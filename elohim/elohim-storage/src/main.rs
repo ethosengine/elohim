@@ -535,6 +535,31 @@ async fn async_main(
     // Initialize blob store
     let blob_store = Arc::new(BlobStore::new(config.blobs_dir()).await?);
 
+    // One-shot shard-manifest backfill (no-p2p build). The p2p build runs the
+    // distribution-capable variant later, once the p2p handle exists; here we
+    // only record manifests so legacy content stops reading as "unmeasured".
+    #[cfg(not(feature = "p2p"))]
+    {
+        let backfill_pool = db_pool.clone();
+        let backfill_blob_store = blob_store.clone();
+        tokio::spawn(async move {
+            if let Some(pool) = backfill_pool {
+                let config =
+                    elohim_storage::services::shard_manifest_backfill::BackfillConfig::default();
+                if let Err(e) = elohim_storage::services::shard_manifest_backfill::run_once(
+                    &pool,
+                    &backfill_blob_store,
+                    "lamad",
+                    &config,
+                )
+                .await
+                {
+                    warn!(error = %e, "shard_manifest_backfill failed (non-fatal)");
+                }
+            }
+        });
+    }
+
     // Graceful-shutdown broadcast channel — shared by the import handler,
     // the PeerStatus heartbeat, and any other task that needs to react to
     // ctrl-c. Created here (before the tasks that subscribe) so a single
@@ -2359,6 +2384,36 @@ async fn async_main(
             .and_then(|v| v.parse().ok())
             .unwrap_or(300);
         let p2p_handle = p2p_node.as_ref().map(|n| n.handle());
+
+        // One-shot shard-manifest backfill — gives legacy content (seeded
+        // before distribute-at-ingest existed) a shard manifest + distribution
+        // so the resilience snapshot stops reading it as "unmeasured" and
+        // shard_locations can populate. Non-fatal, paced, skip-and-warn on
+        // missing blobs. Distributes when a p2p handle is present.
+        {
+            let backfill_pool = db_pool.clone();
+            let backfill_blob_store = blob_store.clone();
+            let backfill_handle = p2p_handle.clone();
+            tokio::spawn(async move {
+                if let Some(pool) = backfill_pool {
+                    let config =
+                        elohim_storage::services::shard_manifest_backfill::BackfillConfig::default(
+                        );
+                    if let Err(e) = elohim_storage::services::shard_manifest_backfill::run_once(
+                        &pool,
+                        &backfill_blob_store,
+                        "lamad",
+                        &config,
+                        backfill_handle,
+                    )
+                    .await
+                    {
+                        warn!(error = %e, "shard_manifest_backfill failed (non-fatal)");
+                    }
+                }
+            });
+        }
+
         // genesis #1122 fix (lamad heal leg): DON'T gate task spawn on a
         // boot-time lamad HcClient. If the registry's bounded boot ramp
         // None-stamped lamad (conductor cells still CellDisabled), the

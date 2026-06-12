@@ -3614,56 +3614,27 @@ impl HttpServer {
                         let blob_hash = blob_hash.unwrap(); // Safe: checked above
                         tokio::spawn(async move {
                             if let Ok(data) = blob_store.get(&blob_hash).await {
-                                let encoder = crate::sharding::ShardEncoder::new(
-                                    crate::sharding::ShardConfig::default(),
-                                );
-                                let manifest =
-                                    match encoder.create_manifest(&data, &content_format, &reach) {
-                                        Ok(m) => m,
-                                        Err(e) => {
-                                            tracing::warn!(
-                                                content_id = %content_id,
-                                                error = %e,
-                                                "shard manifest encode failed; skipping persistence"
-                                            );
-                                            return;
-                                        }
-                                    };
-                                let shard_hashes_json =
-                                    serde_json::to_string(&manifest.shard_hashes)
-                                        .unwrap_or_else(|_| "[]".to_string());
                                 if let Ok(mut conn) = pool.get() {
-                                    let new_manifest = crate::db::models::NewShardManifest {
-                                        content_id: &content_id,
-                                        h_app_id: "lamad",
-                                        blob_hash: &blob_hash,
-                                        blob_cid: blob_cid.as_deref(),
-                                        encoding: &manifest.encoding,
-                                        data_shard_count: manifest.data_shards as i32,
-                                        parity_shard_count: (manifest.total_shards
-                                            - manifest.data_shards)
-                                            as i32,
-                                        shard_hashes_json: &shard_hashes_json,
-                                        total_size_bytes: manifest.total_size as i64,
-                                        shard_size_bytes: manifest.shard_size as i64,
-                                        mime_type: &manifest.mime_type,
-                                        reach: &reach,
-                                    };
-                                    if let Err(e) = crate::db::shard_manifests::upsert_manifest(
+                                    match crate::db::shard_manifests::record_manifest_from_bytes(
                                         &mut conn,
-                                        &new_manifest,
+                                        &content_id,
+                                        "lamad",
+                                        &blob_hash,
+                                        blob_cid.as_deref(),
+                                        &data,
+                                        &content_format,
+                                        &reach,
                                     ) {
-                                        tracing::warn!(
+                                        Ok(row) => tracing::debug!(
+                                            content_id = %content_id,
+                                            encoding = %row.encoding,
+                                            "Recorded shard manifest"
+                                        ),
+                                        Err(e) => tracing::warn!(
                                             content_id = %content_id,
                                             error = %e,
                                             "Failed to record shard manifest"
-                                        );
-                                    } else {
-                                        tracing::debug!(
-                                            content_id = %content_id,
-                                            encoding = %manifest.encoding,
-                                            "Recorded shard manifest"
-                                        );
+                                        ),
                                     }
                                 }
                             }
