@@ -61,6 +61,15 @@ junction rows, p = online peers within those households):
 Layer-2: three seeded contents land one in each status; assert API
 `protectionStatus` + snapshot icon class `status-{at-risk,partial,protected}`.
 
+Follow-up (operator, 2026-06-12 demo read): the degenerate row currently
+renders identically to measured-zero — a false at-risk claim for content
+that never entered the distribution plane, which is ALL bulk-seeded
+content today (no shard_manifests rows). The honest-view change
+(`distributionState: unmeasured|measured` + live/known peer-count pairs)
+and the seed-path manifest decision are filed in
+`genesis/data/timeline/backlog/resilience-unmeasured-vs-zero-honest-denominators.md`;
+when it lands, the D1 degenerate test asserts `unmeasured`, not at-risk.
+
 ### D2 — Peer counts
 Truth: `count_online_peers_in_households` — counts `peer_statuses` rows with
 status `online` OR `degraded`, only within stewarding households.
