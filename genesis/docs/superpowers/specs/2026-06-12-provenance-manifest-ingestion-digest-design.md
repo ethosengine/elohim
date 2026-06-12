@@ -7,8 +7,22 @@ cites:
 
 # Provenance Manifest v1 + Ingestion Digest — Layer 2 distribution-plane design
 
+> **⚠ SUPERSEDED (2026-06-12 evening, operator scope cut).** The historical-provenance
+> half designed below — the Provenance Manifest v1 artifact, the genesis sealer CLI, the
+> ingestion digest that replays declared git-era lineage, the `attestation:seed-bootstrap`
+> "declared-not-witnessed" discriminator, and brit as stage-2 author — is **dropped
+> entirely**. The operator's cut: **seeding = init.** When content is written to the
+> network, that IS its birth; there is no declared past to digest, and brit drops off the
+> critical path (history, if ever needed, grafts on later as an enrichment attestation).
+> The live design is now **`2026-06-12-init-authoring-native-seeding-design.md`** — a
+> conductor-bearing agent authors content through the real `create_content` front door
+> (anchored, witnessed, signal-projected, stocked natively), and the real remaining work is
+> the relationship design (author standing · author-steward · custody vs. projection
+> replication · peers-per-reach). This file is kept for the design-history record only; do
+> not implement from it.
+
 **Date:** 2026-06-12
-**Status:** Approved (operator-led brainstorm, this doc is the written record)
+**Status:** SUPERSEDED by `2026-06-12-init-authoring-native-seeding-design.md` (operator scope cut, same day)
 **Owner surfaces:** `elohim/sdk/schemas/v1/objects/provenance-manifest.schema.json` (new),
 genesis sealer CLI (new, cite-gen-shaped), seeder digest pass (new), brit stage-2 seam
 **Origin:** part 2 of `genesis/data/timeline/backlog/resilience-unmeasured-vs-zero-honest-denominators.md`
