@@ -63,27 +63,34 @@ pub fn list_current(conn: &mut SqliteConnection) -> QueryResult<Vec<PeerStatusRo
     peer_statuses::table.load::<PeerStatusRow>(conn)
 }
 
-/// List peer status rows for a specific household.
+/// List peer status rows for a specific household, joined through
+/// `stewarded_nodes.household_id` (the C3 column — landed 2026-04-19).
 ///
-/// NOTE(C3): The `stewarded_nodes.household_id` column does not exist yet — it is
-/// added by Task C3's migration. Until that migration lands this function falls
-/// back to `list_current`, returning all peers regardless of household.
-/// Once Task C3 is merged, replace the body below with:
-///
-/// ```rust,ignore
-/// use crate::db::diesel_schema::stewarded_nodes::dsl as sn;
-/// peer_statuses::table
-///     .inner_join(sn::stewarded_nodes.on(sn::id.eq(peer_statuses::peer_id)))
-///     .filter(sn::household_id.eq(household_id))
-///     .select(PeerStatusRow::as_select())
-///     .load(conn)
-/// ```
+/// History: this shipped as a stub returning `list_current()` (all peers)
+/// long after the column existed. `count_online_peers_in_households` calls
+/// this once PER stewarding household, so the stub multiplied every online
+/// peer by the household count — inflating `onlinePeerCount` and pushing
+/// protection status across the `protected` floor with a single live peer.
+/// Pinned by elohim-storage/tests/household_resilience.rs (D1/D2 rows).
 pub fn list_by_household(
     conn: &mut SqliteConnection,
-    _household_id: &str,
+    household_id: &str,
 ) -> QueryResult<Vec<PeerStatusRow>> {
-    // TODO(C3): filter by household_id once diesel_schema reflects the column
-    list_current(conn)
+    use crate::db::diesel_schema::stewarded_nodes::dsl as sn;
+    peer_statuses::table
+        .inner_join(sn::stewarded_nodes.on(sn::id.eq(peer_statuses::peer_id)))
+        .filter(sn::household_id.eq(household_id))
+        .select((
+            peer_statuses::peer_id,
+            peer_statuses::status,
+            peer_statuses::general_pool_member,
+            peer_statuses::accepting_stewardship_reserves,
+            peer_statuses::archetype_class,
+            peer_statuses::timestamp,
+            peer_statuses::dht_anchor_hash,
+            peer_statuses::updated_at,
+        ))
+        .load(conn)
 }
 
 /// List peers currently advertising themselves as general-pool members and
