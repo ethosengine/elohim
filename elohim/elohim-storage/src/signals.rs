@@ -767,6 +767,44 @@ pub fn handle_mishpat_signal(
                 &action_hash,
             ) {
                 Ok(crate::mishpat_projection::CommitmentProjection::Upsert(new_row)) => {
+                    // Epic B side-projection: a notarized `replicates-commons`
+                    // CONTENT commitment is a standing offer to provide content
+                    // at commons reach. The resilience snapshot + PeerSelection
+                    // read that as a `rea_commitments` provide / `content:<reach>`
+                    // row, which the production path never wrote (only test_util
+                    // did). Derive it from this DHT-anchored event BEFORE the
+                    // mishpat_commitments write consumes `new_row`.
+                    if let Some(p) = crate::mishpat_projection::provide_projection_for(&new_row) {
+                        match crate::db::rea_commitments::record_provide_from_commons_commitment(
+                            conn,
+                            app_id,
+                            &p.provider,
+                            &p.reach,
+                            p.dht_anchor_hash.as_deref(),
+                        ) {
+                            Ok(inserted) => {
+                                if inserted {
+                                    tracing::info!(
+                                        provider = %p.provider,
+                                        reach = %p.reach,
+                                        action_hash = %action_hash,
+                                        "handle_mishpat_signal: replicates-commons → active provide row (rea_commitments)"
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                // Non-fatal: the authoritative mishpat_commitments
+                                // projection below must still land. A failed
+                                // provide side-projection self-heals on the next
+                                // commitment for the same provider/reach (idempotent).
+                                tracing::warn!(
+                                    error = %e,
+                                    provider = %p.provider,
+                                    "handle_mishpat_signal: provide side-projection failed (non-fatal; retries on next commitment)"
+                                );
+                            }
+                        }
+                    }
                     crate::db::mishpat_commitments::upsert_with_anchor(conn, new_row)
                         .map_err(|e| StorageError::Database(e.to_string()))?;
                     tracing::info!(

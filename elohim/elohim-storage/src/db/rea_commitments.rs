@@ -315,6 +315,88 @@ fn reach_from_scope(scope: Option<&str>) -> String {
 // Write Operations
 // ============================================================================
 
+/// Deterministic id for the per-(provider, reach) provide-projection row.
+///
+/// One row represents "this provider actively provides `content:<reach>`",
+/// regardless of how many individual content head_refs back it. Keyed by
+/// `(provider, reach)` so repeated `replicates-commons` commitments from the
+/// same provider collapse onto a single idempotent row.
+pub fn provide_projection_id(provider: &str, reach: &str) -> String {
+    format!("provide-{provider}-content:{reach}")
+}
+
+/// Project an **active provide** `rea_commitments` row from a notarized
+/// `replicates-commons` content commitment (Epic B creation path).
+///
+/// ## Why this exists
+///
+/// The production provide loop authors `replicates-commons` Commitments that
+/// project into `mishpat_commitments` — but the resilience snapshot and the
+/// `PeerSelection` contract-aware scorer both read the `rea_commitments`
+/// `provide` / `content:<reach>` shape. Nothing bridged the two ledgers, so a
+/// production database had ZERO `action='provide'` rows and the snapshot's
+/// `commitment_backed_collectives` was permanently 0 (the rows existed only in
+/// `test_util`). This is the substrate-anchored bridge: a DHT-notarized
+/// `replicates-commons` Commitment landing in the signal projector also records
+/// the standing-provision fact in `rea_commitments`.
+///
+/// ## Shape contract (must match the snapshot + peer_selection reads)
+/// - `action = "provide"`, `state = "active"`, `finished = 0`
+/// - `resource_classified_as = "content:<reach>"` (the scope both readers filter)
+/// - `provider` is the commitment's provider == the conductor agent key, which
+///   is the SAME vocabulary as `humans.agent_pub_key` (the snapshot join key)
+/// - `dht_anchor_hash` carries the commitment's `action_hash` (provenance; the
+///   row is a projection of a notarized event, never a free-standing truth)
+///
+/// Idempotent: keyed by [`provide_projection_id`] via `insert_or_ignore`, so a
+/// provider's many caught-up commons pins collapse to one provide row per reach.
+/// A reach the provider already provides is a no-op (returns `Ok(false)`).
+///
+/// Returns `Ok(true)` when a new row was inserted, `Ok(false)` when one already
+/// existed.
+pub fn record_provide_from_commons_commitment(
+    conn: &mut SqliteConnection,
+    h_app_id: &str,
+    provider: &str,
+    reach: &str,
+    dht_anchor_hash: Option<&str>,
+) -> Result<bool, StorageError> {
+    let id = provide_projection_id(provider, reach);
+    let scope = format!("content:{reach}");
+
+    let new = NewReaCommitment {
+        id: &id,
+        h_app_id,
+        action: "provide",
+        provider,
+        receiver: "",
+        resource_conforms_to: None,
+        resource_classified_as: Some(&scope),
+        resource_quantity_value: None,
+        resource_quantity_unit: None,
+        effort_quantity_value: None,
+        effort_quantity_unit: None,
+        has_beginning: None,
+        has_end: None,
+        due: None,
+        clause_of: None,
+        in_scope_of: None,
+        medium_of_exchange_id: None,
+        state: "active",
+        finished: 0,
+        note: None,
+        metadata_json: None,
+        dht_anchor_hash,
+    };
+
+    let inserted = diesel::insert_or_ignore_into(rea_commitments::table)
+        .values(&new)
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("provide projection insert failed: {e}")))?;
+
+    Ok(inserted > 0)
+}
+
 /// Create an REA commitment - scoped by app
 pub fn create_commitment(
     conn: &mut SqliteConnection,
@@ -1402,6 +1484,89 @@ mod provide_reach_tests {
         // No reach: marker → default.
         assert_eq!(reach_from_scope(Some("doorway:x|epr:y")), "commons");
         assert_eq!(reach_from_scope(Some("")), "commons");
+    }
+
+    // ── record_provide_from_commons_commitment (Epic B creation path) ─────────
+
+    /// A first commons commitment records exactly one active provide row with
+    /// the snapshot-matching shape; the deterministic id is stable.
+    #[test]
+    fn record_provide_creates_active_content_commons_row() {
+        let mut conn = setup();
+        let inserted = record_provide_from_commons_commitment(
+            &mut conn,
+            "lamad",
+            "agent:steward-a",
+            "commons",
+            Some("uhCkk-anchor"),
+        )
+        .unwrap();
+        assert!(inserted, "first commitment inserts a row");
+
+        let ctx = AppContext::default_lamad();
+        let id = provide_projection_id("agent:steward-a", "commons");
+        let row = get_commitment(&mut conn, &ctx, &id).unwrap().expect("row");
+        assert_eq!(row.action, "provide");
+        assert_eq!(row.state, "active");
+        assert_eq!(row.finished, 0);
+        assert_eq!(
+            row.resource_classified_as.as_deref(),
+            Some("content:commons")
+        );
+        assert_eq!(row.provider, "agent:steward-a");
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-anchor"));
+    }
+
+    /// Idempotent: a second commitment for the same (provider, reach) is a no-op.
+    #[test]
+    fn record_provide_is_idempotent_per_provider_reach() {
+        let mut conn = setup();
+        let first = record_provide_from_commons_commitment(
+            &mut conn,
+            "lamad",
+            "agent:steward-a",
+            "commons",
+            Some("anchor-1"),
+        )
+        .unwrap();
+        let second = record_provide_from_commons_commitment(
+            &mut conn,
+            "lamad",
+            "agent:steward-a",
+            "commons",
+            Some("anchor-2"),
+        )
+        .unwrap();
+        assert!(first, "first inserts");
+        assert!(!second, "second is a no-op (row already exists)");
+
+        let count: i64 = rea_commitments::table
+            .filter(rea_commitments::provider.eq("agent:steward-a"))
+            .filter(rea_commitments::action.eq("provide"))
+            .count()
+            .get_result(&mut conn)
+            .unwrap();
+        assert_eq!(count, 1, "exactly one provide row across two commitments");
+    }
+
+    /// The produced row is exactly what `active_provide_reaches` + the snapshot
+    /// query select on: action=provide, state=active, content:<reach>.
+    #[test]
+    fn record_provide_row_is_visible_to_active_provide_reaches() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        record_provide_from_commons_commitment(
+            &mut conn,
+            "lamad",
+            "agent:steward-a",
+            "commons",
+            None,
+        )
+        .unwrap();
+        // active_provide_reaches reads in_scope_of (None → default commons), so a
+        // content:commons provide row contributes the commons reach tag.
+        let reaches = active_provide_reaches(&mut conn, &ctx, "agent:steward-a").unwrap();
+        assert_eq!(reaches, vec!["commons"]);
     }
 }
 

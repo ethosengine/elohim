@@ -490,6 +490,54 @@ fn parse_replicates_commons(
     }
 }
 
+/// A standing provide-projection derived from a notarized commitment (Epic B).
+///
+/// When a `replicates-commons` **content** Commitment lands, the steward is
+/// making a standing offer to provide content at a reach. The resilience
+/// snapshot and `PeerSelection` read this as a `rea_commitments` `provide` /
+/// `content:<reach>` row; this descriptor carries exactly what the side-
+/// projection needs (the SQLite write lives in the signal handler, keeping this
+/// module I/O-free and unit-testable).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProvideProjection {
+    /// Commitment provider == conductor agent key == `humans.agent_pub_key`.
+    pub provider: String,
+    /// Reach class for the `content:<reach>` scope (always `commons` today —
+    /// `replicates-commons` is reach-gated to commons in `parse_replicates_commons`).
+    pub reach: String,
+    /// The commitment's `action_hash` for provenance on the projected row.
+    pub dht_anchor_hash: Option<String>,
+}
+
+/// Decide whether a just-projected commitment should ALSO record a standing
+/// `rea_commitments` provide row, and with what `(provider, reach)`.
+///
+/// Returns `Some` only for `replicates-commons` **content** commitments: the
+/// content variant carries a `head_ref` recipient (a real per-content offer);
+/// the **capacity** variant is a byte pledge with no counterparty and must NOT
+/// mint a content-reach provide row. Any non-`replicates-commons` action
+/// returns `None` (custody-blob, delegates-compute, etc. are not commons
+/// content provision).
+///
+/// Pure — no DB, no conductor. The caller in `signals.rs` performs the write
+/// via [`crate::db::rea_commitments::record_provide_from_commons_commitment`].
+pub fn provide_projection_for(row: &NewMishpatCommitment) -> Option<ProvideProjection> {
+    if row.action != "replicates-commons" {
+        return None;
+    }
+    // The content variant sets recipient = head_ref; the capacity variant sets
+    // recipient = "" (pure pledge, no per-content offer). Reach is `commons`
+    // for replicates-commons by construction (the parse fn rejects otherwise).
+    if row.recipient.is_empty() {
+        return None;
+    }
+    Some(ProvideProjection {
+        provider: row.provider.clone(),
+        reach: "commons".to_string(),
+        dht_anchor_hash: row.dht_anchor_hash.clone(),
+    })
+}
+
 /// Parse a `revokes-commitment` Commitment payload (Slice-2b).
 ///
 /// A revoke does NOT create a new row — it supersedes a previously-notarized
@@ -1098,6 +1146,63 @@ mod tests {
         assert!(
             result.unwrap_err().contains("variant"),
             "error must mention 'variant'"
+        );
+    }
+
+    // ── provide_projection_for (Epic B side-projection descriptor) ────────────
+
+    #[test]
+    fn provide_projection_for_content_commitment_yields_provider_and_commons() {
+        let row = unwrap_upsert(
+            parse_commitment_payload(
+                "replicates-commons",
+                &replicates_commons_content_payload(),
+                "eh-pp",
+                "ah-pp",
+            )
+            .expect("content payload parses"),
+        );
+        let p = provide_projection_for(&row).expect("content commitment yields a provide");
+        assert_eq!(p.reach, "commons");
+        assert_eq!(p.dht_anchor_hash.as_deref(), Some("ah-pp"));
+        // provider is whatever the content payload carried.
+        assert!(!p.provider.is_empty(), "provider threads through");
+    }
+
+    #[test]
+    fn provide_projection_for_capacity_commitment_yields_none() {
+        // A capacity pledge has no head_ref recipient — it is a byte pledge, not
+        // a per-content offer, so it must NOT mint a content-reach provide row.
+        let row = unwrap_upsert(
+            parse_commitment_payload(
+                "replicates-commons",
+                &replicates_commons_capacity_payload(),
+                "eh-cap",
+                "ah-cap",
+            )
+            .expect("capacity payload parses"),
+        );
+        assert!(
+            provide_projection_for(&row).is_none(),
+            "capacity pledge yields no provide projection"
+        );
+    }
+
+    #[test]
+    fn provide_projection_for_non_commons_action_yields_none() {
+        // A delegates-compute commitment is not commons content provision.
+        let row = unwrap_upsert(
+            parse_commitment_payload(
+                "delegates-compute",
+                &delegates_compute_payload(),
+                "eh-dc",
+                "ah-dc",
+            )
+            .expect("delegates-compute parses"),
+        );
+        assert!(
+            provide_projection_for(&row).is_none(),
+            "non-replicates-commons action yields no provide projection"
         );
     }
 
