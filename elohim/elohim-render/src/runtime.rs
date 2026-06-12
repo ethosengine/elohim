@@ -112,6 +112,23 @@ impl JsRuntime {
         }
     }
 
+    /// Replace the `fetch` global's backing [`DataFetcher`](crate::DataFetcher)
+    /// for all subsequent fetches on this isolate.
+    ///
+    /// `op_fetch` reads the `FetcherHandle` from `OpState` on every call, so
+    /// `put`-ing a new handle here redirects every fetch issued by the next
+    /// render. This is the per-request fetcher swap: a reused isolate renders
+    /// each request against that request's own fetcher (carrying, e.g., the
+    /// originating user's session credential) rather than a fixed construction-
+    /// time fetcher. No-op if the runtime was built without the fetch shim.
+    pub fn set_fetcher(&mut self, fetcher: std::sync::Arc<dyn crate::DataFetcher>) {
+        use crate::shim::fetch::FetcherHandle;
+        self.inner
+            .op_state()
+            .borrow_mut()
+            .put(FetcherHandle(fetcher));
+    }
+
     /// Evaluate a JS expression and return its `toString()`.
     ///
     /// Requires `&mut self` because V8 operations require exclusive access

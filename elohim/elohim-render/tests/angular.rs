@@ -5,7 +5,7 @@ use elohim_render::{
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 struct EmptyFetcher;
 
@@ -64,6 +64,26 @@ impl DataFetcher for SlowFetcher {
             status: 200,
             headers: HashMap::new(),
             body: b"{\"late\":true}".to_vec(),
+            content_hash: None,
+        })
+    }
+}
+
+/// Records its identity into a shared log on every fetch — proves WHICH fetcher
+/// the render actually used (the per-request one or the construction-time one).
+struct MarkerFetcher {
+    marker: &'static str,
+    calls: Arc<Mutex<Vec<String>>>,
+}
+
+#[async_trait]
+impl DataFetcher for MarkerFetcher {
+    async fn fetch(&self, _request: FetchRequest) -> Result<FetchResponse> {
+        self.calls.lock().unwrap().push(self.marker.to_string());
+        Ok(FetchResponse {
+            status: 200,
+            headers: HashMap::new(),
+            body: b"{\"ok\":true}".to_vec(),
             content_hash: None,
         })
     }
@@ -178,6 +198,47 @@ async fn render_trace_classifies_a_stalled_upstream_as_stalled() {
         RenderTerminal::Stalled,
         "a never-settling upstream must classify as stalled; trace: {:?}",
         out.trace.fetches
+    );
+}
+
+#[tokio::test]
+async fn render_uses_the_per_request_ctx_data_fetcher_not_the_construction_one() {
+    // The SSR auth contract: doorway builds a per-request fetcher carrying the
+    // user's session credential and passes it in ctx.data_fetcher. The render MUST
+    // use it — otherwise authenticated SSR fetches as anonymous (reach-aware
+    // content falls back to public). Guards against the renderer ignoring
+    // ctx.data_fetcher in favour of its construction-time fetcher.
+    let construction_calls = Arc::new(Mutex::new(Vec::<String>::new()));
+    let request_calls = Arc::new(Mutex::new(Vec::<String>::new()));
+
+    let renderer = AngularRenderer::new(
+        trace_fixture_bundle(),
+        Arc::new(MarkerFetcher {
+            marker: "construction",
+            calls: construction_calls.clone(),
+        }),
+    )
+    .expect("init");
+
+    let ctx = RenderContext {
+        spec: RenderSpec::AngularSsr,
+        url: "/auth-content".into(),
+        data_fetcher: Arc::new(MarkerFetcher {
+            marker: "request",
+            calls: request_calls.clone(),
+        }),
+        limits: RenderLimits::default(),
+    };
+    renderer.render(ctx).await.expect("render");
+
+    assert!(
+        !request_calls.lock().unwrap().is_empty(),
+        "the per-request ctx.data_fetcher must be used (the fixture issues a fetch)"
+    );
+    assert!(
+        construction_calls.lock().unwrap().is_empty(),
+        "the construction-time fetcher must NOT be used when ctx provides one — \
+         using it is the SSR-as-anonymous auth hole"
     );
 }
 

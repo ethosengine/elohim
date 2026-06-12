@@ -32,6 +32,10 @@ use crate::{RenderContext, RenderError, RenderOutput, Renderer, Result};
 struct StringWorkItem {
     /// The JS expression/IIFE driver to evaluate via `eval_string`.
     script: String,
+    /// The per-request `DataFetcher` for this render — swapped into the isolate
+    /// before evaluation so each request renders against its own fetcher (e.g.
+    /// one carrying the originating user's session credential).
+    fetcher: Arc<dyn crate::DataFetcher>,
     /// Channel to return the raw string result (or error) and the fetch
     /// breadcrumbs recorded during this render back to the caller. Events are
     /// returned alongside the result so the caller can assemble the render trace
@@ -67,12 +71,11 @@ impl AngularRenderer {
     /// `TextEncoder`/`TextDecoder`, the `fs` module loader, and a `fetch`
     /// global backed by the supplied `DataFetcher`.
     ///
-    /// The fetcher is fixed at construction time. Per-request `RenderContext.
-    /// data_fetcher` is currently ignored by this renderer — the constructor's
-    /// fetcher is used for every render. This matches the doorway use case
-    /// where one renderer instance always forwards to a single elohim-storage
-    /// endpoint. Per-request DataFetcher swapping via OpState is a future
-    /// enhancement (Task 14+).
+    /// The construction-time `fetcher` is the bootstrap default. Each call to
+    /// [`render`](AngularRenderer::render) swaps in that request's
+    /// `RenderContext.data_fetcher` via `JsRuntime::set_fetcher` before evaluating,
+    /// so an authenticated render fetches with the originating user's credential
+    /// rather than as anonymous (the SSR reach-aware contract).
     ///
     /// # Errors
     ///
@@ -121,27 +124,31 @@ impl AngularRenderer {
                     .expect("angular render worker: tokio runtime init failed");
 
                 local_rt.block_on(async move {
-                    // Wrap the consumer's fetcher in a TracingFetcher so every
-                    // `fetch()` the render issues is recorded below the framework
-                    // (status/timing/empty classification + soft-deadline stall
-                    // detection). The worker keeps a handle to reset+drain it per
-                    // render; the runtime drives fetches through the same instance.
-                    let traced =
-                        Arc::new(TracingFetcher::with_soft_budget(fetcher, soft_budget_ms));
-
                     // JsRuntime is created here — it stays on this thread forever.
                     // with_full_shims() wires console, URL, TextEncoder/TextDecoder,
                     // FsModuleLoader, AND a `fetch` global that dispatches into the
-                    // supplied DataFetcher. Without fetch, Angular SSR bootstrap
+                    // current DataFetcher. Without fetch, Angular SSR bootstrap
                     // hangs forever waiting on HttpClient calls (services like
-                    // ConfigService, AuthService, ContentService).
-                    let mut runtime = crate::runtime::JsRuntime::with_full_shims(traced.clone());
+                    // ConfigService, AuthService, ContentService). The construction-
+                    // time `fetcher` is the bootstrap default — every render swaps in
+                    // its own per-request fetcher below before evaluating.
+                    let mut runtime = crate::runtime::JsRuntime::with_full_shims(fetcher);
 
-                    for StringWorkItem { script, reply } in rx {
-                        // Scope the trace to this render: reset the log + offset
-                        // clock, run, then drain the breadcrumbs. The isolate is
-                        // sequential, so this cleanly attributes fetches per render.
-                        traced.reset();
+                    for StringWorkItem {
+                        script,
+                        fetcher,
+                        reply,
+                    } in rx
+                    {
+                        // Wrap THIS request's fetcher in a fresh TracingFetcher so
+                        // every `fetch()` it issues is recorded below the framework
+                        // (status/timing/empty classification + soft-deadline stall
+                        // detection), then swap it into the isolate. A fresh instance
+                        // per render scopes the trace and the offset clock cleanly;
+                        // the isolate is sequential so there is no cross-render race.
+                        let traced =
+                            Arc::new(TracingFetcher::with_soft_budget(fetcher, soft_budget_ms));
+                        runtime.set_fetcher(traced.clone());
                         let result = runtime.eval_string(&script).await;
                         let events = traced.take_events();
                         // Ignore send error — caller may have dropped its receiver
@@ -222,6 +229,10 @@ impl Renderer for AngularRenderer {
         let tx = self.tx.clone();
         let work_item = StringWorkItem {
             script: driver,
+            // Render against THIS request's fetcher (carries the originating user's
+            // session credential for reach-aware SSR), not a fixed construction-time
+            // fetcher — the worker swaps it into the isolate before evaluating.
+            fetcher: Arc::clone(&ctx.data_fetcher),
             reply: reply_tx,
         };
         tokio::task::spawn_blocking(move || {

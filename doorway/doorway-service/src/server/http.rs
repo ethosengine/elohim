@@ -309,13 +309,13 @@ fn init_renderer() -> Option<Arc<dyn elohim_render::Renderer>> {
     let storage_url = std::env::var("SSR_STORAGE_URL")
         .or_else(|_| std::env::var("STORAGE_URL"))
         .unwrap_or_else(|_| "http://localhost:8090".to_string());
+    // Bootstrap default fetcher for the isolate — every render swaps in its own
+    // per-request fetcher (carrying the user credential, and any test-only fault)
+    // via ctx.data_fetcher, so this one is never used for a real render.
     let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(crate::ssr::ResolverFetcher::new(
         Arc::new(reqwest::Client::new()),
         storage_url.clone(),
     ));
-    // Test-only stall fault injection (env-gated, off by default) — exercises the
-    // render-trace `stalled` terminal for the a2o scenario.
-    let fetcher = crate::ssr::maybe_inject_stall_fault(fetcher);
     match elohim_render::AngularRenderer::new(std::path::PathBuf::from(&bundle_path), fetcher) {
         Ok(r) => {
             tracing::info!(
@@ -2907,6 +2907,11 @@ async fn handle_request(
                             )
                             .maybe_with_user_credential(user_credential),
                         );
+                        // Test-only stall fault injection (env-gated, off by default).
+                        // Applied to the per-request fetcher because the renderer now
+                        // renders against ctx.data_fetcher (per-request swap), not its
+                        // construction-time bootstrap fetcher.
+                        let fetcher = crate::ssr::maybe_inject_stall_fault(fetcher);
                         // Default RenderLimits.wall_time_ms is 2_000ms — too tight
                         // for cold-start where V8 parses + interprets a 51MB bundle
                         // (171 .mjs files, main.server.mjs ~484KB), walks Angular's
