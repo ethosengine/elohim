@@ -63,6 +63,10 @@ pub struct BootstrapStore {
     agents: DashMap<AgentKey, AgentEntry>,
     /// Index of agents per space: (network, space) -> list of agents
     space_index: DashMap<SpaceKey, Vec<Agent>>,
+    /// Kitsune2-protocol store (HC 0.6 conductors) — lives inside the legacy
+    /// store so both protocols share the one `state.bootstrap` handle and the
+    /// one cleanup task.
+    k2: super::k2::K2BootstrapStore,
 }
 
 impl BootstrapStore {
@@ -71,7 +75,13 @@ impl BootstrapStore {
         Self {
             agents: DashMap::new(),
             space_index: DashMap::new(),
+            k2: super::k2::K2BootstrapStore::new(),
         }
+    }
+
+    /// The kitsune2-protocol store (PUT /bootstrap/{space}/{agent}).
+    pub fn k2(&self) -> &super::k2::K2BootstrapStore {
+        &self.k2
     }
 
     /// Store agent info, returning the key string
@@ -183,7 +193,8 @@ impl BootstrapStore {
         // Remove empty space indices
         self.space_index.retain(|_, agents| !agents.is_empty());
 
-        removed
+        // Kitsune2-protocol entries age out on the same sweep.
+        removed + self.k2.cleanup()
     }
 
     /// Get stats about the store

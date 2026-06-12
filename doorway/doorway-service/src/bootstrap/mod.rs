@@ -9,9 +9,11 @@
 //! - POST /bootstrap/random - Get random agents in space (MessagePack body)
 //! - POST /bootstrap/now   - Get server timestamp (empty body)
 
+pub mod k2;
 pub mod store;
 mod types;
 
+pub use k2::{K2BootstrapStore, K2PutOutcome};
 pub use store::BootstrapStore;
 pub use types::*;
 

@@ -2402,6 +2402,19 @@ async fn handle_request(
             handle_bootstrap_request(state, req, &path).await
         }
 
+        // Kitsune2 bootstrap protocol (HC 0.6 conductors):
+        //   PUT /bootstrap/{spaceB64Url}/{agentB64Url}  — publish agent info
+        //   GET /bootstrap/{spaceB64Url}                — list agent infos
+        // Before 2026-06-12 these fell through the route registry to 404 and
+        // conductor-plane peer discovery never worked (each conductor was its
+        // own DHT island — the custody-convergence root cause).
+        (Method::PUT, p) if p.starts_with("/bootstrap/") => {
+            handle_k2_bootstrap_put(state, req, &path).await
+        }
+        (Method::GET, p) if p.starts_with("/bootstrap/") => {
+            handle_k2_bootstrap_get(state, &path).await
+        }
+
         // Bootstrap ping (GET for health check)
         (Method::GET, "/bootstrap") => to_boxed(
             Response::builder()
@@ -3051,6 +3064,86 @@ fn maybe_contribute_observation(
     });
 }
 
+/// Handle a kitsune2 bootstrap PUT: `PUT /bootstrap/{spaceB64Url}/{agentB64Url}`.
+///
+/// Body is the JSON-encoded signed agent info; validation (path/body match,
+/// timing windows, ed25519 signature) lives in `bootstrap::k2`.
+async fn handle_k2_bootstrap_put(
+    state: Arc<AppState>,
+    req: Request<Incoming>,
+    path: &str,
+) -> Response<BoxBody> {
+    let Some(store) = state.bootstrap.as_ref().map(Arc::clone) else {
+        return to_boxed(service_unavailable_response(
+            "Bootstrap service not enabled",
+        ));
+    };
+
+    let rest = path.strip_prefix("/bootstrap/").unwrap_or("");
+    let segments: Vec<&str> = rest.split('/').collect();
+    if segments.len() != 2 || segments.iter().any(|s| s.is_empty()) {
+        return to_boxed(bad_request_response(
+            "Expected PUT /bootstrap/{space}/{agent}",
+        ));
+    }
+    let (space_b64, agent_b64) = (segments[0].to_string(), segments[1].to_string());
+
+    let body = match req.collect().await {
+        Ok(collected) => collected.to_bytes(),
+        Err(e) => {
+            warn!("k2 bootstrap PUT body error: {}", e);
+            return to_boxed(bad_request_response("Failed to read request body"));
+        }
+    };
+
+    match store.k2().put(&space_b64, &agent_b64, &body) {
+        Ok(outcome) => {
+            debug!(
+                "k2 bootstrap PUT {:?} space={} agent={}",
+                outcome, space_b64, agent_b64
+            );
+            to_boxed(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "application/json")
+                    .body(Full::new(Bytes::from("{}")))
+                    .unwrap(),
+            )
+        }
+        Err(e) => {
+            warn!(
+                "k2 bootstrap PUT rejected space={} agent={}: {}",
+                space_b64, agent_b64, e
+            );
+            to_boxed(bad_request_response(&e))
+        }
+    }
+}
+
+/// Handle a kitsune2 bootstrap GET: `GET /bootstrap/{spaceB64Url}` — returns
+/// the JSON array of signed agent infos currently held for the space.
+async fn handle_k2_bootstrap_get(state: Arc<AppState>, path: &str) -> Response<BoxBody> {
+    let Some(store) = state.bootstrap.as_ref().map(Arc::clone) else {
+        return to_boxed(service_unavailable_response(
+            "Bootstrap service not enabled",
+        ));
+    };
+
+    let rest = path.strip_prefix("/bootstrap/").unwrap_or("");
+    if rest.is_empty() || rest.contains('/') {
+        return to_boxed(bad_request_response("Expected GET /bootstrap/{space}"));
+    }
+
+    let body = store.k2().get(rest);
+    to_boxed(
+        Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from(body)))
+            .unwrap(),
+    )
+}
+
 /// Handle bootstrap service requests
 /// Supports both X-Op header protocol (POST /bootstrap) and legacy path-based routing
 async fn handle_bootstrap_request(
@@ -3278,6 +3371,20 @@ fn not_found_response(path: &str) -> Response<Full<Bytes>> {
 
     Response::builder()
         .status(StatusCode::NOT_FOUND)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body.to_string())))
+        .unwrap()
+}
+
+/// Service unavailable response
+fn service_unavailable_response(message: &str) -> Response<Full<Bytes>> {
+    let body = serde_json::json!({
+        "error": "Service Unavailable",
+        "message": message
+    });
+
+    Response::builder()
+        .status(StatusCode::SERVICE_UNAVAILABLE)
         .header("Content-Type", "application/json")
         .body(Full::new(Bytes::from(body.to_string())))
         .unwrap()
