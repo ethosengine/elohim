@@ -111,6 +111,39 @@ OTHER zeros (stewarding/commitment-backed/diversity/regions) remain
 gated on the humans-junction + provide-row gaps (workstream D / Epic B —
 unchanged).
 
+## WAVE-7 VERDICT (genesis #1128, ~02:35Z 06-12) — lockout extinct, chain advanced two links
+
+The coordinator hot-swap delivered fleet-wide at 23:53–56Z (every pod:
+installed `uhCokSPspAA…` → bundle `uhCokGdAwkIN…`, `applied=true`, no
+re-key); the late-connect fix wired heartbeat+subscribers on the very pods
+that lost the boot race (matthew/gertrude/adam). The 5-minute attestation
+rejections are EXTINCT (last one 23:58Z, from the NEW wasm). Genesis #1128
+measure stayed **1**, but the custody-convergence failure class CHANGED —
+no longer attestation-shaped: "custody-blob commitment missing on: adam
+jessica after 300s — DHT leg (anchor → conductor gossip →
+projection_reconcile) not converging". Two new links surfaced behind the
+dead guard:
+
+1. **`Host("Role not found: elohim")`** (matthew, every attestation cycle):
+   12 cross-DNA bridge sites (imagodei ×8, infrastructure ×1, mishpat ×3)
+   target `OtherRole("elohim")` but the content_store DNA installs under
+   role **`lamad`** (dna/elohim/ packs as lamad.dna — crate name ≠ role
+   name). FIXED in-tree 06-12 (`LAMAD_ROLE` constant, all 12 sites);
+   coordinator-only → the new hot-swap delivers it on the next DNA wave.
+   No sweettest could catch it (single-DNA test apps) — guard + real
+   bridge test: `dna-bridge-role-name-conformance.md`.
+2. **`Guest("Subject doorway 'alpha-elohim-host' not found")`** (adam):
+   doorways call record_health_attestation every 5 min but only
+   register_doorway at startup — doorway pods predate the fix, so no
+   re-registration has been attempted. Clears on the next doorway restart
+   (any edge wave that rolls doorway, or operator restart). The mishpat
+   bridge sites fixed in (1) are also on live paths (CommitmentByState /
+   governance) — their repair may move the custody-convergence DHT leg
+   directly, since commitment projection depends on them.
+
+NOTE: genesis runs read UNSTABLE throughout this arc — that's the standing
+suite shape, not a regression signal; the measure script is the judge.
+
 ## State of the world (verified 2026-06-11, do not re-derive)
 
 - **Mesh PROVEN**: 14/14 pods `connected:13`; `mesh.adjacency` both

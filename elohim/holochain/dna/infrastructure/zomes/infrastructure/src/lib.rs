@@ -11,6 +11,14 @@
 use hdk::prelude::*;
 use infrastructure_integrity::*;
 
+/// Role name of the consolidated elohim/content_store DNA in the hApp manifest.
+/// The DNA crate lives at dna/elohim/ but packs as lamad.dna and is installed
+/// under role "lamad" (see dna/elohim/workdir/happ.yaml). Cross-DNA `call`
+/// targets resolve against ROLE names, not DNA/crate names — OtherRole("elohim")
+/// fails at runtime with Host("Role not found: elohim") and no sweettest
+/// catches it (bridge tests install single-DNA apps). 2026-06-12 trace.
+const LAMAD_ROLE: &str = "lamad";
+
 pub mod peer_status;
 pub use peer_status::*;
 
@@ -1105,7 +1113,7 @@ fn call_elohim_issue_attestation(
     input: ConsolidatedIssueAttestationInput,
 ) -> ExternResult<ConsolidatedAttestationOutput> {
     let response = call(
-        CallTargetCell::OtherRole("elohim".into()),
+        CallTargetCell::OtherRole(LAMAD_ROLE.into()),
         ZomeName::from("content_store"),
         FunctionName::from("issue_attestation"),
         None,

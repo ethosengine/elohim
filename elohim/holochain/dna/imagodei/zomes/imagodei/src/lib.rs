@@ -13,6 +13,14 @@ use hdk::prelude::*;
 use imagodei_integrity::*;
 use std::time::Duration;
 
+/// Role name of the consolidated elohim/content_store DNA in the hApp manifest.
+/// The DNA crate lives at dna/elohim/ but packs as lamad.dna and is installed
+/// under role "lamad" (see dna/elohim/workdir/happ.yaml). Cross-DNA `call`
+/// targets resolve against ROLE names, not DNA/crate names — OtherRole("elohim")
+/// fails at runtime with Host("Role not found: elohim") and no sweettest
+/// catches it (bridge tests install single-DNA apps). 2026-06-12 trace.
+const LAMAD_ROLE: &str = "lamad";
+
 // Stewardship coordinator functions
 pub mod stewardship;
 pub use stewardship::*;
@@ -776,7 +784,7 @@ fn call_elohim_issue_attestation(
     consolidated_input: ConsolidatedIssueAttestationInput,
 ) -> ExternResult<ConsolidatedAttestationOutput> {
     let response = call(
-        CallTargetCell::OtherRole("elohim".into()),
+        CallTargetCell::OtherRole(LAMAD_ROLE.into()),
         ZomeName::from("content_store"),
         FunctionName::from("issue_attestation"),
         None,
@@ -810,7 +818,7 @@ fn call_elohim_get_attestations_for_subject(
     subject_cid: String,
 ) -> ExternResult<Vec<ConsolidatedAttestationOutput>> {
     let response = call(
-        CallTargetCell::OtherRole("elohim".into()),
+        CallTargetCell::OtherRole(LAMAD_ROLE.into()),
         ZomeName::from("content_store"),
         FunctionName::from("get_attestations_for_subject"),
         None,
@@ -844,7 +852,7 @@ fn call_elohim_propose_governance_action(
     consolidated_input: ConsolidatedProposeGovernanceActionInput,
 ) -> ExternResult<ConsolidatedGovernanceActionOutput> {
     let response = call(
-        CallTargetCell::OtherRole("elohim".into()),
+        CallTargetCell::OtherRole(LAMAD_ROLE.into()),
         ZomeName::from("content_store"),
         FunctionName::from("propose_governance_action"),
         None,
@@ -885,7 +893,7 @@ pub(crate) fn call_elohim_propose_recovery_governance_action(
     consolidated_input: ConsolidatedProposeRecoveryGovernanceActionInput,
 ) -> ExternResult<ConsolidatedGovernanceActionOutput> {
     let response = call(
-        CallTargetCell::OtherRole("elohim".into()),
+        CallTargetCell::OtherRole(LAMAD_ROLE.into()),
         ZomeName::from("content_store"),
         FunctionName::from("propose_recovery_governance_action"),
         None,
@@ -923,7 +931,7 @@ pub(crate) fn call_elohim_propose_recovery_governance_action(
 // ---------------------------------------------------------------------------
 fn fetch_recovery_request_human_id(recovery_request_cid: &str) -> ExternResult<String> {
     let response = call(
-        CallTargetCell::OtherRole("elohim".into()),
+        CallTargetCell::OtherRole(LAMAD_ROLE.into()),
         ZomeName::from("content_store"),
         FunctionName::from("get_content_by_id"),
         None,
@@ -996,7 +1004,7 @@ fn call_elohim_query_effective_revocation_for_key(
     revoked_key: &str,
 ) -> ExternResult<Option<ConsolidatedContentOutput>> {
     let response = call(
-        CallTargetCell::OtherRole("elohim".into()),
+        CallTargetCell::OtherRole(LAMAD_ROLE.into()),
         ZomeName::from("content_store"),
         FunctionName::from("query_effective_revocation_for_key"),
         None,
@@ -1032,7 +1040,7 @@ fn call_elohim_query_effective_identity_freeze_for_human(
     human_id: &str,
 ) -> ExternResult<Option<ConsolidatedContentOutput>> {
     let response = call(
-        CallTargetCell::OtherRole("elohim".into()),
+        CallTargetCell::OtherRole(LAMAD_ROLE.into()),
         ZomeName::from("content_store"),
         FunctionName::from("query_effective_identity_freeze_for_human"),
         None,
@@ -1073,7 +1081,7 @@ fn call_elohim_query_effective_identity_freeze_for_human(
 // ---------------------------------------------------------------------------
 fn call_elohim_get_content_by_id(cid: &str) -> ExternResult<Option<ConsolidatedContentOutput>> {
     let response = call(
-        CallTargetCell::OtherRole("elohim".into()),
+        CallTargetCell::OtherRole(LAMAD_ROLE.into()),
         ZomeName::from("content_store"),
         FunctionName::from("get_content_by_id"),
         None,
