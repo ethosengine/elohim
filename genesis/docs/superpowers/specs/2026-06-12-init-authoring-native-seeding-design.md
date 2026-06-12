@@ -149,8 +149,42 @@ Implications locked by this decision:
   (cross-household custody between eden and dowell collectives is the first real D1 ladder).
 - The junction rows themselves (`humans.household_id`, collective membership, regions for the
   Seattle members) remain **Epic B ingestion work** — this decision names exactly which rows
-  to create, which was the gating unknown. Two residual confirms for the operator: the
-  extended-family fixture mapping, and the church's fourth member.
+  to create, which was the gating unknown.
+
+### b.1 The inferred collective graph (story-derived — the stories ARE the membership table)
+
+`genesis/data/collectives/collectives.json` declares collective *identities* but lists no
+members — deliberately. Membership and the relationships between collectives are carried by
+the canonical stories (`genesis/data/stories/`, operator 2026-06-12: "there are collectives
+that can be inferred from these stories, that's why they're so rich"). The connected graph,
+with story evidence:
+
+| Collective | Members (inferred) | Evidence |
+|---|---|---|
+| `household-dowell` | matthew + jessica (co-stewards), james (stewardee) | every story's `characters:`; james-and-the-spoke (stewarded-device-sync) |
+| `household-gertrude` | gertrude (her always-on home-nuc hub on shem) | gertrude-holds-the-share; her hub *is* the share's resting place |
+| **Extended-family collective** = the reciprocal-backup/intimate-circle web | gertrude + matthew + jessica + james + the Seattle-area couple | the recovery web IS the collective: household-dowell ↔ household-gertrude hold each other's shares (both counterparty stories); gertrude's five share-holders include matthew + jessica; matthew's custodians are "Jessica, Adam, and Abby" (`recovery-shamir-optional.feature:14`) — Abby is plausibly one of the Seattle couple (**no `human-abby` fixture exists — names the missing Seattle-couple fixture work**) |
+| `community-local-church` | matthew, jessica, james + **pete-pastor (CONFIRMED by evidence)** | pete-pastor's presence is *established by* the FCT content (`establishingContentIds: ["foundations-christian-technology"]`, `affinityDomains: ["fct","scripture"]`) — the fourth member and the FCT→church routing corroborate each other |
+| `community-homeschool-coop` | terrance (collective-steward), jessica (member/proposer), james + sarah (students) | the-coop-decides (ranked-choice curriculum; collective-as-actor) |
+| `couple-adam-eve` / `household-eden` | adam + eve (Eden Valley) | humans fixtures (core-family); adam is ALSO matthew's recovery custodian — a real cross-collective tie between eden and dowell |
+
+Two load-bearing consequences:
+
+1. **The inferred edges are commitment edges, not just membership rows.** Reciprocal
+   backup-stewardship = recovery-share custody = the same `Commitment` substrate this spec
+   replicates content with (the compute-commitment primitive's "recovery quorum"
+   instantiation). Epic B ingestion should therefore derive BOTH the membership junctions
+   AND the inter-collective custody relationships from the same story-declared graph — the
+   stories are the seed manifest for the social layer, the way git was almost the seed
+   manifest for content history.
+2. **Geography is already in the fixtures**: gertrude (Sunset Acres) ≠ adam/eve (Eden
+   Valley) ≠ the Seattle couple — three regions across the extended-family web, lighting D5
+   honestly the moment the junctions exist.
+
+Residual fixture gaps this names: the Seattle-couple humans (incl. resolving "Abby"), the
+extended-family collective row (closest existing: `neighborhood-extended`/`household-extended`
+— or a new explicit `family-extended` row), and member lists formalized wherever Epic B
+decides junctions live.
 
 ### c. Resiliency replication (custody) — who holds the author's blobs
 
