@@ -20,9 +20,13 @@ export interface LookOptions {
   as?: string;
   doorway?: string;
   waitTestid?: string;
+  /** Click this data-testid after load (opens panels/menus) before the shot. */
+  clickTestid?: string;
   out?: string;
   viewport?: { width: number; height: number };
   timeoutMs?: number;
+  /** Emulated prefers-color-scheme — render the OTHER theme without an OS. */
+  scheme?: 'light' | 'dark';
 }
 
 export interface LookResult {
@@ -47,7 +51,8 @@ const REPORTS_DIR = 'reports/look';
 
 const USAGE =
   'Usage: look <url> [--as <FixtureHuman>] [--doorway <id|url>] ' +
-  '[--wait-testid <id>] [--out <slug>] [--viewport <WxH>] [--timeout <ms>]';
+  '[--wait-testid <id>] [--click-testid <id>] [--out <slug>] [--viewport <WxH>] ' +
+  '[--timeout <ms>] [--scheme light|dark]';
 
 export function parseArgs(argv: string[]): LookOptions {
   const args = [...argv];
@@ -71,6 +76,17 @@ export function parseArgs(argv: string[]): LookOptions {
         opts.waitTestid = val;
         i++;
         break;
+      case '--click-testid':
+        opts.clickTestid = val;
+        i++;
+        break;
+      case '--scheme': {
+        if (val !== 'light' && val !== 'dark')
+          throw new Error(`--scheme expects light|dark, got: ${val}`);
+        opts.scheme = val;
+        i++;
+        break;
+      }
       case '--out':
         opts.out = val;
         i++;
@@ -149,6 +165,10 @@ export async function runLook(opts: LookOptions): Promise<LookResult> {
     // Override the device's default 1280x720 viewport.
     await device.page.setViewportSize(viewport);
 
+    if (opts.scheme) {
+      await device.page.emulateMedia({ colorScheme: opts.scheme });
+    }
+
     if (opts.as) {
       const creds = fixtureCredentials(opts.as);
       await device.login({ identifier: creds.identifier, password: creds.password });
@@ -169,6 +189,18 @@ export async function runLook(opts: LookOptions): Promise<LookResult> {
         await device.page
           .locator(`[data-testid="${opts.waitTestid}"]`)
           .waitFor({ state: 'visible', timeout: 15_000 });
+      } catch {
+        ok = false;
+      }
+    }
+
+    if (opts.clickTestid) {
+      try {
+        await device.page.locator(`[data-testid="${opts.clickTestid}"]`).first().click({
+          timeout: 15_000,
+        });
+        // Let the opened surface (panel/menu/dialog) settle before the shot.
+        await device.page.waitForTimeout(500);
       } catch {
         ok = false;
       }

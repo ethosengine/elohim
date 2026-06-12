@@ -10,6 +10,14 @@
 }
 
 :root {
+  /* The UA must agree with the token palette (theme-authority spec D-2,
+     mirrors elohim-core/tokens.scss): dark is the default scheme exactly as
+     the dark palette is the default below. System colors (Canvas, CanvasText,
+     ...) follow color-scheme, never data-theme -- without this line they stay
+     LIGHT while the tokens go dark (regression class C2; bit the resilience
+     hypercard panel 2026-06-12: white Canvas surface on the dark app). */
+  color-scheme: dark;
+
   /* Space theme colors - Dark Mode (Default) */
   --space-black: #000000;
   --atmosphere-dark: #0a0a0a;
@@ -74,6 +82,8 @@
 /* Light Theme - Activates based on device preference */
 @media (prefers-color-scheme: light) {
   :root {
+    color-scheme: light;
+
     /* Sky theme colors - Light Mode */
     --space-black: #e3f2fd;
     --atmosphere-dark: #bbdefb;
@@ -540,6 +550,18 @@ footer {
 }
 
 /* Manual Theme Overrides - These take precedence over media queries */
+
+/* The scheme must follow the MANUAL choice too -- ThemeStore writes
+   data-theme on documentElement (the :root authority); body carries a
+   legacy compat copy that can never reach :root-declared var chains or
+   the UA color-scheme. Mirrors elohim-core/tokens.scss. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
 
 /* Light Theme Override - Applied when user manually selects light theme */
 body[data-theme='light'] {

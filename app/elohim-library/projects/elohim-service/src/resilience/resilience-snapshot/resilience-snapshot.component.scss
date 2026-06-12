@@ -1,3 +1,13 @@
+// Theme discipline (2026-06-12 contrast/dark-theme fix): this component binds
+// the REAL lamad palette (--lamad-*, tokens.scss) — the previous tokens
+// (--surface-1, --text-muted, --success-600, …) existed in NO palette, so
+// every surface froze to its light hex fallback while the text INHERITED the
+// app theme: in dark mode the panel was a white box with white text (the
+// status label was literally invisible). Rule applied throughout: any forced
+// surface is PAIRED with an explicit text color from the same palette — the
+// pairing stays correct even when the bundle's color-scheme line is missing
+// (the C2 regression class), because both sides resolve from --lamad-*.
+
 :host {
   display: inline-block;
   font: inherit;
@@ -11,21 +21,26 @@
   cursor: pointer;
 
   &.status-protected {
-    color: var(--success-600, #16a34a);
+    color: var(--lamad-success, #059669);
   }
+
   &.status-partial {
-    color: var(--warning-600, #d97706);
+    color: var(--lamad-warning, #d97706);
   }
+
   &.status-at-risk {
-    color: var(--danger-600, #dc2626);
+    color: var(--lamad-danger, #dc2626);
   }
+
   &.status-unknown {
-    color: var(--neutral-400, #9ca3af);
+    color: var(--lamad-text-tertiary, #6b7280);
   }
+
   // Unmeasured ≠ zero: a distinct neutral state for content that has never
-  // entered the distribution plane — never the at-risk red.
+  // entered the distribution plane — never the at-risk red. Glyph only;
+  // the textual claim lives in the status label.
   &.status-unmeasured {
-    color: var(--neutral-300, #d1d5db);
+    color: var(--lamad-text-tertiary, #6b7280);
   }
 }
 
@@ -33,7 +48,7 @@
   margin: 0.25rem 0 0.5rem;
   font-size: 0.85em;
   font-style: italic;
-  color: var(--neutral-500, #6b7280);
+  color: var(--lamad-text-secondary, #475569);
 }
 
 // The icon glyph is now a <button> in icon density; reset native chrome so
@@ -42,6 +57,7 @@ button.resilience-icon {
   background: none;
   border: 0;
   font: inherit;
+
   // WCAG 2.5.8 minimum target size: the glyph is ~7x14px at chrome font
   // sizes — pad the hit area to >=24x24 and pull the visual footprint back
   // with matching negative margins so the chrome layout (and the wrap box
@@ -57,22 +73,32 @@ button.resilience-icon {
   .resilience-tooltip {
     visibility: hidden;
     position: absolute;
+
     // Fold DOWN, inline-start aligned (logical properties — he/RTL claimed):
     // down-right in LTR, down-left in RTL. Matches distribution-badge's
     // top-chrome convention and keeps the tooltip inside the viewport when
     // the snapshot is pinned to the top edge.
     inset-block-start: calc(100% + 0.35rem);
     inset-inline-start: 0;
+
     // Wrap instead of running off the viewport edge.
     max-inline-size: min(20rem, 80vw);
+
     // A glance surface only — must never intercept the pointer (it overlaps
     // the hypercard panel's anchor area and the click-outside detection).
     pointer-events: none;
-    background: var(--tooltip-bg, rgba(15, 23, 42, 0.92));
-    color: var(--tooltip-fg, white);
+
+    // Fixed dark surface with explicit light text — 4.5:1+ in both themes.
+    background: var(--tooltip-bg, rgb(15 23 42 / 92%));
+    color: var(--tooltip-fg, #f8fafc);
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
-    font-size: 0.85em;
+
+    // The wrap anchors inside title-scale chrome; rem keeps the tooltip at
+    // body scale instead of inheriting the heading's font-size.
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    font-weight: 400;
     z-index: 1000;
   }
 
@@ -93,28 +119,41 @@ button.resilience-icon {
   // inline-END edge to the wrap — same flip the hypercard panel gets via its
   // align attribute — so neither fold-down grows off the viewport edge.
   &.align-end .resilience-tooltip {
-    inset-inline-start: auto;
-    inset-inline-end: 0;
+    inset-inline: auto 0;
   }
 }
 
 .resilience-context-panel {
   display: grid;
-  grid-template-columns: auto 1fr;
+
+  // Labels flex and wrap; values hug the inline-end edge INSIDE the surface.
+  // (auto 1fr let a long label push the value column out of the panel box —
+  // the 2026-06-12 spill.)
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.25rem 0.75rem;
   padding: 0.75rem 1rem;
   border-radius: 8px;
-  background: var(--surface-1, white);
+
+  // Paired surface + text (never inherit page text onto a forced surface).
+  background: var(--lamad-bg-secondary, #f8fafc);
+  color: var(--lamad-text-primary, #0f172a);
   border-left: 4px solid transparent;
 
+  // The panel anchors inside title-scale chrome — pin to body scale.
+  font-size: 0.875rem;
+  line-height: 1.45;
+  font-weight: 400;
+
   &.status-protected {
-    border-left-color: var(--success-600, #16a34a);
+    border-left-color: var(--lamad-success, #059669);
   }
+
   &.status-partial {
-    border-left-color: var(--warning-600, #d97706);
+    border-left-color: var(--lamad-warning, #d97706);
   }
+
   &.status-at-risk {
-    border-left-color: var(--danger-600, #dc2626);
+    border-left-color: var(--lamad-danger, #dc2626);
   }
 
   header {
@@ -126,11 +165,15 @@ button.resilience-icon {
 
   dl {
     display: contents;
+
     dt {
-      color: var(--text-muted, #64748b);
+      color: var(--lamad-text-secondary, #475569);
     }
+
     dd {
       margin: 0;
+      text-align: end;
+      font-weight: 500;
     }
   }
 }
@@ -138,8 +181,14 @@ button.resilience-icon {
 .resilience-full-card {
   padding: 1rem 1.25rem;
   border-radius: 8px;
-  background: var(--surface-1, white);
-  border: 1px solid var(--border-default, #e2e8f0);
+
+  // Paired surface + text (see header comment).
+  background: var(--lamad-bg-secondary, #f8fafc);
+  color: var(--lamad-text-primary, #0f172a);
+  border: 1px solid var(--lamad-border, #e2e8f0);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  font-weight: 400;
 
   header {
     display: flex;
@@ -150,26 +199,31 @@ button.resilience-icon {
     h3 {
       margin: 0;
       flex: 1;
+      font-size: 1rem;
     }
+
     .status-pill {
       padding: 0.125rem 0.5rem;
       border-radius: 999px;
       font-size: 0.75rem;
-      background: var(--surface-2, #f1f5f9);
+      background: var(--lamad-bg-tertiary, #f1f5f9);
+      color: var(--lamad-text-primary, #0f172a);
     }
   }
 
   .summary-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.25rem 1rem;
     margin: 0 0 1rem;
 
     dt {
-      color: var(--text-muted, #64748b);
+      color: var(--lamad-text-secondary, #475569);
     }
+
     dd {
       margin: 0;
+      text-align: end;
       font-weight: 500;
     }
   }
@@ -177,7 +231,7 @@ button.resilience-icon {
   h4 {
     margin: 0.5rem 0 0.25rem;
     font-size: 0.9rem;
-    color: var(--text-muted, #64748b);
+    color: var(--lamad-text-secondary, #475569);
   }
 
   .collective-list,
@@ -195,9 +249,10 @@ button.resilience-icon {
     .collective-label {
       font-weight: 500;
     }
+
     .collective-kind {
       font-size: 0.85em;
-      color: var(--text-muted, #64748b);
+      color: var(--lamad-text-secondary, #475569);
     }
   }
 }

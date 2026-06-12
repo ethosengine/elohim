@@ -57,4 +57,13 @@
   /* <elohim-lang-picker> */
   --elohim-lang-picker-fg: var(--lamad-text-primary);
   --elohim-lang-picker-border: var(--lamad-border);
+
+  /* <elohim-hypercard-panel> (resilience snapshot fold-down et al.) — unbound
+     it falls back to Canvas, which goes WHITE whenever the color-scheme line
+     is missing/overridden while the token palette is dark (the 2026-06-12
+     white-box-on-dark-page card). Paired per the rule above; the panel's
+     inner text inherits from the host content, which pairs its own surface. */
+  --elohim-hypercard-bg: var(--lamad-bg-secondary);
+  --elohim-hypercard-border: 1px solid var(--lamad-border);
+  --elohim-hypercard-shadow: 0 4px 12px rgb(0 0 0 / 28%);
 }
