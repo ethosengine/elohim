@@ -31,6 +31,8 @@ export interface PWPage {
   title(): Promise<string>;
   waitForLoadState(state?: string, options?: Record<string, unknown>): Promise<void>;
   waitForTimeout(ms: number): Promise<void>;
+  /** Emulate media features (look's --scheme renders the OTHER theme). */
+  emulateMedia(options?: Record<string, unknown>): Promise<void>;
   /**
    * Register a network interceptor. Used to abort/observe navigations toward
    * server-less fixture origins (e.g. a steward portal host) so assertions can
