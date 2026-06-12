@@ -187,6 +187,56 @@ impl DataFetcher for ResolverFetcher {
 }
 
 // =============================================================================
+// Test-only fault injection (env-gated)
+// =============================================================================
+
+/// Wrap `inner` with stall fault injection when `DOORWAY_SSR_FAULT_STALL_PATH`
+/// is set (off by default — zero production impact). Any outbound SSR fetch whose
+/// URL contains the configured substring then never settles, exercising the
+/// render-trace `stalled` terminal + fast soft-deadline fallback end-to-end.
+///
+/// The match is on the *fetch* URL (which carries the content slug), because the
+/// renderer's fetcher is fixed at construction and sees every render's fetches —
+/// so a single shared fetcher can fault just the configured route. Used by the
+/// `render-trace-distinguishes-stall-from-empty` a2o scenario.
+pub fn maybe_inject_stall_fault(inner: Arc<dyn DataFetcher>) -> Arc<dyn DataFetcher> {
+    match std::env::var("DOORWAY_SSR_FAULT_STALL_PATH") {
+        Ok(substr) if !substr.is_empty() => {
+            tracing::warn!(
+                target: "doorway::ssr",
+                fault = %substr,
+                "SSR stall fault injection ENABLED (DOORWAY_SSR_FAULT_STALL_PATH — test-only)"
+            );
+            Arc::new(StallFaultFetcher {
+                inner,
+                fault_substr: substr,
+            })
+        }
+        _ => inner,
+    }
+}
+
+/// Decorator that stalls fetches whose URL contains `fault_substr`, delegating
+/// everything else to `inner`. See [`maybe_inject_stall_fault`].
+struct StallFaultFetcher {
+    inner: Arc<dyn DataFetcher>,
+    fault_substr: String,
+}
+
+#[async_trait]
+impl DataFetcher for StallFaultFetcher {
+    async fn fetch(&self, request: FetchRequest) -> Result<FetchResponse> {
+        if request.url.contains(self.fault_substr.as_str()) {
+            // Never settle — the TracingFetcher's per-fetch soft-deadline converts
+            // this into a recorded `stalled` and a fast fallback.
+            tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
+            return Err(RenderError::DataFetch("ssr stall fault (test-only)".into()));
+        }
+        self.inner.fetch(request).await
+    }
+}
+
+// =============================================================================
 // Helpers
 // =============================================================================
 

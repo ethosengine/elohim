@@ -79,6 +79,25 @@ impl AngularRenderer {
     /// Returns `RenderError::ModuleLoad` if the bundle path does not exist or the
     /// background thread cannot be spawned.
     pub fn new(bundle: PathBuf, fetcher: Arc<dyn crate::DataFetcher>) -> Result<Self> {
+        Self::with_soft_budget(
+            bundle,
+            fetcher,
+            crate::traced_fetcher::DEFAULT_SOFT_BUDGET_MS,
+        )
+    }
+
+    /// Like [`AngularRenderer::new`], but with an explicit per-fetch soft budget
+    /// (milliseconds). A data fetch outstanding longer than this is recorded as
+    /// `Stalled` and rejected so the render falls back fast — the per-peer fetch
+    /// SLA whose breach feeds compute-commitment tuning. Consumers thread this
+    /// from their render limits; `new` uses [`DEFAULT_SOFT_BUDGET_MS`].
+    ///
+    /// [`DEFAULT_SOFT_BUDGET_MS`]: crate::traced_fetcher::DEFAULT_SOFT_BUDGET_MS
+    pub fn with_soft_budget(
+        bundle: PathBuf,
+        fetcher: Arc<dyn crate::DataFetcher>,
+        soft_budget_ms: u64,
+    ) -> Result<Self> {
         if !bundle.exists() {
             return Err(RenderError::ModuleLoad(format!(
                 "bundle not found: {}",
@@ -107,7 +126,8 @@ impl AngularRenderer {
                     // (status/timing/empty classification + soft-deadline stall
                     // detection). The worker keeps a handle to reset+drain it per
                     // render; the runtime drives fetches through the same instance.
-                    let traced = Arc::new(TracingFetcher::new(fetcher));
+                    let traced =
+                        Arc::new(TracingFetcher::with_soft_budget(fetcher, soft_budget_ms));
 
                     // JsRuntime is created here — it stays on this thread forever.
                     // with_full_shims() wires console, URL, TextEncoder/TextDecoder,

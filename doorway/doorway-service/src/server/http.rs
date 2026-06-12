@@ -307,6 +307,9 @@ fn init_renderer() -> Option<Arc<dyn elohim_render::Renderer>> {
         Arc::new(reqwest::Client::new()),
         storage_url.clone(),
     ));
+    // Test-only stall fault injection (env-gated, off by default) — exercises the
+    // render-trace `stalled` terminal for the a2o scenario.
+    let fetcher = crate::ssr::maybe_inject_stall_fault(fetcher);
     match elohim_render::AngularRenderer::new(std::path::PathBuf::from(&bundle_path), fetcher) {
         Ok(r) => {
             tracing::info!(

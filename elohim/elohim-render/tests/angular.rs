@@ -51,6 +51,24 @@ impl DataFetcher for EmptyArrayFetcher {
     }
 }
 
+/// An upstream that never settles within a tight soft budget.
+struct SlowFetcher {
+    delay_ms: u64,
+}
+
+#[async_trait]
+impl DataFetcher for SlowFetcher {
+    async fn fetch(&self, _request: FetchRequest) -> Result<FetchResponse> {
+        tokio::time::sleep(std::time::Duration::from_millis(self.delay_ms)).await;
+        Ok(FetchResponse {
+            status: 200,
+            headers: HashMap::new(),
+            body: b"{\"late\":true}".to_vec(),
+            content_hash: None,
+        })
+    }
+}
+
 fn trace_fixture_bundle() -> PathBuf {
     [
         env!("CARGO_MANIFEST_DIR"),
@@ -128,6 +146,37 @@ async fn render_trace_classifies_empty_upstream_as_rendered_empty() {
         out.trace.terminal,
         RenderTerminal::RenderedEmpty,
         "an empty-array upstream is rendered-empty, not stalled; trace: {:?}",
+        out.trace.fetches
+    );
+}
+
+#[tokio::test]
+async fn render_trace_classifies_a_stalled_upstream_as_stalled() {
+    // The keystone fault-injection: a slow upstream + a tight soft budget. The
+    // render must COMPLETE (the soft-deadline rejects the fetch fast, the fixture
+    // catches it and emits a shell) and self-classify as `stalled` — never hang
+    // to the wall-time. Deterministic, no deploy required.
+    let renderer = AngularRenderer::with_soft_budget(
+        trace_fixture_bundle(),
+        Arc::new(SlowFetcher { delay_ms: 10_000 }),
+        40,
+    )
+    .expect("init");
+    let ctx = RenderContext {
+        spec: RenderSpec::AngularSsr,
+        url: "/slow".into(),
+        data_fetcher: Arc::new(SlowFetcher { delay_ms: 10_000 }),
+        limits: RenderLimits::default(),
+    };
+    let out = renderer
+        .render(ctx)
+        .await
+        .expect("render completes despite the stall");
+
+    assert_eq!(
+        out.trace.terminal,
+        RenderTerminal::Stalled,
+        "a never-settling upstream must classify as stalled; trace: {:?}",
         out.trace.fetches
     );
 }
