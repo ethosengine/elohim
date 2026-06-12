@@ -42,7 +42,7 @@ pub fn reconnect_backoff(attempt: u32) -> Duration {
 pub fn should_warn_still_down(attempt: u32) -> bool {
     // Warn on the first attempt (the give-up→retry transition is loud),
     // then every 5th attempt thereafter (~5 min once saturated at the cap).
-    attempt == 1 || attempt % 5 == 0
+    attempt == 1 || attempt.is_multiple_of(5)
 }
 
 /// Role-keyed registry of HcClient connections. Fields hold `None` when

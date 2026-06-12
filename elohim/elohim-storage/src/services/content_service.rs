@@ -286,7 +286,7 @@ impl ContentService {
         // on top of the existing SQL row's data. Fields not patched fall
         // through to the existing row's values.
         let bootstrap = {
-            let bootstrap = lamad_types::CreateContentInput {
+            lamad_types::CreateContentInput {
                 id: existing.content.id.clone(),
                 content_type: existing.content.content_type.clone(),
                 title: view
@@ -326,8 +326,7 @@ impl ContentService {
                     .or_else(|| existing.content.blob_hash.clone()),
                 content_size_bytes: existing.content.content_size_bytes.map(|n| n as u64),
                 content_hash: existing.content.blob_hash.clone(),
-            };
-            bootstrap
+            }
         };
 
         let output_bytes = if existing.content.dht_anchor_hash.is_none() {

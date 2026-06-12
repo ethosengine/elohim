@@ -25,10 +25,12 @@ impl LimitGradientRegistry {
     /// Core value-laden default for a substrate/layer, wall-clamped.
     /// v1: layer-defaulted alpha (small-N household → 1.0; community+ → 2.0).
     pub fn core_default(_substrate_signal: &str, governance_layer: &str) -> GradientConfig {
-        let mut g = GradientConfig::default();
-        g.alpha = match governance_layer {
-            "individual" | "household" => 1.0,
-            _ => 2.0,
+        let g = GradientConfig {
+            alpha: match governance_layer {
+                "individual" | "household" => 1.0,
+                _ => 2.0,
+            },
+            ..Default::default()
         };
         Self::clamp_to_walls(g)
     }
