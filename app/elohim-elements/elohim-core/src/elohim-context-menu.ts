@@ -20,6 +20,12 @@ export interface ContextMenuItem {
  *
  * @prop {boolean} open  - Whether the menu is visible
  * @prop {ContextMenuItem[]} items - The menu items
+ * @prop {'start'|'end'} align - OPT-IN inline-axis pin (reflected). Absent
+ *   (default) the menu keeps its static position inside the consumer's
+ *   .menu-anchor wrap (existing <elohim-epr-link> geometry). 'start' pins
+ *   inset-inline-start:0, 'end' pins inset-inline-end:0 — set 'end' from
+ *   hosts whose anchor sits in end-side chrome so the fold-down grows into
+ *   the viewport instead of off its edge. Logical-property correct in RTL.
  *
  * @fires item-select - { detail: { id: string } } when an item is selected
  * @fires close       - When the menu closes (any reason)
@@ -28,6 +34,7 @@ export interface ContextMenuItem {
  * @cssprop --elohim-menu-border - Override border color
  * @cssprop --elohim-menu-radius - Override border-radius
  * @cssprop --elohim-menu-shadow - Override drop shadow
+ * @cssprop --elohim-menu-max-width - Maximum inline size (default: min(22rem, calc(100vw - 1rem)))
  *
  * @csspart menu - The <ul> element
  * @csspart item - Each <li> menu item
@@ -45,6 +52,7 @@ export interface ContextMenuItem {
 export class ElohimContextMenu extends LitElement {
   @property({ type: Boolean, reflect: true }) open = false;
   @property({ type: Array }) items: ContextMenuItem[] = [];
+  @property({ type: String, reflect: true }) align?: 'start' | 'end';
 
   @state() private focusedIndex = -1;
   @queryAll('[role="menuitem"]') private readonly menuItems!: NodeListOf<HTMLElement>;
@@ -70,9 +78,26 @@ export class ElohimContextMenu extends LitElement {
         var(--elohim-menu-border, color-mix(in oklch, currentColor 15%, transparent));
       border-radius: var(--elohim-menu-radius, 6px);
       box-shadow: var(--elohim-menu-shadow, 0 4px 12px rgb(0 0 0 / 12%));
-      min-inline-size: 180px;
+      min-inline-size: min(180px, calc(100vw - 1rem));
+      max-inline-size: var(--elohim-menu-max-width, min(22rem, calc(100vw - 1rem)));
       padding-block: 0.25rem;
       padding-inline: 0;
+    }
+
+    /* OPT-IN anchored fold-down (same convention as elohim-hypercard-panel):
+       absent align keeps the static position existing consumers rely on. */
+    :host([open][align]) {
+      inset-block-start: calc(100% + 0.25rem);
+    }
+
+    :host([open][align='start']) {
+      inset-inline-start: 0;
+      inset-inline-end: auto;
+    }
+
+    :host([open][align='end']) {
+      inset-inline-end: 0;
+      inset-inline-start: auto;
     }
 
     :host([hidden]) {
@@ -128,6 +153,9 @@ export class ElohimContextMenu extends LitElement {
       min-block-size: 44px;
       display: flex;
       align-items: center;
+      /* Unbreakable tokens (content addresses) must wrap inside the
+         viewport-capped inline size, not push the box off-screen. */
+      overflow-wrap: anywhere;
     }
 
     [role='menuitem']:hover,

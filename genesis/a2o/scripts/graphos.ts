@@ -18,6 +18,11 @@ import { join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
+  VIEWPORT_ARCHETYPES,
+  type ViewportArchetype,
+} from '../src/framework/fixtures/viewport-archetypes.js';
+
+import {
   componentPrefix,
   familyOf,
   groupByComponent,
@@ -25,6 +30,8 @@ import {
   sheetHtml,
   storiesForSheet,
   suggestComponents,
+  viewportScale,
+  type SheetViewport,
   type StoryEntry,
   type StorybookIndex,
 } from './lib/graphos-stories.js';
@@ -43,11 +50,18 @@ export function containedSlug(slug: string): string {
   return slug;
 }
 
+const ARCHETYPE_NAMES = Object.keys(VIEWPORT_ARCHETYPES).join('|');
+
 const USAGE = `Usage:
   graphos list  [filter]                                 [--base <url>]
-  graphos story <story-id> [--docs] [--viewport WxH]     [--base <url>] [--out <slug>]
+  graphos story <story-id> [--docs] [--viewport <WxH|archetype>]
+                                                         [--base <url>] [--out <slug>]
   graphos sheet <component> [--family designed|default]
-                [--cell WxH] [--cols N]                  [--base <url>] [--out <slug>]`;
+                [--cell WxH] [--cols N]
+                [--viewports <archetype|WxH>[,...]]      [--base <url>] [--out <slug>]
+
+Viewport archetypes: ${ARCHETYPE_NAMES} (the matrix dimension shared with the
+element viewport gate and the Storybook viewport selector).`;
 
 export interface GraphosCommand {
   verb: 'list' | 'story' | 'sheet';
@@ -59,6 +73,7 @@ export interface GraphosCommand {
   cell: { width: number; height: number };
   cols: number;
   viewport?: { width: number; height: number };
+  viewports?: SheetViewport[];
 }
 
 function parseWxH(val: string | undefined, flag: string): { width: number; height: number } {
@@ -68,6 +83,14 @@ function parseWxH(val: string | undefined, flag: string): { width: number; heigh
   if (extra.length > 0 || !Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1)
     throw new Error(`${flag} expects WxH (e.g. 420x320), got: ${val}`);
   return { width: w, height: h };
+}
+
+/** Resolve a viewport spec — a named archetype or a WxH literal. */
+function parseViewportSpec(val: string, flag: string): SheetViewport {
+  const archetype = (VIEWPORT_ARCHETYPES as Record<string, ViewportArchetype>)[val];
+  if (archetype) return { name: val, width: archetype.width, height: archetype.height };
+  const { width, height } = parseWxH(val, flag);
+  return { name: val, width, height };
 }
 
 /** Strip one or more trailing slashes from a URL base string. */
@@ -108,9 +131,17 @@ function applyFlag(cmd: GraphosCommand, flag: string, val: string | undefined): 
       cmd.cols = n;
       return true;
     }
-    case '--viewport':
-      cmd.viewport = parseWxH(val, '--viewport');
+    case '--viewport': {
+      if (!val) throw new Error(`--viewport expects WxH or an archetype name`);
+      const vp = parseViewportSpec(val, '--viewport');
+      cmd.viewport = { width: vp.width, height: vp.height };
       return true;
+    }
+    case '--viewports': {
+      if (!val) throw new Error(`--viewports expects a comma-separated list`);
+      cmd.viewports = val.split(',').map(v => parseViewportSpec(v.trim(), '--viewports'));
+      return true;
+    }
     default:
       throw new Error(`Unknown flag: ${flag}\n${USAGE}`);
   }
@@ -215,14 +246,28 @@ async function cmdSheet(index: StorybookIndex, cmd: GraphosCommand): Promise<boo
   const sheetPath = join(outDir, 'sheet.html');
   await writeFile(
     sheetPath,
-    sheetHtml({ component, base: cmd.base, entries, cell: cmd.cell, cols: cmd.cols })
+    sheetHtml({
+      component,
+      base: cmd.base,
+      entries,
+      cell: cmd.cell,
+      cols: cmd.cols,
+      viewports: cmd.viewports,
+    })
   );
+  // Cell width: with viewport bands, cells render at the archetype's scaled
+  // width (true size × fit-to-cell scale) — the widest band governs the shot.
+  const bandWidths = (cmd.viewports ?? []).map(vp =>
+    Math.round(vp.width * viewportScale(cmd.cell.width, vp))
+  );
+  const cellW = bandWidths.length > 0 ? Math.max(...bandWidths) : cmd.cell.width;
   // cols * cellW + (cols-1) * 8px grid gap + 2*8px body padding + 2px border per cell column; full-page shot covers height.
-  const width = cmd.cols * cmd.cell.width + (cmd.cols - 1) * 8 + 16 + 2 * cmd.cols;
+  const width = cmd.cols * cellW + (cmd.cols - 1) * 8 + 16 + 2 * cmd.cols;
   // 60s base + ~3s per iframe; all iframes now load in-viewport simultaneously (viewport
   // sized to full height — no deferred offscreen loading), so networkidle waits for all
-  // of them to quiesce. Cap at 300s.
-  const timeoutMs = Math.min(300_000, 60_000 + 3_000 * entries.length);
+  // of them to quiesce. Cap at 300s. Viewport bands multiply the iframe count.
+  const iframeCount = entries.length * Math.max(1, cmd.viewports?.length ?? 0);
+  const timeoutMs = Math.min(300_000, 60_000 + 3_000 * iframeCount);
   // Chromium defers rendering of offscreen iframes — networkidle fires while
   // below-the-fold frames are still unrendered, so the full-page shot captures
   // blank cells. Make the viewport tall enough to hold the WHOLE sheet.
@@ -230,7 +275,17 @@ async function cmdSheet(index: StorybookIndex, cmd: GraphosCommand): Promise<boo
   const rows = [...groupRows(entries, cmd)].reduce((a, b) => a + b, 0);
   // 16px body padding + per-family blended h1+h2 header ≈46px + per-row:
   // figcaption ~18px + iframe (cell.height + 2px border) + 8px row-gap + ~5px rounding ≈ cell.height + 33.
-  const sheetHeight = 16 + families * 46 + rows * (cmd.cell.height + 33);
+  // With viewport bands: per family, each band contributes its h3 (~22px) +
+  // rows at the band's scaled cell height.
+  const sheetHeight =
+    cmd.viewports && cmd.viewports.length > 0
+      ? 16 +
+        families * 46 +
+        cmd.viewports.reduce((acc, vp) => {
+          const cellH = Math.round(vp.height * viewportScale(cmd.cell.width, vp));
+          return acc + families * 22 + rows * (cellH + 33);
+        }, 0)
+      : 16 + families * 46 + rows * (cmd.cell.height + 33);
   if (sheetHeight + 100 > 15_000) {
     console.warn(
       `[graphos] sheet height ${sheetHeight}px exceeds the 15000px viewport cap ` +

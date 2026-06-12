@@ -11,6 +11,11 @@ import {
   themeFixture,
   type ThemeCell,
 } from './testing/theme-contrast.js';
+import {
+  assertInlineWithinViewport,
+  resetViewport,
+  setViewportArchetype,
+} from './testing/viewport.js';
 
 const FIXTURE_HEAD: EprHead = {
   version: 1,
@@ -310,4 +315,44 @@ describe('<elohim-epr-popover> — theme-contrast gate', () => {
       await axeScanStrict(el);
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// <elohim-epr-popover> — viewport precondition gate
+//
+// The popover applies consumer-supplied {top,left} fixed coords. Any naive
+// anchor-rect caller (rect.bottom/rect.left — markdown-renderer is the live
+// example) reproduces the 2026-06-12 fold-down overflow class near viewport
+// edges, so the element owns the final clamp.
+// ---------------------------------------------------------------------------
+
+describe('<elohim-epr-popover> — viewport precondition gate', () => {
+  afterEach(() => resetViewport());
+
+  it('clamps an off-screen consumer position back inside the phone viewport', async () => {
+    await setViewportArchetype('phone');
+    const el = await fixture<ElohimEprPopover>(html`
+      <elohim-epr-popover
+        .head=${FIXTURE_HEAD}
+        .visible=${true}
+        .position=${{ top: 100, left: 360 }}
+      ></elohim-epr-popover>
+    `);
+    await elementUpdated(el);
+    assertInlineWithinViewport(el);
+  });
+
+  it('leaves honest coordinates untouched when the popover already fits', async () => {
+    await setViewportArchetype('phone');
+    const el = await fixture<ElohimEprPopover>(html`
+      <elohim-epr-popover
+        .head=${FIXTURE_HEAD}
+        .visible=${true}
+        .position=${{ top: 40, left: 20 }}
+      ></elohim-epr-popover>
+    `);
+    await elementUpdated(el);
+    expect(el.style.top).to.equal('40px');
+    expect(el.style.left).to.equal('20px');
+  });
 });

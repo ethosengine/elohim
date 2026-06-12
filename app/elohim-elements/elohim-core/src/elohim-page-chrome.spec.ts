@@ -115,7 +115,6 @@ describe('<elohim-page-chrome> — ua-prefs precondition gate', () => {
     ).styles.cssText;
     expect(cssText).to.contain('forced-colors: active');
     const forcedIdx = cssText.indexOf('forced-colors: active');
-    // eslint-disable-next-line unicorn/prefer-set-has -- string scan, not membership lookup
     const forcedSection = cssText.slice(forcedIdx);
     const hasSystemColor = /Canvas|CanvasText|ButtonText/.test(forcedSection);
     expect(hasSystemColor).to.be.true;
@@ -242,7 +241,6 @@ describe('<elohim-default-omnibar> — ua-prefs precondition gate', () => {
     ).styles.cssText;
     expect(cssText).to.contain('forced-colors: active');
     const forcedIdx = cssText.indexOf('forced-colors: active');
-    // eslint-disable-next-line unicorn/prefer-set-has -- string scan, not membership lookup
     const forcedSection = cssText.slice(forcedIdx);
     const hasSystemColor = /Canvas|CanvasText|LinkText|ButtonText/.test(forcedSection);
     expect(hasSystemColor).to.be.true;

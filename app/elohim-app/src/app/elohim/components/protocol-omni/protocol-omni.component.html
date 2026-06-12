@@ -64,10 +64,13 @@
       data-testid="protocol-omni-resilience"
       aria-label="Resilience indicator"
     >
+      <!-- panelAlign="end": this segment sits in end-side chrome, so the
+           hypercard + tooltip fold down INTO the viewport (spec §11.2). -->
       <elohim-resilience-snapshot
         *ngIf="resilience() as snap; else resilienceNeutral"
         [snapshot]="snap"
         density="icon"
+        panelAlign="end"
       ></elohim-resilience-snapshot>
       <!-- No snapshot yet (loading, error, or empty substrate): a neutral
            glyph that makes no status claim — never cries wolf, never fakes. -->

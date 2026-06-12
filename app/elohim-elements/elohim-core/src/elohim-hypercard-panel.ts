@@ -17,6 +17,12 @@ export type { ContextMenuItem } from './elohim-context-menu.js';
  * calc(100% + 0.25rem); inset-inline-start:0 — folds DOWN + inline-start
  * aligned (down-right LTR, down-left RTL). Top-chrome affordances conventionally
  * fold downward so they render on-screen under fixed top-edge chrome.
+ * The inline axis is the host's call (the host knows where its chrome sits;
+ * the element can't): `align="end"` swaps the pin to inset-inline-end:0 so a
+ * panel anchored in END-side chrome grows INTO the viewport instead of off
+ * its edge — the 2026-06-12 phone-viewport regression class. Both inline-size
+ * defaults clamp to calc(100vw - 1rem) so the box itself can never exceed
+ * the screen.
  *
  * Accessibility: non-modal role="dialog" + aria-label from panelLabel; Escape
  * closes from anywhere inside; click-outside closes; on open focus moves into
@@ -32,6 +38,10 @@ export type { ContextMenuItem } from './elohim-context-menu.js';
  * @prop {ContextMenuItem[]} actions - Action row items; row is absent when empty
  * @prop {string} panelLabel  - aria-label for the dialog; host-supplied — the
  *   element ships NO built-in strings
+ * @prop {'start'|'end'} align - Inline-axis pin (reflected). 'start' (default)
+ *   pins inset-inline-start:0 to the anchor wrap; 'end' pins inset-inline-end:0
+ *   — set by hosts whose anchor sits in end-side chrome so the fold-down grows
+ *   into the viewport. Logical-property correct in RTL.
  *
  * @fires action-select - { detail: { id: string } } when an action is activated.
  *   The panel stays open — selection is intent, not dismissal; the HOST decides
@@ -46,8 +56,8 @@ export type { ContextMenuItem } from './elohim-context-menu.js';
  * @cssprop --elohim-hypercard-border     - Panel border (default: 1px solid color-mix(in oklch, currentColor 15%, transparent))
  * @cssprop --elohim-hypercard-radius     - Panel border-radius (default: 6px)
  * @cssprop --elohim-hypercard-shadow     - Panel drop shadow (default: 0 4px 12px rgba(0,0,0,0.12))
- * @cssprop --elohim-hypercard-min-width  - Minimum inline size (default: 240px)
- * @cssprop --elohim-hypercard-max-width  - Maximum inline size (default: min(22rem, 80vw))
+ * @cssprop --elohim-hypercard-min-width  - Minimum inline size (default: min(240px, calc(100vw - 1rem)))
+ * @cssprop --elohim-hypercard-max-width  - Maximum inline size (default: min(22rem, calc(100vw - 1rem)))
  * @cssprop --elohim-hypercard-z         - z-index when open (default: 1000)
  *
  * @csspart container   - The outer panel container (role="dialog")
@@ -69,6 +79,7 @@ export class ElohimHypercardPanel extends LitElement {
   @property({ type: Boolean, reflect: true }) open = false;
   @property({ type: Array }) actions: ContextMenuItem[] = [];
   @property({ type: String }) panelLabel = '';
+  @property({ type: String, reflect: true }) align: 'start' | 'end' = 'start';
 
   @state() private focusedActionIndex = -1;
 
@@ -99,8 +110,15 @@ export class ElohimHypercardPanel extends LitElement {
       );
       border-radius: var(--elohim-hypercard-radius, 6px);
       box-shadow: var(--elohim-hypercard-shadow, 0 4px 12px rgb(0 0 0 / 12%));
-      min-inline-size: var(--elohim-hypercard-min-width, 240px);
-      max-inline-size: var(--elohim-hypercard-max-width, min(22rem, 80vw));
+      min-inline-size: var(--elohim-hypercard-min-width, min(240px, calc(100vw - 1rem)));
+      max-inline-size: var(--elohim-hypercard-max-width, min(22rem, calc(100vw - 1rem)));
+    }
+
+    /* End-side chrome: the host pins the panel's inline-END edge to the
+       anchor so the fold-down grows into the viewport, not off its edge. */
+    :host([open][align='end']) {
+      inset-inline-start: auto;
+      inset-inline-end: 0;
     }
 
     :host([hidden]) {

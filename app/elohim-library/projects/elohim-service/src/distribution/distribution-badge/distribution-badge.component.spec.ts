@@ -51,6 +51,21 @@ describe('DistributionBadgeComponent (elohim-library)', () => {
     ).toBeTruthy();
   });
 
+  it('tooltipAlign="end" marks the badge with align-end so the tooltip flips to the inline-end pin', () => {
+    // 2026-06-12 fold-down regression class: a start-pinned 240px tooltip off
+    // a badge trailing the title line projects off phone viewports. The host
+    // knows where the badge sits; it forwards that as tooltipAlign.
+    fixture.componentRef.setInput('tooltipAlign', 'end');
+    fixture.detectChanges();
+    const badge: HTMLElement = fixture.nativeElement.querySelector('[data-testid="distribution-badge"]');
+    expect(badge.classList.contains('align-end')).toBe(true);
+  });
+
+  it('defaults tooltipAlign to start — no align-end class', () => {
+    const badge: HTMLElement = fixture.nativeElement.querySelector('[data-testid="distribution-badge"]');
+    expect(badge.classList.contains('align-end')).toBe(false);
+  });
+
   it('renders replica count', () => {
     const el = fixture.nativeElement.querySelector('[data-testid="distribution-badge-replica-count"]');
     expect(el?.textContent?.trim()).toBe('3');

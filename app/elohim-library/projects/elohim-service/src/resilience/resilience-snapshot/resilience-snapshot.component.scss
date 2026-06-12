@@ -29,8 +29,13 @@
 button.resilience-icon {
   background: none;
   border: 0;
-  padding: 0;
   font: inherit;
+  // WCAG 2.5.8 minimum target size: the glyph is ~7x14px at chrome font
+  // sizes — pad the hit area to >=24x24 and pull the visual footprint back
+  // with matching negative margins so the chrome layout (and the wrap box
+  // the panel/tooltip anchor to) is unchanged.
+  padding: 0.3125rem 0.5625rem;
+  margin: -0.3125rem -0.5625rem;
 }
 
 .resilience-icon-wrap {
@@ -70,6 +75,14 @@ button.resilience-icon {
 
   &.panel-open .resilience-tooltip {
     visibility: hidden;
+  }
+
+  // End-side chrome (host sets panelAlign="end"): the tooltip pins its
+  // inline-END edge to the wrap — same flip the hypercard panel gets via its
+  // align attribute — so neither fold-down grows off the viewport edge.
+  &.align-end .resilience-tooltip {
+    inset-inline-start: auto;
+    inset-inline-end: 0;
   }
 }
 

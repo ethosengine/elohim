@@ -3,6 +3,7 @@
   [class.healthy]="summary.replicaHealth === 'healthy'"
   [class.at_risk]="summary.replicaHealth === 'at_risk'"
   [class.critical]="summary.replicaHealth === 'critical'"
+  [class.align-end]="tooltipAlign === 'end'"
   data-testid="distribution-badge"
   tabindex="0"
   (mouseenter)="onTooltipExpand()"

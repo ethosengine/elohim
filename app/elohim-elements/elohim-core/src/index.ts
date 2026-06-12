@@ -1,6 +1,12 @@
 // Side-effect-free entry. Re-exports component classes and types.
 // Consumers that want auto-registration import from './register' instead.
 
+export {
+  VIEWPORT_ARCHETYPES,
+  type ViewportArchetype,
+  type ViewportArchetypeName,
+} from './viewport-archetypes.js';
+
 export { ElohimButton } from './elohim-button.js';
 export type { ElohimButtonVariant } from './elohim-button.js';
 

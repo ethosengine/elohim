@@ -86,16 +86,20 @@
           >
             {{ getReachIcon() }}
           </span>
+          <!-- panelAlign="end": the icon trails the title line, so the
+               fold-downs grow back INTO the viewport on phone widths. -->
           <elohim-resilience-snapshot
             *ngIf="resilienceSnapshot$ | async as snap"
             [snapshot]="snap"
             density="icon"
+            panelAlign="end"
             data-testid="viewer-resilience-info"
           ></elohim-resilience-snapshot>
           @if (node.distribution) {
             <elohim-distribution-badge
               [summary]="node.distribution"
               [blobHash]="node.blobs?.[0]?.hash"
+              tooltipAlign="end"
               data-testid="viewer-distribution-info"
             ></elohim-distribution-badge>
           }

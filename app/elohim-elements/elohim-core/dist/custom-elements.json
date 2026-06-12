@@ -932,6 +932,10 @@
             {
               "description": "Override drop shadow",
               "name": "--elohim-menu-shadow"
+            },
+            {
+              "description": "Maximum inline size (default: min(22rem, calc(100vw - 1rem)))",
+              "name": "--elohim-menu-max-width"
             }
           ],
           "cssParts": [
@@ -965,6 +969,16 @@
               "default": "[]",
               "description": "The menu items",
               "attribute": "items"
+            },
+            {
+              "kind": "field",
+              "name": "align",
+              "type": {
+                "text": "'start'|'end'"
+              },
+              "description": "OPT-IN inline-axis pin (reflected). Absent (default) the menu keeps its static position inside the consumer's .menu-anchor wrap (existing <elohim-epr-link> geometry). 'start' pins inset-inline-start:0, 'end' pins inset-inline-end:0 — set 'end' from hosts whose anchor sits in end-side chrome so the fold-down grows into the viewport instead of off its edge. Logical-property correct in RTL.",
+              "attribute": "align",
+              "reflects": true
             },
             {
               "kind": "field",
@@ -1114,6 +1128,14 @@
               "default": "[]",
               "description": "The menu items",
               "fieldName": "items"
+            },
+            {
+              "name": "align",
+              "type": {
+                "text": "'start'|'end'"
+              },
+              "description": "OPT-IN inline-axis pin (reflected). Absent (default) the menu keeps its static position inside the consumer's .menu-anchor wrap (existing <elohim-epr-link> geometry). 'start' pins inset-inline-start:0, 'end' pins inset-inline-end:0 — set 'end' from hosts whose anchor sits in end-side chrome so the fold-down grows into the viewport instead of off its edge. Logical-property correct in RTL.",
+              "fieldName": "align"
             }
           ],
           "superclass": {
@@ -1810,6 +1832,17 @@
               "description": "Whether the popover is visible",
               "attribute": "visible",
               "reflects": true
+            },
+            {
+              "kind": "method",
+              "name": "applyClampedPosition",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Apply the consumer-supplied coords, clamped to the visual viewport. Any\nnaive anchor-rect caller (rect.bottom/rect.left) reproduces the\n2026-06-12 fold-down overflow class near viewport edges, so the element\nowns the final guard. Fixed-position coords are physical by nature —\nmatching the {top,left} API shape. Re-runs on visible because the box\nhas no measurable size until it renders."
             },
             {
               "kind": "method",
@@ -3692,7 +3725,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "<elohim-hypercard-panel> — anchored fold-down hypercard panel.\n\nA generic fold-down surface providing a default slot for arbitrary hypercard\ncontent and an optional action row below the slot. Intended as the\nprogressive L2 disclosure surface from a position:relative anchor wrapper\n(the same .menu-anchor convention as <elohim-epr-link>).\n\nPositioning: :host([open]) is position:absolute; inset-block-start:\ncalc(100% + 0.25rem); inset-inline-start:0 — folds DOWN + inline-start\naligned (down-right LTR, down-left RTL). Top-chrome affordances conventionally\nfold downward so they render on-screen under fixed top-edge chrome.\n\nAccessibility: non-modal role=\"dialog\" + aria-label from panelLabel; Escape\ncloses from anywhere inside; click-outside closes; on open focus moves into\nthe panel (first enabled action button, else the panel container with\ntabindex=\"-1\"); on close focus restores to the previously focused element.\n\nMotion: fold-down animation (120ms ease-out) gated on\n(prefers-reduced-motion: no-preference) and (update: fast).",
+          "description": "<elohim-hypercard-panel> — anchored fold-down hypercard panel.\n\nA generic fold-down surface providing a default slot for arbitrary hypercard\ncontent and an optional action row below the slot. Intended as the\nprogressive L2 disclosure surface from a position:relative anchor wrapper\n(the same .menu-anchor convention as <elohim-epr-link>).\n\nPositioning: :host([open]) is position:absolute; inset-block-start:\ncalc(100% + 0.25rem); inset-inline-start:0 — folds DOWN + inline-start\naligned (down-right LTR, down-left RTL). Top-chrome affordances conventionally\nfold downward so they render on-screen under fixed top-edge chrome.\nThe inline axis is the host's call (the host knows where its chrome sits;\nthe element can't): `align=\"end\"` swaps the pin to inset-inline-end:0 so a\npanel anchored in END-side chrome grows INTO the viewport instead of off\nits edge — the 2026-06-12 phone-viewport regression class. Both inline-size\ndefaults clamp to calc(100vw - 1rem) so the box itself can never exceed\nthe screen.\n\nAccessibility: non-modal role=\"dialog\" + aria-label from panelLabel; Escape\ncloses from anywhere inside; click-outside closes; on open focus moves into\nthe panel (first enabled action button, else the panel container with\ntabindex=\"-1\"); on close focus restores to the previously focused element.\n\nMotion: fold-down animation (120ms ease-out) gated on\n(prefers-reduced-motion: no-preference) and (update: fast).",
           "name": "ElohimHypercardPanel",
           "cssProperties": [
             {
@@ -3712,11 +3745,11 @@
               "name": "--elohim-hypercard-shadow"
             },
             {
-              "description": "Minimum inline size (default: 240px)",
+              "description": "Minimum inline size (default: min(240px, calc(100vw - 1rem)))",
               "name": "--elohim-hypercard-min-width"
             },
             {
-              "description": "Maximum inline size (default: min(22rem, 80vw))",
+              "description": "Maximum inline size (default: min(22rem, calc(100vw - 1rem)))",
               "name": "--elohim-hypercard-max-width"
             },
             {
@@ -3779,6 +3812,17 @@
               "default": "''",
               "description": "aria-label for the dialog; host-supplied — the element ships NO built-in strings",
               "attribute": "panelLabel"
+            },
+            {
+              "kind": "field",
+              "name": "align",
+              "type": {
+                "text": "'start'|'end'"
+              },
+              "default": "'start'",
+              "description": "Inline-axis pin (reflected). 'start' (default) pins inset-inline-start:0 to the anchor wrap; 'end' pins inset-inline-end:0 — set by hosts whose anchor sits in end-side chrome so the fold-down grows into the viewport. Logical-property correct in RTL.",
+              "attribute": "align",
+              "reflects": true
             },
             {
               "kind": "field",
@@ -3911,6 +3955,15 @@
               "default": "''",
               "description": "aria-label for the dialog; host-supplied — the element ships NO built-in strings",
               "fieldName": "panelLabel"
+            },
+            {
+              "name": "align",
+              "type": {
+                "text": "'start'|'end'"
+              },
+              "default": "'start'",
+              "description": "Inline-axis pin (reflected). 'start' (default) pins inset-inline-start:0 to the anchor wrap; 'end' pins inset-inline-end:0 — set by hosts whose anchor sits in end-side chrome so the fold-down grows into the viewport. Logical-property correct in RTL.",
+              "fieldName": "align"
             }
           ],
           "superclass": {
@@ -5906,6 +5959,30 @@
       "exports": [
         {
           "kind": "js",
+          "name": "VIEWPORT_ARCHETYPES",
+          "declaration": {
+            "name": "VIEWPORT_ARCHETYPES",
+            "module": "./viewport-archetypes.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ViewportArchetype",
+          "declaration": {
+            "name": "ViewportArchetype",
+            "module": "./viewport-archetypes.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ViewportArchetypeName",
+          "declaration": {
+            "name": "ViewportArchetypeName",
+            "module": "./viewport-archetypes.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "ElohimButton",
           "declaration": {
             "name": "ElohimButton",
@@ -6763,6 +6840,27 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/viewport-archetypes.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "VIEWPORT_ARCHETYPES",
+          "default": "{ /** Small/older phones and split-screen Android — the floor. */ 'phone-small': { width: 320, height: 568, represents: 'small phone / split-screen floor' }, /** Mainstream phone portrait (iPhone 12-16 class). */ phone: { width: 390, height: 844, represents: 'mainstream phone portrait' }, /** Tablet portrait / phone landscape class. */ tablet: { width: 768, height: 1024, represents: 'tablet portrait' }, /** Default desktop window — matches the look/device default. */ desktop: { width: 1280, height: 800, represents: 'desktop window' }, } as const satisfies Record<string, ViewportArchetype>"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "VIEWPORT_ARCHETYPES",
+          "declaration": {
+            "name": "VIEWPORT_ARCHETYPES",
+            "module": "src/viewport-archetypes.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/contracts/omnibar.contract.ts",
       "declarations": [],
       "exports": []
@@ -7601,6 +7699,331 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/loader/loader.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Loader",
+          "members": [
+            {
+              "kind": "field",
+              "name": "verifyCid",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "return": {
+                "type": {
+                  "text": "Promise<LoaderResolution>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "verifyCidMatches",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "bytes",
+                  "type": {
+                    "text": "Uint8Array"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Loader",
+          "declaration": {
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/theme/theme-store.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "THEME_STORAGE_KEY",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-theme'"
+        },
+        {
+          "kind": "variable",
+          "name": "THEME_CHANGE_EVENT",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-theme-changed'"
+        },
+        {
+          "kind": "class",
+          "description": "",
+          "name": "ThemeStore",
+          "members": [
+            {
+              "kind": "field",
+              "name": "_theme",
+              "type": {
+                "text": "ElohimTheme"
+              },
+              "privacy": "private",
+              "default": "'device'"
+            },
+            {
+              "kind": "field",
+              "name": "_destroyed",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "readonly": true,
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "_onStorage",
+              "type": {
+                "text": "(e: StorageEvent) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "_onThemeChange",
+              "type": {
+                "text": "(e: Event) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "destroy",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getThemeStore()) is intentionally never destroyed."
+            },
+            {
+              "kind": "field",
+              "name": "theme",
+              "type": {
+                "text": "ElohimTheme"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "effectiveTheme",
+              "type": {
+                "text": "'light' | 'dark'"
+              },
+              "description": "The theme actually in effect ('device' resolved against the UA signal).",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "set",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "theme",
+                  "type": {
+                    "text": "ElohimTheme"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "cycle",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to theme changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "adopt",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "theme",
+                  "type": {
+                    "text": "ElohimTheme"
+                  }
+                }
+              ],
+              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
+            },
+            {
+              "kind": "method",
+              "name": "applyToDocument",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "theme",
+                  "type": {
+                    "text": "ElohimTheme"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "persist",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "theme",
+                  "type": {
+                    "text": "ElohimTheme"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "load",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "ElohimTheme"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "getThemeStore",
+          "return": {
+            "type": {
+              "text": "ThemeStore"
+            }
+          },
+          "description": "Module-level singleton — all islands in a document share one store."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "THEME_STORAGE_KEY",
+          "declaration": {
+            "name": "THEME_STORAGE_KEY",
+            "module": "src/theme/theme-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "THEME_CHANGE_EVENT",
+          "declaration": {
+            "name": "THEME_CHANGE_EVENT",
+            "module": "src/theme/theme-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ThemeStore",
+          "declaration": {
+            "name": "ThemeStore",
+            "module": "src/theme/theme-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "getThemeStore",
+          "declaration": {
+            "name": "getThemeStore",
+            "module": "src/theme/theme-store.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/testing/a11y.ts",
       "declarations": [
         {
@@ -7786,6 +8209,14 @@
           "declaration": {
             "name": "*",
             "module": "src/testing/ua-prefs.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/testing/viewport.js"
           }
         }
       ]
@@ -8062,325 +8493,162 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/theme/theme-store.ts",
+      "path": "src/testing/viewport.ts",
       "declarations": [
         {
-          "kind": "variable",
-          "name": "THEME_STORAGE_KEY",
-          "type": {
-            "text": "string"
+          "kind": "function",
+          "name": "setViewportArchetype",
+          "return": {
+            "type": {
+              "text": "Promise<void>"
+            }
           },
-          "default": "'elohim-theme'"
-        },
-        {
-          "kind": "variable",
-          "name": "THEME_CHANGE_EVENT",
-          "type": {
-            "text": "string"
-          },
-          "default": "'elohim-theme-changed'"
-        },
-        {
-          "kind": "class",
-          "description": "",
-          "name": "ThemeStore",
-          "members": [
+          "parameters": [
             {
-              "kind": "field",
-              "name": "_theme",
+              "name": "name",
               "type": {
-                "text": "ElohimTheme"
-              },
-              "privacy": "private",
-              "default": "'device'"
-            },
-            {
-              "kind": "field",
-              "name": "_destroyed",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "default": "false"
-            },
-            {
-              "kind": "field",
-              "name": "subscribers",
-              "privacy": "private",
-              "readonly": true,
-              "default": "new Set<Subscriber>()"
-            },
-            {
-              "kind": "field",
-              "name": "_onStorage",
-              "type": {
-                "text": "(e: StorageEvent) => void"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "_onThemeChange",
-              "type": {
-                "text": "(e: Event) => void"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "destroy",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getThemeStore()) is intentionally never destroyed."
-            },
-            {
-              "kind": "field",
-              "name": "theme",
-              "type": {
-                "text": "ElohimTheme"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "effectiveTheme",
-              "type": {
-                "text": "'light' | 'dark'"
-              },
-              "description": "The theme actually in effect ('device' resolved against the UA signal).",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "set",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "theme",
-                  "type": {
-                    "text": "ElohimTheme"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "cycle",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              }
-            },
-            {
-              "kind": "method",
-              "name": "subscribe",
-              "return": {
-                "type": {
-                  "text": "() => void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "fn",
-                  "type": {
-                    "text": "Subscriber"
-                  }
-                }
-              ],
-              "description": "Subscribe to theme changes. Returns an unsubscribe function."
-            },
-            {
-              "kind": "method",
-              "name": "adopt",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "theme",
-                  "type": {
-                    "text": "ElohimTheme"
-                  }
-                }
-              ],
-              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
-            },
-            {
-              "kind": "method",
-              "name": "applyToDocument",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "theme",
-                  "type": {
-                    "text": "ElohimTheme"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "persist",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "theme",
-                  "type": {
-                    "text": "ElohimTheme"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "load",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "ElohimTheme"
-                }
+                "text": "ViewportArchetypeName"
               }
             }
-          ]
+          ],
+          "description": "Resize the test browser window to a named archetype."
         },
         {
           "kind": "function",
-          "name": "getThemeStore",
+          "name": "setViewportSize",
           "return": {
             "type": {
-              "text": "ThemeStore"
+              "text": "Promise<void>"
             }
           },
-          "description": "Module-level singleton — all islands in a document share one store."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "THEME_STORAGE_KEY",
-          "declaration": {
-            "name": "THEME_STORAGE_KEY",
-            "module": "src/theme/theme-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "THEME_CHANGE_EVENT",
-          "declaration": {
-            "name": "THEME_CHANGE_EVENT",
-            "module": "src/theme/theme-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "ThemeStore",
-          "declaration": {
-            "name": "ThemeStore",
-            "module": "src/theme/theme-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "getThemeStore",
-          "declaration": {
-            "name": "getThemeStore",
-            "module": "src/theme/theme-store.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/loader/loader.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Loader",
-          "members": [
+          "parameters": [
             {
-              "kind": "field",
-              "name": "verifyCid",
+              "name": "size",
               "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "resolve",
-              "return": {
-                "type": {
-                  "text": "Promise<LoaderResolution>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "verifyCidMatches",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "Promise<void>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                },
-                {
-                  "name": "bytes",
-                  "type": {
-                    "text": "Uint8Array"
-                  }
-                }
-              ]
+                "text": "{ width: number; height: number }"
+              }
             }
-          ]
+          ],
+          "description": "Resize to a raw size (sub-archetype guards, e.g. below the 240px floor)."
+        },
+        {
+          "kind": "function",
+          "name": "resetViewport",
+          "return": {
+            "type": {
+              "text": "Promise<void>"
+            }
+          },
+          "description": "Restore the runner default window size (call from afterEach)."
+        },
+        {
+          "kind": "function",
+          "name": "assertInlineWithinViewport",
+          "return": {
+            "type": {
+              "text": "void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "el",
+              "type": {
+                "text": "Element"
+              }
+            },
+            {
+              "name": "gutterPx",
+              "default": "0.5"
+            }
+          ],
+          "description": "Assert the element's border box is fully inside the visual viewport on the\ninline axis. `gutterPx` tolerates sub-pixel layout (default 0.5px)."
+        },
+        {
+          "kind": "function",
+          "name": "assertWithinViewport",
+          "return": {
+            "type": {
+              "text": "void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "el",
+              "type": {
+                "text": "Element"
+              }
+            },
+            {
+              "name": "gutterPx",
+              "default": "0.5"
+            }
+          ],
+          "description": "Assert the element's border box is fully inside the viewport on both axes."
         }
       ],
       "exports": [
         {
           "kind": "js",
-          "name": "Loader",
+          "name": "VIEWPORT_ARCHETYPES",
           "declaration": {
-            "name": "Loader",
-            "module": "src/loader/loader.ts"
+            "name": "VIEWPORT_ARCHETYPES",
+            "module": "src/testing/viewport.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ViewportArchetype",
+          "declaration": {
+            "name": "ViewportArchetype",
+            "module": "src/testing/viewport.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ViewportArchetypeName",
+          "declaration": {
+            "name": "ViewportArchetypeName",
+            "module": "src/testing/viewport.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "setViewportArchetype",
+          "declaration": {
+            "name": "setViewportArchetype",
+            "module": "src/testing/viewport.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "setViewportSize",
+          "declaration": {
+            "name": "setViewportSize",
+            "module": "src/testing/viewport.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "resetViewport",
+          "declaration": {
+            "name": "resetViewport",
+            "module": "src/testing/viewport.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "assertInlineWithinViewport",
+          "declaration": {
+            "name": "assertInlineWithinViewport",
+            "module": "src/testing/viewport.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "assertWithinViewport",
+          "declaration": {
+            "name": "assertWithinViewport",
+            "module": "src/testing/viewport.ts"
           }
         }
       ]

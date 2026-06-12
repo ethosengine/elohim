@@ -57,6 +57,14 @@ export class DistributionBadgeComponent implements OnChanges {
    */
   @Input() detailsInput?: DistributionDetails;
 
+  /**
+   * Inline-axis pin for the hover tooltip. Hosts whose badge trails the line
+   * (e.g. content-viewer's title row) set 'end' so the fold-down grows INTO
+   * the viewport instead of off its edge — the 2026-06-12 phone regression
+   * class shared with elohim-resilience-snapshot's panelAlign.
+   */
+  @Input() tooltipAlign: 'start' | 'end' = 'start';
+
   protected readonly expanded = signal(false);
   protected readonly details = signal<DistributionDetails | null>(null);
   protected readonly loadingDetails = signal(false);

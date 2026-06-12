@@ -370,6 +370,14 @@ by `GET /api/v1/resilience/{id}/household`). Two defects/gaps in that landing:
   inset-block-start: calc(100% + 0.25rem); inset-inline-start: 0` — assumes a
   `position: relative` anchor wrapper, same `.menu-anchor` convention as
   epr-link. Folds **down + inline-start aligned** by construction.
+  **End-edge amendment (2026-06-12):** the inline pin is the host's call —
+  `align="end"` (reflected prop, default `start`) swaps to
+  `inset-inline-end: 0` so a panel anchored in END-side chrome grows INTO the
+  viewport (start-pinned from the omni resilience segment it projected ~173px
+  off a 390px phone). Same fold-down convention, host-chosen inline side;
+  min/max-width defaults clamp to `calc(100vw - 1rem)`. `<elohim-context-menu>`
+  carries the same `align` prop, OPT-IN only (absent = static position for
+  existing epr-link geometry).
 - A11y: non-modal `role="dialog"` + `aria-label`; Escape closes; click-outside
   closes; focus moves into the panel on open and restores to the previously
   focused element on close (same discipline as `<elohim-context-menu>`).

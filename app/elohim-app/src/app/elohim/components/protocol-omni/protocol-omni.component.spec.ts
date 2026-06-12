@@ -346,6 +346,17 @@ describe('ProtocolOmniComponent resilience segment', () => {
     expect(getSnapshot).not.toHaveBeenCalled();
   });
 
+  it('end-aligns the resilience fold-downs — omni chrome anchors near the inline-end edge', () => {
+    // 2026-06-12 phone regression: the hypercard pinned inset-inline-start:0
+    // to the icon wrap mid-toolbar and projected ~173px off a 390px viewport.
+    // The omni statically knows its resilience segment sits in end-side
+    // chrome, so it passes panelAlign="end" (wrap class + panel align attr).
+    const { expand, segment } = setup();
+    expand();
+    const wrap = segment()?.querySelector('.resilience-icon-wrap');
+    expect(wrap?.classList.contains('align-end')).toBe(true);
+  });
+
   it('fetches once on first expansion and renders the live icon in the segment', () => {
     const { getSnapshot, expand, liveIcon } = setup();
     expand();

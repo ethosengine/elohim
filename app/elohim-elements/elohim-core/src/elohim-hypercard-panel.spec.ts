@@ -12,6 +12,15 @@ import {
   themeFixture,
   type ThemeCell,
 } from './testing/theme-contrast.js';
+import { ifDefined } from 'lit/directives/if-defined.js';
+
+import {
+  assertInlineWithinViewport,
+  resetViewport,
+  setViewportArchetype,
+  setViewportSize,
+  type ViewportArchetypeName,
+} from './testing/viewport.js';
 
 // ---------------------------------------------------------------------------
 // Helpers — omni binding fixture injection
@@ -527,6 +536,144 @@ describe('<elohim-hypercard-panel>', () => {
 
     // Focus should have restored to the trigger
     expect(document.activeElement).to.equal(trigger);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// <elohim-hypercard-panel> — viewport precondition gate
+//
+// Regression class (2026-06-12): the panel pinned inset-inline-start:0 to a
+// tiny inline anchor with a 240px min width; anchored in end-side chrome
+// (protocol-omni resilience icon at ~83% of a 390px phone viewport) it
+// projected 173px off the right screen edge. Width caps (80vw) bound the
+// box's SIZE but never its POSITION. The fix is the host-set `align` escape
+// hatch — `align="end"` swaps the pin to inset-inline-end:0 so the panel
+// grows INTO the viewport from end-side chrome — plus viewport-relative
+// clamps on the min/max inline-size defaults so the box itself can never be
+// wider than the screen.
+// ---------------------------------------------------------------------------
+
+describe('<elohim-hypercard-panel> — viewport precondition gate', () => {
+  afterEach(() => resetViewport());
+
+  /**
+   * Mimic end-side top chrome (the protocol-omni resilience segment): a tiny
+   * inline anchor wrap pushed to the inline-end edge of a full-width row.
+   */
+  async function endEdgeAnchoredPanel(align?: 'start' | 'end'): Promise<ElohimHypercardPanel> {
+    const row = await fixture<HTMLDivElement>(html`
+      <div style="display: flex; justify-content: flex-end;">
+        <span style="position: relative; display: inline-block;">
+          <button type="button">●</button>
+          <elohim-hypercard-panel
+            panelLabel=${PANEL_LABEL}
+            .actions=${ACTIONS}
+            align=${ifDefined(align)}
+            open
+          >
+            <dl>
+              <dt>Stewarding collectives</dt>
+              <dd>3</dd>
+            </dl>
+          </elohim-hypercard-panel>
+        </span>
+      </div>
+    `);
+    const panel = row.querySelector('elohim-hypercard-panel') as ElohimHypercardPanel;
+    await panel.updateComplete;
+    return panel;
+  }
+
+  it('align property defaults to start and reflects to the attribute', async () => {
+    const el = await fixture<ElohimHypercardPanel>(html`
+      <elohim-hypercard-panel panelLabel=${PANEL_LABEL} open></elohim-hypercard-panel>
+    `);
+    expect(el.align).to.equal('start');
+    el.align = 'end';
+    await elementUpdated(el);
+    expect(el.getAttribute('align')).to.equal('end');
+  });
+
+  const PHONE_CELLS: ViewportArchetypeName[] = ['phone-small', 'phone'];
+  for (const cell of PHONE_CELLS) {
+    it(`align="end" keeps an end-edge-anchored panel inside the ${cell} viewport`, async () => {
+      await setViewportArchetype(cell);
+      const panel = await endEdgeAnchoredPanel('end');
+      assertInlineWithinViewport(panel);
+    });
+  }
+
+  it('align="end" pins the panel inline-end edge to the anchor wrap', async () => {
+    await setViewportArchetype('phone');
+    const panel = await endEdgeAnchoredPanel('end');
+    const wrap = panel.parentElement as HTMLElement;
+    const panelRect = panel.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    expect(Math.abs(panelRect.right - wrapRect.right)).to.be.lessThan(1);
+  });
+
+  it('default (start) alignment still pins the panel inline-start edge to the anchor wrap', async () => {
+    await setViewportArchetype('phone');
+    const row = await fixture<HTMLDivElement>(html`
+      <div style="display: flex; justify-content: flex-start;">
+        <span style="position: relative; display: inline-block;">
+          <button type="button">●</button>
+          <elohim-hypercard-panel panelLabel=${PANEL_LABEL} .actions=${ACTIONS} open>
+            <p>Start-side chrome</p>
+          </elohim-hypercard-panel>
+        </span>
+      </div>
+    `);
+    const panel = row.querySelector('elohim-hypercard-panel') as ElohimHypercardPanel;
+    await panel.updateComplete;
+    const wrap = panel.parentElement as HTMLElement;
+    expect(
+      Math.abs(panel.getBoundingClientRect().left - wrap.getBoundingClientRect().left)
+    ).to.be.lessThan(1);
+    assertInlineWithinViewport(panel);
+  });
+
+  it('clamps its inline size below the viewport width even under the 240px min default', async () => {
+    // Narrower than the 240px min floor + gutter (Galaxy-Fold-cover class is
+    // 280px; 230px exercises the clamp deterministically below the floor).
+    await setViewportSize({ width: 230, height: 568 });
+    const panel = await endEdgeAnchoredPanel('end');
+    const rect = panel.getBoundingClientRect();
+    expect(rect.width).to.be.lessThan(230);
+    assertInlineWithinViewport(panel);
+  });
+
+  it('align="end" in RTL pins to the physical-left wrap edge and stays inside the viewport', async () => {
+    await setViewportArchetype('phone');
+    document.documentElement.setAttribute('dir', 'rtl');
+    try {
+      // In RTL, inline-end is physical LEFT — end-side chrome sits at the
+      // left screen edge, and the panel must grow rightward INTO the viewport.
+      const row = await fixture<HTMLDivElement>(html`
+        <div style="display: flex; justify-content: flex-end;">
+          <span style="position: relative; display: inline-block;">
+            <button type="button">●</button>
+            <elohim-hypercard-panel
+              panelLabel="מצב חוסן"
+              .actions=${[{ id: 'view-full', label: 'הצג מלא' }]}
+              align="end"
+              open
+            >
+              <p>סיכום ניהול קולקטיב</p>
+            </elohim-hypercard-panel>
+          </span>
+        </div>
+      `);
+      const panel = row.querySelector('elohim-hypercard-panel') as ElohimHypercardPanel;
+      await panel.updateComplete;
+      const wrap = panel.parentElement as HTMLElement;
+      expect(
+        Math.abs(panel.getBoundingClientRect().left - wrap.getBoundingClientRect().left)
+      ).to.be.lessThan(1);
+      assertInlineWithinViewport(panel);
+    } finally {
+      document.documentElement.removeAttribute('dir');
+    }
   });
 });
 

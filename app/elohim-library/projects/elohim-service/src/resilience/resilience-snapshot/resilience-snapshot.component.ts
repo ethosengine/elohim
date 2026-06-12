@@ -42,6 +42,16 @@ export class ResilienceSnapshotComponent {
   @Input() actions: ContextMenuItem[] = [];
 
   /**
+   * Inline-axis pin for the icon-density fold-downs (hypercard panel +
+   * hover tooltip). The HOST knows where its chrome sits; anchors in
+   * end-side chrome (e.g. the protocol-omni toolbar) set 'end' so the
+   * surfaces grow INTO the viewport instead of off its edge — the
+   * 2026-06-12 phone regression (panel projected ~173px off a 390px
+   * viewport). Forwarded to the panel's align attribute (spec §11.2).
+   */
+  @Input() panelAlign: 'start' | 'end' = 'start';
+
+  /**
    * Re-emits every action selection id, the built-in `view-full` included —
    * mirrors elohim-epr-link's re-emit contract so a host can observe the full
    * intent stream while the component still owns the in-place density flip.

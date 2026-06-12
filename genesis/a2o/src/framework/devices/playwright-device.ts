@@ -59,6 +59,8 @@ export interface PWPage {
   ): Promise<unknown>;
   /** Current viewport dimensions (null in some headless contexts). */
   viewportSize(): { width: number; height: number } | null;
+  /** Resize the viewport (e.g. to a named viewport archetype). */
+  setViewportSize(size: { width: number; height: number }): Promise<void>;
   /** Keyboard input surface (e.g. `keyboard.press('Escape')`). */
   keyboard: PWKeyboard;
 }

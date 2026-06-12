@@ -177,3 +177,51 @@ void describe('sheetHtml', () => {
     assert.ok(html.includes('&lt;b&gt;&amp;'));
   });
 });
+
+// ---------------------------------------------------------------------------
+// sheetHtml — viewport bands (viewport archetypes as a matrix dimension,
+// sibling of the default/designed family sections)
+// ---------------------------------------------------------------------------
+
+describe('sheetHtml viewport bands', () => {
+  const entries: StoryEntry[] = [
+    {
+      id: 'default-core-elohim-hypercard-panel--standard',
+      title: 'Default/Core/elohim-hypercard-panel',
+      name: 'Standard',
+      type: 'story',
+    },
+  ];
+  const baseOpts = {
+    component: 'elohim-hypercard-panel',
+    base: 'https://storybook.example',
+    entries,
+    cell: { width: 420, height: 320 },
+    cols: 3,
+  };
+
+  it('renders one band per viewport with iframes at the TRUE archetype size', () => {
+    const html = sheetHtml({
+      ...baseOpts,
+      viewports: [
+        { name: 'phone', width: 390, height: 844 },
+        { name: 'desktop', width: 1280, height: 800 },
+      ],
+    });
+    // Band headings name the archetype and its true size.
+    assert.ok(html.includes('phone (390×844)'), 'phone band heading');
+    assert.ok(html.includes('desktop (1280×800)'), 'desktop band heading');
+    // Iframes render at the archetype's true pixel size so vw-relative CSS
+    // and breakpoints resolve as on a real device...
+    assert.ok(html.includes('width="390"'), 'phone-true-size iframe');
+    assert.ok(html.includes('width="1280"'), 'desktop-true-size iframe');
+    // ...and oversized archetypes are scaled down to fit the cell.
+    assert.ok(/scale\(0\.3\d+\)/.test(html), 'desktop iframe scaled to cell width');
+  });
+
+  it('keeps the single-grid shape when viewports are absent', () => {
+    const html = sheetHtml(baseOpts);
+    assert.ok(!html.includes('class="band"'), 'no viewport bands');
+    assert.ok(html.includes(`width="420"`), 'iframe at cell width');
+  });
+});

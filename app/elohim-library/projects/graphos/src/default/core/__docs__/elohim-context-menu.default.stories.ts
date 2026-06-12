@@ -118,6 +118,34 @@ export const ThreeMvpItems: Story = {
   },
 };
 
+export const MobileEndAligned: Story = {
+  name: 'MobileEndAligned (phone archetype, end-side anchor)',
+  globals: { viewport: { value: 'phone', isRotated: false } },
+  render: () => html`
+    <div
+      style="display: flex; justify-content: flex-end; align-items: flex-start; padding-block-start: 0.5rem; min-block-size: 260px;"
+    >
+      <span style="position: relative; display: inline-block;">
+        <button type="button" style="font: inherit; padding: 0.5rem 0.75rem;">epr-chip</button>
+        <elohim-context-menu .open=${true} .items=${mvpItems} align="end"></elohim-context-menu>
+      </span>
+    </div>
+  `,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Viewport-archetype cell: anchor at the inline-END edge on the phone archetype (390×844). ' +
+          'The OPT-IN `align="end"` pins the menu\'s inline-END edge to the `.menu-anchor` wrap so the ' +
+          'fold-down grows INTO the viewport — without `align`, the menu keeps its static position ' +
+          '(existing `<elohim-epr-link>` geometry) and a 180px+ menu would project off-screen. The menu ' +
+          'also caps `max-inline-size` at `min(22rem, calc(100vw - 1rem))` with `overflow-wrap: anywhere` ' +
+          'for unbreakable content-address labels.',
+      },
+    },
+  },
+};
+
 export const WithDisabledItem: Story = {
   name: 'WithDisabledItem',
   render: () => html`

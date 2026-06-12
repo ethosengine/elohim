@@ -82,12 +82,31 @@ export function storiesForSheet(
   );
 }
 
+/** A named viewport archetype band for the sheet's viewport dimension. */
+export interface SheetViewport {
+  name: string;
+  width: number;
+  height: number;
+}
+
 export interface SheetOptions {
   component: string;
   base: string;
   entries: StoryEntry[];
   cell: { width: number; height: number };
   cols: number;
+  /**
+   * Optional viewport dimension: when present, each family section renders
+   * one BAND per archetype, with iframes at the archetype's TRUE pixel size
+   * (so vw-relative CSS and breakpoints resolve as on a real device), scaled
+   * down via CSS transform to fit the cell width.
+   */
+  viewports?: SheetViewport[];
+}
+
+/** Scale factor that fits an archetype's true width into the cell width. */
+export function viewportScale(cellWidth: number, vp: SheetViewport): number {
+  return Math.min(1, cellWidth / vp.width);
 }
 
 /**
@@ -97,7 +116,7 @@ export interface SheetOptions {
  * Precondition: caller validates `entries` is non-empty (the CLI errors before calling).
  */
 export function sheetHtml(opts: SheetOptions): string {
-  const { component, base, entries, cell, cols } = opts;
+  const { component, base, entries, cell, cols, viewports } = opts;
   const byFamily = new Map<string, StoryEntry[]>();
   for (const e of entries) {
     const fam = familyOf(e);
@@ -105,13 +124,39 @@ export function sheetHtml(opts: SheetOptions): string {
     if (list) list.push(e);
     else byFamily.set(fam, [e]);
   }
+  const storyIframe = (e: StoryEntry, width: number, height: number, extra = ''): string =>
+    `<iframe src="${escapeHtml(base)}/iframe.html?id=${encodeURIComponent(e.id)}&amp;viewMode=story" width="${width}" height="${height}" loading="eager"${extra}></iframe>`;
   const sections = [...byFamily.entries()]
     .map(([family, stories]) => {
+      if (viewports && viewports.length > 0) {
+        // Viewport dimension: one band per archetype; iframes at TRUE
+        // archetype size (vw units + breakpoints resolve as on-device),
+        // transform-scaled to fit the cell width.
+        const bands = viewports
+          .map(vp => {
+            const scale = viewportScale(cell.width, vp);
+            const cellW = Math.round(vp.width * scale);
+            const cellH = Math.round(vp.height * scale);
+            const cells = stories
+              .map(
+                e => `<figure class="cell">
+  <figcaption>${escapeHtml(e.name)}</figcaption>
+  <div class="vp-frame" style="width: ${cellW}px; height: ${cellH}px;">
+    ${storyIframe(e, vp.width, vp.height, ` style="transform: scale(${scale}); transform-origin: top left;"`)}
+  </div>
+</figure>`
+              )
+              .join('\n');
+            return `<div class="band">\n<h3>${escapeHtml(vp.name)} (${vp.width}×${vp.height})</h3>\n<div class="grid" style="grid-template-columns: repeat(${cols}, ${cellW}px);">\n${cells}\n</div>\n</div>`;
+          })
+          .join('\n');
+        return `<section>\n<h2>${escapeHtml(family)}</h2>\n${bands}\n</section>`;
+      }
       const cells = stories
         .map(
           e => `<figure class="cell">
   <figcaption>${escapeHtml(e.name)}</figcaption>
-  <iframe src="${escapeHtml(base)}/iframe.html?id=${encodeURIComponent(e.id)}&amp;viewMode=story" width="${cell.width}" height="${cell.height}" loading="eager"></iframe>
+  ${storyIframe(e, cell.width, cell.height)}
 </figure>`
         )
         .join('\n');
@@ -127,10 +172,13 @@ export function sheetHtml(opts: SheetOptions): string {
   body { margin: 0; padding: 8px; font-family: system-ui, sans-serif; background: #fff; }
   h1 { font-size: 16px; margin: 4px 0; }
   h2 { margin: 12px 0 4px; font-size: 14px; }
+  h3 { margin: 8px 0 2px; font-size: 12px; color: #333; }
   .grid { display: grid; grid-template-columns: repeat(${cols}, ${cell.width}px); gap: 8px; }
   .cell { margin: 0; }
   .cell figcaption { font-size: 11px; color: #555; padding: 2px 0; }
   .cell iframe { border: 1px solid #ddd; display: block; }
+  .vp-frame { overflow: hidden; border: 1px solid #ddd; }
+  .vp-frame iframe { border: 0; }
 </style>
 </head>
 <body>

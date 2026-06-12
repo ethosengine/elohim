@@ -1244,6 +1244,24 @@ describe('ContentViewerComponent', () => {
       ).toBeTruthy();
     }));
 
+    it('end-aligns the resilience fold-downs — the icon trails the title text', fakeAsync(() => {
+      // The icon sits at the END of the title's last line; on phone widths a
+      // start-pinned 240px panel projects off the right edge for any line
+      // longer than ~135px (most titles). End-alignment grows it back into
+      // the viewport (2026-06-12 regression class, omnibar spec §11.2).
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+      component.isLoading = false;
+      fixture.detectChanges();
+
+      const wrap = fixture.nativeElement.querySelector(
+        '[data-testid="viewer-resilience-info"] .resilience-icon-wrap',
+      );
+      expect(wrap).toBeTruthy();
+      expect(wrap?.classList.contains('align-end')).toBe(true);
+    }));
+
     it('hides the distribution badge when node.distribution is absent', fakeAsync(() => {
       fixture.detectChanges();
       tick();

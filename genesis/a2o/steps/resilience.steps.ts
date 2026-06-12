@@ -20,6 +20,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import { request } from 'undici';
 
 import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
+import { viewportArchetype } from '../src/framework/fixtures/viewport-archetypes.js';
 import { PROTOCOL_OMNI } from '../src/framework/pages/selectors.js';
 import { retry } from '../src/framework/utils/retry.js';
 import { doorwayToAppUrl } from '../src/framework/utils/url.js';
@@ -694,6 +695,83 @@ Then(
       tooltipBox.y >= iconBox.y + iconBox.height - 1,
       `Tooltip must render below the icon: tooltip top=${tooltipBox.y}, ` +
         `icon bottom=${iconBox.y + iconBox.height}. It should fold DOWN, not UP.`
+    );
+  }
+);
+
+/**
+ * Resize the browser to a named viewport archetype (phone-small | phone |
+ * tablet | desktop) — the viewport dimension of the component matrix, sibling
+ * of the light/dark theme cells. Must run BEFORE navigation so media queries
+ * and vw-relative clamps resolve against the archetype from first paint.
+ */
+Given(
+  'the browser viewport is the {string} archetype',
+  async function (this: E2EWorld, name: string) {
+    const device = findPwDevice(this);
+    if (!device) {
+      assert.fail(NO_PW_DEVICE);
+    }
+    const { width, height } = viewportArchetype(name);
+    await device.page.setViewportSize({ width, height });
+  }
+);
+
+/**
+ * REGRESSION ANCHOR (omnibar spec §11.2 end-alignment amendment): the
+ * hypercard panel pinned inset-inline-start:0 to the icon wrap with a 240px
+ * min width; anchored in end-side omni chrome on a phone archetype it
+ * projected ~173px off the right screen edge. Assert the open panel's box is
+ * FULLY inside the viewport — the inline-axis twin of the tooltip's
+ * fold-down containment anchor above.
+ */
+Then(
+  'the resilience hypercard panel is fully inside the viewport',
+  async function (this: E2EWorld) {
+    const device = findPwDevice(this);
+    if (!device) {
+      assert.fail(NO_PW_DEVICE);
+    }
+    const panel = device.page
+      .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE_HYPERCARD}"]`)
+      .first();
+    await panel.waitFor({ state: 'visible', timeout: 5_000 });
+    const box = await panel.boundingBox();
+    assert.ok(box, 'Expected the resilience hypercard to have a bounding box (is it open?)');
+    const viewport = device.page.viewportSize();
+    assert.ok(viewport, 'Expected a viewport size (browser device should set one)');
+    assert.ok(
+      box.x >= 0 && box.y >= 0,
+      `Hypercard clips off the top/left edge: box=(${box.x}, ${box.y}).`
+    );
+    assert.ok(
+      box.x + box.width <= viewport.width && box.y + box.height <= viewport.height,
+      `Hypercard clips off the right/bottom edge: box right=${box.x + box.width}, ` +
+        `bottom=${box.y + box.height}; viewport=${viewport.width}x${viewport.height}. ` +
+        `Regression: end-side chrome must end-align the panel (align="end") and ` +
+        `the panel must clamp its inline size to the viewport.`
+    );
+  }
+);
+
+/**
+ * WCAG 2.5.8 minimum target size: the resilience icon trigger's hit area must
+ * be at least 24x24 CSS px (it was a 7x14px glyph with zero padding). The
+ * bounding box includes padding, so the padded button is what's measured.
+ */
+Then(
+  'the omni resilience icon meets the minimum tap target size',
+  async function (this: E2EWorld) {
+    const device = findPwDevice(this);
+    if (!device) {
+      assert.fail(NO_PW_DEVICE);
+    }
+    const box = await omniResilienceIcon(device).boundingBox();
+    assert.ok(box, 'Expected the resilience icon to have a bounding box');
+    assert.ok(
+      box.width >= 24 && box.height >= 24,
+      `Resilience icon tap target is ${box.width}x${box.height}px — below the ` +
+        `WCAG 2.5.8 minimum of 24x24. Pad the trigger button's hit area.`
     );
   }
 );

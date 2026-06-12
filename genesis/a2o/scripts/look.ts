@@ -147,11 +147,7 @@ export async function runLook(opts: LookOptions): Promise<LookResult> {
       if (status >= 400) httpErrors.push({ url: resp.url(), status });
     });
     // Override the device's default 1280x720 viewport.
-    await (
-      device.page as unknown as {
-        setViewportSize(s: { width: number; height: number }): Promise<void>;
-      }
-    ).setViewportSize(viewport);
+    await device.page.setViewportSize(viewport);
 
     if (opts.as) {
       const creds = fixtureCredentials(opts.as);

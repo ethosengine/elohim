@@ -14,7 +14,16 @@ export default defineConfig({
       fileName: (_format, entry) => `${entry}.js`,
     },
     rollupOptions: {
-      external: [/^lit($|\/)/, /^@open-wc\//, 'axe-core', /^@lit\//],
+      // @web/test-runner-commands only resolves inside the web-test-runner
+      // (its browser module imports the runner's websocket virtual module) —
+      // it stays external in the library build like the other harness deps.
+      external: [
+        /^lit($|\/)/,
+        /^@open-wc\//,
+        'axe-core',
+        /^@lit\//,
+        /^@web\/test-runner-commands/,
+      ],
     },
     sourcemap: true,
     target: 'es2022',

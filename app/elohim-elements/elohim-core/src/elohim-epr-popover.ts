@@ -311,10 +311,31 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
 
   override updated(changed: Map<string | symbol, unknown>): void {
     super.updated(changed);
-    if (changed.has('position')) {
-      this.style.top = `${this.position.top}px`;
-      this.style.left = `${this.position.left}px`;
+    if (changed.has('position') || changed.has('visible')) {
+      this.applyClampedPosition();
     }
+  }
+
+  /**
+   * Apply the consumer-supplied coords, clamped to the visual viewport. Any
+   * naive anchor-rect caller (rect.bottom/rect.left) reproduces the
+   * 2026-06-12 fold-down overflow class near viewport edges, so the element
+   * owns the final guard. Fixed-position coords are physical by nature —
+   * matching the {top,left} API shape. Re-runs on visible because the box
+   * has no measurable size until it renders.
+   */
+  private applyClampedPosition(): void {
+    let { top, left } = this.position;
+    if (this.visible) {
+      const GUTTER = 8;
+      const rect = this.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth;
+      const viewportHeight = document.documentElement.clientHeight;
+      left = Math.max(GUTTER, Math.min(left, viewportWidth - rect.width - GUTTER));
+      top = Math.max(GUTTER, Math.min(top, viewportHeight - rect.height - GUTTER));
+    }
+    this.style.top = `${top}px`;
+    this.style.left = `${left}px`;
   }
 
   override render(): unknown {

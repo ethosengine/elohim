@@ -64,6 +64,9 @@ Sibling of \`<elohim-context-menu>\`. Reuses the fold-down motion idiom and
 - \`actions: ContextMenuItem[]\` — action row below the slot; absent when empty
 - \`panelLabel: string\` — \`aria-label\` for the \`role="dialog"\`; host-supplied —
   the element ships NO built-in strings
+- \`align: 'start' | 'end'\` (reflected, default \`start\`) — inline-axis pin.
+  Hosts whose anchor sits in END-side chrome set \`end\` so the fold-down grows
+  INTO the viewport instead of off its edge (the 2026-06-12 phone regression).
 
 **Events:**
 - \`action-select\` \`{ detail: { id } }\` — bubbles, composed
@@ -219,6 +222,54 @@ export const Interactive: Story = {
       description: {
         story:
           'Interactive story: a trigger button toggles `open`. Escape, click-outside, and action clicks all close the panel. Check the browser console for events.',
+      },
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// MobileEndAligned — viewport archetype cell (phone) + end-side chrome anchor
+// ---------------------------------------------------------------------------
+
+export const MobileEndAligned: Story = {
+  name: 'MobileEndAligned (phone archetype, end-side chrome)',
+  globals: { viewport: { value: 'phone', isRotated: false } },
+  render: () => html`
+    <div
+      style="display: flex; justify-content: flex-end; align-items: flex-start; padding-block-start: 0.5rem; min-block-size: 320px;"
+    >
+      <span style="position: relative; display: inline-block;">
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          style="font: inherit; background: none; border: 0; cursor: pointer; padding: 0.3125rem 0.5625rem;"
+        >
+          ●
+        </button>
+        <elohim-hypercard-panel
+          panelLabel="Collective resilience"
+          align="end"
+          .actions=${resilienceActions}
+          open
+        >
+          <dl style="margin: 0;">
+            <dt style="font-size: 0.75rem; opacity: 0.7;">Placement coverage</dt>
+            <dd style="margin: 0 0 0.5rem;">9 of 12 collective roles filled</dd>
+            <dt style="font-size: 0.75rem; opacity: 0.7;">Stewarding collectives</dt>
+            <dd style="margin: 0;">Vineyard Household (active)</dd>
+          </dl>
+        </elohim-hypercard-panel>
+      </span>
+    </div>
+  `,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Viewport-archetype cell: a tiny anchor in END-side chrome on the phone archetype (390×844). ' +
+          '`align="end"` pins the panel\'s inline-END edge to the anchor so it grows INTO the viewport — ' +
+          'the default start pin would project ~173px off the right screen edge (2026-06-12 regression). ' +
+          'The min/max inline-size defaults also clamp to `calc(100vw - 1rem)`.',
       },
     },
   },

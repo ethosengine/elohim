@@ -12,6 +12,11 @@ import {
   themeFixture,
   type ThemeCell,
 } from './testing/theme-contrast.js';
+import {
+  assertInlineWithinViewport,
+  resetViewport,
+  setViewportArchetype,
+} from './testing/viewport.js';
 
 // ---------------------------------------------------------------------------
 // Shared fixture data
@@ -374,4 +379,101 @@ describe('<elohim-context-menu> — theme-contrast gate', () => {
       await axeScanStrict(el);
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// <elohim-context-menu> — viewport precondition gate
+//
+// Same regression class as <elohim-hypercard-panel> (2026-06-12): an anchored
+// fold-down surface near the inline-end viewport edge extends off-screen on
+// phone archetypes. The menu's geometry was strictly worse — no insets at all
+// (static position inside the consumer's .menu-anchor) and NO max-inline-size
+// cap. The fix is additive: `align` is OPT-IN (no attribute → static position
+// preserved for existing consumers like <elohim-epr-link>); the viewport
+// width cap applies always.
+// ---------------------------------------------------------------------------
+
+describe('<elohim-context-menu> — viewport precondition gate', () => {
+  afterEach(() => resetViewport());
+
+  it('default (no align) keeps static positioning — below the anchor content, start-aligned', async () => {
+    // Behavior pin for existing consumers (<elohim-epr-link>): with no align
+    // attribute the menu lands at its static position inside the wrap.
+    const wrap = await fixture<HTMLSpanElement>(html`
+      <span style="position: relative; display: inline-block;">
+        <button type="button">chip</button>
+        <elohim-context-menu .items=${ITEMS} open></elohim-context-menu>
+      </span>
+    `);
+    const menu = wrap.querySelector('elohim-context-menu') as ElohimContextMenu;
+    await menu.updateComplete;
+    const button = wrap.querySelector('button') as HTMLButtonElement;
+    // Static position lands the block box at the line box after the inline
+    // chip — within a few px of the button's bottom edge (sub-line-box slack).
+    expect(menu.getBoundingClientRect().top).to.be.greaterThan(
+      button.getBoundingClientRect().bottom - 5
+    );
+    expect(
+      Math.abs(menu.getBoundingClientRect().left - wrap.getBoundingClientRect().left)
+    ).to.be.lessThan(1);
+  });
+
+  it('align="end" keeps an end-edge-anchored menu inside the phone viewport', async () => {
+    await setViewportArchetype('phone');
+    const row = await fixture<HTMLDivElement>(html`
+      <div style="display: flex; justify-content: flex-end;">
+        <span style="position: relative; display: inline-block;">
+          <button type="button">chip</button>
+          <elohim-context-menu .items=${ITEMS} align="end" open></elohim-context-menu>
+        </span>
+      </div>
+    `);
+    const menu = row.querySelector('elohim-context-menu') as ElohimContextMenu;
+    await menu.updateComplete;
+    assertInlineWithinViewport(menu);
+    const wrap = menu.parentElement as HTMLElement;
+    expect(
+      Math.abs(menu.getBoundingClientRect().right - wrap.getBoundingClientRect().right)
+    ).to.be.lessThan(1);
+  });
+
+  it('align="end" folds the menu down below the anchor wrap', async () => {
+    await setViewportArchetype('phone');
+    const row = await fixture<HTMLDivElement>(html`
+      <div style="display: flex; justify-content: flex-end;">
+        <span style="position: relative; display: inline-block;">
+          <button type="button">chip</button>
+          <elohim-context-menu .items=${ITEMS} align="end" open></elohim-context-menu>
+        </span>
+      </div>
+    `);
+    const menu = row.querySelector('elohim-context-menu') as ElohimContextMenu;
+    await menu.updateComplete;
+    const wrap = menu.parentElement as HTMLElement;
+    expect(menu.getBoundingClientRect().top).to.be.greaterThan(
+      wrap.getBoundingClientRect().bottom - 1
+    );
+  });
+
+  it('caps its inline size below the viewport width on phone-small (unbreakable label)', async () => {
+    await setViewportArchetype('phone-small');
+    // A content address is the realistic unbreakable token (no hyphenation
+    // break opportunities mid-hex) — EPR-flavored labels can carry these.
+    const longItems: ContextMenuItem[] = [
+      {
+        id: 'long',
+        label: 'sha256e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      },
+    ];
+    const wrap = await fixture<HTMLSpanElement>(html`
+      <span style="position: relative; display: inline-block;">
+        <button type="button">chip</button>
+        <elohim-context-menu .items=${longItems} open></elohim-context-menu>
+      </span>
+    `);
+    const menu = wrap.querySelector('elohim-context-menu') as ElohimContextMenu;
+    await menu.updateComplete;
+    const viewportWidth = document.documentElement.clientWidth;
+    expect(menu.getBoundingClientRect().width).to.be.at.most(viewportWidth - 8);
+  });
 });

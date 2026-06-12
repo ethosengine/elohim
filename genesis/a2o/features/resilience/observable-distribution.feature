@@ -211,6 +211,39 @@ Feature: Observable + contract-aware auto-distribute
     And the resilience hypercard names the stewarding collective count
     And the resilience hypercard offers a "View full resilience" action
 
+  @browser-only @resilience-p1 @regression
+  Scenario: Resilience hypercard stays fully inside a phone viewport
+    # Regression anchor: the hypercard pinned inset-inline-start:0 to the tiny
+    # icon wrap with a 240px min width; from the omni toolbar on a 390px phone
+    # the panel projected ~173px off the right screen edge — unreadable unless
+    # the phone was rotated to landscape. End-side chrome now end-aligns the
+    # panel (align="end", omnibar spec §11.2 amendment) and the panel clamps
+    # its width to the viewport. The icon trigger also meets the WCAG 2.5.8
+    # minimum tap target (it was a 7x14px glyph).
+    Given "content-alpha" has been distributed to at least 2 households
+    And the browser viewport is the "phone" archetype
+    When I open the EPR resource page for "content-alpha"
+    And I expand the protocol omni toolbar
+    And I click the omni resilience icon
+    Then the resilience hypercard panel is fully inside the viewport
+    And the resilience hypercard panel is visible below the icon
+    And the omni resilience icon meets the minimum tap target size
+
+  @wip @browser-only @resilience-p1
+  Scenario: Content-viewer resilience fold-downs stay inside a phone viewport
+    # Capability proof for the SECOND host of the same constraint: the
+    # content-viewer's resilience icon trails the title's last line, so its
+    # viewport position varies with title length. A start-pinned 240px panel
+    # overflows a 390px phone for any last line wider than ~135px (most
+    # titles); the viewer passes panelAlign="end" so the fold-down grows back
+    # into the viewport. Operational parameters: 240px panel min-inline-size,
+    # 390x844 phone archetype, ~135px title-line tipping point.
+    Given "content-alpha" has been distributed to at least 2 households
+    And the browser viewport is the "phone" archetype
+    When I open the content viewer for "content-alpha"
+    And I click the content-viewer resilience icon
+    Then the content-viewer resilience hypercard is fully inside the viewport
+
   @browser-only @resilience-p1
   Scenario: View full resilience flips the hypercard in place without navigating
     # HyperCard semantics: cards flip in place — deepening disclosure never

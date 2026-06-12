@@ -277,4 +277,40 @@ describe('ResilienceSnapshotComponent', () => {
       ]);
     });
   });
+  // -------------------------------------------------------------------------
+  // panelAlign — inline-axis pin passthrough (2026-06-12 phone regression:
+  // the panel pinned inset-inline-start:0 to the icon wrap in end-side omni
+  // chrome and projected ~173px off a 390px viewport). The HOST knows where
+  // its chrome sits; this component forwards that knowledge to the panel's
+  // align attribute and mirrors it as a wrap class so the hover tooltip flips
+  // the same way.
+  // -------------------------------------------------------------------------
+
+  describe('panelAlign passthrough', () => {
+    it('defaults to start — panel align attribute is start, wrap has no align-end class', () => {
+      component.snapshot = sampleProtected;
+      component.density = 'icon';
+      fixture.detectChanges();
+      expect(panel().getAttribute('align')).toBe('start');
+      const wrap = fixture.nativeElement.querySelector('.resilience-icon-wrap');
+      expect(wrap?.classList.contains('align-end')).toBe(false);
+    });
+
+    it('panelAlign="end" forwards align="end" to the hypercard panel', () => {
+      component.snapshot = sampleProtected;
+      component.density = 'icon';
+      component.panelAlign = 'end';
+      fixture.detectChanges();
+      expect(panel().getAttribute('align')).toBe('end');
+    });
+
+    it('panelAlign="end" marks the wrap with align-end so the tooltip flips too', () => {
+      component.snapshot = sampleProtected;
+      component.density = 'icon';
+      component.panelAlign = 'end';
+      fixture.detectChanges();
+      const wrap = fixture.nativeElement.querySelector('.resilience-icon-wrap');
+      expect(wrap?.classList.contains('align-end')).toBe(true);
+    });
+  });
 });

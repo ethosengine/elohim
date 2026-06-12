@@ -30,17 +30,29 @@
 
   .tooltip {
     position: absolute;
-    top: 100%;
-    left: 0;
+    // Logical insets (he/RTL claimed) + viewport-clamped sizes: a start-pinned
+    // fixed-min-width tooltip off a badge near the inline-end edge is the
+    // 2026-06-12 fold-down regression class. Width caps bound the box's SIZE;
+    // the align-end flip below handles its POSITION.
+    inset-block-start: 100%;
+    inset-inline-start: 0;
     z-index: 10;
-    margin-top: 0.25rem;
+    margin-block-start: 0.25rem;
     padding: 0.5rem;
     background: var(--surface-1, white);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     border-radius: 4px;
-    min-width: 240px;
+    min-inline-size: min(240px, calc(100vw - 1rem));
+    max-inline-size: min(20rem, calc(100vw - 1rem));
     font-size: 0.85rem;
     color: var(--text-default, inherit);
+  }
+
+  // End-side placement (host sets tooltipAlign="end"): pin the tooltip's
+  // inline-END edge to the badge so it grows into the viewport.
+  &.align-end .tooltip {
+    inset-inline-start: auto;
+    inset-inline-end: 0;
   }
 
   .tooltip-row {

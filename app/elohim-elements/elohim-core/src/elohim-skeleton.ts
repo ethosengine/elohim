@@ -95,10 +95,10 @@ export class ElohimSkeleton extends LitElement {
     // host's inline style, which beats every inherited
     // --elohim-skeleton-radius binding and silently kills the advertised
     // @cssprop override surface.
-    if (this.radius !== ElohimSkeleton.DEFAULT_RADIUS) {
-      this.style.setProperty('--elohim-skeleton-radius', this.radius);
-    } else {
+    if (this.radius === ElohimSkeleton.DEFAULT_RADIUS) {
       this.style.removeProperty('--elohim-skeleton-radius');
+    } else {
+      this.style.setProperty('--elohim-skeleton-radius', this.radius);
     }
   }
 

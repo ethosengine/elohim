@@ -1,6 +1,11 @@
 <ng-container [ngSwitch]="density">
   <!-- icon + tooltip density -->
-  <span *ngSwitchCase="'icon'" class="resilience-icon-wrap" [class.panel-open]="panelOpen">
+  <span
+    *ngSwitchCase="'icon'"
+    class="resilience-icon-wrap"
+    [class.panel-open]="panelOpen"
+    [class.align-end]="panelAlign === 'end'"
+  >
     <button
       type="button"
       data-testid="resilience-icon"
@@ -27,6 +32,7 @@
       data-testid="resilience-hypercard"
       [open]="panelOpen"
       [actions]="panelActions"
+      [attr.align]="panelAlign"
       panelLabel="Resilience details"
       (action-select)="onPanelAction($event)"
       (close)="onPanelClose()"
