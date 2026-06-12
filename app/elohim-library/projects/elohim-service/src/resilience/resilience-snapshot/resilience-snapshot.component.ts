@@ -64,7 +64,18 @@ export class ResilienceSnapshotComponent {
   /** Which density body the panel renders; reset to 'context' on close. */
   panelDensity: 'context' | 'full' = 'context';
 
+  /**
+   * Unmeasured ≠ zero (2026-06-12): content that never entered the
+   * distribution plane reports `distributionState: 'unmeasured'` — every
+   * count is a non-measurement. Render a distinct neutral state, never a
+   * fake at-risk verdict.
+   */
+  get isUnmeasured(): boolean {
+    return this.snapshot?.distributionState === 'unmeasured';
+  }
+
   get statusClass(): string {
+    if (this.isUnmeasured) return 'status-unmeasured';
     switch (this.snapshot?.protectionStatus) {
       case 'protected':
         return 'status-protected';
@@ -75,6 +86,18 @@ export class ResilienceSnapshotComponent {
       default:
         return 'status-unknown';
     }
+  }
+
+  /** Human status text — 'not yet distributed' for unmeasured content. */
+  get statusLabel(): string {
+    return this.isUnmeasured ? 'not yet distributed' : (this.snapshot?.protectionStatus ?? '');
+  }
+
+  /** "live/known peers live" pair, e.g. "2/3" — honest denominators. */
+  get peersLiveSummary(): string {
+    const peers = this.snapshot?.details?.onlinePeers;
+    if (!peers) return '';
+    return `${peers.live}/${peers.known} peers live`;
   }
 
   get regionSummary(): string {

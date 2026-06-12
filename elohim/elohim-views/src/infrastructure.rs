@@ -1451,6 +1451,11 @@ pub struct RegionalDistributionView {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct ResilienceSnapshotView {
     pub content_id: String,
+    /// `"unmeasured"` when the content has never entered the distribution
+    /// plane (no shard manifest) — every count in this view is then a
+    /// non-measurement, NOT a measured zero. `"measured"` when a manifest
+    /// exists and the counts are real.
+    pub distribution_state: String,
     pub stewarding_collectives: i32,
     pub commitment_backed_collectives: i32,
     pub diversity_score: f32,
@@ -1485,8 +1490,23 @@ pub struct StewardingCollectiveEntry {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct ResilienceSnapshotDetailsView {
     pub stewarding_collectives: Vec<StewardingCollectiveEntry>,
-    pub online_peer_count: i32,
+    pub online_peers: OnlinePeersView,
     pub health_score: f32,
+}
+
+/// Live/known peer pair — honest denominators ("2/3 peers live"; "0/0" only
+/// when genuinely nothing is known).
+///
+/// Wire format: embedded in `resilience-snapshot-view.schema.json` details
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct OnlinePeersView {
+    /// Peers with an active online|degraded PeerStatus across the stewarding
+    /// collectives.
+    pub live: i32,
+    /// Stewarded nodes registered across those collectives (the D2 join).
+    pub known: i32,
 }
 
 /// Replica health bucket for a CID's distribution summary.

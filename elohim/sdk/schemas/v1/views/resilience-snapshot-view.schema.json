@@ -7,6 +7,7 @@
   "additionalProperties": false,
   "required": [
     "contentId",
+    "distributionState",
     "stewardingCollectives",
     "commitmentBackedCollectives",
     "diversityScore",
@@ -16,6 +17,7 @@
   ],
   "properties": {
     "contentId":                   { "type": "string" },
+    "distributionState":           { "enum": ["unmeasured", "measured"], "description": "unmeasured = content has never entered the distribution plane (no shard manifest) — every count below is a non-measurement, NOT a measured zero. measured = a shard manifest exists and the counts are real. Renderers MUST show a distinct 'not yet distributed' state for unmeasured, never a fake at-risk verdict. Diagnostic tell preserved: a measured content with regionless stewards puts steward counts in regionalDistribution.unknown, so unknown == 0 with all-zeros implies unmeasured." },
     "stewardingCollectives":       { "type": "integer", "minimum": 0, "description": "Distinct collectives (of any kind) with at least one peer holding this content." },
     "commitmentBackedCollectives": { "type": "integer", "minimum": 0, "description": "Distinct collectives with an active REA commitment covering this content." },
     "diversityScore":              { "type": "number",  "minimum": 0, "maximum": 1, "description": "0..1 — ratio of achieved distinct-collective placements to requested." },
@@ -54,7 +56,16 @@
             }
           }
         },
-        "onlinePeerCount": { "type": "integer", "minimum": 0 },
+        "onlinePeers": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["live", "known"],
+          "description": "Live/known peer pair — honest denominators. live = peers with an active online|degraded PeerStatus across the stewarding collectives; known = stewarded nodes registered across those collectives. Renderers show 'live/known peers live' (e.g. '2/3'); '0/0' only when genuinely nothing is known.",
+          "properties": {
+            "live":  { "type": "integer", "minimum": 0 },
+            "known": { "type": "integer", "minimum": 0 }
+          }
+        },
         "healthScore":     { "type": "number",  "minimum": 0, "maximum": 1 }
       }
     }

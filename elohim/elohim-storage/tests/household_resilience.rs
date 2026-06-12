@@ -1,8 +1,8 @@
 use diesel::{ExpressionMethods, RunQueryDsl};
 use elohim_storage::db;
 use elohim_storage::db::models::{
-    NewCollective, NewHuman, NewPlacementGap, NewReaCommitment, NewShardLocation,
-    NewShardManifest, NewStewardedNode,
+    NewCollective, NewHuman, NewPlacementGap, NewReaCommitment, NewShardLocation, NewShardManifest,
+    NewStewardedNode,
 };
 use elohim_storage::db::peer_statuses::PeerStatusRow;
 use elohim_storage::db::placement_gaps;
@@ -291,6 +291,32 @@ fn d1_missing_manifest_is_degenerate_at_risk() {
     assert!(view.details.steward_households.is_empty());
 }
 
+#[test]
+fn d1_missing_manifest_snapshot_is_unmeasured_not_zero() {
+    // 2026-06-12 unmeasured≠zero: a content that never entered the
+    // distribution plane must declare itself UNMEASURED — the all-zero counts
+    // are non-measurements, and renderers must not show a fake at-risk
+    // verdict. (Every bulk-seeded content hits this path today.)
+    let pool = test_pool();
+    let snapshot =
+        household_resilience::snapshot(&pool, &ctx(), "content-never-seeded", None).unwrap();
+    assert_eq!(snapshot.distribution_state, "unmeasured");
+    // The diagnostic tell stays intact: unknown == 0 with all-zeros.
+    assert_eq!(snapshot.regional_distribution.unknown, 0);
+    let details = snapshot.details.expect("details present");
+    assert_eq!(details.online_peers.live, 0);
+    assert_eq!(details.online_peers.known, 0);
+}
+
+#[test]
+fn d1_manifest_present_snapshot_is_measured() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let content_id = seed_protection_case(&mut conn, "d1-measured", &[("home-a", 0)]);
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), &content_id, None).unwrap();
+    assert_eq!(snapshot.distribution_state, "measured");
+}
+
 // =============================================================================
 // D2 — Peer counts: only online|degraded peers, only within stewarding
 // households. These pin the INTENDED semantics — list_by_household's
@@ -336,6 +362,26 @@ fn d2_peer_outside_stewarding_households_does_not_count() {
     );
 }
 
+#[test]
+fn d2_snapshot_reports_live_over_known_denominator() {
+    // Honest denominators: live = online|degraded peers in stewarding
+    // households; known = stewarded nodes registered across those households.
+    // Tooltip renders "1/2 peers live", never a bare zero.
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let content_id = seed_protection_case(&mut conn, "d2-live-known", &[("home-a", 0)]);
+    seed_stewarded_node(&mut conn, "peer-live", Some("home-a"));
+    seed_peer_status(&mut conn, "peer-live", "online");
+    seed_stewarded_node(&mut conn, "peer-dark", Some("home-a"));
+    // peer-dark has NO PeerStatus row — known but not live.
+    // A node in a non-stewarding household counts in neither number.
+    seed_stewarded_node(&mut conn, "peer-elsewhere", Some("home-zz"));
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), &content_id, None).unwrap();
+    let details = snapshot.details.expect("details present");
+    assert_eq!(details.online_peers.live, 1, "online peer in home-a");
+    assert_eq!(details.online_peers.known, 2, "stewarded nodes in home-a");
+}
+
 // =============================================================================
 // D3 — Commitment-backing: distinct households over provide+active rows
 // scoped content:<reach> (reach falls back to "commons" with no content row).
@@ -345,24 +391,62 @@ fn d2_peer_outside_stewarding_households_does_not_count() {
 fn d3_commitment_backing_edges() {
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
-    let content_id =
-        seed_protection_case(&mut conn, "d3", &[("home-a", 0), ("home-b", 0), ("home-c", 0)]);
+    let content_id = seed_protection_case(
+        &mut conn,
+        "d3",
+        &[("home-a", 0), ("home-b", 0), ("home-c", 0)],
+    );
 
     let agent_a = "agent-d3-home-a"; // seeded by seed_protection_case
     let agent_b = "agent-d3-home-b";
     let agent_c = "agent-d3-home-c";
 
     // Counts: active provide, content:commons.
-    seed_commitment(&mut conn, "c1", agent_a, "provide", "active", "content:commons");
+    seed_commitment(
+        &mut conn,
+        "c1",
+        agent_a,
+        "provide",
+        "active",
+        "content:commons",
+    );
     // Same household second row — still one household.
-    seed_commitment(&mut conn, "c2", agent_a, "provide", "active", "content:commons");
+    seed_commitment(
+        &mut conn,
+        "c2",
+        agent_a,
+        "provide",
+        "active",
+        "content:commons",
+    );
     // proposed does NOT count.
-    seed_commitment(&mut conn, "c3", agent_b, "provide", "proposed", "content:commons");
+    seed_commitment(
+        &mut conn,
+        "c3",
+        agent_b,
+        "provide",
+        "proposed",
+        "content:commons",
+    );
     // Wrong scope does NOT count.
-    seed_commitment(&mut conn, "c4", agent_c, "provide", "active", "content:community");
+    seed_commitment(
+        &mut conn,
+        "c4",
+        agent_c,
+        "provide",
+        "active",
+        "content:community",
+    );
     // Provider with no household junction does NOT count.
     seed_human(&mut conn, "agent-d3-ghost", None);
-    seed_commitment(&mut conn, "c5", "agent-d3-ghost", "provide", "active", "content:commons");
+    seed_commitment(
+        &mut conn,
+        "c5",
+        "agent-d3-ghost",
+        "provide",
+        "active",
+        "content:commons",
+    );
 
     let snapshot = household_resilience::snapshot(&pool, &ctx(), &content_id, None).unwrap();
     assert_eq!(
@@ -466,8 +550,16 @@ fn d5_no_viewer_no_region_is_unknown() {
 
 #[test]
 fn d5_same_region_is_local() {
-    let s = d5_snapshot("d5-local", Some("home-viewer"), &[("home-a", Some("us-east"))]);
-    assert_eq!(s.regional_distribution.local, 1, "{:?}", s.regional_distribution);
+    let s = d5_snapshot(
+        "d5-local",
+        Some("home-viewer"),
+        &[("home-a", Some("us-east"))],
+    );
+    assert_eq!(
+        s.regional_distribution.local, 1,
+        "{:?}",
+        s.regional_distribution
+    );
 }
 
 #[test]
@@ -477,13 +569,21 @@ fn d5_different_region_is_regional() {
         Some("home-viewer"),
         &[("home-a", Some("eu-west"))],
     );
-    assert_eq!(s.regional_distribution.regional, 1, "{:?}", s.regional_distribution);
+    assert_eq!(
+        s.regional_distribution.regional, 1,
+        "{:?}",
+        s.regional_distribution
+    );
 }
 
 #[test]
 fn d5_viewer_with_region_steward_without_is_unknown() {
     let s = d5_snapshot("d5-vr-unknown", Some("home-viewer"), &[("home-a", None)]);
-    assert_eq!(s.regional_distribution.unknown, 1, "{:?}", s.regional_distribution);
+    assert_eq!(
+        s.regional_distribution.unknown, 1,
+        "{:?}",
+        s.regional_distribution
+    );
 }
 
 #[test]

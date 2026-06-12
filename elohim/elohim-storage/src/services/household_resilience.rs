@@ -14,7 +14,7 @@ use crate::db::{peer_statuses, placement_gaps, AppContext, DbPool};
 use crate::error::StorageError;
 use crate::views::{
     CommitmentBackedReplication, HouseholdResilienceDetails, HouseholdResilienceView,
-    PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
+    OnlinePeersView, PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
     ResilienceSnapshotView, StewardingCollectiveEntry,
 };
 
@@ -143,6 +143,17 @@ pub fn snapshot(
         .get()
         .map_err(|e| StorageError::Internal(e.to_string()))?;
 
+    // Distribution-state honesty (2026-06-12 unmeasured≠zero): a content with
+    // no shard manifest has never entered the distribution plane — every
+    // count below is a non-measurement, not a measured zero. Renderers show a
+    // distinct "not yet distributed" state instead of a fake at-risk verdict.
+    let distribution_state =
+        match crate::db::shard_manifests::get_manifest(&mut conn, &ctx.h_app_id, content_id)? {
+            Some(_) => "measured",
+            None => "unmeasured",
+        }
+        .to_string();
+
     // commitment_backed_collectives: distinct households with an active provide
     // commitment whose resource_classified_as matches this content's reach.
     use crate::db::diesel_schema::{content, humans, rea_commitments};
@@ -224,8 +235,30 @@ pub fn snapshot(
         })
         .collect();
 
+    // Known denominator: stewarded nodes registered across the stewarding
+    // collectives (the D2 join) — "2/3 peers live", never a bare zero.
+    let known_peer_count: i32 = {
+        use crate::db::diesel_schema::stewarded_nodes;
+        if base.details.steward_households.is_empty() {
+            0
+        } else {
+            stewarded_nodes::table
+                .filter(stewarded_nodes::h_app_id.eq(&ctx.h_app_id))
+                .filter(stewarded_nodes::household_id.is_not_null())
+                .filter(
+                    stewarded_nodes::household_id
+                        .assume_not_null()
+                        .eq_any(&base.details.steward_households),
+                )
+                .count()
+                .first::<i64>(&mut conn)
+                .unwrap_or(0) as i32
+        }
+    };
+
     Ok(ResilienceSnapshotView {
         content_id: base.content_id.clone(),
+        distribution_state,
         stewarding_collectives: base.households_stewarding,
         commitment_backed_collectives,
         diversity_score,
@@ -235,7 +268,10 @@ pub fn snapshot(
         reciprocating_collectives: Some(base.households_reciprocated),
         details: Some(ResilienceSnapshotDetailsView {
             stewarding_collectives: steward_collective_entries,
-            online_peer_count: base.details.online_peer_count,
+            online_peers: OnlinePeersView {
+                live: base.details.online_peer_count,
+                known: known_peer_count,
+            },
             health_score: base.details.health_score,
         }),
     })

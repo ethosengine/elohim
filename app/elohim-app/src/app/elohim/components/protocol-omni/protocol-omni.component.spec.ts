@@ -277,13 +277,14 @@ describe('ProtocolOmniComponent serving context', () => {
 describe('ProtocolOmniComponent resilience segment', () => {
   const snapshotFixture: ResilienceSnapshotView = {
     contentId: 'test-cid',
+    distributionState: 'measured',
     stewardingCollectives: 3,
     commitmentBackedCollectives: 2,
     diversityScore: 0.43,
     regionalDistribution: { local: 1, regional: 1, global: 1, unknown: 0 },
     placementGaps: [],
     protectionStatus: 'partial',
-    details: { stewardingCollectives: [], onlinePeerCount: 5, healthScore: 0.8 },
+    details: { stewardingCollectives: [], onlinePeers: { live: 5, known: 6 }, healthScore: 0.8 },
   } as ResilienceSnapshotView;
 
   function setup(opts?: { getSnapshot?: ReturnType<typeof vi.fn>; contentId?: string }) {
@@ -406,7 +407,7 @@ describe('ProtocolOmniComponent resilience segment', () => {
     const tooltip = segment()?.querySelector('[data-testid="resilience-tooltip"]');
     expect(tooltip?.textContent).toContain('3 collectives');
     expect(tooltip?.textContent).toContain('2 commitment-backed');
-    expect(tooltip?.textContent).toContain('5 peers online');
+    expect(tooltip?.textContent).toContain('5/6 peers live');
   });
 
   it('refetches for the new CID when contentId changes while expanded (no stale claim)', () => {

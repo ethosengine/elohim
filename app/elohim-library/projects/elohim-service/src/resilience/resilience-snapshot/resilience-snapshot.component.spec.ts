@@ -6,6 +6,7 @@ import type { ContextMenuItem } from 'elohim-core';
 
 const sampleProtected: ResilienceSnapshotView = {
   contentId: 'c1',
+  distributionState: 'measured',
   stewardingCollectives: 4,
   commitmentBackedCollectives: 4,
   diversityScore: 0.95,
@@ -74,13 +75,45 @@ describe('ResilienceSnapshotComponent', () => {
   it('icon tooltip names peers online when details carry a live peer count', () => {
     component.snapshot = {
       ...sampleProtected,
-      details: { stewardingCollectives: [], onlinePeerCount: 5 },
+      details: { stewardingCollectives: [], onlinePeers: { live: 5, known: 8 } },
     };
     component.density = 'icon';
     fixture.detectChanges();
     const tooltip =
       fixture.nativeElement.querySelector('[data-testid="resilience-tooltip"]')?.textContent ?? '';
-    expect(tooltip).toContain('5 peers online');
+    expect(tooltip).toContain('5/8 peers live');
+  });
+
+  it('icon tooltip renders the unmeasured state instead of a fake at-risk verdict', () => {
+    // Unmeasured ≠ zero (2026-06-12): content that never entered the
+    // distribution plane must say so — never render at-risk counts.
+    component.snapshot = {
+      ...sampleProtected,
+      distributionState: 'unmeasured',
+      stewardingCollectives: 0,
+      commitmentBackedCollectives: 0,
+      diversityScore: 0,
+      protectionStatus: 'at-risk',
+    };
+    component.density = 'icon';
+    fixture.detectChanges();
+    const iconEl = fixture.nativeElement.querySelector('[data-testid="resilience-icon"]');
+    expect(iconEl?.classList.contains('status-unmeasured')).toBe(true);
+    expect(iconEl?.classList.contains('status-at-risk')).toBe(false);
+    const tooltip =
+      fixture.nativeElement.querySelector('[data-testid="resilience-tooltip"]')?.textContent ?? '';
+    expect(tooltip).toContain('not yet distributed');
+    expect(tooltip).not.toContain('at-risk');
+  });
+
+  it('context density carries the unmeasured note', () => {
+    component.snapshot = { ...sampleProtected, distributionState: 'unmeasured' };
+    component.density = 'context';
+    fixture.detectChanges();
+    const note = fixture.nativeElement.querySelector(
+      '[data-testid="resilience-unmeasured-note"]',
+    );
+    expect(note?.textContent).toContain('not entered the distribution plane');
   });
 
   it('icon tooltip stays silent about peers when details are absent', () => {
@@ -90,7 +123,7 @@ describe('ResilienceSnapshotComponent', () => {
     fixture.detectChanges();
     const tooltip =
       fixture.nativeElement.querySelector('[data-testid="resilience-tooltip"]')?.textContent ?? '';
-    expect(tooltip).not.toContain('peers online');
+    expect(tooltip).not.toContain('peers live');
   });
 
   it('context-menu density lists placement gap count', () => {
@@ -127,7 +160,7 @@ describe('ResilienceSnapshotComponent', () => {
           { id: 'home-gamma', kind: 'household', label: 'Gamma Household' },
           { id: 'home-delta', kind: 'household', label: 'Delta Household' },
         ],
-        onlinePeerCount: 4,
+        onlinePeers: { live: 4, known: 4 },
         healthScore: 0.95,
       },
     };

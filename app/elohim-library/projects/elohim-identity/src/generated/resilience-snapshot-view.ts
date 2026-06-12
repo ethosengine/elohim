@@ -7,6 +7,10 @@
 export interface ResilienceSnapshotView {
   contentId: string;
   /**
+   * unmeasured = content has never entered the distribution plane (no shard manifest) — every count below is a non-measurement, NOT a measured zero. measured = a shard manifest exists and the counts are real. Renderers MUST show a distinct 'not yet distributed' state for unmeasured, never a fake at-risk verdict. Diagnostic tell preserved: a measured content with regionless stewards puts steward counts in regionalDistribution.unknown, so unknown == 0 with all-zeros implies unmeasured.
+   */
+  distributionState: 'unmeasured' | 'measured';
+  /**
    * Distinct collectives (of any kind) with at least one peer holding this content.
    */
   stewardingCollectives: number;
@@ -45,7 +49,13 @@ export interface ResilienceSnapshotView {
        */
       label?: string;
     }[];
-    onlinePeerCount?: number;
+    /**
+     * Live/known peer pair — honest denominators. live = peers with an active online|degraded PeerStatus across the stewarding collectives; known = stewarded nodes registered across those collectives. Renderers show 'live/known peers live' (e.g. '2/3'); '0/0' only when genuinely nothing is known.
+     */
+    onlinePeers?: {
+      live: number;
+      known: number;
+    };
     healthScore?: number;
   };
 }

@@ -1008,12 +1008,13 @@ fn placement_gap_view_matches_schema() {
 #[test]
 fn resilience_snapshot_view_matches_schema() {
     use elohim_storage::{
-        PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
+        OnlinePeersView, PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
         ResilienceSnapshotView, StewardingCollectiveEntry,
     };
 
     let view = ResilienceSnapshotView {
         content_id: "content-abc-001".to_string(),
+        distribution_state: "measured".to_string(),
         stewarding_collectives: 3,
         commitment_backed_collectives: 2,
         diversity_score: 0.75,
@@ -1049,7 +1050,7 @@ fn resilience_snapshot_view_matches_schema() {
                     label: None,
                 },
             ],
-            online_peer_count: 5,
+            online_peers: OnlinePeersView { live: 5, known: 7 },
             health_score: 0.8,
         }),
     };
@@ -1065,6 +1066,7 @@ fn resilience_snapshot_view_minimal_matches_schema() {
     // Minimal: no reciprocating_collectives, no details, empty gaps
     let view = ResilienceSnapshotView {
         content_id: "content-minimal-001".to_string(),
+        distribution_state: "unmeasured".to_string(),
         stewarding_collectives: 1,
         commitment_backed_collectives: 1,
         diversity_score: 1.0,

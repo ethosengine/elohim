@@ -22,6 +22,18 @@
   &.status-unknown {
     color: var(--neutral-400, #9ca3af);
   }
+  // Unmeasured ≠ zero: a distinct neutral state for content that has never
+  // entered the distribution plane — never the at-risk red.
+  &.status-unmeasured {
+    color: var(--neutral-300, #d1d5db);
+  }
+}
+
+.unmeasured-note {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.85em;
+  font-style: italic;
+  color: var(--neutral-500, #6b7280);
 }
 
 // The icon glyph is now a <button> in icon density; reset native chrome so

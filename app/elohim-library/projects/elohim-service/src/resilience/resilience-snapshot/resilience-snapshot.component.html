@@ -11,7 +11,7 @@
       data-testid="resilience-icon"
       class="resilience-icon"
       [ngClass]="statusClass"
-      [attr.aria-label]="'Resilience: ' + snapshot.protectionStatus"
+      [attr.aria-label]="'Resilience: ' + statusLabel"
       aria-haspopup="dialog"
       [attr.aria-expanded]="panelOpen"
       (click)="togglePanel()"
@@ -20,12 +20,15 @@
       ●
     </button>
     <span data-testid="resilience-tooltip" class="resilience-tooltip">
-      {{ snapshot.stewardingCollectives }} collectives ·
-      {{ snapshot.commitmentBackedCollectives }} commitment-backed ·
-      {{ regionSummary || 'no region data' }} · {{ snapshot.protectionStatus }}
-      <ng-container *ngIf="snapshot.details?.onlinePeerCount != null">
-        · {{ snapshot.details?.onlinePeerCount }} peers online
+      <ng-container *ngIf="isUnmeasured; else measuredTooltip">
+        not yet distributed — no measurements
       </ng-container>
+      <ng-template #measuredTooltip>
+        {{ snapshot.stewardingCollectives }} collectives ·
+        {{ snapshot.commitmentBackedCollectives }} commitment-backed ·
+        {{ regionSummary || 'no region data' }} · {{ snapshot.protectionStatus }}
+        <ng-container *ngIf="peersLiveSummary"> · {{ peersLiveSummary }} </ng-container>
+      </ng-template>
     </span>
 
     <elohim-hypercard-panel
@@ -63,8 +66,12 @@
   <div class="resilience-context-panel" [ngClass]="statusClass">
     <header>
       <span class="resilience-icon" [ngClass]="statusClass">●</span>
-      <strong>{{ snapshot.protectionStatus }}</strong>
+      <strong>{{ statusLabel }}</strong>
     </header>
+    <p *ngIf="isUnmeasured" class="unmeasured-note" data-testid="resilience-unmeasured-note">
+      This content has not entered the distribution plane yet — the counts below are
+      non-measurements, not zeros.
+    </p>
     <dl>
       <dt>Stewarding collectives</dt>
       <dd>{{ snapshot.stewardingCollectives }}</dd>
@@ -85,8 +92,13 @@
     <header>
       <h3>Resilience snapshot</h3>
       <span class="resilience-icon" [ngClass]="statusClass">●</span>
-      <span class="status-pill">{{ snapshot.protectionStatus }}</span>
+      <span class="status-pill">{{ statusLabel }}</span>
     </header>
+
+    <p *ngIf="isUnmeasured" class="unmeasured-note">
+      This content has not entered the distribution plane yet — the counts below are
+      non-measurements, not zeros.
+    </p>
 
     <dl class="summary-grid">
       <dt>Stewarding collectives</dt>

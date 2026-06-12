@@ -39,6 +39,14 @@ pub fn build(engine: &GraphEngine, cid: &str) -> Result<ResilienceSnapshotView, 
 
     Ok(ResilienceSnapshotView {
         content_id: cid.to_string(),
+        // Graph-backed branch measures STEWARDS edges directly: an atom with
+        // zero edges is honestly unmeasured (no distribution-plane entry),
+        // one with edges is measured.
+        distribution_state: if stewarding_count > 0 {
+            "measured".to_string()
+        } else {
+            "unmeasured".to_string()
+        },
         stewarding_collectives: stewarding_count,
         commitment_backed_collectives: commitment_backed_count,
         // Composition placeholders — require relational placement-gap + peer diversity reads

@@ -11,4 +11,11 @@ import type { ResilienceSnapshotDetailsView } from "./ResilienceSnapshotDetailsV
  *
  * Wire format: `elohim/sdk/schemas/v1/views/resilience-snapshot-view.schema.json`
  */
-export type ResilienceSnapshotView = { contentId: string, stewardingCollectives: number, commitmentBackedCollectives: number, diversityScore: number, regionalDistribution: RegionalDistributionView, placementGaps: Array<PlacementGapView>, protectionStatus: string, reciprocatingCollectives: number | null, details: ResilienceSnapshotDetailsView | null, };
+export type ResilienceSnapshotView = { contentId: string, 
+/**
+ * `"unmeasured"` when the content has never entered the distribution
+ * plane (no shard manifest) — every count in this view is then a
+ * non-measurement, NOT a measured zero. `"measured"` when a manifest
+ * exists and the counts are real.
+ */
+distributionState: string, stewardingCollectives: number, commitmentBackedCollectives: number, diversityScore: number, regionalDistribution: RegionalDistributionView, placementGaps: Array<PlacementGapView>, protectionStatus: string, reciprocatingCollectives: number | null, details: ResilienceSnapshotDetailsView | null, };
