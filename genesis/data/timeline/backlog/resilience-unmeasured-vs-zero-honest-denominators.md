@@ -82,3 +82,25 @@ commit|push|log|tag|stock`), and the seed sprint becomes
 `epr push --as trusted-issuer` in a loop — the provenance manifest is
 the commit graph real usage would have produced. Bonus: every seed run
 becomes an at-scale integration test of the whole CRUD gate surface.
+
+**Home project: brit (operator-routed, 2026-06-12).** `elohim/brit`
+submodule — the gitoxide expansion that makes version control covenantal
+(approved spec `docs/specs/2026-04-12-brit-design.md`; LLM-first CLI is
+framing #1). This is NOT greenfield: Phases 0+1 + 2a are COMPLETE —
+three-pillar RFC-822 trailers surviving stock `git clone`, `brit verify`,
+signed build/deploy/validate/reach attestation ContentNodes under
+`refs/notes/brit/`, `brit build-ref` CLI, EPR-id→git-ref encoding
+(`encode_segment`), `Signed` trait + `verify_signed_node`. Branch
+anatomy: `gix-main` = upstream-gitoxide parity tracking; `gix-brit` =
+the fork line (git porcelain journeys: restore/switch/mv steward-
+verified); `feature/phase-2a-attestation-primitives` = the brit-epr
+engine features. The EPR seeding/authoring suite = **native EPR-based
+commands building on the NON-parity features** (brit-epr engine +
+elohim-protocol AppSchema feature flag), and brit Phase 2 ("git
+artifacts become protocol content" — repos/commits/branches addressable
+by CID) is this idea's inverse direction already on the roadmap: the
+two meet where content authoring IS covenant commits and the
+distribution-plane provenance manifest IS the commit graph. Scope note
+(operator: "a bit of a rabbit hole"): route the design session to
+brit's roadmap — do not expand this backlog entry's view-honesty fix
+(part 1) to wait on it.
