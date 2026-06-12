@@ -185,11 +185,8 @@ fn build_health_response(state: &AppState) -> HealthResponse {
     // Registration is always open for now (can be made configurable via args later)
     let registration_open = true;
 
-    // Calculate uptime in seconds (approximate - from process start)
-    let uptime = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+    // Calculate uptime in seconds since AppState creation (process start)
+    let uptime = (chrono::Utc::now() - state.started_at).num_seconds().max(0) as u64;
 
     // Read cached P2P health (non-blocking — uses try_read to avoid stalling health checks)
     let p2p = state
@@ -285,6 +282,38 @@ pub fn readiness_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         .header("Content-Type", "application/json")
         .body(Full::new(Bytes::from(body)))
         .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Args;
+    use clap::Parser;
+
+    fn test_state() -> AppState {
+        let args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        AppState::new(args)
+    }
+
+    #[test]
+    fn uptime_is_relative_to_process_start_not_epoch() {
+        let state = test_state();
+        let response = build_health_response(&state);
+        // A freshly created AppState has near-zero uptime. The old bug
+        // reported seconds-since-UNIX-epoch here (~1.7 billion).
+        assert!(
+            response.uptime < 60,
+            "uptime should be seconds since start, got {}",
+            response.uptime
+        );
+    }
+
+    #[test]
+    fn liveness_returns_200_even_without_conductor() {
+        let state = Arc::new(test_state());
+        let resp = health_check(state);
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
 }
 
 /// Handle startup progress endpoint (/health/startup)
