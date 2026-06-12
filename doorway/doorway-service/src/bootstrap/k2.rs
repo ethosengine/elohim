@@ -106,10 +106,14 @@ impl K2BootstrapStore {
             return Err("space does not match url path".into());
         }
 
-        // Timing constraints (microseconds, mirrors kitsune2_bootstrap_srv).
-        if parsed.created_at < now_micros - CLOCK_SKEW_MICROS {
-            return Err("created_at is more than 3 minutes in the past".into());
-        }
+        // Timing constraints (microseconds). The reference server also rejects
+        // created_at older than 3 minutes — but live HC 0.6 conductors re-put
+        // agent infos on a refresh cadence with created_at 3-30 min old
+        // (observed 2026-06-12: EVERY real put rejected, bootstrap store
+        // empty, peers never connected). The past-floor is redundant anyway:
+        // `expires_at > now` + the 30-min span cap already bound staleness —
+        // an info older than its span is expired and still rejected. Only the
+        // FUTURE skew check remains (anti clock-cheat).
         if parsed.created_at > now_micros + CLOCK_SKEW_MICROS {
             return Err("created_at is more than 3 minutes in the future".into());
         }
@@ -423,7 +427,9 @@ mod tests {
         let store = K2BootstrapStore::new();
         let k = key();
 
-        // created_at too old
+        // created_at in the past is ACCEPTED while unexpired — live HC 0.6
+        // conductors re-put 3-30-min-old infos (the 2026-06-12 empty-store
+        // regression); staleness is bounded by expires_at + the span cap.
         let (space, agent, body) = signed_body(
             &k,
             b"s",
@@ -431,7 +437,7 @@ mod tests {
             NOW + 60_000_000,
             false,
         );
-        assert!(store.put_at(&space, &agent, &body, NOW).is_err());
+        assert!(store.put_at(&space, &agent, &body, NOW).is_ok());
 
         // created_at too far in the future
         let (space, agent, body) = signed_body(
