@@ -399,23 +399,34 @@ impl HcClient {
             .on_signal(move |signal| {
                 if let Signal::App { signal, .. } = signal {
                     let bytes: Vec<u8> = signal.into_inner().into();
-                    match rmp_serde::from_slice::<serde_json::Value>(&bytes) {
-                        Ok(value) => {
-                            match serde_json::from_value::<crate::signals::InfrastructureSignal>(
-                                value.clone(),
-                            ) {
-                                Ok(infra) => handler(infra),
-                                Err(e) => {
-                                    debug!(
-                                        error = %e,
-                                        value = %value,
-                                        "Received app signal not matching InfrastructureSignal — ignoring"
-                                    );
-                                }
-                            }
+                    // Typed msgpack decode — the old `rmp → serde_json::Value`
+                    // pre-pass failed on EVERY HoloHash-bearing signal
+                    // (serde_json::Value cannot represent msgpack byte arrays)
+                    // and dropped it at debug level: the 2026-06-12
+                    // peer-statuses dark-surface root cause. Real misses are
+                    // now LOUD; foreign signals on the shared app interface
+                    // stay quiet.
+                    match crate::signals::decode_infrastructure_signal(&bytes) {
+                        Ok(infra) => handler(infra),
+                        Err(crate::signals::SignalDecodeMiss::InfraShapeMismatch {
+                            type_tag,
+                            error,
+                        }) => {
+                            warn!(
+                                type_tag = %type_tag,
+                                error = %error,
+                                misses_total = crate::signals::infrastructure_decode_miss_count(),
+                                "InfrastructureSignal DECODE MISS — signal dropped, projection will go dark for this variant"
+                            );
                         }
-                        Err(e) => {
-                            debug!(error = %e, "Failed to msgpack-decode app signal");
+                        Err(crate::signals::SignalDecodeMiss::ForeignSignal { type_tag }) => {
+                            debug!(
+                                type_tag = %type_tag,
+                                "App signal from another family — ignoring"
+                            );
+                        }
+                        Err(crate::signals::SignalDecodeMiss::Undecodable { error }) => {
+                            debug!(error = %error, "App signal payload undecodable — ignoring");
                         }
                     }
                 }

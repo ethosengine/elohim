@@ -361,20 +361,163 @@ impl SignalHandler {
 // Serde tagging (`tag = "type", content = "payload"`) MUST match the DNA
 // side exactly; variant names MUST match exactly.
 
+/// A HoloHash-bearing signal field (AgentPubKey / ActionHash), normalized to
+/// the canonical holochain base64 form (`u` + base64url-no-pad over the raw
+/// 39 bytes).
+///
+/// WHY THIS EXISTS (2026-06-12 peer-statuses root cause): the conductor
+/// encodes app signals with MessagePack (`ExternIO`), and `holo_hash` types
+/// serialize there as raw BYTE ARRAYS — not base64 strings. The old mirror
+/// declared these fields `String`, so every real `PeerStatusRecorded` signal
+/// failed to decode and was dropped at `debug!` level: heartbeat publishes
+/// succeeded, `post_commit` emitted, and `peer_statuses` stayed empty,
+/// silently. (The old `rmp → serde_json::Value` pre-pass died even earlier:
+/// `serde_json::Value` has no byte-array representation.) This type accepts
+/// bytes, byte-seq, or string and normalizes — JSON-context producers (tests,
+/// fixtures) keep working.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct HoloHashB64(pub String);
+
+impl From<&str> for HoloHashB64 {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl From<String> for HoloHashB64 {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl HoloHashB64 {
+    fn from_raw_bytes(bytes: &[u8]) -> Self {
+        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        use base64::Engine;
+        Self(format!("u{}", URL_SAFE_NO_PAD.encode(bytes)))
+    }
+}
+
+impl<'de> Deserialize<'de> for HoloHashB64 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct V;
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = HoloHashB64;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a holo-hash as bytes or base64 string")
+            }
+
+            fn visit_bytes<E: serde::de::Error>(self, v: &[u8]) -> Result<Self::Value, E> {
+                Ok(HoloHashB64::from_raw_bytes(v))
+            }
+
+            fn visit_byte_buf<E: serde::de::Error>(self, v: Vec<u8>) -> Result<Self::Value, E> {
+                Ok(HoloHashB64::from_raw_bytes(&v))
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(HoloHashB64(v.to_string()))
+            }
+
+            fn visit_string<E: serde::de::Error>(self, v: String) -> Result<Self::Value, E> {
+                Ok(HoloHashB64(v))
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut bytes = Vec::with_capacity(seq.size_hint().unwrap_or(39));
+                while let Some(b) = seq.next_element::<u8>()? {
+                    bytes.push(b);
+                }
+                Ok(HoloHashB64::from_raw_bytes(&bytes))
+            }
+        }
+        deserializer.deserialize_any(V)
+    }
+}
+
 /// Storage-side mirror of the DNA `InfrastructureSignal` enum.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload")]
 pub enum InfrastructureSignal {
     /// PeerStatus DHT entry was recorded — project into SQLite.
     PeerStatusRecorded {
-        peer_id: String,
+        peer_id: HoloHashB64,
         status: String,
         general_pool_member: bool,
         accepting_stewardship_reserves: bool,
         archetype_class: Option<String>,
         timestamp: i64,
-        action_hash: String,
+        action_hash: HoloHashB64,
     },
+}
+
+/// Mirror-variant names: a decode failure on one of these tags is a REAL
+/// projection miss (loud); any other tag is a foreign signal sharing the app
+/// interface (quiet).
+const INFRA_MIRROR_VARIANTS: &[&str] = &["PeerStatusRecorded"];
+
+/// Cumulative count of REAL infrastructure decode misses this process.
+static INFRA_DECODE_MISSES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Cumulative REAL decode misses (mirror-variant tag present but the typed
+/// decode failed). Exposed for status surfaces / tests.
+pub fn infrastructure_decode_miss_count() -> u64 {
+    INFRA_DECODE_MISSES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Outcome classification for a non-decodable app-signal payload.
+#[derive(Debug)]
+pub enum SignalDecodeMiss {
+    /// The payload carries a different signal family's tag (lamad content,
+    /// REA, …) — expected on a shared app interface, not an error.
+    ForeignSignal { type_tag: String },
+    /// The tag IS one of ours but the payload failed the typed decode —
+    /// a real wire-shape regression. LOUD.
+    InfraShapeMismatch { type_tag: String, error: String },
+    /// Not even the tag could be read.
+    Undecodable { error: String },
+}
+
+/// Decode a conductor app-signal payload (MessagePack `ExternIO` bytes) into
+/// the typed mirror, classifying failures so the subscriber can be loud about
+/// real misses without spamming on foreign signals.
+pub fn decode_infrastructure_signal(
+    bytes: &[u8],
+) -> Result<InfrastructureSignal, SignalDecodeMiss> {
+    match rmp_serde::from_slice::<InfrastructureSignal>(bytes) {
+        Ok(signal) => Ok(signal),
+        Err(typed_err) => {
+            /// Tag-only peek: serde skips the payload via IgnoredAny (which,
+            /// unlike `serde_json::Value`, tolerates msgpack byte arrays).
+            #[derive(Deserialize)]
+            struct TagOnly {
+                #[serde(rename = "type")]
+                type_tag: String,
+            }
+            match rmp_serde::from_slice::<TagOnly>(bytes) {
+                Ok(tag) if INFRA_MIRROR_VARIANTS.contains(&tag.type_tag.as_str()) => {
+                    INFRA_DECODE_MISSES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    Err(SignalDecodeMiss::InfraShapeMismatch {
+                        type_tag: tag.type_tag,
+                        error: typed_err.to_string(),
+                    })
+                }
+                Ok(tag) => Err(SignalDecodeMiss::ForeignSignal {
+                    type_tag: tag.type_tag,
+                }),
+                Err(tag_err) => Err(SignalDecodeMiss::Undecodable {
+                    error: format!("typed: {typed_err}; tag peek: {tag_err}"),
+                }),
+            }
+        }
+    }
 }
 
 /// Dispatch an `InfrastructureSignal` into the SQLite projection.
@@ -397,13 +540,13 @@ pub fn handle_signal(
             action_hash,
         } => {
             let row = crate::db::peer_statuses::PeerStatusRow {
-                peer_id,
+                peer_id: peer_id.0,
                 status,
                 general_pool_member: general_pool_member as i32,
                 accepting_stewardship_reserves: accepting_stewardship_reserves as i32,
                 archetype_class,
                 timestamp,
-                dht_anchor_hash: action_hash,
+                dht_anchor_hash: action_hash.0,
                 updated_at: chrono::Utc::now().timestamp_micros(),
             };
             crate::db::peer_statuses::upsert(conn, &row)?;
@@ -2383,10 +2526,117 @@ mod peer_status_tests {
             InfrastructureSignal::PeerStatusRecorded {
                 peer_id, status, ..
             } => {
-                assert_eq!(peer_id, "uhCAkABC");
+                assert_eq!(peer_id.0, "uhCAkABC");
                 assert_eq!(status, "online");
             }
         }
+    }
+
+    /// THE 2026-06-12 root-cause regression test: decode the signal from the
+    /// REAL conductor wire format — MessagePack (`ExternIO`), where
+    /// `AgentPubKey`/`ActionHash` serialize as raw 39-BYTE ARRAYS, not base64
+    /// strings. The old `String`-typed mirror (and the `rmp →
+    /// serde_json::Value` pre-pass before it) failed on every such signal,
+    /// silently emptying `peer_statuses`.
+    #[test]
+    fn peer_status_signal_decodes_from_conductor_msgpack_wire() {
+        use holochain_types::prelude::{ActionHash, AgentPubKey};
+
+        // DNA-side shape: the infrastructure zome's enum with real holo_hash
+        // types (see elohim/holochain/dna/infrastructure/.../lib.rs).
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "payload")]
+        enum DnaInfrastructureSignal {
+            PeerStatusRecorded {
+                peer_id: AgentPubKey,
+                status: String,
+                general_pool_member: bool,
+                accepting_stewardship_reserves: bool,
+                archetype_class: Option<String>,
+                timestamp: i64,
+                action_hash: ActionHash,
+            },
+        }
+
+        let peer_id = AgentPubKey::from_raw_36(vec![0x11; 36]);
+        let action_hash = ActionHash::from_raw_36(vec![0x22; 36]);
+        let dna_signal = DnaInfrastructureSignal::PeerStatusRecorded {
+            peer_id: peer_id.clone(),
+            status: "online".into(),
+            general_pool_member: true,
+            accepting_stewardship_reserves: false,
+            archetype_class: Some("home-nuc".into()),
+            timestamp: 1_700_000_000_000_000,
+            action_hash: action_hash.clone(),
+        };
+
+        // emit_signal encodes via ExternIO == holochain_serialized_bytes ==
+        // rmp_serde::to_vec_named.
+        let wire = rmp_serde::to_vec_named(&dna_signal).expect("encode DNA signal");
+
+        let decoded =
+            decode_infrastructure_signal(&wire).expect("conductor msgpack wire format must decode");
+        match decoded {
+            InfrastructureSignal::PeerStatusRecorded {
+                peer_id: got_peer,
+                status,
+                action_hash: got_action,
+                ..
+            } => {
+                assert_eq!(status, "online");
+                // Normalized form must match holochain's canonical base64
+                // ("u" + base64url-no-pad over the raw 39 bytes).
+                assert_eq!(got_peer.0, format!("{peer_id}"));
+                assert_eq!(got_action.0, format!("{action_hash}"));
+            }
+        }
+        assert_eq!(
+            infrastructure_decode_miss_count(),
+            0,
+            "a successful decode must not count as a miss"
+        );
+    }
+
+    /// Foreign signals (lamad content, REA, …) share the app interface — they
+    /// must classify quiet, not as infrastructure misses.
+    #[test]
+    fn foreign_signal_classifies_quiet() {
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "payload")]
+        enum OtherSignal {
+            ContentCommitted { id: String },
+        }
+        let wire = rmp_serde::to_vec_named(&OtherSignal::ContentCommitted { id: "x".into() })
+            .expect("encode");
+        match decode_infrastructure_signal(&wire) {
+            Err(SignalDecodeMiss::ForeignSignal { type_tag }) => {
+                assert_eq!(type_tag, "ContentCommitted");
+            }
+            other => panic!("expected ForeignSignal, got {other:?}"),
+        }
+    }
+
+    /// A mirror-variant tag whose payload no longer decodes is a REAL miss —
+    /// it must be loud (counted).
+    #[test]
+    fn shape_mismatch_on_mirror_variant_is_counted() {
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "payload")]
+        enum BrokenShape {
+            PeerStatusRecorded { unexpected_only_field: bool },
+        }
+        let wire = rmp_serde::to_vec_named(&BrokenShape::PeerStatusRecorded {
+            unexpected_only_field: true,
+        })
+        .expect("encode");
+        let before = infrastructure_decode_miss_count();
+        match decode_infrastructure_signal(&wire) {
+            Err(SignalDecodeMiss::InfraShapeMismatch { type_tag, .. }) => {
+                assert_eq!(type_tag, "PeerStatusRecorded");
+            }
+            other => panic!("expected InfraShapeMismatch, got {other:?}"),
+        }
+        assert_eq!(infrastructure_decode_miss_count(), before + 1);
     }
 }
 
