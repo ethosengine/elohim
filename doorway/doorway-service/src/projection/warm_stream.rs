@@ -683,6 +683,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)] // intentional invariant guard on tuning constants
     fn per_stream_timeout_under_liveness_window() {
         // kill-window floor is 150s; per-stream timeout must stay well under it.
         assert_eq!(WARMUP_STREAM_TIMEOUT_SECS, 45);
@@ -693,6 +694,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)] // intentional invariant guard on tuning constants
     fn warmup_budget_constants_sane() {
         assert_eq!(WARMUP_TOTAL_BUDGET_SECS, 75); // ~0.5x kill-window floor 150
         assert!(WARMUP_TOTAL_BUDGET_SECS <= 150 / 2);
