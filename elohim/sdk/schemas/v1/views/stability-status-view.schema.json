@@ -1,0 +1,95 @@
+{
+  "$id": "epr:schema:view:stability-status-view",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StabilityStatusView",
+  "description": "Unified self-healing read model served at doorway GET /admin/self-healing. Source of truth: doorway in-process runtime state + storage projector status (Operational, Category C — node-local, never notarized). A node serves its OWN state. NOTE: the TS codegen registration (codegen-ts.mjs INTERFACE_FILES) + the Angular consumer service are a flagged frontend/TS sibling follow-on; this file is the authored wire contract, kept in sync with doorway's Rust SelfHealingView (self_healing.rs).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["upstreams", "projector", "peers", "render", "warmup", "conductor"],
+  "properties": {
+    "autoPreset": {
+      "description": "Resource snapshot + derived Auto config + reasons. Null until the auto-config sibling plan lands.",
+      "type": ["object", "null"]
+    },
+    "admission": {
+      "description": "Inbound admission state. Null until the inbound-admission wire-up follow-on exposes inbound_semaphore state.",
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "maxInflight": { "type": "integer" },
+        "available": { "type": "integer" },
+        "shedTotal": { "type": "integer" }
+      },
+      "required": ["maxInflight", "available", "shedTotal"]
+    },
+    "upstreams": {
+      "description": "Per-upstream circuit/health. Empty until the upstream-self-protection wire-up follow-on exposes a breaker snapshot.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "endpoint": { "type": "string" },
+          "circuit": { "type": "string", "enum": ["closed", "half-open", "open"] },
+          "errorStreak": { "type": "integer" },
+          "lastGood": { "type": ["string", "null"] },
+          "skipped": { "type": "boolean" }
+        },
+        "required": ["endpoint", "circuit", "errorStreak", "lastGood", "skipped"]
+      }
+    },
+    "projector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lagSeconds": { "type": ["integer", "null"] },
+        "caughtUp": { "type": ["boolean", "null"] },
+        "divergentAnchor": { "type": ["integer", "null"] }
+      },
+      "required": ["lagSeconds", "caughtUp", "divergentAnchor"]
+    },
+    "peers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "peer": { "type": "string" },
+          "status": { "type": "string" },
+          "lastSeen": { "type": ["string", "null"] }
+        },
+        "required": ["peer", "status", "lastSeen"]
+      }
+    },
+    "render": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "total": { "type": "integer" },
+        "degenerateRate": { "type": "number" }
+      },
+      "required": ["total", "degenerateRate"]
+    },
+    "warmup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "inProgress": { "type": "boolean" },
+        "attempts": { "type": "integer" },
+        "completed": { "type": "boolean" },
+        "lastError": { "type": ["string", "null"] }
+      },
+      "required": ["inProgress", "attempts", "completed", "lastError"]
+    },
+    "conductor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "connected": { "type": "boolean" },
+        "connectedWorkers": { "type": "integer" },
+        "totalWorkers": { "type": "integer" }
+      },
+      "required": ["connected", "connectedWorkers", "totalWorkers"]
+    }
+  }
+}
