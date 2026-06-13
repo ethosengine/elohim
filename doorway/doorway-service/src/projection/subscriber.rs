@@ -454,6 +454,12 @@ impl SignalSubscriber {
                                 + result.relationship_count
                                 > 0;
                         if let Some(ws) = ws {
+                            // Record-only (observability): a per-conductor
+                            // subscriber warms a single peer, so we never gate
+                            // (skipping the only upstream would starve it). tick
+                            // is the pass counter; the reconnect path does not
+                            // drive cooldown recovery (see warm_stream.rs tick
+                            // note) — error_streak/circuit feed /health/startup.
                             ws.health.record_outcome(&url, ok, 0);
                         }
                         active.store(false, std::sync::atomic::Ordering::SeqCst);

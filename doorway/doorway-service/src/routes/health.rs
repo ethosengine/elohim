@@ -380,7 +380,7 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
             "maxAttempts": ws.max_attempts.load(std::sync::atomic::Ordering::Relaxed),
             "completed": ws.completed.load(std::sync::atomic::Ordering::Relaxed),
             "lastError": ws.last_error.lock().unwrap().clone(),
-            "budgetSecs": 75,
+            "budgetSecs": crate::projection::warm_stream::WARMUP_TOTAL_BUDGET_SECS,
             "upstreams": ws.health.snapshot(),
         })
     } else {

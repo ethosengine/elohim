@@ -35,8 +35,9 @@ const WARMUP_STREAM_TIMEOUT_SECS: u64 = 45;
 
 /// Hard cap on TOTAL warm-up wall-time across the whole peer set (~0.5x the
 /// W5 liveness kill-window floor of 150s). The peer-SET bound the per-peer
-/// timeout cannot provide.
-const WARMUP_TOTAL_BUDGET_SECS: u64 = 75;
+/// timeout cannot provide. `pub` so the /health/startup surface reports the
+/// enforced value rather than a hand-copied literal that could silently drift.
+pub const WARMUP_TOTAL_BUDGET_SECS: u64 = 75;
 
 /// Consecutive failed warm-up outcomes before an upstream circuit opens.
 const WARMUP_CIRCUIT_FAIL_THRESHOLD: u32 = 3;
@@ -429,7 +430,17 @@ pub fn spawn_stream_task(
             ws.in_progress.store(true, Ordering::Relaxed);
         }
 
-        let tick: u64 = 0; // single startup pass; reconnect passes increment via subscriber path
+        // Single startup pass. A tick is a warm-up-PASS counter, and there is
+        // exactly one pass here, so tick stays 0. Cross-pass cooldown/half-open
+        // recovery is intentionally INERT in doorway: per-conductor subscribers
+        // warm a single peer on reconnect (subscriber.rs), where gating would
+        // risk starving the only upstream — so the reconnect path records
+        // outcomes for observability but does not gate. The cooldown/half-open
+        // machinery is exercised by Plan B's continuous admission path (real
+        // clock, peer-SET). What protects warm-up HERE is tick-independent: the
+        // startup gate_upstreams + the mid-pass is_open() early-bail + the 75s
+        // total budget + the per-entry yield.
+        let tick: u64 = 0;
 
         // Gate the upstream set BEFORE iterating (filter-before-act); the guard
         // guarantees a non-empty result if storage_urls is non-empty.
@@ -788,6 +799,28 @@ mod tests {
         assert!(should_yield(WARMUP_YIELD_EVERY_N * 2));
         assert!(!should_yield(1));
         assert!(!should_yield(WARMUP_YIELD_EVERY_N - 1));
+    }
+
+    #[test]
+    fn doorway_single_pass_frozen_tick_no_inpass_recovery() {
+        // Pins the PRODUCTION wiring: spawn_stream_task runs ONE startup pass
+        // with a constant tick=0 (warm_stream.rs). A breaker opened at tick 0
+        // never satisfies `elapsed >= cooldown` within that pass, so the
+        // cooldown/half-open recovery is intentionally inert in doorway — the
+        // tick-independent is_open() early-bail + the budget guard protect
+        // instead. (Cross-pass cooldown recovery is Plan B's concern, driven by
+        // a real clock.) Every other CircuitBreaker test injects an ADVANCING
+        // tick the doorway warm-up never produces; this one closes that gap.
+        let h = WarmStreamHealth::new(1, WARMUP_CIRCUIT_COOLDOWN_TICKS);
+        h.record_outcome("http://p:8090", false, 0); // opens at the frozen tick
+        assert!(
+            h.should_skip("http://p:8090", 0),
+            "at the frozen production tick the opened breaker stays skipped (no recovery)"
+        );
+        // The observable signal that DOES work: error_streak + circuit state.
+        let snap = h.snapshot();
+        assert_eq!(snap[0].error_streak, 1);
+        assert_eq!(snap[0].circuit, CircuitState::Open);
     }
 
     #[test]
