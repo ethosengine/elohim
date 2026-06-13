@@ -116,6 +116,7 @@ fn project_commons_commitment(
     let payload_json = build_content_payload(
         provider,
         head_ref,
+        "commons",
         "2026-06-01T00:00:00Z",
         "2027-06-01T00:00:00Z",
         60,
@@ -321,13 +322,14 @@ fn snapshot_excludes_provider_without_household() {
 }
 
 // ── Non-commons (household reach) end-to-end ──────────────────────────────────
-// These exercise the Stage-A producer path at a non-commons reach: the signal
-// handler parses a household-reach content commitment, provide_projection_for
-// reads the reach through, record_provide writes content:household, and the
-// (unchanged) snapshot — scoped to the content's own reach — counts it. The
-// author still emits the `replicates-commons` action string (Stage B renames the
-// author); the reach is what generalizes. We build the payload directly here
-// because the author-side `build_content_payload` is commons-pinned until Stage B.
+// These exercise the Stage-B producer path at a non-commons reach through the
+// REAL production payload builder: the signal handler parses a household-reach
+// content commitment, provide_projection_for reads the reach through,
+// record_provide writes content:household, and the (unchanged) snapshot — scoped
+// to the content's own reach — counts it. Stage B generalized
+// `build_content_payload` to take the content's reach, so these now drive the
+// SAME production author payload as commons (no inline JSON); the action string
+// stays `replicates-commons` (the one-window alias).
 
 /// Seed a content + manifest + shard_locations at an arbitrary reach so the
 /// snapshot's reach lookup resolves to `reach` (matching the provide scope).
@@ -386,17 +388,17 @@ fn project_content_commitment_at_reach(
     entry_hash: &str,
     action_hash: &str,
 ) {
-    let payload_json = serde_json::json!({
-        "action": "replicates-commons",
-        "variant": "content",
-        "head_ref": head_ref,
-        "reach": reach,
-        "bounds": { "rate_per_minute": 60, "reach_ceiling": reach },
-        "provider": provider,
-        "valid_from": "2026-06-01T00:00:00Z",
-        "valid_until": "2027-06-01T00:00:00Z",
-    })
-    .to_string();
+    // Stage B: the REAL production payload builder, now reach-general. Note
+    // `reach_ceiling` stays "commons" (built in) regardless of content `reach` —
+    // the hash-neutrality + bounds invariant.
+    let payload_json = build_content_payload(
+        provider,
+        head_ref,
+        reach,
+        "2026-06-01T00:00:00Z",
+        "2027-06-01T00:00:00Z",
+        60,
+    );
     let signal = MishpatSignal::CommitmentCommitted {
         action_hash: action_hash.into(),
         entry_hash: entry_hash.into(),

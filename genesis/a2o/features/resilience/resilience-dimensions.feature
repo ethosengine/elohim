@@ -81,6 +81,30 @@ Feature: Resilience dimensions — the matrix that proves the felt-durability su
     # Verifiable durability beats claimed durability: the count is the
     # notarized promise, not the observed bytes.
 
+  @wip @regression
+  Scenario: A household-reach content can be commitment-backed (not just commons)
+    # Stage B (hash-neutral): the provide commitment generalized from commons-only
+    # to reach-general. A household's OWN content — never destined for the commons —
+    # earns the same demonstrable commitment-backing. The provide commitment carries
+    # reach "household" with reach_ceiling "commons" (the bound that keeps the DNA
+    # integrity zome unchanged); the snapshot, scoped to the content's own reach,
+    # counts it. This guards the regression where non-commons content was silently
+    # uncounted because the author hard-coded reach "commons".
+    Given household "matthew-home" stewards content "dim-household-backed" at reach "household"
+    And "matthew-home" holds an active "provide" commitment scoped "content:household"
+    When I request "/api/v1/resilience/dim-household-backed/household"
+    Then the response field "commitmentBackedCollectives" is at least 1
+
+  @wip
+  Scenario: A commons-reach provide commitment does NOT back a household-reach content
+    # The scope is exact: a content:commons provide row is not counted for a
+    # household-reach content (the snapshot scopes to the content's own reach).
+    # Reach is the discriminator, not a wildcard.
+    Given household "matthew-home" stewards content "dim-household-only" at reach "household"
+    And "matthew-home" holds an active "provide" commitment scoped "content:commons"
+    When I request "/api/v1/resilience/dim-household-only/household"
+    Then the response field "commitmentBackedCollectives" is 0
+
   # --- D5: local / regional / global projection -------------------------------
 
   @wip
