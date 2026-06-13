@@ -52,6 +52,22 @@ export class StabilityLensComponent implements OnInit {
       : 'Composed on-device from storage status endpoints (node-local).'
   );
 
+  /**
+   * Render order + labels. The key is typed `keyof StabilityBlocks` (not a bare
+   * string) so the template's `blocks()[row.key]` index passes strictTemplates
+   * (an inline `*ngFor` array would widen the key to `string` → AOT error).
+   */
+  readonly rows: { key: keyof StabilityBlocks; label: string }[] = [
+    { key: 'projector', label: 'Projector (lag / caught-up / divergent-anchor)' },
+    { key: 'peers', label: 'Peers (signal-peer health)' },
+    { key: 'render', label: 'Render (SSR trace)' },
+    { key: 'warmup', label: 'Warmup (projection warm-stream)' },
+    { key: 'conductor', label: 'Conductor (worker pool)' },
+    { key: 'admission', label: 'Admission (inbound semaphore)' },
+    { key: 'upstreams', label: 'Upstreams (circuit breakers)' },
+    { key: 'autoPreset', label: 'Auto preset (resource policy)' },
+  ];
+
   ngOnInit(): void {
     const work =
       this.ctx.mode() === 'doorway'

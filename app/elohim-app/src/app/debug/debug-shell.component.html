@@ -5,6 +5,17 @@
       Node-local diagnostics for this device. Read-only. Reflects whichever replica/node answered —
       not a cluster-wide aggregate.
     </p>
+    <button
+      type="button"
+      class="nav-pin-toggle"
+      data-testid="debug-nav-pin"
+      (click)="toggleNavPin()"
+    >
+      {{ navPinned() ? '📌 Unpin from navigation' : '📍 Pin to navigation' }}
+    </button>
+    <span class="nav-pin-hint" *ngIf="navVisible() && !navPinned()">
+      (currently shown in nav via dev mode)
+    </span>
   </header>
 
   <nav class="debug-tabs" role="tablist">

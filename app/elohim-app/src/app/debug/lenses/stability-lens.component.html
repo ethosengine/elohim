@@ -1,21 +1,7 @@
 <p class="lens-note">{{ contextNote() }}</p>
 <p class="lens-error" *ngIf="error()">{{ error() }}</p>
 
-<div
-  class="block"
-  *ngFor="
-    let row of [
-      { key: 'projector', label: 'Projector (lag / caught-up / divergent-anchor)' },
-      { key: 'peers', label: 'Peers (signal-peer health)' },
-      { key: 'render', label: 'Render (SSR trace)' },
-      { key: 'warmup', label: 'Warmup (projection warm-stream)' },
-      { key: 'conductor', label: 'Conductor (worker pool)' },
-      { key: 'admission', label: 'Admission (inbound semaphore)' },
-      { key: 'upstreams', label: 'Upstreams (circuit breakers)' },
-      { key: 'autoPreset', label: 'Auto preset (resource policy)' },
-    ]
-  "
->
+<div class="block" *ngFor="let row of rows">
   <div class="block-head">
     <span class="block-label">{{ row.label }}</span>
     <span class="block-badge" [attr.data-state]="blocks()[row.key].state">

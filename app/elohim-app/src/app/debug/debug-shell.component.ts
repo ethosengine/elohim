@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
+import { DebugModeService } from '../services/debug-mode.service';
 import { DebugLens } from './debug.types';
 import { ConnectionLensComponent } from './lenses/connection-lens.component';
 import { StabilityLensComponent } from './lenses/stability-lens.component';
@@ -32,5 +33,22 @@ export class DebugShellComponent {
   readonly activeId = signal(this.lenses[0].id);
   select(id: string): void {
     this.activeId.set(id);
+  }
+
+  // --- Nav pin (chrome://flags "enable the entry" — see DebugModeService) ---
+  private readonly debugMode = inject(DebugModeService);
+  /** Persisted pin preference (distinct from dev-mode). */
+  readonly navPinned = this.debugMode.pinned;
+  /** Whether the /debug nav entry currently shows (pin OR dev-mode). */
+  readonly navVisible = this.debugMode.navVisible;
+
+  /** Toggle the persisted nav pin so a deployed-build user who reached /debug
+   *  by URL can make (or unmake) the nav entry stick. */
+  toggleNavPin(): void {
+    if (this.debugMode.pinned()) {
+      this.debugMode.disable();
+    } else {
+      this.debugMode.enable();
+    }
   }
 }

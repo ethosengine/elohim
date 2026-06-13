@@ -19,4 +19,17 @@ describe('DebugShellComponent', () => {
     expect(el.querySelector('.debug-kv')).toBeTruthy();
     expect(el.textContent).toContain('Connection mode');
   });
+
+  it('toggleNavPin() pins and unpins the nav entry (wires DebugModeService)', () => {
+    localStorage.removeItem('elohim-debug');
+    TestBed.configureTestingModule({ imports: [DebugShellComponent] });
+    const c = TestBed.createComponent(DebugShellComponent).componentInstance;
+    expect(c.navPinned()).toBe(false);
+    c.toggleNavPin();
+    expect(c.navPinned()).toBe(true);
+    expect(localStorage.getItem('elohim-debug')).toBe('on');
+    c.toggleNavPin();
+    expect(c.navPinned()).toBe(false);
+    expect(localStorage.getItem('elohim-debug')).toBeNull();
+  });
 });

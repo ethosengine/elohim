@@ -9,7 +9,20 @@
 .debug-subtitle {
   opacity: 0.7;
   font-size: 0.9rem;
-  margin: 0 0 1rem;
+  margin: 0 0 0.5rem;
+}
+.nav-pin-toggle {
+  background: none;
+  border: 1px solid var(--color-border, #ccc);
+  border-radius: 4px;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.nav-pin-hint {
+  margin-left: 0.5rem;
+  opacity: 0.6;
+  font-size: 0.8rem;
 }
 .debug-tabs {
   display: flex;

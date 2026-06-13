@@ -9,7 +9,12 @@ const KEY = 'elohim-debug';
 export class DebugModeService {
   private readonly sticky = signal(this.readSticky());
 
-  /** Nav entry visible when dev-mode OR the user flipped the sticky flag. */
+  /** The persisted (sticky) "pin debug to nav" preference, distinct from
+   *  isDevMode(). Read by the shell's pin toggle so deployed-build users who
+   *  reach /debug by URL can make the nav entry stick. */
+  readonly pinned = this.sticky.asReadonly();
+
+  /** Nav entry visible when dev-mode OR the user pinned it (sticky flag). */
   readonly navVisible = () => isDevMode() || this.sticky();
 
   enable(): void {
