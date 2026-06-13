@@ -16,6 +16,6 @@ pub use build_info::BuildInfo;
 pub use counters::{RequestCounterSnapshot, RequestCounters};
 pub use detail_level::DetailLevel;
 pub use health::{HealthReporter, ServiceHealth};
-pub use peers::{PeerHealthRegistry, PeerHealthSnapshot};
+pub use peers::{CircuitBreaker, CircuitState, PeerHealthRegistry, PeerHealthSnapshot};
 pub use report::ComputeReport;
 pub use resources::{ResourceReporter, ResourceSnapshot};

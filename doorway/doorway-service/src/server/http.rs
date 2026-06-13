@@ -282,6 +282,48 @@ pub struct AppState {
     /// behaviour is byte-for-byte unchanged. Written via the dev-mode-gated
     /// `PUT /admin/dev/portal-health` route (`routes::admin_dev`).
     pub portal_health_override: Arc<tokio::sync::RwLock<std::collections::HashMap<String, bool>>>,
+
+    /// Global inbound admission limiter (Pillar 2 layer 2). Bounds total
+    /// in-flight requests; `try_acquire_owned()` sheds 503+Retry-After when
+    /// full. NON-Option (always present, unlike render_semaphore). Sized from
+    /// DOORWAY_MAX_INFLIGHT at boot (main.rs). Liveness/version/WS are exempt
+    /// (admission_exempt) so /health stays answerable while shedding.
+    pub inbound_semaphore: Arc<tokio::sync::Semaphore>,
+
+    /// ONE pooled HTTP client for the storage proxy (connect 3s / request 12s).
+    /// Replaces per-request `reqwest::Client::new()` in forward_to_storage.
+    pub storage_proxy_client: Arc<reqwest::Client>,
+
+    /// Per-upstream circuit breakers for the storage proxy (Pillar 2 layer 4).
+    pub upstream_breakers: Arc<crate::routes::UpstreamBreakers>,
+}
+
+/// Retry-After (seconds) advertised when doorway sheds an inbound request at
+/// the admission ceiling. Short — admission saturation is a transient burst.
+const DOORWAY_ADMISSION_RETRY_AFTER_SECS: u64 = 2;
+
+/// Inbound admission ceiling default (≈4× storage's 64 permits for a 4-worker
+/// projection edge) and floor (anti-deadlock: a ceiling can never be 0). HOME
+/// is here (not main.rs): the AppState ctors below reference DEFAULT_MAX_INFLIGHT,
+/// and a lib cannot import a const from the bin. main.rs `use`s these.
+pub const DEFAULT_MAX_INFLIGHT: usize = 256;
+pub const MIN_MAX_INFLIGHT: usize = 8;
+
+/// Build the ONE pooled client the storage proxy uses for forward_to_storage /
+/// forward_blob_to_storage. Replaces the per-request `reqwest::Client::new()`
+/// (untimed) so a hung upstream cannot block a worker indefinitely.
+fn init_storage_proxy_client() -> Arc<reqwest::Client> {
+    Arc::new(
+        reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(
+                crate::routes::storage_proxy::STORAGE_PROXY_CONNECT_TIMEOUT_SECS,
+            ))
+            .timeout(std::time::Duration::from_secs(
+                crate::routes::storage_proxy::STORAGE_PROXY_REQUEST_TIMEOUT_SECS,
+            ))
+            .build()
+            .unwrap_or_default(),
+    )
 }
 
 /// Build the shared HTTP client used by SSR `ResolverFetcher` instances.
@@ -446,6 +488,9 @@ impl AppState {
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
+            inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
+            storage_proxy_client: init_storage_proxy_client(),
+            upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
         }
     }
 
@@ -543,6 +588,9 @@ impl AppState {
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
+            inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
+            storage_proxy_client: init_storage_proxy_client(),
+            upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
         }
     }
 
@@ -655,6 +703,9 @@ impl AppState {
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
+            inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
+            storage_proxy_client: init_storage_proxy_client(),
+            upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
         }
     }
 
@@ -770,6 +821,9 @@ impl AppState {
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
+            inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
+            storage_proxy_client: init_storage_proxy_client(),
+            upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
         })
     }
 
@@ -1108,10 +1162,15 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
                 match client.get(&url).send().await {
                     Ok(resp) if resp.status().is_success() => {
                         if let Ok(body) = resp.json::<serde_json::Value>().await {
+                            let recon = &body["projectionReconcile"];
                             let health = crate::routes::health::P2PHealth {
                                 enabled: true,
                                 peer_count: body["connectedPeers"].as_u64().unwrap_or(0) as usize,
                                 peer_id: body["peerId"].as_str().map(String::from),
+                                caught_up: recon["caughtUp"].as_bool(),
+                                divergent_anchor: recon["divergentAnchor"]
+                                    .as_u64()
+                                    .map(|n| n as usize),
                             };
                             *p2p_health.write().await = Some(health);
                         }
@@ -2047,6 +2106,37 @@ async fn handle_request(
         return Ok(gate_resp);
     }
 
+    // ── Pillar 2 / layer 2: global inbound admission ──────────────────────────
+    // Placed AFTER the wisdom gate and BEFORE routing. Liveness, /version, and
+    // WebSocket upgrades are exempt (admission_exempt) so /health stays
+    // answerable while we shed. SHED (try_acquire_owned), never QUEUE — an
+    // unbounded queue is just a slower wedge. The permit is bound at function
+    // scope (`_admit`, a named binding, NOT bare `_`) so it is held across the
+    // downstream forward_to_storage await for the whole request.
+    let is_upgrade = hyper_tungstenite::is_upgrade_request(&req);
+    let _admit = if admission_exempt(&path, is_upgrade) {
+        None
+    } else {
+        match Arc::clone(&state.inbound_semaphore).try_acquire_owned() {
+            Ok(permit) => Some(permit),
+            Err(_) => {
+                // Admission saturation is otherwise invisible to status-code
+                // metrics on the happy path. Emit a distinct, greppable,
+                // aggregation-countable signal (Plan D seam).
+                tracing::warn!(
+                    target: "admission_busy",
+                    counter = "doorway_admission_shed_total",
+                    path = %path,
+                    available = state.inbound_semaphore.available_permits(),
+                    "inbound admission at ceiling — shedding (503 + Retry-After)"
+                );
+                return Ok(to_boxed(catching_up_response(
+                    DOORWAY_ADMISSION_RETRY_AFTER_SECS,
+                )));
+            }
+        }
+    };
+
     // Extract observation session ID before req is consumed by the match block.
     // Used to fire-and-forget doorway-originated error contributions to storage.
     let observation_id: Option<String> = req
@@ -2336,6 +2426,18 @@ async fn handle_request(
         // Render-trace feed-forward aggregate (terminal classes + latency)
         (Method::GET, "/admin/render-stats") => {
             to_boxed(routes::handle_admin_render_stats(Arc::clone(&state)).await)
+        }
+
+        // Unified self-healing read model — Cat C node-local Operational state
+        // (SELF-HEALING-CONTROL-PLANE-DESIGN-2026-06-13.md §6). Composed fresh
+        // per request from in-process snapshots + on-demand projector fetch.
+        // Legitimate doorway-local aggregate (NOT a per-domain proxy): fails the
+        // swap test by design — a node serves its OWN runtime state, same class
+        // as /admin/capability + /admin/render-stats. No auth (operator-only is
+        // an ingress property). PENDING sibling keys (autoPreset/admission/
+        // upstreams) are null/empty with FOLLOW-ON wire-up seams.
+        (Method::GET, "/admin/self-healing") => {
+            to_boxed(routes::handle_self_healing(Arc::clone(&state)).await)
         }
 
         // Conductor pool visibility (available on ALL instances)
@@ -3006,7 +3108,15 @@ async fn handle_request(
                                     agent_cid: agent_cid_owned.as_deref(),
                                 };
                                 return Ok(to_boxed(
-                                    routes::forward_to_storage(req, &endpoint, p, ctx).await,
+                                    routes::forward_to_storage(
+                        req,
+                        &endpoint,
+                        p,
+                        &state.storage_proxy_client,
+                        &state.upstream_breakers,
+                        ctx,
+                    )
+                    .await,
                                 ));
                             }
                         };
@@ -3138,7 +3248,15 @@ async fn handle_request(
                         agent_cid: agent_cid_owned.as_deref(),
                     };
                     return Ok(to_boxed(
-                        routes::forward_to_storage(req, &endpoint, p, ctx).await,
+                        routes::forward_to_storage(
+                        req,
+                        &endpoint,
+                        p,
+                        &state.storage_proxy_client,
+                        &state.upstream_breakers,
+                        ctx,
+                    )
+                    .await,
                     ));
                 }
 
@@ -3163,13 +3281,23 @@ async fn handle_request(
                                 &endpoint,
                                 p,
                                 Arc::clone(&state.cache),
+                                &state.storage_proxy_client,
+                                &state.upstream_breakers,
                                 ctx,
                             )
                             .await,
                         ));
                     }
                     return Ok(to_boxed(
-                        routes::forward_to_storage(req, &endpoint, p, ctx).await,
+                        routes::forward_to_storage(
+                        req,
+                        &endpoint,
+                        p,
+                        &state.storage_proxy_client,
+                        &state.upstream_breakers,
+                        ctx,
+                    )
+                    .await,
                     ));
                 }
                 Disposition::RegistryUnhandled => {
@@ -3591,6 +3719,39 @@ fn bad_request_response(message: &str) -> Response<Full<Bytes>> {
     Response::builder()
         .status(StatusCode::BAD_REQUEST)
         .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body.to_string())))
+        .unwrap()
+}
+
+/// True ONLY for paths that must NEVER be shed by the inbound admission gate:
+/// the liveness/health family, /version, and ANY WebSocket upgrade. Exempt paths
+/// take NO permit (`_admit = None`) — upgrades (signal, /debug/stream) are
+/// long-lived relays that must not occupy a bounded admission slot for their
+/// whole socket lifetime, and liveness must answer even at zero permits.
+/// Everything else — proxy, api, blob, apps, SPA/EPR — is gated. Deliberately
+/// NARROW: gating on `!is_service_path` would exempt /api,/db,/blob,/apps and
+/// gut the gate.
+fn admission_exempt(path: &str, is_upgrade: bool) -> bool {
+    if is_upgrade {
+        return true;
+    }
+    matches!(
+        path,
+        "/health" | "/healthz" | "/health/startup" | "/ready" | "/readyz" | "/version"
+    )
+}
+
+/// Propagated-backpressure shed response: 503 + Retry-After + a structured
+/// `{status:"catching-up", retryAfter:N}` body. Never a bare drop/hang/502.
+fn catching_up_response(retry_after_secs: u64) -> Response<Full<Bytes>> {
+    let body = serde_json::json!({
+        "status": "catching-up",
+        "retryAfter": retry_after_secs,
+    });
+    Response::builder()
+        .status(StatusCode::SERVICE_UNAVAILABLE)
+        .header("Content-Type", "application/json")
+        .header("Retry-After", retry_after_secs.to_string())
         .body(Full::new(Bytes::from(body.to_string())))
         .unwrap()
 }
@@ -4311,5 +4472,106 @@ mod epr_claims_dispatch_tests {
             "<loc>https://alpha.elohim.host/lamad/path/foundations-christian-technology</loc>"
         ));
         assert!(xml.starts_with("<?xml"));
+    }
+}
+
+#[cfg(test)]
+mod admission_tests {
+    use super::*;
+
+    #[test]
+    fn liveness_paths_are_exempt() {
+        for p in [
+            "/health",
+            "/healthz",
+            "/health/startup",
+            "/ready",
+            "/readyz",
+            "/version",
+        ] {
+            assert!(admission_exempt(p, false), "{p} must be admission-exempt");
+        }
+    }
+
+    #[test]
+    fn upgrades_are_exempt() {
+        assert!(
+            admission_exempt("/some-signal-pubkey", true),
+            "WS upgrades hold the socket; never gate"
+        );
+        assert!(admission_exempt("/debug/stream", true));
+    }
+
+    #[test]
+    fn flood_surface_is_gated() {
+        // The whole point: proxy/api/blob/apps traffic is NOT exempt.
+        for p in [
+            "/api/v1/cache/x",
+            "/db/content/y",
+            "/blob/sha256-z",
+            "/apps/foo",
+            "/lamad",
+        ] {
+            assert!(
+                !admission_exempt(p, false),
+                "{p} must be gated (not exempt)"
+            );
+        }
+    }
+
+    #[test]
+    fn catching_up_is_503_with_retry_after_and_body() {
+        let resp = catching_up_response(2);
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(resp.headers().get("Retry-After").unwrap(), "2");
+        assert!(resp.headers().get("Content-Type").is_some());
+    }
+
+    #[test]
+    fn zero_permit_semaphore_sheds_nonexempt() {
+        // Models the gate: a zero-permit semaphore fails try_acquire_owned ->
+        // the gate returns catching_up; an exempt path is never consulted.
+        let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(0));
+        assert!(
+            std::sync::Arc::clone(&sem).try_acquire_owned().is_err(),
+            "0 permits => shed"
+        );
+    }
+
+    #[test]
+    fn appstate_has_inbound_admission_fields() {
+        // Assert the semaphore is usable + a fresh breaker is closed.
+        let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT));
+        assert!(
+            sem.available_permits() >= MIN_MAX_INFLIGHT,
+            "ceiling floored"
+        );
+        let breakers = std::sync::Arc::new(crate::routes::UpstreamBreakers::default());
+        assert!(!breakers.is_open("http://x:8090"), "fresh breaker closed");
+    }
+
+    #[test]
+    fn health_never_shed_even_at_zero_permits() {
+        // Compose the gate decision exactly as handle_request does: exempt paths
+        // bypass the semaphore entirely, so a 0-permit ceiling cannot shed them.
+        let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(0));
+        for p in [
+            "/health",
+            "/healthz",
+            "/health/startup",
+            "/ready",
+            "/readyz",
+            "/version",
+        ] {
+            let exempt = admission_exempt(p, false);
+            assert!(exempt, "{p} must be exempt");
+            let would_shed = !exempt && std::sync::Arc::clone(&sem).try_acquire_owned().is_err();
+            assert!(!would_shed, "{p} must NOT shed at 0 permits");
+        }
+        // Control: a gated path DOES shed at 0 permits.
+        let gated = "/api/v1/cache/x";
+        let would_shed = !admission_exempt(gated, false)
+            && std::sync::Arc::clone(&sem).try_acquire_owned().is_err();
+        assert!(would_shed, "gated path must shed at 0 permits");
     }
 }

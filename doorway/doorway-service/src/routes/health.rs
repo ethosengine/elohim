@@ -81,6 +81,13 @@ pub struct P2PHealth {
     pub peer_count: usize,
     /// Local peer ID
     pub peer_id: Option<String>,
+    /// Projection-reconcile caught-up flag (from storage projectionReconcile).
+    /// None when storage's reconcile task is not spawned (block is null).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub caught_up: Option<bool>,
+    /// Count of anchors that diverged during reconcile (from projectionReconcile).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub divergent_anchor: Option<usize>,
 }
 
 /// Cache status for backwards compatibility
@@ -314,6 +321,54 @@ mod tests {
         let resp = health_check(state);
         assert_eq!(resp.status(), StatusCode::OK);
     }
+
+    #[test]
+    fn startup_warmup_block_includes_upstreams_and_budget() {
+        use crate::projection::warm_stream::WarmupState;
+        let ws = WarmupState::new();
+        ws.health.record_outcome("http://peer-a:8090", false, 0);
+        let upstreams = serde_json::to_value(ws.health.snapshot()).unwrap();
+        let block = serde_json::json!({
+            "inProgress": false,
+            "upstreams": upstreams,
+            "budgetSecs": 75u64,
+        });
+        let s = block.to_string();
+        assert!(s.contains("\"upstreams\""));
+        assert!(s.contains("\"errorStreak\""));
+        assert!(s.contains("\"budgetSecs\":75"));
+    }
+
+    #[test]
+    fn p2p_health_carries_reconcile_caught_up_and_divergent_anchor() {
+        let h = P2PHealth {
+            enabled: true,
+            peer_count: 2,
+            peer_id: Some("p".to_string()),
+            caught_up: Some(true),
+            divergent_anchor: Some(0),
+        };
+        let json = serde_json::to_value(&h).unwrap();
+        assert_eq!(json["caughtUp"], serde_json::json!(true));
+        assert_eq!(json["divergentAnchor"], serde_json::json!(0));
+    }
+
+    #[test]
+    fn p2p_health_omits_reconcile_fields_when_absent() {
+        let h = P2PHealth {
+            enabled: true,
+            peer_count: 0,
+            peer_id: None,
+            caught_up: None,
+            divergent_anchor: None,
+        };
+        let json = serde_json::to_value(&h).unwrap();
+        assert!(
+            json.get("caughtUp").is_none(),
+            "caughtUp must be omitted when None"
+        );
+        assert!(json.get("divergentAnchor").is_none());
+    }
 }
 
 /// Handle startup progress endpoint (/health/startup)
@@ -363,6 +418,8 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
             "maxAttempts": ws.max_attempts.load(std::sync::atomic::Ordering::Relaxed),
             "completed": ws.completed.load(std::sync::atomic::Ordering::Relaxed),
             "lastError": ws.last_error.lock().unwrap().clone(),
+            "budgetSecs": crate::projection::warm_stream::WARMUP_TOTAL_BUDGET_SECS,
+            "upstreams": ws.health.snapshot(),
         })
     } else {
         serde_json::json!(null)

@@ -197,6 +197,9 @@ pub struct SubscriberConfig {
     /// Called on every reconnect attempt — feeds peer-health observability
     /// so reconnect storms are visible to operators (/status).
     pub on_reconnect: Option<Arc<dyn Fn() + Send + Sync>>,
+    /// Shared warm-up circuit map (Plan A): reconnect warm-up records its
+    /// outcome here so reconnect flapping cannot bypass the breaker.
+    pub warmup_state: Option<Arc<super::warm_stream::WarmupState>>,
 }
 
 impl std::fmt::Debug for SubscriberConfig {
@@ -218,6 +221,10 @@ impl std::fmt::Debug for SubscriberConfig {
                     .map(|_| "ProjectionStore(...)"),
             )
             .field("on_reconnect", &self.on_reconnect.as_ref().map(|_| "Fn"))
+            .field(
+                "warmup_state",
+                &self.warmup_state.as_ref().map(|_| "WarmupState(...)"),
+            )
             .finish()
     }
 }
@@ -235,6 +242,7 @@ impl Default for SubscriberConfig {
             storage_url: None,
             projection_store: None,
             on_reconnect: None,
+            warmup_state: None,
         }
     }
 }
@@ -267,6 +275,7 @@ impl SubscriberConfig {
             storage_url: None,
             projection_store: None,
             on_reconnect: None,
+            warmup_state: None,
         }
     }
 }
@@ -436,8 +445,23 @@ impl SignalSubscriber {
                     let store = Arc::clone(store);
                     let url = storage_url.clone();
                     let active = Arc::clone(&self.warm_stream_active);
+                    let ws = self.config.warmup_state.clone();
                     tokio::spawn(async move {
-                        super::warm_stream::stream_from_peer(store, &url).await;
+                        let result = super::warm_stream::stream_from_peer(store, &url).await;
+                        let ok = result.errors.is_empty()
+                            || result.content_count
+                                + result.human_count
+                                + result.relationship_count
+                                > 0;
+                        if let Some(ws) = ws {
+                            // Record-only (observability): a per-conductor
+                            // subscriber warms a single peer, so we never gate
+                            // (skipping the only upstream would starve it). tick
+                            // is the pass counter; the reconnect path does not
+                            // drive cooldown recovery (see warm_stream.rs tick
+                            // note) — error_streak/circuit feed /health/startup.
+                            ws.health.record_outcome(&url, ok, 0);
+                        }
                         active.store(false, std::sync::atomic::Ordering::SeqCst);
                     });
                     info!("Cache stream warm-up triggered after connect");
@@ -1160,5 +1184,14 @@ mod tests {
             }
             Err(_) => panic!("Expected ContentServerRegistration to be emitted"),
         }
+    }
+
+    #[test]
+    fn reconnect_failure_feeds_shared_breaker() {
+        use crate::projection::warm_stream::WarmStreamHealth;
+        let h = WarmStreamHealth::new(3, 5);
+        h.record_outcome("ws://conductor:8445", false, 0);
+        let snap = h.snapshot();
+        assert_eq!(snap[0].error_streak, 1);
     }
 }

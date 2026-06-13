@@ -109,6 +109,27 @@ pub fn service_unavailable(message: &str) -> Response<Full<Bytes>> {
     )
 }
 
+/// Build a propagated-backpressure shed response: 503 + Retry-After +
+/// X-Available-Permits + structured {status:"catching-up", retryAfter:N} body.
+/// (Named per the inbound-admission plan; uses 503 for saturation consistency.)
+pub fn too_many_requests_with_retry(
+    retry_after_secs: u64,
+    available: usize,
+) -> Response<Full<Bytes>> {
+    let body = serde_json::json!({
+        "status": "catching-up",
+        "retryAfter": retry_after_secs,
+    });
+    let json = body.to_string();
+    Response::builder()
+        .status(StatusCode::SERVICE_UNAVAILABLE)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::RETRY_AFTER, retry_after_secs.to_string())
+        .header("X-Available-Permits", available.to_string())
+        .body(Full::new(Bytes::from(json)))
+        .unwrap()
+}
+
 /// Convert a StorageError to an appropriate HTTP response
 pub fn error_response(error: StorageError) -> Response<Full<Bytes>> {
     let (status, message) = match &error {
@@ -233,5 +254,17 @@ mod tests {
     fn test_error_response_invalid_input() {
         let resp = error_response(StorageError::InvalidInput("bad field".into()));
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn too_many_requests_is_503_with_retry_and_permits_and_body() {
+        let resp = too_many_requests_with_retry(2, 0);
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(resp.headers().get(header::RETRY_AFTER).unwrap(), "2");
+        assert_eq!(resp.headers().get("X-Available-Permits").unwrap(), "0");
+        assert_eq!(
+            resp.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/json"
+        );
     }
 }
