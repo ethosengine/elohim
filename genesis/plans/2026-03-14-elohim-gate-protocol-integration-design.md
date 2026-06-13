@@ -498,11 +498,26 @@ Current reality: `evaluate_gate(...)` fires by explicit per-handler invocation �
 1. **Middleware deny-by-default (runtime, HTTP).** A tower layer matching POST/PATCH/PUT that refuses dispatch unless the route is registered gated. The verb can't classify `MutationType`, so middleware enforces *that a gate ran*; the handler supplies *what kind*.
 2. **Type-token chokepoint (compile-time, all callers).** The DB-commit path requires a `Gated<T>` proof constructible only by `evaluate_gate`. "Forgot to gate" becomes a compile error — the borrow checker is the immune system. Catches non-HTTP callers.
 
-### B. Egress scope — "leaves your machine" ⊋ POST/PATCH/PUT
+### B. The post-discipline invariant — transport-agnostic, performance-preserving
 
-HTTP-verb gating at elohim-storage governs the **web2 projection** writes. The protocol's true egress is the **DHT publish / source-chain commit → libp2p gossip**: the notarized entry *is* the post, and it gossips with no HTTP verb. Two rings:
-- **Outer ring** — HTTP method gate at doorway/storage (web2 surface).
-- **Inner ring** — publish-time gate bound to the authoring step *before* the source-chain commit; the one chokepoint every mutation crosses regardless of arrival path (HTTP / P2P / local). The strong claim "every post decision is gated" requires the inner ring.
+> HTTP/POST is only the handle — the most reachable analogy, not the definition. The discipline is its own concern and will want its own design pass; it is **not** bound to any transport verb.
+
+**The invariant:** every *act of human creation that touches the network* passes the gate — regardless of how it egresses (web2 HTTP, DHT publish/gossip, P2P transport, transports not yet built). The chokepoint is the **authoring boundary** — the intent to commit a notarized entry / emit to peers — not a verb and not a transport. HTTP-method gating is one *projection* of the invariant (it covers the web2 doorway surface); the source-chain-commit bind is the projection that covers the P2P truth layer. Same invariant, two transports.
+
+The hard requirement is to hold that invariant **universally** while the system still flows freely enough to meet any real-time / throughput / interactive-latency demand. Three axes reconcile discipline with flow:
+
+1. **Scope to creation, not to all traffic.** The discipline binds to *acts of creation* — the notarized / derived / agent-scoped entry classes (A / A2 / B / B2 in the p2p-design-gate taxonomy). High-frequency **operational** traffic (C-class: presence, cursors, read-receipts, transport keepalives) is not an act of creation and flows ungated. Acts of creation are inherently the rarer, more consequential events; the firehose stays unthrottled. This is the first and largest performance win — **you are not gating the network, you are gating creation.**
+
+2. **Mandatory gate, tiered inference.** Every creative act passes the chokepoint — but passing is *cheap by default*. The common case clears at tier None/Light **synchronously** (trust-context lookup + structural check, microseconds, no model call); only acts that *signal* consequence escalate to Full/Constitutional. "Everything is gated" never meant "everything waits for an LLM" — it means everything crosses a fast-path that escalates only on signal.
+
+3. **Synchrony is a decision, not a fixed cost — `block` vs `witness-and-flow`.** The lever that preserves flow for the consequential cases is **reversibility × stakes × trust**:
+   - *Reversible + low-stakes + high-trust* → **witness-and-flow**: the act proceeds immediately, the gate runs concurrently and can retroactively quarantine / tombstone / challenge if it later finds harm. Zero perceived latency.
+   - *Irreversible, or high-stakes, or low-trust pattern* → **block**: egress is held until the gate clears (the only safe choice when you cannot un-send).
+   - P2P gives the reversibility axis real teeth: a gossiped entry can often be retracted/tombstoned, which makes witness-and-flow safe for far more acts than a fire-once web2 POST ever could.
+
+So the discipline is **universal in coverage, tiered in cost, asynchronous wherever reversibility permits.** A high-trust person doing ordinary creative work experiences a protocol that flows at native speed; synchronous latency is spent only where an act is both consequential and un-undoable. That is how every act of human creation is witnessed without the witnessing becoming the thing that blocks human flow.
+
+**This wants its own design.** The post-discipline invariant is a cross-cutting primitive — it touches every DNA's authoring path, the doorway egress, and future transports. It should graduate out of this gate-integration doc into its own design; the gate-integration doc *consumes* it, does not *define* it. (Open: the exact classification seam that decides A/A2/B/B2 vs C at the authoring boundary, and where `block`-vs-`witness-and-flow` is computed — both pass the p2p-design-gate.)
 
 ### C. Off-switch invariant (non-negotiable)
 
