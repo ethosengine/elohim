@@ -9,7 +9,10 @@ import { ConnectionLensComponent } from './lenses/connection-lens.component';
 @Component({
   selector: 'app-debug-shell',
   standalone: true,
-  imports: [CommonModule, ConnectionLensComponent],
+  // Lens components render dynamically via *ngComponentOutlet (registry below),
+  // so they are NOT template-referenced and must not be in `imports` — only
+  // CommonModule (for ngComponentOutlet/ngFor/ngIf) belongs here.
+  imports: [CommonModule],
   templateUrl: './debug-shell.component.html',
   styleUrl: './debug-shell.component.scss',
 })
