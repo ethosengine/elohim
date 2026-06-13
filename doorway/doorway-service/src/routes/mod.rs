@@ -30,6 +30,7 @@ pub mod status;
 pub mod storage_proxy;
 pub mod stream;
 pub mod threshold;
+pub mod upstream_health;
 pub mod zome_helpers;
 
 pub use admin::{
@@ -79,6 +80,7 @@ pub use status::{status_check, status_page};
 pub use storage_proxy::{forward_blob_to_storage, forward_to_storage, ForwardCtx};
 pub use stream::handle_stream_request;
 pub use threshold::handle_threshold_request;
+pub use upstream_health::UpstreamBreakers;
 
 pub use collectives::handle_collectives_request;
 pub use elohim_agent::handle_elohim_agent_request;

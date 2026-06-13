@@ -26,6 +26,10 @@ use doorway::{
     },
     worker::{PoolConfig, WorkerPool},
 };
+// DEFAULT_MAX_INFLIGHT / MIN_MAX_INFLIGHT have their single home in the lib
+// (server::http) because the AppState ctors reference them and a lib cannot
+// import a const from this bin. We `use` them here for inbound_max().
+use doorway::server::http::{DEFAULT_MAX_INFLIGHT, MIN_MAX_INFLIGHT};
 
 /// Number of tokio worker threads to run, regardless of the cgroup CPU limit.
 ///
@@ -52,6 +56,19 @@ fn worker_threads() -> usize {
         .and_then(|v| v.parse::<usize>().ok())
         .filter(|&v| v > 0)
         .unwrap_or(DEFAULT_WORKER_THREADS)
+}
+
+/// Inbound admission ceiling (Pillar 2): max concurrent in-flight requests
+/// before doorway sheds 503+Retry-After. Floored at `MIN_MAX_INFLIGHT` so a
+/// fat-fingered tiny/zero value can never deadlock the gate.
+fn inbound_max() -> usize {
+    // FOLLOW-ON: when elohim_compute::limits::derive() lands (Auto-config plan),
+    // source the default from the host-derived ceiling instead of the constant.
+    std::env::var("DOORWAY_MAX_INFLIGHT")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(DEFAULT_MAX_INFLIGHT)
+        .max(MIN_MAX_INFLIGHT)
 }
 
 fn main() -> anyhow::Result<()> {
@@ -621,6 +638,16 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             doorway::projection::warm_stream::WarmupState::new(),
         ));
     }
+
+    // Pillar 2: size the inbound admission ceiling from DOORWAY_MAX_INFLIGHT
+    // (the ctor set a default; this overrides with the env-derived value).
+    // storage_proxy_client + upstream_breakers are already ctor-set to identical
+    // defaults — not reassigned here.
+    state.inbound_semaphore = Arc::new(tokio::sync::Semaphore::new(inbound_max()));
+    info!(
+        max_inflight = inbound_max(),
+        "inbound admission ceiling set"
+    );
 
     // Create discovery readiness channel before Arc::new(state)
     let (discovery_tx, discovery_rx) = tokio::sync::watch::channel(false);
@@ -1451,4 +1478,26 @@ fn derive_app_url(conductor_url: &str, app_port: u16) -> String {
     }
     // Fallback: just use the default
     format!("ws://localhost:{app_port}")
+}
+
+#[cfg(test)]
+mod inbound_max_tests {
+    use super::*;
+
+    #[test]
+    fn inbound_max_floors_and_defaults() {
+        std::env::remove_var("DOORWAY_MAX_INFLIGHT");
+        assert_eq!(inbound_max(), DEFAULT_MAX_INFLIGHT, "unset => default");
+        std::env::set_var("DOORWAY_MAX_INFLIGHT", "0");
+        assert_eq!(
+            inbound_max(),
+            MIN_MAX_INFLIGHT,
+            "0 clamped to floor (anti-deadlock)"
+        );
+        std::env::set_var("DOORWAY_MAX_INFLIGHT", "3");
+        assert_eq!(inbound_max(), MIN_MAX_INFLIGHT, "below floor clamps up");
+        std::env::set_var("DOORWAY_MAX_INFLIGHT", "512");
+        assert_eq!(inbound_max(), 512, "honored above floor");
+        std::env::remove_var("DOORWAY_MAX_INFLIGHT");
+    }
 }

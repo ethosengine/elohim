@@ -38,6 +38,45 @@ use std::time::Duration;
 use tracing::{debug, warn};
 
 use crate::cache::ContentCache;
+use crate::routes::UpstreamBreakers;
+
+/// Connect timeout for the pooled storage-proxy client (fail fast on a dead peer).
+pub const STORAGE_PROXY_CONNECT_TIMEOUT_SECS: u64 = 3;
+/// Whole-request timeout — browser-facing, well under warm-up's 45s.
+pub const STORAGE_PROXY_REQUEST_TIMEOUT_SECS: u64 = 12;
+
+/// Classifies an upstream result for the per-endpoint circuit breaker (D6).
+/// Only transient saturation/connectivity counts as Failure; a 404 is a normal
+/// blob miss (no-fanout rule) and must NEVER open the breaker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProxyOutcome {
+    Ok,
+    Failure,
+    Neutral,
+}
+
+impl ProxyOutcome {
+    pub fn classify(status: u16) -> ProxyOutcome {
+        match status {
+            200..=299 => ProxyOutcome::Ok,
+            429 => ProxyOutcome::Failure,
+            500..=599 => ProxyOutcome::Failure,
+            _ => ProxyOutcome::Neutral, // 4xx incl 404 = neutral
+        }
+    }
+}
+
+/// Proxy-side catching-up shed (mirrors server::http::catching_up_response but
+/// returns Response<Full<Bytes>> for the forwarder return type).
+fn catching_up_proxy_response(retry_after_secs: u64) -> Response<Full<Bytes>> {
+    let body = serde_json::json!({ "status": "catching-up", "retryAfter": retry_after_secs });
+    Response::builder()
+        .status(StatusCode::SERVICE_UNAVAILABLE)
+        .header("Content-Type", "application/json")
+        .header("Retry-After", retry_after_secs.to_string())
+        .body(Full::new(Bytes::from(body.to_string())))
+        .unwrap()
+}
 
 /// Bundle of doorway-resolved context that the forwarder injects as headers on the
 /// outbound request to elohim-storage.
@@ -91,6 +130,8 @@ pub async fn forward_to_storage<B>(
     req: Request<B>,
     storage_url: &str,
     path: &str,
+    client: &reqwest::Client,
+    breakers: &UpstreamBreakers,
     ctx: ForwardCtx<'_>,
 ) -> Response<Full<Bytes>>
 where
@@ -98,6 +139,22 @@ where
     B::Data: Send,
     B::Error: std::fmt::Display,
 {
+    // Per-upstream breaker (Pillar 2 layer 4): if this endpoint is circuit-open,
+    // shed WITHOUT calling storage. Keyed by storage_url (per-upstream, not per
+    // path — matches the single-target dispatch model).
+    if breakers.is_open(storage_url) {
+        warn!(
+            target: "upstream_shed",
+            counter = "doorway_upstream_breaker_open_total",
+            storage_url = %storage_url,
+            path = %path,
+            "upstream circuit OPEN — shedding without calling storage (503 + Retry-After)"
+        );
+        return catching_up_proxy_response(
+            crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+        );
+    }
+
     let storage_endpoint = format!("{}{}", storage_url.trim_end_matches('/'), path);
 
     let query = req.uri().query();
@@ -109,7 +166,6 @@ where
     let method = req.method().clone();
     debug!(method = %method, url = %full_url, "Forwarding request to elohim-storage");
 
-    let client = reqwest::Client::new();
     let mut builder = match method {
         Method::GET => client.get(&full_url),
         Method::POST => client.post(&full_url),
@@ -175,6 +231,32 @@ where
     match builder.send().await {
         Ok(response) => {
             let status = response.status();
+            let status_u16 = status.as_u16();
+            let outcome = ProxyOutcome::classify(status_u16);
+            breakers.record(storage_url, outcome != ProxyOutcome::Failure);
+
+            // HONOR upstream backpressure: a 429/503 from storage becomes a
+            // catching-up to the browser, preserving the upstream Retry-After
+            // (else the breaker cooldown) so the client does not hammer.
+            if matches!(status_u16, 429 | 503) {
+                let upstream_ra = response
+                    .headers()
+                    .get(reqwest::header::RETRY_AFTER)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| s.parse::<u64>().ok());
+                let retry_after = upstream_ra
+                    .unwrap_or(crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS);
+                warn!(
+                    target: "upstream_shed",
+                    counter = "doorway_upstream_backpressure_honored_total",
+                    storage_url = %storage_url,
+                    status = status_u16,
+                    retry_after,
+                    "honoring upstream backpressure — surfacing catching-up to client"
+                );
+                return catching_up_proxy_response(retry_after);
+            }
+
             let content_type = response
                 .headers()
                 .get("content-type")
@@ -184,32 +266,27 @@ where
 
             match response.bytes().await {
                 Ok(body) => Response::builder()
-                    .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
+                    .status(StatusCode::from_u16(status_u16).unwrap_or(StatusCode::OK))
                     .header("Content-Type", content_type)
                     .header("Cross-Origin-Resource-Policy", "cross-origin")
                     .body(Full::new(Bytes::from(body.to_vec())))
                     .unwrap(),
                 Err(e) => {
                     warn!(error = %e, "Failed to read storage response body");
-                    Response::builder()
-                        .status(StatusCode::BAD_GATEWAY)
-                        .header("Content-Type", "application/json")
-                        .body(Full::new(Bytes::from(format!(
-                            r#"{{"error": "Failed to read storage response: {e}"}}"#
-                        ))))
-                        .unwrap()
+                    breakers.record(storage_url, false);
+                    catching_up_proxy_response(
+                        crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+                    )
                 }
             }
         }
         Err(e) => {
-            warn!(error = %e, path = %path, "Failed to forward request to storage");
-            Response::builder()
-                .status(StatusCode::BAD_GATEWAY)
-                .header("Content-Type", "application/json")
-                .body(Full::new(Bytes::from(format!(
-                    r#"{{"error": "Failed to connect to storage: {e}"}}"#
-                ))))
-                .unwrap()
+            warn!(error = %e, path = %path, storage_url = %storage_url,
+                "storage forward failed (connect/timeout) — recording breaker failure");
+            breakers.record(storage_url, false);
+            catching_up_proxy_response(
+                crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+            )
         }
     }
 }
@@ -241,6 +318,8 @@ pub async fn forward_blob_to_storage<B>(
     storage_url: &str,
     path: &str,
     cache: Arc<ContentCache>,
+    client: &reqwest::Client,
+    breakers: &UpstreamBreakers,
     ctx: ForwardCtx<'_>,
 ) -> Response<Full<Bytes>>
 where
@@ -253,7 +332,7 @@ where
         Some(h) if !h.is_empty() => h.to_string(),
         _ => {
             // Not a blob path — fall through to generic forwarder
-            return forward_to_storage(req, storage_url, path, ctx).await;
+            return forward_to_storage(req, storage_url, path, client, breakers, ctx).await;
         }
     };
 
@@ -261,7 +340,7 @@ where
     let has_range_header = req.headers().contains_key(hyper::header::RANGE);
     if has_range_header {
         debug!(hash = %hash, "Range request — skipping pantry, forwarding directly");
-        return forward_to_storage(req, storage_url, path, ctx).await;
+        return forward_to_storage(req, storage_url, path, client, breakers, ctx).await;
     }
 
     // --- Cache-first: pantry hit? ------------------------------------------------
@@ -283,6 +362,21 @@ where
     }
 
     // --- Forward to storage ------------------------------------------------------
+    // Per-upstream breaker (Pillar 2 layer 4): shed without calling storage if
+    // this endpoint's circuit is open.
+    if breakers.is_open(storage_url) {
+        warn!(
+            target: "upstream_shed",
+            counter = "doorway_upstream_breaker_open_total",
+            storage_url = %storage_url,
+            hash = %hash,
+            "upstream circuit OPEN — shedding blob without calling storage (503 + Retry-After)"
+        );
+        return catching_up_proxy_response(
+            crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+        );
+    }
+
     let storage_endpoint = format!("{}{}", storage_url.trim_end_matches('/'), path);
     let query = req.uri().query();
     let full_url = match query {
@@ -292,7 +386,6 @@ where
 
     debug!(hash = %hash, url = %full_url, "Blob cache miss — forwarding to elohim-storage");
 
-    let client = reqwest::Client::new();
     let builder = client.get(&full_url);
 
     // Forward auth header if present
@@ -316,6 +409,33 @@ where
     match builder.send().await {
         Ok(upstream) => {
             let status = upstream.status();
+            let status_u16 = status.as_u16();
+            let outcome = ProxyOutcome::classify(status_u16);
+            // 404 = Neutral (normal blob miss under no-fanout) → records as ok,
+            // never opens the breaker. Only 429/5xx count as Failure.
+            breakers.record(storage_url, outcome != ProxyOutcome::Failure);
+
+            // HONOR upstream backpressure (429/503) — surface catching-up to the
+            // client (preserve upstream Retry-After, else cooldown).
+            if matches!(status_u16, 429 | 503) {
+                let upstream_ra = upstream
+                    .headers()
+                    .get(reqwest::header::RETRY_AFTER)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| s.parse::<u64>().ok());
+                let retry_after = upstream_ra
+                    .unwrap_or(crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS);
+                warn!(
+                    target: "upstream_shed",
+                    counter = "doorway_upstream_backpressure_honored_total",
+                    storage_url = %storage_url,
+                    status = status_u16,
+                    retry_after,
+                    "honoring upstream blob backpressure — surfacing catching-up"
+                );
+                return catching_up_proxy_response(retry_after);
+            }
+
             let content_type = upstream
                 .headers()
                 .get("content-type")
@@ -361,25 +481,20 @@ where
                 }
                 Err(e) => {
                     warn!(error = %e, hash = %hash, "Failed to read blob response body from storage");
-                    Response::builder()
-                        .status(StatusCode::BAD_GATEWAY)
-                        .header("Content-Type", "application/json")
-                        .body(Full::new(Bytes::from(format!(
-                            r#"{{"error": "Failed to read blob response: {e}"}}"#
-                        ))))
-                        .unwrap()
+                    breakers.record(storage_url, false);
+                    catching_up_proxy_response(
+                        crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+                    )
                 }
             }
         }
         Err(e) => {
-            warn!(error = %e, hash = %hash, "Failed to connect to storage for blob");
-            Response::builder()
-                .status(StatusCode::BAD_GATEWAY)
-                .header("Content-Type", "application/json")
-                .body(Full::new(Bytes::from(format!(
-                    r#"{{"error": "Failed to connect to storage: {e}"}}"#
-                ))))
-                .unwrap()
+            warn!(error = %e, hash = %hash, storage_url = %storage_url,
+                "blob forward failed (connect/timeout) — recording breaker failure");
+            breakers.record(storage_url, false);
+            catching_up_proxy_response(
+                crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+            )
         }
     }
 }
@@ -403,6 +518,62 @@ mod tests {
     /// the parallel test runner produces flakes (e.g. an 18-byte payload
     /// failing to cache because the oversized-blob test set the limit to 10).
     static BLOB_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    #[test]
+    fn proxy_timeout_consts_browser_facing() {
+        assert_eq!(STORAGE_PROXY_CONNECT_TIMEOUT_SECS, 3);
+        assert_eq!(STORAGE_PROXY_REQUEST_TIMEOUT_SECS, 12);
+        assert!(
+            STORAGE_PROXY_REQUEST_TIMEOUT_SECS < 45,
+            "browser-facing, well under warm-up's 45s"
+        );
+    }
+
+    #[test]
+    fn proxy_outcome_classifies_failures() {
+        assert_eq!(ProxyOutcome::classify(200), ProxyOutcome::Ok);
+        assert_eq!(ProxyOutcome::classify(204), ProxyOutcome::Ok);
+        assert_eq!(
+            ProxyOutcome::classify(404),
+            ProxyOutcome::Neutral,
+            "blob miss never opens breaker"
+        );
+        assert_eq!(ProxyOutcome::classify(400), ProxyOutcome::Neutral);
+        assert_eq!(ProxyOutcome::classify(429), ProxyOutcome::Failure);
+        assert_eq!(ProxyOutcome::classify(503), ProxyOutcome::Failure);
+        assert_eq!(ProxyOutcome::classify(500), ProxyOutcome::Failure);
+    }
+
+    #[test]
+    fn honor_decision_maps_upstream_to_retry_after() {
+        // The honor decision: a 503/429 upstream surfaces catching-up; the
+        // Retry-After is the upstream's value if present, else the cooldown.
+        fn honored_retry_after(
+            upstream_status: u16,
+            upstream_ra: Option<u64>,
+            cooldown: u64,
+        ) -> Option<u64> {
+            match upstream_status {
+                429 | 503 => Some(upstream_ra.unwrap_or(cooldown)),
+                _ => None,
+            }
+        }
+        assert_eq!(
+            honored_retry_after(503, Some(7), 30),
+            Some(7),
+            "preserve upstream Retry-After"
+        );
+        assert_eq!(
+            honored_retry_after(429, None, 30),
+            Some(30),
+            "fallback to cooldown"
+        );
+        assert_eq!(
+            honored_retry_after(200, None, 30),
+            None,
+            "2xx passes through unchanged"
+        );
+    }
 
     // ========================================================================
     // Existing forward_to_storage tests
@@ -562,6 +733,8 @@ mod tests {
             &storage_url,
             &path,
             Arc::clone(&cache),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
             ForwardCtx::default(),
         )
         .await;
@@ -602,6 +775,8 @@ mod tests {
             &storage_url,
             &path,
             Arc::clone(&cache),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
             ForwardCtx::default(),
         )
         .await;
@@ -639,6 +814,8 @@ mod tests {
             &storage_url,
             &path,
             Arc::clone(&cache),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
             ForwardCtx::default(),
         )
         .await;
@@ -673,6 +850,8 @@ mod tests {
             &storage_url,
             &path,
             Arc::clone(&cache),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
             ForwardCtx::default(),
         )
         .await;
@@ -751,6 +930,8 @@ mod tests {
             &storage_url,
             &path,
             Arc::clone(&cache),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
             ForwardCtx::default(),
         )
         .await;
@@ -770,6 +951,8 @@ mod tests {
             &storage_url,
             &path,
             Arc::clone(&cache),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
             ForwardCtx::default(),
         )
         .await;
@@ -805,6 +988,8 @@ mod tests {
             &storage_url,
             &path,
             Arc::clone(&cache),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
             ForwardCtx::default(),
         )
         .await;
@@ -886,7 +1071,15 @@ mod tests {
         let ctx = ForwardCtx {
             agent_cid: Some("matthew"),
         };
-        let resp = forward_to_storage(req, &storage_url, "/api/v1/cluster", ctx).await;
+        let resp = forward_to_storage(
+            req,
+            &storage_url,
+            "/api/v1/cluster",
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
+            ctx,
+        )
+        .await;
         assert_eq!(resp.status(), StatusCode::OK);
 
         let captured_value = captured.lock().await.clone();
@@ -906,8 +1099,15 @@ mod tests {
         let storage_url = format!("http://{addr}");
 
         let req = make_get_request("http://doorway/api/v1/cluster");
-        let resp =
-            forward_to_storage(req, &storage_url, "/api/v1/cluster", ForwardCtx::default()).await;
+        let resp = forward_to_storage(
+            req,
+            &storage_url,
+            "/api/v1/cluster",
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
+            ForwardCtx::default(),
+        )
+        .await;
         assert_eq!(resp.status(), StatusCode::OK);
 
         let captured_value = captured.lock().await.clone();
