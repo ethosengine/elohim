@@ -814,6 +814,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
                     installed_app_id: args.installed_app_id.clone(),
                     storage_url: peer_urls.get(i).cloned(),
                     projection_store: state.projection.as_ref().map(Arc::clone),
+                    warmup_state: state.warmup_state.clone(),
                     on_reconnect: Some({
                         // Make reconnect churn visible to operators (/status):
                         // each subscriber reconnect attempt marks the peer

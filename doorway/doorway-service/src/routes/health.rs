@@ -314,6 +314,23 @@ mod tests {
         let resp = health_check(state);
         assert_eq!(resp.status(), StatusCode::OK);
     }
+
+    #[test]
+    fn startup_warmup_block_includes_upstreams_and_budget() {
+        use crate::projection::warm_stream::WarmupState;
+        let ws = WarmupState::new();
+        ws.health.record_outcome("http://peer-a:8090", false, 0);
+        let upstreams = serde_json::to_value(ws.health.snapshot()).unwrap();
+        let block = serde_json::json!({
+            "inProgress": false,
+            "upstreams": upstreams,
+            "budgetSecs": 75u64,
+        });
+        let s = block.to_string();
+        assert!(s.contains("\"upstreams\""));
+        assert!(s.contains("\"errorStreak\""));
+        assert!(s.contains("\"budgetSecs\":75"));
+    }
 }
 
 /// Handle startup progress endpoint (/health/startup)
@@ -363,6 +380,8 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
             "maxAttempts": ws.max_attempts.load(std::sync::atomic::Ordering::Relaxed),
             "completed": ws.completed.load(std::sync::atomic::Ordering::Relaxed),
             "lastError": ws.last_error.lock().unwrap().clone(),
+            "budgetSecs": 75,
+            "upstreams": ws.health.snapshot(),
         })
     } else {
         serde_json::json!(null)
