@@ -1,0 +1,34 @@
+<div class="level-control">
+  <span class="control-label" id="log-level-label">App log level (live):</span>
+  <button
+    type="button"
+    *ngFor="let lvl of angularLevels"
+    class="level-btn"
+    [class.active]="lvl === current()"
+    [attr.data-testid]="'level-btn-' + lvl"
+    (click)="setLevel(lvl)"
+  >{{ lvl }}</button>
+</div>
+
+<p class="rust-levels" *ngIf="isTauri()">
+  Native (Rust) range: <code>{{ rustLevels.join(' · ') }}</code> — current set via
+  <code>RUST_LOG</code> at launch; live adjust is a follow-on.
+</p>
+
+<div class="log-toolbar">
+  <span>Recent logs ({{ logs().length }}):</span>
+  <label for="log-level-filter" class="visually-hidden">Filter log level</label>
+  <select id="log-level-filter" data-testid="log-level-filter" aria-label="Filter log level" (change)="setFilter($any($event.target).value)">
+    <option value="all">all</option>
+    <option *ngFor="let lvl of angularLevels" [value]="lvl">{{ lvl }}</option>
+  </select>
+  <button type="button" data-testid="clear-logs" (click)="clear()">clear</button>
+</div>
+
+<ul class="log-list">
+  <li class="log-line" *ngFor="let e of logs()" [attr.data-level]="e.level">
+    <span class="log-ts">{{ e.timestamp.split('T')[1].split('.')[0] }}</span>
+    <span class="log-level">{{ e.level }}</span>
+    <span class="log-msg">{{ e.message }}</span>
+  </li>
+</ul>
