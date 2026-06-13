@@ -91,6 +91,15 @@ export const routes: Routes = [
     data: { protocolContent: true },
     title: 'Raw node',
   },
+  // Hidden-but-accessible debug surface (chrome://flags model). Always resolves
+  // by URL; the nav entry is gated by DebugModeService. No guard — it reads only
+  // already-public endpoints, so gating the route would protect nothing.
+  {
+    path: 'debug',
+    loadComponent: async () =>
+      import('./debug/debug-shell.component').then(m => m.DebugShellComponent),
+    title: 'Protocol Debug',
+  },
   // Spatial map — cross-pillar geospatial view (Places, resources, governance)
   {
     path: 'map',

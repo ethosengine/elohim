@@ -11,6 +11,8 @@ import { filter, map, takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 
 import { RunningContextService } from '@app/doorway/services/running-context.service';
+import { DebugModeService } from '../../../services/debug-mode.service';
+import { environment } from '../../../../environments/environment';
 import { EdgeNodeDisplayInfo } from '@app/elohim/models/holochain-connection.model';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { AgencyBadgeComponent } from '@app/imagodei/components/agency-badge/agency-badge.component';
@@ -34,7 +36,7 @@ import { BannerService } from '../../services/banner.service';
 /**
  * Context app identifiers for the Elohim Protocol
  */
-export type ContextApp = 'lamad' | 'community' | 'shefa' | 'doorway' | 'avodah' | 'map';
+export type ContextApp = 'lamad' | 'community' | 'shefa' | 'doorway' | 'avodah' | 'map' | 'debug';
 
 /**
  * Context app configuration
@@ -157,8 +159,21 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
     available: true,
   };
 
+  /** Debug context app (gated by DebugModeService nav visibility) */
+  private readonly debugApp: ContextAppConfig = {
+    id: 'debug',
+    name: 'Debug',
+    icon: '🛠️',
+    route: '/debug',
+    tagline: 'Node Diagnostics',
+    available: true,
+  };
+
   /** Running context service - determines if operator mode is available */
   private readonly runningContext = inject(RunningContextService);
+
+  /** Debug mode service — controls nav entry visibility */
+  private readonly debugMode = inject(DebugModeService);
 
   /** Auth service for immediate auth state feedback */
   private readonly authService = inject(AuthService);
@@ -171,6 +186,9 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
     const apps = [...this.baseContextApps];
     if (this.runningContext.hasDoorwayCapableNode() || isDevMode()) {
       apps.push(this.doorwayApp);
+    }
+    if (this.debugMode.navVisible() || environment.features?.showDebug) {
+      apps.push(this.debugApp);
     }
     return apps;
   });

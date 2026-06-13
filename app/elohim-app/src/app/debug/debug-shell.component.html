@@ -1,0 +1,32 @@
+<section class="debug-shell">
+  <header class="debug-header">
+    <h1>Protocol Debug</h1>
+    <p class="debug-subtitle">
+      Node-local diagnostics for this device. Read-only. Reflects whichever
+      replica/node answered — not a cluster-wide aggregate.
+    </p>
+  </header>
+
+  <nav class="debug-tabs" role="tablist">
+    <button
+      type="button"
+      *ngFor="let lens of lenses"
+      role="tab"
+      class="debug-tab"
+      [attr.data-testid]="'debug-tab-' + lens.id"
+      [class.active]="lens.id === activeId()"
+      [attr.aria-selected]="lens.id === activeId()"
+      (click)="select(lens.id)"
+    >
+      <span class="tab-icon">{{ lens.icon }}</span> {{ lens.title }}
+    </button>
+  </nav>
+
+  <div class="debug-panel" role="tabpanel">
+    <ng-container *ngFor="let lens of lenses">
+      <ng-container *ngIf="lens.id === activeId()">
+        <ng-container *ngComponentOutlet="lens.component" />
+      </ng-container>
+    </ng-container>
+  </div>
+</section>
