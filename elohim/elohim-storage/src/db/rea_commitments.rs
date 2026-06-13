@@ -326,19 +326,25 @@ pub fn provide_projection_id(provider: &str, reach: &str) -> String {
 }
 
 /// Project an **active provide** `rea_commitments` row from a notarized
-/// `replicates-commons` content commitment (Epic B creation path).
+/// content-provide commitment (`replicates-content` / `replicates-commons`
+/// alias) (Epic B creation path).
 ///
 /// ## Why this exists
 ///
-/// The production provide loop authors `replicates-commons` Commitments that
+/// The production provide loop authors content-provide Commitments that
 /// project into `mishpat_commitments` — but the resilience snapshot and the
 /// `PeerSelection` contract-aware scorer both read the `rea_commitments`
 /// `provide` / `content:<reach>` shape. Nothing bridged the two ledgers, so a
 /// production database had ZERO `action='provide'` rows and the snapshot's
 /// `commitment_backed_collectives` was permanently 0 (the rows existed only in
 /// `test_util`). This is the substrate-anchored bridge: a DHT-notarized
-/// `replicates-commons` Commitment landing in the signal projector also records
+/// content-provide Commitment landing in the signal projector also records
 /// the standing-provision fact in `rea_commitments`.
+///
+/// `reach` is read through from the commitment's declared content reach, so a
+/// non-commons commitment writes `content:<reach>` (e.g. `content:household`)
+/// — the row is keyed by `(provider, reach)`, so a provider stewarding content
+/// at several reaches gets one provide row per reach.
 ///
 /// ## Shape contract (must match the snapshot + peer_selection reads)
 /// - `action = "provide"`, `state = "active"`, `finished = 0`
@@ -354,7 +360,7 @@ pub fn provide_projection_id(provider: &str, reach: &str) -> String {
 ///
 /// Returns `Ok(true)` when a new row was inserted, `Ok(false)` when one already
 /// existed.
-pub fn record_provide_from_commons_commitment(
+pub fn record_provide_from_content_commitment(
     conn: &mut SqliteConnection,
     h_app_id: &str,
     provider: &str,
@@ -1486,14 +1492,14 @@ mod provide_reach_tests {
         assert_eq!(reach_from_scope(Some("")), "commons");
     }
 
-    // ── record_provide_from_commons_commitment (Epic B creation path) ─────────
+    // ── record_provide_from_content_commitment (Epic B creation path) ─────────
 
     /// A first commons commitment records exactly one active provide row with
     /// the snapshot-matching shape; the deterministic id is stable.
     #[test]
     fn record_provide_creates_active_content_commons_row() {
         let mut conn = setup();
-        let inserted = record_provide_from_commons_commitment(
+        let inserted = record_provide_from_content_commitment(
             &mut conn,
             "lamad",
             "agent:steward-a",
@@ -1517,11 +1523,41 @@ mod provide_reach_tests {
         assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-anchor"));
     }
 
+    /// A non-commons (household) content commitment writes a `content:household`
+    /// scope — the reach is read through, not pinned to commons. This is the
+    /// row shape the snapshot scopes a household-reach content's count to.
+    #[test]
+    fn record_provide_creates_active_content_household_row() {
+        let mut conn = setup();
+        let inserted = record_provide_from_content_commitment(
+            &mut conn,
+            "lamad",
+            "agent:steward-b",
+            "household",
+            Some("uhCkk-household-anchor"),
+        )
+        .unwrap();
+        assert!(inserted, "first household commitment inserts a row");
+
+        let ctx = AppContext::default_lamad();
+        let id = provide_projection_id("agent:steward-b", "household");
+        assert_eq!(id, "provide-agent:steward-b-content:household");
+        let row = get_commitment(&mut conn, &ctx, &id).unwrap().expect("row");
+        assert_eq!(row.action, "provide");
+        assert_eq!(row.state, "active");
+        assert_eq!(
+            row.resource_classified_as.as_deref(),
+            Some("content:household"),
+            "non-commons reach is read through to the scope"
+        );
+        assert_eq!(row.provider, "agent:steward-b");
+    }
+
     /// Idempotent: a second commitment for the same (provider, reach) is a no-op.
     #[test]
     fn record_provide_is_idempotent_per_provider_reach() {
         let mut conn = setup();
-        let first = record_provide_from_commons_commitment(
+        let first = record_provide_from_content_commitment(
             &mut conn,
             "lamad",
             "agent:steward-a",
@@ -1529,7 +1565,7 @@ mod provide_reach_tests {
             Some("anchor-1"),
         )
         .unwrap();
-        let second = record_provide_from_commons_commitment(
+        let second = record_provide_from_content_commitment(
             &mut conn,
             "lamad",
             "agent:steward-a",
@@ -1555,7 +1591,7 @@ mod provide_reach_tests {
     fn record_provide_row_is_visible_to_active_provide_reaches() {
         let mut conn = setup();
         let ctx = AppContext::default_lamad();
-        record_provide_from_commons_commitment(
+        record_provide_from_content_commitment(
             &mut conn,
             "lamad",
             "agent:steward-a",

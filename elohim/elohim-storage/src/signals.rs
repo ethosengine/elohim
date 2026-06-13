@@ -878,7 +878,7 @@ pub fn handle_mishpat_signal(
                     // did). Derive it from this DHT-anchored event BEFORE the
                     // mishpat_commitments write consumes `new_row`.
                     if let Some(p) = crate::mishpat_projection::provide_projection_for(&new_row) {
-                        match crate::db::rea_commitments::record_provide_from_commons_commitment(
+                        match crate::db::rea_commitments::record_provide_from_content_commitment(
                             conn,
                             app_id,
                             &p.provider,
