@@ -835,6 +835,36 @@ pub fn content_ids_with_reach(
     Ok(found.into_iter().collect())
 }
 
+/// For each of `ids` that exists locally, return `(id, reach)` — the content's
+/// own declared reach.
+///
+/// The reach-general provide-eligibility path needs per-content reach (NOT a
+/// single fixed reach filter): a node may provide a household-reach record
+/// only if it has embodied responsibility for that scope, and commons is the
+/// only openly-providable reach. The caller builds the topic
+/// `elohim/<pillar>/<reach>[/<collective>]` from each pair and runs
+/// `classify_pre_authorization`. The pillar is supplied caller-side (there is
+/// no `pillar` column on `content`); Stage-1 classification ignores everything
+/// past the reach segment, so caller-side pillar derivation is sufficient and
+/// the seam tightens with the graph walk in Stage 2/3.
+///
+/// NOTE: same SQLITE_MAX_VARIABLE_NUMBER caveat as [`content_ids_present`] —
+/// chunk large id sets.
+pub fn content_reaches_for_ids(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    ids: &[String],
+) -> QueryResult<Vec<(String, String)>> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::id.eq_any(ids))
+        .select((content::id, content::reach))
+        .load(conn)
+}
+
 /// Get content count for an app
 pub fn content_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     content::table
@@ -1172,6 +1202,56 @@ mod tests {
         // Empty ids → empty set (no all-rows leak).
         let empty = content_ids_with_reach(&mut conn, &ctx, &[], "commons").unwrap();
         assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn content_reaches_for_ids_returns_per_content_reach() {
+        // The reach-aware eligibility path needs per-content reach (not a fixed
+        // filter): each present id maps to its own declared reach so the caller
+        // can classify reach-aware.
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let mk = |id: &str, reach: &str| CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: reach.to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+        };
+        create_content(&mut conn, &ctx, mk("epr:commons-2", "commons")).unwrap();
+        create_content(&mut conn, &ctx, mk("epr:household-2", "household")).unwrap();
+
+        let ids = vec![
+            "epr:commons-2".to_string(),
+            "epr:household-2".to_string(),
+            "epr:absent-2".to_string(), // not present
+        ];
+        let pairs = content_reaches_for_ids(&mut conn, &ctx, &ids).unwrap();
+        let map: std::collections::HashMap<String, String> = pairs.into_iter().collect();
+        assert_eq!(map.len(), 2, "only present ids are returned");
+        assert_eq!(
+            map.get("epr:commons-2").map(String::as_str),
+            Some("commons")
+        );
+        assert_eq!(
+            map.get("epr:household-2").map(String::as_str),
+            Some("household"),
+            "household content reports its own reach, not commons"
+        );
+        assert!(!map.contains_key("epr:absent-2"));
+
+        // Empty ids → empty.
+        assert!(content_reaches_for_ids(&mut conn, &ctx, &[])
+            .unwrap()
+            .is_empty());
     }
 
     #[test]

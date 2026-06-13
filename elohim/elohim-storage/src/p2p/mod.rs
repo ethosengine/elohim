@@ -6860,23 +6860,30 @@ impl P2PNode {
             })
             .collect();
 
-        // commons-reach head_refs from local content projection. Filter on
-        // reach == "commons" so a non-commons locally-present item never enters
-        // the desired set (it must not mint a spurious replicates-commons
-        // commitment — the provide loop offers to the commons only what IS
-        // commons).
+        // Provide-eligible head_refs: per-content (head_ref, reach) for present
+        // content, classified reach-aware (commons is openly providable;
+        // non-commons requires embodied responsibility for the scope). This
+        // replaces the old commons-only filter so a non-commons item the node IS
+        // eligible to provide can enter the desired set, while a non-commons item
+        // the node is NOT eligible for is excluded (a privacy gate, not a no-op).
+        use crate::services::provide_reconcile::ProvideEligibility;
         let head_refs: Vec<String> = pins.iter().map(|p| p.head_ref.clone()).collect();
-        let commons: std::collections::HashSet<String> = {
+        let eligible: std::collections::HashSet<String> = {
             let Ok(mut conn) = pool.get() else { return };
             let app_ctx = crate::db::AppContext::default_lamad();
-            crate::db::content_diesel::content_ids_with_reach(
-                &mut conn, &app_ctx, &head_refs, "commons",
-            )
-            .unwrap_or_default()
+            let candidates =
+                crate::db::content_diesel::content_reaches_for_ids(&mut conn, &app_ctx, &head_refs)
+                    .unwrap_or_default();
+            drop(conn);
+            let resolver = crate::services::provide_reconcile::ClassifierEligibility::new(
+                std::sync::Arc::new(pool.clone()),
+                "lamad",
+            );
+            resolver.eligible_head_refs(&candidates)
         };
 
         let desired = crate::services::provide_reconcile::ProvideReconciler::derive_desired(
-            &pins, &caught_up, &commons,
+            &pins, &caught_up, &eligible,
         );
         if desired.is_empty() {
             return;

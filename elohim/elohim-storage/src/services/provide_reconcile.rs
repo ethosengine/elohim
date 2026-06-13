@@ -129,6 +129,100 @@ impl CommitmentAuthor for MockAuthor {
     }
 }
 
+/// Reach-aware provide-eligibility seam.
+///
+/// Off-commons, "may this node provide content X at reach R?" is a privacy
+/// question, not just a presence question: a household-reach record is not
+/// openly providable; the node must have **embodied responsibility** for the
+/// scope (the same predicate that decides receiver-side pre-authorization — you
+/// may provide a scope iff you have standing to hold it). Commons stays openly
+/// providable.
+///
+/// The seam takes `(head_ref, reach)` candidates (caught-up AND locally present)
+/// and returns the head_refs the node is eligible to provide. Extracting it
+/// behind a trait (mirroring [`CommitmentAuthor`]/[`MockAuthor`]) lets the
+/// admit/reject decision be unit-tested without a live DB pool — the production
+/// resolver reads `peer_identity_bindings`; the mock injects the eligible set.
+pub trait ProvideEligibility: Send + Sync {
+    /// Filter `candidates` (`(head_ref, reach)`) to the head_refs this node is
+    /// eligible to provide.
+    fn eligible_head_refs(&self, candidates: &[(String, String)]) -> HashSet<String>;
+}
+
+/// Production eligibility resolver: builds the scope topic per candidate and
+/// runs [`classify_pre_authorization`](crate::p2p::classify_pre_authorization).
+///
+/// `node_has_embodied_responsibility` is resolved ONCE (Stage 1 ignores the
+/// topic — it answers "does this node have any standing at all"); Stage 2/3
+/// will thread per-scope graph walks through the same call without changing
+/// this seam. The pillar is supplied here (no `pillar` column on content);
+/// `community` reach additionally carries the collective segment when known
+/// (none at Stage 1 — `None`), riding the topic ladder so Stage 2/3 tightening
+/// flows through with no call-site rewrite.
+///
+/// Gated on the `p2p` feature: the classifier + topic machinery live in the
+/// `p2p` module. The `ProvideEligibility` trait itself is ungated so a
+/// non-p2p build (and the unit tests) can still inject a mock resolver.
+#[cfg(feature = "p2p")]
+pub struct ClassifierEligibility {
+    pool: Arc<DbPool>,
+    pillar: String,
+}
+
+#[cfg(feature = "p2p")]
+impl ClassifierEligibility {
+    pub fn new(pool: Arc<DbPool>, pillar: impl Into<String>) -> Self {
+        Self {
+            pool,
+            pillar: pillar.into(),
+        }
+    }
+}
+
+#[cfg(feature = "p2p")]
+impl ProvideEligibility for ClassifierEligibility {
+    fn eligible_head_refs(&self, candidates: &[(String, String)]) -> HashSet<String> {
+        use crate::p2p::{classify_pre_authorization, topics::topic_for, PreAuthorizationDecision};
+
+        if candidates.is_empty() {
+            return HashSet::new();
+        }
+        // Resolve the embodied-responsibility boolean once. NOTE (flag, not
+        // fixed here): this resolver fails OPEN on pool/query error (returns
+        // true), so under DB stress it can admit a node that lacks standing —
+        // existing Stage 1 behavior, tracked with the receiver-side gate, not
+        // re-designed in this change.
+        let has_responsibility =
+            crate::p2p::reach_authorization::node_has_embodied_responsibility(&self.pool, "");
+
+        candidates
+            .iter()
+            .filter(|(_head_ref, reach)| {
+                // Parse the reach to build the canonical topic; an unknown reach
+                // is not providable (defensive — the parse pins it to the DNA
+                // vocabulary). The collective segment is None at Stage 1.
+                let Some(reach_enum) = parse_reach_for_topic(reach) else {
+                    return false;
+                };
+                let topic = topic_for(&self.pillar, reach_enum, None);
+                matches!(
+                    classify_pre_authorization(&topic, has_responsibility),
+                    PreAuthorizationDecision::Standing
+                )
+            })
+            .map(|(head_ref, _reach)| head_ref.clone())
+            .collect()
+    }
+}
+
+/// Parse a reach string to [`elohim_epr::Reach`] for topic construction.
+/// Mirrors the storage-side read-through (`mishpat_projection::parse_reach`):
+/// membership in the canonical reach vocabulary is "the parse succeeds".
+#[cfg(feature = "p2p")]
+fn parse_reach_for_topic(reach: &str) -> Option<elohim_epr::Reach> {
+    serde_json::from_value::<elohim_epr::Reach>(serde_json::Value::String(reach.to_string())).ok()
+}
+
 /// One desired provide derived from a caught-up commons pin.
 #[derive(Debug, Clone)]
 pub struct DesiredProvide {
@@ -381,18 +475,22 @@ impl ProvideReconciler {
     }
 
     /// Derive the desired provide set: active `item` pins that are caught-up
-    /// (acquisition byte-arrival complete) AND whose content is `reach=="commons"`.
-    /// Caught-up ids come from the live `AcquisitionState` rollup; the caller
-    /// passes the set of head_refs the acquisition stream reports complete.
+    /// (acquisition byte-arrival complete) AND that this node is **eligible to
+    /// provide** at their content's reach. Caught-up ids come from the live
+    /// `AcquisitionState` rollup; the eligible set is computed by the caller via
+    /// the reach-aware [`ProvideEligibility`] seam (commons is openly providable;
+    /// non-commons requires embodied responsibility for the scope). Staying pure
+    /// — the caller resolves both sets and passes them in — keeps the diff/dedup
+    /// logic unit-testable without a live pool.
     pub fn derive_desired(
         pins: &[crate::db::models::AcquisitionPin],
         caught_up_head_refs: &HashSet<String>,
-        commons_head_refs: &HashSet<String>,
+        provide_eligible_head_refs: &HashSet<String>,
     ) -> Vec<DesiredProvide> {
         pins.iter()
             .filter(|p| p.kind == PIN_KIND_ITEM && p.status == PIN_STATUS_ACTIVE)
             .filter(|p| caught_up_head_refs.contains(&p.head_ref))
-            .filter(|p| commons_head_refs.contains(&p.head_ref))
+            .filter(|p| provide_eligible_head_refs.contains(&p.head_ref))
             .map(|p| DesiredProvide {
                 pin_id: p.id,
                 head_ref: p.head_ref.clone(),
@@ -584,7 +682,7 @@ mod tests {
     }
 
     #[test]
-    fn derive_desired_filters_non_caught_up_and_non_commons() {
+    fn derive_desired_filters_non_caught_up_and_non_eligible() {
         use crate::db::models::AcquisitionPin;
         let pin = |id: i32, head: &str, status: &str| AcquisitionPin {
             id,
@@ -599,30 +697,104 @@ mod tests {
             commitment_cid: None,
         };
         let pins = vec![
-            pin(1, "epr:ready-commons", "active"),
+            pin(1, "epr:ready-eligible", "active"),
             pin(2, "epr:not-caught-up", "active"),
-            pin(3, "epr:caught-up-not-commons", "active"),
+            pin(3, "epr:caught-up-not-eligible", "active"),
             pin(4, "epr:paused", "paused"),
         ];
         let caught: HashSet<String> = [
-            "epr:ready-commons",
-            "epr:caught-up-not-commons",
+            "epr:ready-eligible",
+            "epr:caught-up-not-eligible",
             "epr:paused",
         ]
         .iter()
         .map(|s| s.to_string())
         .collect();
-        let commons: HashSet<String> = ["epr:ready-commons", "epr:not-caught-up", "epr:paused"]
+        // The eligible set (reach-aware, computed by the caller's seam) is the
+        // third filter. Only a pin that is BOTH caught-up AND eligible is desired.
+        let eligible: HashSet<String> = ["epr:ready-eligible", "epr:not-caught-up", "epr:paused"]
             .iter()
             .map(|s| s.to_string())
             .collect();
 
-        let d = ProvideReconciler::derive_desired(&pins, &caught, &commons);
+        let d = ProvideReconciler::derive_desired(&pins, &caught, &eligible);
         assert_eq!(
             d.len(),
             1,
-            "only the caught-up commons active pin is desired"
+            "only the caught-up AND eligible active pin is desired"
         );
-        assert_eq!(d[0].head_ref, "epr:ready-commons");
+        assert_eq!(d[0].head_ref, "epr:ready-eligible");
+    }
+
+    /// Mock eligibility seam — admit a fixed allow-list, reject the rest. Mirrors
+    /// `MockAuthor`: it lets admit/reject be asserted without a live DB pool.
+    struct MockEligibility {
+        admit: HashSet<String>,
+    }
+    impl ProvideEligibility for MockEligibility {
+        fn eligible_head_refs(&self, candidates: &[(String, String)]) -> HashSet<String> {
+            candidates
+                .iter()
+                .filter(|(head_ref, _reach)| self.admit.contains(head_ref))
+                .map(|(head_ref, _)| head_ref.clone())
+                .collect()
+        }
+    }
+
+    #[test]
+    fn eligibility_seam_admits_allowlisted_rejects_rest() {
+        let resolver = MockEligibility {
+            admit: ["epr:household-eligible"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        };
+        let candidates = vec![
+            (
+                "epr:household-eligible".to_string(),
+                "household".to_string(),
+            ),
+            (
+                "epr:household-no-standing".to_string(),
+                "household".to_string(),
+            ),
+        ];
+        let eligible = resolver.eligible_head_refs(&candidates);
+        assert!(
+            eligible.contains("epr:household-eligible"),
+            "a head_ref the node has standing for is admitted"
+        );
+        assert!(
+            !eligible.contains("epr:household-no-standing"),
+            "a head_ref the node lacks standing for is rejected (privacy gate)"
+        );
+        assert_eq!(eligible.len(), 1);
+    }
+
+    /// The production classifier admits commons unconditionally (commons is
+    /// openly providable — `classify_pre_authorization` returns Standing for
+    /// commons regardless of embodied responsibility) and admits bound-tier
+    /// reaches only when the node has embodied responsibility. With a pool that
+    /// has NO peer_identity_bindings rows, the Stage-1 resolver returns false,
+    /// so a household candidate is rejected while commons is still admitted.
+    #[cfg(feature = "p2p")]
+    #[test]
+    fn classifier_eligibility_admits_commons_rejects_household_without_standing() {
+        use crate::test_util::test_pool;
+        let pool = std::sync::Arc::new(test_pool());
+        let resolver = ClassifierEligibility::new(pool, "lamad");
+        let candidates = vec![
+            ("epr:commons-item".to_string(), "commons".to_string()),
+            ("epr:household-item".to_string(), "household".to_string()),
+        ];
+        let eligible = resolver.eligible_head_refs(&candidates);
+        assert!(
+            eligible.contains("epr:commons-item"),
+            "commons is openly providable — always admitted"
+        );
+        assert!(
+            !eligible.contains("epr:household-item"),
+            "household requires embodied responsibility; none seeded → rejected"
+        );
     }
 }

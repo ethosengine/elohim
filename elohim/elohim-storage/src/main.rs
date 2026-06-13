@@ -947,9 +947,12 @@ async fn async_main(
                 // self_cid; absent any, the loop is not spawned.
                 //
                 // Caught-up proxy: for an `item` pin, local content presence IS
-                // the durable, DB-queryable signal that byte arrival completed.
-                // `content_ids_with_reach(.., "commons")` answers present-AND-
-                // commons in one query, which is exactly the desired-set gate.
+                // the durable, DB-queryable signal that byte arrival completed
+                // (`content_ids_present`, reach-agnostic). The provide-eligibility
+                // gate is SEPARATE: a reach-aware classifier pass that admits
+                // commons openly and non-commons only with embodied responsibility
+                // for the scope. The two sets were previously conflated (commons
+                // presence doubled as both proxy and gate); they are now distinct.
                 match (
                     registry.lamad.clone(),
                     db_pool.clone(),
@@ -967,6 +970,15 @@ async fn async_main(
                         );
                         let reconciler = std::sync::Arc::new(
                             elohim_storage::services::provide_reconcile::ProvideReconciler::new(),
+                        );
+                        // Reach-aware provide-eligibility resolver (lamad pillar).
+                        // Commons is openly providable; non-commons requires
+                        // embodied responsibility for the scope (classify_pre_authorization).
+                        let eligibility = std::sync::Arc::new(
+                            elohim_storage::services::provide_reconcile::ClassifierEligibility::new(
+                                std::sync::Arc::new(provide_pool.clone()),
+                                "lamad",
+                            ),
                         );
                         let self_cid_for_log = self_cid.clone();
                         let mut provide_shutdown = shutdown_tx.subscribe();
@@ -996,15 +1008,22 @@ async fn async_main(
                                                     continue;
                                                 }
                                             };
+                                            use elohim_storage::services::provide_reconcile::ProvideEligibility;
                                             let head_refs: Vec<String> = pins.iter().map(|p| p.head_ref.clone()).collect();
-                                            let commons_present = elohim_storage::db::content_diesel::content_ids_with_reach(
-                                                &mut conn, &app_ctx, &head_refs, "commons",
+                                            // Caught-up proxy: reach-agnostic local presence.
+                                            let present = elohim_storage::db::content_diesel::content_ids_present(
+                                                &mut conn, &app_ctx, &head_refs,
                                             )
                                             .unwrap_or_default();
-                                            // present-and-commons doubles as both
-                                            // the caught-up and commons gate.
+                                            // Eligibility gate: per-content (head_ref, reach)
+                                            // for present content, classified reach-aware.
+                                            let candidates: Vec<(String, String)> = elohim_storage::db::content_diesel::content_reaches_for_ids(
+                                                &mut conn, &app_ctx, &head_refs,
+                                            )
+                                            .unwrap_or_default();
+                                            let eligible = eligibility.eligible_head_refs(&candidates);
                                             elohim_storage::services::provide_reconcile::ProvideReconciler::derive_desired(
-                                                &pins, &commons_present, &commons_present,
+                                                &pins, &present, &eligible,
                                             )
                                         };
                                         if desired.is_empty() {
