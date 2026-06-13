@@ -212,3 +212,52 @@ Feature: Network Health Posture — Aggregate Awareness and Attestation-Gated In
     Then the posture warns that no always-on peers exist
     And the posture suggests that a home node or network node would improve resilience
     And the network still functions but with reduced availability expectations
+
+  # --- Per-Context Stability Read Model (/debug surface) -----------------------
+  # Harvested 2026-06-13 building the reusable /debug surface. The self-healing
+  # read model (StabilityStatusView, GET /admin/self-healing) is served two ways
+  # by deployment context. CONSTRAINT/BOUNDARY: of its blocks, only `projector`
+  # (reconciliation lag, caught-up, divergent-anchor) is reconstructable on a
+  # single node from storage status endpoints; `peers` (signal-peer health),
+  # `render` (SSR trace), `warmup` (projection warm-stream), and `conductor`
+  # (worker pool) are doorway-ROLE state with NO single-node analog. The reusable
+  # surface (elohim-app runs in both web and tauri) must degrade honestly — it
+  # marks doorway-role blocks "not applicable on this node" rather than fabricate
+  # values, mirroring the single-node-posture edge cases above (never cries wolf).
+
+  @wip
+  Scenario: Stability view served through a doorway is the full composed self-healing model
+    Given human "Matthew" reaches the "/debug" surface through doorway "alpha"
+    When Matthew opens the Stability lens
+    Then the projector, peers, render, warmup, and conductor blocks show real values
+    And the autoPreset, admission, and upstreams blocks show "pending wire-up"
+    And the view is labeled as composed by the doorway edge
+
+  @wip
+  Scenario: Stability view on a single node degrades honestly, never fabricating doorway-role state
+    Given Matthew runs a single node reached directly, with no doorway in the data path
+    When Matthew opens the Stability lens on that node
+    Then the projector block shows real lag, caught-up, and divergent-anchor values
+    And the peers, render, warmup, and conductor blocks are marked "not applicable on this single node"
+    And no block fabricates a value or falsely claims the node is degraded
+    # Boundary: only `projector` survives the doorway→node transition. If a future
+    # change makes peers/render/warmup/conductor node-reconstructable, this honest
+    # N/A should be revisited — the constraint moved, it didn't disappear.
+
+  @wip
+  Scenario: Node diagnostics are reachable by URL regardless of navigation visibility
+    Given the "/debug" surface is not shown in Matthew's navigation
+    When Matthew navigates directly to "/debug"
+    Then the diagnostics surface loads (the gate is discoverability, not access)
+    And Matthew can pin it to navigation so it persists across reloads
+
+  @wip
+  Scenario: Self-healing read model exposes peer identities without attestation today
+    Given doorway "alpha" serves "GET /admin/self-healing"
+    And no ingress rule restricts "/admin/*" to operator networks
+    When an unauthenticated caller requests "/admin/self-healing"
+    Then the response includes per-peer identities and health
+    # Open, operator-owned gap: the "operator-only" property is aspirational —
+    # ingress protection for /admin/* is not enforced, so this is a deanonymization
+    # surface. When ingress gating lands, this should converge to the
+    # attestation-gated introspection model above (compute:debug scope).
