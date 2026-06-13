@@ -9605,6 +9605,16 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .cache_ttl(5)
                 .build(),
         )
+        // Projector cursor + reconciliation-lag (operational, Cat-C). The path
+        // has an explicit handler arm above (the /api/v1/status/projector match)
+        // but must ALSO be declared here so a doorway RouteRegistry learns it is
+        // proxiable — single-target, as always. Consumed by /admin/self-healing.
+        .route(
+            Route::get("/api/v1/status/projector")
+                .handler("projector_status")
+                .cache_ttl(5)
+                .build(),
+        )
         // =====================================================================
         // /api/v1/mastery — Content mastery lifecycle
         // =====================================================================
@@ -12322,6 +12332,22 @@ mod auth_me_tests {
             !route.auth_required,
             "/auth/me must not set auth_required at route level; \
              the handler returns 401 itself to match doorway's contract"
+        );
+    }
+
+    /// Verify build_manifest() declares /api/v1/status/projector so doorway's
+    /// RouteRegistry learns it is proxiable (the path has an explicit storage
+    /// handler arm but was absent from the manifest → doorway 404 — wf1 fix).
+    #[test]
+    fn build_manifest_includes_projector_status_route() {
+        let manifest = build_manifest();
+        let found = manifest.routes.iter().any(|r| {
+            r.method == doorway_client::HttpMethod::Get && r.path == "/api/v1/status/projector"
+        });
+        assert!(
+            found,
+            "GET /api/v1/status/projector missing from build_manifest — doorway \
+             cannot proxy projector lag/caughtUp to the stability surface"
         );
     }
 }

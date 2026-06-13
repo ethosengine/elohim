@@ -1162,10 +1162,15 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
                 match client.get(&url).send().await {
                     Ok(resp) if resp.status().is_success() => {
                         if let Ok(body) = resp.json::<serde_json::Value>().await {
+                            let recon = &body["projectionReconcile"];
                             let health = crate::routes::health::P2PHealth {
                                 enabled: true,
                                 peer_count: body["connectedPeers"].as_u64().unwrap_or(0) as usize,
                                 peer_id: body["peerId"].as_str().map(String::from),
+                                caught_up: recon["caughtUp"].as_bool(),
+                                divergent_anchor: recon["divergentAnchor"]
+                                    .as_u64()
+                                    .map(|n| n as usize),
                             };
                             *p2p_health.write().await = Some(health);
                         }
@@ -2421,6 +2426,18 @@ async fn handle_request(
         // Render-trace feed-forward aggregate (terminal classes + latency)
         (Method::GET, "/admin/render-stats") => {
             to_boxed(routes::handle_admin_render_stats(Arc::clone(&state)).await)
+        }
+
+        // Unified self-healing read model — Cat C node-local Operational state
+        // (SELF-HEALING-CONTROL-PLANE-DESIGN-2026-06-13.md §6). Composed fresh
+        // per request from in-process snapshots + on-demand projector fetch.
+        // Legitimate doorway-local aggregate (NOT a per-domain proxy): fails the
+        // swap test by design — a node serves its OWN runtime state, same class
+        // as /admin/capability + /admin/render-stats. No auth (operator-only is
+        // an ingress property). PENDING sibling keys (autoPreset/admission/
+        // upstreams) are null/empty with FOLLOW-ON wire-up seams.
+        (Method::GET, "/admin/self-healing") => {
+            to_boxed(routes::handle_self_healing(Arc::clone(&state)).await)
         }
 
         // Conductor pool visibility (available on ALL instances)
