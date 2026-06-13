@@ -177,6 +177,29 @@ spec:
             # SSR to real content routes once the engine is wired.
             - name: SSR_BUNDLE_PATH
               value: "/opt/elohim-render/main.server.mjs"
+            # Tokio worker threads — set EXPLICITLY, never CPU-derived. The pod has
+            # limits.cpu: 1, so the default runtime spun up a SINGLE worker thread;
+            # the 2026-06-13 freeze was one synchronously-blocked await on that lone
+            # worker wedging the whole gateway (10 threads in futex_wait, /health
+            # included). A futex-blocked worker costs no CPU, so 4 workers break the
+            # single-blocked-await wedge even at cpu: 1 — this is the direct antidote
+            # and does NOT require raising limits.cpu. (See the resources block: cpu
+            # stays at 1000m; raise to 2000m only if SSR render latency under
+            # concurrency demands it — that buys CPU-bound render throughput, not
+            # freeze-resistance.) Default in-binary is 4 if unset.
+            - name: DOORWAY_WORKER_THREADS
+              value: "4"
+            # Conductor-call hard deadline (ms). Bounds every zome/admin call so an
+            # intermittent cluster NXDOMAIN or a never-settling record_heartbeat can
+            # never park the caller forever (the freeze root contributor). Default
+            # in-binary is 10000 if unset.
+            - name: DOORWAY_ZOME_CALL_TIMEOUT_MS
+              value: "10000"
+            # DOORWAY_HEALTH_PORT (dedicated probe listener) intentionally LEFT
+            # UNSET: that listener shares the main tokio runtime, so a killer probe
+            # (liveness/startup) pointed at it would stay green during a PARTIAL
+            # wedge — defeating restart-on-hang for exactly the serving-nothing case.
+            # Probes below stay on 8080 (the real request path) on purpose.
             # Federation peer: doorway-alpha-b in the same elohim-alpha namespace,
             # apex hostname (elohim.host). Both doorways back onto the shared alpha
             # conductor pool — this surfaces multi-projection federation without
