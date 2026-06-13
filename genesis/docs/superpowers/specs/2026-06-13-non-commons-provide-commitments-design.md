@@ -361,11 +361,17 @@ The coordinator/integrity split matters here: the validator generalization is in
 *coordinator* zome (`commitments.rs`) — a coordinator-only change hot-swaps via
 `update_coordinators` (no re-key, no DHT churn, `sync_coordinators` / `ALLOW_COORDINATOR_UPDATE`,
 per `project_dna_hash_blind_to_coordinator_zomes`). The **integrity** defense-in-depth arm
-change is what moves the hash. **OPEN (§9.2):** if the integrity arm can be left commons-only
-— relying on the coordinator validator + storage eligibility to gate non-commons — Stage B is
-**coordinator-only and hot-swappable**, no DNA-hash move, no reinstall ceremony. That is a real
-architecture fork worth the operator's call: defense-in-depth (integrity also enforces, hash
-moves) vs. hot-swappable (integrity stays permissive on reach, coordinator + storage enforce).
+change is what moves the hash. **DECIDED (§9.2): Option A — integrity also enforces.** The
+integrity defense-in-depth arm takes the structural reach check (`reach ∈ enum`,
+`reach_ceiling ≥ reach`, well-ordering); the hash moves; the alpha bootstrap-pair reinstall
+ceremony is scheduled while alpha is small. Rationale: the reinstall cost is *cheapest now*
+(6 peers, a 2-agent bootstrap pair) and only grows with the network — deferring banks the cost
+at a worse exchange rate; mishpat is the reach-governance substrate, so the well-ordered reach
+invariant belongs on the immutable floor for future escalation logic to build on; the substrate
+floor should mean what it says. **Caveat — what A does NOT buy:** the integrity arm enforces
+*structural* reach only. It cannot enforce **consent**, which is relational (needs `must_get`
+graph walks HDI does not have). Consent stays coordinator-side (grant exists at author time) +
+storage/serve (grant resolves at count time). See the consent-model direction in §9.6.
 
 ### Stage C — Epic-B junction dependency (not this spec)
 
@@ -406,11 +412,12 @@ out of scope.
    action string and only widen its reach gate (smaller change, permanently misleading name).
    The spec recommends the rename with a one-window alias; the operator owns the churn/clarity
    trade.
-2. **Stage B: integrity change vs coordinator-only (§7).** Can the non-commons reach gate live
-   entirely in the coordinator + storage eligibility (hot-swappable, no DNA-hash move), leaving
-   the integrity defense-in-depth arm commons-only? If the integrity arm must enforce
-   non-commons structurally, the hash moves and the alpha bootstrap-pair reinstall ceremony is
-   required. This is the single biggest cost fork — operator call.
+2. **Stage B: integrity change vs coordinator-only (§7). DECIDED — Option A (integrity also
+   enforces).** The integrity arm takes the structural reach check; the DNA hash moves; the
+   alpha bootstrap-pair (adam + matthew) reinstall ceremony under `ALLOW_DNA_REINSTALL` is
+   scheduled while alpha is small (the cost only grows). Rationale and the load-bearing caveat
+   (A enforces *structural* reach only — consent is relational and stays coordinator/storage by
+   necessity) are in §7 Stage B. Operator owns ceremony scheduling.
 3. **Private/intimate provide commitments: gossiped vs source-chain-private (§4.4).** v1
    gossips the commitment (opaque CID + reach class only, which is provider-safe). A stronger
    posture puts intimate/private provide on a private source-chain entry — but private entries
@@ -424,6 +431,24 @@ out of scope.
    walks (qahal memberships, imagodei attestations) are the same deferral the consent gate
    itself carries (`reach_authorization.rs` "Stage 2/3 — open question O2"); this design rides
    that ladder, does not get ahead of it.
+6. **Consent model: predicate vs first-class grant, and the inverse-scaling shape (DRAFT —
+   needs more thought; feeds §4.2/§4.3/§4.4, NOT a Stage-A/B blocker).** Today the spec gates
+   non-commons eligibility with the `classify_pre_authorization` *predicate* (a derived boolean).
+   An emerging operator intuition reshapes this: **consent strength scales inversely with reach.**
+   - **Commons / outward contact = opt-out.** Open by default; the gate is a good-faith/care
+     threshold (judged by the elohim agents) plus absence of a **block** (negative consent). No
+     invitation required to reach the commons.
+   - **Intimate / private groups / small collectives / sandboxed stewardees = opt-in.** Closed by
+     default; the gate *is* a positive invitation/handshake (e.g. a real-world QR/business-card
+     consent moment), revocable, with standing and audit trail — the
+     [[project_rea_compute_commitment_primitive]] shape (a bounded `Mishpat::Commitment`:
+     "A grants B the right to reach/provide at reach R, revocable, audited").
+   - The same axis governs **disclosure** (§4.4/§9.3): a commons provide-commitment can be
+     broadly gossiped; an intimate one wants private source-chain residence. Consent-strength and
+     disclosure-strength move together, both inverse to reach.
+   If the grant becomes a **first-class invitation entry** (rather than a derived predicate), it
+   is a new DHT entry type → must pass the **p2p-design-gate** before design. Deferred pending
+   operator; the structural floor (Option A) is invariant to this choice.
 
 ---
 
