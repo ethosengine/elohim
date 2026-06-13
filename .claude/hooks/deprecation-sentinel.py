@@ -136,6 +136,22 @@ ECHO_COMMIT_SUBJECT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Guard D — ephemeral-script self-capture:
+#   A DeprecationWarning whose SOURCE marker is literally `<string>:N:` or
+#   `<stdin>:N:` was emitted by code run via `python3 -c "…"`, `exec()`, or
+#   stdin — by Python's own convention these markers NEVER name a checked-in
+#   source file (a real file warning carries its path: "foo.py:12:"). These
+#   are an agent's own ad-hoc inline scripts (e.g. parsing an MCP tool-result
+#   .txt with datetime.utcfromtimestamp), scrolled past in Bash output and
+#   re-fingerprinted line-by-line. Every one of the 14 priors of this exact
+#   shape (utcfromtimestamp / PIL getdata) was dispositioned false-positive,
+#   and because the marker's line number differs each run, fp-dedupe can never
+#   suppress the class — only this shape guard can. The marker may sit at
+#   line-start OR after a grep line-number prefix ("1110: <string>:1: …"), so
+#   we search rather than anchor. Zero true-positive risk: a genuine codebase
+#   deprecation is always sourced from a named path or a toolchain prefix.
+ECHO_EPHEMERAL_SOURCE_RE = re.compile(r"<(?:string|stdin)>:\d+:")
+
 # Command-level gates for echo classes B and C: if the command itself is a pure
 # git history read (git log / git show without a -p / --patch flag) or reads
 # directly from the history prose tree, ALL lines from that output are echo
@@ -155,15 +171,22 @@ def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool
     Called after classify() returns non-None to prevent false echo entries
     from being fingerprinted and appended to the ledger.
 
-    The three guards:
+    The four guards:
       A) Line sourced from the ledger file (self-capture via recursive grep).
       B) Line sourced from the history/museum prose tree.
       C) Line that is git commit-message text (log oneline entry, or any
          subject/body line from a pure git history read), NOT a diff hunk
          (diff hunks start with + or - so carry real signal).
+      D) DeprecationWarning sourced from `<string>:N:`/`<stdin>:N:` — an
+         agent's own ephemeral `python3 -c`/stdin script, never a real file.
     """
     # Guard A — ledger self-capture
     if ECHO_LEDGER_PATH.search(line):
+        return True
+
+    # Guard D — ephemeral-script self-capture (<string>:N: / <stdin>:N:).
+    # Placed early: cheapest deterministic skip, no command-flag dependency.
+    if ECHO_EPHEMERAL_SOURCE_RE.search(line):
         return True
 
     # Guard B — history prose (grep output carries file path in the line;
