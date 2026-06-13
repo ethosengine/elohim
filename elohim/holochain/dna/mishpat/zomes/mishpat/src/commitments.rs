@@ -191,7 +191,10 @@ pub fn validate_commitment_payload(input: &CreateCommitmentInput) -> Result<(), 
         // TODO(sprint1-task3): implement acknowledges-reach-change validation
         "acknowledges-reach-change" => validate_acknowledges_reach_change(&payload),
         "replicates-dwelling" => validate_replicates_dwelling(&payload),
-        "replicates-commons" => validate_replicates_commons(&payload),
+        // `replicates-content` is the reach-general content-provide action;
+        // `replicates-commons` is the migration-window alias (Stage B rename).
+        // Both route to the same reach-general validator for one window.
+        "replicates-content" | "replicates-commons" => validate_replicates_content(&payload),
         "revokes-commitment" => validate_revokes_commitment(&payload),
         "ratifies-limit-gradient" => validate_ratifies_limit_gradient(&payload),
         other => Err(format!(
@@ -200,26 +203,40 @@ pub fn validate_commitment_payload(input: &CreateCommitmentInput) -> Result<(), 
     }
 }
 
-/// Validator for the `replicates-commons` action (EPR provide loop, Slice-2b T3).
-/// Variant-dispatch on `variant` ("content" | "capacity"), reach-must-be-commons,
-/// and (capacity only) ratio_attestation sum-to-100 + effective_ratio_cid present.
-/// Mirrors `validate_replicates_dwelling`'s hand-rolled style.
+/// Validator for the `replicates-content` action (EPR provide loop; Stage B
+/// generalization of the former commons-only `replicates-commons`).
+/// Variant-dispatch on `variant` ("content" | "capacity"). The **content**
+/// reach is now reach-general (any non-empty string — the projection floor),
+/// NOT pinned to "commons"; the `bounds.reach_ceiling == "commons"` invariant is
+/// UNCHANGED (it is what keeps the mishpat *integrity* zome — which gates only
+/// `reach_ceiling == "commons"` — passing unmodified, so this coordinator edit
+/// is DNA-hash-neutral). Capacity variant carries ratio_attestation sum-to-100 +
+/// effective_ratio_cid present. Mirrors `validate_replicates_dwelling`'s style.
 ///
-/// Note: the author does NOT supply `epr_scope`. For a content-scoped commons
+/// One-window action alias: accepts BOTH `"replicates-content"` (the new name)
+/// and `"replicates-commons"` (the migration alias the author still emits until
+/// the rename fully lands), structurally identical.
+///
+/// Note: the author does NOT supply `epr_scope`. For a content-scoped
 /// commitment the effective `bounds.epr_scope` is derived as `[head_ref]` at
 /// projection time (the storage `parse_replicates_commons` projection), so the
 /// bounds-validator's epr_scope check is satisfied downstream — never required
 /// in the author-facing payload here.
-fn validate_replicates_commons(payload: &serde_json::Value) -> Result<(), String> {
-    if payload["action"] != "replicates-commons" {
-        return Err("action field must equal 'replicates-commons'".into());
+fn validate_replicates_content(payload: &serde_json::Value) -> Result<(), String> {
+    // One-window action alias: accept both the renamed action and the alias.
+    let action = payload["action"].as_str().unwrap_or("");
+    if action != "replicates-content" && action != "replicates-commons" {
+        return Err(
+            "action field must equal 'replicates-content' (or the 'replicates-commons' alias)"
+                .into(),
+        );
     }
 
     // bounds: required object with rate_per_minute and reach_ceiling="commons".
     let bounds = payload
         .get("bounds")
         .and_then(|b| b.as_object())
-        .ok_or_else(|| "replicates-commons bounds must be object".to_string())?;
+        .ok_or_else(|| "replicates-content bounds must be object".to_string())?;
     for field in ["rate_per_minute", "reach_ceiling"] {
         if !bounds.contains_key(field) {
             return Err(format!("bounds missing required field: {field}"));
@@ -228,8 +245,13 @@ fn validate_replicates_commons(payload: &serde_json::Value) -> Result<(), String
     // rate_per_minute must be a positive rate — a zero rate is a no-op
     // commitment (mirrors replicates-dwelling's positive-quantity guards).
     if bounds["rate_per_minute"].as_u64().unwrap_or(0) == 0 {
-        return Err("replicates-commons bounds.rate_per_minute must be > 0".into());
+        return Err("replicates-content bounds.rate_per_minute must be > 0".into());
     }
+    // KEPT UNCHANGED (load-bearing for hash-neutrality): the commitment's
+    // reach_ceiling must be "commons". The mishpat *integrity* zome gates ONLY
+    // `reach_ceiling == "commons"` (never the top-level content `reach`), so a
+    // non-commons content provide carrying `reach: <content-reach>` +
+    // `reach_ceiling: "commons"` passes integrity UNMODIFIED → no DNA hash move.
     if bounds["reach_ceiling"].as_str().unwrap_or("") != "commons" {
         return Err("bounds.reach_ceiling must equal 'commons'".into());
     }
@@ -241,21 +263,29 @@ fn validate_replicates_commons(payload: &serde_json::Value) -> Result<(), String
             for field in ["head_ref", "reach"] {
                 if payload.get(field).is_none() {
                     return Err(format!(
-                        "replicates-commons content variant missing field: {field}"
+                        "replicates-content content variant missing field: {field}"
                     ));
                 }
             }
             if payload["head_ref"].as_str().unwrap_or("").is_empty() {
-                return Err("replicates-commons head_ref must be non-empty".into());
+                return Err("replicates-content head_ref must be non-empty".into());
             }
-            // commons-reach is the ONLY admissible reach for the commons provide loop.
-            if payload["reach"].as_str().unwrap_or("") != "commons" {
-                return Err("replicates-commons content reach must equal 'commons'".into());
+            // Stage B: the content `reach` is now reach-GENERAL — any non-empty
+            // string is admissible (this is the projection floor only). We do
+            // NOT enforce schema-8 membership here: production content carries
+            // reaches outside the schema-8 DNA vocabulary (`local` (~11.5k rows),
+            // `household`, `neighborhood`, …) and a membership gate would reject
+            // those exact rows (the reach-vocab drift, roadmap-13, deferred).
+            // The `reach_ceiling == "commons"` invariant above is what bounds the
+            // offer (and keeps integrity hash-neutral); the content's own reach
+            // is read through faithfully by the storage projection.
+            if payload["reach"].as_str().unwrap_or("").is_empty() {
+                return Err("replicates-content content reach must be non-empty".into());
             }
             // content variant carries NO ratio_attestation.
             if payload.get("ratio_attestation").is_some() {
                 return Err(
-                    "replicates-commons content variant must not carry ratio_attestation".into(),
+                    "replicates-content content variant must not carry ratio_attestation".into(),
                 );
             }
             Ok(())
@@ -264,13 +294,13 @@ fn validate_replicates_commons(payload: &serde_json::Value) -> Result<(), String
             // commons_bytes > 0.
             let bytes = payload["commons_bytes"].as_u64().unwrap_or(0);
             if bytes == 0 {
-                return Err("replicates-commons commons_bytes must be > 0".into());
+                return Err("replicates-content commons_bytes must be > 0".into());
             }
             // ratio_attestation: required sub-fields + sum-to-100 (mirrors replicates-dwelling).
             let attestation = payload
                 .get("ratio_attestation")
                 .and_then(|v| v.as_object())
-                .ok_or("replicates-commons capacity variant requires ratio_attestation object")?;
+                .ok_or("replicates-content capacity variant requires ratio_attestation object")?;
             for f in [
                 "commons_pct",
                 "dwelling_pct",
@@ -302,7 +332,7 @@ fn validate_replicates_commons(payload: &serde_json::Value) -> Result<(), String
             Ok(())
         }
         other => Err(format!(
-            "replicates-commons variant '{other}' not in enum (content|capacity)"
+            "replicates-content variant '{other}' not in enum (content|capacity)"
         )),
     }
 }
@@ -885,15 +915,76 @@ mod tests {
     }
 
     #[test]
-    fn replicates_commons_content_reach_not_commons_rejected() {
+    fn replicates_content_non_commons_reach_now_accepted() {
+        // Stage B INVERSION: the content `reach` is now reach-general. A
+        // household/community/local reach with reach_ceiling="commons" VALIDATES
+        // (the integrity zome gates only reach_ceiling, so this is hash-neutral).
+        for reach in ["community", "household", "local", "neighborhood"] {
+            let mut payload = well_formed_commons_content_payload();
+            payload["reach"] = serde_json::json!(reach);
+            let input = CreateCommitmentInput {
+                action: "replicates-commons".to_string(),
+                payload_json: payload.to_string(),
+                signed_at: "2026-06-10T00:00:00Z".to_string(),
+            };
+            assert!(
+                validate_commitment_payload(&input).is_ok(),
+                "content reach '{reach}' (with reach_ceiling=commons) must validate post-Stage-B"
+            );
+        }
+    }
+
+    #[test]
+    fn replicates_content_empty_reach_rejected() {
+        // Reach is still REQUIRED and must be non-empty (structural floor) even
+        // though it is no longer pinned to "commons".
         let mut payload = well_formed_commons_content_payload();
-        payload["reach"] = serde_json::json!("community");
+        payload["reach"] = serde_json::json!("");
         let input = CreateCommitmentInput {
             action: "replicates-commons".to_string(),
             payload_json: payload.to_string(),
             signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    #[test]
+    fn replicates_content_action_alias_validates() {
+        // The renamed `replicates-content` action validates identically to the
+        // `replicates-commons` migration alias (one-window dispatch).
+        let payload = {
+            let mut p = well_formed_commons_content_payload();
+            p["action"] = serde_json::json!("replicates-content");
+            p["reach"] = serde_json::json!("household");
+            p
+        };
+        let input = CreateCommitmentInput {
+            action: "replicates-content".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_ok(),
+            "the replicates-content action (household reach) must validate"
+        );
+    }
+
+    #[test]
+    fn replicates_content_reach_ceiling_not_commons_still_rejected() {
+        // The reach_ceiling invariant is UNCHANGED and load-bearing for
+        // hash-neutrality: a non-commons reach_ceiling is still rejected.
+        let mut payload = well_formed_commons_content_payload();
+        payload["reach"] = serde_json::json!("household");
+        payload["bounds"]["reach_ceiling"] = serde_json::json!("household");
+        let input = CreateCommitmentInput {
+            action: "replicates-content".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_err(),
+            "reach_ceiling != commons must still reject (hash-neutrality invariant)"
+        );
     }
 
     #[test]
