@@ -9,7 +9,9 @@ import { BlockState } from '../debug.types';
 
 /** Minimal read-subset of storage's ProjectorStatusView / P2PStatusInfo (canonical
  *  types: ts-rs ProjectorStatusView + P2PStatusInfo in @elohim/storage-client). */
-interface ProjectorStatusReadModel { lag: Array<{ lagSeconds: number | null }>; }
+interface ProjectorStatusReadModel {
+  lag: Array<{ lagSeconds: number | null }>;
+}
 interface P2pStatusReadModel {
   projectionReconcile?: { caughtUp: boolean; divergentAnchor: number } | null;
 }
@@ -53,19 +55,32 @@ export class StabilityLensComponent implements OnInit {
   ngOnInit(): void {
     const work =
       this.ctx.mode() === 'doorway'
-        ? firstValueFrom(this.admin.getSelfHealing()).then((v) => this.fromDoorway(v))
+        ? firstValueFrom(this.admin.getSelfHealing()).then(v => this.fromDoorway(v))
         : this.fromStorage();
     work.then(
-      (b) => { this.blocks.set(b); },
-      (e: unknown) => { this.error.set(this.describe(e)); this.blocks.set(this.errorBlocks()); },
+      b => {
+        this.blocks.set(b);
+      },
+      (e: unknown) => {
+        this.error.set(this.describe(e));
+        this.blocks.set(this.errorBlocks());
+      }
     );
   }
 
   private fromDoorway(v: StabilityStatusView): StabilityBlocks {
     return {
-      autoPreset: v.autoPreset == null ? { state: 'pending', note: PENDING } : { state: 'real', value: v.autoPreset },
-      admission: v.admission == null ? { state: 'pending', note: PENDING } : { state: 'real', value: v.admission },
-      upstreams: !v.upstreams?.length ? { state: 'pending', note: PENDING } : { state: 'real', value: v.upstreams },
+      autoPreset:
+        v.autoPreset == null
+          ? { state: 'pending', note: PENDING }
+          : { state: 'real', value: v.autoPreset },
+      admission:
+        v.admission == null
+          ? { state: 'pending', note: PENDING }
+          : { state: 'real', value: v.admission },
+      upstreams: !v.upstreams?.length
+        ? { state: 'pending', note: PENDING }
+        : { state: 'real', value: v.upstreams },
       projector: { state: 'real', value: v.projector },
       peers: { state: 'real', value: v.peers },
       render: { state: 'real', value: v.render },
@@ -80,7 +95,7 @@ export class StabilityLensComponent implements OnInit {
       firstValueFrom(this.http.get<ProjectorStatusReadModel>(`${base}/api/v1/status/projector`)),
       firstValueFrom(this.http.get<P2pStatusReadModel>(`${base}/p2p/status`)),
     ]).then(([proj, p2p]) => {
-      const lags = (proj.lag ?? []).map((l) => l.lagSeconds).filter((n): n is number => n != null);
+      const lags = (proj.lag ?? []).map(l => l.lagSeconds).filter((n): n is number => n != null);
       const projector: ProjectorBlock = {
         lagSeconds: lags.length ? Math.max(...lags) : null,
         caughtUp: p2p.projectionReconcile?.caughtUp ?? null,
@@ -110,8 +125,21 @@ export class StabilityLensComponent implements OnInit {
 
   private base(state: BlockState<unknown>['state']): StabilityBlocks {
     const b: BlockState<never> = { state };
-    return { autoPreset: b, admission: b, upstreams: b, projector: b, peers: b, render: b, warmup: b, conductor: b } as unknown as StabilityBlocks;
+    return {
+      autoPreset: b,
+      admission: b,
+      upstreams: b,
+      projector: b,
+      peers: b,
+      render: b,
+      warmup: b,
+      conductor: b,
+    } as unknown as StabilityBlocks;
   }
-  private loadingBlocks(): StabilityBlocks { return this.base('loading'); }
-  private errorBlocks(): StabilityBlocks { return this.base('error'); }
+  private loadingBlocks(): StabilityBlocks {
+    return this.base('loading');
+  }
+  private errorBlocks(): StabilityBlocks {
+    return this.base('error');
+  }
 }

@@ -1,13 +1,52 @@
-.level-control, .log-toolbar { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.6rem; }
-.control-label { font-weight: 600; }
-.level-btn { border: 1px solid var(--color-border, #ccc); background: none; padding: 0.2rem 0.6rem; cursor: pointer; border-radius: 4px; }
-.level-btn.active { background: var(--color-accent, #6a8); color: #fff; }
-.rust-levels { opacity: 0.7; font-size: 0.85rem; }
-.log-list { list-style: none; padding: 0; margin: 0; max-height: 360px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; }
-.log-line { display: grid; grid-template-columns: 5rem 3.5rem 1fr; gap: 0.5rem; padding: 0.1rem 0; }
-.log-line[data-level='warn'] { color: #a76b00; }
-.log-line[data-level='error'] { color: #b23; }
-.log-ts { opacity: 0.6; }
+.level-control,
+.log-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+.control-label {
+  font-weight: 600;
+}
+.level-btn {
+  border: 1px solid var(--color-border, #ccc);
+  background: none;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.level-btn.active {
+  background: var(--color-accent, #6a8);
+  color: #fff;
+}
+.rust-levels {
+  opacity: 0.7;
+  font-size: 0.85rem;
+}
+.log-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 360px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+.log-line {
+  display: grid;
+  grid-template-columns: 5rem 3.5rem 1fr;
+  gap: 0.5rem;
+  padding: 0.1rem 0;
+}
+.log-line[data-level='warn'] {
+  color: #a76b00;
+}
+.log-line[data-level='error'] {
+  color: #b23;
+}
+.log-ts {
+  opacity: 0.6;
+}
 
 /* Accessible-but-invisible label for the level filter select. */
 .visually-hidden {

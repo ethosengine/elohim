@@ -13,16 +13,28 @@ export class DebugModeService {
   readonly navVisible = () => isDevMode() || this.sticky();
 
   enable(): void {
-    try { localStorage.setItem(KEY, 'on'); } catch { /* storage unavailable */ }
+    try {
+      localStorage.setItem(KEY, 'on');
+    } catch {
+      /* storage unavailable */
+    }
     this.sticky.set(true);
   }
 
   disable(): void {
-    try { localStorage.removeItem(KEY); } catch { /* storage unavailable */ }
+    try {
+      localStorage.removeItem(KEY);
+    } catch {
+      /* storage unavailable */
+    }
     this.sticky.set(false);
   }
 
   private readSticky(): boolean {
-    try { return localStorage.getItem(KEY) === 'on'; } catch { return false; }
+    try {
+      return localStorage.getItem(KEY) === 'on';
+    } catch {
+      return false;
+    }
   }
 }

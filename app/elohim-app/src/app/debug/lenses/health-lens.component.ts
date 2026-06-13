@@ -8,6 +8,8 @@ import { HealthIndicatorComponent } from '../../elohim/components/health-indicat
   selector: 'app-health-lens',
   standalone: true,
   imports: [HealthIndicatorComponent],
-  template: `<app-health-indicator />`,
+  template: `
+    <app-health-indicator />
+  `,
 })
 export class HealthLensComponent {}

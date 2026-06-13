@@ -2,8 +2,8 @@
   <header class="debug-header">
     <h1>Protocol Debug</h1>
     <p class="debug-subtitle">
-      Node-local diagnostics for this device. Read-only. Reflects whichever
-      replica/node answered — not a cluster-wide aggregate.
+      Node-local diagnostics for this device. Read-only. Reflects whichever replica/node answered —
+      not a cluster-wide aggregate.
     </p>
   </header>
 
@@ -18,7 +18,8 @@
       [attr.aria-selected]="lens.id === activeId()"
       (click)="select(lens.id)"
     >
-      <span class="tab-icon">{{ lens.icon }}</span> {{ lens.title }}
+      <span class="tab-icon">{{ lens.icon }}</span>
+      {{ lens.title }}
     </button>
   </nav>
 

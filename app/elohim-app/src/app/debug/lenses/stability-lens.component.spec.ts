@@ -16,7 +16,8 @@ describe('StabilityLensComponent', () => {
     };
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(), provideHttpClientTesting(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: DebugContextService, useValue: ctx },
       ],
     });
@@ -28,13 +29,18 @@ describe('StabilityLensComponent', () => {
   it('doorway: marks autoPreset PENDING and projector REAL', async () => {
     const { fixture, httpMock } = setup('doorway');
     fixture.detectChanges(); // ngOnInit fires the fetch
-    httpMock.expectOne((r) => r.url.endsWith('/admin/self-healing')).flush({
-      autoPreset: null, admission: null, upstreams: [],
-      projector: { lagSeconds: 3, caughtUp: true, divergentAnchor: 0 },
-      peers: [], render: { total: 5, degenerateRate: 0 },
-      warmup: { inProgress: false, attempts: 0, completed: true, lastError: null },
-      conductor: { connected: true, connectedWorkers: 1, totalWorkers: 1 },
-    });
+    httpMock
+      .expectOne(r => r.url.endsWith('/admin/self-healing'))
+      .flush({
+        autoPreset: null,
+        admission: null,
+        upstreams: [],
+        projector: { lagSeconds: 3, caughtUp: true, divergentAnchor: 0 },
+        peers: [],
+        render: { total: 5, degenerateRate: 0 },
+        warmup: { inProgress: false, attempts: 0, completed: true, lastError: null },
+        conductor: { connected: true, connectedWorkers: 1, totalWorkers: 1 },
+      });
     await fixture.whenStable();
     expect(fixture.componentInstance.blocks().autoPreset.state).toBe('pending');
     expect(fixture.componentInstance.blocks().projector.state).toBe('real');
@@ -44,12 +50,17 @@ describe('StabilityLensComponent', () => {
   it('tauri: projector REAL from storage, doorway-role blocks N/A', async () => {
     const { fixture, httpMock } = setup('tauri');
     fixture.detectChanges();
-    httpMock.expectOne((r) => r.url.endsWith('/api/v1/status/projector')).flush({
-      cursors: [], lag: [{ pillar: 'lamad', kind: 'content', lagSeconds: 7 }],
-    });
-    httpMock.expectOne((r) => r.url.endsWith('/p2p/status')).flush({
-      projectionReconcile: { caughtUp: false, divergentAnchor: 2 },
-    });
+    httpMock
+      .expectOne(r => r.url.endsWith('/api/v1/status/projector'))
+      .flush({
+        cursors: [],
+        lag: [{ pillar: 'lamad', kind: 'content', lagSeconds: 7 }],
+      });
+    httpMock
+      .expectOne(r => r.url.endsWith('/p2p/status'))
+      .flush({
+        projectionReconcile: { caughtUp: false, divergentAnchor: 2 },
+      });
     await fixture.whenStable();
     const b = fixture.componentInstance.blocks();
     expect(b.projector.state).toBe('real');

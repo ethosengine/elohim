@@ -515,12 +515,15 @@ describe('DoorwayAdminService.getSelfHealing', () => {
   it('GETs /admin/self-healing and returns the typed view', async () => {
     const { firstValueFrom } = await import('rxjs');
     const promise = firstValueFrom(service.getSelfHealing());
-    const req = httpMock.expectOne((r) => r.url.endsWith('/admin/self-healing'));
+    const req = httpMock.expectOne(r => r.url.endsWith('/admin/self-healing'));
     expect(req.request.method).toBe('GET');
     req.flush({
-      autoPreset: null, admission: null, upstreams: [],
+      autoPreset: null,
+      admission: null,
+      upstreams: [],
       projector: { lagSeconds: 0, caughtUp: true, divergentAnchor: 0 },
-      peers: [], render: { total: 0, degenerateRate: 0 },
+      peers: [],
+      render: { total: 0, degenerateRate: 0 },
       warmup: { inProgress: false, attempts: 0, completed: false, lastError: null },
       conductor: { connected: true, connectedWorkers: 1, totalWorkers: 1 },
     });

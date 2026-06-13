@@ -17,14 +17,33 @@ import { environment } from '../../../environments/environment';
       </ng-container>
     </dl>
     <p class="flags-note">
-      Build-time flags (no runtime override). Note: <code>useGraphqlTopology</code> is
-      documented "default false" but set <code>true</code> in every environment build.
+      Build-time flags (no runtime override). Note:
+      <code>useGraphqlTopology</code>
+      is documented "default false" but set
+      <code>true</code>
+      in every environment build.
     </p>
   `,
   styles: [
-    `.debug-kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
-     dt { font-weight: 600; } dd { margin: 0; font-family: monospace; }
-     .flags-note { opacity: 0.7; font-size: 0.85rem; margin-top: 0.75rem; }`,
+    `
+      .debug-kv {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.25rem 1rem;
+      }
+      dt {
+        font-weight: 600;
+      }
+      dd {
+        margin: 0;
+        font-family: monospace;
+      }
+      .flags-note {
+        opacity: 0.7;
+        font-size: 0.85rem;
+        margin-top: 0.75rem;
+      }
+    `,
   ],
 })
 export class FlagsLensComponent {

@@ -1,7 +1,36 @@
-.debug-shell { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
-.debug-header h1 { margin: 0 0 0.25rem; }
-.debug-subtitle { opacity: 0.7; font-size: 0.9rem; margin: 0 0 1rem; }
-.debug-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 1px solid var(--color-border, #ccc); margin-bottom: 1rem; }
-.debug-tab { background: none; border: none; padding: 0.5rem 0.75rem; cursor: pointer; opacity: 0.7; border-bottom: 2px solid transparent; }
-.debug-tab.active { opacity: 1; border-bottom-color: var(--color-accent, #6a8); font-weight: 600; }
-.debug-panel { padding: 0.5rem 0; }
+.debug-shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+.debug-header h1 {
+  margin: 0 0 0.25rem;
+}
+.debug-subtitle {
+  opacity: 0.7;
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
+}
+.debug-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--color-border, #ccc);
+  margin-bottom: 1rem;
+}
+.debug-tab {
+  background: none;
+  border: none;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  opacity: 0.7;
+  border-bottom: 2px solid transparent;
+}
+.debug-tab.active {
+  opacity: 1;
+  border-bottom-color: var(--color-accent, #6a8);
+  font-weight: 600;
+}
+.debug-panel {
+  padding: 0.5rem 0;
+}

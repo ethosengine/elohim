@@ -29,27 +29,40 @@ export class LoggingLensComponent implements OnInit {
   readonly logs = computed(() => {
     const f = this.levelFilter();
     const all = this.logger.getRecentLogs();
-    return f === 'all' ? all : all.filter((e) => e.level === f);
+    return f === 'all' ? all : all.filter(e => e.level === f);
   });
 
   ngOnInit(): void {
     const saved = this.readSaved();
-    if (saved) { this.logger.setMinLevel(saved); this.current.set(saved); }
+    if (saved) {
+      this.logger.setMinLevel(saved);
+      this.current.set(saved);
+    }
   }
 
   setLevel(level: LogLevel): void {
     this.logger.setMinLevel(level);
     this.current.set(level);
-    try { localStorage.setItem(LEVEL_KEY, level); } catch { /* unavailable */ }
+    try {
+      localStorage.setItem(LEVEL_KEY, level);
+    } catch {
+      /* unavailable */
+    }
   }
 
-  setFilter(f: LogLevel | 'all'): void { this.levelFilter.set(f); }
-  clear(): void { this.logger.clearRecentLogs(); }
+  setFilter(f: LogLevel | 'all'): void {
+    this.levelFilter.set(f);
+  }
+  clear(): void {
+    this.logger.clearRecentLogs();
+  }
 
   private readSaved(): LogLevel | null {
     try {
       const v = localStorage.getItem(LEVEL_KEY);
       return (ANGULAR_LEVELS as string[]).includes(v ?? '') ? (v as LogLevel) : null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 }

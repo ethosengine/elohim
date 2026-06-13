@@ -7,18 +7,28 @@
     [class.active]="lvl === current()"
     [attr.data-testid]="'level-btn-' + lvl"
     (click)="setLevel(lvl)"
-  >{{ lvl }}</button>
+  >
+    {{ lvl }}
+  </button>
 </div>
 
 <p class="rust-levels" *ngIf="isTauri()">
-  Native (Rust) range: <code>{{ rustLevels.join(' · ') }}</code> — current set via
-  <code>RUST_LOG</code> at launch; live adjust is a follow-on.
+  Native (Rust) range:
+  <code>{{ rustLevels.join(' · ') }}</code>
+  — current set via
+  <code>RUST_LOG</code>
+  at launch; live adjust is a follow-on.
 </p>
 
 <div class="log-toolbar">
   <span>Recent logs ({{ logs().length }}):</span>
   <label for="log-level-filter" class="visually-hidden">Filter log level</label>
-  <select id="log-level-filter" data-testid="log-level-filter" aria-label="Filter log level" (change)="setFilter($any($event.target).value)">
+  <select
+    id="log-level-filter"
+    data-testid="log-level-filter"
+    aria-label="Filter log level"
+    (change)="setFilter($any($event.target).value)"
+  >
     <option value="all">all</option>
     <option *ngFor="let lvl of angularLevels" [value]="lvl">{{ lvl }}</option>
   </select>

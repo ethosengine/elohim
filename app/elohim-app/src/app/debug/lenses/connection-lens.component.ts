@@ -10,19 +10,40 @@ import { environment } from '../../../environments/environment';
   imports: [CommonModule],
   template: `
     <dl class="debug-kv">
-      <dt>Connection mode</dt><dd>{{ ctx.mode() }}</dd>
-      <dt>Tauri (native)</dt><dd>{{ ctx.isTauri() ? 'yes' : 'no' }}</dd>
-      <dt>Direct-to-storage</dt><dd>{{ ctx.isDirectStorage() ? 'yes' : 'no' }}</dd>
-      <dt>Storage base URL</dt><dd>{{ ctx.storageBaseUrl() || '(same-origin)' }}</dd>
-      <dt>Doorway URL</dt><dd>{{ doorwayUrl || '(same-origin)' }}</dd>
-      <dt>Environment</dt><dd>{{ ctx.environmentName }}</dd>
-      <dt>Production build</dt><dd>{{ production ? 'yes' : 'no' }}</dd>
-      <dt>Git hash</dt><dd>{{ gitHash }}</dd>
+      <dt>Connection mode</dt>
+      <dd>{{ ctx.mode() }}</dd>
+      <dt>Tauri (native)</dt>
+      <dd>{{ ctx.isTauri() ? 'yes' : 'no' }}</dd>
+      <dt>Direct-to-storage</dt>
+      <dd>{{ ctx.isDirectStorage() ? 'yes' : 'no' }}</dd>
+      <dt>Storage base URL</dt>
+      <dd>{{ ctx.storageBaseUrl() || '(same-origin)' }}</dd>
+      <dt>Doorway URL</dt>
+      <dd>{{ doorwayUrl || '(same-origin)' }}</dd>
+      <dt>Environment</dt>
+      <dd>{{ ctx.environmentName }}</dd>
+      <dt>Production build</dt>
+      <dd>{{ production ? 'yes' : 'no' }}</dd>
+      <dt>Git hash</dt>
+      <dd>{{ gitHash }}</dd>
     </dl>
   `,
   styles: [
-    `.debug-kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
-     dt { font-weight: 600; opacity: 0.8; } dd { margin: 0; font-family: monospace; }`,
+    `
+      .debug-kv {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.25rem 1rem;
+      }
+      dt {
+        font-weight: 600;
+        opacity: 0.8;
+      }
+      dd {
+        margin: 0;
+        font-family: monospace;
+      }
+    `,
   ],
 })
 export class ConnectionLensComponent {

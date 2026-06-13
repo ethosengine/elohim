@@ -451,7 +451,9 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   onSearch(): void {
     if (this.searchQuery.trim()) {
-      void this.eprNav.navigate(`/${this.context}/search?q=${encodeURIComponent(this.searchQuery.trim())}`);
+      void this.eprNav.navigate(
+        `/${this.context}/search?q=${encodeURIComponent(this.searchQuery.trim())}`
+      );
     }
   }
 

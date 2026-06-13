@@ -30,5 +30,7 @@ export class DebugShellComponent {
     { id: 'flags', title: 'Flags', icon: '🚩', component: FlagsLensComponent },
   ];
   readonly activeId = signal(this.lenses[0].id);
-  select(id: string): void { this.activeId.set(id); }
+  select(id: string): void {
+    this.activeId.set(id);
+  }
 }
