@@ -36,5 +36,8 @@ export const environment: Environment = {
     // for rationale; Vitest parity at shefa/services/topology-parity.spec.ts
     // asserts structural equivalence with REST. Flipped 2026-05-19 (L6).
     useGraphqlTopology: true,
+    // Prod: /debug nav entry hidden by default (still URL-reachable; gating is
+    // visibility, not access — the endpoints it reads are public).
+    showDebug: false,
   },
 };

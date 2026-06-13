@@ -28,6 +28,8 @@ export const environment: Environment = {
     // shefa/services/topology-parity.spec.ts asserts structural equivalence
     // with the REST path. Flipped 2026-05-19 (L6 viewer.* symmetry pass).
     useGraphqlTopology: true,
+    // Dev build: seed the /debug nav entry visible (UI visibility only).
+    showDebug: true,
   },
   // ElohimClient configuration
   // Drives content operations (browser→doorway, tauri→local storage)

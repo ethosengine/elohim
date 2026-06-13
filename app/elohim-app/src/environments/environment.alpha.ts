@@ -36,5 +36,8 @@ export const environment: Environment = {
     // Routes topology fetches through /api/v1/graphql. See environment.ts
     // for rationale. Flipped 2026-05-19 (L6 viewer.* symmetry pass).
     useGraphqlTopology: true,
+    // Alpha: /debug nav entry hidden by default (still URL-reachable; gating is
+    // visibility, not access — the endpoints it reads are public).
+    showDebug: false,
   },
 };

@@ -96,6 +96,14 @@ export interface FeatureFlags {
    * A7 will enforce visual parity between the two paths with a Cypress scenario.
    */
   useGraphqlTopology?: boolean;
+
+  /**
+   * Seed the /debug nav entry visible by default in this environment build.
+   * UI visibility only — the /debug route always resolves by URL and the
+   * endpoints it reads are public, so this is NOT access control. Default false;
+   * DebugModeService also honors isDevMode() and a sticky localStorage flag.
+   */
+  showDebug?: boolean;
 }
 
 /**
