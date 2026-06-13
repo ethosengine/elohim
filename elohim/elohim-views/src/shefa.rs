@@ -507,6 +507,10 @@ pub struct CollectiveView {
     pub governance_layer: String,
     pub constitutional_parent_id: Option<String>,
     pub reach: String,
+    /// Opaque free-text geographic region label (e.g. "us-pnw", "seattle").
+    /// Compared by string equality in resilience distribution bucketing — no
+    /// fixed vocabulary. NULL ⇒ region unknown.
+    pub region: Option<String>,
     pub metadata: Option<JsonVal>,
     pub created_by: Option<String>,
     pub created_at: String,
@@ -528,6 +532,11 @@ pub struct CreateCollectiveInputView {
     pub constitutional_parent_id: Option<String>,
     #[serde(default)]
     pub reach: Option<String>,
+    /// Opaque free-text geographic region label. Persisted to
+    /// `collectives.region`; consumed by resilience regional-distribution
+    /// bucketing via string equality. No fixed vocabulary.
+    #[serde(default)]
+    pub region: Option<String>,
     #[serde(default)]
     pub metadata: Option<JsonVal>,
     #[serde(default)]

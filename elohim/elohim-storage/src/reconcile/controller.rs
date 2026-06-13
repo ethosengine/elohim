@@ -804,6 +804,7 @@ impl<S: DnaSignalStream> ReconcileController<S> {
             } else {
                 "community".to_string()
             },
+            region: None,
             metadata_json: None,
             created_by: Some(signal.founder_agent_cid.clone()),
             // collective_cid is set to the canonical CID so the resolver can
@@ -1999,6 +2000,7 @@ mod tests {
                     governance_layer: "family".to_string(),
                     constitutional_parent_id: None,
                     reach: "trusted".to_string(),
+                    region: None,
                     metadata_json: None,
                     created_by: None,
                 },

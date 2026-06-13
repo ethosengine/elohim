@@ -334,6 +334,7 @@ mod tests {
             governance_layer: "family".to_string(),
             constitutional_parent_id: None,
             reach: "private".to_string(),
+            region: None,
             metadata_json: None,
             created_by: None,
         };

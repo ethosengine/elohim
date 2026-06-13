@@ -1132,6 +1132,8 @@ pub struct NewCollective<'a> {
     pub governance_layer: &'a str,
     pub constitutional_parent_id: Option<&'a str>,
     pub reach: &'a str,
+    /// Opaque free-text geographic region label. None ⇒ region unknown.
+    pub region: Option<&'a str>,
     pub metadata_json: Option<&'a str>,
     pub created_by: Option<&'a str>,
     /// Canonical CID: `collective:{action_hash}`. None pre-coherence.

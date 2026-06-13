@@ -231,6 +231,7 @@ impl From<CreateCollectiveInputView> for CreateCollectiveInput {
             governance_layer: v.governance_layer,
             constitutional_parent_id: v.constitutional_parent_id,
             reach: v.reach.unwrap_or_else(|| "community".to_string()),
+            region: v.region,
             metadata_json: serialize_json_opt(&v.metadata),
             created_by: v.created_by,
         }
@@ -382,6 +383,8 @@ mod schema_version_tests {
         InitiateClaimInputView, RecognitionTriggerInputView, UpdateAllocationInputView,
         UpdateContentInputView, UpsertPolicyInputView,
     };
+
+    use crate::db::collectives::CreateCollectiveInput;
 
     #[test]
     fn default_schema_version_is_one() {
@@ -580,5 +583,20 @@ mod schema_version_tests {
         let view: CreateCollectiveInputView = serde_json::from_str(json).unwrap();
         assert_eq!(view.id, "c1");
         assert_eq!(view.name, "Test Collective");
+        // region is optional on the wire — absent ⇒ None.
+        assert!(view.region.is_none());
+    }
+
+    #[test]
+    fn collective_input_region_threads_to_db_input() {
+        let json = r#"{"id":"c1","name":"Test Collective","governanceLayer":"community","reach":"commons","region":"us-pnw"}"#;
+        let view: CreateCollectiveInputView = serde_json::from_str(json).unwrap();
+        assert_eq!(view.region.as_deref(), Some("us-pnw"));
+        let db_input: CreateCollectiveInput = view.into();
+        assert_eq!(
+            db_input.region.as_deref(),
+            Some("us-pnw"),
+            "region carried through the View→Input conversion"
+        );
     }
 }

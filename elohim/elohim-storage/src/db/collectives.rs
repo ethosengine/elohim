@@ -32,6 +32,9 @@ pub struct CreateCollectiveInput {
     pub constitutional_parent_id: Option<String>,
     #[serde(default = "default_community_reach")]
     pub reach: String,
+    /// Opaque free-text geographic region label. None ⇒ region unknown.
+    #[serde(default)]
+    pub region: Option<String>,
     #[serde(default)]
     pub metadata_json: Option<String>,
     #[serde(default)]
@@ -62,6 +65,7 @@ impl CreateCollectiveInput {
             governance_layer: default_governance_layer(),
             constitutional_parent_id: None,
             reach: default_community_reach(),
+            region: None,
             metadata_json: None,
             created_by: None,
         }
@@ -216,6 +220,7 @@ pub fn create_collective(
             collectives::description.eq(&input.description),
             collectives::governance_layer.eq(&input.governance_layer),
             collectives::reach.eq(&input.reach),
+            collectives::region.eq(&input.region),
             collectives::metadata_json.eq(&input.metadata_json),
             collectives::updated_at.eq(current_timestamp()),
         ))
@@ -230,6 +235,7 @@ pub fn create_collective(
             governance_layer: &input.governance_layer,
             constitutional_parent_id: input.constitutional_parent_id.as_deref(),
             reach: &input.reach,
+            region: input.region.as_deref(),
             metadata_json: input.metadata_json.as_deref(),
             created_by: input.created_by.as_deref(),
             collective_cid: None,
@@ -507,6 +513,7 @@ mod tests {
             governance_layer: "family".to_string(),
             constitutional_parent_id: None,
             reach: "private".to_string(),
+            region: None,
             metadata_json: None,
             created_by: None,
         };
@@ -547,6 +554,58 @@ mod tests {
             Some("family-dowell"),
             "slug round-trips"
         );
+    }
+
+    /// D5 input: `region` set through the create-collective input path lands
+    /// in the `collectives.region` column on insert AND is overwritten on the
+    /// upsert update path. This is the column resilience's
+    /// `compute_regional_distribution` reads for geographic-distribution
+    /// bucketing — without a settable input it was structurally always NULL.
+    #[test]
+    fn region_threads_through_create_and_upsert() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        // Insert path: region carried straight onto the row.
+        let input = CreateCollectiveInput {
+            id: "collective-pnw".to_string(),
+            name: "PNW Collective".to_string(),
+            description: None,
+            governance_layer: "community".to_string(),
+            constitutional_parent_id: None,
+            reach: "commons".to_string(),
+            region: Some("us-pnw".to_string()),
+            metadata_json: None,
+            created_by: None,
+        };
+        let created = create_collective(&mut conn, &ctx, &input).expect("create");
+        assert_eq!(
+            created.region.as_deref(),
+            Some("us-pnw"),
+            "region lands in the column on insert"
+        );
+
+        // Upsert update path: same id, new region → column is overwritten.
+        let updated_input = CreateCollectiveInput {
+            region: Some("us-east".to_string()),
+            ..input.clone()
+        };
+        let updated = create_collective(&mut conn, &ctx, &updated_input).expect("upsert");
+        assert_eq!(
+            updated.region.as_deref(),
+            Some("us-east"),
+            "region overwritten on upsert update"
+        );
+
+        // A creation with no region yields NULL (the honest unknown bucket).
+        let no_region = CreateCollectiveInput {
+            id: "collective-unknown".to_string(),
+            region: None,
+            ..input
+        };
+        let plain = create_collective(&mut conn, &ctx, &no_region).expect("create no-region");
+        assert!(plain.region.is_none(), "absent region stays NULL");
     }
 
     /// Regression for the genesis #1105 jessica-alpha FK storm: account
@@ -605,6 +664,7 @@ mod tests {
             governance_layer: "family".to_string(),
             constitutional_parent_id: None,
             reach: "private".to_string(),
+            region: None,
             metadata_json: None,
             created_by: None,
         };
@@ -632,6 +692,7 @@ mod tests {
             governance_layer: "family".to_string(),
             constitutional_parent_id: None,
             reach: "private".to_string(),
+            region: None,
             metadata_json: None,
             created_by: None,
         };

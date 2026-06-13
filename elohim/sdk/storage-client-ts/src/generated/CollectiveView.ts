@@ -4,4 +4,10 @@ import type { JsonValue } from "./JsonValue";
 /**
  * Collective response view
  */
-export type CollectiveView = { id: string, name: string, description: string | null, governanceLayer: string, constitutionalParentId: string | null, reach: string, metadata: JsonValue | null, createdBy: string | null, createdAt: string, updatedAt: string, dissolvedAt: string | null, };
+export type CollectiveView = { id: string, name: string, description: string | null, governanceLayer: string, constitutionalParentId: string | null, reach: string, 
+/**
+ * Opaque free-text geographic region label (e.g. "us-pnw", "seattle").
+ * Compared by string equality in resilience distribution bucketing — no
+ * fixed vocabulary. NULL ⇒ region unknown.
+ */
+region: string | null, metadata: JsonValue | null, createdBy: string | null, createdAt: string, updatedAt: string, dissolvedAt: string | null, };

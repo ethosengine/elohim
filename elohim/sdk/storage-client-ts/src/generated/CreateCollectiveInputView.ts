@@ -4,4 +4,10 @@ import type { JsonValue } from "./JsonValue";
 /**
  * Create collective input view
  */
-export type CreateCollectiveInputView = { id: string, name: string, description: string | null, governanceLayer: string, constitutionalParentId: string | null, reach: string | null, metadata: JsonValue | null, createdBy: string | null, };
+export type CreateCollectiveInputView = { id: string, name: string, description: string | null, governanceLayer: string, constitutionalParentId: string | null, reach: string | null, 
+/**
+ * Opaque free-text geographic region label. Persisted to
+ * `collectives.region`; consumed by resilience regional-distribution
+ * bucketing via string equality. No fixed vocabulary.
+ */
+region: string | null, metadata: JsonValue | null, createdBy: string | null, };

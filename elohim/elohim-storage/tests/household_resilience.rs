@@ -1,4 +1,4 @@
-use diesel::{ExpressionMethods, RunQueryDsl};
+use diesel::RunQueryDsl;
 use elohim_storage::db;
 use elohim_storage::db::models::{
     NewCollective, NewHuman, NewPlacementGap, NewReaCommitment, NewShardLocation, NewShardManifest,
@@ -176,6 +176,7 @@ fn seed_collective(conn: &mut diesel::SqliteConnection, id: &str, region: Option
             governance_layer: "community",
             constitutional_parent_id: None,
             reach: "commons",
+            region,
             metadata_json: None,
             created_by: None,
             collective_cid: None,
@@ -183,13 +184,6 @@ fn seed_collective(conn: &mut diesel::SqliteConnection, id: &str, region: Option
         })
         .execute(conn)
         .unwrap();
-    if let Some(r) = region {
-        diesel::update(db::diesel_schema::collectives::table)
-            .filter(db::diesel_schema::collectives::id.eq(id))
-            .set(db::diesel_schema::collectives::region.eq(r))
-            .execute(conn)
-            .unwrap();
-    }
 }
 
 /// D1 fixture builder: `households` lists (household_id, online_peer_count).
