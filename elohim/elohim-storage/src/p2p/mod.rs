@@ -6868,22 +6868,30 @@ impl P2PNode {
         // the node is NOT eligible for is excluded (a privacy gate, not a no-op).
         use crate::services::provide_reconcile::ProvideEligibility;
         let head_refs: Vec<String> = pins.iter().map(|p| p.head_ref.clone()).collect();
-        let eligible: std::collections::HashSet<String> = {
+        // Content reach per head_ref — feeds both the eligibility gate and the
+        // Stage B reach map on the desired set (observe-only here, but the
+        // signature carries it so the desired provides declare the content reach).
+        let candidates: Vec<(String, String)> = {
             let Ok(mut conn) = pool.get() else { return };
             let app_ctx = crate::db::AppContext::default_lamad();
-            let candidates =
-                crate::db::content_diesel::content_reaches_for_ids(&mut conn, &app_ctx, &head_refs)
-                    .unwrap_or_default();
-            drop(conn);
+            crate::db::content_diesel::content_reaches_for_ids(&mut conn, &app_ctx, &head_refs)
+                .unwrap_or_default()
+        };
+        let eligible: std::collections::HashSet<String> = {
             let resolver = crate::services::provide_reconcile::ClassifierEligibility::new(
                 std::sync::Arc::new(pool.clone()),
                 "lamad",
             );
             resolver.eligible_head_refs(&candidates)
         };
+        let reach_by_head_ref: std::collections::HashMap<String, String> =
+            candidates.iter().cloned().collect();
 
         let desired = crate::services::provide_reconcile::ProvideReconciler::derive_desired(
-            &pins, &caught_up, &eligible,
+            &pins,
+            &caught_up,
+            &eligible,
+            &reach_by_head_ref,
         );
         if desired.is_empty() {
             return;

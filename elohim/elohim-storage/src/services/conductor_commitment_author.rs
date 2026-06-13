@@ -77,7 +77,7 @@ impl ConductorCommitmentAuthor {
     }
 }
 
-/// Build the EXACT `replicates-commons` content payload (snake_case JSON).
+/// Build the EXACT `replicates-content` content payload (snake_case JSON).
 ///
 /// This is a PURE function so the wire contract is unit-testable without a
 /// conductor. The shape is BOTH schema-valid and projection-valid
@@ -85,17 +85,25 @@ impl ConductorCommitmentAuthor {
 ///
 /// ```json
 /// { "action":"replicates-commons", "variant":"content", "head_ref":"<cid>",
-///   "reach":"commons",
+///   "reach":"<content-reach>",
 ///   "bounds":{ "rate_per_minute":<int>=1>, "reach_ceiling":"commons" },
 ///   "provider":"<self_cid>", "valid_from":"<ISO>", "valid_until":"<ISO>" }
 /// ```
 ///
+/// Stage B: `reach` is the CONTENT's own reach (threaded from the pin/content
+/// row), not pinned to "commons". `reach_ceiling` STAYS "commons" — it bounds
+/// the offer and keeps the DNA hash-neutral (the mishpat integrity zome gates
+/// only `reach_ceiling`). The action string stays `replicates-commons` (the
+/// one-window alias the coordinator + projection both honor alongside the
+/// renamed `replicates-content`).
+///
 /// Deliberately carries NO `epr_scope` and NO `ratio_attestation` (those belong
-/// to `delegates-compute` / `replicates-dwelling`, not a commons re-publish).
+/// to `delegates-compute` / `replicates-dwelling`, not a content re-publish).
 /// `closure_rule` is optional and omitted here.
 pub fn build_content_payload(
     self_cid: &str,
     head_ref: &str,
+    reach: &str,
     valid_from: &str,
     valid_until: &str,
     rate_per_minute: i64,
@@ -104,9 +112,11 @@ pub fn build_content_payload(
         "action": "replicates-commons",
         "variant": "content",
         "head_ref": head_ref,
-        "reach": "commons",
+        "reach": reach,
         "bounds": {
             "rate_per_minute": rate_per_minute,
+            // reach_ceiling stays commons — the offer bound + hash-neutrality
+            // invariant; the content's own `reach` (above) is what generalizes.
             "reach_ceiling": "commons",
         },
         "provider": self_cid,
@@ -156,10 +166,12 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
         let valid_from = deterministic_valid_from(now);
         let valid_until = validity_until(&valid_from)?;
 
-        // Step 1 — notarise the replicates-commons Commitment.
+        // Step 1 — notarise the replicates-content Commitment. The content's own
+        // reach (Stage B) rides the request; `reach_ceiling` stays commons.
         let payload_json = build_content_payload(
             &self.self_cid,
             &req.head_ref,
+            &req.reach,
             &valid_from,
             &valid_until,
             DEFAULT_RATE_PER_MINUTE,
@@ -212,6 +224,16 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
             commitment_cid: new_cid.clone(),
             content_store_commitment_cid: None,
             target_epr_id: req.head_ref.clone(),
+            // STAYS "commons" — do NOT thread `req.reach` here. The EconomicEvent
+            // `reach` is bounds-validated by `bounds_validator` check 5, which
+            // calls `reach_rank()` and REJECTS any value outside the schema-8
+            // vocabulary ("unknown reach value"). A content reach of
+            // `household`/`local` (the Stage B case, ~11.5k local rows) would fail
+            // that gate and roll back the author. The CONTENT's own reach lives on
+            // the COMMITMENT payload (`build_content_payload.reach`, NOT
+            // bounds-validated) — that is what the projection reads to scope the
+            // `content:<reach>` provide row the snapshot counts. The event only
+            // needs to clear `<= reach_ceiling(=commons)`, which "commons" does.
             reach: "commons".to_string(),
         };
         // A bounds failure on our OWN freshly-authored, in-window commitment is
@@ -263,6 +285,7 @@ mod tests {
         let json = build_content_payload(
             "agent:self-steward",
             "epr:album-1",
+            "commons",
             "2026-06-08T00:00:00+00:00",
             "2027-06-08T00:00:00+00:00",
             60,
@@ -319,10 +342,41 @@ mod tests {
 
     #[test]
     fn content_payload_honors_supplied_rate() {
-        let json =
-            build_content_payload("p", "h", "2026-06-08T00:00:00Z", "2027-06-08T00:00:00Z", 1);
+        let json = build_content_payload(
+            "p",
+            "h",
+            "commons",
+            "2026-06-08T00:00:00Z",
+            "2027-06-08T00:00:00Z",
+            1,
+        );
         let v: Value = serde_json::from_str(&json).unwrap();
         assert_eq!(v["bounds"]["rate_per_minute"], 1);
+    }
+
+    #[test]
+    fn content_payload_threads_non_commons_reach_keeps_commons_ceiling() {
+        // Stage B: the content's own reach rides the top-level `reach`; the
+        // `reach_ceiling` bound STAYS commons (hash-neutrality + bounds invariant).
+        for reach in ["household", "local", "community"] {
+            let json = build_content_payload(
+                "agent:self",
+                "epr:hh-1",
+                reach,
+                "2026-06-08T00:00:00Z",
+                "2027-06-08T00:00:00Z",
+                60,
+            );
+            let v: Value = serde_json::from_str(&json).unwrap();
+            assert_eq!(
+                v["reach"], reach,
+                "top-level reach is the content's own reach"
+            );
+            assert_eq!(
+                v["bounds"]["reach_ceiling"], "commons",
+                "reach_ceiling stays commons regardless of content reach"
+            );
+        }
     }
 
     #[test]

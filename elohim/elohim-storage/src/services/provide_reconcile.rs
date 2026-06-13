@@ -68,6 +68,12 @@ pub enum ProvideStage {
 pub struct ProvideAuthorRequest {
     pub provider: String,
     pub head_ref: String,
+    /// The CONTENT's own reach (Stage B), threaded from the desired pin's
+    /// content row. The author writes this as the commitment's top-level
+    /// `reach` (the `reach_ceiling` bound stays "commons"); the projection scopes
+    /// the `content:<reach>` provide row by it. Defaults to "commons" when the
+    /// caller has no per-content reach (back-compat with the commons loop).
+    pub reach: String,
 }
 
 /// A revocation the reconciler decided to author for a removed pin.
@@ -198,11 +204,17 @@ impl ProvideEligibility for ClassifierEligibility {
         candidates
             .iter()
             .filter(|(_head_ref, reach)| {
-                // Parse the reach to build the canonical topic; an unknown reach
-                // is not providable (defensive — the parse pins it to the DNA
-                // vocabulary). The collective segment is None at Stage 1.
+                // Stage B DEGRADE-OPEN: a reach OUTSIDE the schema-8 DNA
+                // vocabulary (`local`, `household`, `neighborhood`, …) does not
+                // parse to `elohim_epr::Reach` and `topic_for` is `Reach`-typed,
+                // so we cannot build its canonical topic. Rather than DROP it
+                // (the Stage-A storage projection already reads such reaches
+                // through, so dropping here would silently starve household/local
+                // content of a provide author — the regression this prevents), we
+                // ADMIT it. Consistent with the storage-side degrade-open: the
+                // schema-8 vocabulary makes no claim about the others.
                 let Some(reach_enum) = parse_reach_for_topic(reach) else {
-                    return false;
+                    return true;
                 };
                 let topic = topic_for(&self.pillar, reach_enum, None);
                 matches!(
@@ -223,11 +235,16 @@ fn parse_reach_for_topic(reach: &str) -> Option<elohim_epr::Reach> {
     serde_json::from_value::<elohim_epr::Reach>(serde_json::Value::String(reach.to_string())).ok()
 }
 
-/// One desired provide derived from a caught-up commons pin.
+/// One desired provide derived from a caught-up pin.
 #[derive(Debug, Clone)]
 pub struct DesiredProvide {
     pub pin_id: i32,
     pub head_ref: String,
+    /// The CONTENT's own reach (Stage B), carried from the eligibility
+    /// candidates `(head_ref, reach)` map so the authored commitment declares the
+    /// content's reach rather than a hardcoded "commons". Defaults to "commons"
+    /// when the caller supplies no per-content reach map.
+    pub reach: String,
     /// Pre-existing commitment_cid back-reference (set on a prior tick).
     ///
     /// Read by the T10 un-pin revoke path (`http::handle_remove_pin`), which
@@ -336,6 +353,7 @@ impl ProvideReconciler {
             let req = ProvideAuthorRequest {
                 provider: self_provider.to_string(),
                 head_ref: d.head_ref.clone(),
+                reach: d.reach.clone(),
             };
             match author.author_commons(&req).await {
                 Ok(cid) => {
@@ -482,10 +500,16 @@ impl ProvideReconciler {
     /// non-commons requires embodied responsibility for the scope). Staying pure
     /// — the caller resolves both sets and passes them in — keeps the diff/dedup
     /// logic unit-testable without a live pool.
+    ///
+    /// `reach_by_head_ref` carries the CONTENT's own reach per head_ref (Stage B,
+    /// from the eligibility `(head_ref, reach)` candidate map) so the authored
+    /// commitment declares the content's reach. A head_ref missing from the map
+    /// defaults to "commons" (back-compat: the commons loop never built one).
     pub fn derive_desired(
         pins: &[crate::db::models::AcquisitionPin],
         caught_up_head_refs: &HashSet<String>,
         provide_eligible_head_refs: &HashSet<String>,
+        reach_by_head_ref: &HashMap<String, String>,
     ) -> Vec<DesiredProvide> {
         pins.iter()
             .filter(|p| p.kind == PIN_KIND_ITEM && p.status == PIN_STATUS_ACTIVE)
@@ -494,6 +518,10 @@ impl ProvideReconciler {
             .map(|p| DesiredProvide {
                 pin_id: p.id,
                 head_ref: p.head_ref.clone(),
+                reach: reach_by_head_ref
+                    .get(&p.head_ref)
+                    .cloned()
+                    .unwrap_or_else(|| "commons".to_string()),
                 commitment_cid: p.commitment_cid.clone(),
             })
             .collect()
@@ -510,6 +538,7 @@ mod tests {
         DesiredProvide {
             pin_id,
             head_ref: head_ref.to_string(),
+            reach: "commons".to_string(),
             commitment_cid: None,
         }
     }
@@ -716,14 +745,49 @@ mod tests {
             .iter()
             .map(|s| s.to_string())
             .collect();
+        // Reach map (Stage B): the surviving pin carries its content's own reach.
+        let reaches: HashMap<String, String> = [("epr:ready-eligible", "household")]
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
 
-        let d = ProvideReconciler::derive_desired(&pins, &caught, &eligible);
+        let d = ProvideReconciler::derive_desired(&pins, &caught, &eligible, &reaches);
         assert_eq!(
             d.len(),
             1,
             "only the caught-up AND eligible active pin is desired"
         );
         assert_eq!(d[0].head_ref, "epr:ready-eligible");
+        assert_eq!(
+            d[0].reach, "household",
+            "the desired provide carries the content's own reach from the map"
+        );
+    }
+
+    #[test]
+    fn derive_desired_reach_defaults_to_commons_when_unmapped() {
+        use crate::db::models::AcquisitionPin;
+        let pin = AcquisitionPin {
+            id: 1,
+            agent_pub_key: "local-device".to_string(),
+            head_ref: "epr:no-reach-map".to_string(),
+            kind: "item".to_string(),
+            closure_rule_json: None,
+            priority: 1,
+            status: "active".to_string(),
+            created_at: "t".to_string(),
+            updated_at: "t".to_string(),
+            commitment_cid: None,
+        };
+        let caught: HashSet<String> = ["epr:no-reach-map"].iter().map(|s| s.to_string()).collect();
+        let eligible = caught.clone();
+        let empty_reaches: HashMap<String, String> = HashMap::new();
+        let d = ProvideReconciler::derive_desired(&[pin], &caught, &eligible, &empty_reaches);
+        assert_eq!(d.len(), 1);
+        assert_eq!(
+            d[0].reach, "commons",
+            "an unmapped head_ref defaults to commons (back-compat)"
+        );
     }
 
     /// Mock eligibility seam — admit a fixed allow-list, reject the rest. Mirrors
@@ -771,21 +835,24 @@ mod tests {
         assert_eq!(eligible.len(), 1);
     }
 
-    /// The production classifier admits commons unconditionally (commons is
-    /// openly providable — `classify_pre_authorization` returns Standing for
-    /// commons regardless of embodied responsibility) and admits bound-tier
-    /// reaches only when the node has embodied responsibility. With a pool that
-    /// has NO peer_identity_bindings rows, the Stage-1 resolver returns false,
-    /// so a household candidate is rejected while commons is still admitted.
+    /// Stage B DEGRADE-OPEN: the production classifier admits commons
+    /// unconditionally (commons is openly providable). A reach OUTSIDE the
+    /// schema-8 vocabulary (`household`, `local`) does not parse to a topic, so
+    /// the classifier now ADMITS it (degrade-open) rather than dropping it — the
+    /// regression fix that lets household/local content get a provide author.
+    /// A schema-8 *bound-tier* reach (e.g. `trusted`) still requires embodied
+    /// responsibility and is rejected without standing.
     #[cfg(feature = "p2p")]
     #[test]
-    fn classifier_eligibility_admits_commons_rejects_household_without_standing() {
+    fn classifier_eligibility_admits_commons_and_degrades_open_for_household() {
         use crate::test_util::test_pool;
         let pool = std::sync::Arc::new(test_pool());
         let resolver = ClassifierEligibility::new(pool, "lamad");
         let candidates = vec![
             ("epr:commons-item".to_string(), "commons".to_string()),
             ("epr:household-item".to_string(), "household".to_string()),
+            ("epr:local-item".to_string(), "local".to_string()),
+            ("epr:trusted-item".to_string(), "trusted".to_string()),
         ];
         let eligible = resolver.eligible_head_refs(&candidates);
         assert!(
@@ -793,8 +860,16 @@ mod tests {
             "commons is openly providable — always admitted"
         );
         assert!(
-            !eligible.contains("epr:household-item"),
-            "household requires embodied responsibility; none seeded → rejected"
+            eligible.contains("epr:household-item"),
+            "household is outside schema-8 → degrade-open admits it (Stage B)"
+        );
+        assert!(
+            eligible.contains("epr:local-item"),
+            "local is outside schema-8 → degrade-open admits it (Stage B)"
+        );
+        assert!(
+            !eligible.contains("epr:trusted-item"),
+            "trusted IS schema-8 (bound-tier); requires embodied responsibility; none seeded → rejected"
         );
     }
 }

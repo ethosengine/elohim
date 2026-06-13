@@ -56,10 +56,16 @@ pub fn validate_typed_for_creation_commons(
                     "content variant head_ref must not be empty".into(),
                 ));
             }
-            if reach != "commons" {
-                return Err(CommonsValidationError::Schema(format!(
-                    "reach must be 'commons', got '{reach}'"
-                )));
+            // Stage B: reach is reach-GENERAL — any non-empty string is admissible
+            // (mirrors the coordinator `validate_replicates_content`). We do NOT
+            // pin it to "commons" nor gate on schema-8 membership; production
+            // content carries reaches outside schema-8 (`local`, `household`, …).
+            // The `reach_ceiling == "commons"` invariant below is what bounds the
+            // offer (and keeps the DNA hash-neutral).
+            if reach.is_empty() {
+                return Err(CommonsValidationError::Schema(
+                    "content variant reach must not be empty".into(),
+                ));
             }
             if bounds.reach_ceiling != "commons" {
                 return Err(CommonsValidationError::Schema(format!(
@@ -206,10 +212,41 @@ mod tests {
     }
 
     #[test]
-    fn content_variant_wrong_reach_rejected() {
+    fn content_variant_non_commons_reach_now_accepted() {
+        // Stage B INVERSION: a non-commons reach (with reach_ceiling=commons) is
+        // now admissible — the reach is reach-general at the author validator too.
+        for r in ["household", "local", "community", "neighborhood"] {
+            let mut payload = content_payload("bafy-epr-head");
+            if let ReplicatesContentPayload::Content { reach, .. } = &mut payload {
+                *reach = r.to_string();
+            }
+            assert!(
+                validate_typed_for_creation_commons(&payload).is_ok(),
+                "content reach '{r}' (reach_ceiling=commons) must pass post-Stage-B"
+            );
+        }
+    }
+
+    #[test]
+    fn content_variant_empty_reach_rejected() {
+        // Reach is still required and must be non-empty (structural floor).
         let mut payload = content_payload("bafy-epr-head");
         if let ReplicatesContentPayload::Content { reach, .. } = &mut payload {
+            *reach = String::new();
+        }
+        assert!(matches!(
+            validate_typed_for_creation_commons(&payload),
+            Err(CommonsValidationError::Schema(_))
+        ));
+    }
+
+    #[test]
+    fn content_variant_non_commons_reach_ceiling_still_rejected() {
+        // The reach_ceiling invariant is unchanged: a non-commons ceiling rejects.
+        let mut payload = content_payload("bafy-epr-head");
+        if let ReplicatesContentPayload::Content { reach, bounds, .. } = &mut payload {
             *reach = "household".to_string();
+            bounds.reach_ceiling = "household".to_string();
         }
         assert!(matches!(
             validate_typed_for_creation_commons(&payload),

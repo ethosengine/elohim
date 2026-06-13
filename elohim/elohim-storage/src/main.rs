@@ -1022,8 +1022,13 @@ async fn async_main(
                                             )
                                             .unwrap_or_default();
                                             let eligible = eligibility.eligible_head_refs(&candidates);
+                                            // Stage B: content reach per head_ref → threaded onto
+                                            // the desired provide so the author declares the
+                                            // content's own reach (not a hardcoded commons).
+                                            let reach_by_head_ref: std::collections::HashMap<String, String> =
+                                                candidates.iter().cloned().collect();
                                             elohim_storage::services::provide_reconcile::ProvideReconciler::derive_desired(
-                                                &pins, &present, &eligible,
+                                                &pins, &present, &eligible, &reach_by_head_ref,
                                             )
                                         };
                                         if desired.is_empty() {
