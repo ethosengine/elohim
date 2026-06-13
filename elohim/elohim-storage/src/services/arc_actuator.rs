@@ -230,6 +230,40 @@ pub fn render_conductor_arc_factor(
     Ok(out)
 }
 
+/// Parse [`ArcGrantBounds`] from a `sets-authority-arc` commitment payload — the
+/// bounds object's `min_factor`/`max_factor` plus the commitment's top-level
+/// ISO-8601 `valid_until`. The zome's coordinator validator
+/// (`mishpat::commitments::validate_sets_authority_arc`) has already structurally
+/// validated this shape at create-time; this projects it into the actuator's
+/// typed bounds. Pure.
+pub fn parse_grant_bounds(payload: &serde_json::Value) -> Result<ArcGrantBounds, String> {
+    let bounds = payload
+        .get("bounds")
+        .and_then(|b| b.as_object())
+        .ok_or_else(|| "sets-authority-arc payload missing bounds object".to_string())?;
+    let min_factor = bounds
+        .get("min_factor")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| "bounds.min_factor missing or not an integer".to_string())?
+        as u32;
+    let max_factor = bounds
+        .get("max_factor")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| "bounds.max_factor missing or not an integer".to_string())?
+        as u32;
+    // Expiry from the commitment's top-level ISO-8601 `valid_until`.
+    let expires_at_epoch_s = payload
+        .get("valid_until")
+        .and_then(|v| v.as_str())
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|dt| dt.timestamp().max(0) as u64);
+    Ok(ArcGrantBounds {
+        min_factor,
+        max_factor,
+        expires_at_epoch_s,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -388,5 +422,38 @@ admin_interfaces:
             render_conductor_arc_factor(no_net, 1).unwrap_err(),
             ActuationError::NoNetworkBlock
         );
+    }
+
+    #[test]
+    fn parse_grant_bounds_reads_factors_and_expiry() {
+        let payload = serde_json::json!({
+            "action": "sets-authority-arc",
+            "scope": "agent:james",
+            "provider": "agent:matthew-steward",
+            "recipient": "agent:james",
+            "bounds": {
+                "knob": "conductor.target_arc_factor",
+                "min_factor": 0,
+                "max_factor": 1,
+                "coverage_floor": 3
+            },
+            "valid_from": "2026-06-13T00:00:00Z",
+            "valid_until": "2026-12-31T00:00:00Z"
+        });
+        let b = parse_grant_bounds(&payload).unwrap();
+        assert_eq!(b.min_factor, 0);
+        assert_eq!(b.max_factor, 1);
+        assert!(b.expires_at_epoch_s.is_some());
+        // The parsed grant flows through authorize: leecher is in [0,1] and the
+        // far-future expiry has not passed.
+        assert!(authorize(&req(0), &b, 1).is_ok());
+    }
+
+    #[test]
+    fn parse_grant_bounds_errors_on_missing_factors() {
+        let bad = serde_json::json!({ "bounds": { "knob": "conductor.target_arc_factor" } });
+        assert!(parse_grant_bounds(&bad).is_err());
+        let no_bounds = serde_json::json!({ "action": "sets-authority-arc" });
+        assert!(parse_grant_bounds(&no_bounds).is_err());
     }
 }

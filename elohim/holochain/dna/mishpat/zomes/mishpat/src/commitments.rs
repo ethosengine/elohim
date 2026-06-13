@@ -197,6 +197,7 @@ pub fn validate_commitment_payload(input: &CreateCommitmentInput) -> Result<(), 
         "replicates-content" | "replicates-commons" => validate_replicates_content(&payload),
         "revokes-commitment" => validate_revokes_commitment(&payload),
         "ratifies-limit-gradient" => validate_ratifies_limit_gradient(&payload),
+        "sets-authority-arc" => validate_sets_authority_arc(&payload),
         other => Err(format!(
             "commitments::validate_commitment_payload unhandled action: {other}"
         )),
@@ -460,6 +461,78 @@ fn validate_ratifies_limit_gradient(payload: &serde_json::Value) -> Result<(), S
                     .into(),
             );
         }
+    }
+    Ok(())
+}
+
+/// Validator for the `sets-authority-arc` action — a bounded, revocable grant of
+/// authority to set a node's conductor authority-arc factor (the memory↔resilience
+/// trade; spec `genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-auto-policy.md` §5).
+///
+/// COORDINATOR-side validation (create-time), like every commitment action — so
+/// adding it is **DNA-hash-NEUTRAL**: the `mishpat_integrity` zome is untouched
+/// and this validator hot-swaps via `update_coordinators`. The deployed arc
+/// lever is `{0,1}` (full anchor vs accountable leecher; no fractional arc until
+/// kitsune2 sharding lands — spec §2), so the granted factor range is constrained
+/// to `{0,1}`. The grant's validity window is the commitment's top-level
+/// `valid_from`/`valid_until`; the storage-side actuator
+/// (`services::arc_actuator`) enforces expiry + the LIVE coverage gate at
+/// actuation time (the zome cannot see the live peer count).
+fn validate_sets_authority_arc(payload: &serde_json::Value) -> Result<(), String> {
+    let required = [
+        "action",
+        "scope",
+        "provider",
+        "recipient",
+        "bounds",
+        "valid_from",
+        "valid_until",
+    ];
+    for field in required {
+        if payload.get(field).is_none() {
+            return Err(format!(
+                "sets-authority-arc missing required field: {field}"
+            ));
+        }
+    }
+    if payload["action"] != "sets-authority-arc" {
+        return Err("action field must equal 'sets-authority-arc'".into());
+    }
+    let bounds = payload
+        .get("bounds")
+        .and_then(|b| b.as_object())
+        .ok_or_else(|| "sets-authority-arc bounds must be object".to_string())?;
+    for field in ["knob", "min_factor", "max_factor", "coverage_floor"] {
+        if !bounds.contains_key(field) {
+            return Err(format!("bounds missing required field: {field}"));
+        }
+    }
+    // Only the conductor authority-arc factor is grantable through this action.
+    if bounds["knob"].as_str().unwrap_or("") != "conductor.target_arc_factor" {
+        return Err("bounds.knob must equal 'conductor.target_arc_factor'".into());
+    }
+    // The deployed lever is {0,1} (spike §2: no fractional arc; holochain_p2p
+    // hard-clamps any factor > 1). Grants must stay within that domain.
+    let min = bounds["min_factor"]
+        .as_u64()
+        .ok_or_else(|| "bounds.min_factor must be an integer".to_string())?;
+    let max = bounds["max_factor"]
+        .as_u64()
+        .ok_or_else(|| "bounds.max_factor must be an integer".to_string())?;
+    if min > 1 || max > 1 {
+        return Err(
+            "bounds.min_factor/max_factor must be in {0,1} (the deployed arc lever; \
+             no fractional arc — spec §2)"
+                .into(),
+        );
+    }
+    if min > max {
+        return Err("bounds.min_factor must be <= max_factor".into());
+    }
+    // coverage_floor: the per-key redundancy floor the grant pins. Must be > 0 —
+    // a zero floor would permit a coverage-destroying leecher.
+    if bounds["coverage_floor"].as_u64().unwrap_or(0) == 0 {
+        return Err("sets-authority-arc bounds.coverage_floor must be > 0".into());
     }
     Ok(())
 }

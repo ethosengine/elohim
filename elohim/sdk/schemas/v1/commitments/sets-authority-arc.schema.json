@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:sets-authority-arc",
+  "title": "SetsAuthorityArcCommitment",
+  "description": "Payload shape for a Mishpat::Commitment entry with action='sets-authority-arc'. A bounded, revocable grant of authority to set a node's conductor authority-arc factor — the memory<->resilience trade. The deployed lever is {0,1} (full authority anchor vs accountable leecher; there is no fractional arc until kitsune2 sharding lands — spike verdict, spec genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-auto-policy.md §2). Source of truth: Holochain DHT (Mishpat zome, existing Commitment entry type — no new entry type; the action discriminator distinguishes; COORDINATOR-validated, so adding it is DNA-hash-neutral and hot-swappable). Canon: rea-compute-commitment-primitive.md. The grant validity window is valid_from/valid_until; the storage-side actuator (services::arc_actuator) enforces expiry + the LIVE mesh-coverage gate at actuation time (the zome cannot see live peer count).",
+  "type": "object",
+  "required": [
+    "action",
+    "scope",
+    "provider",
+    "recipient",
+    "bounds",
+    "valid_from",
+    "valid_until"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "type": "string",
+      "const": "sets-authority-arc",
+      "description": "Action discriminator. Fixed at 'sets-authority-arc' for this commitment kind."
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The node/agent whose authority arc this grant governs (CID or agent identifier)."
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID or agent identifier granting the authority — typically the node's operator/steward."
+    },
+    "recipient": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID or agent identifier receiving the authority — the node itself, its Auto policy, or an on-device agent. Blast radius = exactly this revocable grant."
+    },
+    "bounds": {
+      "type": "object",
+      "description": "Enforceable bounds the storage-side actuator validates before any arc change.",
+      "required": [
+        "knob",
+        "min_factor",
+        "max_factor",
+        "coverage_floor"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "knob": {
+          "type": "string",
+          "const": "conductor.target_arc_factor",
+          "description": "The only knob this action grants. Fixed — a new knob gets its own action discriminator."
+        },
+        "min_factor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum arc factor the grant permits. {0,1} only — the deployed lever (no fractional arc; holochain_p2p hard-clamps >1, spec §2)."
+        },
+        "max_factor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Maximum arc factor the grant permits. Must be >= min_factor."
+        },
+        "coverage_floor": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The per-key redundancy floor the grant pins. The actuator REFUSES a leecher that would drop remaining mesh coverage below this — never opens a keyspace gap (spec §4)."
+        }
+      }
+    },
+    "valid_from": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ISO 8601 datetime when this grant becomes effective."
+    },
+    "valid_until": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ISO 8601 datetime when this grant expires. The actuator enforces expiry at actuation time."
+    }
+  }
+}
