@@ -12,7 +12,7 @@ const target = process.env.DOORWAY_TARGET ?? 'https://doorway-alpha.elohim.host'
 
 export default [
   {
-    context: ['/api', '/db', '/blob', '/apps', '/epr-head', '/account', '/health', '/p2p'],
+    context: ['/api', '/db', '/blob', '/apps', '/epr-head', '/account', '/health', '/p2p', '/admin'],
     target,
     secure: true,
     changeOrigin: true,
