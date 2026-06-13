@@ -55,6 +55,12 @@ fn worker_threads() -> usize {
 }
 
 fn main() -> anyhow::Result<()> {
+    // Load .env BEFORE reading any config env var (incl. DOORWAY_WORKER_THREADS
+    // below) so a .env-provided value is honored, not silently ignored. In the
+    // live deployment these are real container env vars (seen regardless), but a
+    // .env-driven local run must agree.
+    let _ = dotenvy::dotenv();
+
     // Build the multi-threaded runtime with an EXPLICIT worker count so a
     // cpu-limited cgroup cannot collapse us to a single worker (the freeze).
     // `enable_all` wires the I/O + time drivers the gateway depends on.
@@ -69,10 +75,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
-    // Load environment variables from .env file if present
-    let _ = dotenvy::dotenv();
-
-    // Parse command line arguments
+    // Parse command line arguments (.env already loaded in main()).
     let args = Args::parse();
 
     // Initialize tracing/logging
