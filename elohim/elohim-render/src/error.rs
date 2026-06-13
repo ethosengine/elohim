@@ -8,6 +8,15 @@ pub enum RenderError {
     #[error("render timed out after {limit_ms}ms")]
     Timeout { limit_ms: u64 },
 
+    /// The render queue is saturated — a render is already in flight (and one
+    /// queued) on the single sequential isolate, so this request is shed rather
+    /// than queued behind a possibly-stuck render. The caller should fall back
+    /// fast (e.g. serve the CSR shell) instead of waiting. See the 2026-06-13
+    /// doorway-freeze RCA: an unbounded queue let a stuck render back-pressure
+    /// onto the runtime.
+    #[error("render queue saturated (busy) — shedding to fast fallback")]
+    Busy,
+
     #[error("isolate out of memory (limit: {limit_mb}MB)")]
     OutOfMemory { limit_mb: u64 },
 
