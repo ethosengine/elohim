@@ -91,8 +91,9 @@
         "edge",
         "performance"
       ],
-      "edgenodeMemoryRequest": "768Mi",
-      "edgenodeMemoryLimit": "3Gi",
+      "$memoryBumpComment2": "2026-06-13: edgenodeMemoryLimit 3Gi \u2192 8Gi (request 768Mi \u2192 2Gi), mirroring the operator's live `kubectl set resources` after james OOM-crashlooped at 3Gi (~9-min cycle, exit 137; james carries the LARGEST corpus, 3654 docs). This is the Nth bump in the chain \u2014 ROOT CAUSE now documented: at target_arc_factor=1 the embedded conductor holds a full authority arc, so its DHT working set is proportional to the whole corpus; a lean device-chromebook-edu archetype fundamentally cannot hold james's full arc and no RAM bump reconciles that. 8Gi is a STOPGAP to stop the re-OOM on the next Jenkins re-apply, NOT a chromebook floor. DURABLE FIX = arc-shrink (target_arc_factor < 1 \u2192 bounded shard per node) \u2014 see genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md (answers jessica's 2026-06-04 'profile elohim-node for a leak' breadcrumb). Restoration: when the arc-factor policy lands, step back toward $chromebookFloor with observed-RSS evidence. NB jessica (4Gi) is climbing too and is the next to OOM under load \u2014 same fix, do not chase it with more RAM.",
+      "edgenodeMemoryRequest": "2Gi",
+      "edgenodeMemoryLimit": "8Gi",
       "edgenodeCpuRequest": "250m",
       "edgenodeCpuLimit": "2000m",
       "$cpuLimitBump": "2026-05-27: bumped 1000m \u2192 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 \u2014 accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md"
