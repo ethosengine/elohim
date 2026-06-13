@@ -59,6 +59,7 @@ const INTERFACE_FILES = [
   { src: 'views/content-graph.ts', dest: 'content-graph-view.ts' },
   { src: 'views/economic-event-view.ts', dest: 'economic-event-view.ts' },
   { src: 'views/p2p-status-view.ts', dest: 'p2p-status-view.ts' },
+  { src: 'views/stability-status-view.ts', dest: 'stability-status-view.ts' },
   { src: 'views/drain-status-view.ts', dest: 'drain-status-view.ts' },
   { src: 'views/replication-status-view.ts', dest: 'replication-status-view.ts' },
   // Slice 2b T13 — per-EPR pull progress (own-node only). Intermediate src name
