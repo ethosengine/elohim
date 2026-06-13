@@ -484,3 +484,70 @@ The tier matrix also serves as developer documentation. "Here's what the protoco
 4. **Appeal path for Settlements**: How does a Settlement flow into the governance immune system? Needs integration with qahal write path (Section 2 of CLAUDE-PICKS).
 5. **Observation retention policy**: How long do observations persist before decay removes them? Constitutional question — different layers may have different retention.
 6. **Multi-elohim coordination**: When multiple elohim (individual, family, community) have observations about the same interaction, how do they coordinate? Constitutional layer precedence applies, but the mechanics need design.
+
+---
+
+## Addendum (2026-06-13): Structural Enforcement, Egress Scope, Agentic Provenance, Hub-Shaped Gating & Compute-as-Trust
+
+Sharpens the core principle (*"every mutation witnessed, not client-remembered"*) from stated intent into an enforcement architecture, and records design directions surfaced in the non-commons consent discussion (cf. `genesis/docs/superpowers/specs/2026-06-13-non-commons-provide-commitments-design.md` §9.6). DRAFT directions below that touch new DHT entry shapes pass the **p2p-design-gate** before design.
+
+### A. The enforcement gap (per-handler opt-in today)
+
+Current reality: `evaluate_gate(...)` fires by explicit per-handler invocation — `stewardship.rs`, `recognition.rs`, `comments.rs`, `steward_affinity.rs` only. A new write handler that omits the call ships **ungated**. The principle is documented; the enforcement is not — the "client-remembers" failure mode displaced one layer in (client → handler author). Enforcement ladder, weakest → strongest:
+
+1. **Middleware deny-by-default (runtime, HTTP).** A tower layer matching POST/PATCH/PUT that refuses dispatch unless the route is registered gated. The verb can't classify `MutationType`, so middleware enforces *that a gate ran*; the handler supplies *what kind*.
+2. **Type-token chokepoint (compile-time, all callers).** The DB-commit path requires a `Gated<T>` proof constructible only by `evaluate_gate`. "Forgot to gate" becomes a compile error — the borrow checker is the immune system. Catches non-HTTP callers.
+
+### B. Egress scope — "leaves your machine" ⊋ POST/PATCH/PUT
+
+HTTP-verb gating at elohim-storage governs the **web2 projection** writes. The protocol's true egress is the **DHT publish / source-chain commit → libp2p gossip**: the notarized entry *is* the post, and it gossips with no HTTP verb. Two rings:
+- **Outer ring** — HTTP method gate at doorway/storage (web2 surface).
+- **Inner ring** — publish-time gate bound to the authoring step *before* the source-chain commit; the one chokepoint every mutation crosses regardless of arrival path (HTTP / P2P / local). The strong claim "every post decision is gated" requires the inner ring.
+
+### C. Off-switch invariant (non-negotiable)
+
+The swappable token-streaming agent decides the **verdict/ceremony**; it must never decide **whether it is invoked**. The chokepoint (middleware / type-token / publish-time bind) is non-swappable protocol; the agent behind it is swappable. Otherwise a plugged-in agent can be configured to skip itself — and the immune system has an off switch.
+
+### D. Agentic provenance fingerprint — signed vs unsigned content (HTTP→HTTPS)
+
+**The trust framing:** today everything we post is **unsigned** content — the HTTP of the protocol. The agentic gate-signature is the move to **HTTPS**: content carrying a gate decision from an elohim (or elohim panel) that *met the constitutional threshold for that content* becomes **signed**, and the signed/unsigned distinction is itself a first-class, visible trust signal at the receiving end.
+
+This is **mostly already substrate.** The notarized `GateDecisionAttestation` DHT entry (mishpat DNA, projected via `MishpatSignal::GateDecisionCreated` → `db/gate_decision_attestations.rs`) already carries:
+- `elohim_id` + `elohim_substance_cid` — **the agentic fingerprint**: content-addressed identity of the gating elohim (its substance/constitution CID).
+- `gate_name` + `gate_process_cid` — **the depth-of-validation provenance**: content-addressed pin of *how* it was gated.
+- `decision` + `reasoning_json` + `universal_band_cid` — verdict, reasoning, constitutional band cleared.
+- notarized + source-chain-signed DHT entry → unforgeable authorship.
+
+**The missing piece** is the *binding*: the mutation/post must reference its attestation (`decision_id`), or the attestation link to the post, so the fingerprint **travels with the content** and the receiver can read "signed by elohim X via process Y at band Z" — i.e. compute the HTTPS-vs-HTTP gradient. This mutation↔attestation reference is a DHT-entry-link design → **p2p-design-gate first.**
+
+**Honest caveat (the "not sure how to provide provenance" crux):** unforgeability here is **signature + content-address + standing**, NOT deterministic re-execution. LLM gate inference is non-deterministic and off-chain — Holochain validation verifies *who attested and that they hold constitutional standing for that band*, not *that the inference was correct* (the oracle problem). The `gate_decision_challenges` table is the backstop: a rubber-stamp attestation is challengeable and costs the signing elohim standing. The fingerprint is **unforgeable-as-to-authorship, accountable-as-to-quality**. A signature is only as good as the constitutional band of the elohim that minted it (`universal_band_cid`).
+
+### E. Hub-shaped inference & the egress-batch model
+
+Gate inference (Full/Constitutional tiers) is heavy LLM compute; the hub-optional floor's local devices may lack it. The existing `InferenceRouter` already routes inference *"to wherever compute capacity exists in the steward network"* — i.e. **hubs** (steward nodes; shem-class compute).
+
+The flow is **compose-local / gate-at-egress**, like the airplane: you write a backlog of posts offline (a local agent applies None/Light gating, or queues drafts); on reconnect the batch flows over the network and **hub agents apply the deep gate at the moment of egress** — where the content is intended to land. The deep gate is *where it crosses the network toward its destination*, not (only) where you hit "post" locally. Heavy-tier evaluation is therefore **async + batched + drained on reconnect**; egress is **held behind the gate-drain** (fail-closed preserved — a queued draft does not leave the machine until its gate completes).
+
+**Tension with the hub-optional floor** (a hubless device is a full participant; hubs are convenience, never gate participation): resolution — **depth scales with available compute; participation does not.** A hubless device mints a valid *lower-tier*, locally-signed attestation and posts; hubs add *depth* (higher tiers, deeper bench), their absence degrades attested depth, never the right to post. The §D fingerprint records the depth honestly. **Open:** whether reach/visibility couples to attested depth (shallow-gated content reaches narrower until a hub deepens it) — a real lever, deferred.
+
+### F. Reach-axis complementarity (ties to non-commons §9.6)
+
+Two gate mechanisms dominate at opposite ends of the reach axis:
+- **Intimate / opt-in:** consent is *structural* — the invitation/handshake already authorized the reach → inference gating is **light** (the consent entry carries it).
+- **Commons / opt-out:** there is no invitation → the **agentic good-faith/care judgment** does the work, and the immune response to exploitative mutation matters most → inference gating is **deep** (hub-shaped).
+
+Positive-consent requirement scales *inverse* to reach (§9.6) while inference-gating depth scales *with* reach — complementary, not redundant: structural consent carries the intimate end, agentic judgment carries the commons end.
+
+### G. Compute-as-trust — gate depth is inverse to earned standing
+
+The original design escalates ceremony by **mutation type** ("exploitative mutation types trigger constant escalation… expensive and miserable to operate without ever saying 'no'"). The generalization: ceremony also scales by **agent character**, inverse to earned standing. The `TrustContext → InferenceTier` map is per-agent, not just per-mutation-type.
+
+- **High-trust conduct** (accurate, thoughtful, good-faith, well-researched, caring) → **cheaper gates** (None/Light tier). The elohim have a working model of you; little bench to clear. Building trust makes your gates cheaper *naturally* — earned, not granted.
+- **Low-trust conduct pattern** (high-conflict, manipulative, conspiratorial, misinformed, lazy, bad-faith, narcissistic, SDO, psychopathic) → **a deeper bench to clear, on average** (Full/Constitutional tier). Not a punishment and never a "no" — the elohim simply can't yet trust the pattern, so the moment deserves more ceremony.
+
+**The compute cost IS the trust signal, economically expressed.** This is the immune system as a gradient over persons, not just mutation types. Two guardrails, both load-bearing:
+
+1. **Behavior-earned, never identity-assigned.** The gate responds to a *demonstrated conduct pattern over time* (the design's Open Q2 behavioral-fingerprinting surface — constitutionally/privacy heavy), not a psychometric diagnosis of a person. The system never asserts "you are a psychopath"; it observes "this conduct pattern hasn't earned trust — clear the bench." You earn cheap gates by *acting* in good faith.
+2. **Anti-plutocratic, not pay-to-trust.** Because hubs bear the inference compute (§E), a poor-but-good-faith person gets cheap gates *because they are trusted*, not because they can pay; a wealthy bad-faith actor cannot buy cheaper gates — trust is earned through conduct, not purchased. The failure mode to design against: **never let compute-access become the barrier** (compute poverty ≠ bad faith). The gradient must track *character demonstrated*, with the network supplying the compute — money cannot shortcut standing, and lack of money cannot manufacture suspicion.
+
+This makes the gate self-funding in attention terms: good-faith participants experience a light, fast protocol; the cost concentrates exactly where bad-faith conduct forces it, without a gatekeeper ever saying no.
