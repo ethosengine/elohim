@@ -114,6 +114,60 @@ pub fn total_memory_bytes() -> Option<u64> {
     }
 }
 
+/// Read the CONTAINER memory ceiling (cgroup limit) in bytes, or `None` when
+/// there is no enforced limit / it can't be read.
+///
+/// `total_memory_bytes()` reports HOST RAM (`libc::sysinfo`), so a 512Mi pod
+/// sees host GBs — useless for sizing anything to the *container* budget. This
+/// is the memory analog of how `cpu_count()` already respects the cgroup CPU
+/// quota. Reads cgroup v2 `/sys/fs/cgroup/memory.max` first (the literal `max`
+/// = no limit), then falls back to cgroup v1
+/// `/sys/fs/cgroup/memory/memory.limit_in_bytes` (a near-`u64::MAX` sentinel =
+/// no limit). It is the hard precondition for the conductor authority-arc Auto
+/// policy ([`super::arc_policy::derive`]): you cannot size an arc to a ceiling
+/// you cannot read.
+#[cfg(target_os = "linux")]
+pub fn container_memory_limit_bytes() -> Option<u64> {
+    // cgroup v2 (unified hierarchy).
+    if let Ok(s) = std::fs::read_to_string("/sys/fs/cgroup/memory.max") {
+        if let Some(v) = parse_cgroup_mem_limit(&s) {
+            return Some(v);
+        }
+        // Present but "max" (no limit) — fall through to v1 in case of a hybrid mount.
+    }
+    // cgroup v1 (legacy hierarchy).
+    if let Ok(s) = std::fs::read_to_string("/sys/fs/cgroup/memory/memory.limit_in_bytes") {
+        if let Some(v) = parse_cgroup_mem_limit(&s) {
+            return Some(v);
+        }
+    }
+    None
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn container_memory_limit_bytes() -> Option<u64> {
+    None
+}
+
+/// Parse a cgroup memory-limit file body into an *enforced* byte limit, or
+/// `None` when the value means "no limit". cgroup v2 writes the literal `max`;
+/// cgroup v1 writes a near-`u64::MAX` sentinel (e.g. `0x7FFFFFFFFFFFF000`) when
+/// unlimited. Anything at/above a sane ceiling (1 PiB) is treated as no limit.
+/// Pure — unit-tested independently of the filesystem.
+fn parse_cgroup_mem_limit(raw: &str) -> Option<u64> {
+    let s = raw.trim();
+    if s.is_empty() || s == "max" {
+        return None;
+    }
+    let v: u64 = s.parse().ok()?;
+    // 1 PiB — above this, treat as the v1 "unlimited" sentinel / absurd value.
+    const SANE_CEILING_BYTES: u64 = 1 << 50;
+    if v == 0 || v >= SANE_CEILING_BYTES {
+        return None;
+    }
+    Some(v)
+}
+
 /// Count CPU cores available to this process.
 ///
 /// Uses `std::thread::available_parallelism`, which respects cgroup CPU
@@ -213,6 +267,37 @@ mod tests {
             assert!(one.is_finite() && one >= 0.0);
             assert!(five.is_finite() && five >= 0.0);
             assert!(fifteen.is_finite() && fifteen >= 0.0);
+        }
+    }
+
+    #[test]
+    fn parse_cgroup_mem_limit_cases() {
+        // cgroup v2 unlimited.
+        assert_eq!(parse_cgroup_mem_limit("max\n"), None);
+        // Real enforced limits.
+        assert_eq!(parse_cgroup_mem_limit("8589934592\n"), Some(8_589_934_592)); // 8Gi
+        assert_eq!(parse_cgroup_mem_limit("805306368"), Some(805_306_368)); // 768Mi
+                                                                            // cgroup v1 "unlimited" sentinel (≈ 2^63) → no limit.
+        assert_eq!(parse_cgroup_mem_limit("9223372036854771712"), None);
+        // Degenerate / unparseable.
+        assert_eq!(parse_cgroup_mem_limit(""), None);
+        assert_eq!(parse_cgroup_mem_limit("0"), None);
+        assert_eq!(parse_cgroup_mem_limit("garbage"), None);
+        // Just under the 1 PiB sanity ceiling is honored; at/over is not.
+        assert_eq!(
+            parse_cgroup_mem_limit(&((1u64 << 50) - 1).to_string()),
+            Some((1 << 50) - 1)
+        );
+        assert_eq!(parse_cgroup_mem_limit(&(1u64 << 50).to_string()), None);
+    }
+
+    #[test]
+    fn container_memory_limit_is_optional_and_sane() {
+        // Environment-dependent: in a limited cgroup it is Some(>0); on a host
+        // with no limit it is None. Either way it must never be Some(0) and must
+        // never exceed the 1 PiB sanity ceiling.
+        if let Some(v) = container_memory_limit_bytes() {
+            assert!(v > 0 && v < (1u64 << 50));
         }
     }
 }

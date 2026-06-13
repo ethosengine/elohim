@@ -22,6 +22,7 @@
 pub mod aggregator;
 pub mod agreement_service;
 pub mod anomaly_detection;
+pub mod arc_policy; // conductor authority-arc Auto policy — pure derive() (2026-06-13-conductor-authority-arc-auto-policy.md)
 pub mod back_prop;
 pub mod behavioral_trust;
 pub mod boot_registration;
