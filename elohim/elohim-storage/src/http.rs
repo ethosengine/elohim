@@ -951,6 +951,12 @@ impl HttpServer {
                 .await
             }
 
+            // Conductor authority-arc Auto policy gauge (operational, Cat-C; spec §6 of
+            // 2026-06-13-conductor-authority-arc-auto-policy.md). Surfaces derive()'s
+            // computed arc aim + live inputs + "why"; on the deployed line the
+            // actuatable lever is {0,1} (spike §2), so the fractional value is a SIGNAL.
+            (Method::GET, "/api/v1/status/arc-policy") => self.handle_arc_policy_status().await,
+
             // SSE event stream — must be matched before the /api/v1/ catch-all
             (Method::GET, "/api/v1/events") => {
                 if let Some(ref services) = self.services {
@@ -2513,6 +2519,94 @@ impl HttpServer {
                 .body(Full::new(Bytes::from(json)))
                 .unwrap())
         }
+    }
+
+    /// Operational (Cat-C) gauge for the conductor authority-arc Auto policy
+    /// (spec §6 of `2026-06-13-conductor-authority-arc-auto-policy.md`). A
+    /// node-local read-model — NOT a source of truth: it surfaces the live
+    /// inputs `derive()` uses (cgroup mem ceiling via M1, conductor peer count +
+    /// corpus working-set via `get_health`), the derived arc aim, the coverage
+    /// floor, and the derivation "why". Reconstructable from live state, so no
+    /// `dht_anchor_hash`. On the deployed substrate the actuatable lever is
+    /// `{0,1}` (spike §2), so the derived fractional value is a SIGNAL surfaced
+    /// here, not yet directly actuatable.
+    async fn handle_arc_policy_status(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::arc_policy::{self, ArcInputs, CoverageParams};
+        use crate::services::system_metrics;
+
+        // M1: the CONTAINER cgroup ceiling (not host RAM). Headroom for the
+        // storage parent (it shares the cgroup with the conductor) ≈ this
+        // process's own RSS.
+        let mem_ceiling = system_metrics::container_memory_limit_bytes();
+        let storage_headroom = system_metrics::process_memory_bytes().unwrap_or(0);
+
+        // observed_N (conductor DHT peer count) + corpus working-set proxy
+        // (storage.bytes_used) from one health call. Best-effort: a missing
+        // conductor client / health failure leaves these None → safe full-arc.
+        let (observed_n, corpus_bytes, entry_count) =
+            if let Some(hc) = self.hc_registry.as_ref().and_then(|r| r.lamad.clone()) {
+                let h = hc.get_health().await;
+                let n = h
+                    .network
+                    .as_ref()
+                    .and_then(|nw| nw.peer_count)
+                    .map(|c| c as u32);
+                let c = h.storage.as_ref().map(|s| s.bytes_used);
+                let e = h.storage.as_ref().map(|s| s.entry_count);
+                (n, c, e)
+            } else {
+                (None, None, None)
+            };
+
+        let coverage = CoverageParams::default();
+        let decision = arc_policy::derive(ArcInputs {
+            mem_ceiling_bytes: mem_ceiling,
+            storage_headroom_bytes: storage_headroom,
+            observed_n,
+            corpus_bytes,
+            // L (own authored share) is not yet split out of the corpus stat;
+            // best-effort 0 (treats all corpus as foreign-arc-eligible — slightly
+            // optimistic on a_mem). Refining L is a follow-up (spec §3, §8).
+            local_authored_bytes: 0,
+            archetype_base_arc: 1.0,
+            coverage,
+        });
+
+        let body = serde_json::json!({
+            "resources": {
+                "memCeilingBytes": mem_ceiling,
+                "storageHeadroomBytes": storage_headroom,
+                "observedN": observed_n,
+                "corpusBytes": corpus_bytes,
+                "entryCount": entry_count,
+            },
+            "derived": {
+                "targetArcFactor": decision.arc_factor,
+                // Spike §2: fractional arc is NOT actuatable on the deployed line;
+                // the only lever is {0,1}. This fractional value is a SIGNAL.
+                "leverTier": "T1-binary",
+                "actuatableValues": [0, 1],
+                "safeDefault": decision.safe_default,
+            },
+            "overrides": {},
+            "coverage": {
+                "rFloor": coverage.r_floor,
+                "rTarget": coverage.r_target,
+                "aCovFloor": decision.coverage_floor,
+                "coverageOverMemory": decision.coverage_over_memory,
+                "meshCoverage": "unknown@P0",
+            },
+            "reasons": decision.reasons,
+            "elevate": decision.elevate,
+        });
+
+        let json = serde_json::to_string(&body)
+            .map_err(|e| StorageError::Internal(format!("arc-policy status serialize: {e}")))?;
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(json)))
+            .unwrap())
     }
 
     /// Handle delivery peers request — returns discovered peers with capabilities
@@ -9468,6 +9562,15 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         .route(
             Route::get("/api/v1/status/write-through")
                 .handler("write_through_status")
+                .cache_ttl(5)
+                .build(),
+        )
+        // Conductor authority-arc Auto policy gauge (operational, Cat-C; spec §6
+        // of 2026-06-13-conductor-authority-arc-auto-policy.md). Node-local —
+        // doorway proxies a single node's arc status (single-target, as always).
+        .route(
+            Route::get("/api/v1/status/arc-policy")
+                .handler("arc_policy_status")
                 .cache_ttl(5)
                 .build(),
         )
