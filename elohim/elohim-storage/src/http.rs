@@ -131,6 +131,9 @@ use tracing::{debug, error, info, warn};
 /// (e.g., HTML5 app iframe loading 30+ assets simultaneously).
 const MAX_CONCURRENT_REQUESTS: usize = 64;
 
+/// Retry-After (seconds) when storage sheds at the request-admission ceiling.
+const STORAGE_SHED_RETRY_AFTER_SECS: u64 = 2;
+
 /// HTTP server state
 pub struct HttpServer {
     blob_store: Arc<BlobStore>,
@@ -700,16 +703,11 @@ impl HttpServer {
             let (stream, remote_addr) = listener.accept().await?;
             let io = TokioIo::new(stream);
             let server = self.clone();
-            let semaphore = self.request_semaphore.clone();
 
             tokio::spawn(async move {
-                // Acquire a permit before processing — back-pressures under burst
-                // traffic (e.g., 30+ concurrent HTML5 app asset requests).
-                let _permit = match semaphore.acquire().await {
-                    Ok(permit) => permit,
-                    Err(_) => return, // semaphore closed — shutting down
-                };
-
+                // Admission moved from per-CONNECTION (acquire().await, which queued
+                // under burst and wedged /health) to per-REQUEST (try_acquire shed)
+                // in handle_request — see the Pillar 2 admission gate there.
                 let service = service_fn(move |req| {
                     let server = server.clone();
                     async move { server.handle_request(req).await }
@@ -747,6 +745,36 @@ impl HttpServer {
         let method_str = method.to_string();
 
         debug!(method = %method, path = %path, "Incoming request");
+
+        // ── Pillar 2 / layer 2: per-request admission (shed, never queue) ─────
+        // Exempt /health, /version, and OPTIONS (preflight) so monitoring + CORS
+        // stay live under shed. try_acquire (NOT acquire().await): at the ceiling
+        // return 503 + Retry-After + X-Available-Permits immediately. The permit
+        // is held for the whole request via `_admit` (function-scope binding).
+        let admission_exempt =
+            method == Method::OPTIONS || matches!(path.as_str(), "/health" | "/version");
+        let _admit = if admission_exempt {
+            None
+        } else {
+            match self.request_semaphore.clone().try_acquire_owned() {
+                Ok(permit) => Some(permit),
+                Err(_) => {
+                    let available = self.request_semaphore.available_permits();
+                    warn!(
+                        target: "upstream_shed",
+                        counter = "storage_admission_shed_total",
+                        path = %path,
+                        available,
+                        "storage request admission at ceiling — shedding (503 + Retry-After)"
+                    );
+                    return Ok(crate::services::response::too_many_requests_with_retry(
+                        STORAGE_SHED_RETRY_AFTER_SECS,
+                        available,
+                    )
+                    .map(Either::Left));
+                }
+            }
+        };
 
         let result = match (method, path.as_str()) {
             // CORS preflight for all routes
@@ -1465,6 +1493,9 @@ impl HttpServer {
             "status": "ok",
             "build": build,
         });
+        // Promoted to default detail (was Trace-only) so any caller — incl.
+        // doorway honoring backpressure — can read remaining admission headroom.
+        body["semaphorePermits"] = serde_json::json!(self.request_semaphore.available_permits());
 
         // info level (default): basic operational data
         if detail >= elohim_compute::DetailLevel::Info {
@@ -1490,8 +1521,7 @@ impl HttpServer {
 
         // trace level: full internal state
         if detail >= elohim_compute::DetailLevel::Trace {
-            body["semaphorePermits"] =
-                serde_json::json!(self.request_semaphore.available_permits());
+            // semaphorePermits promoted to default detail (above).
             body["dbPoolEnabled"] = serde_json::json!(self.db_pool.is_some());
             body["extractionCacheEnabled"] = serde_json::json!(self.extraction_cache.is_some());
         }
@@ -12660,5 +12690,35 @@ mod session_exchange_tests {
         let server = test_server().await;
         let removed = server.test_handle_remove_pin("99999").await;
         assert_eq!(removed.status, 404, "removing an unknown pin must 404");
+    }
+}
+
+#[cfg(test)]
+mod admission_tests {
+    use tokio::sync::Semaphore;
+
+    #[test]
+    fn try_acquire_sheds_when_exhausted() {
+        // Models the per-request gate (Task 7): a 0-permit semaphore fails
+        // try_acquire immediately (shed), never blocking like acquire().await.
+        let sem = Semaphore::new(0);
+        assert!(sem.try_acquire().is_err(), "exhausted => shed, not queue");
+        let sem2 = Semaphore::new(1);
+        assert!(sem2.try_acquire().is_ok(), "available => admit");
+    }
+
+    #[test]
+    fn storage_health_version_never_shed_at_zero_permits() {
+        use hyper::Method;
+        let sem = Semaphore::new(0);
+        let exempt = |method: &Method, path: &str| {
+            matches!(method, &Method::OPTIONS) || matches!(path, "/health" | "/version")
+        };
+        for p in ["/health", "/version"] {
+            assert!(exempt(&Method::GET, p), "{p} exempt");
+        }
+        // gated path sheds
+        assert!(!exempt(&Method::GET, "/db/content/x"));
+        assert!(sem.try_acquire().is_err(), "0 permits => gated path sheds");
     }
 }
