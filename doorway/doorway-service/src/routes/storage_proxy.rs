@@ -537,6 +537,7 @@ mod tests {
     static BLOB_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     #[test]
+    #[allow(clippy::assertions_on_constants)] // intentional invariant guard on tuning constants
     fn proxy_timeout_consts_browser_facing() {
         assert_eq!(STORAGE_PROXY_CONNECT_TIMEOUT_SECS, 3);
         assert_eq!(STORAGE_PROXY_REQUEST_TIMEOUT_SECS, 12);

@@ -478,7 +478,7 @@ async fn async_main(
     // (gated by ENABLE_CONDUCTOR_AGENT_INFO_GOSSIP).
     let mut agent_info_admin_ws: Option<Arc<holochain_client::AdminWebsocket>> = None;
 
-    let _conductor_manager = if args.embedded_conductor {
+    let conductor_manager = if args.embedded_conductor {
         use elohim_storage::conductor::ConductorManager;
         use elohim_storage::happ_manager;
 
@@ -508,7 +508,10 @@ async fn async_main(
         // refcounted), so this clone is cheap.
         agent_info_admin_ws = Some(Arc::new(admin_ws.clone()));
 
-        Some(manager)
+        // Shared (Arc<Mutex>) so the authority-arc actuation endpoint can rewrite
+        // the conductor-config + restart it. Held in main for the process
+        // lifetime (kill_on_drop on shutdown).
+        Some(Arc::new(tokio::sync::Mutex::new(manager)))
     } else {
         None
     };
@@ -1675,6 +1678,11 @@ async fn async_main(
 
     if args.embedded_conductor {
         http_server = http_server.with_embedded_conductor();
+    }
+    // Wire the conductor manager so POST /admin/arc-policy/actuate can rewrite
+    // the conductor-config + restart it (authority-arc actuation, spec §5).
+    if let Some(ref cm) = conductor_manager {
+        http_server = http_server.with_conductor_manager(Arc::clone(cm));
     }
 
     // Cutover gate #2 (Plan 2 Task 3): wire iroh blob store into HTTP server.

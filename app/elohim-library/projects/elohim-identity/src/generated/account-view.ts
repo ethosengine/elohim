@@ -100,6 +100,10 @@ export interface HumanView {
    * ActionHash (base64url) of the Human entry in imagodei DNA. None for pre-coherence rows.
    */
   dhtAnchorHash?: string | null;
+  /**
+   * Household collective id (projection of collectives DHT entry with kind:household). None for humans outside a household grouping. Short-term: settable at create-time via the create-human input while the DHT humans-replayer is a stub; otherwise filled by the household_backfill startup pass.
+   */
+  householdId?: string | null;
 }
 /**
  * Projection of imagodei KeyRotation DHT entry with RecoveryAuthority enum. Source of truth: DHT. The authoritative claim that a human's agent key has rotated. Authority evidence carried as variant_kind + JSON-encoded variant fields.

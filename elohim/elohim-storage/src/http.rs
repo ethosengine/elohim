@@ -187,6 +187,11 @@ pub struct HttpServer {
     /// Registry of per-cell HcClient instances for zome forwarding (Phase 11).
     /// Wired at startup via `with_hc_registry`. None = conductor bridge unavailable.
     hc_registry: Option<Arc<crate::hc_client_registry::HcClientRegistry>>,
+    /// Embedded conductor manager — wired at startup (embedded mode only) so the
+    /// authority-arc actuation endpoint can rewrite the conductor-config and
+    /// RESTART the conductor (the only way to apply target_arc_factor — spec §2).
+    /// None = no embedded conductor → actuation unavailable.
+    conductor_manager: Option<Arc<tokio::sync::Mutex<crate::conductor::ConductorManager>>>,
     /// FeedbackSignal fan-out context (Phase 3.5 T22).
     /// When set, `PUT /api/v1/epr` with FeedbackSignal kind runs
     /// project_signal + back_prop_one_hop + flood_feedback end-to-end.
@@ -384,6 +389,7 @@ impl HttpServer {
             signing_client: None,
             write_through_state: None,
             hc_registry: None,
+            conductor_manager: None,
             fan_out_ctx: None,
             #[cfg(feature = "ssr")]
             ssr_state: None,
@@ -489,6 +495,16 @@ impl HttpServer {
         registry: std::sync::Arc<crate::hc_client_registry::HcClientRegistry>,
     ) -> Self {
         self.hc_registry = Some(registry);
+        self
+    }
+
+    /// Wire the embedded conductor manager so the authority-arc actuation
+    /// endpoint can rewrite the conductor-config and restart the conductor.
+    pub fn with_conductor_manager(
+        mut self,
+        manager: Arc<tokio::sync::Mutex<crate::conductor::ConductorManager>>,
+    ) -> Self {
+        self.conductor_manager = Some(manager);
         self
     }
 
@@ -985,6 +1001,14 @@ impl HttpServer {
             // computed arc aim + live inputs + "why"; on the deployed line the
             // actuatable lever is {0,1} (spike §2), so the fractional value is a SIGNAL.
             (Method::GET, "/api/v1/status/arc-policy") => self.handle_arc_policy_status().await,
+
+            // Operator/agent-initiated authority-arc actuation (explicit POST trigger,
+            // spec §5). Reads the authorizing sets-authority-arc commitment, runs the
+            // coverage gate, and RESTARTS the conductor on success. Node-local
+            // (deliberately NOT in build_manifest); no auto-subscriber (churn risk).
+            (Method::POST, "/admin/arc-policy/actuate") => {
+                self.handle_arc_policy_actuate(req).await
+            }
 
             // SSE event stream — must be matched before the /api/v1/ catch-all
             (Method::GET, "/api/v1/events") => {
@@ -2549,6 +2573,145 @@ impl HttpServer {
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Full::new(Bytes::from(json)))
                 .unwrap())
+        }
+    }
+
+    /// Operator/agent-initiated authority-arc actuation — the explicit POST
+    /// trigger (spec §5). Body: `{"proposedFactor": 0|1, "commitmentCid": "..."}`.
+    /// Reads the authorizing `sets-authority-arc` commitment by CID, reconstructs
+    /// its grant payload, reads observed_N from the conductor, and runs
+    /// `apply_arc_actuation` — which authorizes + runs the coverage gate and, only
+    /// on pass, rewrites the config and RESTARTS the conductor (the only way to
+    /// apply `target_arc_factor` — spec §2). A refusal (out-of-grant / expired /
+    /// would-break-coverage) returns 409 with the finding to elevate; no restart.
+    /// Explicit POST only — deliberately NO auto-subscriber that restarts the
+    /// conductor on a commitment landing (churn risk); node-local (not in
+    /// build_manifest, so not doorway-proxied).
+    async fn handle_arc_policy_actuate(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::arc_actuator::{self, ActuationRefusal, ApplyError};
+
+        // Actuation restarts the embedded conductor — unavailable without one.
+        let conductor = match &self.conductor_manager {
+            Some(cm) => cm.clone(),
+            None => {
+                return Ok(response::json_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    &serde_json::json!({ "error": "arc actuation unavailable: no embedded conductor" }),
+                ))
+            }
+        };
+
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("read body: {e}")))?
+            .to_bytes();
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ActuateReq {
+            proposed_factor: u32,
+            commitment_cid: String,
+        }
+        let body: ActuateReq = match serde_json::from_slice(&body) {
+            Ok(v) => v,
+            Err(e) => return Ok(response::bad_request(&format!("Invalid JSON: {e}"))),
+        };
+
+        // Read the authorizing grant from the projection.
+        let mut conn = self.get_diesel_conn()?;
+        let row = match crate::db::mishpat_commitments::get_by_cid(&mut conn, &body.commitment_cid)
+            .map_err(|e| StorageError::Database(e.to_string()))?
+        {
+            Some(r) => r,
+            None => {
+                return Ok(response::json_response(
+                    StatusCode::NOT_FOUND,
+                    &serde_json::json!({ "error": format!("no commitment for cid {}", body.commitment_cid) }),
+                ))
+            }
+        };
+        if row.action != "sets-authority-arc" {
+            return Ok(response::bad_request(
+                "commitment is not a sets-authority-arc grant",
+            ));
+        }
+        if row.state != "active" || row.revoked_at.is_some() {
+            return Ok(response::json_response(
+                StatusCode::CONFLICT,
+                &serde_json::json!({ "error": "grant is not active (revoked or not yet active)" }),
+            ));
+        }
+        // Reconstruct the grant payload `compute_actuation` expects from the row.
+        let bounds: serde_json::Value = serde_json::from_str(&row.bounds_json)
+            .map_err(|e| StorageError::Internal(format!("bounds_json parse: {e}")))?;
+        let grant_payload = serde_json::json!({
+            "action": row.action,
+            "bounds": bounds,
+            "valid_until": row.valid_until,
+        });
+
+        // observed_N (conductor DHT peer count) — the coverage gate needs it.
+        let observed_n = match self.hc_registry.as_ref().and_then(|r| r.lamad.clone()) {
+            Some(hc) => hc
+                .get_health()
+                .await
+                .network
+                .as_ref()
+                .and_then(|nw| nw.peer_count)
+                .map(|c| c as u32),
+            None => None,
+        };
+        let observed_n = match observed_n {
+            Some(n) => n,
+            None => {
+                return Ok(response::json_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    &serde_json::json!({ "error": "cannot read conductor peer count (observed_N) — refusing actuation" }),
+                ))
+            }
+        };
+
+        let now = chrono::Utc::now().timestamp().max(0) as u64;
+        let outcome = {
+            let mut cm = conductor.lock().await;
+            arc_actuator::apply_arc_actuation(
+                body.proposed_factor,
+                &body.commitment_cid,
+                &grant_payload,
+                observed_n,
+                &mut cm, // tokio MutexGuard<ConductorManager> → &mut ConductorManager (DerefMut)
+                now,
+            )
+            .await
+        };
+
+        match outcome {
+            Ok(applied) => Ok(response::json_response(
+                StatusCode::OK,
+                &serde_json::json!({
+                    "status": "applied",
+                    "targetArcFactor": applied,
+                    "commitmentCid": body.commitment_cid,
+                    "observedN": observed_n,
+                }),
+            )),
+            Err(ApplyError::Refused(ActuationRefusal { code, elevate })) => {
+                Ok(response::json_response(
+                    StatusCode::CONFLICT,
+                    &serde_json::json!({
+                        "status": "refused",
+                        "code": format!("{code:?}"),
+                        "elevate": elevate,
+                    }),
+                ))
+            }
+            Err(other) => Ok(response::json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &serde_json::json!({ "status": "error", "error": format!("{other:?}") }),
+            )),
         }
     }
 
