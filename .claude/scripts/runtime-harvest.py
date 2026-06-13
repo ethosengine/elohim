@@ -27,6 +27,14 @@ Modes:
 
 Fail-safe: in --hook mode every error exits 0 — a node outage must never
 break session start.
+
+Boundary (by design): this is the ELEVATE arm for SELF-REPORTED exhaustion —
+a node serving /admin/self-healing that says "my circuit is open / I'm
+shedding / projector can't catch up". A TOTAL outage (runtime wedged, nginx
+503, host unreachable) returns no JSON to sample, so poll_node degrades quiet
+and files NOTHING — a dead node cannot self-report. Catching total-down is
+external uptime/liveness monitoring, a different system; it is intentionally
+out of scope here.
 """
 import argparse
 import fcntl
