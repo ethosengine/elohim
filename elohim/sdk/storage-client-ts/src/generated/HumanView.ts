@@ -11,4 +11,10 @@ affinities: Array<string>, profileReach: string, location: string | null, profil
 /**
  * DHT provenance: ActionHash of the Human entry in imagodei DNA. None for pre-coherence rows.
  */
-dhtAnchorHash: string | null, };
+dhtAnchorHash: string | null, 
+/**
+ * Household collective id (projection of collectives DHT entry with
+ * kind:household). None for humans outside a household grouping. Exposed
+ * for read-back so a create-time-seeded household membership is verifiable.
+ */
+householdId: string | null, };

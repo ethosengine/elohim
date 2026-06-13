@@ -102,10 +102,12 @@ async fn register_human(
         location: body.location,
         profile_photo_url: body.profile_photo_url,
         h_app_id: "imagodei".to_string(),
-        // Registration via HTTP API does not carry household signal at this
-        // point; household membership is populated by the seeder pipeline or
-        // the household_backfill startup pass.
-        household_id: None,
+        // Short-term explicit bridge (while the DHT humans-replayer is a stub):
+        // the create surface may seed household membership directly so the
+        // load-bearing resilience-snapshot junction is populated. When absent,
+        // membership is still filled by the seeder pipeline or the
+        // household_backfill startup pass (which never overwrites a set value).
+        household_id: body.household_id,
     };
 
     let mut conn = get_conn(pool)?;

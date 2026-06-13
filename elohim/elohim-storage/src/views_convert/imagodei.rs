@@ -94,6 +94,7 @@ impl From<Human> for HumanView {
             created_at: h.created_at,
             updated_at: h.updated_at,
             dht_anchor_hash: h.dht_anchor_hash,
+            household_id: h.household_id,
         }
     }
 }

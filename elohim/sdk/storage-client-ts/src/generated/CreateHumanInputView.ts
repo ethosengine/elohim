@@ -7,4 +7,11 @@ export type CreateHumanInputView = {
 /**
  * Caller-supplied stable ID (e.g. UUID derived from agent key)
  */
-id: string, agentPubKey: string | null, displayName: string, bio: string | null, affinities: Array<string>, profileReach: string, location: string | null, profilePhotoUrl: string | null, };
+id: string, agentPubKey: string | null, displayName: string, bio: string | null, affinities: Array<string>, profileReach: string, location: string | null, profilePhotoUrl: string | null, 
+/**
+ * Household collective id to seed at create-time. Short-term explicit
+ * bridge while the DHT humans-replayer is a stub: lets a create surface
+ * populate the load-bearing resilience-snapshot junction directly. The
+ * `household_backfill` startup pass never overwrites a value set here.
+ */
+householdId: string | null, };

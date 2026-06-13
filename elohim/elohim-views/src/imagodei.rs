@@ -479,6 +479,10 @@ pub struct HumanView {
     pub updated_at: String,
     /// DHT provenance: ActionHash of the Human entry in imagodei DNA. None for pre-coherence rows.
     pub dht_anchor_hash: Option<String>,
+    /// Household collective id (projection of collectives DHT entry with
+    /// kind:household). None for humans outside a household grouping. Exposed
+    /// for read-back so a create-time-seeded household membership is verifiable.
+    pub household_id: Option<String>,
 }
 
 /// Input for registering a new human — camelCase API boundary type.
@@ -501,6 +505,12 @@ pub struct CreateHumanInputView {
     pub location: Option<String>,
     #[serde(default)]
     pub profile_photo_url: Option<String>,
+    /// Household collective id to seed at create-time. Short-term explicit
+    /// bridge while the DHT humans-replayer is a stub: lets a create surface
+    /// populate the load-bearing resilience-snapshot junction directly. The
+    /// `household_backfill` startup pass never overwrites a value set here.
+    #[serde(default)]
+    pub household_id: Option<String>,
 }
 
 /// Input for updating a human's mutable profile fields — camelCase API boundary type.

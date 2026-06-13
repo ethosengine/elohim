@@ -4,15 +4,7 @@
 /**
  * Visibility of this human's profile
  */
-export type Reach =
-  | 'private'
-  | 'self'
-  | 'intimate'
-  | 'trusted'
-  | 'familiar'
-  | 'community'
-  | 'public'
-  | 'commons';
+export type Reach = 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
 
 /**
  * Source of truth: DHT (Notarized, Category A). Projection of the imagodei Human DHT entry. Rebuildable via signal replay on HumanCreated/HumanUpdated signals. dhtAnchorHash is null for pre-coherence rows (seeded before DHT was live).
@@ -45,4 +37,8 @@ export interface HumanView {
    * ActionHash (base64url) of the Human entry in imagodei DNA. None for pre-coherence rows.
    */
   dhtAnchorHash?: string | null;
+  /**
+   * Household collective id (projection of collectives DHT entry with kind:household). None for humans outside a household grouping. Short-term: settable at create-time via the create-human input while the DHT humans-replayer is a stub; otherwise filled by the household_backfill startup pass.
+   */
+  householdId?: string | null;
 }

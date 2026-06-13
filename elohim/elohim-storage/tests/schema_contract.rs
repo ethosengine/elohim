@@ -1517,6 +1517,7 @@ fn human_view_matches_schema() {
         created_at: "2026-04-25T00:00:00Z".into(),
         updated_at: "2026-04-25T00:00:00Z".into(),
         dht_anchor_hash: Some("uhCkkHUMAN001".into()),
+        household_id: Some("household-dowell".into()),
     };
 
     validate_against_schema(
@@ -1543,6 +1544,7 @@ fn human_view_pre_coherence_matches_schema() {
         created_at: "2026-04-25T00:01:00Z".into(),
         updated_at: "2026-04-25T00:01:00Z".into(),
         dht_anchor_hash: None,
+        household_id: None,
     };
 
     validate_against_schema(
@@ -1720,6 +1722,7 @@ fn account_view_matches_schema() {
         created_at: "2026-04-25T00:00:00Z".into(),
         updated_at: "2026-04-25T00:00:00Z".into(),
         dht_anchor_hash: Some("uhCkkHUMAN001".into()),
+        household_id: Some("household-dowell".into()),
     };
 
     let emergency_contact = HumanRelationshipView {
