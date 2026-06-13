@@ -114,6 +114,104 @@ impl Default for PeerHealthRegistry {
     }
 }
 
+/// Operational circuit state for an upstream. Cat C node-local — no DHT entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CircuitState {
+    Closed,
+    Open,
+    HalfOpen,
+}
+
+/// Pure, deterministic per-upstream circuit breaker.
+///
+/// Advanced ONLY by injected outcomes + a monotonic `tick` (a warm-up pass
+/// counter), never wall-clock — so the state machine is unit-testable without
+/// time or network. Opens after `fail_threshold` consecutive failures; stays
+/// open for `cooldown_ticks`; then admits exactly ONE half-open trial.
+#[derive(Debug, Clone)]
+pub struct CircuitBreaker {
+    state: CircuitState,
+    consecutive_failures: u32,
+    opened_at_tick: Option<u64>,
+    error_streak: u32,
+    last_good_tick: Option<u64>,
+    fail_threshold: u32,
+    cooldown_ticks: u64,
+}
+
+impl CircuitBreaker {
+    pub fn new(fail_threshold: u32, cooldown_ticks: u64) -> Self {
+        Self {
+            state: CircuitState::Closed,
+            consecutive_failures: 0,
+            opened_at_tick: None,
+            error_streak: 0,
+            last_good_tick: None,
+            fail_threshold: fail_threshold.max(1),
+            cooldown_ticks,
+        }
+    }
+
+    pub fn record_outcome(&mut self, ok: bool, tick: u64) {
+        if ok {
+            self.consecutive_failures = 0;
+            self.error_streak = 0;
+            self.last_good_tick = Some(tick);
+            self.state = CircuitState::Closed;
+            self.opened_at_tick = None;
+        } else {
+            self.consecutive_failures = self.consecutive_failures.saturating_add(1);
+            self.error_streak = self.error_streak.saturating_add(1);
+            if self.state == CircuitState::HalfOpen
+                || self.consecutive_failures >= self.fail_threshold
+            {
+                self.state = CircuitState::Open;
+                self.opened_at_tick = Some(tick);
+            }
+        }
+    }
+
+    pub fn is_open(&self) -> bool {
+        self.state == CircuitState::Open
+    }
+
+    /// Returns true if this upstream should be skipped on `tick`.
+    /// Side effect: an Open breaker whose cooldown has elapsed transitions to
+    /// HalfOpen and admits exactly one trial (returns false once); subsequent
+    /// calls return true until an outcome is recorded.
+    pub fn should_skip(&mut self, tick: u64) -> bool {
+        match self.state {
+            CircuitState::Closed => false,
+            CircuitState::HalfOpen => true, // trial already admitted; await outcome
+            CircuitState::Open => {
+                let elapsed = self
+                    .opened_at_tick
+                    .map(|t| tick.saturating_sub(t))
+                    .unwrap_or(u64::MAX);
+                if elapsed >= self.cooldown_ticks {
+                    self.state = CircuitState::HalfOpen;
+                    false // admit the one trial
+                } else {
+                    true
+                }
+            }
+        }
+    }
+
+    pub fn state(&self) -> CircuitState {
+        self.state
+    }
+
+    pub fn error_streak(&self) -> u32 {
+        self.error_streak
+    }
+
+    pub fn last_good_tick(&self) -> Option<u64> {
+        self.last_good_tick
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,5 +306,83 @@ mod tests {
         assert!(json.contains("\"signalsReceived\""));
         assert!(json.contains("\"lastSignalAt\""));
         assert!(json.contains("\"reconnectAttempts\""));
+    }
+
+    #[test]
+    fn circuit_opens_after_k_consecutive_failures() {
+        let mut cb = CircuitBreaker::new(3, 5);
+        assert_eq!(cb.state(), CircuitState::Closed);
+        cb.record_outcome(false, 1);
+        cb.record_outcome(false, 2);
+        assert!(!cb.is_open(), "2 failures < K=3 should stay closed");
+        cb.record_outcome(false, 3);
+        assert!(cb.is_open(), "3rd consecutive failure must open");
+        assert_eq!(cb.state(), CircuitState::Open);
+        assert_eq!(cb.error_streak(), 3);
+    }
+
+    #[test]
+    fn circuit_success_resets_streak() {
+        let mut cb = CircuitBreaker::new(3, 5);
+        cb.record_outcome(false, 1);
+        cb.record_outcome(false, 2);
+        cb.record_outcome(true, 3);
+        assert!(!cb.is_open());
+        assert_eq!(cb.error_streak(), 0);
+        assert_eq!(cb.last_good_tick(), Some(3));
+    }
+
+    #[test]
+    fn circuit_should_skip_open_until_cooldown_then_halfopen_one_trial() {
+        let mut cb = CircuitBreaker::new(1, 5);
+        cb.record_outcome(false, 10); // opens at tick 10
+        assert!(cb.is_open());
+        assert!(cb.should_skip(11), "within cooldown: skip");
+        assert!(cb.should_skip(14), "tick 14, elapsed 4 < 5: skip");
+        assert!(
+            !cb.should_skip(15),
+            "tick 15, elapsed 5 >= cooldown: half-open admits one trial"
+        );
+        assert_eq!(cb.state(), CircuitState::HalfOpen);
+        // A second should_skip while HalfOpen does NOT re-admit (one trial outstanding)
+        assert!(
+            cb.should_skip(16),
+            "half-open trial already admitted: skip until outcome recorded"
+        );
+    }
+
+    #[test]
+    fn circuit_halfopen_success_closes_failure_reopens() {
+        let mut cb = CircuitBreaker::new(1, 5);
+        cb.record_outcome(false, 0); // open at 0
+        assert!(!cb.should_skip(5)); // half-open
+        cb.record_outcome(true, 6);
+        assert_eq!(cb.state(), CircuitState::Closed);
+        // reopen path
+        let mut cb2 = CircuitBreaker::new(1, 5);
+        cb2.record_outcome(false, 0);
+        assert!(!cb2.should_skip(5));
+        cb2.record_outcome(false, 6);
+        assert_eq!(
+            cb2.state(),
+            CircuitState::Open,
+            "half-open failure re-opens"
+        );
+    }
+
+    #[test]
+    fn circuit_state_serializes_kebab_case() {
+        assert_eq!(
+            serde_json::to_string(&CircuitState::HalfOpen).unwrap(),
+            "\"half-open\""
+        );
+        assert_eq!(
+            serde_json::to_string(&CircuitState::Open).unwrap(),
+            "\"open\""
+        );
+        assert_eq!(
+            serde_json::to_string(&CircuitState::Closed).unwrap(),
+            "\"closed\""
+        );
     }
 }
