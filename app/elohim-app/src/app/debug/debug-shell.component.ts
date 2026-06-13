@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, signal } from '@angular/core';
 import { DebugLens } from './debug.types';
 import { ConnectionLensComponent } from './lenses/connection-lens.component';
+import { StabilityLensComponent } from './lenses/stability-lens.component';
 
 /** Hidden-but-accessible /debug surface (chrome://flags model). Always resolves
  *  by URL; the nav entry is gated separately (DebugModeService). Read-only +
@@ -17,9 +18,10 @@ import { ConnectionLensComponent } from './lenses/connection-lens.component';
   styleUrl: './debug-shell.component.scss',
 })
 export class DebugShellComponent {
-  // Registry — later tasks append Stability, Logging, Health, Flags here.
+  // Registry — later tasks append Logging, Health, Flags here.
   readonly lenses: DebugLens[] = [
     { id: 'connection', title: 'Connection', icon: '🔌', component: ConnectionLensComponent },
+    { id: 'stability', title: 'Stability', icon: '🩺', component: StabilityLensComponent },
   ];
   readonly activeId = signal(this.lenses[0].id);
   select(id: string): void { this.activeId.set(id); }

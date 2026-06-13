@@ -1,0 +1,12 @@
+.lens-note { opacity: 0.7; font-size: 0.85rem; }
+.lens-error { color: var(--color-warn, #b85); font-weight: 600; }
+.block { border: 1px solid var(--color-border, #ddd); border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; }
+.block-head { display: flex; justify-content: space-between; align-items: center; }
+.block-label { font-weight: 600; }
+.block-badge { font-size: 0.7rem; text-transform: uppercase; padding: 0.1rem 0.4rem; border-radius: 4px; background: var(--color-surface-2, #eee); }
+.block-badge[data-state='real'] { background: #d6efd6; }
+.block-badge[data-state='pending'] { background: #fff0c8; }
+.block-badge[data-state='na'] { background: #e8e8e8; opacity: 0.8; }
+.block-badge[data-state='error'] { background: #f3d2d2; }
+.block-value { font-family: monospace; font-size: 0.8rem; overflow-x: auto; margin: 0.4rem 0 0; }
+.block-note { opacity: 0.65; font-size: 0.8rem; margin: 0.3rem 0 0; }
