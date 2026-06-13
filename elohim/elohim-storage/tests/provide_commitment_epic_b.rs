@@ -319,3 +319,189 @@ fn snapshot_excludes_provider_without_household() {
         "a provider with no household_id is not a commitment-backed collective"
     );
 }
+
+// ── Non-commons (household reach) end-to-end ──────────────────────────────────
+// These exercise the Stage-A producer path at a non-commons reach: the signal
+// handler parses a household-reach content commitment, provide_projection_for
+// reads the reach through, record_provide writes content:household, and the
+// (unchanged) snapshot — scoped to the content's own reach — counts it. The
+// author still emits the `replicates-commons` action string (Stage B renames the
+// author); the reach is what generalizes. We build the payload directly here
+// because the author-side `build_content_payload` is commons-pinned until Stage B.
+
+/// Seed a content + manifest + shard_locations at an arbitrary reach so the
+/// snapshot's reach lookup resolves to `reach` (matching the provide scope).
+fn seed_content_with_steward_at_reach(
+    conn: &mut diesel::SqliteConnection,
+    content_id: &str,
+    steward_agent: &str,
+    reach: &str,
+) {
+    let shard = format!("shard-{content_id}");
+    let manifest = NewShardManifest {
+        content_id,
+        h_app_id: APP,
+        blob_hash: "blob-hash-stub",
+        blob_cid: None,
+        encoding: "identity",
+        data_shard_count: 1,
+        parity_shard_count: 0,
+        shard_hashes_json: &format!(r#"["{shard}"]"#),
+        total_size_bytes: 0,
+        shard_size_bytes: 0,
+        mime_type: "application/octet-stream",
+        reach,
+    };
+    db::shard_manifests::upsert_manifest(conn, &manifest).unwrap();
+
+    diesel::insert_into(db::diesel_schema::content::table)
+        .values((
+            db::diesel_schema::content::id.eq(content_id),
+            db::diesel_schema::content::h_app_id.eq(APP),
+            db::diesel_schema::content::title.eq("epic-b non-commons fixture"),
+            db::diesel_schema::content::content_type.eq("concept"),
+            db::diesel_schema::content::reach.eq(reach),
+        ))
+        .execute(conn)
+        .unwrap();
+
+    let loc = NewShardLocation {
+        shard_hash: &shard,
+        peer_id: steward_agent,
+        h_app_id: APP,
+        status: "announced",
+    };
+    db::shard_locations::upsert_location(conn, &loc).unwrap();
+}
+
+/// Drive the REAL signal handler with a household-reach content commitment.
+/// `reach_ceiling` is set equal to `reach` (well-ordered). Author action string
+/// stays `replicates-commons` (the migration-window alias) — the reach is what
+/// generalizes.
+fn project_content_commitment_at_reach(
+    pool: &db::DbPool,
+    provider: &str,
+    head_ref: &str,
+    reach: &str,
+    entry_hash: &str,
+    action_hash: &str,
+) {
+    let payload_json = serde_json::json!({
+        "action": "replicates-commons",
+        "variant": "content",
+        "head_ref": head_ref,
+        "reach": reach,
+        "bounds": { "rate_per_minute": 60, "reach_ceiling": reach },
+        "provider": provider,
+        "valid_from": "2026-06-01T00:00:00Z",
+        "valid_until": "2027-06-01T00:00:00Z",
+    })
+    .to_string();
+    let signal = MishpatSignal::CommitmentCommitted {
+        action_hash: action_hash.into(),
+        entry_hash: entry_hash.into(),
+        author: provider.into(),
+        commitment: CommitmentPayload {
+            action: "replicates-commons".into(),
+            payload_json,
+            signed_at: "2026-06-01T00:00:00Z".into(),
+        },
+    };
+    let mut conn = pool.get().expect("pool connection");
+    handle_mishpat_signal(&mut conn, APP, signal)
+        .expect("handle_mishpat_signal must succeed for a well-formed household-reach signal");
+}
+
+/// A household-reach content commitment writes a `content:household` provide row
+/// (reach read through, not pinned commons).
+#[test]
+fn household_reach_signal_creates_content_household_provide_row() {
+    use diesel::prelude::*;
+    let pool = test_pool();
+    project_content_commitment_at_reach(
+        &pool,
+        "agent:steward-hh",
+        "epr:household-record",
+        "household",
+        "uhCEk-hh",
+        "uhCkk-hh",
+    );
+
+    let mut conn = pool.get().unwrap();
+    use db::diesel_schema::rea_commitments as r;
+    let scope: Option<String> = r::table
+        .filter(r::action.eq("provide"))
+        .filter(r::provider.eq("agent:steward-hh"))
+        .select(r::resource_classified_as)
+        .first(&mut conn)
+        .unwrap();
+    assert_eq!(
+        scope.as_deref(),
+        Some("content:household"),
+        "the household-reach commitment projects content:household, not content:commons"
+    );
+}
+
+/// THE non-commons counting assertion: household content + the production
+/// creation path + the humans junction (with household_id) → snapshot counts it.
+#[test]
+fn snapshot_counts_non_commons_commitment_backed_collective() {
+    let pool = test_pool();
+    let content_id = "content-epic-b-household";
+    let provider = "agent:steward-hh-counted";
+
+    {
+        let mut conn = pool.get().unwrap();
+        seed_human(&mut conn, provider, Some("home-hh"));
+        seed_content_with_steward_at_reach(&mut conn, content_id, provider, "household");
+    }
+
+    project_content_commitment_at_reach(
+        &pool,
+        provider,
+        "epr:household-head",
+        "household",
+        "uhCEk-hh-e2e",
+        "uhCkk-hh-e2e",
+    );
+
+    // The snapshot scopes to the content's own reach (household) — UNCHANGED
+    // reader — and counts the content:household provide row.
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), content_id, None).unwrap();
+    assert_eq!(
+        snapshot.commitment_backed_collectives, 1,
+        "a household-reach content with a household-reach provide commitment and a \
+         provider carrying household_id IS commitment-backed: got {} (distribution_state={})",
+        snapshot.commitment_backed_collectives, snapshot.distribution_state
+    );
+}
+
+/// Correct-but-dormant: a household-reach provide row with a provider lacking
+/// household_id counts zero (honest zero until the Epic-B junction lands).
+#[test]
+fn snapshot_excludes_non_commons_provider_without_household() {
+    let pool = test_pool();
+    let content_id = "content-epic-b-household-nohh";
+    let provider = "agent:steward-hh-orphan";
+
+    {
+        let mut conn = pool.get().unwrap();
+        seed_human(&mut conn, provider, None);
+        seed_content_with_steward_at_reach(&mut conn, content_id, provider, "household");
+    }
+
+    project_content_commitment_at_reach(
+        &pool,
+        provider,
+        "epr:household-orphan-head",
+        "household",
+        "uhCEk-hh-orph",
+        "uhCkk-hh-orph",
+    );
+
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), content_id, None).unwrap();
+    assert_eq!(
+        snapshot.commitment_backed_collectives, 0,
+        "a non-commons provide row with no household_id is correct-but-dormant (counts 0)"
+    );
+}

@@ -51,14 +51,15 @@ use tracing::warn;
 use crate::db::models::NewMishpatCommitment;
 use elohim_epr::Reach;
 
-/// Parse a reach string into the DNA-notarized [`Reach`] enum.
+/// Parse a reach string into the DNA-notarized schema-8 [`Reach`] enum, or
+/// `None` if it is outside that vocabulary.
 ///
-/// Membership in the canonical 8-value reach vocabulary is "the parse
-/// succeeds"; `Reach::openness()` is the ordinal the `reach_ceiling >= reach`
-/// well-ordering check compares against (the schema enum's `_ordinal`, matched
-/// by `elohim_epr::Reach`). This is the storage-side read-through of the reach
-/// vocabulary the DNA owns — we never re-vocabularize, we parse the value the
-/// content row already holds (spec §6).
+/// `Reach::openness()` is the ordinal the `reach_ceiling >= reach` well-ordering
+/// check compares against (the schema enum's `_ordinal`). This is used ONLY for
+/// the degrade-open well-ordering check — a `None` (reach outside the schema-8
+/// vocabulary the DNA owns) is NOT a rejection; the reach reads through
+/// unmodified (spec §6 — never re-vocabularize; production content carries
+/// `local`/`household`/`neighborhood`/… reaches the schema-8 enum does not).
 fn parse_reach(reach: &str) -> Option<Reach> {
     serde_json::from_value::<Reach>(serde_json::Value::String(reach.to_string())).ok()
 }
@@ -356,16 +357,19 @@ fn parse_replicates_commons(
     entry_hash: &str,
     action_hash: &str,
 ) -> Result<NewMishpatCommitment, String> {
-    // Structural reach read-through (defense-in-depth, mirrors the DNA
-    // coordinator/integrity well-ordering): the content `reach` must be a known
-    // value in the canonical reach vocabulary and the `reach_ceiling` must be at
-    // least as open as the content reach (a commitment may not promise wider
-    // reach than its content). The reach is NOT pinned to commons — it is read
-    // through from the payload so non-commons content (household, community,
-    // …) projects a `content:<reach>` provide row. The capacity view carries no
-    // `reach` field, so only the content variant is reach-checked here. (The
-    // *consent* question — is this node eligible to make this offer — lives one
-    // layer up in the provide reconciler; this is the structural floor only.)
+    // Reach READ-THROUGH (spec §6 — never re-vocabularize). The content `reach`
+    // is whatever `content::reach` already holds; the projection faithfully
+    // projects what the authoritative layer accepted and must NOT impose a
+    // stricter vocabulary gate. Production content carries reach values outside
+    // the schema-8 DNA vocabulary (`local`, `household`, `neighborhood`,
+    // `agent-private`, …) — gating on schema-8 membership here would silently
+    // drop those exact rows (the non-fatal side-projection swallow makes the
+    // drop invisible), which is the regression this change exists to prevent.
+    // The reach is required (a content provide must declare one) and read
+    // through to the projected row. The capacity view carries no `reach`, so
+    // only the content variant is reach-handled here. The *consent* question —
+    // is this node eligible to make this offer — lives one layer up in the
+    // provide reconciler; this is the projection floor only.
     let variant = payload
         .get("variant")
         .and_then(|v| v.as_str())
@@ -377,25 +381,23 @@ fn parse_replicates_commons(
                 .get("reach")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "replicates-commons content payload missing 'reach'".to_string())?;
-            let reach_level = parse_reach(reach).ok_or_else(|| {
-                format!("replicates-commons reach '{reach}' is not a known reach value")
-            })?;
-            // reach_ceiling >= reach (well-ordering). The ceiling is read from
-            // the bounds object (the same place the commons pin used to live);
-            // when present it must be a known value at least as open as reach.
-            if let Some(ceiling) = payload
-                .pointer("/bounds/reach_ceiling")
-                .and_then(|v| v.as_str())
-            {
-                let ceiling_level = parse_reach(ceiling).ok_or_else(|| {
-                    format!(
-                        "replicates-commons reach_ceiling '{ceiling}' is not a known reach value"
-                    )
-                })?;
-                if ceiling_level.openness() < reach_level.openness() {
-                    return Err(format!(
-                        "replicates-commons reach_ceiling '{ceiling}' is more restrictive than reach '{reach}'"
-                    ));
+            // Well-ordering (reach_ceiling >= reach), DEGRADE-OPEN: enforce ONLY
+            // when BOTH reach and reach_ceiling parse to the schema-8 vocabulary
+            // the DNA owns (§6 — the check is scoped to that one vocabulary and
+            // makes no claim about the others). An unknown-vocab reach reads
+            // through; it is never rejected for being unknown.
+            if let (Some(reach_level), Some(ceiling)) = (
+                parse_reach(reach),
+                payload
+                    .pointer("/bounds/reach_ceiling")
+                    .and_then(|v| v.as_str()),
+            ) {
+                if let Some(ceiling_level) = parse_reach(ceiling) {
+                    if ceiling_level.openness() < reach_level.openness() {
+                        return Err(format!(
+                            "replicates-commons reach_ceiling '{ceiling}' is more restrictive than reach '{reach}'"
+                        ));
+                    }
                 }
             }
 
@@ -1323,29 +1325,36 @@ mod tests {
         );
     }
 
-    /// A non-enum reach value is not a known reach and must be rejected.
+    /// A reach value OUTSIDE the schema-8 DNA vocabulary (`neighborhood`,
+    /// `local`, `household`, …) READS THROUGH — it is NOT rejected. Production
+    /// content carries such reaches in bulk; gating on schema-8 membership would
+    /// silently drop those rows (spec §6: read-through, never re-vocabularize).
+    /// The unknown reach is projected to `content:<reach>` for the provide row.
     #[test]
-    fn parse_replicates_commons_non_enum_reach_fails() {
+    fn parse_replicates_commons_non_schema8_reach_reads_through() {
         let payload = serde_json::json!({
             "action": "replicates-commons",
             "variant": "content",
-            "head_ref": "epr:bogus-record",
+            "head_ref": "epr:neighborhood-record",
             "reach": "neighborhood",
-            "bounds": { "reach_ceiling": "commons" },
+            // reach_ceiling also outside schema-8 — well-ordering degrades open.
+            "bounds": { "reach_ceiling": "neighborhood" },
             "provider": "agent:provider-x",
             "valid_from": "2026-06-01T00:00:00Z",
             "valid_until": "2026-09-01T00:00:00Z"
         })
         .to_string();
-        let result = parse_commitment_payload("replicates-commons", &payload, "eh-nb", "ah-nb");
-        assert!(
-            result.is_err(),
-            "a reach value outside the canonical enum must reject"
+        let row = unwrap_upsert(
+            parse_commitment_payload("replicates-commons", &payload, "eh-nb", "ah-nb")
+                .expect("an unknown-vocab reach must read through, not reject"),
         );
-        assert!(
-            result.unwrap_err().contains("not a known reach"),
-            "error must say the reach is not a known value"
+        let bounds: serde_json::Value = serde_json::from_str(&row.bounds_json).unwrap();
+        assert_eq!(
+            bounds["reach"], "neighborhood",
+            "the non-schema-8 reach is read through to the projected row"
         );
+        let p = provide_projection_for(&row).expect("yields a provide");
+        assert_eq!(p.reach, "neighborhood");
     }
 
     #[test]

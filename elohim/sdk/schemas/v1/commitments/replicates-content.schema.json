@@ -45,7 +45,7 @@
         "reach": {
           "type": "string",
           "enum": ["private", "self", "intimate", "trusted", "familiar", "community", "public", "commons"],
-          "description": "The content's declared reach. Any of the 8 DNA-notarized values, inlined (not $ref'd) for standalone Ajv strict compilation. The well-ordering reach_ceiling >= reach is a structural validator check (ordinal), not expressible in JSON Schema here."
+          "description": "The content's declared reach. Any of the 8 DNA-notarized schema-8 values, inlined (not $ref'd) for standalone Ajv strict compilation. The well-ordering reach_ceiling >= reach is a structural validator check (ordinal), not expressible in JSON Schema here. NOTE: this wire contract mirrors the DECIDED Stage-B DNA validator (reach ∈ schema-8); the STORAGE PROJECTION layer is deliberately MORE PERMISSIVE (spec §6 read-through — it projects whatever content::reach holds, including drifted production values like local/household/neighborhood). Do not 'reconcile' the two by re-tightening the projection parser — that re-drops those rows."
         },
         "provider": { "type": "string", "minLength": 1 },
         "valid_from": { "type": "string", "minLength": 1 },
