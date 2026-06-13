@@ -428,6 +428,14 @@ impl ProvideReconciler {
             latch.insert(key, ProvideStage::Revoked);
         }
 
+        // Prune the per-process latch. It is a pure optimisation, but without a
+        // sweep it accumulates a key for every (provider, head_ref) ever seen —
+        // notably terminal `Revoked` keys from un-pinned offers, which otherwise
+        // never leave. Keep only keys still desired or still live in `actual`; a
+        // key that is re-needed next pass is re-inserted by the walks above.
+        let live: HashSet<(String, String)> = actual.keys().cloned().collect();
+        latch.retain(|k, _| desired_keys.contains(k) || live.contains(k));
+
         Ok(authored)
     }
 

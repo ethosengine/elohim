@@ -245,6 +245,22 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         &self.observed_kinds
     }
 
+    /// Record a dispatched signal kind for test introspection.
+    ///
+    /// No-op in release builds: `observed_kinds` was an append-per-signal `Vec`
+    /// with no bound, so a long-running production controller grew it without
+    /// limit. Gating the append to test builds preserves the ordered
+    /// introspection the dispatch tests rely on while leaving the field empty
+    /// (zero growth) in production.
+    #[cfg(test)]
+    fn observe_kind(&mut self, kind: &str) {
+        self.observed_kinds.push(kind.to_string());
+    }
+
+    #[cfg(not(test))]
+    #[inline]
+    fn observe_kind(&mut self, _kind: &str) {}
+
     // -----------------------------------------------------------------------
     // Internal dispatch
     // -----------------------------------------------------------------------
@@ -253,42 +269,42 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         match signal {
             DnaSignal::KeyRotation(r) => {
                 debug!(agent_cid = %r.agent_cid, "dispatching KeyRotation signal");
-                self.observed_kinds.push("keyRotation".into());
+                self.observe_kind("keyRotation");
                 self.on_key_rotation(r).await
             }
             DnaSignal::KeyRevocation(r) => {
                 debug!(agent_cid = %r.agent_cid, "dispatching KeyRevocation signal");
-                self.observed_kinds.push("keyRevocation".into());
+                self.observe_kind("keyRevocation");
                 self.on_key_revocation(r).await
             }
             DnaSignal::AgentPeerBinding(b) => {
                 debug!(peer_id = %b.peer_id, agent_cid = %b.agent_cid, "dispatching AgentPeerBinding signal");
-                self.observed_kinds.push("agentPeerBinding".into());
+                self.observe_kind("agentPeerBinding");
                 self.on_agent_peer_binding(b).await
             }
             DnaSignal::RevocationAttestation(a) => {
                 debug!(revocation_id = %a.revocation_id, "dispatching RevocationAttestation signal");
-                self.observed_kinds.push("revocationAttestation".into());
+                self.observe_kind("revocationAttestation");
                 self.on_revocation_attestation(a).await
             }
             DnaSignal::PortalHostCreated(p) => {
                 debug!(host_url = %p.host_url, "dispatching PortalHostCreated signal");
-                self.observed_kinds.push("portalHostCreated".into());
+                self.observe_kind("portalHostCreated");
                 self.on_portal_host_created(p).await
             }
             DnaSignal::PortalHostRemoved(p) => {
                 debug!(host_url = %p.host_url, "dispatching PortalHostRemoved signal");
-                self.observed_kinds.push("portalHostRemoved".into());
+                self.observe_kind("portalHostRemoved");
                 self.on_portal_host_removed(p).await
             }
             DnaSignal::CollectiveProjected(c) => {
                 debug!(collective_cid = %c.collective_cid, "dispatching CollectiveProjected signal");
-                self.observed_kinds.push("collectiveProjected".into());
+                self.observe_kind("collectiveProjected");
                 self.on_collective_projected(c).await
             }
             DnaSignal::MembershipProjected(m) => {
                 debug!(collective_cid = %m.collective_cid, member_cid = %m.member_cid, "dispatching MembershipProjected signal");
-                self.observed_kinds.push("membershipProjected".into());
+                self.observe_kind("membershipProjected");
                 self.on_membership_projected(m).await
             }
         }

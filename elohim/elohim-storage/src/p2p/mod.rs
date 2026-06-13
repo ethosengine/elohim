@@ -4518,6 +4518,16 @@ impl P2PNode {
                 },
             ) => {
                 warn!(peer = %peer, request_id = ?request_id, error = ?error, "Outbound EPR request failed");
+                // Mirror every sibling pending_* map: free the leaked entry on
+                // transport failure (this arm previously only logged it), and
+                // resolve the caller's oneshot with `None` so it fails fast
+                // instead of waiting out its 5s timeout. Without this, every
+                // failed peer EPR resolve leaked a (CID, Sender) entry for the
+                // process lifetime.
+                if let Some((_, reply)) = self.pending_epr_resolves.lock().await.remove(&request_id)
+                {
+                    let _ = reply.send(None);
+                }
             }
             behaviour::ElohimStorageBehaviourEvent::EprProtocol(
                 request_response::Event::InboundFailure {
