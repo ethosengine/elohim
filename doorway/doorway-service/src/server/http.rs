@@ -922,6 +922,99 @@ fn resolve_agent_cid_from_request<B>(state: &AppState, req: &Request<B>) -> Opti
 }
 
 /// Start the HTTP server
+/// Minimal health-probe dispatch for the dedicated health listener.
+///
+/// Serves ONLY the liveness/readiness/startup probes, with no CORS, no gate, no
+/// route-registry lookup, and no blocking work. Anything else returns 404 so the
+/// listener can never be dragged into the heavy request path.
+///
+/// LIVE-INCIDENT INVARIANT (2026-06-13 doorway freeze): the probes shared the
+/// main listener, so a wedged request path made `/health` time out too, which
+/// defeated kubelet's restart-on-hang. This listener runs on a separate port and
+/// its handlers touch only cached state — it reflects "process alive / ready",
+/// not "request path drained".
+async fn handle_health_probe(
+    state: Arc<AppState>,
+    req: Request<Incoming>,
+) -> Response<Full<Bytes>> {
+    match (req.method(), req.uri().path()) {
+        (&Method::GET, "/health") | (&Method::GET, "/healthz") => {
+            routes::health_check(Arc::clone(&state))
+        }
+        (&Method::GET, "/health/startup") => routes::startup_check(Arc::clone(&state)).await,
+        (&Method::GET, "/ready") | (&Method::GET, "/readyz") => {
+            routes::readiness_check(Arc::clone(&state))
+        }
+        _ => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from_static(
+                br#"{"error":"health listener serves only /health, /ready, /health/startup"}"#,
+            )))
+            .expect("infallible 404"),
+    }
+}
+
+/// Spawn a dedicated lightweight listener that serves only the health probes,
+/// isolated from the main request path. Bound to `DOORWAY_HEALTH_PORT` on the
+/// same host as the main `--listen` address.
+///
+/// Opt-in: when `DOORWAY_HEALTH_PORT` is unset the probes remain on the main
+/// listener (backward-compatible — existing manifests are unaffected). When set,
+/// point the manifest's liveness/readiness/startup probes at this port so a
+/// wedged request path can never silence them.
+async fn spawn_health_listener(state: Arc<AppState>) {
+    let Some(port) = std::env::var("DOORWAY_HEALTH_PORT")
+        .ok()
+        .and_then(|v| v.parse::<u16>().ok())
+        .filter(|&p| p > 0)
+    else {
+        return;
+    };
+
+    let mut health_addr = state.args.listen;
+    health_addr.set_port(port);
+
+    let listener = match TcpListener::bind(health_addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            error!(
+                "Health listener failed to bind {}: {} — probes stay on main listener",
+                health_addr, e
+            );
+            return;
+        }
+    };
+    info!(
+        "Dedicated health listener bound on {} (isolated from request path)",
+        health_addr
+    );
+
+    tokio::spawn(async move {
+        loop {
+            match listener.accept().await {
+                Ok((stream, addr)) => {
+                    let state = Arc::clone(&state);
+                    tokio::spawn(async move {
+                        let io = TokioIo::new(stream);
+                        let service = service_fn(move |req: Request<Incoming>| {
+                            let state = Arc::clone(&state);
+                            async move { Ok::<_, hyper::Error>(handle_health_probe(state, req).await) }
+                        });
+                        if let Err(err) = http1::Builder::new().serve_connection(io, service).await
+                        {
+                            debug!("Health listener connection error from {}: {:?}", addr, err);
+                        }
+                    });
+                }
+                Err(e) => {
+                    error!("Health listener accept error: {:?}", e);
+                }
+            }
+        }
+    });
+}
+
 pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
     let listener = TcpListener::bind(state.args.listen).await?;
 
@@ -929,6 +1022,11 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
         "Doorway listening on {} as node {}",
         state.args.listen, state.args.node_id
     );
+
+    // Dedicated health listener (opt-in via DOORWAY_HEALTH_PORT) — isolates the
+    // liveness/readiness/startup probes from the main request path so a wedged
+    // handler can never silence kubelet's restart-on-hang. See the freeze RCA.
+    spawn_health_listener(Arc::clone(&state)).await;
 
     if state.args.dev_mode {
         warn!("Development mode enabled - authentication disabled");
