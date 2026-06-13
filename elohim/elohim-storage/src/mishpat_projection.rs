@@ -49,6 +49,19 @@
 use tracing::warn;
 
 use crate::db::models::NewMishpatCommitment;
+use elohim_epr::Reach;
+
+/// Parse a reach string into the DNA-notarized [`Reach`] enum.
+///
+/// Membership in the canonical 8-value reach vocabulary is "the parse
+/// succeeds"; `Reach::openness()` is the ordinal the `reach_ceiling >= reach`
+/// well-ordering check compares against (the schema enum's `_ordinal`, matched
+/// by `elohim_epr::Reach`). This is the storage-side read-through of the reach
+/// vocabulary the DNA owns — we never re-vocabularize, we parse the value the
+/// content row already holds (spec §6).
+fn parse_reach(reach: &str) -> Option<Reach> {
+    serde_json::from_value::<Reach>(serde_json::Value::String(reach.to_string())).ok()
+}
 
 // ============================================================================
 // Projection result — upsert a new row, or revoke an existing target row
@@ -151,8 +164,13 @@ pub fn parse_commitment_payload(
             .map(CommitmentProjection::Upsert),
         "replicates-dwelling" => parse_replicates_dwelling(&payload, entry_hash, action_hash)
             .map(CommitmentProjection::Upsert),
-        "replicates-commons" => parse_replicates_commons(&payload, entry_hash, action_hash)
-            .map(CommitmentProjection::Upsert),
+        // `replicates-content` is the reach-general content-provide action;
+        // `replicates-commons` is the migration-window alias (the author still
+        // emits it until Stage B). Both route to the same parser.
+        "replicates-content" | "replicates-commons" => {
+            parse_replicates_commons(&payload, entry_hash, action_hash)
+                .map(CommitmentProjection::Upsert)
+        }
         "acknowledges-reach-change" => {
             parse_acknowledges_reach_change(&payload, entry_hash, action_hash)
                 .map(CommitmentProjection::Upsert)
@@ -338,10 +356,16 @@ fn parse_replicates_commons(
     entry_hash: &str,
     action_hash: &str,
 ) -> Result<NewMishpatCommitment, String> {
-    // Reach MUST be commons for this action (defense-in-depth; the validator
-    // and DNA coordinator both enforce, but the projection refuses to land a
-    // mis-reached row). The capacity view carries no `reach` field, so only the
-    // content variant is reach-checked here.
+    // Structural reach read-through (defense-in-depth, mirrors the DNA
+    // coordinator/integrity well-ordering): the content `reach` must be a known
+    // value in the canonical reach vocabulary and the `reach_ceiling` must be at
+    // least as open as the content reach (a commitment may not promise wider
+    // reach than its content). The reach is NOT pinned to commons — it is read
+    // through from the payload so non-commons content (household, community,
+    // …) projects a `content:<reach>` provide row. The capacity view carries no
+    // `reach` field, so only the content variant is reach-checked here. (The
+    // *consent* question — is this node eligible to make this offer — lives one
+    // layer up in the provide reconciler; this is the structural floor only.)
     let variant = payload
         .get("variant")
         .and_then(|v| v.as_str())
@@ -353,10 +377,26 @@ fn parse_replicates_commons(
                 .get("reach")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "replicates-commons content payload missing 'reach'".to_string())?;
-            if reach != "commons" {
-                return Err(format!(
-                    "replicates-commons reach must be 'commons', got '{reach}'"
-                ));
+            let reach_level = parse_reach(reach).ok_or_else(|| {
+                format!("replicates-commons reach '{reach}' is not a known reach value")
+            })?;
+            // reach_ceiling >= reach (well-ordering). The ceiling is read from
+            // the bounds object (the same place the commons pin used to live);
+            // when present it must be a known value at least as open as reach.
+            if let Some(ceiling) = payload
+                .pointer("/bounds/reach_ceiling")
+                .and_then(|v| v.as_str())
+            {
+                let ceiling_level = parse_reach(ceiling).ok_or_else(|| {
+                    format!(
+                        "replicates-commons reach_ceiling '{ceiling}' is not a known reach value"
+                    )
+                })?;
+                if ceiling_level.openness() < reach_level.openness() {
+                    return Err(format!(
+                        "replicates-commons reach_ceiling '{ceiling}' is more restrictive than reach '{reach}'"
+                    ));
+                }
             }
 
             let head_ref = payload
@@ -385,8 +425,17 @@ fn parse_replicates_commons(
             let rate_per_minute = payload
                 .pointer("/bounds/rate_per_minute")
                 .and_then(|v| v.as_u64());
+            // Carry the content's top-level `reach` onto the projected row's
+            // bounds under a key DISTINCT from `reach_ceiling`. `reach_ceiling`
+            // is the bound (>= reach); `reach` is the content's own reach, and
+            // it is the value `provide_projection_for` reads to scope the
+            // `content:<reach>` provide row. Threading `reach_ceiling` instead
+            // would silently mis-scope a household commitment to its (wider)
+            // ceiling and the snapshot — scoped to `content:household` — would
+            // never count it.
             let mut bounds = serde_json::json!({
                 "epr_scope": [head_ref],
+                "reach": reach,
                 "reach_ceiling": payload.pointer("/bounds/reach_ceiling"),
                 "closure_rule": payload.get("closure_rule"),
             });
@@ -502,8 +551,10 @@ fn parse_replicates_commons(
 pub struct ProvideProjection {
     /// Commitment provider == conductor agent key == `humans.agent_pub_key`.
     pub provider: String,
-    /// Reach class for the `content:<reach>` scope (always `commons` today —
-    /// `replicates-commons` is reach-gated to commons in `parse_replicates_commons`).
+    /// Reach class for the `content:<reach>` scope, read through from the
+    /// content commitment's declared `reach` (the content's own reach, NOT the
+    /// `reach_ceiling` bound). Non-commons content projects a non-commons
+    /// provide row so the resilience snapshot can count it at the content's reach.
     pub reach: String,
     /// The commitment's `action_hash` for provenance on the projected row.
     pub dht_anchor_hash: Option<String>,
@@ -512,28 +563,39 @@ pub struct ProvideProjection {
 /// Decide whether a just-projected commitment should ALSO record a standing
 /// `rea_commitments` provide row, and with what `(provider, reach)`.
 ///
-/// Returns `Some` only for `replicates-commons` **content** commitments: the
-/// content variant carries a `head_ref` recipient (a real per-content offer);
-/// the **capacity** variant is a byte pledge with no counterparty and must NOT
-/// mint a content-reach provide row. Any non-`replicates-commons` action
-/// returns `None` (custody-blob, delegates-compute, etc. are not commons
-/// content provision).
+/// Returns `Some` only for `replicates-content` / `replicates-commons`
+/// (migration-window alias) **content** commitments: the content variant
+/// carries a `head_ref` recipient (a real per-content offer); the **capacity**
+/// variant is a byte pledge with no counterparty and must NOT mint a
+/// content-reach provide row. Any other action returns `None` (custody-blob,
+/// delegates-compute, etc. are not content provision). The reach is read
+/// through from the row's bounds (the content's own declared reach), so
+/// non-commons content projects a non-commons provide row.
 ///
 /// Pure — no DB, no conductor. The caller in `signals.rs` performs the write
-/// via [`crate::db::rea_commitments::record_provide_from_commons_commitment`].
+/// via [`crate::db::rea_commitments::record_provide_from_content_commitment`].
 pub fn provide_projection_for(row: &NewMishpatCommitment) -> Option<ProvideProjection> {
-    if row.action != "replicates-commons" {
+    // Accept both the renamed action and the migration-window alias. The author
+    // still emits `replicates-commons` until Stage B; `replicates-content` is
+    // the post-rename action string both validators honor for one window.
+    if row.action != "replicates-commons" && row.action != "replicates-content" {
         return None;
     }
     // The content variant sets recipient = head_ref; the capacity variant sets
-    // recipient = "" (pure pledge, no per-content offer). Reach is `commons`
-    // for replicates-commons by construction (the parse fn rejects otherwise).
+    // recipient = "" (pure pledge, no per-content offer). Only the content
+    // variant mints a provide row.
     if row.recipient.is_empty() {
         return None;
     }
+    // Read the content's reach through from the bounds the content arm wrote
+    // (the `reach` key, distinct from `reach_ceiling`). A row missing it (e.g.
+    // a capacity-shaped bounds object that slipped through with a recipient) is
+    // not a content provide — skip rather than fabricate a reach.
+    let bounds: serde_json::Value = serde_json::from_str(&row.bounds_json).ok()?;
+    let reach = bounds.get("reach").and_then(|v| v.as_str())?.to_string();
     Some(ProvideProjection {
         provider: row.provider.clone(),
-        reach: "commons".to_string(),
+        reach,
         dht_anchor_hash: row.dht_anchor_hash.clone(),
     })
 }
@@ -882,6 +944,9 @@ mod tests {
         let bounds: serde_json::Value =
             serde_json::from_str(&row.bounds_json).expect("bounds_json must be valid JSON");
         assert_eq!(bounds["epr_scope"][0], "epr:lamad-spa-head-cid");
+        // The content's own reach is carried distinctly from reach_ceiling so
+        // provide_projection_for reads the right scope. Here both are commons.
+        assert_eq!(bounds["reach"], "commons");
         assert_eq!(bounds["reach_ceiling"], "commons");
         assert_eq!(bounds["rate_per_minute"], 60);
         // Rate-bound bridge: bounds_validator check 6 reads `rate_per_hour`, so the
@@ -1167,6 +1232,120 @@ mod tests {
         assert_eq!(p.dht_anchor_hash.as_deref(), Some("ah-pp"));
         // provider is whatever the content payload carried.
         assert!(!p.provider.is_empty(), "provider threads through");
+    }
+
+    /// A non-commons content commitment must project the content's own reach —
+    /// read through from the payload, not hard-coded commons, and NOT the
+    /// `reach_ceiling`. This is the net-new read-through (and the discriminating
+    /// reach != reach_ceiling case) the whole non-commons-counting change exists
+    /// for. `intimate` (ordinal 3) content under a `community` (ordinal 6)
+    /// ceiling: well-ordering holds; the projected provide reach MUST be
+    /// `intimate` (the content's reach), NOT `community` (the ceiling). Threading
+    /// the ceiling instead would silently mis-scope the row and the snapshot —
+    /// scoped `content:intimate` — would never count it.
+    #[test]
+    fn provide_projection_for_non_commons_reach_reads_through() {
+        let payload = serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "content",
+            "head_ref": "epr:intimate-record",
+            "reach": "intimate",
+            "bounds": { "reach_ceiling": "community" },
+            "provider": "agent:provider-x",
+            "valid_from": "2026-06-01T00:00:00Z",
+            "valid_until": "2026-09-01T00:00:00Z"
+        })
+        .to_string();
+
+        let row = unwrap_upsert(
+            parse_commitment_payload("replicates-commons", &payload, "eh-int", "ah-int")
+                .expect("intimate-reach content payload parses (well-ordered ceiling)"),
+        );
+        // The bounds carry both reach (intimate) and reach_ceiling (community);
+        // the provide reach is read from `reach`, NOT `reach_ceiling`.
+        let bounds: serde_json::Value = serde_json::from_str(&row.bounds_json).unwrap();
+        assert_eq!(bounds["reach"], "intimate");
+        assert_eq!(bounds["reach_ceiling"], "community");
+
+        let p = provide_projection_for(&row).expect("intimate content yields a provide");
+        assert_eq!(
+            p.reach, "intimate",
+            "provide reach must be the content reach (intimate), not the ceiling (community)"
+        );
+    }
+
+    /// The `replicates-content` action string (the post-rename action) parses
+    /// through the same arm as `replicates-commons` (the migration-window alias).
+    #[test]
+    fn parse_replicates_content_action_alias_parses() {
+        let payload = serde_json::json!({
+            "action": "replicates-content",
+            "variant": "content",
+            "head_ref": "epr:community-record",
+            "reach": "community",
+            "bounds": { "reach_ceiling": "commons" },
+            "provider": "agent:provider-x",
+            "valid_from": "2026-06-01T00:00:00Z",
+            "valid_until": "2026-09-01T00:00:00Z"
+        })
+        .to_string();
+        let row = unwrap_upsert(
+            parse_commitment_payload("replicates-content", &payload, "eh-rc", "ah-rc")
+                .expect("replicates-content action parses through the same arm"),
+        );
+        let p = provide_projection_for(&row).expect("replicates-content yields a provide");
+        assert_eq!(p.reach, "community");
+    }
+
+    /// `reach_ceiling` more restrictive than `reach` violates the well-ordering
+    /// and must be rejected at parse time (structural floor).
+    #[test]
+    fn parse_replicates_commons_ceiling_below_reach_fails() {
+        let payload = serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "content",
+            "head_ref": "epr:community-record",
+            "reach": "community",
+            "bounds": { "reach_ceiling": "intimate" },
+            "provider": "agent:provider-x",
+            "valid_from": "2026-06-01T00:00:00Z",
+            "valid_until": "2026-09-01T00:00:00Z"
+        })
+        .to_string();
+        let result = parse_commitment_payload("replicates-commons", &payload, "eh-bad", "ah-bad");
+        assert!(
+            result.is_err(),
+            "reach_ceiling intimate < reach community must reject"
+        );
+        assert!(
+            result.unwrap_err().contains("more restrictive"),
+            "error must explain the well-ordering violation"
+        );
+    }
+
+    /// A non-enum reach value is not a known reach and must be rejected.
+    #[test]
+    fn parse_replicates_commons_non_enum_reach_fails() {
+        let payload = serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "content",
+            "head_ref": "epr:bogus-record",
+            "reach": "neighborhood",
+            "bounds": { "reach_ceiling": "commons" },
+            "provider": "agent:provider-x",
+            "valid_from": "2026-06-01T00:00:00Z",
+            "valid_until": "2026-09-01T00:00:00Z"
+        })
+        .to_string();
+        let result = parse_commitment_payload("replicates-commons", &payload, "eh-nb", "ah-nb");
+        assert!(
+            result.is_err(),
+            "a reach value outside the canonical enum must reject"
+        );
+        assert!(
+            result.unwrap_err().contains("not a known reach"),
+            "error must say the reach is not a known value"
+        );
     }
 
     #[test]
