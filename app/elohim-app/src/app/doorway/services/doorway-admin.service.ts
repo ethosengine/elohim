@@ -5,9 +5,10 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 
-import { Observable, Subject, catchError, of, retry, timeout } from 'rxjs';
+import { Observable, Subject, catchError, of, retry, throwError, timeout } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import type { StabilityStatusView } from '../../generated/stability-status-view';
 import {
   NodesResponse,
   NodeDetails,
@@ -135,6 +136,25 @@ export class DoorwayAdminService {
         retry(2),
         catchError(this.handleError<CustodianNetwork | null>('getCustodians', null))
       );
+  }
+
+  /**
+   * Doorway self-healing read model (debug surface). Node-local, unauthenticated
+   * by design — see the /debug visibility gate (UI visibility only, not access
+   * control). Web context only; in tauri the StabilityLens composes from storage
+   * raw status endpoints instead (this endpoint 404s on elohim-storage).
+   */
+  getSelfHealing(): Observable<StabilityStatusView> {
+    return this.http.get<StabilityStatusView>(`${this.baseUrl}/admin/self-healing`).pipe(
+      timeout(this.timeout),
+      retry(1),
+      catchError((error: HttpErrorResponse) => {
+        if (error.status === 503) {
+          console.warn('[DoorwayAdmin] getSelfHealing 503: node catching up');
+        }
+        return throwError(() => error);
+      })
+    );
   }
 
   // ============================================================================

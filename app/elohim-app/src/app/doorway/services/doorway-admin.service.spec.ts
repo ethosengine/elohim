@@ -498,6 +498,38 @@ describe('DoorwayAdminService', () => {
   });
 });
 
+describe('DoorwayAdminService.getSelfHealing', () => {
+  let service: DoorwayAdminService;
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [DoorwayAdminService, provideHttpClient(), provideHttpClientTesting()],
+    });
+    service = TestBed.inject(DoorwayAdminService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpMock.verify());
+
+  it('GETs /admin/self-healing and returns the typed view', async () => {
+    const { firstValueFrom } = await import('rxjs');
+    const promise = firstValueFrom(service.getSelfHealing());
+    const req = httpMock.expectOne((r) => r.url.endsWith('/admin/self-healing'));
+    expect(req.request.method).toBe('GET');
+    req.flush({
+      autoPreset: null, admission: null, upstreams: [],
+      projector: { lagSeconds: 0, caughtUp: true, divergentAnchor: 0 },
+      peers: [], render: { total: 0, degenerateRate: 0 },
+      warmup: { inProgress: false, attempts: 0, completed: false, lastError: null },
+      conductor: { connected: true, connectedWorkers: 1, totalWorkers: 1 },
+    });
+    const view = await promise;
+    expect(view.projector.caughtUp).toBe(true);
+    expect(view).toHaveProperty('peers');
+  });
+});
+
 // =============================================================================
 // Test Helpers
 // =============================================================================
