@@ -3707,10 +3707,13 @@ fn bad_request_response(message: &str) -> Response<Full<Bytes>> {
 }
 
 /// True ONLY for paths that must NEVER be shed by the inbound admission gate:
-/// the liveness/health family, /version, and ANY WebSocket upgrade (signal +
-/// /debug/stream hold a permit for the whole socket lifetime). Everything else
-/// — proxy, api, blob, apps, SPA/EPR — is gated. Deliberately NARROW: gating on
-/// `!is_service_path` would exempt /api,/db,/blob,/apps and gut the gate.
+/// the liveness/health family, /version, and ANY WebSocket upgrade. Exempt paths
+/// take NO permit (`_admit = None`) — upgrades (signal, /debug/stream) are
+/// long-lived relays that must not occupy a bounded admission slot for their
+/// whole socket lifetime, and liveness must answer even at zero permits.
+/// Everything else — proxy, api, blob, apps, SPA/EPR — is gated. Deliberately
+/// NARROW: gating on `!is_service_path` would exempt /api,/db,/blob,/apps and
+/// gut the gate.
 fn admission_exempt(path: &str, is_upgrade: bool) -> bool {
     if is_upgrade {
         return true;

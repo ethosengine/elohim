@@ -121,7 +121,8 @@ const BLOB_PANTRY_TTL: Duration = Duration::from_secs(3_600); // 1 hour
 ///
 /// Errors surfaces as:
 /// - `400 BAD_REQUEST`  — failed to read incoming body
-/// - `502 BAD_GATEWAY`  — failed to connect to or read from storage
+/// - `503 catching-up + Retry-After` — connect/read failure, upstream 429/503,
+///   or circuit-open (no bare 502; propagated backpressure per Plan B)
 /// - `405 METHOD_NOT_ALLOWED` — method not in GET/POST/PUT/DELETE/HEAD/PATCH
 ///
 /// Generic over `B` so the production path accepts `hyper::body::Incoming` and
@@ -139,22 +140,6 @@ where
     B::Data: Send,
     B::Error: std::fmt::Display,
 {
-    // Per-upstream breaker (Pillar 2 layer 4): if this endpoint is circuit-open,
-    // shed WITHOUT calling storage. Keyed by storage_url (per-upstream, not per
-    // path — matches the single-target dispatch model).
-    if breakers.is_open(storage_url) {
-        warn!(
-            target: "upstream_shed",
-            counter = "doorway_upstream_breaker_open_total",
-            storage_url = %storage_url,
-            path = %path,
-            "upstream circuit OPEN — shedding without calling storage (503 + Retry-After)"
-        );
-        return catching_up_proxy_response(
-            crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
-        );
-    }
-
     let storage_endpoint = format!("{}{}", storage_url.trim_end_matches('/'), path);
 
     let query = req.uri().query();
@@ -228,17 +213,35 @@ where
         }
     }
 
+    // Per-upstream breaker (Pillar 2 layer 4): consulted IMMEDIATELY before send
+    // so it brackets exactly the upstream probe. The 405/400 early-returns above
+    // never consume a half-open trial, and the send-result match below records
+    // exactly one outcome per terminal path (no double-record, no half-open
+    // wedge). Circuit-open sheds WITHOUT calling storage. Keyed by storage_url
+    // (per-upstream, single-target dispatch).
+    if breakers.is_open(storage_url) {
+        warn!(
+            target: "upstream_shed",
+            counter = "doorway_upstream_breaker_open_total",
+            storage_url = %storage_url,
+            path = %path,
+            "upstream circuit OPEN — shedding without calling storage (503 + Retry-After)"
+        );
+        return catching_up_proxy_response(
+            crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+        );
+    }
+
     match builder.send().await {
         Ok(response) => {
             let status = response.status();
             let status_u16 = status.as_u16();
-            let outcome = ProxyOutcome::classify(status_u16);
-            breakers.record(storage_url, outcome != ProxyOutcome::Failure);
 
             // HONOR upstream backpressure: a 429/503 from storage becomes a
             // catching-up to the browser, preserving the upstream Retry-After
             // (else the breaker cooldown) so the client does not hammer.
             if matches!(status_u16, 429 | 503) {
+                breakers.record(storage_url, false);
                 let upstream_ra = response
                     .headers()
                     .get(reqwest::header::RETRY_AFTER)
@@ -265,12 +268,22 @@ where
                 .to_string();
 
             match response.bytes().await {
-                Ok(body) => Response::builder()
-                    .status(StatusCode::from_u16(status_u16).unwrap_or(StatusCode::OK))
-                    .header("Content-Type", content_type)
-                    .header("Cross-Origin-Resource-Policy", "cross-origin")
-                    .body(Full::new(Bytes::from(body.to_vec())))
-                    .unwrap(),
+                Ok(body) => {
+                    // Record-once terminal outcome: a non-429/503 status with a
+                    // readable body — classify it (404/4xx = neutral/ok, 5xx =
+                    // failure). 429/503 already recorded+returned in the honor
+                    // branch above.
+                    breakers.record(
+                        storage_url,
+                        ProxyOutcome::classify(status_u16) != ProxyOutcome::Failure,
+                    );
+                    Response::builder()
+                        .status(StatusCode::from_u16(status_u16).unwrap_or(StatusCode::OK))
+                        .header("Content-Type", content_type)
+                        .header("Cross-Origin-Resource-Policy", "cross-origin")
+                        .body(Full::new(Bytes::from(body.to_vec())))
+                        .unwrap()
+                }
                 Err(e) => {
                     warn!(error = %e, "Failed to read storage response body");
                     breakers.record(storage_url, false);
@@ -410,14 +423,11 @@ where
         Ok(upstream) => {
             let status = upstream.status();
             let status_u16 = status.as_u16();
-            let outcome = ProxyOutcome::classify(status_u16);
-            // 404 = Neutral (normal blob miss under no-fanout) → records as ok,
-            // never opens the breaker. Only 429/5xx count as Failure.
-            breakers.record(storage_url, outcome != ProxyOutcome::Failure);
 
             // HONOR upstream backpressure (429/503) — surface catching-up to the
             // client (preserve upstream Retry-After, else cooldown).
             if matches!(status_u16, 429 | 503) {
+                breakers.record(storage_url, false);
                 let upstream_ra = upstream
                     .headers()
                     .get(reqwest::header::RETRY_AFTER)
@@ -445,6 +455,13 @@ where
 
             match upstream.bytes().await {
                 Ok(body) => {
+                    // Record-once terminal outcome: a non-429/503 status with a
+                    // readable body. 404 = Neutral (normal blob miss under
+                    // no-fanout) → ok, never opens; 5xx = failure.
+                    breakers.record(
+                        storage_url,
+                        ProxyOutcome::classify(status_u16) != ProxyOutcome::Failure,
+                    );
                     // --- Stock pantry on clean 200 -----------------------------------
                     let should_cache = status == StatusCode::OK
                         && status != StatusCode::PARTIAL_CONTENT

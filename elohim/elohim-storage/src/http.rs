@@ -127,8 +127,9 @@ use tokio::sync::{RwLock, Semaphore};
 use tracing::{debug, error, info, warn};
 
 /// Maximum number of concurrent HTTP requests the server will handle.
-/// Excess requests wait for a permit, preventing OOM under burst traffic
-/// (e.g., HTML5 app iframe loading 30+ assets simultaneously).
+/// Excess requests are SHED (per-request try_acquire → 503 + Retry-After), not
+/// queued — an unbounded wait is just a slower wedge and gated /health too.
+/// Bounds memory under burst (e.g., HTML5 app iframe loading 30+ assets).
 const MAX_CONCURRENT_REQUESTS: usize = 64;
 
 /// Retry-After (seconds) when storage sheds at the request-admission ceiling.
