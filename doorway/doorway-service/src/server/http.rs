@@ -311,12 +311,34 @@ fn init_renderer() -> Option<Arc<dyn elohim_render::Renderer>> {
         .unwrap_or_else(|_| "http://localhost:8090".to_string());
     // Bootstrap default fetcher for the isolate — every render swaps in its own
     // per-request fetcher (carrying the user credential, and any test-only fault)
-    // via ctx.data_fetcher, so this one is never used for a real render.
+    // via ctx.data_fetcher, so this one is never used for a real render. It still
+    // gets a hard reqwest timeout: a bootstrap fetch must never be the one
+    // unbounded await on the SSR thread (cheap defense, matches the per-request
+    // client's 10s bound).
+    let bootstrap_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap_or_default();
     let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(crate::ssr::ResolverFetcher::new(
-        Arc::new(reqwest::Client::new()),
+        Arc::new(bootstrap_client),
         storage_url.clone(),
     ));
-    match elohim_render::AngularRenderer::new(std::path::PathBuf::from(&bundle_path), fetcher) {
+    // Per-fetch soft budget for SSR data fetches (the TracingFetcher SLA): a fetch
+    // outstanding longer than this is recorded `Stalled` and rejected so the render
+    // falls back fast instead of riding to the 60s wall-time. Env-configurable
+    // (`DOORWAY_SSR_FETCH_SOFT_BUDGET_MS`) — parameter-bearing: too low flaps a
+    // slow-but-healthy storage peer, too high lets a stalled fetch hold the
+    // single sequential isolate. Defaults to elohim-render's DEFAULT_SOFT_BUDGET_MS.
+    let soft_budget_ms = std::env::var("DOORWAY_SSR_FETCH_SOFT_BUDGET_MS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|&v| v > 0)
+        .unwrap_or(elohim_render::DEFAULT_SOFT_BUDGET_MS);
+    match elohim_render::AngularRenderer::with_soft_budget(
+        std::path::PathBuf::from(&bundle_path),
+        fetcher,
+        soft_budget_ms,
+    ) {
         Ok(r) => {
             tracing::info!(
                 target: "doorway::ssr",
@@ -900,6 +922,114 @@ fn resolve_agent_cid_from_request<B>(state: &AppState, req: &Request<B>) -> Opti
 }
 
 /// Start the HTTP server
+/// Minimal health-probe dispatch for the dedicated health listener.
+///
+/// Serves ONLY the liveness/readiness/startup probes, with no CORS, no gate, no
+/// route-registry lookup, and no blocking work. Anything else returns 404 so the
+/// listener can never be dragged into the heavy request path.
+///
+/// LIVE-INCIDENT INVARIANT (2026-06-13 doorway freeze): the probes shared the
+/// main listener, so a wedged request path made `/health` time out too, which
+/// defeated kubelet's restart-on-hang. This listener runs on a separate port and
+/// its handlers touch only cached state — it reflects "process alive / ready",
+/// not "request path drained".
+async fn handle_health_probe(
+    state: Arc<AppState>,
+    req: Request<Incoming>,
+) -> Response<Full<Bytes>> {
+    match (req.method(), req.uri().path()) {
+        (&Method::GET, "/health") | (&Method::GET, "/healthz") => {
+            routes::health_check(Arc::clone(&state))
+        }
+        (&Method::GET, "/health/startup") => routes::startup_check(Arc::clone(&state)).await,
+        (&Method::GET, "/ready") | (&Method::GET, "/readyz") => {
+            routes::readiness_check(Arc::clone(&state))
+        }
+        _ => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from_static(
+                br#"{"error":"health listener serves only /health, /ready, /health/startup"}"#,
+            )))
+            .expect("infallible 404"),
+    }
+}
+
+/// Spawn a dedicated lightweight listener that serves only the health probes,
+/// isolated from the main request path. Bound to `DOORWAY_HEALTH_PORT` on the
+/// same host as the main `--listen` address.
+///
+/// Opt-in: when `DOORWAY_HEALTH_PORT` is unset the probes remain on the main
+/// listener (backward-compatible — existing manifests are unaffected). When set,
+/// point the manifest's liveness/readiness/startup probes at this port so a
+/// wedged request path can never silence them.
+///
+/// FOOTGUN — left unset by design (do not enable casually). This isolates the
+/// probes only at the *listener/port* axis: a wedged request *handler* can't
+/// silence them. It does NOT isolate them at the *runtime* axis. The spawned
+/// listener and its connection tasks run via `tokio::spawn` on the SAME main
+/// tokio runtime as the request path — they share the worker-thread pool. So a
+/// full worker-thread STALL (every worker blocked — the exact cpu-limited freeze
+/// this sprint hardens against) would starve these probes too, yet because they
+/// answer on a separate port the manifest could keep them GREEN long enough that
+/// kubelet never restarts the hung pod — DEFEATING restart-on-hang, the one thing
+/// that recovers a wedged worker pool. Enable a health listener for true stall
+/// resilience ONLY with a DEDICATED, pinned `tokio::runtime::Runtime` on its own
+/// OS thread (so it survives a main-runtime stall); the shared-runtime form here
+/// is safe only for the narrower request-handler-wedge case, which is why it
+/// stays opt-in and unset.
+async fn spawn_health_listener(state: Arc<AppState>) {
+    let Some(port) = std::env::var("DOORWAY_HEALTH_PORT")
+        .ok()
+        .and_then(|v| v.parse::<u16>().ok())
+        .filter(|&p| p > 0)
+    else {
+        return;
+    };
+
+    let mut health_addr = state.args.listen;
+    health_addr.set_port(port);
+
+    let listener = match TcpListener::bind(health_addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            error!(
+                "Health listener failed to bind {}: {} — probes stay on main listener",
+                health_addr, e
+            );
+            return;
+        }
+    };
+    info!(
+        "Dedicated health listener bound on {} (isolated from request path)",
+        health_addr
+    );
+
+    tokio::spawn(async move {
+        loop {
+            match listener.accept().await {
+                Ok((stream, addr)) => {
+                    let state = Arc::clone(&state);
+                    tokio::spawn(async move {
+                        let io = TokioIo::new(stream);
+                        let service = service_fn(move |req: Request<Incoming>| {
+                            let state = Arc::clone(&state);
+                            async move { Ok::<_, hyper::Error>(handle_health_probe(state, req).await) }
+                        });
+                        if let Err(err) = http1::Builder::new().serve_connection(io, service).await
+                        {
+                            debug!("Health listener connection error from {}: {:?}", addr, err);
+                        }
+                    });
+                }
+                Err(e) => {
+                    error!("Health listener accept error: {:?}", e);
+                }
+            }
+        }
+    });
+}
+
 pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
     let listener = TcpListener::bind(state.args.listen).await?;
 
@@ -907,6 +1037,11 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
         "Doorway listening on {} as node {}",
         state.args.listen, state.args.node_id
     );
+
+    // Dedicated health listener (opt-in via DOORWAY_HEALTH_PORT) — isolates the
+    // liveness/readiness/startup probes from the main request path so a wedged
+    // handler can never silence kubelet's restart-on-hang. See the freeze RCA.
+    spawn_health_listener(Arc::clone(&state)).await;
 
     if state.args.dev_mode {
         warn!("Development mode enabled - authentication disabled");
@@ -2829,6 +2964,20 @@ async fn handle_request(
                                     path = %p,
                                     available = sem.available_permits(),
                                     "render semaphore at limit — falling back to CSR shell"
+                                );
+                                // SSR saturation is otherwise INVISIBLE to
+                                // status-code metrics: the shed returns HTTP 200
+                                // with the CSR shell. Emit a distinct, greppable,
+                                // log-aggregation-countable signal on its own
+                                // `ssr_busy` target so saturation is observable
+                                // (the post-deploy watch item). HTTP behavior is
+                                // unchanged — still 200 + CSR shell below.
+                                tracing::warn!(
+                                    target: "ssr_busy",
+                                    counter = "ssr_render_busy_total",
+                                    path = %p,
+                                    available = sem.available_permits(),
+                                    "SSR render queue saturated — shedding to CSR shell (HTTP 200)"
                                 );
                                 return Ok(to_boxed(
                                     ssr_spa_shell_fallback_with_skip_reason(Some("overflow")),

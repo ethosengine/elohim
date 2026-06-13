@@ -27,12 +27,55 @@ use doorway::{
     worker::{PoolConfig, WorkerPool},
 };
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    // Load environment variables from .env file if present
+/// Number of tokio worker threads to run, regardless of the cgroup CPU limit.
+///
+/// LIVE-INCIDENT INVARIANT (2026-06-13 doorway freeze): the pod has
+/// `resources.limits.cpu: 1`, so the default `#[tokio::main]` (worker_threads =
+/// available parallelism) spun up a SINGLE worker thread. The thread dump showed
+/// exactly one `tokio-runtime-w` thread, and one synchronously-blocked await on
+/// it froze the entire gateway — `/health` included — letting kubelet's
+/// restart-on-hang never fire.
+///
+/// A worker thread blocked in `futex_wait` consumes NO CPU, so running several
+/// worker threads breaks the single-blocked-await wedge even at `cpu: 1`. This
+/// is the direct antidote to the freeze: raising `limits.cpu` only buys
+/// CPU-bound render throughput; it is NOT required to un-freeze the runtime.
+///
+/// We set the count EXPLICITLY (never CPU-derived) so the cgroup limit can never
+/// silently collapse us back to one worker. Env-overridable via
+/// `DOORWAY_WORKER_THREADS` (0/garbage → default).
+const DEFAULT_WORKER_THREADS: usize = 4;
+
+fn worker_threads() -> usize {
+    std::env::var("DOORWAY_WORKER_THREADS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|&v| v > 0)
+        .unwrap_or(DEFAULT_WORKER_THREADS)
+}
+
+fn main() -> anyhow::Result<()> {
+    // Load .env BEFORE reading any config env var (incl. DOORWAY_WORKER_THREADS
+    // below) so a .env-provided value is honored, not silently ignored. In the
+    // live deployment these are real container env vars (seen regardless), but a
+    // .env-driven local run must agree.
     let _ = dotenvy::dotenv();
 
-    // Parse command line arguments
+    // Build the multi-threaded runtime with an EXPLICIT worker count so a
+    // cpu-limited cgroup cannot collapse us to a single worker (the freeze).
+    // `enable_all` wires the I/O + time drivers the gateway depends on.
+    let workers = worker_threads();
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(workers)
+        .enable_all()
+        .thread_name("doorway-tokio-w")
+        .build()
+        .expect("failed to build tokio runtime");
+    runtime.block_on(async_main(workers))
+}
+
+async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
+    // Parse command line arguments (.env already loaded in main()).
     let args = Args::parse();
 
     // Initialize tracing/logging
@@ -91,6 +134,10 @@ async fn main() -> anyhow::Result<()> {
     info!("NATS: {}", args.nats.nats_url);
     info!("MongoDB: {}", args.mongodb_uri);
     info!("Workers: {}", args.worker_count);
+    // Tokio runtime worker threads — set EXPLICITLY (not CPU-derived) so a
+    // cpu-limited cgroup cannot collapse the runtime to a single worker (the
+    // 2026-06-13 freeze). See worker_threads()/DEFAULT_WORKER_THREADS.
+    info!("Tokio worker threads: {} (explicit)", worker_threads);
     info!("======================================");
 
     // Connect to MongoDB (optional in dev mode)
@@ -1306,7 +1353,30 @@ async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: 
             }
         };
 
-        match admin.list_apps().await {
+        // Bound the startup `list_apps` probe with the same per-conductor SLA the
+        // ZomeCaller uses. A conductor that accepts the admin connection then
+        // stalls (the live NXDOMAIN / half-open class) must NOT wedge boot for the
+        // full 120s startup-probe budget — it degrades to a skipped conductor.
+        // Safe to skip: this fn only runs for conductor_urls.len() > 1, so one
+        // conductor's agents being missed leaves the others' routing intact.
+        let list_apps_result = match tokio::time::timeout(
+            doorway::services::zome_caller::zome_call_timeout(),
+            admin.list_apps(),
+        )
+        .await
+        {
+            Ok(inner) => inner,
+            Err(_) => {
+                warn!(
+                    conductor = %conductor_id,
+                    admin_url = %admin_url,
+                    "list_apps timed out at startup for {conductor_id}; skipping"
+                );
+                continue;
+            }
+        };
+
+        match list_apps_result {
             Ok(apps) => {
                 let mut conductor_agents = 0usize;
                 for app in &apps {

@@ -178,9 +178,18 @@ impl Renderer for AngularRenderer {
     /// caller resumes immediately. The worker continues executing in its V8
     /// isolate until the in-flight JS resolves or the isolate OOMs —
     /// V8-level termination (interrupt + `TerminateExecution`) is deferred to
-    /// a future task. The next work item sent to the worker will block until
-    /// the current render completes, so sustained timeout storms will exhaust the
-    /// channel queue. Mitigation (isolate interrupt) is tracked as Task 14+.
+    /// a future task.
+    ///
+    /// # Load shedding (bounded queue)
+    ///
+    /// The isolate is sequential (capacity-1 channel). Work is handed off with a
+    /// non-blocking `try_send`: if the queue is saturated (a render in flight and
+    /// one already buffered behind it), this returns `RenderError::Busy` so the
+    /// caller sheds to a fast fallback (CSR shell) rather than queuing behind a
+    /// possibly-stuck render. This bounds the queue so a stuck render cannot
+    /// back-pressure onto the tokio runtime (2026-06-13 freeze RCA). Pooling more
+    /// than one isolate (round-robin over `Vec<SyncSender<…>>`) and V8-level
+    /// interrupt are the natural follow-ups.
     async fn render(&self, ctx: RenderContext) -> Result<RenderOutput> {
         // Build a file:// URL for the bundle so dynamic import() can locate it.
         let bundle_url = url::Url::from_file_path(&self.bundle).map_err(|_| {
@@ -221,12 +230,17 @@ impl Renderer for AngularRenderer {
             }})()"#
         );
 
-        // Send the work item to the background thread.
-        // SyncSender::send is a blocking call and must not run on a tokio worker
-        // thread directly — wrap it in spawn_blocking so tokio can schedule other
-        // tasks while we wait for channel capacity.
+        // Hand the work item to the background render thread WITHOUT blocking.
+        //
+        // The isolate is sequential (capacity-1 channel). A blocking `send` would
+        // park the caller until channel capacity frees — and if the in-flight
+        // render is stuck (e.g. a JS infinite loop the wall-time timeout cannot
+        // free, since the worker keeps running), that block back-pressures onto
+        // the tokio runtime. That is a load-bearing contributor to the 2026-06-13
+        // freeze. Instead we `try_send`: if the queue is saturated, shed this
+        // request with `RenderError::Busy` so the caller falls back fast (CSR
+        // shell) rather than queuing behind a possibly-stuck render.
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
-        let tx = self.tx.clone();
         let work_item = StringWorkItem {
             script: driver,
             // Render against THIS request's fetcher (carries the originating user's
@@ -235,12 +249,12 @@ impl Renderer for AngularRenderer {
             fetcher: Arc::clone(&ctx.data_fetcher),
             reply: reply_tx,
         };
-        tokio::task::spawn_blocking(move || {
-            tx.send(work_item)
-                .map_err(|_| RenderError::Panic("angular render worker: channel closed".into()))
-        })
-        .await
-        .map_err(|_| RenderError::Panic("spawn_blocking join failed".into()))??;
+        self.tx.try_send(work_item).map_err(|e| match e {
+            mpsc::TrySendError::Full(_) => RenderError::Busy,
+            mpsc::TrySendError::Disconnected(_) => {
+                RenderError::Panic("angular render worker: channel closed".into())
+            }
+        })?;
 
         // Await the result from the background thread, subject to wall-time limit.
         // A hard-timeout here is the backstop for a true hang (e.g. an infinite
@@ -315,5 +329,58 @@ impl Drop for AngularRenderer {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::RenderError;
+
+    /// The load-shedding invariant (2026-06-13 freeze): once the capacity-1 queue
+    /// is saturated (one item buffered while no consumer drains), `try_send` must
+    /// return `Full`, and the renderer maps that to `RenderError::Busy` — a fast
+    /// shed, NOT a block. This exercises the exact mapping `render()` applies
+    /// without booting a V8 isolate (which needs a real bundle).
+    #[test]
+    fn saturated_queue_sheds_with_busy_not_block() {
+        // No receiver loop is draining — model a worker stuck on an in-flight
+        // render. Capacity 1 means the first try_send buffers, the next is Full.
+        let (tx, _rx) = mpsc::sync_channel::<u32>(1);
+
+        // First send buffers into the single slot.
+        assert!(tx.try_send(1).is_ok(), "first item fills the single slot");
+
+        // Second send finds the slot full — this is the shed point.
+        let err = tx.try_send(2).expect_err("saturated queue must reject");
+        let mapped = match err {
+            mpsc::TrySendError::Full(_) => RenderError::Busy,
+            mpsc::TrySendError::Disconnected(_) => RenderError::Panic("channel closed".into()),
+        };
+        assert!(
+            matches!(mapped, RenderError::Busy),
+            "a full queue maps to Busy (fast fallback), never a block"
+        );
+    }
+
+    /// A disconnected worker (the rx half dropped) must map to `Panic`, not
+    /// `Busy` — the two failure modes are distinct and the caller treats them
+    /// differently (Busy → fall back fast; Panic → genuine error).
+    #[test]
+    fn disconnected_worker_maps_to_panic_not_busy() {
+        let (tx, rx) = mpsc::sync_channel::<u32>(1);
+        drop(rx); // worker gone
+
+        let err = tx
+            .try_send(1)
+            .expect_err("disconnected channel must reject");
+        let mapped = match err {
+            mpsc::TrySendError::Full(_) => RenderError::Busy,
+            mpsc::TrySendError::Disconnected(_) => RenderError::Panic("channel closed".into()),
+        };
+        assert!(
+            matches!(mapped, RenderError::Panic(_)),
+            "a disconnected worker is a Panic, not a Busy shed"
+        );
     }
 }
