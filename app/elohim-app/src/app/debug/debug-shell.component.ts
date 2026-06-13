@@ -5,6 +5,7 @@ import { ConnectionLensComponent } from './lenses/connection-lens.component';
 import { StabilityLensComponent } from './lenses/stability-lens.component';
 import { LoggingLensComponent } from './lenses/logging-lens.component';
 import { HealthLensComponent } from './lenses/health-lens.component';
+import { FlagsLensComponent } from './lenses/flags-lens.component';
 
 /** Hidden-but-accessible /debug surface (chrome://flags model). Always resolves
  *  by URL; the nav entry is gated separately (DebugModeService). Read-only +
@@ -26,6 +27,7 @@ export class DebugShellComponent {
     { id: 'stability', title: 'Stability', icon: '🩺', component: StabilityLensComponent },
     { id: 'logging', title: 'Logging', icon: '📜', component: LoggingLensComponent },
     { id: 'health', title: 'Health', icon: '💓', component: HealthLensComponent },
+    { id: 'flags', title: 'Flags', icon: '🚩', component: FlagsLensComponent },
   ];
   readonly activeId = signal(this.lenses[0].id);
   select(id: string): void { this.activeId.set(id); }
