@@ -5,12 +5,12 @@ created: 2026-06-13
 class: substrate
 artifact_kind: spec
 written: 2026-06-13
-# cites: TODO(integrator) — cite-seal is the finishing step (seal/describe/propagate).
-#   The four design inputs below are the cite targets; fingerprints are integrator-run.
-#   - 2026-06-08-epr-acquisition-slice2b-provide-loop-design.md | the commons provide loop this generalizes — replicates-commons action, ProvideReconciler, provide_projection_for; the direct ancestor | path: genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md
-#   - 2026-06-12-init-authoring-native-seeding-design.md | the per-corpus author-steward routing + story-derived collective graph this design's eligibility-and-visibility model must align with | path: genesis/docs/superpowers/specs/2026-06-12-init-authoring-native-seeding-design.md
-#   - resilience-protocol-spec | Part V's three-class stewardship surface (encrypted / social / commons); the non-commons provide row lights the "social" class | path: genesis/docs/content/elohim-protocol/resilience/README.md
-#   - reach-vocabulary-frontend-strand | the reach vocabulary is in known multi-way drift; this design references the drift, does NOT canonize a reconciliation | path: genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md
+cites:
+  - init-authoring-native-seeding-design | the per-corpus author-steward routing + story-derived collective graph this design's eligibility-and-visibility model must align with | sha256:c8efe09b9262401b | path: genesis/docs/superpowers/specs/2026-06-12-init-authoring-native-seeding-design.md
+  - resilience-protocol-spec | Part V's three-class stewardship surface (encrypted / social / commons); the non-commons provide row lights the "social" class | sha256:2c832b517c7204cc | path: genesis/docs/content/elohim-protocol/resilience/README.md
+  # legacy path cites — no-id (slice2b spec predates frontmatter) / non-doc-root (data/ backlog); relationship documented in body prose (§"Companion to", §6)
+  - genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md
+  - genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md
 ---
 
 # Non-commons provide commitments — commitment-backed counting past commons reach
