@@ -202,6 +202,29 @@ impl ProjectionStore {
             .clone()
             .unwrap_or_else(|| format!("{}:{}", doc.doc_type, doc.doc_id));
 
+        // Idempotency guard — skip redundant re-projections.
+        //
+        // warm-stream re-streams the entire corpus on every (re)connect and every
+        // DHT signal re-projects, so under load the same documents are re-`set`
+        // many times per minute (measured ~14k upserts/2min over a ~3.6k-doc
+        // corpus on alpha — a re-projection firehose that saturated the gateway).
+        // When the hot cache already holds a projection identical in every served
+        // field, the Mongo upsert and the broadcast are pure overhead: skip both
+        // and just refresh the entry's recency so it stays hot. The equivalence
+        // check runs under a short-lived read guard that is dropped before the
+        // recency bump, so no shard lock is ever held across work.
+        let already_current = self
+            .hot_cache
+            .get(&cache_key)
+            .map(|existing| existing.doc.is_equivalent_projection(&doc))
+            .unwrap_or(false);
+        if already_current {
+            if let Some(mut existing) = self.hot_cache.get_mut(&cache_key) {
+                existing.cached_at = std::time::Instant::now();
+            }
+            return Ok(());
+        }
+
         // Write to MongoDB first (if available)
         if let Some(ref mongo) = self.mongo {
             self.upsert_to_mongo(mongo, &doc).await?;
@@ -523,13 +546,22 @@ impl ProjectionStore {
         }
     }
 
-    /// Evict oldest entries if hot cache is over capacity
+    /// Evict oldest entries if hot cache is over capacity.
+    ///
+    /// Batched, single-pass eviction. The previous implementation did
+    /// `while len > max { iter().min_by_key() }` — a full-map rescan per evicted
+    /// entry (O(n²)) that held DashMap shard locks across each scan. With a
+    /// stable cache key the live corpus stays well under the cap so this path is
+    /// latent, but under any workload that did cross the cap it was a synchronous
+    /// lock-holding hot-path scan — a wedge waiting to happen. Collect-sort-drop
+    /// in one pass is O(n log n) once per over-cap write instead.
     fn evict_if_needed(&self) {
-        if self.hot_cache.len() <= self.config.max_hot_cache_entries {
+        let max = self.config.max_hot_cache_entries;
+        if self.hot_cache.len() <= max {
             return;
         }
 
-        // Find and remove expired entries first
+        // Find and remove expired entries first (single pass).
         let expired_keys: Vec<String> = self
             .hot_cache
             .iter()
@@ -541,20 +573,20 @@ impl ProjectionStore {
             self.hot_cache.remove(&key);
         }
 
-        // If still over capacity, remove oldest entries (LRU-style)
-        while self.hot_cache.len() > self.config.max_hot_cache_entries {
-            // Find oldest entry
-            let oldest = self
-                .hot_cache
-                .iter()
-                .min_by_key(|entry| entry.cached_at)
-                .map(|entry| entry.key().clone());
-
-            if let Some(key) = oldest {
-                self.hot_cache.remove(&key);
-            } else {
-                break;
-            }
+        // If still over capacity, evict the oldest entries in ONE pass: snapshot
+        // (key, cached_at), sort by age, drop the overflow. No per-entry rescan.
+        let overflow = self.hot_cache.len().saturating_sub(max);
+        if overflow == 0 {
+            return;
+        }
+        let mut by_age: Vec<(String, std::time::Instant)> = self
+            .hot_cache
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.cached_at))
+            .collect();
+        by_age.sort_by_key(|(_, cached_at)| *cached_at);
+        for (key, _) in by_age.into_iter().take(overflow) {
+            self.hot_cache.remove(&key);
         }
     }
 
@@ -620,5 +652,85 @@ mod tests {
         let retrieved = store.get("Content", "test-123").await;
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().doc_id, "test-123");
+    }
+
+    #[tokio::test]
+    async fn redundant_reprojection_is_skipped_real_change_reprojects() {
+        // Regression for the alpha re-projection firehose: warm-stream re-streams
+        // the whole corpus repeatedly, each entry rebuilt fresh (new created_at/
+        // projected_at) but identical in served content. `set` must recognise the
+        // no-op and skip the broadcast (and, in prod, the Mongo upsert); a genuine
+        // content change must still re-project + broadcast.
+        let store = ProjectionStore::memory_only(ProjectionConfig::default());
+        let mut rx = store.subscribe();
+
+        let initial = ProjectedDocument::new(
+            "Content",
+            "c-1",
+            "cache-stream",
+            "cache-stream",
+            serde_json::json!({ "title": "Stable" }),
+        );
+        store.set(initial).await.unwrap(); // broadcast #1 (first projection)
+
+        // Re-stream: a FRESH doc (different created_at/projected_at) with identical
+        // served content. Must be skipped — proves the timestamp fields are
+        // excluded from equivalence.
+        let restream = ProjectedDocument::new(
+            "Content",
+            "c-1",
+            "cache-stream",
+            "cache-stream",
+            serde_json::json!({ "title": "Stable" }),
+        );
+        store.set(restream).await.unwrap(); // no broadcast (equivalent)
+
+        // A real content change must re-project + broadcast.
+        let changed = ProjectedDocument::new(
+            "Content",
+            "c-1",
+            "cache-stream",
+            "cache-stream",
+            serde_json::json!({ "title": "Changed" }),
+        );
+        store.set(changed).await.unwrap(); // broadcast #2
+
+        let mut broadcasts = 0;
+        while rx.try_recv().is_ok() {
+            broadcasts += 1;
+        }
+        assert_eq!(
+            broadcasts, 2,
+            "redundant re-projection must be skipped; only the initial and the changed projection broadcast"
+        );
+
+        let got = store.get("Content", "c-1").await.unwrap();
+        assert_eq!(got.data, serde_json::json!({ "title": "Changed" }));
+    }
+
+    #[tokio::test]
+    async fn eviction_keeps_cache_within_cap_over_flood() {
+        // The latent eviction path: push well past the cap with distinct keys and
+        // assert the batched eviction trims back to (at most) the cap. Exercises
+        // the over-capacity branch that the live corpus never reaches.
+        let store = ProjectionStore::memory_only(ProjectionConfig {
+            max_hot_cache_entries: 100,
+            hot_cache_ttl_secs: 300,
+            collection_name: "test".to_string(),
+        });
+        for i in 0..250 {
+            let doc = ProjectedDocument::new(
+                "Content",
+                format!("c-{i}"),
+                format!("h-{i}"),
+                "author",
+                serde_json::json!({ "n": i }),
+            );
+            store.set(doc).await.unwrap();
+        }
+        assert!(
+            store.hot_cache_stats().total_entries <= 100,
+            "eviction must keep the hot cache at or under the configured cap"
+        );
     }
 }

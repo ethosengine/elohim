@@ -180,6 +180,56 @@ impl ProjectedDocument {
             .map(|word| word.to_lowercase())
             .collect()
     }
+
+    /// True when `other` would project identically to `self` in every field a
+    /// reader or subscriber observes — i.e. re-projecting it is a no-op.
+    ///
+    /// Deliberately excludes the bookkeeping fields `created_at` and
+    /// `projected_at` (both stamped with `DateTime::now()` by [`Self::new`], so
+    /// they differ on every re-stream of identical content), `mongo_id` (derived
+    /// from `doc_type`/`doc_id`), and `metadata` (soft-delete travels the separate
+    /// `invalidate` path and its timestamps are volatile). Comparing only the
+    /// served payload + version fields lets [`crate::projection::ProjectionStore::set`]
+    /// skip the expensive Mongo upsert + broadcast for a redundant re-projection
+    /// (warm-stream re-stream or repeated signal) without ever masking a real
+    /// change — a change to any served field flips this to `false` and forces a
+    /// full re-projection.
+    pub fn is_equivalent_projection(&self, other: &Self) -> bool {
+        // Exhaustive destructure so a future field added to `ProjectedDocument`
+        // fails to compile here until it is explicitly classified. A missed
+        // *served* field must never silently fall through to "equivalent" — that
+        // would mask a real change and serve stale content (the exact hazard this
+        // guard exists to avoid).
+        let Self {
+            doc_type,
+            doc_id,
+            action_hash,
+            entry_hash,
+            author,
+            data,
+            search_tokens,
+            reach,
+            blob_hash,
+            blob_endpoints,
+            // Excluded by design (see doc comment): volatile timestamps, the
+            // derived id, and metadata (soft-delete travels `invalidate`, not `set`).
+            mongo_id: _,
+            created_at: _,
+            projected_at: _,
+            metadata: _,
+        } = self;
+
+        *doc_type == other.doc_type
+            && *doc_id == other.doc_id
+            && *action_hash == other.action_hash
+            && *entry_hash == other.entry_hash
+            && *author == other.author
+            && *data == other.data
+            && *search_tokens == other.search_tokens
+            && *reach == other.reach
+            && *blob_hash == other.blob_hash
+            && *blob_endpoints == other.blob_endpoints
+    }
 }
 
 impl IntoIndexes for ProjectedDocument {
