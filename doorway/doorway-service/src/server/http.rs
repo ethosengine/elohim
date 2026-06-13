@@ -311,12 +311,34 @@ fn init_renderer() -> Option<Arc<dyn elohim_render::Renderer>> {
         .unwrap_or_else(|_| "http://localhost:8090".to_string());
     // Bootstrap default fetcher for the isolate — every render swaps in its own
     // per-request fetcher (carrying the user credential, and any test-only fault)
-    // via ctx.data_fetcher, so this one is never used for a real render.
+    // via ctx.data_fetcher, so this one is never used for a real render. It still
+    // gets a hard reqwest timeout: a bootstrap fetch must never be the one
+    // unbounded await on the SSR thread (cheap defense, matches the per-request
+    // client's 10s bound).
+    let bootstrap_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap_or_default();
     let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(crate::ssr::ResolverFetcher::new(
-        Arc::new(reqwest::Client::new()),
+        Arc::new(bootstrap_client),
         storage_url.clone(),
     ));
-    match elohim_render::AngularRenderer::new(std::path::PathBuf::from(&bundle_path), fetcher) {
+    // Per-fetch soft budget for SSR data fetches (the TracingFetcher SLA): a fetch
+    // outstanding longer than this is recorded `Stalled` and rejected so the render
+    // falls back fast instead of riding to the 60s wall-time. Env-configurable
+    // (`DOORWAY_SSR_FETCH_SOFT_BUDGET_MS`) — parameter-bearing: too low flaps a
+    // slow-but-healthy storage peer, too high lets a stalled fetch hold the
+    // single sequential isolate. Defaults to elohim-render's DEFAULT_SOFT_BUDGET_MS.
+    let soft_budget_ms = std::env::var("DOORWAY_SSR_FETCH_SOFT_BUDGET_MS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|&v| v > 0)
+        .unwrap_or(elohim_render::DEFAULT_SOFT_BUDGET_MS);
+    match elohim_render::AngularRenderer::with_soft_budget(
+        std::path::PathBuf::from(&bundle_path),
+        fetcher,
+        soft_budget_ms,
+    ) {
         Ok(r) => {
             tracing::info!(
                 target: "doorway::ssr",
