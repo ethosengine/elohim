@@ -87,7 +87,7 @@ impl FederationConfig {
 
 pub use infrastructure_types::{
     DoorwayOutput, DoorwayRegistration, FindPublishersInput, RecordHealthAttestationInput,
-    RecordHeartbeatInput, RegisterDoorwayInput,
+    RegisterDoorwayInput,
 };
 
 /// Federation error types
@@ -198,10 +198,23 @@ pub async fn register_doorway_in_dht(
 // Heartbeat
 // =============================================================================
 
-/// Spawn periodic heartbeat task (every heartbeat_interval_secs).
+/// Spawn periodic peer-health-probe task (every heartbeat_interval_secs).
 ///
-/// Gathers live metrics from AppState and reports to infrastructure DHT.
+/// On every Nth tick it probes cached federation peers' `/health` endpoints and
+/// records peer-witnessed health attestations via the infrastructure zome.
 /// Logs warnings on failure but does not crash.
+///
+/// NOTE: This task no longer reports a *self*-heartbeat to the conductor. The
+/// `record_heartbeat` coordinator fn was retired from the infrastructure DNA
+/// (observation-event-layer spec `2026-05-11-observation-event-layer-design.md`
+/// §10 Stage 6) — doorway self-liveness now flows through
+/// `infrastructure:doorway-heartbeat` observations on the Track 2 observation
+/// substrate (not yet wired here; Stages 4/7 of that spec). Calling the removed
+/// fn every interval failed unconditionally, and a zome-call `Err` clears the
+/// conductor connection (`zome_caller::call_zome`), so the dead call drove a
+/// reconnect-churn loop that wedged the gateway under load (2026-06-13 freeze).
+/// The peer-health-probe path below uses `record_health_attestation`, which
+/// still exists (bridges to elohim `issue_attestation`), so it is retained.
 pub fn spawn_heartbeat_task(
     config: FederationConfig,
     zome_caller: Arc<ZomeCaller>,
@@ -213,12 +226,11 @@ pub fn spawn_heartbeat_task(
         info!(
             doorway_id = %config.doorway_id,
             interval_secs = config.heartbeat_interval_secs,
-            "Federation heartbeat task started"
+            "Federation peer-health-probe task started"
         );
 
-        let mut content_served_total: u64 = 0;
         let mut probe_counter: u32 = 0;
-        let probe_interval: u32 = 5; // Every 5th heartbeat (~5 minutes)
+        let probe_interval: u32 = 5; // Every 5th interval (~5 minutes)
         let http_client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
@@ -227,64 +239,7 @@ pub fn spawn_heartbeat_task(
         loop {
             tokio::time::sleep(interval).await;
 
-            // Gather live metrics from AppState
-            let active_connections = state
-                .pool
-                .as_ref()
-                .map(|p| p.connected_count() as u32)
-                .unwrap_or(0);
-
-            // Increment a rough content served counter based on cache stats
-            let cache_hits = state.cache.stats().hits;
-            content_served_total = content_served_total.wrapping_add(cache_hits);
-
-            let input = RecordHeartbeatInput {
-                doorway_id: config.doorway_id.clone(),
-                status: "online".to_string(),
-                uptime_ratio: 1.0, // Running = online
-                active_connections,
-                content_served: content_served_total,
-            };
-
-            debug!(
-                doorway_id = %config.doorway_id,
-                active_connections = active_connections,
-                "Recording heartbeat"
-            );
-
-            // Use call_zome directly — the zome returns ActionHash which we don't need.
-            // Using the typed `call` method would fail because ActionHash deserializes
-            // as a tagged map, not a flat sequence.
-            let payload = match rmp_serde::to_vec(&input) {
-                Ok(p) => p,
-                Err(e) => {
-                    warn!(error = %e, "Failed to serialize heartbeat input");
-                    continue;
-                }
-            };
-
-            match zome_caller
-                .call_zome(
-                    &config.infrastructure_role,
-                    &config.zome_name,
-                    "record_heartbeat",
-                    payload,
-                )
-                .await
-            {
-                Ok(_) => {
-                    debug!("Heartbeat recorded successfully");
-                }
-                Err(e) => {
-                    warn!(
-                        doorway_id = %config.doorway_id,
-                        error = %e,
-                        "Failed to record heartbeat (will retry next interval)"
-                    );
-                }
-            }
-
-            // Peer health probing — every Nth heartbeat
+            // Peer health probing — every Nth tick
             probe_counter += 1;
             if probe_counter >= probe_interval {
                 probe_counter = 0;
