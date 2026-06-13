@@ -59,30 +59,15 @@ spec:
     spec:
       securityContext:
         fsGroup: 999
-      affinity:
-        nodeAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 80
-              preference:
-                matchExpressions:
-                  - key: node-type
-                    operator: In
-                    values:
-                      - operations
-            - weight: 70
-              preference:
-                matchExpressions:
-                  - key: node-type
-                    operator: In
-                    values:
-                      - edge
-            - weight: 60
-              preference:
-                matchExpressions:
-                  - key: node-type
-                    operator: In
-                    values:
-                      - performance
+      # HARD-pin to the operations node (intel-nuc). MongoDB's data lives on a
+      # node-local openebs-hostpath PVC, so the pod MUST always schedule where that
+      # data physically is. The previous soft `preferredDuringScheduling` affinity
+      # (operations > edge > performance) let the pod drift onto an edge node
+      # (thinkc-p0h) when the PVC was re-provisioned — stranding the hostpath data
+      # there and losing identity data (incident 2026-06-13). A hard nodeSelector
+      # keeps the pod and its hostpath PVC co-located on intel-nuc.
+      nodeSelector:
+        node-type: operations
       containers:
         - name: mongodb
           image: mongo:7
