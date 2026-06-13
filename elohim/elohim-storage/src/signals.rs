@@ -397,7 +397,9 @@ impl HoloHashB64 {
         Self(format!("u{}", URL_SAFE_NO_PAD.encode(bytes)))
     }
 
-    /// The canonical base64 string this hash normalizes to.
+    /// The canonical base64 string this hash normalizes to. Used by projection
+    /// handlers that thread the anchor through `&str` APIs (e.g. the REA
+    /// `upsert_with_anchor` family, which takes `Option<&str>`).
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -495,6 +497,12 @@ pub enum SignalDecodeMiss {
     /// As `InfraShapeMismatch`, but for a `MishpatSignal` mirror variant — a
     /// real mishpat wire-shape regression. LOUD.
     MishpatShapeMismatch { type_tag: String, error: String },
+    /// As `InfraShapeMismatch`, but for a `ReaProjectionSignal` mirror variant
+    /// — a real REA wire-shape regression. LOUD.
+    ReaShapeMismatch { type_tag: String, error: String },
+    /// As `InfraShapeMismatch`, but for the elohim-content `ContentCommitted`
+    /// mirror variant — a real content wire-shape regression. LOUD.
+    ElohimContentShapeMismatch { type_tag: String, error: String },
     /// Not even the tag could be read.
     Undecodable { error: String },
 }
@@ -3172,6 +3180,368 @@ pub struct ElohimContentSignal {
     pub description: String,
     /// ISO 8601 / RFC 3339 creation timestamp.
     pub created_at: String,
+}
+
+// -----------------------------------------------------------------------------
+// Conductor-wire decode for the elohim-content projection (2026-06-13).
+//
+// THE STRUCTURAL TRAP (worse than the plain holo_hash class): the storage
+// `ElohimContentSignal` above is a FLAT struct (`id`, `content_type`,
+// `entry_hash`, `metadata_json`, `author_id`, `title`, `description`,
+// `created_at`) — but the elohim DNA never emits that shape. The only Content
+// post-commit signal the DNA emits is the TAGGED-enum variant
+// `ProjectionSignal::ContentCommitted { action_hash: ActionHash, entry_hash:
+// EntryHash, content: Content, author: AgentPubKey }` (content_store/src/lib.rs
+// ~10392/~10639). So the old `subscribe_elohim_content_signals` —
+// `rmp → serde_json::Value → from_value::<ElohimContentSignal>` — failed on
+// EVERY real signal twice over: (1) the `Value` pre-pass cannot represent the
+// holo_hash byte arrays, and (2) even past that, the flat field names never
+// matched the `{type, payload:{...}}` envelope. The attestation + recovery
+// projections have been dark since wiring.
+//
+// The honest fix is to decode the REAL wire envelope (`ContentCommitted`) and
+// translate into the flat `ElohimContentSignal` the dispatcher/projectors
+// consume — filtering to the `attestation:*` / `governance-action:*` content
+// this subscriber owns (every other Content type is handled by the REA
+// `ContentCommitted` arm and is a quiet skip here). The flat struct stays the
+// dispatcher's input contract; only the SUBSCRIBER changes.
+//
+// `entry_hash` (flat) is sourced from the wire `action_hash` — the codebase-wide
+// `dht_anchor_hash` convention (the REA arm threads `action_hash` as the anchor;
+// the projectors store `signal.entry_hash` AS `dht_anchor_hash`). `author_id`
+// (flat) comes from the Content entry's own `author_id: Option<String>` domain
+// field, NOT the wire `author: AgentPubKey` (the committing agent).
+
+/// Storage-side mirror of the DNA `ProjectionSignal::ContentCommitted` wire
+/// envelope — the ONLY Content post-commit signal the elohim DNA emits. The
+/// embedded `content` reuses `rea_projection::ContentEntry` (the verified
+/// field-by-field mirror of the DNA `Content` entry; all-`String`, no holo_hash
+/// fields). The three envelope hashes are `HoloHashB64` because they are
+/// `ActionHash`/`EntryHash`/`AgentPubKey` on the DNA side (raw byte arrays on
+/// the MessagePack wire).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", content = "payload")]
+enum ElohimContentWireSignal {
+    ContentCommitted {
+        action_hash: HoloHashB64,
+        #[serde(default)]
+        #[allow(dead_code)]
+        entry_hash: Option<HoloHashB64>,
+        content: crate::rea_projection::ContentEntry,
+        #[serde(default)]
+        #[allow(dead_code)]
+        author: Option<HoloHashB64>,
+    },
+}
+
+/// Mirror-variant tags for the elohim-content family. `ContentCommitted` is
+/// shared with the REA subscriber's content arm, but on THIS subscriber a
+/// decode failure of a `ContentCommitted` envelope is still a real wire-shape
+/// regression worth shouting about.
+const ELOHIM_CONTENT_MIRROR_VARIANTS: &[&str] = &["ContentCommitted"];
+
+/// Cumulative count of REAL elohim-content decode misses this process.
+static ELOHIM_CONTENT_DECODE_MISSES: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
+/// Cumulative REAL elohim-content decode misses (a `ContentCommitted` envelope
+/// that failed the typed decode). Exposed for status surfaces / tests.
+pub fn elohim_content_decode_miss_count() -> u64 {
+    ELOHIM_CONTENT_DECODE_MISSES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// True for the content types this subscriber owns (attestation + governance
+/// action). All other Content entries belong to the REA `ContentCommitted`
+/// arm and are a quiet skip here.
+fn is_elohim_content_owned(content_type: &str) -> bool {
+    content_type.starts_with("attestation:") || content_type.starts_with("governance-action:")
+}
+
+/// Decode a conductor app-signal payload into the flat `ElohimContentSignal`
+/// the dispatcher consumes, by decoding the REAL `ContentCommitted` wire
+/// envelope and translating.
+///
+/// Returns:
+/// - `Ok(Some(signal))` — a `ContentCommitted` for an `attestation:*` /
+///   `governance-action:*` entry, translated to the flat shape.
+/// - `Ok(None)` — a `ContentCommitted` for some OTHER content type (handled by
+///   the REA subscriber; a quiet, expected skip here).
+/// - `Err(ElohimContentShapeMismatch)` — a `ContentCommitted` envelope that
+///   failed the typed decode (a real wire regression; LOUD).
+/// - `Err(ForeignSignal)` / `Err(Undecodable)` — another family / unreadable.
+pub fn decode_elohim_content_signal(
+    bytes: &[u8],
+) -> Result<Option<ElohimContentSignal>, SignalDecodeMiss> {
+    match rmp_serde::from_slice::<ElohimContentWireSignal>(bytes) {
+        Ok(ElohimContentWireSignal::ContentCommitted {
+            action_hash,
+            content,
+            ..
+        }) => {
+            if !is_elohim_content_owned(&content.content_type) {
+                return Ok(None);
+            }
+            // Translate the DNA `Content` entry → the flat projector contract.
+            // `entry_hash` (flat) = the wire `action_hash` (the dht_anchor_hash
+            // convention used everywhere else in this codebase).
+            Ok(Some(ElohimContentSignal {
+                id: content.id,
+                content_type: content.content_type,
+                entry_hash: action_hash.0,
+                metadata_json: content.metadata_json,
+                author_id: content.author_id,
+                title: content.title,
+                description: content.description,
+                created_at: content.created_at,
+            }))
+        }
+        Err(typed_err) => {
+            // Tag-only peek: serde skips the payload via IgnoredAny (which,
+            // unlike `serde_json::Value`, tolerates msgpack byte arrays).
+            #[derive(Deserialize)]
+            struct TagOnly {
+                #[serde(rename = "type")]
+                type_tag: String,
+            }
+            match rmp_serde::from_slice::<TagOnly>(bytes) {
+                Ok(tag) if ELOHIM_CONTENT_MIRROR_VARIANTS.contains(&tag.type_tag.as_str()) => {
+                    ELOHIM_CONTENT_DECODE_MISSES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    Err(SignalDecodeMiss::ElohimContentShapeMismatch {
+                        type_tag: tag.type_tag,
+                        error: typed_err.to_string(),
+                    })
+                }
+                Ok(tag) => Err(SignalDecodeMiss::ForeignSignal {
+                    type_tag: tag.type_tag,
+                }),
+                Err(tag_err) => Err(SignalDecodeMiss::Undecodable {
+                    error: format!("typed: {typed_err}; tag peek: {tag_err}"),
+                }),
+            }
+        }
+    }
+}
+
+// =============================================================================
+// ElohimContent wire-conformance tests
+// =============================================================================
+
+#[cfg(test)]
+mod elohim_content_signal_tests {
+    use super::*;
+    use holochain_types::prelude::{ActionHash, AgentPubKey, EntryHash};
+    use serde::Serialize;
+
+    /// DNA-side `Content` entry shape (the subset relevant to projection),
+    /// all-`String`/`Option<String>` — matches content_store_integrity::Content.
+    #[derive(Serialize)]
+    struct DnaContent {
+        id: String,
+        content_type: String,
+        title: String,
+        description: String,
+        content: String,
+        content_format: String,
+        tags: Vec<String>,
+        related_node_ids: Vec<String>,
+        author_id: Option<String>,
+        reach: String,
+        trust_score: f64,
+        metadata_json: String,
+        created_at: String,
+        updated_at: String,
+        schema_version: u32,
+        validation_status: String,
+    }
+
+    /// DNA-side envelope: the ONLY Content post-commit signal the elohim DNA
+    /// emits — `ProjectionSignal::ContentCommitted { action_hash, entry_hash,
+    /// content, author }` with REAL holo_hash types.
+    #[derive(Serialize)]
+    #[serde(tag = "type", content = "payload")]
+    enum DnaProjectionSignal {
+        ContentCommitted {
+            action_hash: ActionHash,
+            entry_hash: EntryHash,
+            content: DnaContent,
+            author: AgentPubKey,
+        },
+    }
+
+    fn dna_content(content_type: &str) -> DnaContent {
+        DnaContent {
+            id: "cid-attestation-001".into(),
+            content_type: content_type.into(),
+            title: "Humanness attestation".into(),
+            description: "I vouch".into(),
+            content: "".into(),
+            content_format: "markdown".into(),
+            tags: vec![],
+            related_node_ids: vec![],
+            author_id: Some("did:key:zAuthor".into()),
+            reach: "local".into(),
+            trust_score: 1.0,
+            metadata_json: "{\"subject_cid\":\"cid-xyz\"}".into(),
+            created_at: "2026-06-13T12:00:00Z".into(),
+            updated_at: "2026-06-13T12:00:00Z".into(),
+            schema_version: 1,
+            validation_status: "valid".into(),
+        }
+    }
+
+    /// THE 2026-06-13 root-cause regression test (elohim-content arm): the DNA
+    /// emits the TAGGED `ContentCommitted` envelope with holo_hash byte arrays;
+    /// the old `rmp → serde_json::Value → from_value::<ElohimContentSignal>`
+    /// (flat struct) path failed twice over. This decodes the real envelope and
+    /// asserts the flat translation lands — including `entry_hash := action_hash`
+    /// (the dht_anchor convention) and `author_id` from the Content entry.
+    #[test]
+    fn elohim_content_signal_decodes_and_translates_from_conductor_msgpack_wire() {
+        let action_hash = ActionHash::from_raw_36(vec![0x44; 36]);
+        let entry_hash = EntryHash::from_raw_36(vec![0x55; 36]);
+        let author = AgentPubKey::from_raw_36(vec![0x66; 36]);
+        let dna_signal = DnaProjectionSignal::ContentCommitted {
+            action_hash: action_hash.clone(),
+            entry_hash,
+            content: dna_content("attestation:humanness"),
+            author,
+        };
+
+        let wire = rmp_serde::to_vec_named(&dna_signal).expect("encode DNA content signal");
+
+        let decoded = decode_elohim_content_signal(&wire)
+            .expect("conductor msgpack wire must decode")
+            .expect("an attestation:* ContentCommitted must translate to Some(signal)");
+
+        assert_eq!(decoded.id, "cid-attestation-001");
+        assert_eq!(decoded.content_type, "attestation:humanness");
+        // entry_hash (flat) is the wire action_hash, normalized to canonical b64.
+        assert_eq!(decoded.entry_hash, format!("{action_hash}"));
+        assert_eq!(decoded.author_id.as_deref(), Some("did:key:zAuthor"));
+        assert_eq!(decoded.title, "Humanness attestation");
+        assert_eq!(decoded.metadata_json, "{\"subject_cid\":\"cid-xyz\"}");
+        assert_eq!(decoded.created_at, "2026-06-13T12:00:00Z");
+        // (The miss counter is process-global; exact before/after assertions
+        // race under parallel tests, so counting is asserted only in the
+        // dedicated `elohim_content_shape_mismatch_is_counted` test.)
+    }
+
+    /// A `governance-action:*` ContentCommitted is also owned by this subscriber.
+    #[test]
+    fn governance_action_content_translates() {
+        let dna_signal = DnaProjectionSignal::ContentCommitted {
+            action_hash: ActionHash::from_raw_36(vec![0x44; 36]),
+            entry_hash: EntryHash::from_raw_36(vec![0x55; 36]),
+            content: dna_content("governance-action:recovery-request"),
+            author: AgentPubKey::from_raw_36(vec![0x66; 36]),
+        };
+        let wire = rmp_serde::to_vec_named(&dna_signal).expect("encode");
+        let decoded = decode_elohim_content_signal(&wire)
+            .expect("must decode")
+            .expect("governance-action:* must translate to Some");
+        assert_eq!(decoded.content_type, "governance-action:recovery-request");
+    }
+
+    /// A ContentCommitted for any OTHER content_type is owned by the REA
+    /// subscriber — this subscriber must quietly skip it (`Ok(None)`), NOT
+    /// treat it as a miss.
+    #[test]
+    fn non_attestation_content_is_quiet_skip() {
+        let dna_signal = DnaProjectionSignal::ContentCommitted {
+            action_hash: ActionHash::from_raw_36(vec![0x44; 36]),
+            entry_hash: EntryHash::from_raw_36(vec![0x55; 36]),
+            content: dna_content("concept"),
+            author: AgentPubKey::from_raw_36(vec![0x66; 36]),
+        };
+        let wire = rmp_serde::to_vec_named(&dna_signal).expect("encode");
+        match decode_elohim_content_signal(&wire) {
+            Ok(None) => {}
+            other => panic!("expected Ok(None) for non-owned content_type, got {other:?}"),
+        }
+    }
+
+    /// A signal from another family classifies quiet.
+    #[test]
+    fn elohim_content_foreign_signal_classifies_quiet() {
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "payload")]
+        enum OtherSignal {
+            PeerStatusRecorded { status: String },
+        }
+        let wire = rmp_serde::to_vec_named(&OtherSignal::PeerStatusRecorded {
+            status: "online".into(),
+        })
+        .expect("encode");
+        match decode_elohim_content_signal(&wire) {
+            Err(SignalDecodeMiss::ForeignSignal { type_tag }) => {
+                assert_eq!(type_tag, "PeerStatusRecorded");
+            }
+            other => panic!("expected ForeignSignal, got {other:?}"),
+        }
+    }
+
+    /// A `ContentCommitted` envelope whose payload no longer decodes is a REAL
+    /// miss — loud (counted).
+    #[test]
+    fn elohim_content_shape_mismatch_is_counted() {
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "payload")]
+        enum BrokenShape {
+            ContentCommitted { unexpected_only_field: bool },
+        }
+        let wire = rmp_serde::to_vec_named(&BrokenShape::ContentCommitted {
+            unexpected_only_field: true,
+        })
+        .expect("encode");
+        // Strictly-increased, not exactly +1: the counter is process-global and
+        // parallel tests may also increment it concurrently.
+        let before = elohim_content_decode_miss_count();
+        match decode_elohim_content_signal(&wire) {
+            Err(SignalDecodeMiss::ElohimContentShapeMismatch { type_tag, .. }) => {
+                assert_eq!(type_tag, "ContentCommitted");
+            }
+            other => panic!("expected ElohimContentShapeMismatch, got {other:?}"),
+        }
+        assert!(elohim_content_decode_miss_count() > before);
+    }
+
+    /// JSON-context producers (the legacy fixture shape) keep working —
+    /// HoloHashB64 accepts strings, so a string-hash envelope still decodes.
+    #[test]
+    fn json_string_hashes_still_decode() {
+        let wire = serde_json::to_vec(&serde_json::json!({
+            "type": "ContentCommitted",
+            "payload": {
+                "action_hash": "uhCkk-anchor",
+                "entry_hash": "uhCEk-entry",
+                "content": {
+                    "id": "cid-1",
+                    "content_type": "attestation:humanness",
+                    "title": "t",
+                    "description": "d",
+                    "content_format": "markdown",
+                    "reach": "local",
+                    "metadata_json": "{}",
+                },
+                "author": "uhCAk-author"
+            }
+        }))
+        .expect("encode json");
+        // serde_json path: decode the wire enum directly (rmp path is the
+        // production one; this asserts the string-accepting fallback).
+        let signal: ElohimContentWireSignal =
+            serde_json::from_slice(&wire).expect("json string-hash envelope must decode");
+        match signal {
+            ElohimContentWireSignal::ContentCommitted {
+                action_hash,
+                content,
+                ..
+            } => {
+                assert_eq!(action_hash.0, "uhCkk-anchor");
+                assert_eq!(content.content_type, "attestation:humanness");
+            }
+        }
+    }
 }
 
 // =============================================================================

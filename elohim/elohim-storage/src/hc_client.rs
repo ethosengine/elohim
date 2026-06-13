@@ -428,16 +428,22 @@ impl HcClient {
                         Err(crate::signals::SignalDecodeMiss::Undecodable { error }) => {
                             debug!(error = %error, "App signal payload undecodable — ignoring");
                         }
-                        // MishpatShapeMismatch cannot arise from the infra
-                        // decoder (different mirror-variant set), but the shared
-                        // enum requires the arm.
+                        // Mishpat / REA / ElohimContent shape-mismatches cannot
+                        // arise from the infra decoder (different mirror-variant
+                        // sets), but the shared enum requires the arms.
                         Err(crate::signals::SignalDecodeMiss::MishpatShapeMismatch {
+                            type_tag, ..
+                        })
+                        | Err(crate::signals::SignalDecodeMiss::ReaShapeMismatch {
+                            type_tag, ..
+                        })
+                        | Err(crate::signals::SignalDecodeMiss::ElohimContentShapeMismatch {
                             type_tag,
                             ..
                         }) => {
                             debug!(
                                 type_tag = %type_tag,
-                                "Unexpected mishpat-shape classification from infra decoder — ignoring"
+                                "Unexpected non-infra shape classification from infra decoder — ignoring"
                             );
                         }
                     }
@@ -470,23 +476,58 @@ impl HcClient {
             .on_signal(move |signal| {
                 if let Signal::App { signal, .. } = signal {
                     let bytes: Vec<u8> = signal.into_inner().into();
-                    match rmp_serde::from_slice::<serde_json::Value>(&bytes) {
-                        Ok(value) => {
-                            match serde_json::from_value::<crate::rea_projection::ReaProjectionSignal>(
-                                value.clone(),
-                            ) {
-                                Ok(rea) => handler(rea),
-                                Err(e) => {
-                                    debug!(
-                                        error = %e,
-                                        value = %value,
-                                        "Received app signal not matching ReaProjectionSignal — ignoring"
-                                    );
-                                }
-                            }
+                    // Typed msgpack decode — the old `rmp → serde_json::Value`
+                    // pre-pass failed on EVERY HoloHash-bearing ReaProjectionSignal
+                    // (action_hash/entry_hash/author are ActionHash/EntryHash/
+                    // AgentPubKey on the DNA side → raw 39-byte arrays on the
+                    // MessagePack wire, which serde_json::Value cannot represent)
+                    // and dropped it at debug level: the same dark-drop class as
+                    // d33b0e1f5. Without this, the substrate-correct write path
+                    // (POST /commitments → project-epr → SQL projection) silently
+                    // never lands and the service-layer bounded poll times out.
+                    // Real misses are now LOUD; foreign signals on the shared app
+                    // interface stay quiet.
+                    match crate::rea_projection::decode_rea_projection_signal(&bytes) {
+                        Ok(rea) => handler(rea),
+                        Err(crate::signals::SignalDecodeMiss::ReaShapeMismatch {
+                            type_tag,
+                            error,
+                        }) => {
+                            warn!(
+                                type_tag = %type_tag,
+                                error = %error,
+                                misses_total = crate::rea_projection::rea_decode_miss_count(),
+                                "ReaProjectionSignal DECODE MISS — signal dropped, projection will go dark for this variant"
+                            );
                         }
-                        Err(e) => {
-                            debug!(error = %e, "Failed to msgpack-decode app signal");
+                        Err(crate::signals::SignalDecodeMiss::ForeignSignal { type_tag }) => {
+                            debug!(
+                                type_tag = %type_tag,
+                                "App signal from another family — ignoring"
+                            );
+                        }
+                        Err(crate::signals::SignalDecodeMiss::Undecodable { error }) => {
+                            debug!(error = %error, "App signal payload undecodable — ignoring");
+                        }
+                        // Infra/Mishpat/ElohimContent shape mismatches cannot
+                        // arise from the REA decoder (different mirror-variant
+                        // set), but the shared enum requires the arms.
+                        Err(crate::signals::SignalDecodeMiss::InfraShapeMismatch {
+                            type_tag,
+                            ..
+                        })
+                        | Err(crate::signals::SignalDecodeMiss::MishpatShapeMismatch {
+                            type_tag,
+                            ..
+                        })
+                        | Err(crate::signals::SignalDecodeMiss::ElohimContentShapeMismatch {
+                            type_tag,
+                            ..
+                        }) => {
+                            debug!(
+                                type_tag = %type_tag,
+                                "Unexpected non-REA shape classification from REA decoder — ignoring"
+                            );
                         }
                     }
                 }
@@ -509,23 +550,62 @@ impl HcClient {
             .on_signal(move |signal| {
                 if let Signal::App { signal, .. } = signal {
                     let bytes: Vec<u8> = signal.into_inner().into();
-                    match rmp_serde::from_slice::<serde_json::Value>(&bytes) {
-                        Ok(value) => {
-                            match serde_json::from_value::<crate::signals::ElohimContentSignal>(
-                                value.clone(),
-                            ) {
-                                Ok(content) => handler(content),
-                                Err(e) => {
-                                    debug!(
-                                        error = %e,
-                                        value = %value,
-                                        "Received app signal not matching ElohimContentSignal — ignoring"
-                                    );
-                                }
-                            }
+                    // Typed msgpack decode of the REAL `ProjectionSignal::
+                    // ContentCommitted` wire envelope, translated to the flat
+                    // `ElohimContentSignal` the dispatcher consumes. The old
+                    // `rmp → serde_json::Value → from_value::<ElohimContentSignal>`
+                    // path failed on every real signal TWICE: serde_json::Value
+                    // cannot hold the holo_hash byte arrays, AND the flat field
+                    // names never matched the `{type, payload}` envelope — the
+                    // attestation + recovery projections were dark since wiring.
+                    // `Ok(None)` is a non-attestation/governance ContentCommitted
+                    // (owned by the REA subscriber) — a quiet, expected skip.
+                    match crate::signals::decode_elohim_content_signal(&bytes) {
+                        Ok(Some(content)) => handler(content),
+                        Ok(None) => {
+                            debug!(
+                                "ContentCommitted for a non-attestation/governance content_type — handled by REA subscriber, skipping"
+                            );
                         }
-                        Err(e) => {
-                            debug!(error = %e, "Failed to msgpack-decode app signal");
+                        Err(crate::signals::SignalDecodeMiss::ElohimContentShapeMismatch {
+                            type_tag,
+                            error,
+                        }) => {
+                            warn!(
+                                type_tag = %type_tag,
+                                error = %error,
+                                misses_total = crate::signals::elohim_content_decode_miss_count(),
+                                "ElohimContentSignal DECODE MISS — signal dropped, attestation/recovery projection will go dark"
+                            );
+                        }
+                        Err(crate::signals::SignalDecodeMiss::ForeignSignal { type_tag }) => {
+                            debug!(
+                                type_tag = %type_tag,
+                                "App signal from another family — ignoring"
+                            );
+                        }
+                        Err(crate::signals::SignalDecodeMiss::Undecodable { error }) => {
+                            debug!(error = %error, "App signal payload undecodable — ignoring");
+                        }
+                        // Infra/Mishpat/Rea shape mismatches cannot arise from
+                        // the elohim-content decoder (different mirror-variant
+                        // set), but the shared enum requires the arms.
+                        Err(crate::signals::SignalDecodeMiss::InfraShapeMismatch {
+                            type_tag,
+                            ..
+                        })
+                        | Err(crate::signals::SignalDecodeMiss::MishpatShapeMismatch {
+                            type_tag,
+                            ..
+                        })
+                        | Err(crate::signals::SignalDecodeMiss::ReaShapeMismatch {
+                            type_tag,
+                            ..
+                        }) => {
+                            debug!(
+                                type_tag = %type_tag,
+                                "Unexpected non-content shape classification from content decoder — ignoring"
+                            );
                         }
                     }
                 }
@@ -593,16 +673,24 @@ impl HcClient {
                         Err(crate::signals::SignalDecodeMiss::Undecodable { error }) => {
                             debug!(error = %error, "App signal payload undecodable — ignoring");
                         }
-                        // InfraShapeMismatch cannot arise from the mishpat
-                        // decoder (different mirror-variant set), but the shared
-                        // enum requires the arm.
+                        // Infra/Rea/ElohimContent shape mismatches cannot arise
+                        // from the mishpat decoder (different mirror-variant
+                        // set), but the shared enum requires the arms.
                         Err(crate::signals::SignalDecodeMiss::InfraShapeMismatch {
+                            type_tag,
+                            ..
+                        })
+                        | Err(crate::signals::SignalDecodeMiss::ReaShapeMismatch {
+                            type_tag,
+                            ..
+                        })
+                        | Err(crate::signals::SignalDecodeMiss::ElohimContentShapeMismatch {
                             type_tag,
                             ..
                         }) => {
                             debug!(
                                 type_tag = %type_tag,
-                                "Unexpected infra-shape classification from mishpat decoder — ignoring"
+                                "Unexpected non-mishpat shape classification from mishpat decoder — ignoring"
                             );
                         }
                     }

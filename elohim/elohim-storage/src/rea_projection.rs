@@ -35,6 +35,7 @@ use crate::db::economic_events::{self, CreateEconomicEventInput};
 use crate::db::rea_commitments::{self, CreateReaCommitmentInput};
 use crate::db::DbPool;
 use crate::error::StorageError;
+use crate::signals::HoloHashB64;
 
 /// A graduation that needs a `CommitmentByState` link authored (the SQL cache is
 /// already flipped; this carries the DHT-truth write to the subscriber that holds
@@ -93,45 +94,116 @@ fn record_pending_state_link(commitment_cid: &str, state: &str, event_hash: &str
 // the in-process bounded poll times out at 1s.
 // ============================================================================
 
+// Wire-shape note (2026-06-13, the REA arm of the conductor-signal
+// msgpack decode-class bug): the DNA `ProjectionSignal` variants declare
+// `action_hash: ActionHash`, `entry_hash: EntryHash`, `author: AgentPubKey`
+// (verified field-by-field against content_store/src/lib.rs ~10390-10552).
+// On the conductor app-signal wire (MessagePack `ExternIO`) those holo_hash
+// types serialize as raw 39-BYTE ARRAYS, NOT base64 strings — so the mirror
+// MUST type them as `HoloHashB64` (accepts bytes/byte-seq/string, normalizes
+// to canonical "u"+base64url), not `String`/`Option<String>`. The old
+// `String` mirror + the `rmp → serde_json::Value` pre-pass dropped every real
+// signal at decode (serde_json::Value has no byte-array representation): the
+// exact dark class fixed for `InfrastructureSignal` in d33b0e1f5. The embedded
+// `agreement`/`commitment`/`event`/`content` sub-structs are all-`String` on
+// the DNA side (no holo_hash-typed fields), so they need NO HoloHashB64
+// treatment and survive the wire intact.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", content = "payload")]
 pub enum ReaProjectionSignal {
     AgreementCommitted {
-        action_hash: String,
+        action_hash: HoloHashB64,
         #[serde(default)]
-        entry_hash: Option<String>,
+        entry_hash: Option<HoloHashB64>,
         agreement: AgreementEntry,
         #[serde(default)]
-        author: Option<String>,
+        author: Option<HoloHashB64>,
     },
     ReaCommitmentCommitted {
-        action_hash: String,
+        action_hash: HoloHashB64,
         #[serde(default)]
-        entry_hash: Option<String>,
+        entry_hash: Option<HoloHashB64>,
         commitment: CommitmentEntry,
         #[serde(default)]
-        author: Option<String>,
+        author: Option<HoloHashB64>,
     },
     ReaEconomicEventCommitted {
-        action_hash: String,
+        action_hash: HoloHashB64,
         #[serde(default)]
-        entry_hash: Option<String>,
+        entry_hash: Option<HoloHashB64>,
         event: EconomicEventEntry,
         #[serde(default)]
-        author: Option<String>,
+        author: Option<HoloHashB64>,
     },
     /// Lamad Content entry committed. Carries the full Content entry shape
     /// for projection into the local SQL `content` table with anchor.
     /// Fires from the DNA post_commit for both create_content (initial
     /// publish) and update_content (e.g. blob_cid patches from stageSpaBlobs).
     ContentCommitted {
-        action_hash: String,
+        action_hash: HoloHashB64,
         #[serde(default)]
-        entry_hash: Option<String>,
+        entry_hash: Option<HoloHashB64>,
         content: ContentEntry,
         #[serde(default)]
-        author: Option<String>,
+        author: Option<HoloHashB64>,
     },
+}
+
+/// Mirror-variant tags: a decode failure on one of these is a REAL projection
+/// miss (loud); any other tag is a foreign signal sharing the app interface
+/// (quiet at debug). The live `content_store` coordinator emits all four.
+const REA_MIRROR_VARIANTS: &[&str] = &[
+    "AgreementCommitted",
+    "ReaCommitmentCommitted",
+    "ReaEconomicEventCommitted",
+    "ContentCommitted",
+];
+
+/// Cumulative count of REAL REA decode misses this process.
+static REA_DECODE_MISSES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Cumulative REAL REA decode misses (mirror-variant tag present but the typed
+/// decode failed). Exposed for status surfaces / tests.
+pub fn rea_decode_miss_count() -> u64 {
+    REA_DECODE_MISSES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Decode a conductor app-signal payload (MessagePack `ExternIO` bytes) into
+/// the typed `ReaProjectionSignal` mirror, classifying failures so the
+/// subscriber can be loud about real misses without spamming on foreign
+/// signals. Identical class/treatment to `decode_infrastructure_signal`
+/// (d33b0e1f5).
+pub fn decode_rea_projection_signal(
+    bytes: &[u8],
+) -> Result<ReaProjectionSignal, crate::signals::SignalDecodeMiss> {
+    use crate::signals::SignalDecodeMiss;
+    match rmp_serde::from_slice::<ReaProjectionSignal>(bytes) {
+        Ok(signal) => Ok(signal),
+        Err(typed_err) => {
+            // Tag-only peek: serde skips the payload via IgnoredAny (which,
+            // unlike `serde_json::Value`, tolerates msgpack byte arrays).
+            #[derive(Deserialize)]
+            struct TagOnly {
+                #[serde(rename = "type")]
+                type_tag: String,
+            }
+            match rmp_serde::from_slice::<TagOnly>(bytes) {
+                Ok(tag) if REA_MIRROR_VARIANTS.contains(&tag.type_tag.as_str()) => {
+                    REA_DECODE_MISSES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    Err(SignalDecodeMiss::ReaShapeMismatch {
+                        type_tag: tag.type_tag,
+                        error: typed_err.to_string(),
+                    })
+                }
+                Ok(tag) => Err(SignalDecodeMiss::ForeignSignal {
+                    type_tag: tag.type_tag,
+                }),
+                Err(tag_err) => Err(SignalDecodeMiss::Undecodable {
+                    error: format!("typed: {typed_err}; tag peek: {tag_err}"),
+                }),
+            }
+        }
+    }
 }
 
 /// Mirror of DNA `Agreement` entry shape.
@@ -443,7 +515,7 @@ pub fn handle_rea_signal(
                 // Agreement DNA entry has no metadata_json; projection writes None.
                 metadata_json: None,
             };
-            agreements::upsert_agreement(&mut conn, ctx, input, Some(&action_hash))?;
+            agreements::upsert_agreement(&mut conn, ctx, input, Some(action_hash.as_str()))?;
         }
         ReaProjectionSignal::ReaCommitmentCommitted {
             action_hash,
@@ -471,7 +543,7 @@ pub fn handle_rea_signal(
                 note: commitment.note.as_deref(),
                 metadata_json: commitment.metadata_json.as_deref(),
             });
-            rea_commitments::upsert_with_anchor(&mut conn, ctx, input, Some(&action_hash))?;
+            rea_commitments::upsert_with_anchor(&mut conn, ctx, input, Some(action_hash.as_str()))?;
         }
         ReaProjectionSignal::ReaEconomicEventCommitted {
             action_hash, event, ..
@@ -493,7 +565,7 @@ pub fn handle_rea_signal(
                     &event.action,
                     &event.provider,
                     &first_resource,
-                    &action_hash,
+                    action_hash.as_str(),
                     &emitted_at,
                 ) {
                     warn!(
@@ -551,7 +623,7 @@ pub fn handle_rea_signal(
                 scope_collab_cid: None,
                 substrate_signal: event.substrate_signal,
             };
-            economic_events::upsert_with_anchor(&mut conn, ctx, input, Some(&action_hash))?;
+            economic_events::upsert_with_anchor(&mut conn, ctx, input, Some(action_hash.as_str()))?;
 
             // The act of providing IS the acceptance: a bounded_by event projecting
             // graduates its Mishpat commitment proposed → active (spec §6.5). No-op
@@ -573,7 +645,12 @@ pub fn handle_rea_signal(
                             event_hash = %action_hash,
                             "graduation projection: proposed→active (CommitmentByState link author queued)"
                         );
-                        record_pending_state_link(bounded, "active", &action_hash, &signed_at);
+                        record_pending_state_link(
+                            bounded,
+                            "active",
+                            action_hash.as_str(),
+                            &signed_at,
+                        );
                     }
                     Ok(_) => { /* not 'proposed' — no transition, no link */ }
                     Err(e) => {
@@ -614,7 +691,13 @@ pub fn handle_rea_signal(
                 reach: Some(content.reach),
                 metadata_json: Some(content.metadata_json),
             };
-            content_diesel::upsert_with_anchor(&mut conn, ctx, &content.id, patch, &action_hash)?;
+            content_diesel::upsert_with_anchor(
+                &mut conn,
+                ctx,
+                &content.id,
+                patch,
+                action_hash.as_str(),
+            )?;
         }
     }
 
@@ -647,6 +730,141 @@ pub fn try_handle_signal(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::signals::SignalDecodeMiss;
+
+    /// THE 2026-06-13 root-cause regression test (REA arm): decode the signal
+    /// from the REAL conductor wire — MessagePack (`ExternIO`), where
+    /// `ActionHash`/`EntryHash`/`AgentPubKey` serialize as raw 39-BYTE ARRAYS,
+    /// not base64 strings. The old `String` mirror (and the `rmp →
+    /// serde_json::Value` pre-pass before it) failed on every such signal,
+    /// silently never landing the substrate-correct write-path projection.
+    #[test]
+    fn rea_commitment_signal_decodes_from_conductor_msgpack_wire() {
+        use holochain_types::prelude::{ActionHash, AgentPubKey, EntryHash};
+        use serde::Serialize;
+
+        // DNA-side shape: the content_store `ProjectionSignal::ReaCommitmentCommitted`
+        // variant with REAL holo_hash types and an all-String Commitment entry
+        // (field-by-field per content_store_integrity::Commitment).
+        #[derive(Serialize)]
+        struct DnaCommitment {
+            id: String,
+            action: String,
+            provider: String,
+            receiver: String,
+            resource_classified_as_json: String,
+            in_scope_of_json: String,
+            finished: bool,
+            state: String,
+            metadata_json: String,
+            created_at: String,
+            updated_at: String,
+        }
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "payload")]
+        enum DnaProjectionSignal {
+            ReaCommitmentCommitted {
+                action_hash: ActionHash,
+                entry_hash: EntryHash,
+                commitment: DnaCommitment,
+                author: AgentPubKey,
+            },
+        }
+
+        let action_hash = ActionHash::from_raw_36(vec![0x22; 36]);
+        let entry_hash = EntryHash::from_raw_36(vec![0x33; 36]);
+        let author = AgentPubKey::from_raw_36(vec![0x11; 36]);
+        let dna_signal = DnaProjectionSignal::ReaCommitmentCommitted {
+            action_hash: action_hash.clone(),
+            entry_hash,
+            commitment: DnaCommitment {
+                id: "doorway:test|epr:test-app".into(),
+                action: "project-epr".into(),
+                provider: "doorway:test".into(),
+                receiver: "epr:test-app".into(),
+                resource_classified_as_json: "[]".into(),
+                in_scope_of_json: "[\"doorway:test|epr:test-app\"]".into(),
+                finished: false,
+                state: "proposed".into(),
+                metadata_json: "{}".into(),
+                created_at: "2026-05-26T12:00:00Z".into(),
+                updated_at: "2026-05-26T12:00:00Z".into(),
+            },
+            author,
+        };
+
+        // emit_signal encodes via ExternIO == rmp_serde::to_vec_named.
+        let wire = rmp_serde::to_vec_named(&dna_signal).expect("encode DNA REA signal");
+
+        let decoded = decode_rea_projection_signal(&wire)
+            .expect("conductor msgpack wire format must decode into ReaProjectionSignal");
+        match decoded {
+            ReaProjectionSignal::ReaCommitmentCommitted {
+                action_hash: got_action,
+                commitment,
+                ..
+            } => {
+                // Normalized form must match holochain's canonical base64
+                // ("u" + base64url-no-pad over the raw 39 bytes).
+                assert_eq!(got_action.0, format!("{action_hash}"));
+                assert_eq!(commitment.id, "doorway:test|epr:test-app");
+                assert_eq!(commitment.action, "project-epr");
+                assert!(!commitment.finished);
+            }
+            other => panic!("unexpected variant: {other:?}"),
+        }
+        // (The miss counter is process-global; a successful decode not counting
+        // is asserted indirectly via the dedicated counted/quiet tests, which
+        // are the only place the counter value is load-bearing.)
+    }
+
+    /// Foreign signals (infra, mishpat, …) share the app interface — they must
+    /// classify quiet, not as REA misses.
+    #[test]
+    fn rea_foreign_signal_classifies_quiet() {
+        use serde::Serialize;
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "payload")]
+        enum OtherSignal {
+            PeerStatusRecorded { status: String },
+        }
+        let wire = rmp_serde::to_vec_named(&OtherSignal::PeerStatusRecorded {
+            status: "online".into(),
+        })
+        .expect("encode");
+        match decode_rea_projection_signal(&wire) {
+            Err(SignalDecodeMiss::ForeignSignal { type_tag }) => {
+                assert_eq!(type_tag, "PeerStatusRecorded");
+            }
+            other => panic!("expected ForeignSignal, got {other:?}"),
+        }
+    }
+
+    /// A REA mirror-variant tag whose payload no longer decodes is a REAL miss
+    /// — it must be loud (counted).
+    #[test]
+    fn rea_shape_mismatch_on_mirror_variant_is_counted() {
+        use serde::Serialize;
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "payload")]
+        enum BrokenShape {
+            ReaCommitmentCommitted { unexpected_only_field: bool },
+        }
+        let wire = rmp_serde::to_vec_named(&BrokenShape::ReaCommitmentCommitted {
+            unexpected_only_field: true,
+        })
+        .expect("encode");
+        // Strictly-increased, not exactly +1: the counter is process-global and
+        // parallel tests may also increment it concurrently.
+        let before = rea_decode_miss_count();
+        match decode_rea_projection_signal(&wire) {
+            Err(SignalDecodeMiss::ReaShapeMismatch { type_tag, .. }) => {
+                assert_eq!(type_tag, "ReaCommitmentCommitted");
+            }
+            other => panic!("expected ReaShapeMismatch, got {other:?}"),
+        }
+        assert!(rea_decode_miss_count() > before);
+    }
 
     /// Reference fixture: a JSON shape matching what the DNA's
     /// `ProjectionSignal::ReaCommitmentCommitted` emits over the wire
@@ -701,7 +919,7 @@ mod tests {
                 commitment,
                 ..
             } => {
-                assert_eq!(action_hash, "uhCkk-abc123");
+                assert_eq!(action_hash.0, "uhCkk-abc123");
                 assert_eq!(commitment.id, "doorway:test|epr:test-app");
                 assert_eq!(commitment.action, "project-epr");
                 assert_eq!(
@@ -738,7 +956,7 @@ mod tests {
                 agreement,
                 ..
             } => {
-                assert_eq!(action_hash, "uhCkk-ag1");
+                assert_eq!(action_hash.0, "uhCkk-ag1");
                 assert_eq!(agreement.id, "agreement-001");
                 assert_eq!(agreement.name.as_deref(), Some("Test Agreement"));
             }
@@ -846,7 +1064,7 @@ mod tests {
                 content,
                 ..
             } => {
-                assert_eq!(action_hash, "uhCkk-content-anchor");
+                assert_eq!(action_hash.0, "uhCkk-content-anchor");
                 assert_eq!(content.id, "elohim-host-landing");
                 assert_eq!(content.blob_cid.as_deref(), Some("sha256-deadbeefcafe1234"));
                 assert_eq!(content.content_size_bytes, Some(4096));
@@ -992,10 +1210,10 @@ mod tests {
         };
 
         let signal = ReaProjectionSignal::ReaEconomicEventCommitted {
-            action_hash: "uhCkk-e2e-anchor".to_string(),
-            entry_hash: Some("uhCEk-e2e-entry".to_string()),
+            action_hash: "uhCkk-e2e-anchor".into(),
+            entry_hash: Some("uhCEk-e2e-entry".into()),
             event,
-            author: Some("uhCAk-e2e-author".to_string()),
+            author: Some("uhCAk-e2e-author".into()),
         };
 
         // ---- drive the REAL production handler ----
