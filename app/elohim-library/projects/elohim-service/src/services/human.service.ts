@@ -126,6 +126,13 @@ export interface Human {
   bio: string;
   category: HumanCategory;
   profileReach: ProfileReach;
+  /**
+   * Household collective id (kind:household in collectives seed data).
+   * Optional — humans outside a household grouping leave this unset.
+   * Projects onto humans.household_id in elohim-storage (the
+   * resilience-snapshot junction) via CreateHumanInputView.householdId.
+   */
+  householdId?: string | null;
   location?: HumanLocation;
   affinities?: string[];
   organizations?: OrganizationMembership[];
@@ -169,6 +176,7 @@ export function createHuman(params: {
   bio: string;
   category: HumanCategory;
   profileReach?: ProfileReach;
+  householdId?: string | null;
   location?: { layer: GovernanceLayer; name: string };
   affinities?: string[];
   organizations?: { orgId: string; orgName: string; role: string }[];
@@ -189,6 +197,10 @@ export function createHuman(params: {
     createdAt: now,
     updatedAt: now,
   };
+
+  if (params.householdId) {
+    human.householdId = params.householdId;
+  }
 
   if (params.location) {
     human.location = {

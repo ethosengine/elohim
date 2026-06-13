@@ -55,6 +55,12 @@ interface CollectiveEntry {
   governanceModel?: string | null;
   domain?: string | null;
   place?: string | null;
+  /**
+   * Opaque free-text geographic region label. Compared by string equality in
+   * the resilience snapshot's regional-distribution bucketing — no fixed
+   * vocabulary (local/regional/global are OUTPUT buckets, not input values).
+   */
+  region?: string | null;
   coupling?: {
     lamad?: string;
     shefa?: string;
@@ -169,6 +175,17 @@ export function validateCollectivesFile(filePath: string): CollectiveValidationR
 
     const domainErr = validateEnum(coll.domain, 'domain', DOMAINS, id, false);
     if (domainErr) result.errors.push(domainErr);
+
+    // region: opaque free-text label (no enum — string-equality vocabulary).
+    // Only the TYPE is validated; an empty string is rejected as it would
+    // create a meaningless equality bucket.
+    if (coll.region != null) {
+      if (typeof coll.region !== 'string') {
+        result.errors.push(`${id}: region must be a string or null`);
+      } else if (coll.region.length === 0) {
+        result.errors.push(`${id}: region must not be an empty string (use null when unknown)`);
+      }
+    }
 
     // Coupling validation
     if (coll.coupling != null && typeof coll.coupling === 'object') {

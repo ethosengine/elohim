@@ -1,6 +1,6 @@
 ---
 id: "human-eve-firstwoman"
-householdId: "household-eve"
+householdId: "household-eden"
 displayName: "Eve"
 agencyPhase: "device"
 category: "core-family"

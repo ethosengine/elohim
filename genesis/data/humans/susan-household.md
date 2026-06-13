@@ -1,6 +1,6 @@
 ---
 id: "human-susan-household"
-householdId: "household-matthew"
+householdId: "household-susan"
 displayName: "Susan"
 category: "core-family"
 profileReach: "community"

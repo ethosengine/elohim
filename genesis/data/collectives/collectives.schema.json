@@ -71,6 +71,10 @@
           "type": ["string", "null"],
           "description": "H3 cell ID for geographic grounding. Null for non-geographic collectives. Flows through metadata_json."
         },
+        "region": {
+          "type": ["string", "null"],
+          "description": "Opaque free-text geographic region label (e.g. 'seattle', 'tulsa', 'tech-valley'), compared by string equality in the resilience snapshot's regional-distribution bucketing (compute_regional_distribution in elohim-storage). local/regional/global are OUTPUT buckets, not input vocabulary. Flows to collectives.region via CreateCollectiveInputView. Null when no region ground-truth exists for the collective — never invent one."
+        },
         "coupling": {
           "type": ["object", "null"],
           "description": "Three-leg EPR coupling declaration. Makes this collective a protocol entity, not just a group.",

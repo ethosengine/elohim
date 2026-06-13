@@ -1,6 +1,6 @@
 ---
 id: "human-matthew-manager"
-householdId: "household-matthew"
+householdId: "household-dowell"
 displayName: "Matthew"
 agencyPhase: "doorway"
 category: "core-family"

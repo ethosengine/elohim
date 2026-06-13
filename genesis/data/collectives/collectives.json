@@ -167,7 +167,8 @@
       "reach": "trusted",
       "constitutionalParentId": "neighborhood-valley",
       "description": "Compute shard — Dowell family members colocated in Tech Valley",
-      "domain": "household"
+      "domain": "household",
+      "region": "tech-valley"
     },
     {
       "id": "household-eden",
@@ -175,7 +176,8 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "description": "Compute shard — Eden family members",
-      "domain": "household"
+      "domain": "household",
+      "region": "eden-valley"
     },
     {
       "id": "household-valley-economy",
@@ -471,7 +473,8 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "description": "Compute shard — Matthew's household",
-      "domain": "household"
+      "domain": "household",
+      "region": "tech-valley"
     },
     {
       "id": "household-jessica",
@@ -479,7 +482,8 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "description": "Compute shard — Jessica's household",
-      "domain": "household"
+      "domain": "household",
+      "region": "tech-valley"
     },
     {
       "id": "household-james",
@@ -487,7 +491,8 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "description": "Compute shard — James's household",
-      "domain": "household"
+      "domain": "household",
+      "region": "tech-valley"
     },
     {
       "id": "household-susan",
@@ -495,7 +500,8 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "description": "Compute shard — Susan's household (Seattle metro; Susan + husband Caleb + 3 young children; Pacific NW leg of the tri-region reciprocal backup chain)",
-      "domain": "household"
+      "domain": "household",
+      "region": "seattle"
     },
     {
       "id": "household-daniel",
@@ -503,7 +509,8 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "description": "Compute shard — Daniel's household (Tulsa, OK metro; Jessica's brother; Plains-region leg of the multi-regional reciprocal backup chain)",
-      "domain": "household"
+      "domain": "household",
+      "region": "tulsa"
     },
     {
       "id": "household-adam",
@@ -511,7 +518,8 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "description": "Compute shard — Adam's household",
-      "domain": "household"
+      "domain": "household",
+      "region": "eden-valley"
     },
     {
       "id": "household-eve",
@@ -519,7 +527,8 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "description": "Compute shard — Eve's household",
-      "domain": "household"
+      "domain": "household",
+      "region": "eden-valley"
     },
     {
       "id": "household-pete",
@@ -543,7 +552,8 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "description": "Compute shard — Nancy's household",
-      "domain": "household"
+      "domain": "household",
+      "region": "tech-valley"
     },
     {
       "id": "household-gertrude",
@@ -551,7 +561,8 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "description": "Compute shard — Gertrude's household",
-      "domain": "household"
+      "domain": "household",
+      "region": "sunset-acres"
     },
     {
       "id": "household-ezra",
@@ -559,7 +570,8 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "description": "Compute shard — Ezra's household",
-      "domain": "household"
+      "domain": "household",
+      "region": "new-haven"
     }
   ],
   "relationships": [

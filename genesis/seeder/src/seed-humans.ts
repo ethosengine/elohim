@@ -22,6 +22,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import type { CreateHumanInputView } from '@elohim/storage-client';
+
 // =============================================================================
 // Types (mirrors humans.json schema)
 // =============================================================================
@@ -34,6 +36,13 @@ interface HumansJsonHuman {
   profileReach: string;
   affinities?: string[];
   agencyPhase?: string;
+  /**
+   * Household collective id (kind:household in collectives.json). Optional —
+   * humans outside a household grouping leave this null. Projects onto
+   * humans.household_id in elohim-storage (the resilience-snapshot junction)
+   * via the storage create surface — see seedProjectionRow().
+   */
+  householdId?: string | null;
 }
 
 interface HumansJson {
@@ -223,6 +232,85 @@ async function verifyExisting(
 }
 
 // =============================================================================
+// Storage projection bridge — humans.household_id junction
+// =============================================================================
+
+type BridgeResult = 'created' | 'exists' | 'skipped' | 'failed';
+
+/**
+ * Seed the human's elohim-storage projection row through the create surface
+ * (`POST /api/v1/identity/register`, `CreateHumanInputView` — transparently
+ * proxied by doorway to elohim-storage). This is the short-term explicit
+ * bridge that populates `humans.household_id`, the load-bearing
+ * resilience-snapshot junction: the DHT humans-replayer is a stub and
+ * `household_backfill` only fills already-NULL rows from an external mapping
+ * (see elohim-storage/src/api/identity.rs and tests/human_household_create_bridge.rs).
+ *
+ * `agentPubKey` is deliberately null: agent keys are conductor-minted
+ * per-deployment, so the seed corpus has no truthful source for them at seed
+ * time — a wrong key silently breaks the snapshot joins worse than NULL.
+ * The substrate paths expected to fill `humans.agent_pub_key` are the DHT
+ * humans-replayer (services/holochain_humans_replayer.rs, currently a stub)
+ * and the authenticated in-app registration flow (identity-api.service.ts),
+ * which posts the live session's key through this same create surface.
+ *
+ * Idempotency: the create surface INSERTs — a row that already exists (e.g.
+ * a re-run against a non-wiped projection DB) is reported as 'exists' and
+ * left untouched; its household_id is NOT healed here (that is the
+ * household_backfill / replayer's job). A fresh seed pass gets the value.
+ */
+async function seedProjectionRow(
+  doorwayUrl: string,
+  human: HumansJsonHuman
+): Promise<{ result: BridgeResult; error?: string }> {
+  if (!human.householdId) {
+    return { result: 'skipped' };
+  }
+
+  const body: CreateHumanInputView = {
+    id: human.id,
+    agentPubKey: null,
+    displayName: human.displayName,
+    bio: human.bio ?? null,
+    affinities: human.affinities ?? [],
+    profileReach: human.profileReach,
+    location: null,
+    profilePhotoUrl: null,
+    householdId: human.householdId,
+  };
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (process.env.DOORWAY_API_KEY) {
+    headers['Authorization'] = `Bearer ${process.env.DOORWAY_API_KEY}`;
+  }
+
+  try {
+    const res = await fetch(`${doorwayUrl}/api/v1/identity/register`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok) {
+      return { result: 'created' };
+    }
+
+    const errorText = await res.text();
+    // Row already present (re-run against a non-wiped projection DB).
+    if (
+      res.status === 409 ||
+      errorText.includes('UNIQUE') ||
+      errorText.includes('already')
+    ) {
+      return { result: 'exists' };
+    }
+    return { result: 'failed', error: `HTTP ${res.status}: ${errorText.slice(0, 200)}` };
+  } catch (err) {
+    return { result: 'failed', error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// =============================================================================
 // Main
 // =============================================================================
 
@@ -286,17 +374,38 @@ async function main(): Promise<void> {
   });
 
   const results: RegisterResult[] = [];
+  const bridgeFailures: Array<{ displayName: string; error: string }> = [];
+  let bridgeCreated = 0;
+  let bridgeExists = 0;
 
   for (const human of sorted) {
     const result = await registerHuman(doorwayUrl, human, adminBootstrapKey);
     results.push(result);
+
+    // Storage projection bridge: carry householdId through the create
+    // surface so the resilience-snapshot junction is populated. Runs only
+    // when registration didn't hard-fail (the human is live/known).
+    let bridgeSuffix = '';
+    if (result.result !== 'failed') {
+      const bridge = await seedProjectionRow(doorwayUrl, human);
+      if (bridge.result === 'created') {
+        bridgeCreated++;
+        bridgeSuffix = ` household=${human.householdId}`;
+      } else if (bridge.result === 'exists') {
+        bridgeExists++;
+        bridgeSuffix = ` household=${human.householdId} (projection row exists — not healed here)`;
+      } else if (bridge.result === 'failed') {
+        bridgeFailures.push({ displayName: human.displayName, error: bridge.error ?? 'unknown' });
+        bridgeSuffix = ` household=${human.householdId} BRIDGE-FAILED`;
+      }
+    }
 
     const icon =
       result.result === 'registered' ? '+' : result.result === 'exists' ? '=' : 'X';
     const phase = human.agencyPhase ?? 'hosted';
     const suffix = result.error ? ` (${result.error})` : '';
     console.log(
-      `  [${icon}] ${result.displayName.padEnd(16)} ${result.identifier.padEnd(40)} ${phase}${suffix}`
+      `  [${icon}] ${result.displayName.padEnd(16)} ${result.identifier.padEnd(40)} ${phase}${suffix}${bridgeSuffix}`
     );
   }
 
@@ -307,6 +416,19 @@ async function main(): Promise<void> {
 
   console.log('');
   console.log(`=== Results: ${registered} registered, ${exists} existing, ${failed} failed ===`);
+  console.log(
+    `=== Household bridge: ${bridgeCreated} projection rows created, ${bridgeExists} already present, ${bridgeFailures.length} failed ===`
+  );
+
+  if (bridgeFailures.length > 0) {
+    // Loud but soft: registration remains the gate for the exit code; the
+    // household junction bridge is best-effort against older deployed
+    // doorway/storage that may not carry the create-surface fields yet.
+    console.warn('\nHousehold-bridge failures (humans.household_id NOT populated):');
+    for (const f of bridgeFailures) {
+      console.warn(`  ! ${f.displayName}: ${f.error}`);
+    }
+  }
 
   if (failed > 0) {
     console.error('\nFailed humans:');

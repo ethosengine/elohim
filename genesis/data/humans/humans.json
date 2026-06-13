@@ -4,7 +4,7 @@
   "humans": [
     {
       "id": "human-adam-firstman",
-      "householdId": "household-adam",
+      "householdId": "household-eden",
       "displayName": "Adam",
       "agencyPhase": "node",
       "category": "core-family",
@@ -153,7 +153,7 @@
     },
     {
       "id": "human-eve-firstwoman",
-      "householdId": "household-eve",
+      "householdId": "household-eden",
       "displayName": "Eve",
       "agencyPhase": "device",
       "category": "core-family",
@@ -300,7 +300,7 @@
     },
     {
       "id": "human-james-son",
-      "householdId": "household-matthew",
+      "householdId": "household-dowell",
       "displayName": "James",
       "category": "core-family",
       "profileReach": "community",
@@ -353,7 +353,7 @@
     },
     {
       "id": "human-jessica-spouse",
-      "householdId": "household-matthew",
+      "householdId": "household-dowell",
       "displayName": "Jessica",
       "agencyPhase": "device",
       "category": "core-family",
@@ -531,7 +531,7 @@
     },
     {
       "id": "human-matthew-manager",
-      "householdId": "household-matthew",
+      "householdId": "household-dowell",
       "displayName": "Matthew",
       "agencyPhase": "doorway",
       "category": "core-family",
@@ -773,7 +773,7 @@
     },
     {
       "id": "human-susan-household",
-      "householdId": "household-matthew",
+      "householdId": "household-susan",
       "displayName": "Susan",
       "category": "core-family",
       "profileReach": "community",

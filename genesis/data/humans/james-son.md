@@ -1,6 +1,6 @@
 ---
 id: "human-james-son"
-householdId: "household-matthew"
+householdId: "household-dowell"
 displayName: "James"
 category: "core-family"
 profileReach: "community"

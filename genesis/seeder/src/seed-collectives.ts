@@ -37,6 +37,12 @@ interface CollectiveEntry {
   governanceModel?: string | null;
   domain?: string | null;
   place?: string | null;
+  /**
+   * Opaque free-text geographic region label (e.g. "seattle", "tulsa",
+   * "tech-valley"). Compared by string equality in the resilience snapshot's
+   * regional-distribution bucketing. Null when no ground truth exists.
+   */
+  region?: string | null;
   coupling?: {
     lamad?: string;
     shefa?: string;
@@ -62,6 +68,7 @@ function toInputView(entry: CollectiveEntry): CreateCollectiveInputView {
     governanceLayer: entry.governanceLayer,
     constitutionalParentId: entry.constitutionalParentId ?? null,
     reach: entry.reach ?? null,
+    region: entry.region ?? null,
     metadata: Object.keys(metadata).length > 0 ? metadata : null,
     createdBy: null,
   };

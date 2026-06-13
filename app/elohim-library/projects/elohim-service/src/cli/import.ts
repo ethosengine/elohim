@@ -590,6 +590,10 @@ program
   .option('--location <name>', 'Location name')
   .option('--layer <layer>', 'Governance layer')
   .option('--affinities <list>', 'Comma-separated affinities')
+  .option(
+    '--household <id>',
+    'Household collective id (kind:household) — projects onto humans.household_id'
+  )
   .option('--list-categories', 'List available categories', false)
   .action(options => {
     if (options.listCategories) {
@@ -617,6 +621,7 @@ program
         displayName: options.name,
         bio: options.bio,
         category: options.category as HumanCategory,
+        householdId: options.household,
         location:
           options.location && options.layer
             ? {

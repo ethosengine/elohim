@@ -1,6 +1,6 @@
 ---
 id: "human-adam-firstman"
-householdId: "household-adam"
+householdId: "household-eden"
 displayName: "Adam"
 agencyPhase: "node"
 category: "core-family"
