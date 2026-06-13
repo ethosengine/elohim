@@ -13,7 +13,7 @@
 
 use holochain_client::{
     AdminWebsocket, AppWebsocket, AuthorizeSigningCredentialsPayload, ClientAgentSigner,
-    ZomeCallTarget,
+    ConductorApiError, ZomeCallTarget,
 };
 use holochain_types::prelude::ExternIO;
 use serde::{de::DeserializeOwned, Serialize};
@@ -54,6 +54,45 @@ pub fn zome_call_timeout() -> Duration {
         .filter(|&v| v > 0)
         .unwrap_or(DEFAULT_ZOME_CALL_TIMEOUT_MS);
     Duration::from_millis(ms)
+}
+
+/// Classify a [`ConductorApiError`] as a TRANSPORT failure (the socket is
+/// genuinely dead → reconnect) versus an APPLICATION-level error (the conductor
+/// answered → the socket is healthy → keep the connection).
+///
+/// LIVE-INCIDENT INVARIANT (2026-06-13 doorway freeze, iteration 3 — the
+/// connection-churn root fix): `call_zome` used to clear the connection
+/// (`*ws = None` → reconnect) on ANY `Err`. So any periodic conductor call that
+/// returned a zome-level `Err` — `find_publishers`/`register_doorway`/
+/// `record_health_attestation` validation failures, a "function doesn't exist"
+/// during a coordinator-zome version skew — forced a needless reconnect. That
+/// reconnect churn (NXDOMAIN / WebSocket-reset cycle seen in Loki) piled SSR
+/// conductor-fetches onto the bounded worker pool and wedged the gateway under
+/// load. The cure: clear ONLY on a dead socket.
+///
+/// Structured as default-KEEP: only the genuinely-transport variants return
+/// `true`. The two misclassification directions are asymmetric — clearing on an
+/// application error is exactly the churn bug we are removing (expensive and
+/// self-reinforcing under load); keeping on a transport error self-corrects,
+/// because a truly dead socket returns `WebsocketError`/`IoError` again on the
+/// very next call and clears then. Bias toward keep, so a future-added
+/// `ConductorApiError` variant defaults to no-churn.
+///
+/// - TRANSPORT (clear): `WebsocketError` (socket-level failure / reset),
+///   `IoError` (connection reset/refused, IO failure). The call TIMEOUT
+///   (`tokio::time::timeout` elapse) is also transport, but it is an
+///   `Elapsed` — not a `ConductorApiError` — so it is handled in its own arm in
+///   `call_zome` and never routes through here.
+/// - APPLICATION (keep): `ExternalApiWireError(_)` — the conductor responded
+///   with a wire-level error (`RibosomeError`/`InternalError`/validation/
+///   "function doesn't exist"/auth), so the socket is healthy. Also
+///   `CellNotFound`, `AppNotFound`, `SignZomeCallError`, `FreshNonceError` —
+///   local/pre-call errors where the socket is fine.
+fn is_transport_error(e: &ConductorApiError) -> bool {
+    matches!(
+        e,
+        ConductorApiError::WebsocketError(_) | ConductorApiError::IoError(_)
+    )
 }
 
 /// Generic zome call client with signed requests.
@@ -343,9 +382,26 @@ impl ZomeCaller {
                 Ok(extern_io.into_vec())
             }
             Err(e) => {
-                warn!("Zome call failed, clearing connection: {e}");
-                let mut ws = self.app_ws.write().await;
-                *ws = None;
+                // Connection-churn root fix (2026-06-13 iteration 3): only a
+                // genuinely-dead socket warrants a reconnect. A zome-returned
+                // application error (the conductor answered) leaves the socket
+                // healthy — clearing it here is the churn that wedged the
+                // gateway under load. Split warn! so Loki distinguishes the two.
+                if is_transport_error(&e) {
+                    warn!(
+                        role_name = %role_name,
+                        fn_name = %fn_name,
+                        "Zome call transport failure, clearing connection: {e}"
+                    );
+                    let mut ws = self.app_ws.write().await;
+                    *ws = None;
+                } else {
+                    warn!(
+                        role_name = %role_name,
+                        fn_name = %fn_name,
+                        "Zome call returned application error, keeping connection: {e}"
+                    );
+                }
                 Err(format!("Zome call failed: {e}"))
             }
         }
@@ -408,6 +464,91 @@ mod tests {
         assert_eq!(
             strip_ws_scheme("ws://elohim-matthew-alpha-0.headless:8445"),
             "elohim-matthew-alpha-0.headless:8445"
+        );
+    }
+
+    // ── transport-vs-application error class (connection-churn root fix) ─────
+
+    /// The load-bearing invariant for the 2026-06-13 doorway freeze, iteration 3
+    /// (the connection-churn root fix): a ZOME-RETURNED application error must
+    /// NOT clear the connection (the conductor answered → the socket is healthy),
+    /// while a genuine TRANSPORT failure MUST. `call_zome`'s `Err(e)` arm gates
+    /// the `*ws = None` reset on `is_transport_error`, so this directly pins the
+    /// classification that decides clear-vs-keep.
+    ///
+    /// (The TIMEOUT case — the third transport class — is an `Elapsed`, not a
+    /// `ConductorApiError`, so it has its own arm in `call_zome` and is exercised
+    /// by `a_conductor_call_that_never_returns_errors_within_the_deadline` above.)
+    #[test]
+    fn application_errors_keep_the_connection() {
+        use holochain_conductor_api::ExternalApiWireError;
+
+        // "function that doesn't exist" — the named case from the incident.
+        // A coordinator-zome version skew surfaces this as a RibosomeError; the
+        // conductor answered, so the socket is healthy → KEEP.
+        assert!(
+            !is_transport_error(&ConductorApiError::ExternalApiWireError(
+                ExternalApiWireError::RibosomeError(
+                    "Zome function find_publishers doesn't exist".to_string()
+                )
+            )),
+            "a zome-returned RibosomeError (function doesn't exist) must NOT clear the connection"
+        );
+
+        // A validation / internal error from the guest — still an answer.
+        assert!(
+            !is_transport_error(&ConductorApiError::ExternalApiWireError(
+                ExternalApiWireError::InternalError("validation failed".to_string())
+            )),
+            "a zome-returned validation/internal error must NOT clear the connection"
+        );
+
+        // Local/pre-call routing errors: the socket is fine → KEEP.
+        assert!(
+            !is_transport_error(&ConductorApiError::CellNotFound),
+            "CellNotFound is local routing, not a dead socket → keep"
+        );
+        assert!(
+            !is_transport_error(&ConductorApiError::AppNotFound),
+            "AppNotFound is local routing, not a dead socket → keep"
+        );
+        assert!(
+            !is_transport_error(&ConductorApiError::SignZomeCallError(
+                "no provenance".to_string()
+            )),
+            "a pre-call signing error means the socket was never used → keep"
+        );
+    }
+
+    /// The other half of the invariant: a genuine transport failure (the socket
+    /// is dead) MUST clear the connection so the next call reconnects.
+    #[test]
+    fn transport_errors_clear_the_connection() {
+        use std::io::{Error as IoError, ErrorKind};
+
+        // Connection reset — the canonical dead-socket signal.
+        assert!(
+            is_transport_error(&ConductorApiError::IoError(IoError::new(
+                ErrorKind::ConnectionReset,
+                "connection reset by peer"
+            ))),
+            "an IO connection-reset must clear the connection"
+        );
+        // Connection refused — conductor went away.
+        assert!(
+            is_transport_error(&ConductorApiError::IoError(IoError::new(
+                ErrorKind::ConnectionRefused,
+                "connection refused"
+            ))),
+            "an IO connection-refused must clear the connection"
+        );
+        // A generic IO error is still transport-class.
+        assert!(
+            is_transport_error(&ConductorApiError::IoError(IoError::new(
+                ErrorKind::BrokenPipe,
+                "broken pipe"
+            ))),
+            "a broken-pipe IO error must clear the connection"
         );
     }
 
