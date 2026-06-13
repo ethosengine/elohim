@@ -9,4 +9,4 @@ import type { CommonsRatioAttestation } from "./CommonsRatioAttestation";
  * style. Source of truth: Holochain DHT (Mishpat Commitment, action discriminator).
  * Spec: genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md §4.
  */
-export type ReplicatesCommonsPayload = { "variant": "content", headRef: string, closureRule: string | null, reach: string, bounds: CommonsBounds, } | { "variant": "capacity", commonsBytes: bigint, bounds: CommonsBounds, ratioAttestation: CommonsRatioAttestation, };
+export type ReplicatesContentPayload = { "variant": "content", headRef: string, closureRule: string | null, reach: string, bounds: CommonsBounds, } | { "variant": "capacity", commonsBytes: bigint, bounds: CommonsBounds, ratioAttestation: CommonsRatioAttestation, };

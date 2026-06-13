@@ -1,7 +1,7 @@
 //! Slice-2b — per-instance validator for `replicates-commons` commitments.
 //!
 //! Three-stage validation mirroring `replicates_dwelling_validator.rs`:
-//!   1. Schema/structural check on the typed [`ReplicatesCommonsPayload`].
+//!   1. Schema/structural check on the typed [`ReplicatesContentPayload`].
 //!   2. Donut check — **only for the `capacity` variant** (a byte-budget pledge
 //!      to the commons tier carries `ratio_attestation`). The `content` variant
 //!      is a provide of a specific EPR with no counterparty and NO donut.
@@ -14,7 +14,7 @@
 //!
 //! ## Typed-view shape this consumes
 //!
-//! The landed `ReplicatesCommonsPayload` (T1-T4, `elohim-views`) is
+//! The landed `ReplicatesContentPayload` (T1-T4, `elohim-views`) is
 //! `#[serde(tag = "variant")]` — the variant IS the discriminator, so there is
 //! NO `action` field on either variant (the DNA action discriminator lives one
 //! level up, on the `Commitment` entry). The `Capacity` variant carries no
@@ -23,7 +23,7 @@
 //! the validator follows the view.
 
 use crate::services::constitutional_ratio_registry;
-use elohim_views::replicates_commons::ReplicatesCommonsPayload;
+use elohim_views::replicates_commons::ReplicatesContentPayload;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CommonsValidationError {
@@ -33,7 +33,7 @@ pub enum CommonsValidationError {
     ConstitutionalRatio(String),
 }
 
-/// Validate a typed [`ReplicatesCommonsPayload`] at **commitment-author time**.
+/// Validate a typed [`ReplicatesContentPayload`] at **commitment-author time**.
 ///
 /// Runs structural checks on the variant fields, then the donut check **only**
 /// for the `capacity` variant. The `content` variant skips the donut entirely
@@ -41,10 +41,10 @@ pub enum CommonsValidationError {
 /// `bounds_validator` (event-time gate — the commitment does not yet exist in
 /// the conductor at author time).
 pub fn validate_typed_for_creation_commons(
-    payload: &ReplicatesCommonsPayload,
+    payload: &ReplicatesContentPayload,
 ) -> Result<(), CommonsValidationError> {
     match payload {
-        ReplicatesCommonsPayload::Content {
+        ReplicatesContentPayload::Content {
             head_ref,
             reach,
             bounds,
@@ -74,7 +74,7 @@ pub fn validate_typed_for_creation_commons(
             }
             Ok(())
         }
-        ReplicatesCommonsPayload::Capacity {
+        ReplicatesContentPayload::Capacity {
             commons_bytes,
             bounds,
             ratio_attestation: att,
@@ -160,11 +160,11 @@ pub fn validate_typed_for_creation_commons(
 mod tests {
     use super::*;
     use elohim_views::replicates_commons::{
-        CommonsBounds, CommonsRatioAttestation, ReplicatesCommonsPayload,
+        CommonsBounds, CommonsRatioAttestation, ReplicatesContentPayload,
     };
 
-    fn content_payload(head_ref: &str) -> ReplicatesCommonsPayload {
-        ReplicatesCommonsPayload::Content {
+    fn content_payload(head_ref: &str) -> ReplicatesContentPayload {
+        ReplicatesContentPayload::Content {
             head_ref: head_ref.to_string(),
             closure_rule: Some("direct".to_string()),
             reach: "commons".to_string(),
@@ -175,10 +175,10 @@ mod tests {
         }
     }
 
-    fn capacity_payload(commons_bytes: u64) -> ReplicatesCommonsPayload {
+    fn capacity_payload(commons_bytes: u64) -> ReplicatesContentPayload {
         let provenance = constitutional_ratio_registry::effective_ratios();
         let r = provenance.ratios;
-        ReplicatesCommonsPayload::Capacity {
+        ReplicatesContentPayload::Capacity {
             commons_bytes,
             bounds: CommonsBounds {
                 rate_per_minute: 6,
@@ -208,7 +208,7 @@ mod tests {
     #[test]
     fn content_variant_wrong_reach_rejected() {
         let mut payload = content_payload("bafy-epr-head");
-        if let ReplicatesCommonsPayload::Content { reach, .. } = &mut payload {
+        if let ReplicatesContentPayload::Content { reach, .. } = &mut payload {
             *reach = "household".to_string();
         }
         assert!(matches!(
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn capacity_variant_ratio_sum_not_100_rejected() {
         let mut payload = capacity_payload(25_000_000_000);
-        if let ReplicatesCommonsPayload::Capacity {
+        if let ReplicatesContentPayload::Capacity {
             ratio_attestation, ..
         } = &mut payload
         {
@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn capacity_variant_wrong_effective_ratio_cid_rejected() {
         let mut payload = capacity_payload(25_000_000_000);
-        if let ReplicatesCommonsPayload::Capacity {
+        if let ReplicatesContentPayload::Capacity {
             ratio_attestation, ..
         } = &mut payload
         {

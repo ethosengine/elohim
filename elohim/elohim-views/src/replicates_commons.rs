@@ -9,7 +9,7 @@ use ts_rs::TS;
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(tag = "variant", rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub enum ReplicatesCommonsPayload {
+pub enum ReplicatesContentPayload {
     // Per-variant `rename_all` is required: the enum-level `rename_all` only
     // camelCases the variant *tag* values, not the fields *inside* each variant.
     // Without this the boundary rule (snake_case never leaves Rust) would be
@@ -54,7 +54,7 @@ mod tests {
 
     #[test]
     fn content_variant_round_trips_with_variant_tag() {
-        let p = ReplicatesCommonsPayload::Content {
+        let p = ReplicatesContentPayload::Content {
             head_ref: "bafyhead".into(),
             closure_rule: Some("transitive-1".into()),
             reach: "commons".into(),
@@ -69,13 +69,13 @@ mod tests {
             json.contains("\"headRef\":\"bafyhead\""),
             "camelCase headRef; json was: {json}"
         );
-        let back: ReplicatesCommonsPayload = serde_json::from_str(&json).unwrap();
-        matches!(back, ReplicatesCommonsPayload::Content { .. });
+        let back: ReplicatesContentPayload = serde_json::from_str(&json).unwrap();
+        matches!(back, ReplicatesContentPayload::Content { .. });
     }
 
     #[test]
     fn capacity_variant_round_trips_with_variant_tag() {
-        let p = ReplicatesCommonsPayload::Capacity {
+        let p = ReplicatesContentPayload::Capacity {
             commons_bytes: 50_000_000_000,
             bounds: CommonsBounds {
                 rate_per_minute: 30,
@@ -98,7 +98,7 @@ mod tests {
             json.contains("\"commonsBytes\":50000000000"),
             "camelCase commonsBytes; json was: {json}"
         );
-        let back: ReplicatesCommonsPayload = serde_json::from_str(&json).unwrap();
-        matches!(back, ReplicatesCommonsPayload::Capacity { .. });
+        let back: ReplicatesContentPayload = serde_json::from_str(&json).unwrap();
+        matches!(back, ReplicatesContentPayload::Capacity { .. });
     }
 }

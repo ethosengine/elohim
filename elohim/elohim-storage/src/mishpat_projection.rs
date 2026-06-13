@@ -332,7 +332,7 @@ fn parse_replicates_dwelling(
 /// Parse a `replicates-commons` Commitment payload (Slice-2b).
 ///
 /// Variant-dispatched on the `variant` field (mirrors the DNA coordinator's
-/// `validate_replicates_commons` and the typed `ReplicatesCommonsPayload`):
+/// `validate_replicates_commons` and the typed `ReplicatesContentPayload`):
 ///
 /// - `content`  — a provide of a specific EPR. `head_ref` is the logical key
 ///   the provide-reconciler dedups on, so we store it as `recipient`. The

@@ -1,15 +1,19 @@
-// Test for v1/commitments/replicates-commons.schema.json
+// Test for v1/commitments/replicates-content.schema.json
 //
-// The replicates-commons Commitment is the EPR provide-loop payload shape —
-// see genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md §4.
+// The replicates-content Commitment is the reach-general EPR content-provide
+// payload shape (migration-window alias: replicates-commons) —
+// see genesis/docs/superpowers/specs/2026-06-13-non-commons-provide-commitments-design.md
+// (reach widening) and 2026-06-08-epr-acquisition-slice2b-provide-loop-design.md §4.
 //
 // Source of truth: Holochain DHT (Mishpat zome, Commitment entry type with
-// action="replicates-commons"). This schema is the wire-format projection.
-// oneOf union on `variant`: "content" (pure provide, NO ratio_attestation) |
-// "capacity" (hosting capacity, WITH ratio_attestation sum-to-100).
+// action="replicates-content" | "replicates-commons"). This schema is the
+// wire-format projection. oneOf union on `variant`: "content" (pure provide,
+// NO ratio_attestation) | "capacity" (hosting capacity, WITH ratio_attestation
+// sum-to-100). `reach`/`reach_ceiling` are the 8-value reach enum (inlined, not
+// $ref'd — this standalone test uses Ajv strict without addSchema).
 
 import Ajv2020 from 'ajv/dist/2020.js';
-import schema from '../v1/commitments/replicates-commons.schema.json' with { type: 'json' };
+import schema from '../v1/commitments/replicates-content.schema.json' with { type: 'json' };
 
 const ajv = new Ajv2020({ strict: true, allErrors: true });
 const validate = ajv.compile(schema);
@@ -69,10 +73,46 @@ check(
   true,
 );
 check('capacity variant minimal', capacityVariant, true);
+// Non-commons reach is now ACCEPTED (the whole point of the widening). community
+// is a valid reach enum value; the well-ordering reach_ceiling >= reach is a
+// structural validator check, not a schema constraint, so a community-reach
+// content under a commons ceiling is schema-valid here.
+check(
+  'content variant non-commons (community) reach accepted',
+  { ...contentVariant, reach: 'community' },
+  true,
+);
+check(
+  'content variant intimate reach accepted',
+  { ...contentVariant, reach: 'intimate' },
+  true,
+);
+// Migration-window alias: the renamed action `replicates-content` validates.
+check(
+  'content variant with replicates-content action (renamed)',
+  { ...contentVariant, action: 'replicates-content' },
+  true,
+);
+check(
+  'capacity variant with replicates-content action (renamed)',
+  { ...capacityVariant, action: 'replicates-content' },
+  true,
+);
 
 // --- Failure paths ---
 check('wrong action discriminator', { ...contentVariant, action: 'something-else' }, false);
 check('unknown variant discriminator', { ...contentVariant, variant: 'bogus' }, false);
+// A reach value outside the 8-value DNA reach enum is rejected.
+check(
+  'content variant reach not in enum',
+  { ...contentVariant, reach: 'neighborhood' },
+  false,
+);
+check(
+  'content variant reach_ceiling not in enum',
+  { ...contentVariant, bounds: { rate_per_minute: 30, reach_ceiling: 'district' } },
+  false,
+);
 check(
   'content variant missing head_ref',
   (() => {
@@ -89,11 +129,6 @@ check(
     delete v.valid_from;
     return v;
   })(),
-  false,
-);
-check(
-  'content variant reach not commons',
-  { ...contentVariant, reach: 'community' },
   false,
 );
 check(
@@ -130,7 +165,7 @@ check(
 check('extra unknown field on root', { ...contentVariant, mystery_field: 'x' }, false);
 
 if (failures.length > 0) {
-  console.error('FAIL: replicates-commons schema');
+  console.error('FAIL: replicates-content schema');
   for (const [name, errors] of failures) {
     console.error('  -', name);
     if (errors) console.error('    errors:', JSON.stringify(errors, null, 2));
@@ -138,4 +173,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('PASS: replicates-commons schema (13 cases)');
+console.log('PASS: replicates-content schema (18 cases)');
