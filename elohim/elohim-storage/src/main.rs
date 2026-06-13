@@ -462,29 +462,10 @@ async fn async_main(
         }
     }
 
-    // One-shot household_id backfill — populates legacy null rows from DHT
-    // humans entries. Tolerates DHT unavailability; logs and continues.
-    // The replayer currently stubs an empty mapping; it will be wired to real
-    // DHT reads when the DHT reader hook lands (no-op backfill is correct).
-    if let Some(pool) = db_pool.as_ref() {
-        let pool_clone = pool.clone();
-        tokio::spawn(async move {
-            match elohim_storage::services::holochain_humans_replayer::snapshot_household_ids(&())
-                .await
-            {
-                Ok(mapping) => {
-                    if let Err(e) =
-                        elohim_storage::services::household_backfill::run_once(&pool_clone, mapping)
-                    {
-                        warn!(error = %e, "household_backfill failed (non-fatal)");
-                    }
-                }
-                Err(e) => {
-                    warn!(error = %e, "household_backfill snapshot failed (non-fatal)");
-                }
-            }
-        });
-    }
+    // One-shot household_id backfill is wired below, AFTER the HcClientRegistry
+    // is connected (the replayer reads DHT household memberships via the
+    // imagodei conductor client, which is not yet available at this point in
+    // boot). See the "household_id backfill" block after the registry wiring.
 
     // --- Embedded conductor mode ---
     // When enabled, spawn the holochain conductor as a child process and
@@ -2119,6 +2100,53 @@ async fn async_main(
     // Wire HcClientRegistry into HTTP server for zome forwarding (Phase 11 Task 5).
     if let Some(registry) = hc_registry_for_http.as_ref() {
         http_server = http_server.with_hc_registry(registry.clone());
+    }
+
+    // One-shot household_id backfill — fills legacy `humans.household_id IS NULL`
+    // rows from DHT household memberships, the same value the live reconcile path
+    // stamps (`on_membership_projected`). The replayer reads household collectives
+    // from the local projection, then reads each household's members back from the
+    // imagodei conductor. Best-effort: a missing imagodei client or unreachable
+    // conductor degrades to an empty/partial mapping — never a startup failure.
+    // The backfill is idempotent and NULL-only, so it never overwrites a
+    // create-time or live-stamped value.
+    if let (Some(pool), Some(imagodei)) = (
+        db_pool.as_ref(),
+        hc_registry_for_http
+            .as_ref()
+            .and_then(|r| r.imagodei.clone()),
+    ) {
+        let pool_clone = pool.clone();
+        tokio::spawn(async move {
+            use elohim_storage::services::holochain_humans_replayer::{
+                snapshot_household_ids, ConductorMembershipReader,
+            };
+            // humans/collectives projections are lamad-app-scoped (see the
+            // reconcile controller's `default_lamad` ctx for the same junction).
+            let ctx = elohim_storage::db::AppContext::default_lamad();
+            let reader = ConductorMembershipReader {
+                hc_client: imagodei,
+            };
+            match snapshot_household_ids(&pool_clone, &ctx, &reader).await {
+                Ok(mapping) => {
+                    if let Err(e) =
+                        elohim_storage::services::household_backfill::run_once_by_membership(
+                            &pool_clone,
+                            mapping,
+                        )
+                    {
+                        warn!(error = %e, "household_backfill failed (non-fatal)");
+                    }
+                }
+                Err(e) => {
+                    warn!(error = %e, "household_backfill snapshot failed (non-fatal)");
+                }
+            }
+        });
+    } else {
+        tracing::debug!(
+            "household_id backfill skipped: db pool or imagodei conductor client unavailable"
+        );
     }
 
     // Load slug index for HTML5 app caching
