@@ -126,6 +126,46 @@ pub fn build_content_payload(
     .to_string()
 }
 
+/// Build the ProvideAnnounce [`EmitEconomicEventInput`] for a content provide.
+///
+/// PURE so the load-bearing `reach` invariant is unit-testable without a
+/// conductor: the event `reach` is HARD-PINNED to "commons" and does NOT take the
+/// content's reach. The EconomicEvent `reach` is bounds-validated by
+/// `bounds_validator` check 5 (`reach_rank()`), which REJECTS any value outside
+/// the schema-8 vocabulary ("unknown reach value"). A content reach of
+/// `household`/`local` (the Stage B case, ~11.5k local rows) would fail that gate
+/// and roll back the author. The CONTENT's own reach lives on the COMMITMENT
+/// payload (`build_content_payload.reach`, NOT bounds-validated) — that is what
+/// the projection reads to scope the `content:<reach>` provide row the snapshot
+/// counts. The event only needs to clear `<= reach_ceiling(=commons)`, which
+/// "commons" does for every content reach. A future edit that threads the content
+/// reach here would silently reintroduce the roll-back; the unit test below is the
+/// guard.
+///
+/// A ProvideAnnounce has no specific counterparty receiver (the offer is to the
+/// commons); `receiver`/`target_epr_id` mirror the head_ref, consistent with the
+/// projection's logical key. `content_store_commitment_cid = None` → a pure
+/// provide (`fulfills == []`); `bounded_by` is the new Mishpat commitment CID.
+pub fn build_provide_announce_input(
+    self_cid: &str,
+    head_ref: &str,
+    commitment_cid: &str,
+    has_point_in_time: &str,
+) -> EmitEconomicEventInput {
+    EmitEconomicEventInput {
+        id: format!("provide:{self_cid}:{head_ref}"),
+        action: "replicates-commons".to_string(),
+        provider: self_cid.to_string(),
+        receiver: head_ref.to_string(),
+        has_point_in_time: has_point_in_time.to_string(),
+        commitment_cid: commitment_cid.to_string(),
+        content_store_commitment_cid: None,
+        target_epr_id: head_ref.to_string(),
+        // STAYS "commons" — see fn doc. NOT the content's reach.
+        reach: "commons".to_string(),
+    }
+}
+
 /// Build the `revokes-commitment` payload (snake_case JSON) targeting an
 /// existing commitment CID. PURE for unit-testability.
 pub fn build_revoke_payload(target_cid: &str, signed_at: &str) -> String {
@@ -212,30 +252,12 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
         let rate = DieselRateHistory {
             pool: self.pool.clone(),
         };
-        let emit_input = EmitEconomicEventInput {
-            id: format!("provide:{}:{}", self.self_cid, req.head_ref),
-            action: "replicates-commons".to_string(),
-            provider: self.self_cid.clone(),
-            // A ProvideAnnounce has no specific counterparty receiver; the offer
-            // is to the commons. The receiver mirrors the commitment recipient
-            // (head_ref), consistent with the projection's logical key.
-            receiver: req.head_ref.clone(),
-            has_point_in_time: now.to_rfc3339(),
-            commitment_cid: new_cid.clone(),
-            content_store_commitment_cid: None,
-            target_epr_id: req.head_ref.clone(),
-            // STAYS "commons" — do NOT thread `req.reach` here. The EconomicEvent
-            // `reach` is bounds-validated by `bounds_validator` check 5, which
-            // calls `reach_rank()` and REJECTS any value outside the schema-8
-            // vocabulary ("unknown reach value"). A content reach of
-            // `household`/`local` (the Stage B case, ~11.5k local rows) would fail
-            // that gate and roll back the author. The CONTENT's own reach lives on
-            // the COMMITMENT payload (`build_content_payload.reach`, NOT
-            // bounds-validated) — that is what the projection reads to scope the
-            // `content:<reach>` provide row the snapshot counts. The event only
-            // needs to clear `<= reach_ceiling(=commons)`, which "commons" does.
-            reach: "commons".to_string(),
-        };
+        let emit_input = build_provide_announce_input(
+            &self.self_cid,
+            &req.head_ref,
+            &new_cid,
+            &now.to_rfc3339(),
+        );
         // A bounds failure on our OWN freshly-authored, in-window commitment is
         // not expected; surface it (and the conductor error path) as a write
         // failure so the reconciler rolls the latch back and retries next tick.
@@ -377,6 +399,36 @@ mod tests {
                 "reach_ceiling stays commons regardless of content reach"
             );
         }
+    }
+
+    #[test]
+    fn provide_announce_event_reach_is_always_commons() {
+        // THE load-bearing Stage B invariant: the ProvideAnnounce EconomicEvent
+        // `reach` is hard-pinned to "commons" regardless of the content's reach.
+        // The author's `req.reach` (household/local/…) rides the COMMITMENT
+        // payload, NOT the event — because bounds_validator check 5 (reach_rank)
+        // rejects any non-schema-8 reach on the event and would roll back the
+        // author. This test is the guard against a future edit re-threading the
+        // content reach here.
+        let input = build_provide_announce_input(
+            "agent:self",
+            "epr:household-record",
+            "uhCkk-commit-1",
+            "2026-06-13T00:00:00Z",
+        );
+        assert_eq!(
+            input.reach, "commons",
+            "the ProvideAnnounce event reach must stay commons (schema-8 / bounds gate)"
+        );
+        assert_eq!(input.action, "replicates-commons");
+        assert_eq!(input.provider, "agent:self");
+        assert_eq!(input.receiver, "epr:household-record");
+        assert_eq!(input.target_epr_id, "epr:household-record");
+        assert_eq!(input.commitment_cid, "uhCkk-commit-1");
+        assert!(
+            input.content_store_commitment_cid.is_none(),
+            "a pure provide carries no content-store commitment (fulfills == [])"
+        );
     }
 
     #[test]
