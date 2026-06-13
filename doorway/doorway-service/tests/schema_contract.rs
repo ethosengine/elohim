@@ -16,6 +16,10 @@ use doorway::routes::auth_routes::{
     AccountResponse, AuthResponse, AuthorityRef, ExchangeSessionResponse, HumanProfileResponse,
     MeResponse, SessionTokenResponse,
 };
+use doorway::routes::self_healing::{
+    AdmissionView, ConductorView, PeerView, ProjectorView, RenderView, SelfHealingView,
+    UpstreamView, WarmupView,
+};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
@@ -497,4 +501,92 @@ fn auth_view_schemas_declare_source_of_truth() {
             .unwrap_or_else(|e| panic!("Failed to parse {}: {}", schema_name, e));
         assert_source_of_truth_declared(&schema_value, schema_name);
     }
+}
+
+// ---------------------------------------------------------------------------
+// stability-status-view (self-healing read model — GET /admin/self-healing)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn stability_status_view_pending_matches_schema() {
+    // PENDING wire-up state: autoPreset/admission null, upstreams empty —
+    // locks the forward-compat seam (sibling wire-ups not yet landed).
+    let view = SelfHealingView {
+        auto_preset: None,
+        admission: None,
+        upstreams: Vec::new(),
+        projector: ProjectorView {
+            lag_seconds: None,
+            caught_up: None,
+            divergent_anchor: None,
+        },
+        peers: Vec::new(),
+        render: RenderView {
+            total: 0,
+            degenerate_rate: 0.0,
+        },
+        warmup: WarmupView {
+            in_progress: false,
+            attempts: 0,
+            completed: false,
+            last_error: None,
+        },
+        conductor: ConductorView {
+            connected: false,
+            connected_workers: 0,
+            total_workers: 0,
+        },
+    };
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/stability-status-view.schema.json", &json);
+
+    let schema = load_schema("views/stability-status-view.schema.json");
+    assert_source_of_truth_declared(&schema, "stability-status-view");
+}
+
+#[test]
+fn stability_status_view_populated_matches_schema() {
+    // Forward-compat: the PENDING fields populated once their siblings wire up.
+    let view = SelfHealingView {
+        auto_preset: Some(serde_json::json!({ "maxInflight": 64 })),
+        admission: Some(AdmissionView {
+            max_inflight: 64,
+            available: 60,
+            shed_total: 3,
+        }),
+        upstreams: vec![UpstreamView {
+            endpoint: "https://upstream.example".to_string(),
+            circuit: "open".to_string(),
+            error_streak: 5,
+            last_good: Some("2026-06-13T00:00:00Z".to_string()),
+            skipped: true,
+        }],
+        projector: ProjectorView {
+            lag_seconds: Some(7),
+            caught_up: Some(false),
+            divergent_anchor: Some(2),
+        },
+        peers: vec![PeerView {
+            peer: "uhCAk...".to_string(),
+            status: "Degraded".to_string(),
+            last_seen: Some("2026-06-13T00:00:00Z".to_string()),
+        }],
+        render: RenderView {
+            total: 42,
+            degenerate_rate: 0.1,
+        },
+        warmup: WarmupView {
+            in_progress: true,
+            attempts: 2,
+            completed: false,
+            last_error: Some("timeout".to_string()),
+        },
+        conductor: ConductorView {
+            connected: true,
+            connected_workers: 3,
+            total_workers: 4,
+        },
+    };
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/stability-status-view.schema.json", &json);
 }
