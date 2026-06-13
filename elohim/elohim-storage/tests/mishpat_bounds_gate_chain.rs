@@ -95,8 +95,8 @@ fn project_commitment(pool: &elohim_storage::db::DbPool) -> String {
     let action_hash = "uhCkk-test-action-chain-1".to_string();
 
     let signal = MishpatSignal::CommitmentCommitted {
-        action_hash: action_hash.clone(),
-        entry_hash: entry_hash.clone(),
+        action_hash: action_hash.clone().into(),
+        entry_hash: entry_hash.clone().into(),
         author: "agent:matthew-steward".into(),
         commitment: CommitmentPayload {
             action: "delegates-compute".into(),
