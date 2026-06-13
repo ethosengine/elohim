@@ -1353,7 +1353,30 @@ async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: 
             }
         };
 
-        match admin.list_apps().await {
+        // Bound the startup `list_apps` probe with the same per-conductor SLA the
+        // ZomeCaller uses. A conductor that accepts the admin connection then
+        // stalls (the live NXDOMAIN / half-open class) must NOT wedge boot for the
+        // full 120s startup-probe budget — it degrades to a skipped conductor.
+        // Safe to skip: this fn only runs for conductor_urls.len() > 1, so one
+        // conductor's agents being missed leaves the others' routing intact.
+        let list_apps_result = match tokio::time::timeout(
+            doorway::services::zome_caller::zome_call_timeout(),
+            admin.list_apps(),
+        )
+        .await
+        {
+            Ok(inner) => inner,
+            Err(_) => {
+                warn!(
+                    conductor = %conductor_id,
+                    admin_url = %admin_url,
+                    "list_apps timed out at startup for {conductor_id}; skipping"
+                );
+                continue;
+            }
+        };
+
+        match list_apps_result {
             Ok(apps) => {
                 let mut conductor_agents = 0usize;
                 for app in &apps {

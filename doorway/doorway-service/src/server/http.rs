@@ -963,6 +963,21 @@ async fn handle_health_probe(
 /// listener (backward-compatible — existing manifests are unaffected). When set,
 /// point the manifest's liveness/readiness/startup probes at this port so a
 /// wedged request path can never silence them.
+///
+/// FOOTGUN — left unset by design (do not enable casually). This isolates the
+/// probes only at the *listener/port* axis: a wedged request *handler* can't
+/// silence them. It does NOT isolate them at the *runtime* axis. The spawned
+/// listener and its connection tasks run via `tokio::spawn` on the SAME main
+/// tokio runtime as the request path — they share the worker-thread pool. So a
+/// full worker-thread STALL (every worker blocked — the exact cpu-limited freeze
+/// this sprint hardens against) would starve these probes too, yet because they
+/// answer on a separate port the manifest could keep them GREEN long enough that
+/// kubelet never restarts the hung pod — DEFEATING restart-on-hang, the one thing
+/// that recovers a wedged worker pool. Enable a health listener for true stall
+/// resilience ONLY with a DEDICATED, pinned `tokio::runtime::Runtime` on its own
+/// OS thread (so it survives a main-runtime stall); the shared-runtime form here
+/// is safe only for the narrower request-handler-wedge case, which is why it
+/// stays opt-in and unset.
 async fn spawn_health_listener(state: Arc<AppState>) {
     let Some(port) = std::env::var("DOORWAY_HEALTH_PORT")
         .ok()
@@ -2949,6 +2964,20 @@ async fn handle_request(
                                     path = %p,
                                     available = sem.available_permits(),
                                     "render semaphore at limit — falling back to CSR shell"
+                                );
+                                // SSR saturation is otherwise INVISIBLE to
+                                // status-code metrics: the shed returns HTTP 200
+                                // with the CSR shell. Emit a distinct, greppable,
+                                // log-aggregation-countable signal on its own
+                                // `ssr_busy` target so saturation is observable
+                                // (the post-deploy watch item). HTTP behavior is
+                                // unchanged — still 200 + CSR shell below.
+                                tracing::warn!(
+                                    target: "ssr_busy",
+                                    counter = "ssr_render_busy_total",
+                                    path = %p,
+                                    available = sem.available_permits(),
+                                    "SSR render queue saturated — shedding to CSR shell (HTTP 200)"
                                 );
                                 return Ok(to_boxed(
                                     ssr_spa_shell_fallback_with_skip_reason(Some("overflow")),

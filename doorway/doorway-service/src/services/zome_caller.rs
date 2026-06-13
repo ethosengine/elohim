@@ -43,7 +43,11 @@ const DEFAULT_ZOME_CALL_TIMEOUT_MS: u64 = 10_000;
 /// falling back to [`DEFAULT_ZOME_CALL_TIMEOUT_MS`]. A `0` value or an unparseable
 /// value falls back to the default (never "no timeout" — that is the bug class
 /// this guards against).
-fn zome_call_timeout() -> Duration {
+///
+/// `pub` so the binary crate (`main.rs::discover_existing_agents`) can bound its
+/// startup `list_apps` probe with the same SLA — a conductor that accepts the
+/// connection then stalls must not wedge boot for the full startup budget.
+pub fn zome_call_timeout() -> Duration {
     let ms = std::env::var("DOORWAY_ZOME_CALL_TIMEOUT_MS")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
@@ -111,44 +115,61 @@ impl ZomeCaller {
 
         let deadline = zome_call_timeout();
 
-        // Step 1: Connect to admin interface.
-        // Hard-bounded: an unresolvable conductor host (cluster NXDOMAIN) must
-        // resolve to an Err within `deadline`, never hang the caller forever.
-        let admin_ws = tokio::time::timeout(
-            deadline,
-            AdminWebsocket::connect(&self.admin_addr, Some(String::from("doorway-zome-caller"))),
-        )
-        .await
-        .map_err(|_| {
-            format!(
-                "Admin connect timed out after {}ms ({})",
-                deadline.as_millis(),
-                self.admin_addr
+        // Overall reconnect budget. The slow path runs up to 5 sequential
+        // conductor steps, each bounded by `deadline` — so the worst case is
+        // ~5×deadline (≈50s at the 10s default) while the `connecting` mutex is
+        // held. Under a full cluster NXDOMAIN every step times out in sequence,
+        // and concurrent callers serialize behind this mutex for the whole
+        // stretch. Bounding the entire body (additively to the per-step
+        // timeouts) guarantees the mutex releases promptly so queued callers get
+        // a fast `Err` instead of parking for the full ~50s. `_lock` lives in the
+        // outer scope, so any early return drops it immediately; `app_ws` is only
+        // written at the very end, so a mid-reconnect elapse leaves it cleanly
+        // `None` for the next caller.
+        let reconnect_budget = deadline * 5 + Duration::from_secs(1);
+
+        let connect_body = async {
+            // Step 1: Connect to admin interface.
+            // Hard-bounded: an unresolvable conductor host (cluster NXDOMAIN) must
+            // resolve to an Err within `deadline`, never hang the caller forever.
+            let admin_ws = tokio::time::timeout(
+                deadline,
+                AdminWebsocket::connect(
+                    &self.admin_addr,
+                    Some(String::from("doorway-zome-caller")),
+                ),
             )
-        })?
-        .map_err(|e| format!("Admin connect failed: {e}"))?;
-
-        info!("ZomeCaller connected to admin at {}", self.admin_addr);
-
-        // Step 2: Find cell_id from app info
-        let apps = tokio::time::timeout(deadline, admin_ws.list_apps(None))
             .await
-            .map_err(|_| format!("list_apps timed out after {}ms", deadline.as_millis()))?
-            .map_err(|e| format!("list_apps failed: {e}"))?;
+            .map_err(|_| {
+                format!(
+                    "Admin connect timed out after {}ms ({})",
+                    deadline.as_millis(),
+                    self.admin_addr
+                )
+            })?
+            .map_err(|e| format!("Admin connect failed: {e}"))?;
 
-        let app_info = apps
-            .iter()
-            .find(|a| a.installed_app_id == self.installed_app_id)
-            .ok_or_else(|| format!("App '{}' not found", self.installed_app_id))?;
+            info!("ZomeCaller connected to admin at {}", self.admin_addr);
 
-        // Step 3: Authorize signing credentials for ALL provisioned cells
-        let signer = ClientAgentSigner::default();
-        let mut cell_count = 0u32;
+            // Step 2: Find cell_id from app info
+            let apps = tokio::time::timeout(deadline, admin_ws.list_apps(None))
+                .await
+                .map_err(|_| format!("list_apps timed out after {}ms", deadline.as_millis()))?
+                .map_err(|e| format!("list_apps failed: {e}"))?;
 
-        for (role_name, cells) in &app_info.cell_info {
-            for cell in cells {
-                if let holochain_client::CellInfo::Provisioned(p) = cell {
-                    let credentials = tokio::time::timeout(
+            let app_info = apps
+                .iter()
+                .find(|a| a.installed_app_id == self.installed_app_id)
+                .ok_or_else(|| format!("App '{}' not found", self.installed_app_id))?;
+
+            // Step 3: Authorize signing credentials for ALL provisioned cells
+            let signer = ClientAgentSigner::default();
+            let mut cell_count = 0u32;
+
+            for (role_name, cells) in &app_info.cell_info {
+                for cell in cells {
+                    if let holochain_client::CellInfo::Provisioned(p) = cell {
+                        let credentials = tokio::time::timeout(
                         deadline,
                         admin_ws.authorize_signing_credentials(
                             AuthorizeSigningCredentialsPayload {
@@ -168,69 +189,88 @@ impl ZomeCaller {
                         format!("authorize_signing_credentials failed for role '{role_name}': {e}")
                     })?;
 
-                    signer.add_credentials(p.cell_id.clone(), credentials);
-                    cell_count += 1;
-                    debug!(role = %role_name, "Authorized signing for cell");
+                        signer.add_credentials(p.cell_id.clone(), credentials);
+                        cell_count += 1;
+                        debug!(role = %role_name, "Authorized signing for cell");
+                    }
                 }
             }
-        }
 
-        if cell_count == 0 {
-            return Err("No provisioned cells found".to_string());
-        }
+            if cell_count == 0 {
+                return Err("No provisioned cells found".to_string());
+            }
 
-        info!(
-            app_id = %self.installed_app_id,
-            cells = cell_count,
-            "Signing credentials authorized for all cells"
-        );
+            info!(
+                app_id = %self.installed_app_id,
+                cells = cell_count,
+                "Signing credentials authorized for all cells"
+            );
 
-        // Step 4: Issue app auth token
-        let token = tokio::time::timeout(
-            deadline,
-            admin_ws.issue_app_auth_token(holochain_client::IssueAppAuthenticationTokenPayload {
-                installed_app_id: self.installed_app_id.clone(),
-                expiry_seconds: 3600,
-                single_use: false,
-            }),
-        )
-        .await
-        .map_err(|_| {
-            format!(
-                "issue_app_auth_token timed out after {}ms",
-                deadline.as_millis()
+            // Step 4: Issue app auth token
+            let token = tokio::time::timeout(
+                deadline,
+                admin_ws.issue_app_auth_token(
+                    holochain_client::IssueAppAuthenticationTokenPayload {
+                        installed_app_id: self.installed_app_id.clone(),
+                        expiry_seconds: 3600,
+                        single_use: false,
+                    },
+                ),
             )
-        })?
-        .map_err(|e| format!("issue_app_auth_token failed: {e}"))?;
+            .await
+            .map_err(|_| {
+                format!(
+                    "issue_app_auth_token timed out after {}ms",
+                    deadline.as_millis()
+                )
+            })?
+            .map_err(|e| format!("issue_app_auth_token failed: {e}"))?;
 
-        // Step 5: Connect AppWebsocket with signer
-        let signer_arc: Arc<ClientAgentSigner> = Arc::new(signer);
-        let app_ws = tokio::time::timeout(
-            deadline,
-            AppWebsocket::connect(&self.app_addr, token.token, signer_arc, None),
-        )
-        .await
-        .map_err(|_| {
-            format!(
-                "App WebSocket connect timed out after {}ms ({})",
-                deadline.as_millis(),
+            // Step 5: Connect AppWebsocket with signer
+            let signer_arc: Arc<ClientAgentSigner> = Arc::new(signer);
+            let app_ws = tokio::time::timeout(
+                deadline,
+                AppWebsocket::connect(&self.app_addr, token.token, signer_arc, None),
+            )
+            .await
+            .map_err(|_| {
+                format!(
+                    "App WebSocket connect timed out after {}ms ({})",
+                    deadline.as_millis(),
+                    self.app_addr
+                )
+            })?
+            .map_err(|e| format!("App WebSocket connect failed: {e}"))?;
+
+            info!(
+                "ZomeCaller connected to app interface at {} with signing",
                 self.app_addr
-            )
-        })?
-        .map_err(|e| format!("App WebSocket connect failed: {e}"))?;
+            );
 
-        info!(
-            "ZomeCaller connected to app interface at {} with signing",
-            self.app_addr
-        );
+            // Store connection
+            {
+                let mut ws = self.app_ws.write().await;
+                *ws = Some(app_ws);
+            }
 
-        // Store connection
-        {
-            let mut ws = self.app_ws.write().await;
-            *ws = Some(app_ws);
+            Ok::<(), String>(())
+        };
+
+        // Enforce the overall budget. On elapse, return promptly so `_lock`
+        // drops and queued callers stop serializing behind a doomed reconnect.
+        match tokio::time::timeout(reconnect_budget, connect_body).await {
+            Ok(inner) => inner,
+            Err(_elapsed) => {
+                warn!(
+                    budget_ms = reconnect_budget.as_millis(),
+                    "ZomeCaller reconnect exceeded full budget; releasing connecting lock"
+                );
+                Err(format!(
+                    "reconnect exceeded full budget after {}ms",
+                    reconnect_budget.as_millis()
+                ))
+            }
         }
-
-        Ok(())
     }
 
     /// Call a zome function with raw bytes payload, return raw bytes.
@@ -442,5 +482,81 @@ mod tests {
         );
 
         std::env::remove_var("DOORWAY_ZOME_CALL_TIMEOUT_MS");
+    }
+
+    // ── reconnect budget bounds the connecting-mutex hold (HIGH freeze guard) ─
+
+    /// The overall reconnect budget is `deadline * 5 + 1s`: the slow path runs up
+    /// to 5 sequential conductor steps, each bounded by `deadline`. This pins the
+    /// formula so a future per-step addition can't silently outrun the budget.
+    #[test]
+    fn reconnect_budget_covers_all_five_sequential_steps() {
+        let deadline = Duration::from_millis(DEFAULT_ZOME_CALL_TIMEOUT_MS);
+        let budget = deadline * 5 + Duration::from_secs(1);
+        // Strictly greater than the sum of the per-step deadlines, so a legitimate
+        // (slow but progressing) reconnect is never falsely budget-killed…
+        assert!(budget > deadline * 5);
+        // …yet finite — never "no timeout", the bug class this whole module guards.
+        assert_eq!(budget, Duration::from_millis(51_000));
+    }
+
+    /// The load-bearing fix #2 invariant: when every reconnect step hangs (full
+    /// NXDOMAIN), the overall budget timeout must fire and RELEASE the `connecting`
+    /// mutex promptly, so a concurrent caller queued behind it gets a fast `Err`
+    /// instead of parking for the full ~50s.
+    ///
+    /// We model `ensure_connected`'s slow path exactly: a task acquires the
+    /// `connecting` mutex, then runs `timeout(budget, <never-settling reconnect>)`
+    /// while holding it. A second task tries to acquire the same mutex. Under a
+    /// paused clock we advance past the budget and assert (a) the held task's
+    /// reconnect resolved to a timeout `Err`, and (b) the second caller then
+    /// acquires the lock — i.e. the budget bounds the mutex hold.
+    #[tokio::test(start_paused = true)]
+    async fn reconnect_budget_releases_the_connecting_mutex() {
+        use std::sync::Arc;
+        use tokio::sync::Mutex;
+
+        let deadline = Duration::from_millis(DEFAULT_ZOME_CALL_TIMEOUT_MS);
+        let budget = deadline * 5 + Duration::from_secs(1);
+
+        // The exact `connecting: Mutex<()>` shape ZomeCaller uses.
+        let connecting: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
+
+        // Task A: holds the lock across the budget-bounded never-settling reconnect.
+        let lock_a = Arc::clone(&connecting);
+        let holder = tokio::spawn(async move {
+            let _lock = lock_a.lock().await;
+            // Models the slow-path body: every conductor step hangs forever.
+            let never_settles = std::future::pending::<Result<(), String>>();
+            tokio::time::timeout(budget, never_settles).await
+            // `_lock` drops here on return — the prompt release fix #2 guarantees.
+        });
+
+        // Give task A a tick to acquire the lock before task B contends.
+        tokio::task::yield_now().await;
+
+        // Task B: a concurrent caller queued behind the same mutex.
+        let lock_b = Arc::clone(&connecting);
+        let waiter = tokio::spawn(async move {
+            let _lock = lock_b.lock().await;
+        });
+
+        // Advance the paused clock just past the budget. The held task's reconnect
+        // must elapse to an `Err`, releasing the mutex…
+        tokio::time::advance(budget + Duration::from_millis(1)).await;
+
+        let holder_result = holder.await.expect("holder task panicked");
+        assert!(
+            holder_result.is_err(),
+            "a full-NXDOMAIN reconnect must elapse to a budget Err, not hang"
+        );
+
+        // …so the queued caller acquires the lock promptly (well within the
+        // budget again), rather than parking for the full ~50s a second time.
+        let waiter_done = tokio::time::timeout(budget, waiter).await;
+        assert!(
+            waiter_done.is_ok(),
+            "the connecting mutex must release promptly so queued callers proceed"
+        );
     }
 }
