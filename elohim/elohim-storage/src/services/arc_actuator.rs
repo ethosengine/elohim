@@ -44,6 +44,10 @@ pub const FACTOR_FULL: u32 = 1;
 pub struct ArcGrantBounds {
     pub min_factor: u32,
     pub max_factor: u32,
+    /// The per-key redundancy floor the grant pins — the `r_floor` the coverage
+    /// gate enforces (spec §4). A leecher that would drop the remaining mesh
+    /// below this is refused.
+    pub coverage_floor: u32,
     /// Grant expiry (unix seconds); `None` = no expiry encoded.
     pub expires_at_epoch_s: Option<u64>,
 }
@@ -251,6 +255,15 @@ pub fn parse_grant_bounds(payload: &serde_json::Value) -> Result<ArcGrantBounds,
         .and_then(|v| v.as_u64())
         .ok_or_else(|| "bounds.max_factor missing or not an integer".to_string())?
         as u32;
+    // coverage_floor must be present and positive — a missing/zero floor would
+    // make the coverage gate admit a coverage-destroying leecher (remaining >= 0
+    // is always true). Fail the parse instead (no actuation on a malformed grant).
+    let coverage_floor = bounds
+        .get("coverage_floor")
+        .and_then(|v| v.as_u64())
+        .filter(|&c| c > 0)
+        .ok_or_else(|| "bounds.coverage_floor missing or not a positive integer".to_string())?
+        as u32;
     // Expiry from the commitment's top-level ISO-8601 `valid_until`.
     let expires_at_epoch_s = payload
         .get("valid_until")
@@ -260,8 +273,110 @@ pub fn parse_grant_bounds(payload: &serde_json::Value) -> Result<ArcGrantBounds,
     Ok(ArcGrantBounds {
         min_factor,
         max_factor,
+        coverage_floor,
         expires_at_epoch_s,
     })
+}
+
+/// The computed effect of an actuation: the factor to set and the rewritten
+/// conductor-config. Produced by [`compute_actuation`] (pure) and applied by
+/// [`apply_arc_actuation`] (impure: write + restart).
+#[derive(Debug, Clone)]
+pub struct ActuationEffect {
+    pub target_factor: u32,
+    pub commitment_cid: String,
+    pub new_config_yaml: String,
+}
+
+/// Why an apply did not proceed. `Refused` is a *policy* outcome (out-of-grant /
+/// expired / would-break-coverage — carries the finding to elevate); the rest
+/// are mechanical.
+#[derive(Debug, Clone)]
+pub enum ApplyError {
+    /// The grant payload could not be parsed into bounds.
+    BadGrant(String),
+    /// Authorization or the coverage gate refused — carries the elevate finding.
+    Refused(ActuationRefusal),
+    /// The conductor-config had no `network:` block to set the factor under.
+    Render(ActuationError),
+    /// Reading/writing the conductor-config failed.
+    Io(String),
+    /// The conductor restart failed.
+    Restart(String),
+}
+
+/// Pure brain of the apply shell: parse the grant, authorize + run the coverage
+/// gate, and render the new conductor-config — WITHOUT touching the filesystem
+/// or the conductor. Fully testable. Returns the effect to apply, or the reason
+/// it was refused/failed.
+pub fn compute_actuation(
+    proposed_factor: u32,
+    commitment_cid: &str,
+    grant_payload: &serde_json::Value,
+    observed_n: u32,
+    config_yaml: &str,
+    now_epoch_s: u64,
+) -> Result<ActuationEffect, ApplyError> {
+    let bounds = parse_grant_bounds(grant_payload).map_err(ApplyError::BadGrant)?;
+    let req = ArcActuationRequest {
+        target_factor: proposed_factor,
+        commitment_cid: commitment_cid.to_string(),
+    };
+    let snap = CoverageSnapshot {
+        observed_n,
+        r_floor: bounds.coverage_floor,
+    };
+    let plan = plan_actuation(&req, &bounds, &snap, now_epoch_s).map_err(ApplyError::Refused)?;
+    let new_config_yaml =
+        render_conductor_arc_factor(config_yaml, plan.target_factor).map_err(ApplyError::Render)?;
+    Ok(ActuationEffect {
+        target_factor: plan.target_factor,
+        commitment_cid: plan.commitment_cid,
+        new_config_yaml,
+    })
+}
+
+/// The impure apply shell: read the conductor-config, [`compute_actuation`],
+/// atomically rewrite the config, then RESTART the conductor to apply it (the
+/// only path — no runtime resize, spec §2). On a refusal/error nothing is
+/// written and the conductor is NOT restarted (the cure must not cause the
+/// partition). The caller MUST stagger restarts across the mesh (spec §4) — this
+/// restarts only the local conductor. Returns the applied factor.
+pub async fn apply_arc_actuation(
+    proposed_factor: u32,
+    commitment_cid: &str,
+    grant_payload: &serde_json::Value,
+    observed_n: u32,
+    conductor: &mut crate::conductor::process_manager::ConductorManager,
+    now_epoch_s: u64,
+) -> Result<u32, ApplyError> {
+    let config_path = conductor.config_path().to_path_buf();
+    let config_yaml = std::fs::read_to_string(&config_path)
+        .map_err(|e| ApplyError::Io(format!("read {}: {e}", config_path.display())))?;
+
+    let effect = compute_actuation(
+        proposed_factor,
+        commitment_cid,
+        grant_payload,
+        observed_n,
+        &config_yaml,
+        now_epoch_s,
+    )?;
+
+    // Atomic-ish write: temp + rename so a crash mid-write cannot corrupt the
+    // config the conductor respawns from.
+    let tmp = config_path.with_extension("yaml.arc-tmp");
+    std::fs::write(&tmp, &effect.new_config_yaml)
+        .map_err(|e| ApplyError::Io(format!("write temp config: {e}")))?;
+    std::fs::rename(&tmp, &config_path)
+        .map_err(|e| ApplyError::Io(format!("rename temp config: {e}")))?;
+
+    conductor
+        .restart()
+        .await
+        .map_err(|e| ApplyError::Restart(e.to_string()))?;
+
+    Ok(effect.target_factor)
 }
 
 #[cfg(test)]
@@ -272,8 +387,109 @@ mod tests {
         ArcGrantBounds {
             min_factor: min,
             max_factor: max,
+            coverage_floor: 3,
             expires_at_epoch_s: exp,
         }
+    }
+
+    fn arc_grant_payload(min: u32, max: u32, coverage_floor: u32) -> serde_json::Value {
+        serde_json::json!({
+            "action": "sets-authority-arc",
+            "scope": "agent:james",
+            "provider": "agent:matthew-steward",
+            "recipient": "agent:james",
+            "bounds": {
+                "knob": "conductor.target_arc_factor",
+                "min_factor": min,
+                "max_factor": max,
+                "coverage_floor": coverage_floor
+            },
+            "valid_from": "2026-06-13T00:00:00Z",
+            "valid_until": "2099-12-31T00:00:00Z"
+        })
+    }
+
+    const SAMPLE_NET_CONFIG: &str = "network:\n  bootstrap_url: \"x\"\n  enable_mdns: false\n";
+
+    #[test]
+    fn compute_actuation_renders_config_when_admitted() {
+        // Grant permits {0,1}, mesh large enough for a leecher, config has network:.
+        let effect = compute_actuation(
+            0,
+            "uhCkk-grant",
+            &arc_grant_payload(0, 1, 3),
+            14,
+            SAMPLE_NET_CONFIG,
+            1_000,
+        )
+        .unwrap();
+        assert_eq!(effect.target_factor, 0);
+        assert!(effect.new_config_yaml.contains("target_arc_factor: 0"));
+    }
+
+    #[test]
+    fn compute_actuation_refuses_leecher_that_breaks_coverage() {
+        // N=2, coverage_floor=3 → remaining 1 < 3 → refuse + elevate, no render.
+        let err = compute_actuation(
+            0,
+            "uhCkk-grant",
+            &arc_grant_payload(0, 1, 3),
+            2,
+            SAMPLE_NET_CONFIG,
+            1_000,
+        )
+        .unwrap_err();
+        match err {
+            ApplyError::Refused(r) => assert_eq!(r.code, RefusalCode::WouldBreakCoverage),
+            other => panic!("expected Refused(WouldBreakCoverage), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn compute_actuation_refuses_out_of_grant() {
+        // Grant permits leecher only (max=0); proposing full (1) is out of grant.
+        let err = compute_actuation(
+            1,
+            "uhCkk-grant",
+            &arc_grant_payload(0, 0, 3),
+            14,
+            SAMPLE_NET_CONFIG,
+            1_000,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            ApplyError::Refused(ActuationRefusal {
+                code: RefusalCode::OutOfGrantBounds,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn compute_actuation_render_error_without_network_block() {
+        let err = compute_actuation(
+            1,
+            "uhCkk-grant",
+            &arc_grant_payload(0, 1, 3),
+            14,
+            "data_root_path: \"/x\"\n",
+            1_000,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            ApplyError::Render(ActuationError::NoNetworkBlock)
+        ));
+    }
+
+    #[test]
+    fn compute_actuation_bad_grant_when_coverage_floor_missing() {
+        let bad = serde_json::json!({
+            "bounds": { "knob": "conductor.target_arc_factor", "min_factor": 0, "max_factor": 1 }
+        });
+        let err = compute_actuation(0, "uhCkk", &bad, 14, SAMPLE_NET_CONFIG, 1_000).unwrap_err();
+        assert!(matches!(err, ApplyError::BadGrant(_)));
     }
     fn req(factor: u32) -> ArcActuationRequest {
         ArcActuationRequest {

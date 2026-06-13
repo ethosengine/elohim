@@ -162,6 +162,27 @@ impl ConductorManager {
     pub fn admin_port(&self) -> u16 {
         self.admin_port
     }
+
+    /// Path to the conductor-config the process is (re)spawned with.
+    pub fn config_path(&self) -> &std::path::Path {
+        &self.config_path
+    }
+
+    /// Restart the conductor: stop, then start again with the (possibly
+    /// rewritten) config at `config_path`.
+    ///
+    /// This is the ONLY way to apply a changed `network.target_arc_factor` —
+    /// there is no runtime arc-resize API (spike verdict, spec §2). The caller
+    /// (the authority-arc actuator) MUST stagger restarts across the mesh so
+    /// coverage holds during this node's reconvergence (spec §4); this method
+    /// restarts only the local conductor. Disruptive: drops all conductor
+    /// connections until `wait_for_ready` succeeds again.
+    pub async fn restart(&mut self) -> Result<(), ConductorError> {
+        info!("Restarting conductor (config change — e.g. authority-arc actuation)");
+        self.stop().await?;
+        self.start()?;
+        Ok(())
+    }
 }
 
 impl Drop for ConductorManager {
