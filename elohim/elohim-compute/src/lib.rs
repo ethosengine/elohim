@@ -4,6 +4,7 @@
 //! request throughput, and peer health — consumed by every service's
 //! `/status` endpoint and the operator elohim agent.
 
+pub mod actuation;
 pub mod build_info;
 pub mod counters;
 pub mod detail_level;
@@ -12,6 +13,7 @@ pub mod peers;
 pub mod report;
 pub mod resources;
 
+pub use actuation::{Governor, LimitOwner, Refusal, RefusalCode};
 pub use build_info::BuildInfo;
 pub use counters::{RequestCounterSnapshot, RequestCounters};
 pub use detail_level::DetailLevel;
