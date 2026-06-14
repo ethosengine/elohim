@@ -396,18 +396,30 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             // derive_app_url would replace the port with app_port_min (4445), which breaks
             // headless k8s services where the socat proxy listens on a different port (e.g. 8445).
             let app_url = url.clone();
-            // Mint a token from this conductor's admin interface — the app interface
-            // will close any unauthenticated connection.
             let admin_url_for_pool = derive_admin_url_from_app(&app_url);
-            let pool_auth_token =
-                mint_app_auth_token(&admin_url_for_pool, &args.installed_app_id, args.dev_mode)
-                    .await;
+            // Do NOT mint the initial token synchronously here. The per-conductor
+            // pool loop iterates the FULL alpha conductor list (CONDUCTOR_URLS =
+            // every env human), and a synchronous mint_app_auth_token retries up
+            // to 5× with exponential backoff (~12.5s) per call when a conductor's
+            // DNS is briefly unresolvable. Serialized across N conductors that is
+            // up to N×~12.5s of startup blocking BEFORE the HTTP listener binds
+            // :8080 (server::run, far below) — on a slow/flaky node (intel-nuc,
+            // 2026-06-14) that blew the startupProbe budget → `/health` connection
+            // refused → SIGKILL → crash-loop, even with the warm_stream firehose
+            // cured. The pool's token_minter (below) + the background connection
+            // loop already mint on the first unstable (unauthenticated) app-iface
+            // session and re-mint on conductor restart, so the upfront mint is
+            // redundant — drop it and let auth heal in the background. The default
+            // pool (state.pool) serves every request until each per-conductor pool
+            // authenticates; per-conductor routing is an affinity optimization,
+            // never a request precondition ("conductor will use default" below).
+            // See genesis/data/timeline/backlog/self-heal-doorway-startup-conductor-mint-serialization.md
             match WorkerPool::new(PoolConfig {
                 worker_count: 2, // Per-conductor pools are smaller than the main pool
                 conductor_url: app_url.clone(),
                 request_timeout_ms: args.request_timeout_ms,
                 max_queue_size: 500,
-                auth_token: pool_auth_token,
+                auth_token: None,
                 token_minter: Some(make_token_minter(
                     admin_url_for_pool.clone(),
                     args.installed_app_id.clone(),
