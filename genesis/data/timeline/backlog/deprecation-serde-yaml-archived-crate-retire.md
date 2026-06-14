@@ -11,7 +11,7 @@ status: "backlog"
 priority: "medium"
 deprecation_status: blocked
 severity: medium
-fingerprints: ["f55c7497fbcb", "e68f63b8dbf3", "ab7c8b27e94f", "afcf8ef8608a", "a6604ecc351d", "2c2c16622939"]
+fingerprints: ["f55c7497fbcb", "e68f63b8dbf3", "ab7c8b27e94f", "afcf8ef8608a", "a6604ecc351d", "2c2c16622939", "8cc10bf8a03b", "e77871f96415"]
 relatedNodeIds: []
 tags: [deprecation, rust, cargo, serde_yaml, yaml, dependency-replacement]
 cites:
@@ -133,6 +133,18 @@ surface is just `from_str`/`to_string`/`Value`/`Error`). The transitive subset
 
 The sentinel will suppress further dispatch on these fingerprints (ledger status:
 blocked); the stasis sweep owns the re-check.
+
+**2026-06-14 re-encounter (re-confirmed blocked).** The deprecation surfaced
+again as a `Compiling serde_yaml v0.9.34+deprecated` line during the
+`elohim-storage` WASM test build (fp `8cc10bf8a03b`), plus a sentinel
+self-capture of the triage's own `cargo tree -i serde_yaml` scope-pass output
+(fp `e77871f96415`). Both are the SAME concern — the storage workspace was
+already documented above as resolving serde_yaml transitively (it has no direct
+declaration; its build graph pulls it via the `gate-client`/`constitution`/`eae`
+chain — `cargo tree -i` confirms `serde_yaml ← constitution ← {eae, elohim-agent
+← gate-client}`). No new usage, no scope change. Folded into this entry's
+fingerprint list; no new investigation warranted. Decision unchanged: blocked on
+the operator-initiated dependency sprint.
 
 ## Verification
 
