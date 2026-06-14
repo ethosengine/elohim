@@ -1772,6 +1772,21 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
+        stage('Seed Content Provide Rows') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+                expression { env.CONDUCTOR_SEEDING_READY == 'true' }
+            }}
+            steps {
+                container('builder') {
+                    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                        sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-provide-rows.sh'"
+                    }
+                }
+            }
+        }
+
         stage('Seed Agent Peer Bindings') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
