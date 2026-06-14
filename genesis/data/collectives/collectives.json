@@ -60,6 +60,7 @@
       "governanceModel": "consent",
       "domain": "household",
       "place": null,
+      "region": "eden-valley",
       "coupling": {
         "lamad": "household-wisdom",
         "shefa": "household-economy",
@@ -76,6 +77,7 @@
       "governanceModel": "consent",
       "domain": "household",
       "place": null,
+      "region": "tech-valley",
       "coupling": {
         "lamad": "household-wisdom",
         "shefa": "household-economy",
@@ -92,6 +94,7 @@
       "governanceModel": "steward-consent",
       "domain": "household",
       "place": null,
+      "region": "tech-valley",
       "coupling": {
         "lamad": "household-wisdom",
         "shefa": "household-economy",
@@ -108,6 +111,7 @@
       "governanceModel": "consent",
       "domain": "worship",
       "place": null,
+      "region": "tech-valley",
       "coupling": {
         "lamad": "scriptural-study",
         "shefa": "shared-materials",
@@ -124,6 +128,7 @@
       "governanceModel": "community-vote",
       "domain": "land-use",
       "place": null,
+      "region": "tech-valley",
       "coupling": {
         "lamad": "local-knowledge",
         "shefa": "shared-infrastructure",
@@ -139,6 +144,7 @@
       "governanceModel": "consent",
       "domain": "household",
       "place": null,
+      "region": "eden-valley",
       "coupling": {
         "lamad": "household-wisdom",
         "shefa": "household-economy",
@@ -151,7 +157,8 @@
       "governanceLayer": "neighborhood",
       "reach": "familiar",
       "description": "Local economy workers, builders, and faith community",
-      "domain": "economy"
+      "domain": "economy",
+      "region": "tech-valley"
     },
     {
       "id": "neighborhood-extended",
@@ -185,7 +192,8 @@
       "governanceLayer": "neighborhood",
       "reach": "familiar",
       "description": "Compute shard — Valley economy workers and builders",
-      "domain": "household"
+      "domain": "household",
+      "region": "tech-valley"
     },
     {
       "id": "household-extended",
@@ -202,7 +210,8 @@
       "reach": "community",
       "description": "Local faith community in Tech Valley",
       "governanceModel": "consent",
-      "domain": "worship"
+      "domain": "worship",
+      "region": "tech-valley"
     },
     {
       "id": "community-homeschool-coop",
@@ -211,14 +220,16 @@
       "reach": "community",
       "description": "Homeschooling families sharing resources",
       "governanceModel": "consent",
-      "domain": "curriculum"
+      "domain": "curriculum",
+      "region": "tech-valley"
     },
     {
       "id": "community-garden-club",
       "name": "Eden Valley Garden Club",
       "governanceLayer": "interest",
       "reach": "community",
-      "description": "Gardeners and growers sharing knowledge"
+      "description": "Gardeners and growers sharing knowledge",
+      "region": "eden-valley"
     },
     {
       "id": "community-neighborhood-association",
@@ -227,7 +238,8 @@
       "reach": "community",
       "description": "Local neighborhood governance",
       "governanceModel": "community-vote",
-      "domain": "land-use"
+      "domain": "land-use",
+      "region": "tech-valley"
     },
     {
       "id": "community-regen-ag-network",
@@ -241,7 +253,8 @@
       "name": "Rust Language Meetup",
       "governanceLayer": "interest",
       "reach": "community",
-      "description": "Local Rust programming community"
+      "description": "Local Rust programming community",
+      "region": "tech-valley"
     },
     {
       "id": "community-holochain-devs",
@@ -255,56 +268,64 @@
       "name": "Pastoral Care Network",
       "governanceLayer": "faith",
       "reach": "community",
-      "description": "Pastoral support and counseling network"
+      "description": "Pastoral support and counseling network",
+      "region": "tech-valley"
     },
     {
       "id": "community-educators-network",
       "name": "Valley Educators Network",
       "governanceLayer": "education",
       "reach": "community",
-      "description": "Teachers and educators sharing practices"
+      "description": "Teachers and educators sharing practices",
+      "region": "tech-valley"
     },
     {
       "id": "community-impact-investors",
       "name": "Impact Investors Circle",
       "governanceLayer": "economic",
       "reach": "community",
-      "description": "Values-aligned investors supporting local enterprise"
+      "description": "Values-aligned investors supporting local enterprise",
+      "region": "tech-valley"
     },
     {
       "id": "community-farmers-market",
       "name": "Valley Farmers Market",
       "governanceLayer": "economic",
       "reach": "community",
-      "description": "Local producers and consumers marketplace"
+      "description": "Local producers and consumers marketplace",
+      "region": "tech-valley"
     },
     {
       "id": "community-local-business",
       "name": "Valley Local Business Alliance",
       "governanceLayer": "economic",
       "reach": "community",
-      "description": "Local business owners supporting each other"
+      "description": "Local business owners supporting each other",
+      "region": "tech-valley"
     },
     {
       "id": "community-manufacturers-guild",
       "name": "Valley Manufacturers Guild",
       "governanceLayer": "economic",
       "reach": "community",
-      "description": "Local manufacturing cooperative"
+      "description": "Local manufacturing cooperative",
+      "region": "tech-valley"
     },
     {
       "id": "community-builders-guild",
       "name": "Builders Guild",
       "governanceLayer": "economic",
       "reach": "community",
-      "description": "Construction professionals sharing knowledge"
+      "description": "Construction professionals sharing knowledge",
+      "region": "tech-valley"
     },
     {
       "id": "community-apprenticeship-program",
       "name": "Valley Apprenticeship Program",
       "governanceLayer": "education",
       "reach": "community",
-      "description": "Trade apprenticeship matching and support"
+      "description": "Trade apprenticeship matching and support",
+      "region": "tech-valley"
     },
     {
       "id": "community-gig-workers-alliance",
@@ -325,28 +346,32 @@
       "name": "Mining Town Community",
       "governanceLayer": "geographic",
       "reach": "community",
-      "description": "Mining community residents"
+      "description": "Mining community residents",
+      "region": "mining-county"
     },
     {
       "id": "community-utility-workers",
       "name": "Utility Workers Network",
       "governanceLayer": "economic",
       "reach": "community",
-      "description": "Power and utility workers community"
+      "description": "Power and utility workers community",
+      "region": "tech-valley"
     },
     {
       "id": "community-immigrant-support",
       "name": "Immigrant Support Network",
       "governanceLayer": "community",
       "reach": "community",
-      "description": "Supporting newcomers and immigrants"
+      "description": "Supporting newcomers and immigrants",
+      "region": "tech-valley"
     },
     {
       "id": "community-esl-program",
       "name": "ESL Learning Program",
       "governanceLayer": "education",
       "reach": "community",
-      "description": "English as second language learning community"
+      "description": "English as second language learning community",
+      "region": "tech-valley"
     },
     {
       "id": "community-refugee-resettlement",
@@ -367,105 +392,120 @@
       "name": "EthosEngine",
       "governanceLayer": "workplace",
       "reach": "community",
-      "description": "Protocol development organization"
+      "description": "Protocol development organization",
+      "region": "tech-valley"
     },
     {
       "id": "org-community-church",
       "name": "Valley Community Church (organization)",
       "governanceLayer": "workplace",
       "reach": "community",
-      "description": "Church as workplace for staff"
+      "description": "Church as workplace for staff",
+      "region": "tech-valley"
     },
     {
       "id": "org-valley-school-district",
       "name": "Valley School District",
       "governanceLayer": "workplace",
       "reach": "community",
-      "description": "Local school district"
+      "description": "Local school district",
+      "region": "tech-valley"
     },
     {
       "id": "org-teachers-union",
       "name": "Valley Teachers Union",
       "governanceLayer": "workplace",
       "reach": "community",
-      "description": "Teachers union local chapter"
+      "description": "Teachers union local chapter",
+      "region": "tech-valley"
     },
     {
       "id": "org-learning-collective",
       "name": "Valley Learning Collective",
       "governanceLayer": "education",
       "reach": "community",
-      "description": "Collaborative learning facilitation"
+      "description": "Collaborative learning facilitation",
+      "region": "tech-valley"
     },
     {
       "id": "org-community-foundation",
       "name": "Valley Community Foundation",
       "governanceLayer": "economic",
       "reach": "community",
-      "description": "Community development foundation"
+      "description": "Community development foundation",
+      "region": "tech-valley"
     },
     {
       "id": "org-franks-farm",
       "name": "Frank's Family Farm",
       "governanceLayer": "workplace",
       "reach": "familiar",
-      "description": "Family-owned regenerative farm"
+      "description": "Family-owned regenerative farm",
+      "region": "tech-valley"
     },
     {
       "id": "org-valley-market",
       "name": "Valley Market",
       "governanceLayer": "workplace",
       "reach": "familiar",
-      "description": "Local grocery and market"
+      "description": "Local grocery and market",
+      "region": "tech-valley"
     },
     {
       "id": "org-valley-machine-works",
       "name": "Valley Machine Works",
       "governanceLayer": "workplace",
       "reach": "familiar",
-      "description": "Local manufacturing business"
+      "description": "Local manufacturing business",
+      "region": "tech-valley"
     },
     {
       "id": "org-bub-construction",
       "name": "Bub's Construction",
       "governanceLayer": "workplace",
       "reach": "familiar",
-      "description": "General contracting and construction"
+      "description": "General contracting and construction",
+      "region": "tech-valley"
     },
     {
       "id": "org-consolidated-mining",
       "name": "Consolidated Mining Corp",
       "governanceLayer": "workplace",
       "reach": "community",
-      "description": "Mining corporation"
+      "description": "Mining corporation",
+      "region": "mining-county"
     },
     {
       "id": "org-miners-union-local-347",
       "name": "Miners Union Local 347",
       "governanceLayer": "workplace",
       "reach": "community",
-      "description": "Mining workers union local"
+      "description": "Mining workers union local",
+      "region": "mining-county"
     },
     {
       "id": "org-valley-power-electric",
       "name": "Valley Power & Electric",
       "governanceLayer": "workplace",
       "reach": "community",
-      "description": "Local power utility"
+      "description": "Local power utility",
+      "region": "tech-valley"
     },
     {
       "id": "org-ibew-local-123",
       "name": "IBEW Local 123",
       "governanceLayer": "workplace",
       "reach": "community",
-      "description": "Electrical workers union local"
+      "description": "Electrical workers union local",
+      "region": "tech-valley"
     },
     {
       "id": "org-pure-valley-association",
       "name": "Pure Valley Community Association",
       "governanceLayer": "geographic",
       "reach": "community",
-      "description": "Community governance association"
+      "description": "Community governance association",
+      "region": "tech-valley"
     },
     {
       "id": "household-matthew",
@@ -536,7 +576,8 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "description": "Compute shard — Pete's household",
-      "domain": "household"
+      "domain": "household",
+      "region": "tech-valley"
     },
     {
       "id": "household-terrance",
@@ -544,7 +585,8 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "description": "Compute shard — Terrance's household",
-      "domain": "household"
+      "domain": "household",
+      "region": "tech-valley"
     },
     {
       "id": "household-nancy",
