@@ -58,6 +58,25 @@ impl Default for ProjectionConfig {
     }
 }
 
+/// Per-operation MongoDB timeout. The client URI bounds only
+/// serverSelectionTimeoutMS/connectTimeoutMS — a checked-out-but-stalled socket
+/// read or upsert has NO bound, so a slow-but-alive mongo can park a tokio
+/// worker indefinitely. Under the warm_stream projection firehose on a
+/// CPU-throttled pod this starved /health → liveness SIGKILL (doorway-freeze
+/// 2026-06-13/14). Bounding each op turns a silent unbounded park into a fast,
+/// LOGGED error. Default 2000ms; override DOORWAY_MONGO_OP_TIMEOUT_MS (0 → default).
+fn parse_mongo_op_timeout(raw: Option<String>) -> std::time::Duration {
+    let ms = raw
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|&v| v > 0)
+        .unwrap_or(2000);
+    std::time::Duration::from_millis(ms)
+}
+
+fn mongo_op_timeout() -> std::time::Duration {
+    parse_mongo_op_timeout(std::env::var("DOORWAY_MONGO_OP_TIMEOUT_MS").ok())
+}
+
 /// Projection Store - unified access to projected data
 ///
 /// Architecture:
@@ -187,10 +206,18 @@ impl ProjectionStore {
         let db = mongo.inner().database(mongo.db_name());
         let collection = db.collection::<ProjectedDocument>(&self.config.collection_name);
 
-        collection
-            .find_one(doc! { "_id": mongo_id, "metadata.is_deleted": { "$ne": true } })
-            .await
-            .map_err(|e| DoorwayError::Database(format!("Find failed: {e}")))
+        match tokio::time::timeout(
+            mongo_op_timeout(),
+            collection.find_one(doc! { "_id": mongo_id, "metadata.is_deleted": { "$ne": true } }),
+        )
+        .await
+        {
+            Ok(r) => r.map_err(|e| DoorwayError::Database(format!("Find failed: {e}"))),
+            Err(_) => Err(DoorwayError::Database(format!(
+                "Find timed out after {}ms (mongo slow/parked): {mongo_id}",
+                mongo_op_timeout().as_millis()
+            ))),
+        }
     }
 
     /// Store a projected document
@@ -260,11 +287,24 @@ impl ProjectionStore {
             .upsert(true)
             .build();
 
-        collection
-            .replace_one(doc! { "_id": &mongo_id }, doc)
-            .with_options(options)
-            .await
-            .map_err(|e| DoorwayError::Database(format!("Upsert failed: {e}")))?;
+        match tokio::time::timeout(
+            mongo_op_timeout(),
+            collection
+                .replace_one(doc! { "_id": &mongo_id }, doc)
+                .with_options(options),
+        )
+        .await
+        {
+            Ok(r) => {
+                r.map_err(|e| DoorwayError::Database(format!("Upsert failed: {e}")))?;
+            }
+            Err(_) => {
+                return Err(DoorwayError::Database(format!(
+                    "Upsert timed out after {}ms (mongo slow/parked): {mongo_id}",
+                    mongo_op_timeout().as_millis()
+                )));
+            }
+        }
 
         debug!("Projected document upserted: {}", mongo_id);
         Ok(())
@@ -731,6 +771,25 @@ mod tests {
         assert!(
             store.hot_cache_stats().total_entries <= 100,
             "eviction must keep the hot cache at or under the configured cap"
+        );
+    }
+
+    #[test]
+    fn mongo_op_timeout_parses_env_and_defaults() {
+        // default when unset / invalid / zero; explicit value otherwise.
+        assert_eq!(super::parse_mongo_op_timeout(None).as_millis(), 2000);
+        assert_eq!(
+            super::parse_mongo_op_timeout(Some("500".to_string())).as_millis(),
+            500
+        );
+        assert_eq!(
+            super::parse_mongo_op_timeout(Some("0".to_string())).as_millis(),
+            2000,
+            "zero must fall back to the default, never a 0ms (instant-timeout) op"
+        );
+        assert_eq!(
+            super::parse_mongo_op_timeout(Some("nope".to_string())).as_millis(),
+            2000
         );
     }
 }

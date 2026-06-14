@@ -49,6 +49,29 @@ const WARMUP_CIRCUIT_COOLDOWN_TICKS: u64 = 5;
 /// monopolize the throttled tokio workers.
 const WARMUP_YIELD_EVERY_N: usize = 64;
 
+/// Real inter-batch pace (ms) applied at each WARMUP_YIELD_EVERY_N boundary.
+/// `yield_now()` only REORDERS ready tasks; under a CFS CPU quota (cpu:1) a
+/// warm_stream catch-up burst still pegs the quota → CFS throttles the whole
+/// process → the /health task can't get a slice inside the 15s probe window →
+/// liveness SIGKILL (doorway-freeze 2026-06-14: warm_stream burst-starvation,
+/// operator cluster-confirmed). A short real sleep caps warm_stream's CPU duty
+/// cycle, leaving headroom for /health + request handling. ~0.45s added over a
+/// 3.6k-doc corpus (56 batches × 8ms) — negligible vs the 75s total budget.
+/// This is the durable "pace itself" fix the cpu 1→2 bump only band-aided.
+/// Default 8ms; override WARMUP_PACE_MS (0 disables — falls back to yield-only).
+const WARMUP_PACE_MS_DEFAULT: u64 = 8;
+
+fn parse_warmup_pace(raw: Option<String>) -> std::time::Duration {
+    let ms = raw
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(WARMUP_PACE_MS_DEFAULT);
+    std::time::Duration::from_millis(ms)
+}
+
+fn warmup_pace() -> std::time::Duration {
+    parse_warmup_pace(std::env::var("WARMUP_PACE_MS").ok())
+}
+
 use super::document::ProjectedDocument;
 use super::store::ProjectionStore;
 
@@ -272,6 +295,7 @@ pub async fn stream_from_peer(store: Arc<ProjectionStore>, storage_url: &str) ->
     let mut line_buffer = String::new();
     let mut event_lines: Vec<String> = Vec::new();
     let mut projected: usize = 0;
+    let pace = warmup_pace();
 
     while let Some(chunk_result) = byte_stream.next().await {
         let chunk = match chunk_result {
@@ -356,6 +380,12 @@ pub async fn stream_from_peer(store: Arc<ProjectionStore>, storage_url: &str) ->
                                 projected += 1;
                                 if projected.is_multiple_of(WARMUP_YIELD_EVERY_N) {
                                     tokio::task::yield_now().await;
+                                    // Real pace, not just a reorder — caps CPU duty
+                                    // cycle so /health gets a runtime slice under a
+                                    // 1-core CFS quota (see WARMUP_PACE_MS_DEFAULT).
+                                    if !pace.is_zero() {
+                                        tokio::time::sleep(pace).await;
+                                    }
                                 }
                             }
                         }
@@ -550,6 +580,24 @@ pub fn spawn_stream_task(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn warmup_pace_parses_env_and_defaults() {
+        assert_eq!(
+            parse_warmup_pace(None).as_millis(),
+            WARMUP_PACE_MS_DEFAULT as u128
+        );
+        assert_eq!(parse_warmup_pace(Some("20".to_string())).as_millis(), 20);
+        assert_eq!(
+            parse_warmup_pace(Some("0".to_string())).as_millis(),
+            0,
+            "0 explicitly disables the real pace (yield-only fallback)"
+        );
+        assert_eq!(
+            parse_warmup_pace(Some("bad".to_string())).as_millis(),
+            WARMUP_PACE_MS_DEFAULT as u128
+        );
+    }
 
     #[test]
     fn test_parse_sse_event_content() {
