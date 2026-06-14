@@ -128,6 +128,9 @@ spec:
         - name: doorway
           image: harbor.ethosengine.com/ethosengine/elohim-doorway:DOORWAY_TAG_PLACEHOLDER
           imagePullPolicy: Always
+          # Capture last log lines into the termination message on crash — see
+          # alpha.yaml for rationale (SIGKILL forensics when promtail misses it).
+          terminationMessagePolicy: FallbackToLogsOnError
           args:
             - "--listen"
             - "0.0.0.0:8080"
@@ -285,11 +288,14 @@ spec:
               path: /health
               port: 8080
             periodSeconds: 30
+            # Widen liveness window so a brief /health stall under load doesn't
+            # SIGKILL a healthy pod — see alpha.yaml for the full rationale.
             timeoutSeconds: 15
             failureThreshold: 5
         - name: doorway-app
           image: harbor.ethosengine.com/ethosengine/doorway-app:DOORWAY_APP_TAG_PLACEHOLDER
           imagePullPolicy: Always
+          terminationMessagePolicy: FallbackToLogsOnError
           ports:
             - name: operator-ui
               containerPort: 80
@@ -324,6 +330,7 @@ spec:
         - name: elohim-agent-sdk
           image: harbor.ethosengine.com/ethosengine/elohim-agent-sdk:AGENT_SDK_TAG_PLACEHOLDER
           imagePullPolicy: Always
+          terminationMessagePolicy: FallbackToLogsOnError
           ports:
             - name: agent-sdk
               containerPort: 8095

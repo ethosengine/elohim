@@ -98,6 +98,12 @@ spec:
         - name: doorway
           image: harbor.ethosengine.com/ethosengine/elohim-doorway:DOORWAY_TAG_PLACEHOLDER
           imagePullPolicy: Always
+          # On a SIGKILL/crash, copy the container's last stdout/stderr lines into
+          # the termination message so the cause survives in containerStatus
+          # (kubectl describe / KSM) even when promtail didn't capture them — the
+          # gap that left build #1075's crash unconfirmed. FallbackToLogsOnError
+          # only populates the message on non-zero exit, so it's free on clean exits.
+          terminationMessagePolicy: FallbackToLogsOnError
           args:
             - "--listen"
             - "0.0.0.0:8080"
@@ -279,6 +285,11 @@ spec:
               path: /health
               port: 8080
             periodSeconds: 30
+            # Default timeoutSeconds=1 + failureThreshold=3 SIGKILLed a HEALTHY,
+            # serving pod: under SSR/conductor load /health stalls >1s, and 3
+            # such stalls in 90s tripped the kill (build #1075 → exit 137,
+            # reason=Error, logs showed it serving bootstrap PUTs to the end —
+            # a liveness kill, not a crash). Widened to 15s/5 (150s budget).
             timeoutSeconds: 15
             failureThreshold: 5
         # Doorway Operator Dashboard - Angular app for node operators
@@ -286,6 +297,7 @@ spec:
         - name: doorway-app
           image: harbor.ethosengine.com/ethosengine/doorway-app:DOORWAY_APP_TAG_PLACEHOLDER
           imagePullPolicy: Always
+          terminationMessagePolicy: FallbackToLogsOnError
           ports:
             - name: operator-ui
               containerPort: 80
@@ -322,6 +334,7 @@ spec:
         - name: elohim-agent-sdk
           image: harbor.ethosengine.com/ethosengine/elohim-agent-sdk:AGENT_SDK_TAG_PLACEHOLDER
           imagePullPolicy: Always
+          terminationMessagePolicy: FallbackToLogsOnError
           ports:
             - name: agent-sdk
               containerPort: 8095
