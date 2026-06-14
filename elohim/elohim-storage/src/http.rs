@@ -1010,6 +1010,18 @@ impl HttpServer {
                 self.handle_arc_policy_actuate(req).await
             }
 
+            // Operator/seed deterministic shard-manifest + agent-keyed locations
+            // write — the gated lever that lights the resilience card's
+            // distributionState + stewardingCollectives for blob-backed demo/test
+            // content WITHOUT waiting on full P2P gossip. Off by default; requires
+            // ALLOW_SEED_SHARD_MANIFEST=1. The genuine distribution path is
+            // POST /db/content (blob) → distribute_shards; this is the seed analogue
+            // for a thin mesh. Node-local (deliberately NOT in build_manifest);
+            // status="seeded" keeps the rows' provenance legible. Idempotent.
+            (Method::PUT, "/admin/seed/shard-manifest") => {
+                self.handle_seed_shard_manifest(req).await
+            }
+
             // SSE event stream — must be matched before the /api/v1/ catch-all
             (Method::GET, "/api/v1/events") => {
                 if let Some(ref services) = self.services {
@@ -2712,6 +2724,105 @@ impl HttpServer {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &serde_json::json!({ "status": "error", "error": format!("{other:?}") }),
             )),
+        }
+    }
+
+    /// PUT /admin/seed/shard-manifest — operator/seed deterministic write of a
+    /// shard manifest + agent-keyed shard_locations for a content.
+    ///
+    /// This is the **deterministic lever** that lights the resilience card's
+    /// `distributionState: measured` + `stewardingCollectives` for blob-backed
+    /// demo/test content WITHOUT waiting on full P2P gossip. The genuine
+    /// distribution path is `POST /db/content` (with a blob_hash) →
+    /// `distribute_shards` over a live mesh; this endpoint produces the same
+    /// table shape for a thin mesh or an acceptance test.
+    ///
+    /// ## Honesty gate (off by default)
+    ///
+    /// Refuses with 403 unless `ALLOW_SEED_SHARD_MANIFEST=1`. Lighting these
+    /// columns is a CLAIM that the named households hold the content; a real
+    /// deployment (flag unset) can never fabricate distribution through this path.
+    /// Seeded rows carry `status="seeded"` so their provenance stays legible
+    /// alongside runtime `announced`/`verified` rows.
+    ///
+    /// Category C (operational): no new DHT entity, no new table, no signal.
+    /// Identity is agent-keyed (`peerId` = the steward's `agent_pub_key`).
+    async fn handle_seed_shard_manifest(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::seed_shard_manifest::{apply, SeedShardManifestInput, SeedSteward};
+
+        // --- Honesty gate: off unless the operator explicitly opts in. --------
+        let allowed = std::env::var("ALLOW_SEED_SHARD_MANIFEST")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+        if !allowed {
+            return Ok(response::forbidden(&serde_json::json!({
+                "error": "seed shard-manifest is disabled",
+                "hint": "set ALLOW_SEED_SHARD_MANIFEST=1 to enable this operator/seed lever",
+                "note": "this path fabricates distribution rows for demo/test; production lights the card via the real distribute_shards path",
+            })));
+        }
+
+        let pool = self
+            .db_pool
+            .as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not available".into()))?;
+
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("read body: {e}")))?
+            .to_bytes();
+
+        // Local request shape — camelCase wire, operator/seed-only (no TS client
+        // consumes it, so no ts-rs View; mirrors arc-policy/actuate's local req).
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct SeedReq {
+            content_id: String,
+            #[serde(default)]
+            h_app_id: Option<String>,
+            #[serde(default)]
+            reach: Option<String>,
+            #[serde(default)]
+            shard_hashes: Vec<String>,
+            #[serde(default)]
+            blob_hash: Option<String>,
+            /// Stewards as agent_pub_key strings.
+            stewards: Vec<String>,
+            #[serde(default)]
+            total_size_bytes: Option<i64>,
+        }
+
+        let body: SeedReq = match serde_json::from_slice(&body) {
+            Ok(v) => v,
+            Err(e) => return Ok(response::bad_request(&format!("Invalid JSON: {e}"))),
+        };
+
+        let input = SeedShardManifestInput {
+            h_app_id: body.h_app_id.unwrap_or_else(|| "lamad".to_string()),
+            content_id: body.content_id,
+            reach: body.reach.unwrap_or_else(|| "commons".to_string()),
+            shard_hashes: body.shard_hashes,
+            blob_hash: body.blob_hash,
+            stewards: body
+                .stewards
+                .into_iter()
+                .map(|peer_id| SeedSteward { peer_id })
+                .collect(),
+            total_size_bytes: body.total_size_bytes.unwrap_or(0),
+        };
+
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("pool: {e}")))?;
+
+        match apply(&mut conn, &input) {
+            Ok(report) => Ok(response::created(&report)),
+            Err(e @ StorageError::InvalidInput(_)) => Ok(response::bad_request(&format!("{e}"))),
+            Err(e) => Ok(response::error_response(e)),
         }
     }
 

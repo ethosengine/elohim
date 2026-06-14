@@ -69,6 +69,45 @@ Feature: Grandma's photos survive a node loss; the family sees they're held
     Then they see the holders rendered by name, not by shard hash or percentage
     And they see the reassurance state as warm language, not a red SLA
 
+  # === Real-data: a blob-backed album lights stewarding (Epic B) ==============
+  # The card honestly reads dark for inline-body content (DHT-replicated, never
+  # shard-distributed). A photo album IS the blob case: it has a blob_hash, so it
+  # enters the distribution plane. These two scenarios prove the card LIGHTS for
+  # genuinely shard-distributed content — first deterministically (the operator
+  # seed lever, for demo/test/thin-mesh), then via the real P2P path on a 2-node
+  # mesh. The honesty boundary: the seed lever is OFF by default
+  # (ALLOW_SEED_SHARD_MANIFEST=1) and marks rows status="seeded", so a real
+  # deployment can never fabricate distribution.
+
+  @resilience-p1 @requires:seeded-content
+  Scenario: A blob-backed album lights stewarding via the operator seed lever
+    # Deterministic lever (PUT /admin/seed/shard-manifest): writes a shard
+    # manifest + agent-keyed shard_locations for blob-backed content WITHOUT
+    # waiting on full P2P gossip. The card lights because the rows are real
+    # operational projection rows (Category C), agent-keyed to join humans →
+    # household_id exactly like the runtime distribute_shards path.
+    Given a blob-backed content item "grandma-album-1974" exists with reach "intimate"
+    And the operator seed-shard-manifest lever is enabled
+    When the operator seeds a shard manifest for "grandma-album-1974" stewarded by 3 distinct households
+    And I read "/api/v1/resilience/grandma-album-1974/household"
+    Then the response field "distributionState" is "measured"
+    And the response field "stewardingCollectives" is at least 3
+    And the response field "feltStatus.reassurance" is "protected"
+
+  @resilience-p1 @local @requires:household-nodes
+  Scenario: A blob-backed album distributes across the live household mesh
+    # The GENUINE path: POST /db/content with a blob_hash triggers distribute_shards,
+    # which selects committed peers and pushes shards, writing shard_locations on
+    # placement. On the household P2P mesh (Matthew/Jessica/James — the stable
+    # floor, itself a multi-node cluster) this lands ≥2 stewarding households.
+    # Constraint: requires ≥2 nodes online with active "commons" provide
+    # commitments and the in-pod conductor cells enabled (see backlog
+    # resilience-card-self-cid-provide-loop-gate). Household-testable, not @shem.
+    Given the cluster has peers in at least 2 distinct households each with an active "commons" provide commitment
+    When I ingest a blob-backed "commons"-reach content item "mesh-album-1974"
+    Then within 60 seconds "/api/v1/resilience/mesh-album-1974/household" reports "stewardingCollectives" >= 2
+    And the response field "distributionState" is "measured"
+
   # === Sibling-stub ATTACH POINTS (named now so the spine shows where they land) ==
   # These assert the EFFECT of the pro-social action, owned by the sibling stubs.
   # Held @wip until each sibling is greenlit; the felt surface above is their anchor.

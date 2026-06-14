@@ -100,6 +100,7 @@ pub mod risk_alert;
 pub mod routing;
 pub mod schemaref_resolver;
 pub mod sealed_against_self;
+pub mod seed_shard_manifest;
 pub mod session_exchange;
 pub mod shard_manifest_backfill; // GAP-2b — steward-side portal session exchange (doorway handoff redemption)
 pub mod sidecar_engine;

@@ -76,6 +76,37 @@ async function storagePost(
   return JSON.parse(text) as Record<string, unknown>;
 }
 
+/** PUT JSON body to elohim-storage, return {statusCode, json}. Does NOT throw on
+ *  non-2xx (the seed-lever scenarios assert on the status themselves). */
+async function storagePut(
+  path: string,
+  payload: Record<string, unknown>
+): Promise<{ statusCode: number; json: Record<string, unknown> }> {
+  const { statusCode, body } = await request(`${storageUrl()}${path}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const text = await body.text();
+  let json: Record<string, unknown> = {};
+  try {
+    json = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    json = { _raw: text };
+  }
+  return { statusCode, json };
+}
+
+/** Read a possibly dotted field path from a JSON object: "feltStatus.reassurance". */
+function readPath(obj: Record<string, unknown>, path: string): unknown {
+  return path.split('.').reduce<unknown>((acc, key) => {
+    if (acc && typeof acc === 'object') {
+      return (acc as Record<string, unknown>)[key];
+    }
+    return undefined;
+  }, obj);
+}
+
 // Store last polled JSON body between steps (per-scenario via world).
 const lastResponseKey = Symbol('resilience:lastResponse');
 
@@ -1168,6 +1199,206 @@ Then(
             .map(r => `${r.metadata?.providerHumanId ?? '?'}→${r.metadata?.receiverHumanId ?? '?'}`)
             .join(', ') || '(none)'
         }`
+    );
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Epic B — blob-backed content lights stewarding (the resilience card's
+// distributionState + stewardingCollectives columns)
+//
+// Two complementary paths prove the card LIGHTS for genuinely shard-distributed
+// content:
+//   1. The operator seed lever (PUT /admin/seed/shard-manifest) — deterministic,
+//      off by default (ALLOW_SEED_SHARD_MANIFEST=1), for demo/test/thin-mesh.
+//   2. The real P2P path (POST /db/content with a blob → distribute_shards) on
+//      the live 2-node household mesh.
+// ---------------------------------------------------------------------------
+
+/** Generate a small deterministic blob payload for a content id. */
+function blobPayloadFor(contentId: string): string {
+  return `BLOB:${contentId}:` + 'x'.repeat(64);
+}
+
+/**
+ * Create a blob-backed content item. A photo album IS the blob case — it carries
+ * a blob_hash, so it enters the distribution plane (unlike inline-body content,
+ * which is DHT-replicated and honestly reads distributionState: unmeasured).
+ *
+ * Example:
+ *   Given a blob-backed content item "grandma-album-1974" exists with reach "intimate"
+ */
+Given(
+  'a blob-backed content item {string} exists with reach {string}',
+  async function (this: E2EWorld, contentId: string, reach: string) {
+    const payload = {
+      id: contentId,
+      contentType: 'album',
+      contentFormat: 'external',
+      reach,
+      title: contentId,
+      // A blob-backed item carries blobHash; the body is the blob the substrate
+      // would shard. We send both so the create path records a manifest.
+      blobHash: `sha256-seed-${contentId}`,
+      content: blobPayloadFor(contentId),
+    };
+    await storagePost('/db/content', payload);
+    this.contentIds.set('lastContentId', contentId);
+    this.contentIds.set('lastContentReach', reach);
+  }
+);
+
+/**
+ * Precondition gate for the operator seed lever. The lever is OFF by default
+ * (the honesty boundary); the storage process must be started with
+ * ALLOW_SEED_SHARD_MANIFEST=1. When the env says it's disabled here, the
+ * scenario skips (pending) rather than false-failing — the lever's whole point
+ * is that it cannot be on by accident.
+ *
+ * Example:
+ *   And the operator seed-shard-manifest lever is enabled
+ */
+Given(
+  'the operator seed-shard-manifest lever is enabled',
+  async function (this: E2EWorld): Promise<string | undefined> {
+    // Probe the endpoint with an intentionally-empty body: a 400 means the lever
+    // is ON (it got past the gate to validation); a 403 means it's OFF.
+    const { statusCode } = await storagePut('/admin/seed/shard-manifest', {});
+    if (statusCode === 403) {
+      // Lever disabled — skip rather than fail. Set ALLOW_SEED_SHARD_MANIFEST=1
+      // on the storage process to exercise this scenario.
+      return 'pending';
+    }
+    return undefined;
+  }
+);
+
+/**
+ * Drive the deterministic lever: discover N real households (from /db/humans),
+ * then PUT a shard manifest + agent-keyed shard_locations placing the album's
+ * single shard on one steward per household. The endpoint is agent-keyed
+ * (peerId = agent_pub_key), so the rows join humans → household_id exactly like
+ * the runtime distribute_shards path.
+ *
+ * Example:
+ *   When the operator seeds a shard manifest for "grandma-album-1974" stewarded by 3 distinct households
+ */
+When(
+  'the operator seeds a shard manifest for {string} stewarded by {int} distinct households',
+  async function (
+    this: E2EWorld,
+    contentId: string,
+    households: number
+  ): Promise<string | undefined> {
+    const humans = (await storageGet('/db/humans')) as unknown as Record<string, unknown>[];
+    // One steward agent key per distinct household.
+    const byHousehold = new Map<string, string>();
+    for (const h of humans) {
+      const hh = h['householdId'] as string | undefined;
+      const key = h['agentPubKey'] as string | undefined;
+      if (hh && key && !byHousehold.has(hh)) {
+        byHousehold.set(hh, key);
+      }
+    }
+    const stewards = [...byHousehold.values()].slice(0, households);
+    if (stewards.length < households) {
+      // Not enough seeded households with agent keys — skip (pending). This is a
+      // @requires:seeded-content precondition, not a code failure.
+      return 'pending';
+    }
+
+    const { statusCode, json } = await storagePut('/admin/seed/shard-manifest', {
+      contentId,
+      reach: this.contentIds.get('lastContentReach') ?? 'commons',
+      blobHash: `sha256-seed-${contentId}`,
+      stewards,
+      totalSizeBytes: 4096,
+    });
+    assert.ok(
+      statusCode < 300,
+      `seed shard-manifest failed: ${statusCode} ${JSON.stringify(json)}`
+    );
+    assert.equal(
+      json['seeded'],
+      true,
+      `expected a seeded report; got ${JSON.stringify(json)}`
+    );
+    return undefined;
+  }
+);
+
+/**
+ * POST a blob-backed content item to elohim-storage and trigger the real
+ * distribute_shards path. Distinct from "I ingest a {string}-reach content item"
+ * (inline body) — this carries a blobHash so the substrate shards + distributes.
+ *
+ * Example:
+ *   When I ingest a blob-backed "commons"-reach content item "mesh-album-1974"
+ */
+When(
+  'I ingest a blob-backed {string}-reach content item {string}',
+  async function (this: E2EWorld, reach: string, contentId: string) {
+    const payload = {
+      id: contentId,
+      contentType: 'album',
+      contentFormat: 'external',
+      reach,
+      title: contentId,
+      blobHash: `sha256-seed-${contentId}`,
+      content: blobPayloadFor(contentId),
+    };
+    await storagePost('/db/content', payload);
+    this.contentIds.set('lastContentId', contentId);
+    this.contentIds.set('lastContentReach', reach);
+  }
+);
+
+/**
+ * GET a storage path and store the response for follow-up Then steps.
+ *
+ * Example:
+ *   And I read "/api/v1/resilience/grandma-album-1974/household"
+ */
+When('I read {string}', async function (this: E2EWorld, path: string) {
+  const data = await storageGet(path);
+  storeResponse(this, data);
+});
+
+/**
+ * Assert a (possibly dotted) field in the last stored response equals a value.
+ *
+ * Example:
+ *   Then the response field "distributionState" is "measured"
+ *   And the response field "feltStatus.reassurance" is "protected"
+ */
+Then(
+  'the response field {string} is {string}',
+  function (this: E2EWorld, fieldName: string, expected: string) {
+    const data = loadResponse(this);
+    const actual = readPath(data, fieldName);
+    assert.equal(
+      String(actual),
+      expected,
+      `Expected "${fieldName}" to be "${expected}"; got: "${String(actual)}"`
+    );
+  }
+);
+
+/**
+ * Assert a numeric (possibly dotted) field in the last stored response is at
+ * least a minimum.
+ *
+ * Example:
+ *   And the response field "stewardingCollectives" is at least 3
+ */
+Then(
+  'the response field {string} is at least {int}',
+  function (this: E2EWorld, fieldName: string, min: number) {
+    const data = loadResponse(this);
+    const actual = readPath(data, fieldName);
+    assert.ok(
+      typeof actual === 'number' && actual >= min,
+      `Expected "${fieldName}" >= ${min}; got: ${String(actual)}`
     );
   }
 );
