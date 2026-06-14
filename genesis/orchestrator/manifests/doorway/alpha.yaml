@@ -183,10 +183,12 @@ spec:
             # worker wedging the whole gateway (10 threads in futex_wait, /health
             # included). A futex-blocked worker costs no CPU, so 4 workers break the
             # single-blocked-await wedge even at cpu: 1 — this is the direct antidote
-            # and does NOT require raising limits.cpu. (See the resources block: cpu
-            # stays at 1000m; raise to 2000m only if SSR render latency under
-            # concurrency demands it — that buys CPU-bound render throughput, not
-            # freeze-resistance.) Default in-binary is 4 if unset.
+            # and does NOT require raising limits.cpu for the single-blocked-await
+            # class. (UPDATE 2026-06-14: limits.cpu WAS raised 1→2 anyway — see the
+            # resources block — for a DIFFERENT class: warm_stream projection bursts
+            # starving the /health task off the runtime on a 1-core quota → liveness
+            # SIGKILL. The 2nd core buys burst headroom; band-aid, not the pacing fix.)
+            # Default in-binary is 4 if unset.
             - name: DOORWAY_WORKER_THREADS
               value: "4"
             # Conductor-call hard deadline (ms). Bounds every zome/admin call so an
@@ -232,10 +234,23 @@ spec:
               # parsed bundle + module loader cache. 256Mi was a coin-toss
               # OOM; build #953 squeaked through, #954 didn't.
               memory: "256Mi"
-              cpu: "100m"
+              # cpu request 100m→500m (2026-06-14): a guaranteed scheduled share, not
+              # just burst. The projection warm_stream replays the Content/scenario
+              # corpus in tight bursts (operator cluster-read: ~8.6k log lines/60s,
+              # mostly projection::store; avg ~0.25 core but bursty); on cpu:1 those
+              # bursts starved the /health task → liveness SIGKILL (137) → CrashLoop
+              # (109 restarts/15h on aa6debe6). doorway-alpha-b at adam stayed 3/3.
+              cpu: "500m"
             limits:
               memory: "1Gi"
-              cpu: "1000m"
+              # cpu limit 1→2 (2026-06-14): a 2nd core of BURST headroom so a
+              # warm_stream projection burst can't starve the latency-sensitive
+              # /health task off the runtime. BAND-AID for burst-starvation, NOT the
+              # fix — warm_stream has no backpressure/yield (the real "can't pace
+              # itself" gap; durable fix = warm_stream pacing + /health isolation,
+              # see doorway-freeze-incident-2026-06-13/WARM-STREAM-RESIDUAL-DIAGNOSIS.md).
+              # Debug logging kept ON deliberately to keep studying the pacing failure.
+              cpu: "2000m"
           # V8 + Angular bundle parse takes 10–60s on cold start (varies by
           # cluster CPU contention). Use a startupProbe with a long failure
           # tolerance so liveness/readiness can stay aggressive once the pod
