@@ -10,14 +10,19 @@ author: "tackle-top-three investigation (wf_e3cc3753-f1a + follow-up agent)"
 status: "backlog"
 priority: "high"
 jobs: [elohim-genesis]
+ci_status: blocked
+fingerprints: [afd13ee9d0bc]
 relatedNodeIds:
   - "backlog-seed-provenance-anchor-gap"
-tags: [qahal, household-formation, collective-cid, reconcile-controller, dna-signal, e2e, app-scope]
+tags: [qahal, household-formation, collective-cid, reconcile-controller, dna-signal, e2e, app-scope, steward-gate, dht-integration-race]
 cites:
   - genesis/a2o/features/qahal/household-formation.feature
+  - genesis/a2o/steps/qahal-formation.steps.ts
   - genesis/seeder/src/seed-household-formation.ts
   - genesis/seeder/src/seed-collectives.ts
   - elohim/elohim-storage/src/reconcile/controller.rs
+  - elohim/holochain/dna/imagodei/zomes/imagodei/src/qahal_coordinator.rs
+  - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1145/
 ---
 
 # `collective_cid not stamped — formation projection has not run` is a SIGNAL-PATH gap, not the FK storm
@@ -84,3 +89,98 @@ branch) while account-import participations use `qahal`. The FK is on bare
 `'qahal'`) and reconcile the seeder + legacy-prefix branch. The stub
 materialization deliberately uses "lamad" today so the projection
 controller's upsert converges instead of PK-colliding — flip both together.
+
+## UPDATE genesis #1145 (2026-06-14): root cause is ONE RUNG DEEPER — formation never reaches a full collective; jessica's affirm is rejected at the STEWARD GATE
+
+The 2026-06-08 framing ("the `CollectiveProjected` signal/stamp path never
+fires") was correct that the FK fix doesn't stamp the CID — but #1145's
+evidence (ci-investigator, build #1145) shows the projection never runs for a
+more fundamental reason: **the collective is only ever 1/3 affirmed, so there
+is no fully-formed collective to project.**
+
+`Seed Household Formation` on #1145 (the upstream stages all GREEN — conductor
+identities `3 existing/0 failed`, peer bindings `9 written/0 failed`, so this
+is NOT the founder-binding concern, which now passes):
+
+```
+[+] collective created: collective:uhCkkSm6cpsyDek1n4v0vK4CWllVXoTLexLM5_ZYeVedwkMbP4kk3
+[X] affirm_membership for human-jessica-spouse:
+    Wasm runtime error … WasmError { file: "zomes/imagodei/src/qahal_coordinator.rs", line: 412,
+    error: Guest("caller is not a current Steward of collective:uhCkk…") }
+[X] human-james-son: no conductor bound — cannot affirm
+=== Results: 1/3 affirmed, custody ok=0 fail=0 ===
+WARNING: Household formation partial: affirmed=[human-matthew-manager]
+```
+
+Then `qahal-formation.steps.ts:45` (re-confirmed verbatim) reads
+`family-dowell` from storage, finds `collective_cid` `undefined`, and fails
+`afd13ee9d0bc` — because the partial collective never reached the projection
+stamp path. (The `When I fetch the collective "family-dowell"` step PASSES —
+the row exists from `seed-collectives`; only the CID field is unstamped — so
+storage/signal reachability is fine, consistent with the 2026-06-08
+"HOUSEHOLD-PROVABLE, not blocked-by-env" reading.)
+
+### The steward-gate circularity (read from the zome)
+
+`affirm_membership` (`qahal_coordinator.rs:699`) requires the invite token's
+**issuer/sponsor** to be a current Steward of the collective — step 2,
+`require_caller_is_steward_of(&issuer_cid, &token.collective_cid)` at `:717`.
+And minting the token via `issue_household_invite` (`:665`) ALSO requires the
+issuer to be a current Steward (`:673`). `require_caller_is_steward_of`
+(`:399`) traverses `HasMembership` links from the collective's ActionHash and
+checks for a non-withdrawn `Steward` Membership matching the agent CID.
+
+So jessica's affirm fails "caller is not a current Steward" because the
+**founder (matthew)'s own Steward Membership is not yet DHT-visible** to the
+steward-link traversal at the moment the invite/affirm chain runs for jessica —
+the seconds-old founder-steward entry isn't integrated/queryable yet. This is
+the **same `DepMissingFromDht` / "seconds-old identity entries aren't
+DHT-integrated when formation commits against them" class** the founder-binding
+concern named at its #1123 update (`ci-genesis-household-founder-binding.md`),
+now manifesting one membership-rung deeper: founder binding itself now passes
+(matthew IS affirmed), but the founder's *Steward* standing isn't yet visible
+when his conductor issues/affirms the co-members' memberships. james failing is
+expected (no conductor bound — household-only, not in the alpha conductor set).
+
+### What this means for the concern
+
+The CID-stamp signal path (the original 2026-06-08 framing) may well ALSO have
+a gap — but it is **unreachable to verify** until formation reaches a full
+(3/3, or at least the affirmable subset) collective. The mover is the
+**seeder's formation choreography / steward-grant ordering**: it must ensure
+the founder's Steward Membership is DHT-integrated (settle-retry on the
+steward-link traversal, mirroring the founder-binding `4×15s DepMissingFromDht`
+retry already landed) BEFORE issuing co-member invites — or issue the invites
+from a path that doesn't depend on the not-yet-gossiped steward link. The
+`steward-grant-fixture-surface.md` backlog is the sibling that owns making
+steward standing reliably present for the seeder; this concern stays the home
+for "formation completes and `collective_cid` gets stamped on `family-dowell`."
+
+## Current decision
+
+**BLOCKED — real household-substrate bug, needs a bounded `/shift` (not a
+sentinel fix).** The fix is a seeder formation-ordering / steward-settle change
+(+ possibly the signal-path verification once formation completes), a multi-file
+change across `seed-household-formation.ts` and the affirm choreography with
+DNA-integration timing — beyond a sentinel's bounded-fix mandate and needing a
+live genesis run to verify the settle window. Named for the operator as a
+`/shift` Objective: "get household formation to 3/3 (or the affirmable subset)
+affirmed so the projection stamps `collective_cid` on `family-dowell`,"
+pairing with `steward-grant-fixture-surface.md`.
+
+Ledger `afd13ee9d0bc` → `status: blocked` (blocker: founder Steward standing
+not DHT-visible when co-member affirms run → formation partial → CID never
+stamped). **No `triaged_at_build`** (nothing landed this run). It disappears on
+a green streak once the formation-ordering `/shift` lands and a genesis run
+reaches a full affirmed collective with the CID stamped.
+
+## Verification path (updated for #1145)
+
+The 2026-06-08 "To verify" questions still hold, but are now GATED behind
+reaching a full collective. The new first question: **does the founder's
+Steward Membership become DHT-queryable (via `require_caller_is_steward_of`'s
+link traversal) before the co-member invite/affirm chain runs?** Instrument or
+settle-retry that, get to 3/3-affirmed (matthew+jessica; james held as
+no-conductor), THEN re-check whether `collective_cid` stamps — if it still
+doesn't, the original signal-path gap is real and isolated; if it does, the
+steward-settle ordering WAS the whole concern.
