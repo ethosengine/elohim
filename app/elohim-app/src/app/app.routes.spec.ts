@@ -31,8 +31,8 @@ describe('App Routes', () => {
   it('should have correct number of routes', () => {
     // home, community, shefa, identity, account, doorway, avodah,
     // auth/callback, deliver/:slug, resource/:resourceId, epr/:resourceId,
-    // epr/:resourceId/raw, map, resolve, and 404 catch-all
-    expect(routes.length).toBe(15);
+    // epr/:resourceId/raw, debug, map, resolve, and 404 catch-all
+    expect(routes.length).toBe(16);
   });
 
   it('should have the universal epr/:resourceId route (§12.6 Slice 2)', () => {
