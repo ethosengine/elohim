@@ -1355,7 +1355,25 @@ VEOF
                         script {
                             def props = loadBuildVars()
                             withBuildVars(props) {
-                                runE2ETests('alpha', 'https://alpha.elohim.host', env.GIT_COMMIT_HASH)
+                                // Advisory by design. This E2E runs against the LIVE
+                                // alpha target (runE2ETests opens with a `timeout 60s
+                                // curl https://alpha.elohim.host`). A down/flapping
+                                // alpha must NOT drive this build to FAILURE — a Level-0
+                                // FAILURE trips the orchestrator's fail-fast abort
+                                // (genesis/orchestrator/Jenkinsfile ~1807), which then
+                                // never dispatches elohim-edge (Level 1+), the ONLY
+                                // pipeline that runs `kubectl apply`. That deadlocks the
+                                // deploy that would FIX alpha behind alpha being up
+                                // (observed: orchestrator #1240, 2026-06-13). UNSTABLE is
+                                // treated as success by triggerPipeline (success ==
+                                // result in [SUCCESS, UNSTABLE]) so the cascade proceeds
+                                // and edge deploys; E2E results still publish below. This
+                                // mirrors the orchestrator's own post-flight/P2P/fed-smoke
+                                // gates, which are all catchError -> UNSTABLE. App
+                                // build/compile/Sonar failures upstream still hard-gate.
+                                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                                    runE2ETests('alpha', 'https://alpha.elohim.host', env.GIT_COMMIT_HASH)
+                                }
                             }
                         }
                     }

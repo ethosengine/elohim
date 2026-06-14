@@ -1,0 +1,86 @@
+###### DOORWAY FREEZE DUMP  pod=elohim-doorway-alpha-7cd7f8847b-tnbwj  Sat Jun 13 04:29:26 AM UTC 2026 ######
+## process / image: elohim-doorway 1.0.0-dev-3d04d24f (Rust/tokio), node=intel-nuc
+
+== cmdline ==
+doorway --listen 0.0.0.0:8080 --conductor-url ws://elohim-matthew-alpha:4445 
+
+== debug tools present? ==
+have cat
+have awk
+
+== thread count ==
+10
+
+== per-thread: comm / state / wchan ==
+TID=1       comm=doorway          state=S  wchan=futex_wait_queue
+TID=14      comm=angular-rendere  state=S  wchan=futex_wait_queue
+TID=15      comm=V8 DefaultWorke  state=S  wchan=futex_wait_queue
+TID=16      comm=V8 DefaultWorke  state=S  wchan=futex_wait_queue
+TID=17      comm=V8 DefaultWorke  state=S  wchan=futex_wait_queue
+TID=18      comm=V8 DefaultWorke  state=S  wchan=futex_wait_queue
+TID=19      comm=V8 DefaultWorke  state=S  wchan=futex_wait_queue
+TID=20      comm=V8 DefaultWorke  state=S  wchan=futex_wait_queue
+TID=21      comm=V8 DefaultWorke  state=S  wchan=futex_wait_queue
+TID=7       comm=tokio-runtime-w  state=S  wchan=futex_wait_queue
+
+== per-thread KERNEL stacks ==
+--- TID 1 [doorway] ---
+(stack not readable: 1)
+--- TID 14 [angular-rendere] ---
+(stack not readable: 1)
+--- TID 15 [V8 DefaultWorke] ---
+(stack not readable: 1)
+--- TID 16 [V8 DefaultWorke] ---
+(stack not readable: 1)
+--- TID 17 [V8 DefaultWorke] ---
+(stack not readable: 1)
+--- TID 18 [V8 DefaultWorke] ---
+(stack not readable: 1)
+--- TID 19 [V8 DefaultWorke] ---
+(stack not readable: 1)
+--- TID 20 [V8 DefaultWorke] ---
+(stack not readable: 1)
+--- TID 21 [V8 DefaultWorke] ---
+(stack not readable: 1)
+--- TID 7 [tokio-runtime-w] ---
+(stack not readable: 1)
+
+###### LAST LOG LINES BEFORE FREEZE (where it wedged) ######
+04:20:52.382 [DEBUG] doorway::projection::store Projected document upserted: Content:scenario-value-scanner-young-adult-scenarios-household-coordinating share
+04:20:52.382 [DEBUG] doorway::projection::warm_stre Projected streamed entry
+04:20:52.384 [DEBUG] doorway::projection::store Projected document upserted: Content:scenario-value-scanner-senior-scenarios-individual-managing fixed income 
+04:20:52.384 [DEBUG] doorway::projection::warm_stre Projected streamed entry
+04:20:52.387 [DEBUG] doorway::projection::store Projected document upserted: Content:assessment-personal-values
+04:20:52.387 [DEBUG] doorway::projection::warm_stre Projected streamed entry
+04:20:52.390 [INFO] doorway::server::http [192.168.86.102:37596] PUT /bootstrap/TYRgnhf5r-hDTurxpWmq6g3-LNgNp1EYAeqZq3T2lAg/IACshfSb9RigK5THEgjBKNvRiIeU
+04:20:52.390 [DEBUG] doorway::server::http k2 bootstrap PUT Stored space=TYRgnhf5r-hDTurxpWmq6g3-LNgNp1EYAeqZq3T2lAg agent=IACshfSb9RigK5THEgjBKNvRiIeUQj
+04:20:52.397 [INFO] doorway::server::http [192.168.86.102:37508] PUT /bootstrap/ZiJIwqB0iR_SYv_aLU-E2Z5CeADWtnQEFTefByn4rFw/A9JOZICjQmaLKBrQD3bwrAhzrKZu
+04:20:52.397 [DEBUG] doorway::server::http k2 bootstrap PUT Stored space=ZiJIwqB0iR_SYv_aLU-E2Z5CeADWtnQEFTefByn4rFw agent=A9JOZICjQmaLKBrQD3bwrAhzrKZuOR
+04:20:52.400 [INFO] doorway::server::http [192.168.86.102:37518] PUT /bootstrap/ZiJIwqB0iR_SYv_aLU-E2Z5CeADWtnQEFTefByn4rFw/AABKCNYUNZI8dW4JeEa-BuwlEVNM
+04:20:52.400 [DEBUG] doorway::server::http k2 bootstrap PUT Stored space=ZiJIwqB0iR_SYv_aLU-E2Z5CeADWtnQEFTefByn4rFw agent=AABKCNYUNZI8dW4JeEa-BuwlEVNMcl
+04:20:52.405 [INFO] doorway::server::http [192.168.86.102:37574] PUT /bootstrap/K8-okzuNgktao5W1TEP5kNJ_6vvLIvK96DzATk2RDsA/Jg_73YpSL1WjZ2ZWA7BEDJVet4n8
+04:20:52.405 [DEBUG] doorway::server::http k2 bootstrap PUT Stored space=K8-okzuNgktao5W1TEP5kNJ_6vvLIvK96DzATk2RDsA agent=Jg_73YpSL1WjZ2ZWA7BEDJVet4n8Su
+04:20:52.409 [INFO] doorway::server::http [192.168.86.102:33268] PUT /bootstrap/TYRgnhf5r-hDTurxpWmq6g3-LNgNp1EYAeqZq3T2lAg/_3CF6FBOVFAg3cgNSvT1xTfxClJ-
+04:20:52.409 [DEBUG] doorway::server::http k2 bootstrap PUT Stored space=TYRgnhf5r-hDTurxpWmq6g3-LNgNp1EYAeqZq3T2lAg agent=_3CF6FBOVFAg3cgNSvT1xTfxClJ-Tg
+04:20:52.413 [INFO] doorway::server::http [192.168.86.102:37550] PUT /bootstrap/l1RwoXU3gFffq_NNRSA5dfQmki5w98nrGxx4PfGeh2g/FTIhOOWV0RS1HrAwYP59J9sFtZyI
+04:20:52.413 [DEBUG] doorway::server::http k2 bootstrap PUT Stored space=l1RwoXU3gFffq_NNRSA5dfQmki5w98nrGxx4PfGeh2g agent=FTIhOOWV0RS1HrAwYP59J9sFtZyIGr
+04:20:52.413 [INFO] doorway::server::http [192.168.86.102:33350] PUT /bootstrap/TYRgnhf5r-hDTurxpWmq6g3-LNgNp1EYAeqZq3T2lAg/nqpqLgwBoqiw56_5u6mo8rPYh3Iw
+04:20:52.414 [DEBUG] doorway::server::http k2 bootstrap PUT Stored space=TYRgnhf5r-hDTurxpWmq6g3-LNgNp1EYAeqZq3T2lAg agent=nqpqLgwBoqiw56_5u6mo8rPYh3IwBl
+04:20:52.421 [INFO] doorway::server::http [192.168.86.102:37596] PUT /bootstrap/ZiJIwqB0iR_SYv_aLU-E2Z5CeADWtnQEFTefByn4rFw/j4Pb2L7FumBZpyX1YTM6E0k_Dmr0
+04:20:52.421 [DEBUG] doorway::server::http k2 bootstrap PUT Stored space=ZiJIwqB0iR_SYv_aLU-E2Z5CeADWtnQEFTefByn4rFw agent=j4Pb2L7FumBZpyX1YTM6E0k_Dmr05m
+04:20:52.423 [INFO] doorway::server::http [192.168.86.102:37550] PUT /bootstrap/cvrXsiO4CaubVR4gQU2PKVY-cJ_n_0uEzGUENQguREM/HNnacaZ_fX4MpFXgK86qr9XRSR5Q
+04:20:52.424 [DEBUG] doorway::server::http k2 bootstrap PUT Stored space=cvrXsiO4CaubVR4gQU2PKVY-cJ_n_0uEzGUENQguREM agent=HNnacaZ_fX4MpFXgK86qr9XRSR5Q2N
+04:20:52.429 [INFO] doorway::server::http [192.168.86.102:37550] PUT /bootstrap/ZiJIwqB0iR_SYv_aLU-E2Z5CeADWtnQEFTefByn4rFw/CYgSqSWUN1SCraqXYGXRKqvN8myG
+
+###### INTERPRETATION ######
+- doorway binary embeds a Rust/tokio runtime WITH ONLY 1 worker thread (TID 7 tokio-runtime-w)
+  alongside an embedded V8 + Angular SSR engine (8x "V8 DefaultWorker" + "angular-renderer").
+- At freeze ALL 10 threads are parked in futex_wait_queue (state S); process emits 0 logs and
+  serves nothing (nginx sees 8-60s upstream times). mongo+NATS verified healthy, bootstrap flood 0.
+- Signature => the single tokio worker is blocked on a futex (lock held across an await, or a
+  synchronous/blocking call - very likely the V8/Angular SSR render - run ON the lone async worker).
+  With worker_threads=1, one blocking call wedges the entire gateway. Suspect a Rust<->V8 lock cycle
+  or a std Mutex held across .await in the SSR/projection path.
+- Kernel symbol stacks were not readable (non-privileged container; /proc/1/task/*/stack EPERM).
+  For symbol-level Rust backtraces: on intel-nuc run `sudo rust-gdb -p <pid> -batch -ex 'thread apply all bt'`
+  (operator host can't reach intel-nuc directly).
