@@ -391,6 +391,76 @@ async fn async_main(
     // Ensure storage directory exists
     tokio::fs::create_dir_all(&config.storage_dir).await?;
 
+    // Provide-loop / re-anchor observability holder. Created here in the
+    // composition root so the boot path (self_cid derive + loop spawn) and the
+    // re-anchor backfill can write it, and `/p2p/status` can read it via a clone
+    // handed to the P2P node below. Mirrors `ProjectionReconcileState`.
+    let provide_loop_state = elohim_storage::services::provide_loop_status::ProvideLoopState::new();
+
+    // ── self_cid derivation (Workstream D — light the resilience card) ────────
+    //
+    // `self_cid` is the node's own steward identity. It is the JOIN KEY three
+    // ways: the custody sweep matches `commitment.provider == self_cid`
+    // (reconcile/custody.rs), the provide-loop authors with it as `provider`,
+    // and the seeder resolves provider/receiver from `GET /p2p/status .peerId`
+    // (genesis/seeder/src/peer-id.ts). All three must agree or the snapshot's
+    // joins silently empty (project_resilience_snapshot_humans_junction).
+    //
+    // `/p2p/status .peerId` is the libp2p `NodeIdentity::peer_id_string()`
+    // derived from `identity.key`. So when `SELF_CID` is unset (it is set in NO
+    // manifest — the dark-card root cause) AND the libp2p P2P path will be
+    // active, we derive `self_cid` from the SAME identity file the P2P node
+    // loads below. `peer_id` depends only on the keypair (not on `agent_pubkey`)
+    // and `load_or_generate` is idempotent on the file, so the early read here
+    // and the P2P node's later read yield byte-identical peer ids.
+    //
+    // iroh backend / disabled P2P are left to the env: their node id is a
+    // different identity (a follow-up), and without a libp2p `/p2p/status
+    // .peerId` the seeder cannot key commitments to them anyway, so the loop
+    // staying dormant there is correct, not a regression.
+    {
+        let self_cid_source = if config.self_cid.is_some() {
+            elohim_storage::services::provide_loop_status::SelfCidSource::Env
+        } else if args.enable_p2p
+            && config.transport_backend == elohim_storage::config::TransportBackend::Libp2p
+        {
+            let identity_path = config.storage_dir.join("identity.key");
+            // agent_pubkey does not affect peer_id; mirror the P2P node's hint
+            // so a first-run generate writes the same file the node will load.
+            let agent_pubkey = args.agent_pubkey.clone().unwrap_or_else(|| {
+                format!(
+                    "uhCAk_{}",
+                    &uuid::Uuid::new_v4().to_string().replace('-', "")[..32]
+                )
+            });
+            match NodeIdentity::load_or_generate(&identity_path, agent_pubkey) {
+                Ok(identity) => {
+                    let peer_id = identity.peer_id_string();
+                    info!(
+                        self_cid = %peer_id,
+                        "self_cid derived from libp2p NodeIdentity (SELF_CID unset) — \
+                         provide-loop will spawn; matches /p2p/status peerId join key"
+                    );
+                    config.self_cid = Some(peer_id);
+                    elohim_storage::services::provide_loop_status::SelfCidSource::DerivedLibp2pPeerId
+                }
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        "self_cid derivation failed (identity.key unreadable) — \
+                         provide-loop stays dormant; resilience card will read zeros"
+                    );
+                    elohim_storage::services::provide_loop_status::SelfCidSource::Unset
+                }
+            }
+        } else {
+            elohim_storage::services::provide_loop_status::SelfCidSource::Unset
+        };
+        provide_loop_state
+            .set_self_cid_source(self_cid_source)
+            .await;
+    }
+
     // Save default config if it doesn't exist
     let config_path = config.config_path();
     if !config_path.exists() {
@@ -1063,12 +1133,107 @@ async fn async_main(
                             self_cid = %self_cid_for_log,
                             "Slice-2b provide-loop authoring tick started (60s interval, shutdown-aware)"
                         );
+                        provide_loop_state.set_active(true).await;
                     }
                     _ => {
                         info!(
                             "Slice-2b provide-loop authoring tick disabled: requires lamad HcClient + db pool + non-empty self_cid"
                         );
+                        provide_loop_state.set_active(false).await;
                     }
+                }
+
+                // ── Re-anchor backfill (Workstream D — cold-seed recovery) ────
+                //
+                // Heal content rows the cold-conductor seed left provenance-only
+                // (`dht_anchor_hash IS NULL`). Spawned here so `registry.lamad`
+                // is in scope; acquires the bridge via the late-connect pattern
+                // (same as the infrastructure block above) so a slow conductor
+                // that enables its cells AFTER boot still heals — instead of the
+                // seeder's circuit latching the card dark forever. One-shot per
+                // boot: re-authoring is idempotent, so the next boot's sweep
+                // picks up anything this one capped or failed.
+                {
+                    let reanchor_pool = db_pool.clone();
+                    let reanchor_state = provide_loop_state.clone();
+                    let reanchor_lamad_boot = registry.lamad.clone();
+                    let reanchor_late_inputs =
+                        elohim_storage::hc_client_registry::HcRegistryInputs {
+                            admin_url: admin_url.clone(),
+                            app_url: args.app_url.clone(),
+                            app_id: args.app_id.clone(),
+                        };
+                    let reanchor_shutdown = shutdown_tx.subscribe();
+                    tokio::spawn(async move {
+                        let Some(pool) = reanchor_pool else {
+                            info!("reanchor_backfill skipped: db pool unavailable");
+                            return;
+                        };
+                        // Acquire the lamad bridge — late-connect so a cold
+                        // conductor (cells CellDisabled at boot) still heals once
+                        // its cells enable.
+                        let hc = match reanchor_lamad_boot {
+                            Some(hc) => hc,
+                            None => {
+                                info!(
+                                    "reanchor_backfill: lamad bridge not up at boot — awaiting late connect"
+                                );
+                                match elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
+                                    &reanchor_late_inputs,
+                                    "lamad",
+                                    reanchor_shutdown,
+                                )
+                                .await
+                                {
+                                    Some(hc) => hc,
+                                    None => {
+                                        info!("reanchor_backfill: lamad bridge never came up (shutdown) — skipping");
+                                        return;
+                                    }
+                                }
+                            }
+                        };
+                        // A ContentService scoped to lamad to drive the canonical
+                        // re-anchor path (update_via_conductor null-anchor branch).
+                        // A throwaway EventBus: the only event this path emits is
+                        // ContentUpdated (cache invalidation), and the HTTP cache
+                        // does not exist yet at this boot phase — re-anchoring is a
+                        // projection write, not a user-visible mutation.
+                        let content_service = elohim_storage::services::ContentService::new(
+                            pool.clone(),
+                            elohim_storage::db::AppContext::default_lamad(),
+                            std::sync::Arc::new(elohim_storage::services::events::EventBus::new()),
+                        );
+                        let cfg =
+                            elohim_storage::services::reanchor_backfill::ReanchorConfig::default();
+                        match elohim_storage::services::reanchor_backfill::run_once(
+                            &pool,
+                            &content_service,
+                            &hc,
+                            &reanchor_state,
+                            &cfg,
+                        )
+                        .await
+                        {
+                            Ok(report) if report.candidates > 0 => {
+                                info!(
+                                    candidates = report.candidates,
+                                    reanchored = report.reanchored,
+                                    failed = report.failed,
+                                    remaining = report.remaining,
+                                    "reanchor_backfill: cold-seed recovery sweep done"
+                                );
+                            }
+                            Ok(_) => {
+                                info!(
+                                    "reanchor_backfill: no NULL-anchor content (nothing to heal)"
+                                );
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "reanchor_backfill failed (non-fatal)");
+                            }
+                        }
+                    });
                 }
 
                 // Stash the registry in shared state for HTTP handlers.
@@ -1208,6 +1373,12 @@ async fn async_main(
         // itself runs in a task spawned after this block (it needs the lamad
         // HcClient author seam); the node only publishes the shared snapshot.
         p2p_node = p2p_node.with_projection_reconcile_state(projection_reconcile_state.clone());
+
+        // Surface the provide-loop / re-anchor-backfill status on /p2p/status
+        // (Workstream D). The holder was written earlier (self_cid derive + loop
+        // spawn) and is written by the re-anchor backfill; the node only
+        // publishes the shared snapshot.
+        p2p_node = p2p_node.with_provide_loop_state(provide_loop_state.clone());
 
         info!("P2P networking enabled");
         info!("  Peer ID: {}", p2p_node.peer_id());

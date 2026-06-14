@@ -76,10 +76,12 @@ pub mod peer_selection;
 pub mod peer_topology_view;
 pub mod presence_service;
 pub mod provenance_service;
+pub mod provide_loop_status; // Workstream D — observability for the provide-loop + re-anchor backfill
 pub mod provide_reconcile;
 pub mod rate_history;
 pub mod rea_commitment_service;
 pub mod reach_earning;
+pub mod reanchor_backfill; // Workstream D — re-author NULL-anchor content a cold-conductor seed left provenance-only
 pub mod reciprocity_view;
 pub mod recognition_pipeline_service;
 pub mod relationship_density;

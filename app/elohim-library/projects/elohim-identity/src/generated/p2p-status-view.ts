@@ -96,6 +96,35 @@ export interface P2PStatusView {
     healedTotal: number;
     sweeps: number;
   } | null;
+  /**
+   * Provide-loop + re-anchor-backfill observability. null when the holder is not wired (e.g. a P2PNode built without the builder).
+   */
+  provideLoop?: {
+    /**
+     * Where self_cid came from at boot. 'unset' means the provide-loop cannot spawn (the dark-card root cause).
+     */
+    selfCidSource: 'env' | 'derived-libp2p-peer-id' | 'unset';
+    /**
+     * True once the Slice-2b provide-loop authoring tick has spawned. False = dormant = card cannot light its content:<reach> counts.
+     */
+    active: boolean;
+    /**
+     * Content rows still lacking dht_anchor_hash after the last re-anchor sweep.
+     */
+    reanchorPending: number;
+    /**
+     * Content rows re-authored (anchor stamped) this process lifetime.
+     */
+    reanchorCompleted: number;
+    /**
+     * Re-author failures (non-fatal, retried on a future boot's sweep).
+     */
+    reanchorFailed: number;
+    /**
+     * True when the re-anchor backfill ran and found no NULL-anchor rows left. False before the first run or while candidates remain.
+     */
+    reanchorCaughtUp: boolean;
+  } | null;
 }
 /**
  * Identity-driven content replication progress

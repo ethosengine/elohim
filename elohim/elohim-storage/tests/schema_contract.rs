@@ -20,6 +20,7 @@ use elohim_storage::p2p::acquisition::PullStatusInfo;
 use elohim_storage::p2p::projection_reconcile::ProjectionReconcileStatus;
 use elohim_storage::p2p::replication::ReplicationStatus;
 use elohim_storage::p2p::DrainStatusInfo;
+use elohim_storage::services::provide_loop_status::ProvideLoopStatus;
 use elohim_storage::P2PStatusInfo;
 use elohim_views::{
     CollabAgreementStatus, CollabAgreementView, CollabCollectiveView, CollabMembershipRole,
@@ -227,6 +228,14 @@ fn p2p_status_view_matches_schema() {
         reconcile_passes_total: 7,
         kicks_fired_total: 3,
         placement_gaps_emitted_total: 12,
+        provide_loop: Some(ProvideLoopStatus {
+            self_cid_source: "derived-libp2p-peer-id".to_string(),
+            active: true,
+            reanchor_pending: 0,
+            reanchor_completed: 8,
+            reanchor_failed: 1,
+            reanchor_caught_up: true,
+        }),
     };
 
     let json = serde_json::to_value(&status).unwrap();
@@ -255,6 +264,7 @@ fn p2p_status_view_with_null_drain() {
         reconcile_passes_total: 0,
         kicks_fired_total: 0,
         placement_gaps_emitted_total: 0,
+        provide_loop: None,
     };
 
     let json = serde_json::to_value(&status).unwrap();

@@ -516,6 +516,12 @@ pub struct P2PNode {
     /// so `refresh_status` can publish it. `None` when the reconcile task was
     /// not spawned (missing HcClient / pool / disabled).
     projection_reconcile: Option<projection_reconcile::ProjectionReconcileState>,
+    /// Provide-loop + re-anchor-backfill observability (Workstream D). The boot
+    /// path (self_cid derive + loop spawn) and the re-anchor backfill run in
+    /// main.rs composition scope; the node holds a clone of the shared status
+    /// only so `refresh_status` can publish it on `/p2p/status`. `None` when not
+    /// wired (e.g. a P2PNode constructed without the builder).
+    provide_loop: Option<crate::services::provide_loop_status::ProvideLoopState>,
     /// Provide-loop reconciler (Slice 2b): caught-up commons pins → notarized
     /// replicates-commons Commitments. Logical-key dedup survives restart; the
     /// in-memory latch is a per-process optimisation only.
@@ -754,6 +760,11 @@ pub struct P2PStatusInfo {
     /// T23 custody reconcile: total placement gaps emitted across all passes.
     #[ts(type = "number")]
     pub placement_gaps_emitted_total: u64,
+    /// Workstream D provide-loop + re-anchor-backfill observability. `None`
+    /// before the holder is wired (e.g. a P2PNode constructed without the
+    /// builder). When present, `active=false` / `selfCidSource="unset"` is the
+    /// dark-resilience-card signal: the provide-loop never spawned.
+    pub provide_loop: Option<crate::services::provide_loop_status::ProvideLoopStatus>,
 }
 
 /// Per-peer detail from libp2p Swarm state.
@@ -1169,6 +1180,7 @@ impl P2PHandle {
             reconcile_passes_total: 0,
             kicks_fired_total: 0,
             placement_gaps_emitted_total: 0,
+            provide_loop: None,
         };
         let (status_tx, status_rx) = watch::channel(initial_status);
         // Keep sender alive so the receiver never sees "sender dropped"
@@ -1709,6 +1721,7 @@ impl P2PNode {
             reconcile_passes_total: 0,
             kicks_fired_total: 0,
             placement_gaps_emitted_total: 0,
+            provide_loop: None,
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
@@ -1767,6 +1780,7 @@ impl P2PNode {
             gap_queue: Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new())),
             acquisition: acquisition::AcquisitionState::new(),
             projection_reconcile: None,
+            provide_loop: None,
             provide_reconciler: crate::services::provide_reconcile::ProvideReconciler::new(),
             pending_acquisition_fetches: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
@@ -1830,6 +1844,17 @@ impl P2PNode {
         state: projection_reconcile::ProjectionReconcileState,
     ) -> Self {
         self.projection_reconcile = Some(state);
+        self
+    }
+
+    /// Attach the shared provide-loop / re-anchor-backfill status (Workstream D)
+    /// so `refresh_status` surfaces it on `/p2p/status`. The clone is written by
+    /// the boot path + re-anchor backfill in main.rs; surfacing-only here.
+    pub fn with_provide_loop_state(
+        mut self,
+        state: crate::services::provide_loop_status::ProvideLoopState,
+    ) -> Self {
+        self.provide_loop = Some(state);
         self
     }
 
@@ -7046,6 +7071,10 @@ impl P2PNode {
             Some(s) => Some(s.status().await),
             None => None,
         };
+        let provide_loop = match &self.provide_loop {
+            Some(s) => Some(s.status().await),
+            None => None,
+        };
         let recon = self.reconciliation_metrics();
         let status = P2PStatusInfo {
             peer_id: self.peer_id().to_string(),
@@ -7067,6 +7096,7 @@ impl P2PNode {
             reconcile_passes_total: recon.reconcile_passes_total,
             kicks_fired_total: recon.kicks_fired_total,
             placement_gaps_emitted_total: recon.placement_gaps_emitted_total,
+            provide_loop,
         };
         let _ = self.status_tx.send(status);
     }

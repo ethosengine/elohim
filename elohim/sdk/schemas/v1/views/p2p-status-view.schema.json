@@ -146,6 +146,52 @@
         { "type": "null" }
       ],
       "description": "P1 projection-reconcile stream status. null when the reconcile task is not running (missing lamad HcClient / pool / disabled)."
+    },
+    "provideLoop": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Workstream D: provide-loop + re-anchor-backfill status. The provide-loop authors the replicates-content commitments whose side-projection writes the content:<reach> rows the resilience card counts; the re-anchor backfill heals content a cold-conductor seed left provenance-only (dht_anchor_hash NULL). active=false / selfCidSource='unset' is the dark-card signal.",
+          "required": [
+            "selfCidSource",
+            "active",
+            "reanchorPending",
+            "reanchorCompleted",
+            "reanchorFailed",
+            "reanchorCaughtUp"
+          ],
+          "properties": {
+            "selfCidSource": {
+              "type": "string",
+              "enum": ["env", "derived-libp2p-peer-id", "unset"],
+              "description": "Where self_cid came from at boot. 'unset' means the provide-loop cannot spawn (the dark-card root cause)."
+            },
+            "active": {
+              "type": "boolean",
+              "description": "True once the Slice-2b provide-loop authoring tick has spawned. False = dormant = card cannot light its content:<reach> counts."
+            },
+            "reanchorPending": {
+              "type": "integer",
+              "description": "Content rows still lacking dht_anchor_hash after the last re-anchor sweep."
+            },
+            "reanchorCompleted": {
+              "type": "integer",
+              "description": "Content rows re-authored (anchor stamped) this process lifetime."
+            },
+            "reanchorFailed": {
+              "type": "integer",
+              "description": "Re-author failures (non-fatal, retried on a future boot's sweep)."
+            },
+            "reanchorCaughtUp": {
+              "type": "boolean",
+              "description": "True when the re-anchor backfill ran and found no NULL-anchor rows left. False before the first run or while candidates remain."
+            }
+          },
+          "additionalProperties": false
+        },
+        { "type": "null" }
+      ],
+      "description": "Provide-loop + re-anchor-backfill observability. null when the holder is not wired (e.g. a P2PNode built without the builder)."
     }
   },
   "additionalProperties": false

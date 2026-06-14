@@ -956,6 +956,55 @@ pub fn list_unpublished_content_ids(
         .map_err(|e| StorageError::Internal(format!("list_unpublished_content_ids failed: {}", e)))
 }
 
+/// Re-anchor backfill query: return IDs of content rows that were never
+/// DHT-authored (`dht_anchor_hash IS NULL`). These are the rows a cold-conductor
+/// seed left provenance-only: the seeder's reach-stamp PATCH routed through the
+/// conductor while its cells were `CellDisabled`, so the entry never landed in
+/// the DHT and reach was never notarized → no `content:<reach>` provide rows →
+/// the resilience card stays dark.
+///
+/// The re-anchor backfill re-authors each of these via the conductor's
+/// `create_content` (the same null-anchor path `update_via_conductor` uses),
+/// which on `ContentCommitted` projection stamps `dht_anchor_hash`. Internal
+/// use only — does NOT apply the provenance read gate (this query IS part of
+/// the machinery that produces provenance). A non-positive limit returns empty.
+///
+/// `created_at` ascending so the oldest un-anchored rows heal first and the
+/// ordering is stable across sweeps (restart-safe, idempotent: an id that
+/// gained an anchor on a prior sweep is no longer a candidate).
+pub fn list_unanchored_content_ids(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    limit: i64,
+) -> Result<Vec<String>, StorageError> {
+    if limit <= 0 {
+        return Ok(Vec::new());
+    }
+    content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::dht_anchor_hash.is_null())
+        .select(content::id)
+        .order((content::created_at.asc(), content::id.asc()))
+        .limit(limit)
+        .load::<String>(conn)
+        .map_err(|e| StorageError::Internal(format!("list_unanchored_content_ids failed: {}", e)))
+}
+
+/// Count content rows that were never DHT-authored (`dht_anchor_hash IS NULL`),
+/// scoped by app context. The re-anchor backfill uses this to report the
+/// remaining `pending` count on `/p2p/status` after a bounded sweep.
+pub fn count_unanchored_content(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+) -> Result<i64, StorageError> {
+    content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::dht_anchor_hash.is_null())
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Internal(format!("count_unanchored_content failed: {}", e)))
+}
+
 /// Drain-loop write: mark a content row as p2p_published at the current time.
 /// Operates on the operational projection column only — does not touch
 /// dht_anchor_hash or any notarized state. Idempotent — re-publishing an

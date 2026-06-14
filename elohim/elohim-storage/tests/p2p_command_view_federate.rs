@@ -55,6 +55,7 @@ fn test_status() -> P2PStatusInfo {
         reconcile_passes_total: 0,
         kicks_fired_total: 0,
         placement_gaps_emitted_total: 0,
+        provide_loop: None,
     }
 }
 
