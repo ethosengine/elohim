@@ -1397,6 +1397,337 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-qahal-memory-safety.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Family Vault / Memory Safety card — household-facing resilience surface.\n\nThe INVERSE of the operator debug Lens: renders NAMES, not nines.\nWhen grandma's edge node dies, her family opens this card and SEES —\nin plain, named language — that her photos are still held by people\nwho love her.\n\nConsumes the `feltStatus` block on ResilienceSnapshotView.\nThe element renders what the substrate computed; it never derives\nits own copy of the protection sentence.",
+          "name": "ElohimQahalMemorySafety",
+          "cssProperties": [
+            {
+              "description": "Card container padding (default: 1.25rem)",
+              "name": "--elohim-memory-safety-padding"
+            },
+            {
+              "description": "Card background (default: Canvas)",
+              "name": "--elohim-memory-safety-bg"
+            },
+            {
+              "description": "Card foreground text (default: CanvasText)",
+              "name": "--elohim-memory-safety-fg"
+            },
+            {
+              "description": "Card border (default: 1px solid currentColor)",
+              "name": "--elohim-memory-safety-border"
+            },
+            {
+              "description": "Card border-radius (default: 0.5rem)",
+              "name": "--elohim-memory-safety-radius"
+            },
+            {
+              "description": "Internal layout gap (default: 0.75rem)",
+              "name": "--elohim-memory-safety-gap"
+            },
+            {
+              "description": "Headline font-size (default: 1rem)",
+              "name": "--elohim-memory-safety-headline-size"
+            },
+            {
+              "description": "Holder chip background (default: ButtonFace)",
+              "name": "--elohim-memory-safety-holder-chip-bg"
+            },
+            {
+              "description": "Holder chip foreground (default: ButtonText)",
+              "name": "--elohim-memory-safety-holder-chip-fg"
+            },
+            {
+              "description": "Holder chip border-radius (default: 2rem)",
+              "name": "--elohim-memory-safety-holder-chip-radius"
+            },
+            {
+              "description": "Accent color for \"protected\" state",
+              "name": "--elohim-memory-safety-status-protected-color"
+            },
+            {
+              "description": "Accent color for \"watching\" state",
+              "name": "--elohim-memory-safety-status-watching-color"
+            },
+            {
+              "description": "Accent color for \"needs-help\" state",
+              "name": "--elohim-memory-safety-status-needs-help-color"
+            },
+            {
+              "description": "Accent color for \"not-yet-seen\" state",
+              "name": "--elohim-memory-safety-status-not-yet-seen-color"
+            },
+            {
+              "description": "CTA button background (default: ButtonFace)",
+              "name": "--elohim-memory-safety-cta-bg"
+            },
+            {
+              "description": "CTA button foreground (default: ButtonText)",
+              "name": "--elohim-memory-safety-cta-fg"
+            },
+            {
+              "description": "CTA button border (default: 1px solid currentColor)",
+              "name": "--elohim-memory-safety-cta-border"
+            },
+            {
+              "description": "CTA button border-radius (default: 0.25rem)",
+              "name": "--elohim-memory-safety-cta-radius"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The outer card container",
+              "name": "container"
+            },
+            {
+              "description": "The \"Memory Safety\" + content-label heading row",
+              "name": "heading"
+            },
+            {
+              "description": "The reassurance state badge (role=status)",
+              "name": "status-badge"
+            },
+            {
+              "description": "The canonical felt sentence paragraph",
+              "name": "headline"
+            },
+            {
+              "description": "The ordered list of named holders",
+              "name": "holder-list"
+            },
+            {
+              "description": "Each individual holder chip (one per heldBy entry)",
+              "name": "holder-chip"
+            },
+            {
+              "description": "The \"held by M of N households\" coverage line",
+              "name": "floor-line"
+            },
+            {
+              "description": "The suggestedAction call-to-action button",
+              "name": "cta"
+            },
+            {
+              "description": "The null/empty state placeholder",
+              "name": "empty"
+            }
+          ],
+          "slots": [
+            {
+              "description": "Optional loading skeleton override",
+              "name": "loading"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "feltStatus",
+              "type": {
+                "text": "FeltStatusView | null"
+              },
+              "default": "null",
+              "description": "The felt-status projection block",
+              "attribute": "feltStatus"
+            },
+            {
+              "kind": "field",
+              "name": "contentLabel",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Optional album/content name shown in the heading",
+              "attribute": "content-label"
+            },
+            {
+              "kind": "method",
+              "name": "#handleCtaClick",
+              "privacy": "private"
+            },
+            {
+              "kind": "method",
+              "name": "#handleCtaKeydown",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "e",
+                  "type": {
+                    "text": "KeyboardEvent"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "#badgeLabel",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "reassurance",
+                  "type": {
+                    "text": "FeltStatusView['reassurance']"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "#badgeIndicator",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "reassurance",
+                  "type": {
+                    "text": "FeltStatusView['reassurance']"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "#holderLabel",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "holder",
+                  "type": {
+                    "text": "FeltStatusHolder"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "#floorText",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "floor",
+                  "type": {
+                    "text": "FeltStatusFloor"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "name": "memory-safety-action",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Emitted when the user activates the suggestedAction CTA. Detail: `{ action: string }` matching `feltStatus.suggestedAction`."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "feltStatus",
+              "type": {
+                "text": "FeltStatusView | null"
+              },
+              "default": "null",
+              "description": "The felt-status projection block",
+              "fieldName": "feltStatus"
+            },
+            {
+              "name": "content-label",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Optional album/content name shown in the heading",
+              "fieldName": "contentLabel"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-memory-safety",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ],
+              "optional": [
+                "pilot"
+              ]
+            },
+            "contentCertainty": "observed",
+            "states": {
+              "empty": "designed",
+              "loading": "designed",
+              "error": "n/a",
+              "stale": "designed",
+              "contested": "n/a",
+              "offline": "designed",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalMemorySafety",
+          "declaration": {
+            "name": "ElohimQahalMemorySafety",
+            "module": "src/elohim-qahal-memory-safety.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-qahal-power-user-expandable.ts",
       "declarations": [
         {

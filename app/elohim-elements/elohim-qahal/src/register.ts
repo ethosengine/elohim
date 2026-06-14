@@ -23,6 +23,7 @@ import { ElohimQahalSidebar } from './elohim-qahal-sidebar.js';
 import { ElohimQahalSocialComputePanel } from './elohim-qahal-social-compute-panel.js';
 import { ElohimQahalStandingInspectorPanel } from './elohim-qahal-standing-inspector-panel.js';
 import { ElohimQahalStandingRing } from './elohim-qahal-standing-ring.js';
+import { ElohimQahalMemorySafety } from './elohim-qahal-memory-safety.js';
 import { ElohimQahalStreamPanel } from './elohim-qahal-stream-panel.js';
 
 if (!customElements.get('elohim-qahal-attestations-panel')) {
@@ -111,4 +112,8 @@ if (!customElements.get('elohim-qahal-standing-ring')) {
 
 if (!customElements.get('elohim-qahal-stream-panel')) {
   customElements.define('elohim-qahal-stream-panel', ElohimQahalStreamPanel);
+}
+
+if (!customElements.get('elohim-qahal-memory-safety')) {
+  customElements.define('elohim-qahal-memory-safety', ElohimQahalMemorySafety);
 }

@@ -66,3 +66,10 @@ export type { BloomTier } from './elohim-qahal-standing-ring.js';
 
 export { ElohimQahalStreamPanel } from './elohim-qahal-stream-panel.js';
 export type { StreamEvent, StreamEventRea } from './elohim-qahal-stream-panel.js';
+
+export { ElohimQahalMemorySafety } from './elohim-qahal-memory-safety.js';
+export type {
+  FeltStatusView,
+  FeltStatusHolder,
+  FeltStatusFloor,
+} from './elohim-qahal-memory-safety.js';
