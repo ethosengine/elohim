@@ -948,6 +948,26 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         info!("App file cache invalidation hook started");
     }
 
+    // Pre-warm the hot cache from MongoDB BEFORE scheduling the warm_stream
+    // replay so the cold-start firehose hits the idempotency guard and is
+    // skipped (the 2026-06-14 crashloop cure: a fresh pod's empty cache made
+    // warm_stream re-upsert the whole corpus → CPU burst → /health starved →
+    // liveness SIGKILL). Awaited (bounded 30s internally) so it completes
+    // before the warm_stream task's 10s delay elapses. Degrade-open.
+    if args.projection_writer {
+        if let Some(ref projection_store) = state.projection {
+            match projection_store.prewarm_hot_cache_from_mongo().await {
+                Ok(n) => info!(
+                    prewarmed = n,
+                    "Hot cache pre-warm complete (cold-start firehose guard)"
+                ),
+                Err(e) => {
+                    warn!("Hot cache pre-warm failed (degrade-open — cold-start may firehose): {e}")
+                }
+            }
+        }
+    }
+
     // Warm projection cache from existing storage content (background, delayed)
     // Signals only deliver FUTURE writes — existing content needs explicit fetch.
     if args.projection_writer && !peer_urls.is_empty() {

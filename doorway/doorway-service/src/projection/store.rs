@@ -364,6 +364,75 @@ impl ProjectionStore {
         Ok(results)
     }
 
+    /// Pre-warm the hot cache from MongoDB at startup — the cold-start firehose cure.
+    ///
+    /// A fresh pod boots with an EMPTY hot cache, so warm_stream's idempotency
+    /// guard (which keys off the hot cache, see `set`) MISSES on every streamed
+    /// entry and re-`upsert`s the entire corpus — a CPU burst that, under a CFS
+    /// quota, starves the /health task off the runtime → liveness SIGKILL (137)
+    /// → crashloop (doorway-freeze 2026-06-14; an already-warm pod was stable
+    /// only because its cache was full). The shared Mongo already holds the
+    /// corpus, so loading it into the hot cache FIRST makes the cold-start replay
+    /// hit the idempotency guard and skip the firehose — a fresh pod then behaves
+    /// like an already-warm one. Bounded by `max_hot_cache_entries`; degrade-open
+    /// (any failure just leaves the cache empty = prior behavior, never fatal).
+    pub async fn prewarm_hot_cache_from_mongo(&self) -> Result<usize, DoorwayError> {
+        let Some(ref mongo) = self.mongo else {
+            return Ok(0); // memory-only mode: nothing to pre-warm from
+        };
+        let db = mongo.inner().database(mongo.db_name());
+        let collection = db.collection::<ProjectedDocument>(&self.config.collection_name);
+
+        let options = FindOptions::builder()
+            .limit(self.config.max_hot_cache_entries as i64)
+            .sort(doc! { "projected_at": -1 })
+            .build();
+
+        let cursor = match tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            collection
+                .find(doc! { "metadata.is_deleted": { "$ne": true } })
+                .with_options(options),
+        )
+        .await
+        {
+            Ok(Ok(c)) => c,
+            Ok(Err(e)) => return Err(DoorwayError::Database(format!("Pre-warm find failed: {e}"))),
+            Err(_) => {
+                return Err(DoorwayError::Database(
+                    "Pre-warm find timed out after 30s".to_string(),
+                ))
+            }
+        };
+
+        let docs: Vec<ProjectedDocument> = cursor
+            .filter_map(|doc| async {
+                match doc {
+                    Ok(d) => Some(d),
+                    Err(e) => {
+                        warn!("Pre-warm: skipping undeserializable doc: {e}");
+                        None
+                    }
+                }
+            })
+            .collect()
+            .await;
+
+        let count = docs.len();
+        for doc in docs {
+            let key = doc
+                .mongo_id
+                .clone()
+                .unwrap_or_else(|| format!("{}:{}", doc.doc_type, doc.doc_id));
+            self.hot_cache.insert(key, HotCacheEntry::new(doc));
+        }
+        info!(
+            prewarmed = count,
+            "Hot cache pre-warmed from MongoDB (cold-start firehose guard)"
+        );
+        Ok(count)
+    }
+
     /// Query hot cache (fallback for memory-only mode)
     fn query_hot_cache(&self, query: &ProjectionQuery) -> Vec<ProjectedDocument> {
         let mut results: Vec<ProjectedDocument> = self
@@ -673,6 +742,14 @@ mod tests {
     fn test_memory_only_store() {
         let store = ProjectionStore::memory_only(ProjectionConfig::default());
         assert!(!store.has_mongodb());
+    }
+
+    #[tokio::test]
+    async fn prewarm_memory_only_is_noop() {
+        // No Mongo → pre-warm degrades open to a no-op (0 entries), never errors.
+        // (The Mongo-backed cold-start-firehose-skip behavior is verified by the deploy.)
+        let store = ProjectionStore::memory_only(ProjectionConfig::default());
+        assert_eq!(store.prewarm_hot_cache_from_mongo().await.unwrap(), 0);
     }
 
     #[tokio::test]
