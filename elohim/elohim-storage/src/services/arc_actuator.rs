@@ -379,6 +379,80 @@ pub async fn apply_arc_actuation(
     Ok(effect.target_factor)
 }
 
+// =============================================================================
+// trait Governor impl — arc as the FIRST instance of the shared actuation
+// contract (`elohim_compute::actuation`), proving the 2026-06-14 lift
+// generalizes (graduated spec: 2026-06-14-elohim-sdk-design / -escalated-architecture).
+// Additive: the existing pure fns + the local `ActuationRefusal` stay for the
+// current http.rs path; this bridges them to the shared `Refusal`/`Governor` so
+// every other face (custody, head, self-limit, capability, covenant) becomes a
+// sibling instance, never a clone. Collapsing the local types into the shared
+// ones (and repointing http.rs) is the named follow-on, once a second face lands.
+// =============================================================================
+
+/// Map the arc-local refusal onto the shared one. An arc actuation is bounded by
+/// a `delegates-compute` / `sets-authority-arc` grant, so its `limit_owner` is
+/// always [`elohim_compute::LimitOwner::Commitment`] — never an operator veto.
+/// `WouldBreakCoverage` is an operational-gate refusal → `GateRefused`.
+impl From<ActuationRefusal> for elohim_compute::Refusal {
+    fn from(r: ActuationRefusal) -> Self {
+        let code = match r.code {
+            RefusalCode::OutOfGrantBounds => elohim_compute::RefusalCode::OutOfGrantBounds,
+            RefusalCode::GrantExpired => elohim_compute::RefusalCode::GrantExpired,
+            RefusalCode::NotActuatable => elohim_compute::RefusalCode::NotActuatable,
+            RefusalCode::WouldBreakCoverage => {
+                elohim_compute::RefusalCode::GateRefused("would-break-coverage".to_string())
+            }
+        };
+        elohim_compute::Refusal {
+            code,
+            limit_owner: elohim_compute::LimitOwner::Commitment,
+            elevate: r.elevate,
+        }
+    }
+}
+
+/// The conductor authority-arc face of the shared [`elohim_compute::Governor`]
+/// contract — the first instance. `decide()` (authorize → gate → render) is the
+/// trait default, equivalent to [`plan_actuation`] but yielding the shared
+/// [`elohim_compute::Refusal`] the self-healing elevate sink consumes.
+pub struct ArcGovernor;
+
+impl elohim_compute::Governor for ArcGovernor {
+    type Request = ArcActuationRequest;
+    type Grant = ArcGrantBounds;
+    type Context = CoverageSnapshot;
+    type Effect = ArcActuationPlan;
+
+    fn authorize(
+        &self,
+        req: &ArcActuationRequest,
+        grant: &ArcGrantBounds,
+        now_epoch_s: u64,
+    ) -> Result<(), elohim_compute::Refusal> {
+        authorize(req, grant, now_epoch_s).map_err(Into::into)
+    }
+
+    fn gate(
+        &self,
+        req: &ArcActuationRequest,
+        ctx: &CoverageSnapshot,
+    ) -> Result<(), elohim_compute::Refusal> {
+        coverage_admits(req.target_factor, ctx).map_err(Into::into)
+    }
+
+    fn render(
+        &self,
+        req: &ArcActuationRequest,
+        _ctx: &CoverageSnapshot,
+    ) -> Result<ArcActuationPlan, elohim_compute::Refusal> {
+        Ok(ArcActuationPlan {
+            target_factor: req.target_factor,
+            commitment_cid: req.commitment_cid.clone(),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -671,5 +745,58 @@ admin_interfaces:
         assert!(parse_grant_bounds(&bad).is_err());
         let no_bounds = serde_json::json!({ "action": "sets-authority-arc" });
         assert!(parse_grant_bounds(&no_bounds).is_err());
+    }
+
+    #[test]
+    fn arc_governor_decides_via_the_shared_contract() {
+        use elohim_compute::Governor;
+        let g = ArcGovernor;
+        // Admitted: leecher within grant, mesh covers → a plan, via the trait default.
+        let plan = g
+            .decide(
+                &req(0),
+                &grant(0, 1, None),
+                &CoverageSnapshot {
+                    observed_n: 14,
+                    r_floor: 3,
+                },
+                1_000,
+            )
+            .unwrap();
+        assert_eq!(plan.target_factor, 0);
+
+        // Coverage would break → shared GateRefused, owned by the GRANT
+        // (Commitment) — never readable as an operator override (capture-resistance).
+        let r = g
+            .decide(
+                &req(0),
+                &grant(0, 1, None),
+                &CoverageSnapshot {
+                    observed_n: 2,
+                    r_floor: 3,
+                },
+                1_000,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            r.code,
+            elohim_compute::RefusalCode::GateRefused(_)
+        ));
+        assert_eq!(r.limit_owner, elohim_compute::LimitOwner::Commitment);
+
+        // Out of grant → shared OutOfGrantBounds, still owned by the Commitment.
+        let r2 = g
+            .decide(
+                &req(1),
+                &grant(0, 0, None),
+                &CoverageSnapshot {
+                    observed_n: 14,
+                    r_floor: 3,
+                },
+                1_000,
+            )
+            .unwrap_err();
+        assert_eq!(r2.code, elohim_compute::RefusalCode::OutOfGrantBounds);
+        assert_eq!(r2.limit_owner, elohim_compute::LimitOwner::Commitment);
     }
 }
