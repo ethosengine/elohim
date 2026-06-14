@@ -692,3 +692,91 @@ fn snapshot_includes_placement_gaps_and_regional_distribution() {
         0
     );
 }
+
+// =============================================================================
+// LIT-CARD PROOF — the resilience card lights with coherent agent-keyed substrate.
+//
+// This is the deterministic proof for the dark-card investigation (2026-06-14):
+// the snapshot joins are CORRECT for agent-keyed data; the live card is dark only
+// because the runtime writes the libp2p peer_id (not the agent_pub_key) into
+// shard_locations.peer_id / rea_commitments.provider, mismatching humans.
+// Seeded coherently (peer_id == provider == humans.agent_pub_key), every column
+// lights. If this test goes red, the read path regressed.
+// =============================================================================
+
+#[test]
+fn resilience_card_lights_with_coherent_agent_keyed_substrate() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+
+    let content_id = "lit-card-content";
+    let shard = "lit-card-shard-1";
+    seed_shard_manifest(&mut conn, content_id, &format!(r#"["{shard}"]"#));
+
+    // Three households, each with one steward agent. CRITICAL: the steward's
+    // shard_locations.peer_id, the commitment.provider, and humans.agent_pub_key
+    // are all the SAME value (the agent key) — the coherent contract.
+    let households = [
+        ("home-dowell", "agent-dowell", Some("us-east")),
+        ("home-ruth", "agent-ruth", Some("us-west")),
+        ("church-bethel", "agent-bethel", Some("us-east")),
+    ];
+    for (i, (household, agent, region)) in households.iter().enumerate() {
+        seed_collective(&mut conn, household, *region);
+        seed_human(&mut conn, agent, Some(household));
+        seed_shard_location(&mut conn, shard, agent); // peer_id == agent_pub_key
+        seed_peer_status(&mut conn, agent, "online");
+        seed_stewarded_node(&mut conn, agent, Some(household));
+        // R2 coverage: mix the seeder convention ("provide") with the runtime
+        // mishpat-projection convention ("replicates-content") — both must count.
+        let action = if i == 0 { "replicates-content" } else { "provide" };
+        seed_commitment(
+            &mut conn,
+            &format!("commit-{agent}"),
+            agent, // provider == agent_pub_key
+            action,
+            "active",
+            "content:commons",
+        );
+    }
+
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), content_id, None).unwrap();
+
+    // distribution_state flips unmeasured -> measured (a manifest exists).
+    assert_eq!(snapshot.distribution_state, "measured");
+    // Steward join lights — 3 distinct households hold the shard.
+    assert_eq!(snapshot.stewarding_collectives, 3, "steward join must light");
+    // Commitment join lights under BOTH action conventions (R2).
+    assert_eq!(
+        snapshot.commitment_backed_collectives, 3,
+        "commitment join must count provide + replicates-content"
+    );
+    // Protected: >=3 households + >=2 online peers.
+    assert_eq!(snapshot.protection_status, "protected");
+    // Region data present (no longer "no region data"). With no viewer context,
+    // stewards in known regions bucket as `global` (local/regional need a viewer);
+    // the card shows real geographic data either way — only all-unknown/zero is dark.
+    let rd = &snapshot.regional_distribution;
+    assert!(
+        rd.local + rd.regional + rd.global > 0,
+        "regional distribution must light (non-unknown): {rd:?}"
+    );
+
+    let details = snapshot.details.expect("details present");
+    assert_eq!(details.stewarding_collectives.len(), 3);
+    for entry in &details.stewarding_collectives {
+        assert!(entry.label.is_some(), "each holder must render a name: {entry:?}");
+    }
+    assert!(details.online_peers.live >= 2, "online peers: {:?}", details.online_peers);
+
+    // The felt projection — names, not nines — reads "protected" with all holders.
+    let felt = snapshot.felt_status.expect("felt_status present");
+    assert_eq!(felt.reassurance, "protected");
+    assert_eq!(felt.held_by.len(), 3);
+    assert_eq!(felt.floor.has_households, 3);
+    assert!(
+        felt.headline.starts_with("Held by 3 households:"),
+        "headline names the holders: {}",
+        felt.headline
+    );
+}

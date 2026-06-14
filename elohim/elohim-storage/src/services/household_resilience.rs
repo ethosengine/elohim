@@ -174,7 +174,16 @@ pub fn snapshot(
                     .eq(rea_commitments::provider.nullable())),
             )
             .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
-            .filter(rea_commitments::action.eq("provide"))
+            // Count provide commitments under BOTH conventions: the seeder writes
+            // the REA action literal `provide`; the runtime mishpat projection
+            // writes the DHT action discriminator (`replicates-content`, and its
+            // migration-window alias `replicates-commons`) for the same economic
+            // act (a household committing to hold content). Filtering only
+            // `provide` silently dropped every runtime-authored commitment.
+            .filter(
+                rea_commitments::action
+                    .eq_any(["provide", "replicates-content", "replicates-commons"]),
+            )
             .filter(rea_commitments::state.eq("active"))
             .filter(
                 rea_commitments::resource_classified_as
@@ -599,7 +608,11 @@ mod felt_status_tests {
         let held = vec![holder("a", Some("the Dowells"))];
         let felt = build_felt_status("measured", &[], held, "standard", false);
         assert_eq!(felt.reassurance, "needs-help");
-        assert!(felt.headline.contains("only 1 household"), "{}", felt.headline);
+        assert!(
+            felt.headline.contains("only 1 household"),
+            "{}",
+            felt.headline
+        );
         assert_eq!(
             felt.suggested_action.as_deref(),
             Some("Invite a household to help hold these")
