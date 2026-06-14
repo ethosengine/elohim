@@ -46,6 +46,14 @@ k2 store is a private `DashMap` shared with nothing on the SSR/projection path (
 
 ---
 
+## UPDATE 2026-06-14 — H3 CONFIRMED from the cluster (§2 observation resolved)
+
+Operator cluster-side investigation answered the §2 distinguishing observation directly: doorway-alpha crashlooped 109×/15h on `aa6debe6` (which HAS `worker_threads=4`) — a **load-driven liveness-probe kill** (exit 137, not crash/OOM; doorway-alpha-b on the identical image at adam stayed 3/3). Live evidence: ~8.6k log lines/60s, only ~14/s bootstrap — the rest `projection::store`/`warm_stream`; **avg ~0.25 core but bursty, zero CFS throttling**. So it is **NOT** the cpu:1 single-worker phantom (worker_threads=4 was live) — it is the **genuine warm_stream residual**: the projection replay grabs the Tokio workers in tight bursts and starves the latency-sensitive `/health` task off the runtime on a 1-core quota → /health misses the 15s probe → SIGKILL.
+
+**Refinement to the ranked hypotheses:** the dominant kill mechanism is **burst-starvation of /health** (+ debug-log overhead: 2 lines per projected doc), more than the all-threads-Mongo-await-park H3 originally emphasized — but the ROOT is identical: **warm_stream has no backpressure/yield (open-loop pacing).** The unbounded Mongo awaits (Fix 1) remain a real contributing latency amplifier; the burst-starvation is the proximate killer.
+
+**Stopgap applied (band-aid, operator + shift):** cpu limit 1→2, request 100m→500m on the doorway container (live patch + durable in `genesis/orchestrator/manifests/doorway/alpha.yaml`, commit `ece274734`). Survives the kill window cleanly. **This hides the pacing gap; it does not fix it.** Durable fix = §3 below (warm_stream pacing/backpressure + `/health` isolation onto a dedicated runtime). **Operator-gated:** debug logging kept ON to keep observing; the warm_stream fix waits until the operator has resolution on the pacing question.
+
 ## The single distinguishing observation (run the moment the deploy lands)
 
 **Top-line arbiter — splits "already fixed" from "genuine residual":** deploy the `worker_threads=4` image, apply sustained load to ONE pod. **Does `/health` still hang gateway-wide at ~2.5min?**
