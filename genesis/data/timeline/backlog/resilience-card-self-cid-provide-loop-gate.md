@@ -74,7 +74,50 @@ provide rows) are gated, in order:
 - `genesis/orchestrator/manifests/network-policies.yaml` (jenkins→conductor :8444,
   for CI *seeding* stages) is a DIFFERENT path and does not gate this card.
 
-## The two real causes (both app-layer in elohim-storage; reseed is NOT the lever)
+## CONFIRMED PRIMARY root causes — the READ joins are broken (code-review + schema verification, 2026-06-14)
+
+The self_cid gate (below) is real but is NOT the biggest blocker. A code-review +
+direct schema verification found the snapshot's READ joins are broken at the
+identity level — the card stays dark **regardless of seeding, self_cid, or
+conductor.** These are the priority fix (all in `household_resilience.rs`):
+
+- **R1 — steward join namespace mismatch [CONFIRMED].** `snapshot()`/`compute()`
+  join `shard_locations.peer_id == humans.agent_pub_key`. `shard_locations.peer_id`
+  is a **libp2p peer id**; `humans.agent_pub_key` is a **holochain agent key** —
+  different namespaces. The `peer_identity_bindings` table exists precisely as the
+  bridge (`peer_id ↔ agent_cid ↔ dht_anchor_hash`) but the join doesn't use it.
+  → **zero stewardingCollectives for every content** (the primary dark-card cause).
+- **R2 — commitment-join action mismatch [CONFIRMED].** `snapshot()` filters
+  `rea_commitments.action.eq("provide")`, but `mishpat_projection.rs:111` writes
+  provide commitments as `action: "replicates-commons"` / `"replicates-content"`.
+  `"provide"` never matches. → **zero commitmentBackedCollectives.** (`rea_commitments`
+  DOES have a `state` column — that filter is fine.)
+- **R3 — provider identity [CONFIRMED same class as R1].** The commitment join is
+  `rea_commitments.provider == humans.agent_pub_key`; `provider` carries the peer
+  id / self_cid (durability plan: seeded provider = pod `/p2p/status .peerId`).
+  Same peer-id-vs-agent-key mismatch.
+- **R4 — content_reach default [BLOCKER-4].** `snapshot()` defaults `content_reach`
+  to `"commons"` on lookup error → wrong `content:<reach>` scope for non-commons
+  content → commitment join misses.
+- **R5 — commitment_backed_replication stub [BLOCKER-2].** `compute()` always
+  returns `CommitmentBackedReplication::default()`; the computed count isn't
+  threaded into the view.
+
+**THE IDENTITY CONTRACT (must be settled once, truth-layer call):** the steward +
+commitment joins both hinge on `humans.agent_pub_key`. Either (A) route both joins
+through `peer_identity_bindings` (peer_id → agent_cid → humans), or (B) make all
+three populators (`humans.agent_pub_key`, `shard_locations.peer_id`,
+`rea_commitments.provider`) AND `self_cid` carry the SAME identity (the libp2p
+peer id). Whichever — the seeder peer-id contract + the storage self_cid-derive
+must produce the matching value, or the card stays dark and per-unit tests still
+pass (the silent-empty trap).
+
+**PROOF GATE:** a deterministic unit test that seeds coherent substrate rows and
+asserts `snapshot()` returns `measured` + non-zero stewards + non-zero
+commitment-backed + named collectives. It must FAIL today and pass after the join
+fixes — the local "card lights" proof, no live cluster needed.
+
+## The self_cid / conductor causes (real, but secondary to the join fixes above)
 
 1. **`SELF_CID` config gap → provide-loop dormant** [code-verified]. No
    startup-derive; only the unset env. **Fix:** derive `self_cid` at startup from
