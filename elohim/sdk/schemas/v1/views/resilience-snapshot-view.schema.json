@@ -68,6 +68,43 @@
         },
         "healthScore":     { "type": "number",  "minimum": 0, "maximum": 1 }
       }
+    },
+    "feltStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["headline", "reassurance", "heldBy", "floor"],
+      "description": "Household-addressed felt projection of the resilience claim — names, not nines. Computed in household_resilience.rs::snapshot(). Honest by construction: floor-relative (reassurance is measured against the content's resilience floor, not a flat threshold) and unmeasured-aware (distributionState 'unmeasured' → reassurance 'not-yet-seen', never a fake verdict). The inverse of the operator debug Lens; consumed by <elohim-memory-safety>.",
+      "properties": {
+        "headline": { "type": "string", "description": "Canonical content-neutral felt sentence — the single source of truth for the translation. The consuming component adds warm framing ('your memories', the album name); it never re-translates the state." },
+        "reassurance": { "enum": ["protected", "watching", "needs-help", "not-yet-seen"], "description": "Floor-relative felt state. not-yet-seen = unmeasured (never entered the distribution plane). protected = meets the floor with no active gap. watching = a holder lapsed but coverage survives, OR below the floor but still holding. needs-help = critically thin (<=1 household)." },
+        "heldBy": {
+          "type": "array",
+          "description": "The collectives currently holding this content, with display labels — names, not nines. Same shape as details.stewardingCollectives.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "kind"],
+            "properties": {
+              "id":    { "type": "string" },
+              "kind":  { "type": "string" },
+              "label": { "type": "string", "description": "Human-readable collective name (collectives.name)." }
+            }
+          }
+        },
+        "floor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tier", "tierDeclared", "wantsHouseholds", "hasHouseholds"],
+          "description": "The resilience FLOOR this content is measured against — the content-relative denominator. Expresses 'held by M of the N homes this should live in'. See genesis/data/timeline/backlog/resilience-tier-content-declared-floor.md.",
+          "properties": {
+            "tier":          { "type": "string", "description": "Resilience tier (value-driven, owner-declarable): 'standard' (default) until the content declares its own value-tier (vault/keepsake/ephemeral/...). NOT derived from reach." },
+            "tierDeclared":  { "type": "boolean", "description": "false = the tier is a default, not the owner's declared intent (honesty marker — the surface must not imply the household chose this floor)." },
+            "wantsHouseholds": { "type": "integer", "minimum": 0, "description": "Households this tier wants holding the content (the floor)." },
+            "hasHouseholds":   { "type": "integer", "minimum": 0, "description": "Households currently holding it (the achievement against the floor)." }
+          }
+        },
+        "suggestedAction": { "type": "string", "description": "One pro-social action offered when protection is short or unseen (e.g. 'Invite a household to help hold these'). Omitted when none needed." }
+      }
     }
   }
 }

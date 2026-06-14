@@ -67,5 +67,9 @@ pub fn build(engine: &GraphEngine, cid: &str) -> Result<ResilienceSnapshotView, 
         },
         reciprocating_collectives: None,
         details: None,
+        // The felt projection is computed in the relational `snapshot()` path
+        // (it needs the collectives label join + placement gaps). The graph
+        // branch leaves it None rather than emit an un-labeled felt block.
+        felt_status: None,
     })
 }

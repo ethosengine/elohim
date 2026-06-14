@@ -1466,6 +1466,11 @@ pub struct ResilienceSnapshotView {
     pub reciprocating_collectives: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub details: Option<ResilienceSnapshotDetailsView>,
+    /// Household-addressed felt projection — "names, not nines". Floor-relative
+    /// and unmeasured-aware. Computed in `household_resilience.rs::snapshot()`.
+    /// Wire: `feltStatus` in `resilience-snapshot-view.schema.json`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub felt_status: Option<FeltStatusView>,
 }
 
 /// A collective (of any kind) currently stewarding a content item.
@@ -1507,6 +1512,56 @@ pub struct OnlinePeersView {
     pub live: i32,
     /// Stewarded nodes registered across those collectives (the D2 join).
     pub known: i32,
+}
+
+/// Household-addressed felt projection of the resilience claim — "names, not
+/// nines". Honest by construction: floor-relative (reassurance is measured
+/// against the content's resilience floor, not a flat threshold) and
+/// unmeasured-aware (distribution_state "unmeasured" → "not-yet-seen", never a
+/// fake verdict). The inverse of the operator debug Lens; consumed by the
+/// `<elohim-memory-safety>` Family Vault component.
+///
+/// Wire format: `feltStatus` in `resilience-snapshot-view.schema.json`
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct FeltStatusView {
+    /// Canonical content-neutral felt sentence — the single source of truth for
+    /// the translation. The consuming component adds warm framing; it never
+    /// re-translates the state.
+    pub headline: String,
+    /// Floor-relative felt state: `"protected"` | `"watching"` | `"needs-help"`
+    /// | `"not-yet-seen"`.
+    pub reassurance: String,
+    /// The collectives currently holding this content, with display labels.
+    pub held_by: Vec<StewardingCollectiveEntry>,
+    /// The resilience floor this content is measured against.
+    pub floor: FeltFloorView,
+    /// One pro-social action offered when protection is short or unseen.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggested_action: Option<String>,
+}
+
+/// The resilience FLOOR a content is measured against — the content-relative
+/// denominator. Expresses "held by M of the N homes this should live in". The
+/// tier is value-driven and owner-declarable (NOT derived from reach);
+/// `tier_declared == false` marks a default, not the owner's stated intent.
+/// See `genesis/data/timeline/backlog/resilience-tier-content-declared-floor.md`.
+///
+/// Wire format: embedded in `resilience-snapshot-view.schema.json` feltStatus.floor
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct FeltFloorView {
+    /// Resilience tier: `"standard"` (default) until the content declares its
+    /// own value-tier (vault/keepsake/ephemeral/…).
+    pub tier: String,
+    /// `false` = the tier is a default, not the owner's declared intent.
+    pub tier_declared: bool,
+    /// Households this tier wants holding the content (the floor).
+    pub wants_households: i32,
+    /// Households currently holding it (achievement against the floor).
+    pub has_households: i32,
 }
 
 /// Replica health bucket for a CID's distribution summary.

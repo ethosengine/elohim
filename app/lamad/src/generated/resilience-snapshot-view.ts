@@ -58,6 +58,55 @@ export interface ResilienceSnapshotView {
     };
     healthScore?: number;
   };
+  /**
+   * Household-addressed felt projection of the resilience claim — names, not nines. Computed in household_resilience.rs::snapshot(). Honest by construction: floor-relative (reassurance is measured against the content's resilience floor, not a flat threshold) and unmeasured-aware (distributionState 'unmeasured' → reassurance 'not-yet-seen', never a fake verdict). The inverse of the operator debug Lens; consumed by <elohim-memory-safety>.
+   */
+  feltStatus?: {
+    /**
+     * Canonical content-neutral felt sentence — the single source of truth for the translation. The consuming component adds warm framing ('your memories', the album name); it never re-translates the state.
+     */
+    headline: string;
+    /**
+     * Floor-relative felt state. not-yet-seen = unmeasured (never entered the distribution plane). protected = meets the floor with no active gap. watching = a holder lapsed but coverage survives, OR below the floor but still holding. needs-help = critically thin (<=1 household).
+     */
+    reassurance: 'protected' | 'watching' | 'needs-help' | 'not-yet-seen';
+    /**
+     * The collectives currently holding this content, with display labels — names, not nines. Same shape as details.stewardingCollectives.
+     */
+    heldBy: {
+      id: string;
+      kind: string;
+      /**
+       * Human-readable collective name (collectives.name).
+       */
+      label?: string;
+    }[];
+    /**
+     * The resilience FLOOR this content is measured against — the content-relative denominator. Expresses 'held by M of the N homes this should live in'. See genesis/data/timeline/backlog/resilience-tier-content-declared-floor.md.
+     */
+    floor: {
+      /**
+       * Resilience tier (value-driven, owner-declarable): 'standard' (default) until the content declares its own value-tier (vault/keepsake/ephemeral/...). NOT derived from reach.
+       */
+      tier: string;
+      /**
+       * false = the tier is a default, not the owner's declared intent (honesty marker — the surface must not imply the household chose this floor).
+       */
+      tierDeclared: boolean;
+      /**
+       * Households this tier wants holding the content (the floor).
+       */
+      wantsHouseholds: number;
+      /**
+       * Households currently holding it (the achievement against the floor).
+       */
+      hasHouseholds: number;
+    };
+    /**
+     * One pro-social action offered when protection is short or unseen (e.g. 'Invite a household to help hold these'). Omitted when none needed.
+     */
+    suggestedAction?: string;
+  };
 }
 /**
  * Structured shefa signal: a content item's achieved placement falls short of its requested stewarding-collective diversity. The 'steward' can be any collective kind (household, church, patron-circle, DAO, …) — any group that can hold DHT-notarized REA commitments. Source of truth: computed projection from shard_locations + rea_commitments + humans → collectives. Operational Category C — no DHT entry.

@@ -1008,8 +1008,8 @@ fn placement_gap_view_matches_schema() {
 #[test]
 fn resilience_snapshot_view_matches_schema() {
     use elohim_storage::{
-        OnlinePeersView, PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
-        ResilienceSnapshotView, StewardingCollectiveEntry,
+        FeltFloorView, FeltStatusView, OnlinePeersView, PlacementGapView, RegionalDistributionView,
+        ResilienceSnapshotDetailsView, ResilienceSnapshotView, StewardingCollectiveEntry,
     };
 
     let view = ResilienceSnapshotView {
@@ -1053,6 +1053,29 @@ fn resilience_snapshot_view_matches_schema() {
             online_peers: OnlinePeersView { live: 5, known: 7 },
             health_score: 0.8,
         }),
+        felt_status: Some(FeltStatusView {
+            headline: "Held by 2 households: Matthew's Home, Bethel Church".to_string(),
+            reassurance: "watching".to_string(),
+            held_by: vec![
+                StewardingCollectiveEntry {
+                    id: "household-matthew".to_string(),
+                    kind: "household".to_string(),
+                    label: Some("Matthew's Home".to_string()),
+                },
+                StewardingCollectiveEntry {
+                    id: "church-bethel".to_string(),
+                    kind: "church".to_string(),
+                    label: None,
+                },
+            ],
+            floor: FeltFloorView {
+                tier: "standard".to_string(),
+                tier_declared: false,
+                wants_households: 3,
+                has_households: 2,
+            },
+            suggested_action: None,
+        }),
     };
 
     let json = serde_json::to_value(&view).unwrap();
@@ -1080,6 +1103,7 @@ fn resilience_snapshot_view_minimal_matches_schema() {
         protection_status: "protected".to_string(),
         reciprocating_collectives: None,
         details: None,
+        felt_status: None,
     };
 
     let json = serde_json::to_value(&view).unwrap();
@@ -1094,6 +1118,10 @@ fn resilience_snapshot_view_minimal_matches_schema() {
     assert!(
         !json.as_object().unwrap().contains_key("details"),
         "details must be absent when None"
+    );
+    assert!(
+        !json.as_object().unwrap().contains_key("feltStatus"),
+        "feltStatus must be absent when None"
     );
     validate_against_schema("views/resilience-snapshot-view.schema.json", &json);
 }

@@ -254,7 +254,7 @@ pub use views::{
 };
 pub use views::{IrohTransportProfileView, Libp2pTransportProfileView, PeerTransportManifestView};
 pub use views::{
-    OnlinePeersView, PlacementGapKind, PlacementGapRow, PlacementGapShortfall, PlacementGapView,
-    RegionalDistributionView, ResilienceSnapshotDetailsView, ResilienceSnapshotView,
-    StewardingCollectiveEntry,
+    FeltFloorView, FeltStatusView, OnlinePeersView, PlacementGapKind, PlacementGapRow,
+    PlacementGapShortfall, PlacementGapView, RegionalDistributionView,
+    ResilienceSnapshotDetailsView, ResilienceSnapshotView, StewardingCollectiveEntry,
 };
