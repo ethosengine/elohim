@@ -37,7 +37,13 @@ must be RECORDED as pre-dispatch gates (GATE-A/B/C, §2).
 
 …**task-0 (MF14/MF17 signal-decode) is VERIFIED DONE** — the class is CLOSED, all four subscriber families on byte-array-tolerant `HoloHashB64`.
 
-**BUILD UNDERWAY (2026-06-14):** graduation landed (`419571e2e` — 5 cite-sealed specs + `ORACLE.md` index); **increment-1** — the canonical `trait Governor` + `Refusal`/`LimitOwner` contract in `elohim-compute::actuation` — landed, 6 tests green (`5ba4dcb02`); **increment-2** — `arc_actuator` implements `Governor` (the lift's first instance, proving it generalizes) — building. Next: `CoverageRollup` → `hello-household` felt-status.
+**BUILD — technical spine COMPLETE + verified (2026-06-14):**
+- graduation `419571e2e` — 5 cite-sealed specs + `ORACLE.md` index.
+- **inc-1** `5ba4dcb02` — canonical `trait Governor` + `Refusal`/`LimitOwner` (incl `ReservedPlace`/`faith`) in `elohim-compute::actuation`; 6 contract tests green.
+- **inc-2** `732fdaa69` — `arc_actuator` implements `Governor` (the lift's first instance; `ActuationRefusal→Refusal` at `limit_owner: Commitment`); 19 arc tests green.
+- **inc-3** `2ff6beb04` — `CoverageRollup` keystone in `src/recursion.rs` (aggregate-with-descent; content-addressed BLAKE3; deficit-as-externality; per-row-degrade); 5 tests green.
+
+**NEXT — `hello-household` felt-status (the felt surface, fresh-context increment):** add `FeltStatusView` + `felt_status: Option<FeltStatusView>` on `ResilienceSnapshotView` (`elohim/elohim-views/src/infrastructure.rs`) + the translator in `household_resilience.rs::snapshot()`. *The honesty data already exists in `snapshot()`* — `distribution_state` (unmeasured≠zero), `kind/label` collective entries, `online_peers {live, known}`; remaining is the human translation ("Aunt Ruth's copy is offline — 2 households still hold these") + **the schema dance** (`resilience-snapshot-view.schema.json` is `additionalProperties:false` with a full-literal `schema_contract` test → exact, 2 build cycles incl ts-rs `export_bindings`) + the Angular `<elohim-memory-safety>` component (frontend sibling). Then: collapse arc's local `ActuationRefusal` into the shared `Refusal` (2nd-face follow-on); re-express the shefa distribution builders via `CoverageRollup`.
 
 ---
 
