@@ -104,6 +104,7 @@ pub mod metadata;
 pub mod mishpat_projection; // Mishpat commitment projection handler (DHT → SQLite sync, Slice-2a T5)
 pub mod observation; // Observation/Event Layer — peer-witnessed evidence (Track 2 substrate)
 pub mod rea_projection; // REA projection signal handler (DHT → SQLite sync)
+pub mod recursion; // CoverageRollup — aggregate-with-descent keystone (recursive-architecture §2.1)
 pub mod shard_service;
 pub mod sharding;
 pub mod signals; // Official holochain_client wrapper with signing support
