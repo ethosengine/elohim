@@ -120,7 +120,9 @@ Feature: Doorway peer-conductor connections back off and do not leak
     And one request path is blocked on a slow upstream
     When a concurrent request hits the gateway during the block
     Then the concurrent request is served without waiting for the blocked path
-    And the liveness probe on the main listener continues to answer
+    And the readiness probe on the main listener continues to answer
+    # (2026-06-15: liveness moved to the dedicated watchdog port; readiness and
+    #  startup stay on the main listener — see the 2026-06-15 section below.)
 
   @regression @requires:ssr-bundle
   Scenario: A saturated SSR render queue sheds to the CSR shell instead of queuing
@@ -151,7 +153,97 @@ Feature: Doorway peer-conductor connections back off and do not leak
   #   DOORWAY_HEALTH_PORT           optional isolated probe listener; LEFT UNSET on
   #                                 alpha — it shares the main runtime, so a killer
   #                                 probe pointed at it would mask a partial wedge.
+  #                                 SUPERSEDED 2026-06-15: now SET (8079) and served
+  #                                 from a DEDICATED OS-thread runtime + heartbeat-
+  #                                 gated, removing the shared-runtime footgun (see
+  #                                 the 2026-06-15 section below).
   # Informs: doorway deployment presets (worker_threads is the freeze-resistance
   #   knob, independent of limits.cpu; raise cpu only for SSR render throughput).
   # Review after: tokio major upgrades, conductor app-interface changes, any move
   #   to pool >1 SSR isolate or add V8-level render interrupt.
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Engineering constraint (story-harvest, 2026-06-15 doorway-alpha crashloop):
+  # the 2026-06-13 freeze fix (zome-call timeout + explicit worker threads + SSR
+  # shed) AND the warm_stream pacing cure (cpu 1->2, WARMUP_PACE_MS) both shipped,
+  # yet the matthew-side doorway kept liveness-SIGKILLing (exit 137 "Error", not
+  # OOM). Metrics showed ZERO CFS throttle and CPU ~0.05 core — so it was NOT CPU
+  # starvation and NOT the firehose. Root cause (5-agent source-verified): the
+  # holochain_client conductor connect resolves the hostname with a BARE
+  # synchronous std::net getaddrinfo (to_socket_addrs, before the first .await),
+  # ON the tokio worker that polls the connect future. During a conductor DNS flap
+  # (309 reconnects/10min, "Name or service not known" = a failing getaddrinfo,
+  # the slowest resolver path) enough workers park in the resolver syscall — zero
+  # CPU, and UNCANCELLABLE by the 2026-06-13 zome-call timeout because a blocking
+  # syscall has no .await yield point — that /health can't be scheduled past the
+  # liveness budget. A/B control: matthew-side 12 restarts vs adam-side 0 on the
+  # SAME image; the kill rate tracks the conductor reconnect/DNS-flap rate, not CPU
+  # or warm_stream replay volume.
+  # Constraints pinned here (two structural invariants):
+  #   I1. No blocking syscall may run on the tokio worker pool — conductor host
+  #       resolution goes through tokio's async resolver (off-pool, cancellable).
+  #   I2. Liveness must be served from a runtime ISOLATED from the main worker
+  #       pool AND gated on a main-runtime progress heartbeat — so it is both
+  #       un-starvable (survives a full main-pool stall) and truthful (a genuine
+  #       wedge still fails the probe → restart-on-hang preserved). This SUPERSEDES
+  #       the 2026-06-13 note that left DOORWAY_HEALTH_PORT unset "because it
+  #       shares the main runtime" and the assertion that liveness answers on the
+  #       MAIN listener.
+
+  @regression
+  Scenario: A conductor DNS flap does not park the doorway's worker pool
+    # I1, the load-bearing root cure. Hostname resolution for a conductor connect
+    # must never run as a blocking syscall on a tokio worker — a failing lookup
+    # during a conductor pod roll otherwise parks workers (no CPU) until the
+    # resolver times out, and enough concurrent parks starve /health.
+    Given a peer conductor whose hostname briefly fails to resolve during a pod roll
+    When the doorway's subscriber and pool workers reconnect through the DNS failure
+    Then conductor host resolution runs off the worker pool, not on it
+    And the doorway's worker pool stays available to schedule other tasks
+    And the doorway keeps serving requests throughout the flap
+
+  @regression
+  Scenario: Liveness survives a full main-runtime stall yet still restarts a real wedge
+    # I2. Liveness is served from a runtime isolated from the main worker pool, so
+    # a fully-stalled main pool can't silence it — but its verdict is gated on a
+    # main-runtime heartbeat, so a GENUINE wedge still fails (restart-on-hang).
+    Given the doorway serves liveness from a runtime isolated from the main worker pool
+    And the liveness verdict is gated on a heartbeat the main runtime stamps
+    When every main worker thread is parked at once
+    Then the liveness endpoint still answers promptly from its isolated runtime
+    And it reports unhealthy because the main-runtime heartbeat has gone stale
+    And the pod is restarted instead of hanging unnoticed
+
+  @regression
+  Scenario: A momentary worker-pool park does not false-kill the pod
+    # The honesty counterpart to I2: a transient park the runtime recovers from
+    # (under the staleness threshold) must NOT trip a liveness kill — that
+    # false-kill class is exactly what moving liveness off the shared listener removes.
+    Given the doorway's main runtime is briefly busy but recovers within the staleness window
+    When the liveness watchdog is probed during and after the brief park
+    Then the heartbeat age stays under the staleness threshold
+    And the liveness probe keeps returning healthy
+    And the pod is not restarted
+
+  # Operational parameters (2026-06-15 crashloop fix — parameter-bearing):
+  #   conductor DNS resolve         tokio::net::lookup_host (async, off the worker
+  #                                 pool), bounded by a 5s timeout; applied at all
+  #                                 conductor connect sites (admin + app).
+  #   DOORWAY_WORKER_THREADS        4 -> 8 on alpha. Raises concurrent-blocked-await
+  #                                 headroom, but a blocking syscall is unbounded by
+  #                                 worker count — so this only RAISES the bar; the
+  #                                 root cure is off-pool DNS (I1).
+  #   DOORWAY_HEALTH_PORT           NOW SET on alpha (8079), served from the doorway's
+  #                                 OWN OS-thread runtime — no longer the shared-
+  #                                 runtime footgun the 2026-06-13 note warned about.
+  #   DOORWAY_HEALTH_STALE_MS       heartbeat staleness threshold, default 15000ms;
+  #                                 the watchdog returns 503 only past it (real wedge).
+  #   liveness probe (watchdog)     10s period x 3 failures = 30s budget; the watchdog
+  #                                 answers sub-ms so timeoutSeconds:5 is ample.
+  #   WARMUP_PACE_MS                8 -> 50 on alpha (spreads the cold-start replay;
+  #                                 band-aid — the firehose was never the SIGKILL).
+  # Informs: doorway deployment presets (off-pool DNS + the heartbeat-gated watchdog
+  #   are the freeze-resistance primitives; worker_threads/pace are only band-aids);
+  #   peer diversity (WAN / flaky-DNS peers amplify the blocking-resolve blast).
+  # Review after: holochain_client connect API changes (it may add async resolve),
+  #   tokio major upgrades, any conductor hostname/DNS topology change.
