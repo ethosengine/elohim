@@ -20,23 +20,23 @@
  * the old id, this catches it before Jenkins does.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 // =============================================================================
 // Constants — sources of truth for deployment vocabulary
 // =============================================================================
 
-export const PATTERNS = ['legacy', 'consolidated'] as const;
+export const PATTERNS = ["legacy", "consolidated"] as const;
 
 // K8s node-type labels the cluster is provisioned with. Keep in sync with
 // genesis/orchestrator/manifests/humans/*.yaml affinity blocks and with the
 // operator runbook that sets `node-type=<value>` on each worker node.
 export const NODE_TYPES = [
-  'performance',
-  'operations',
-  'edge',
-  'remote',
+  "performance",
+  "operations",
+  "edge",
+  "remote",
 ] as const;
 
 // =============================================================================
@@ -79,13 +79,16 @@ interface DevicesJson {
 // Loaders
 // =============================================================================
 
-const REPO_ROOT = resolve(import.meta.dirname, '../../..');
-const DEPLOYMENTS_PATH = resolve(REPO_ROOT, 'genesis/orchestrator/data/deployments.json');
-const HUMANS_PATH = resolve(REPO_ROOT, 'genesis/data/humans/humans.json');
-const DEVICES_PATH = resolve(REPO_ROOT, 'genesis/data/devices/devices.json');
+const REPO_ROOT = resolve(import.meta.dirname, "../../..");
+const DEPLOYMENTS_PATH = resolve(
+  REPO_ROOT,
+  "genesis/orchestrator/data/deployments.json",
+);
+const HUMANS_PATH = resolve(REPO_ROOT, "genesis/data/humans/humans.json");
+const DEVICES_PATH = resolve(REPO_ROOT, "genesis/data/devices/devices.json");
 
 function loadJson<T>(path: string): T {
-  return JSON.parse(readFileSync(path, 'utf-8')) as T;
+  return JSON.parse(readFileSync(path, "utf-8")) as T;
 }
 
 // =============================================================================
@@ -98,10 +101,17 @@ export function validateRecord(
   knownDeviceIds: Set<string>,
 ): string[] {
   const errors: string[] = [];
-  const tag = record.name ? `[${record.name}]` : '[?]';
+  const tag = record.name ? `[${record.name}]` : "[?]";
 
   // Required presence
-  for (const field of ['name', 'role', 'humanLabel', 'humanId', 'pattern', 'deviceArchetype'] as const) {
+  for (const field of [
+    "name",
+    "role",
+    "humanLabel",
+    "humanId",
+    "pattern",
+    "deviceArchetype",
+  ] as const) {
     if (!record[field]) errors.push(`${tag} missing required field: ${field}`);
   }
 
@@ -112,28 +122,37 @@ export function validateRecord(
 
   // Cross-reference: deviceArchetype exists in devices.json
   if (record.deviceArchetype && !knownDeviceIds.has(record.deviceArchetype)) {
-    errors.push(`${tag} deviceArchetype "${record.deviceArchetype}" not found in devices.json`);
+    errors.push(
+      `${tag} deviceArchetype "${record.deviceArchetype}" not found in devices.json`,
+    );
   }
 
   // Pattern enum
-  if (record.pattern && !PATTERNS.includes(record.pattern as typeof PATTERNS[number])) {
-    errors.push(`${tag} pattern "${record.pattern}" not in: ${PATTERNS.join(', ')}`);
+  if (
+    record.pattern &&
+    !PATTERNS.includes(record.pattern as (typeof PATTERNS)[number])
+  ) {
+    errors.push(
+      `${tag} pattern "${record.pattern}" not in: ${PATTERNS.join(", ")}`,
+    );
   }
 
   // Pattern-specific file existence
-  if (record.pattern === 'legacy') {
+  if (record.pattern === "legacy") {
     if (!record.template) {
       errors.push(`${tag} pattern=legacy requires 'template' field`);
     } else if (!existsSync(resolve(REPO_ROOT, record.template))) {
       errors.push(`${tag} template file missing: ${record.template}`);
     }
-  } else if (record.pattern === 'consolidated') {
+  } else if (record.pattern === "consolidated") {
     // adam carries an explicit `manifest`; every other consolidated human
     // sed-renders the shared `template` (deployments.json's own $comment
     // documents this convention). Accept whichever is present.
     const source = record.manifest ?? record.template;
     if (!source) {
-      errors.push(`${tag} pattern=consolidated requires 'manifest' or 'template' field`);
+      errors.push(
+        `${tag} pattern=consolidated requires 'manifest' or 'template' field`,
+      );
     } else if (!existsSync(resolve(REPO_ROOT, source))) {
       errors.push(`${tag} deployment source file missing: ${source}`);
     }
@@ -142,8 +161,13 @@ export function validateRecord(
   // edgenodeDbPoolSize renders STORAGE_DB_POOL_SIZE via sed — must be a positive
   // integer string (a non-numeric value would render a garbage env the Rust
   // parser silently discards back to the default, losing the intended override).
-  if (record.edgenodeDbPoolSize !== undefined && !/^[1-9]\d*$/.test(record.edgenodeDbPoolSize)) {
-    errors.push(`${tag} edgenodeDbPoolSize must be a positive integer string: ${JSON.stringify(record.edgenodeDbPoolSize)}`);
+  if (
+    record.edgenodeDbPoolSize !== undefined &&
+    !/^[1-9]\d*$/.test(record.edgenodeDbPoolSize)
+  ) {
+    errors.push(
+      `${tag} edgenodeDbPoolSize must be a positive integer string: ${JSON.stringify(record.edgenodeDbPoolSize)}`,
+    );
   }
 
   // nodeTypes: non-empty, all in allowed set
@@ -151,20 +175,20 @@ export function validateRecord(
     errors.push(`${tag} nodeTypes must be a non-empty array`);
   } else {
     for (const nt of record.nodeTypes) {
-      if (!NODE_TYPES.includes(nt as typeof NODE_TYPES[number])) {
-        errors.push(`${tag} nodeType "${nt}" not in: ${NODE_TYPES.join(', ')}`);
+      if (!NODE_TYPES.includes(nt as (typeof NODE_TYPES)[number])) {
+        errors.push(`${tag} nodeType "${nt}" not in: ${NODE_TYPES.join(", ")}`);
       }
     }
   }
 
   // Legacy humans must declare edgenode resource sizing (consolidated humans
   // hardcode theirs in the manifest).
-  if (record.pattern === 'legacy') {
+  if (record.pattern === "legacy") {
     for (const field of [
-      'edgenodeMemoryRequest',
-      'edgenodeMemoryLimit',
-      'edgenodeCpuRequest',
-      'edgenodeCpuLimit',
+      "edgenodeMemoryRequest",
+      "edgenodeMemoryLimit",
+      "edgenodeCpuRequest",
+      "edgenodeCpuLimit",
     ] as const) {
       if (!record[field]) {
         errors.push(`${tag} pattern=legacy requires ${field}`);
@@ -183,29 +207,39 @@ export function validateRecord(
   // by static validation), which commit 5e704040 now handles in-flight but
   // we still want flagged at validation time as a defense-in-depth.
   const sedInterpolatedFields = [
-    'affinityComment',
-    'edgenodeMemoryRequest',
-    'edgenodeMemoryLimit',
-    'edgenodeCpuRequest',
-    'edgenodeCpuLimit',
-    'edgenodeDbPoolSize',
-    'humanLabel',
-    'humanId',
+    "affinityComment",
+    "edgenodeMemoryRequest",
+    "edgenodeMemoryLimit",
+    "edgenodeCpuRequest",
+    "edgenodeCpuLimit",
+    "edgenodeDbPoolSize",
+    "humanLabel",
+    "humanId",
   ] as const;
   for (const field of sedInterpolatedFields) {
     const value = record[field];
-    if (typeof value !== 'string') continue;
-    if (value.includes('|')) {
-      errors.push(`${tag} ${field} contains '|' (the sed delimiter) — would truncate substitution: ${JSON.stringify(value)}`);
+    if (typeof value !== "string") continue;
+    if (value.includes("|")) {
+      errors.push(
+        `${tag} ${field} contains '|' (the sed delimiter) — would truncate substitution: ${JSON.stringify(value)}`,
+      );
     }
     if (/[\n\r]/.test(value)) {
-      errors.push(`${tag} ${field} contains a line break — would split the sed expression: ${JSON.stringify(value)}`);
+      errors.push(
+        `${tag} ${field} contains a line break — would split the sed expression: ${JSON.stringify(value)}`,
+      );
     }
   }
 
   // humanId should match the pattern human-<humanLabel>
-  if (record.humanId && record.humanLabel && record.humanId !== `human-${record.humanLabel}`) {
-    errors.push(`${tag} humanId "${record.humanId}" must equal "human-${record.humanLabel}"`);
+  if (
+    record.humanId &&
+    record.humanLabel &&
+    record.humanId !== `human-${record.humanLabel}`
+  ) {
+    errors.push(
+      `${tag} humanId "${record.humanId}" must equal "human-${record.humanLabel}"`,
+    );
   }
 
   return errors;
@@ -220,8 +254,8 @@ async function main(): Promise<void> {
   const humans = loadJson<HumansJson>(HUMANS_PATH);
   const devices = loadJson<DevicesJson>(DEVICES_PATH);
 
-  const knownHumanIds = new Set(humans.humans.map(h => h.id));
-  const knownDeviceIds = new Set(devices.devices.map(d => d.id));
+  const knownHumanIds = new Set(humans.humans.map((h) => h.id));
+  const knownDeviceIds = new Set(devices.devices.map((d) => d.id));
 
   const errors: string[] = [];
 
@@ -236,7 +270,10 @@ async function main(): Promise<void> {
     idCounts.set(r.humanId, (idCounts.get(r.humanId) ?? 0) + 1);
   }
   for (const [id, count] of idCounts) {
-    if (count > 1) errors.push(`duplicate humanId "${id}" in deployments.json (${count} records)`);
+    if (count > 1)
+      errors.push(
+        `duplicate humanId "${id}" in deployments.json (${count} records)`,
+      );
   }
 
   // Directory-level: duplicate names
@@ -245,24 +282,29 @@ async function main(): Promise<void> {
     nameCounts.set(r.name, (nameCounts.get(r.name) ?? 0) + 1);
   }
   for (const [name, count] of nameCounts) {
-    if (count > 1) errors.push(`duplicate name "${name}" in deployments.json (${count} records)`);
+    if (count > 1)
+      errors.push(
+        `duplicate name "${name}" in deployments.json (${count} records)`,
+      );
   }
 
   for (const error of errors) console.error(`ERROR ${error}`);
 
-  console.log(`\nValidated ${deployments.humans.length} deployment records: ${errors.length} errors`);
+  console.log(
+    `\nValidated ${deployments.humans.length} deployment records: ${errors.length} errors`,
+  );
 
   if (errors.length > 0) process.exit(1);
-  console.log('All deployment records valid.');
+  console.log("All deployment records valid.");
 }
 
 const isCli =
-  process.argv[1]?.endsWith('validate-deployments.ts') ||
-  process.argv[1]?.endsWith('validate-deployments.js');
+  process.argv[1]?.endsWith("validate-deployments.ts") ||
+  process.argv[1]?.endsWith("validate-deployments.js");
 
 if (isCli) {
-  main().catch(err => {
-    console.error('Unexpected error:', err);
+  main().catch((err) => {
+    console.error("Unexpected error:", err);
     process.exit(1);
   });
 }

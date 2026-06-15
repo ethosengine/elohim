@@ -22,17 +22,25 @@ describe('classifyResource', () => {
   });
 
   it('classifies an arc/dht working-set incident', () => {
-    const classes = classifyResource('per-node RAM tracks the full authority arc DHT working set', ['gossip']);
+    const classes = classifyResource('per-node RAM tracks the full authority arc DHT working set', [
+      'gossip',
+    ]);
     assert.ok(classes.includes('arc-dht'));
   });
 
   it('classifies a crash-loop/liveness incident as runtime-sched', () => {
-    const classes = classifyResource('doorway crash-loop: liveness watchdog SIGKILL on a wedged runtime', ['crash-loop']);
+    const classes = classifyResource(
+      'doorway crash-loop: liveness watchdog SIGKILL on a wedged runtime',
+      ['crash-loop']
+    );
     assert.ok(classes.includes('runtime-sched'));
   });
 
   it('returns empty for an unrelated entry', () => {
-    assert.deepEqual(classifyResource('add a new content type to the lamad manifest', ['lamad']), []);
+    assert.deepEqual(
+      classifyResource('add a new content type to the lamad manifest', ['lamad']),
+      []
+    );
   });
 });
 
@@ -91,14 +99,28 @@ describe('parseFrontmatter', () => {
 describe('buildShape', () => {
   const entries: ShapeEntry[] = [
     {
-      slug: 'a', title: 'a', severity: 'high', selfHealStatus: 'in-progress',
-      nodes: ['matthew'], classes: ['sessions', 'db-pool'], fingerprints: [], ciOccurrences: 3,
-      hasExhaustedSection: true, documentedTunables: ['STORAGE_DB_POOL_SIZE'],
+      slug: 'a',
+      title: 'a',
+      severity: 'high',
+      selfHealStatus: 'in-progress',
+      nodes: ['matthew'],
+      classes: ['sessions', 'db-pool'],
+      fingerprints: [],
+      ciOccurrences: 3,
+      hasExhaustedSection: true,
+      documentedTunables: ['STORAGE_DB_POOL_SIZE'],
     },
     {
-      slug: 'b', title: 'b', severity: 'high', selfHealStatus: 'cured',
-      nodes: ['matthew', 'james'], classes: ['memory'], fingerprints: [], ciOccurrences: 0,
-      hasExhaustedSection: true, documentedTunables: ['deployments.json edgenodeMemoryLimit'],
+      slug: 'b',
+      title: 'b',
+      severity: 'high',
+      selfHealStatus: 'cured',
+      nodes: ['matthew', 'james'],
+      classes: ['memory'],
+      fingerprints: [],
+      ciOccurrences: 0,
+      hasExhaustedSection: true,
+      documentedTunables: ['deployments.json edgenodeMemoryLimit'],
     },
   ];
 

@@ -23,8 +23,11 @@ import { fileURLToPath } from 'node:url';
 import * as AjvNs from 'ajv/dist/2020.js';
 
 const AjvCtor: new (opts: { strict: boolean; allErrors: boolean }) => AjvNs.default =
-  (AjvNs as unknown as { default: new (opts: { strict: boolean; allErrors: boolean }) => AjvNs.default })
-    .default ??
+  (
+    AjvNs as unknown as {
+      default: new (opts: { strict: boolean; allErrors: boolean }) => AjvNs.default;
+    }
+  ).default ??
   (AjvNs as unknown as new (opts: { strict: boolean; allErrors: boolean }) => AjvNs.default);
 
 // ---------------------------------------------------------------------------
@@ -46,15 +49,62 @@ export type ResourceClass = (typeof RESOURCE_CLASSES)[number];
 const CLASS_KEYWORDS: Record<ResourceClass, string[]> = {
   cpu: ['cpu', 'throttle', 'cfs', 'cpu starvation', 'starve'],
   // Resource-context only — bare "memory" false-matches MemPalace/"memory kit".
-  memory: ['oom', 'oomkill', 'memcg', 'anon-rss', 'rss ', 'memory limit', 'memory pressure', 'out of memory', 'working set'],
-  'db-pool': ['db-pool', 'db pool', 'sqlite', 'read pool', 'read-pool', 'r2d2', 'connection pool', 'busy_timeout', 'pool size'],
-  'arc-dht': ['arc-factor', 'target_arc_factor', 'authority arc', 'dht', 'arc shrink', 'arc-shrink'],
+  memory: [
+    'oom',
+    'oomkill',
+    'memcg',
+    'anon-rss',
+    'rss ',
+    'memory limit',
+    'memory pressure',
+    'out of memory',
+    'working set',
+  ],
+  'db-pool': [
+    'db-pool',
+    'db pool',
+    'sqlite',
+    'read pool',
+    'read-pool',
+    'r2d2',
+    'connection pool',
+    'busy_timeout',
+    'pool size',
+  ],
+  'arc-dht': [
+    'arc-factor',
+    'target_arc_factor',
+    'authority arc',
+    'dht',
+    'arc shrink',
+    'arc-shrink',
+  ],
   // Resource-context only — bare "session" false-matches "dev session".
-  sessions: ['app-ws', 'app_ws', 'reconnect', 'websocket', 'admin-ws', 'ws session', 'session pressure'],
+  sessions: [
+    'app-ws',
+    'app_ws',
+    'reconnect',
+    'websocket',
+    'admin-ws',
+    'ws session',
+    'session pressure',
+  ],
   'disk-pvc': ['pvc', 'openebs', 'jiva', 'no space', 'disk pressure', 'watermark', 'fingerprint'],
   'runtime-sched': [
-    'liveness', 'crash-loop', 'crashloop', 'watchdog', 'startup', 'serializ', 'scheduling',
-    'admission-shed', 'shed', 'backpressure', 'wedge', 'firehose', 'sigkill', 'self-heal',
+    'liveness',
+    'crash-loop',
+    'crashloop',
+    'watchdog',
+    'startup',
+    'serializ',
+    'scheduling',
+    'admission-shed',
+    'shed',
+    'backpressure',
+    'wedge',
+    'firehose',
+    'sigkill',
+    'self-heal',
   ],
 };
 
@@ -74,7 +124,7 @@ export function classifyResource(text: string, tags: string[]): ResourceClass[] 
   const hay = (text + ' ' + tags.join(' ')).toLowerCase();
   const out: ResourceClass[] = [];
   for (const cls of RESOURCE_CLASSES) {
-    if (CLASS_KEYWORDS[cls].some((kw) => hay.includes(kw))) out.push(cls);
+    if (CLASS_KEYWORDS[cls].some(kw => hay.includes(kw))) out.push(cls);
   }
   return out;
 }
@@ -100,7 +150,10 @@ export interface BacklogFrontmatter {
 }
 
 function stripQuotes(s: string): string {
-  return s.trim().replace(/^["']|["']$/g, '').trim();
+  return s
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .trim();
 }
 
 /** Parse an inline `[a, b, "c"]` array; returns [] for `[]` or absent. */
@@ -109,8 +162,8 @@ function parseInlineArray(v: string): string[] {
   if (!m) return [];
   return m[1]
     .split(',')
-    .map((x) => stripQuotes(x))
-    .filter((x) => x.length > 0);
+    .map(x => stripQuotes(x))
+    .filter(x => x.length > 0);
 }
 
 export function parseFrontmatter(md: string): BacklogFrontmatter | null {
@@ -123,14 +176,29 @@ export function parseFrontmatter(md: string): BacklogFrontmatter | null {
     const [, key, rawVal] = kv;
     const val = rawVal.trim();
     switch (key) {
-      case 'slug': fm.slug = stripQuotes(val); break;
-      case 'title': fm.title = stripQuotes(val); break;
-      case 'severity': fm.severity = stripQuotes(val); break;
-      case 'self_heal_status': fm.selfHealStatus = stripQuotes(val); break;
-      case 'nodes': fm.nodes = parseInlineArray(val); break;
-      case 'tags': fm.tags = parseInlineArray(val); break;
-      case 'fingerprints': fm.fingerprints = parseInlineArray(val); break;
-      default: break;
+      case 'slug':
+        fm.slug = stripQuotes(val);
+        break;
+      case 'title':
+        fm.title = stripQuotes(val);
+        break;
+      case 'severity':
+        fm.severity = stripQuotes(val);
+        break;
+      case 'self_heal_status':
+        fm.selfHealStatus = stripQuotes(val);
+        break;
+      case 'nodes':
+        fm.nodes = parseInlineArray(val);
+        break;
+      case 'tags':
+        fm.tags = parseInlineArray(val);
+        break;
+      case 'fingerprints':
+        fm.fingerprints = parseInlineArray(val);
+        break;
+      default:
+        break;
     }
   }
   return fm;
@@ -160,8 +228,19 @@ export interface ShapeEntry {
 }
 
 export function buildShape(entries: ShapeEntry[]) {
-  const byNode: Record<string, { total: number; classes: Record<string, number>; lifecycle: Record<string, number> }> = {};
-  const byClass: Record<string, { total: number; nodes: string[]; documentedTunables: string[]; lifecycle: Record<string, number> }> = {};
+  const byNode: Record<
+    string,
+    { total: number; classes: Record<string, number>; lifecycle: Record<string, number> }
+  > = {};
+  const byClass: Record<
+    string,
+    {
+      total: number;
+      nodes: string[];
+      documentedTunables: string[];
+      lifecycle: Record<string, number>;
+    }
+  > = {};
   const byLifecycle: Record<string, number> = {};
   const cells: Record<string, Record<string, number>> = {};
 
@@ -186,7 +265,12 @@ export function buildShape(entries: ShapeEntry[]) {
     }
     for (const c of e.classes) {
       classSet.add(c);
-      byClass[c] ??= { total: 0, nodes: [], documentedTunables: DOCUMENTED_TUNABLES[c as ResourceClass] ?? [], lifecycle: {} };
+      byClass[c] ??= {
+        total: 0,
+        nodes: [],
+        documentedTunables: DOCUMENTED_TUNABLES[c as ResourceClass] ?? [],
+        lifecycle: {},
+      };
       byClass[c].total += 1;
       byClass[c].lifecycle[life] = (byClass[c].lifecycle[life] ?? 0) + 1;
       for (const node of nodes) if (!byClass[c].nodes.includes(node)) byClass[c].nodes.push(node);
@@ -199,7 +283,7 @@ export function buildShape(entries: ShapeEntry[]) {
     byLifecycle,
     matrix: {
       nodes: [...nodeSet].sort(),
-      classes: RESOURCE_CLASSES.filter((c) => classSet.has(c)),
+      classes: RESOURCE_CLASSES.filter(c => classSet.has(c)),
       cells,
     },
   };
@@ -219,9 +303,9 @@ function loadCiFindings(path: string): CiFinding[] {
   if (!existsSync(path)) return [];
   return readFileSync(path, 'utf-8')
     .split('\n')
-    .map((l) => l.trim())
+    .map(l => l.trim())
     .filter(Boolean)
-    .map((l) => {
+    .map(l => {
       try {
         return JSON.parse(l) as CiFinding;
       } catch {
@@ -238,7 +322,7 @@ function loadCiFindings(path: string): CiFinding[] {
 export function collectEntries(backlogDir: string, ci: CiFinding[]): ShapeEntry[] {
   if (!existsSync(backlogDir)) return [];
   const entries: ShapeEntry[] = [];
-  for (const file of readdirSync(backlogDir).filter((f) => f.endsWith('.md'))) {
+  for (const file of readdirSync(backlogDir).filter(f => f.endsWith('.md'))) {
     const md = readFileSync(join(backlogDir, file), 'utf-8');
     const fm = parseFrontmatter(md);
     if (!fm) continue;
@@ -250,7 +334,7 @@ export function collectEntries(backlogDir: string, ci: CiFinding[]): ShapeEntry[
     // Only resource/resilience/self-heal entries belong in the shape report.
     if (classes.length === 0 && !fm.selfHealStatus && !hasExhaustedSection) continue;
 
-    const ciForEntry = ci.filter((f) => f.backlog === slug || fm.fingerprints.includes(f.fp));
+    const ciForEntry = ci.filter(f => f.backlog === slug || fm.fingerprints.includes(f.fp));
     const ciOccurrences = ciForEntry.reduce((sum, f) => sum + (f.seen ?? 1), 0);
 
     entries.push({
@@ -273,7 +357,10 @@ function renderMarkdown(report: ReturnType<typeof assembleReport>): string {
   const { shape, entries, entryCount } = report;
   const L: string[] = [];
   L.push('# Resource-Exhaustion Shape Report', '');
-  L.push(`Aggregates **${entryCount}** self-heal/resilience backlog entries × the CI ledger into the shape of where runaway-resource issues occur on the stack.`, '');
+  L.push(
+    `Aggregates **${entryCount}** self-heal/resilience backlog entries × the CI ledger into the shape of where runaway-resource issues occur on the stack.`,
+    ''
+  );
 
   // Node × class matrix (the "shape").
   L.push('## Shape — node × resource-class', '');
@@ -284,7 +371,9 @@ function renderMarkdown(report: ReturnType<typeof assembleReport>): string {
     L.push(`| node | ${cls.join(' | ')} |`);
     L.push(`|------|${cls.map(() => '------').join('|')}|`);
     for (const node of shape.matrix.nodes) {
-      const row = cls.map((c) => (shape.matrix.cells[node]?.[c] ? String(shape.matrix.cells[node][c]) : '·'));
+      const row = cls.map(c =>
+        shape.matrix.cells[node]?.[c] ? String(shape.matrix.cells[node][c]) : '·'
+      );
       L.push(`| ${node} | ${row.join(' | ')} |`);
     }
     L.push('');
@@ -294,7 +383,10 @@ function renderMarkdown(report: ReturnType<typeof assembleReport>): string {
   L.push('## By resource class — documented tunable vs gap', '');
   for (const c of cls) {
     const info = shape.byClass[c];
-    const knob = info.documentedTunables.length > 0 ? info.documentedTunables.join(', ') : '⚠ NO DOCUMENTED TUNABLE';
+    const knob =
+      info.documentedTunables.length > 0
+        ? info.documentedTunables.join(', ')
+        : '⚠ NO DOCUMENTED TUNABLE';
     L.push(`- **${c}** — ${info.total} incident(s) on ${info.nodes.join(', ')}; tunable: ${knob}`);
   }
   L.push('');
@@ -307,7 +399,9 @@ function renderMarkdown(report: ReturnType<typeof assembleReport>): string {
   // Entry detail.
   L.push('## Entries', '');
   for (const e of entries) {
-    L.push(`- **${e.slug}** [${e.classes.join(', ') || 'unclassified'}] — ${e.severity ?? '?'} / ${e.selfHealStatus ?? 'unstated'}; nodes: ${e.nodes.join(', ') || '(unattributed)'}; CI occurrences: ${e.ciOccurrences}`);
+    L.push(
+      `- **${e.slug}** [${e.classes.join(', ') || 'unclassified'}] — ${e.severity ?? '?'} / ${e.selfHealStatus ?? 'unstated'}; nodes: ${e.nodes.join(', ') || '(unattributed)'}; CI occurrences: ${e.ciOccurrences}`
+    );
   }
   L.push('');
   return L.join('\n');
@@ -337,7 +431,8 @@ if (isCli) {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const repoRoot = join(scriptDir, '..', '..', '..');
   const opts = new Map<string, string>();
-  for (let i = 2; i < process.argv.length - 1; i += 2) opts.set(process.argv[i], process.argv[i + 1]);
+  for (let i = 2; i < process.argv.length - 1; i += 2)
+    opts.set(process.argv[i], process.argv[i + 1]);
 
   const backlogDir = opts.get('--backlog-dir') ?? join(repoRoot, 'genesis/data/timeline/backlog');
   const ciFindings = opts.get('--ci-findings') ?? join(repoRoot, '.claude/data/ci-findings.jsonl');
@@ -363,7 +458,7 @@ if (isCli) {
 
   console.log(`Resource-shape report: ${report.entryCount} entries → ${outJson} + ${outMd}`);
   const undocumented = report.shape.matrix.classes.filter(
-    (c) => (report.shape.byClass[c]?.documentedTunables.length ?? 0) === 0,
+    c => (report.shape.byClass[c]?.documentedTunables.length ?? 0) === 0
   );
   if (undocumented.length > 0) {
     console.log(`⚠ resource classes WITHOUT a documented tunable: ${undocumented.join(', ')}`);
