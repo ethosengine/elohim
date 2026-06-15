@@ -1513,21 +1513,14 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         } else if (res.exitCode != 0) {
                             unstable("Seed Conductor Identities exited ${res.exitCode} (unexpected — see console)")
                         }
-                    }
-                }
-            }
-        }
-
-        stage('Seed Content Provide Rows') {
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-                expression { env.CONDUCTOR_SEEDING_READY == 'true' }
-            }}
-            steps {
-                container('builder') {
-                    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                        sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-provide-rows.sh'"
+                        // Seed Content Provide Rows — folded in from its own stage to
+                        // keep the declarative model under the 64KB CPS method limit
+                        // (32→31 stages). Reached only when conductor seeding did NOT
+                        // skip (res.skipped returns early above) — i.e. exactly the
+                        // CONDUCTOR_SEEDING_READY=='true' gate the old stage carried.
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-provide-rows.sh'"
+                        }
                     }
                 }
             }
