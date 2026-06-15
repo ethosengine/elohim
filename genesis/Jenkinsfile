@@ -1550,7 +1550,8 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             // The mesh is the precondition for everything downstream:
             // per-pod libp2p peer counts, source↔target adjacency (the
             // cross-pod fetch races CONNECTED peers), binary-version parity
-            // (partial-rollout = DHT-partition risk class).            steps {
+            // (partial-rollout = DHT-partition risk class).
+            steps {
                 container('builder') {
                     script {
                         // Downstream coupling: propagation/delivery/projection/
@@ -1571,7 +1572,8 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             // probe blob's hash never existed before this build, so Verify
             // Substrate Propagation can only pass via live cross-pod
             // replication (genesis #1100/#1110 "passed" on a fossil replica
-            // of the previous manifesto hash — never again).            steps {
+            // of the previous manifesto hash — never again).
+            steps {
                 container('builder') {
                     script { uploadBlobContentStage() }
                 }
@@ -1686,7 +1688,8 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
-        stage('Warm Projection Cache') {            steps {
+        stage('Warm Projection Cache') {
+            steps {
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
@@ -1700,7 +1703,8 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             // Projector cursor lag per pod + replication/pull/
             // projection-reconcile stream caught-up flags from /p2p/status.
             // null streams are "not computable" — warned, never treated as
-            // caught up (spec §4.3 in P2PStatusInfo docs).            steps {
+            // caught up (spec §4.3 in P2PStatusInfo docs).
+            steps {
                 container('builder') {
                     script { substrateVerifyStage('projection') }
                 }
@@ -1710,7 +1714,8 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
         stage('Verify Federation Layer') {
             // Doorway federation membership + the p2p bootstrap surface.
             // Cross-doorway breadth is shem-dependent and reported, not
-            // asserted (a2o @requires:shem vocabulary).            steps {
+            // asserted (a2o @requires:shem vocabulary).
+            steps {
                 container('builder') {
                     script { substrateVerifyStage('federation') }
                 }
