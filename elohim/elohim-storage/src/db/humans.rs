@@ -85,6 +85,66 @@ pub fn create_human(
         .ok_or_else(|| StorageError::Internal("Human not found after insert".to_string()))
 }
 
+/// STOPGAP (resolver spec §3.4 / §5 step 1,
+/// `genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md`):
+/// heal a slug-keyed `humans` row whose `agent_pub_key` (and/or `household_id`)
+/// is still NULL, filling only the currently-NULL columns from the supplied
+/// values. NEVER overwrites a value that is already set.
+///
+/// Why this exists: production `humans` rows are created by `seed-humans.ts`
+/// (`POST /api/v1/identity/register`) with `agentPubKey: null` — there was no
+/// truthful agent-key source at seed time. The truthful `uhCAk…` key DOES exist
+/// at runtime: each pod's conductor mints one, exposed via `GET /auth/me`. The
+/// seeder now fetches it (`seed-provide-rows.ts`) and calls this heal path so
+/// `humans.agent_pub_key` equals the `rea_commitments.provider` the snapshot
+/// join compares against (`household_resilience.rs:172-174`). With the key
+/// populated, the existing direct-equality join lights `commitment_backed`.
+///
+/// This is a strict subset of the durable resolver design (step 3 resolves
+/// transport ids → agent_cid through `peer_identity_bindings`); it must not
+/// overwrite a set key, so a later key rotation / supersede is never blocked.
+///
+/// Returns the (possibly-unchanged) row. `NotFound` if the id does not exist.
+pub fn heal_human_identity(
+    conn: &mut SqliteConnection,
+    human_id: &str,
+    agent_pub_key: Option<&str>,
+    household_id: Option<&str>,
+) -> Result<Human, StorageError> {
+    let existing = get_human_by_id(conn, human_id)?
+        .ok_or_else(|| StorageError::NotFound(format!("Human not found: {}", human_id)))?;
+
+    // Fill only currently-NULL columns from the input. A set value is sacred —
+    // never clobber it (a wrong overwrite breaks the snapshot join worse than
+    // a NULL). An input of None for a column is also a no-op.
+    let new_agent_pub_key = match (&existing.agent_pub_key, agent_pub_key) {
+        (None, Some(k)) if !k.is_empty() => Some(k.to_string()),
+        _ => existing.agent_pub_key.clone(),
+    };
+    let new_household_id = match (&existing.household_id, household_id) {
+        (None, Some(h)) if !h.is_empty() => Some(h.to_string()),
+        _ => existing.household_id.clone(),
+    };
+
+    // Skip the write entirely when nothing changed (idempotent re-runs).
+    if new_agent_pub_key == existing.agent_pub_key && new_household_id == existing.household_id {
+        return Ok(existing);
+    }
+
+    let now = current_timestamp();
+    diesel::update(humans::table.filter(humans::id.eq(human_id)))
+        .set((
+            humans::agent_pub_key.eq(new_agent_pub_key),
+            humans::household_id.eq(new_household_id),
+            humans::updated_at.eq(&now),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Failed to heal human identity: {}", e)))?;
+
+    get_human_by_id(conn, human_id)?
+        .ok_or_else(|| StorageError::Internal("Human not found after heal".to_string()))
+}
+
 /// Retrieve a human by its stable ID.
 pub fn get_human_by_id(
     conn: &mut SqliteConnection,
@@ -162,4 +222,143 @@ pub fn update_human(
 
     get_human_by_id(conn, id)?
         .ok_or_else(|| StorageError::Internal("Human not found after update".to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::{run_migrations, DbPool};
+    use diesel::r2d2::{ConnectionManager, Pool};
+
+    fn test_pool() -> DbPool {
+        let url = format!(
+            "file:humans_db_test_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::<SqliteConnection>::new(&url))
+            .expect("pool");
+        run_migrations(&pool).expect("migrations");
+        pool
+    }
+
+    /// Insert a slug-keyed human with NULL agent_pub_key + NULL household_id —
+    /// the exact production shape after `seed-humans.ts` registers with
+    /// `agentPubKey: null` (it sets household_id; we leave both NULL here to
+    /// exercise both heal arms).
+    fn insert_null_human(conn: &mut SqliteConnection, id: &str) {
+        create_human(
+            conn,
+            CreateHumanInput {
+                id: id.to_string(),
+                agent_pub_key: None,
+                display_name: id.to_string(),
+                bio: None,
+                affinities: "[]".to_string(),
+                profile_reach: "commons".to_string(),
+                location: None,
+                profile_photo_url: None,
+                h_app_id: "imagodei".to_string(),
+                household_id: None,
+            },
+        )
+        .expect("insert null human");
+    }
+
+    /// STOPGAP heal (resolver spec §3.4): a NULL agent_pub_key heals to the
+    /// supplied uhCAk key, and NULL household_id heals too — both currently-NULL
+    /// columns fill from the input.
+    #[test]
+    fn heal_fills_null_agent_key_and_household() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_null_human(&mut conn, "human-matthew-manager");
+
+        let healed = heal_human_identity(
+            &mut conn,
+            "human-matthew-manager",
+            Some("uhCAkMATTHEW"),
+            Some("household-dowell"),
+        )
+        .expect("heal");
+
+        assert_eq!(healed.agent_pub_key.as_deref(), Some("uhCAkMATTHEW"));
+        assert_eq!(healed.household_id.as_deref(), Some("household-dowell"));
+    }
+
+    /// STOPGAP invariant (resolver spec §3.4, §3.5): heal NEVER overwrites a
+    /// value that is already set. A second heal with a *different* key is a
+    /// no-op on the set column — this is load-bearing so a later key
+    /// rotation/supersede (resolver step 3) is not silently clobbered.
+    #[test]
+    fn heal_never_overwrites_a_set_value() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_null_human(&mut conn, "human-adam-firstman");
+
+        // First heal seeds the key.
+        let first = heal_human_identity(
+            &mut conn,
+            "human-adam-firstman",
+            Some("uhCAkADAM_ORIGINAL"),
+            Some("household-eden"),
+        )
+        .expect("first heal");
+        assert_eq!(first.agent_pub_key.as_deref(), Some("uhCAkADAM_ORIGINAL"));
+        assert_eq!(first.household_id.as_deref(), Some("household-eden"));
+
+        // Second heal with a DIFFERENT key + household must NOT overwrite.
+        let second = heal_human_identity(
+            &mut conn,
+            "human-adam-firstman",
+            Some("uhCAkADAM_DIFFERENT"),
+            Some("household-OTHER"),
+        )
+        .expect("second heal");
+        assert_eq!(
+            second.agent_pub_key.as_deref(),
+            Some("uhCAkADAM_ORIGINAL"),
+            "set agent_pub_key must never be overwritten"
+        );
+        assert_eq!(
+            second.household_id.as_deref(),
+            Some("household-eden"),
+            "set household_id must never be overwritten"
+        );
+    }
+
+    /// Idempotent re-run: healing with the SAME values changes nothing and does
+    /// not error.
+    #[test]
+    fn heal_is_idempotent() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_null_human(&mut conn, "human-jessica-spouse");
+
+        heal_human_identity(
+            &mut conn,
+            "human-jessica-spouse",
+            Some("uhCAkJESSICA"),
+            None,
+        )
+        .expect("heal once");
+        let again = heal_human_identity(
+            &mut conn,
+            "human-jessica-spouse",
+            Some("uhCAkJESSICA"),
+            None,
+        )
+        .expect("heal twice");
+        assert_eq!(again.agent_pub_key.as_deref(), Some("uhCAkJESSICA"));
+    }
+
+    /// A heal against an absent id is NotFound (never a silent insert).
+    #[test]
+    fn heal_missing_human_is_not_found() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let err = heal_human_identity(&mut conn, "human-ghost", Some("uhCAkX"), None);
+        assert!(matches!(err, Err(StorageError::NotFound(_))));
+    }
 }

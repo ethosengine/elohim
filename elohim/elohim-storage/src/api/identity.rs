@@ -2,6 +2,7 @@
 //!
 //! Routes:
 //!   POST /api/v1/identity/register
+//!   POST /api/v1/identity/heal                        → STOPGAP NULL-only identity heal (resolver spec §3.4)
 //!   GET  /api/v1/identity/me
 //!   PUT  /api/v1/identity/me
 //!   GET  /api/v1/identity/{agentId}/session          → SessionHumanView (M-AGGR-1)
@@ -63,6 +64,7 @@ pub async fn handle(
 
     match (method, resource_path) {
         (Method::POST, "/register") => register_human(req, pool).await,
+        (Method::POST, "/heal") => heal_human(req, pool).await,
         (Method::GET, "/me") => get_me(req, pool).await,
         (Method::PUT, "/me") => update_me(req, pool).await,
         _ => Ok(response::not_found(&format!(
@@ -113,6 +115,44 @@ async fn register_human(
     let mut conn = get_conn(pool)?;
     let human = humans::create_human(&mut conn, input)?;
     Ok(response::created(&HumanView::from(human)))
+}
+
+/// Request body for `POST /api/v1/identity/heal`.
+///
+/// STOPGAP (resolver spec §3.4) — the NULL-only heal payload. The seeder
+/// supplies the slug `id` (e.g. `human-matthew-manager`) plus the truthful
+/// `agentPubKey` it fetched from the pod's `GET /auth/me`. `householdId` is
+/// optional (the seeder leaves it None — `seed-humans.ts` already set it).
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HealHumanInputView {
+    id: String,
+    agent_pub_key: Option<String>,
+    household_id: Option<String>,
+}
+
+/// POST /api/v1/identity/heal
+///
+/// STOPGAP (resolver spec §3.4 / §5 step 1): fill a slug-keyed human row's
+/// currently-NULL `agent_pub_key` (and/or `household_id`) without overwriting a
+/// set value. Lights the `commitment_backed_collectives` column of the
+/// resilience card by making `humans.agent_pub_key` equal the
+/// `rea_commitments.provider` (`uhCAk…`) the snapshot join compares against.
+/// Idempotent + reachable through doorway's transparent `/api/v1/identity/*`
+/// proxy (no doorway change needed).
+async fn heal_human(
+    req: Request<Incoming>,
+    pool: &DbPool,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let body: HealHumanInputView = parse_body(req).await?;
+    let mut conn = get_conn(pool)?;
+    let human = humans::heal_human_identity(
+        &mut conn,
+        &body.id,
+        body.agent_pub_key.as_deref(),
+        body.household_id.as_deref(),
+    )?;
+    Ok(response::ok(&HumanView::from(human)))
 }
 
 /// GET /api/v1/identity/me

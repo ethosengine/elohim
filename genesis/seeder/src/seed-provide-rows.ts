@@ -262,6 +262,30 @@ class ProvideClient extends DoorwayClient {
     });
   }
 
+  /**
+   * STOPGAP (resolver spec §3.4 / §5 step 1):
+   * `genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md`.
+   *
+   * Heal the slug-keyed `humans` row's NULL `agent_pub_key` so it equals the
+   * commitment `provider` (the `uhCAk…` agent key) the snapshot join compares
+   * against (`household_resilience.rs:172-174`). Production rows are created by
+   * `seed-humans.ts` with `agentPubKey: null`; this stamps the truthful key
+   * fetched from `/auth/me` so the existing direct-equality join lights the
+   * `commitment_backed_collectives` column.
+   *
+   * NULL-only on the storage side — never overwrites a set key. Routed through
+   * the SAME doorway channel as the provide-row write so the heal and the
+   * commitment co-locate in the same projection DB (the join is intra-pod).
+   * `household_id` is intentionally omitted: `seed-humans.ts` already set it.
+   */
+  async healHumanIdentity(humanId: string, agentPubKey: string): Promise<Response> {
+    return this.fetch('/api/v1/identity/heal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: humanId, agentPubKey }),
+    });
+  }
+
   async patchCommitmentState(id: string, state: string): Promise<Response> {
     return this.fetch(`/api/v1/commitments/${id}`, {
       method: 'PATCH',
@@ -403,6 +427,31 @@ async function main(): Promise<void> {
     }
 
     console.log(`  agent_pub_key: ${agentPubKey.slice(0, 16)}…`);
+
+    // STOPGAP (resolver spec §3.4): heal humans.agent_pub_key = uhCAk BEFORE
+    // writing provide rows, so the snapshot join (humans.agent_pub_key =
+    // rea_commitments.provider) is satisfied. NULL-only on the storage side;
+    // per-human non-fatal (mirror the /auth/me 401-skip pattern — a heal
+    // failure must not block the provide seed for the remaining humans).
+    try {
+      const healResp = await client.healHumanIdentity(humanId, agentPubKey);
+      if (healResp.ok) {
+        console.log(`  [H] ${humanId.replace(/^human-/, '')}: agent_pub_key healed`);
+      } else if (healResp.status === 404) {
+        // Row not present yet (seed-humans bridge has not run for this human).
+        console.warn(
+          `  [?] ${humanId}: identity heal 404 — humans row absent (seed-humans must run first); non-fatal`
+        );
+      } else {
+        const text = await healResp.text();
+        console.warn(
+          `  [?] ${humanId}: identity heal HTTP ${healResp.status} — ${text.slice(0, 200)}; non-fatal`
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`  [?] ${humanId}: identity heal failed (${msg}); non-fatal`);
+    }
 
     for (const reach of reaches) {
       const result = await seedProvideForHuman(client, humanId, agentPubKey, reach);

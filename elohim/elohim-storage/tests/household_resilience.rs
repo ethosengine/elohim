@@ -780,3 +780,84 @@ fn resilience_card_lights_with_coherent_agent_keyed_substrate() {
         felt.headline
     );
 }
+
+// =============================================================================
+// STOPGAP PROOF — resolver spec §3.4 / §5 step 1
+// (genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md)
+//
+// Reproduces the PRODUCTION shape end-to-end: a slug-keyed human created with
+// NULL agent_pub_key (as `seed-humans.ts` writes it) + household_id set, plus an
+// active provide commitment whose provider is the truthful uhCAk agent key (as
+// `seed-provide-rows.ts` writes it). With agent_pub_key NULL the snapshot's
+// direct-equality join (humans.agent_pub_key = rea_commitments.provider) is
+// structurally empty → card reads 0. After the STOPGAP `heal_human_identity`
+// stamps agent_pub_key = uhCAk, the SAME unchanged join lights. This is the
+// whole effect of the stopgap; the join itself is NOT modified (that is
+// resolver step 3, out of scope here).
+// =============================================================================
+
+#[test]
+fn stopgap_heal_lights_commitment_backed_via_direct_join() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+
+    let content_id = "stopgap-content";
+    let shard = "stopgap-shard-1";
+    seed_shard_manifest(&mut conn, content_id, &format!(r#"["{shard}"]"#));
+
+    let household = "household-dowell";
+    let agent_key = "uhCAkMATTHEW"; // the truthful uhCAk key from /auth/me
+
+    // Production human shape: slug id, household_id SET (seed-humans bridge),
+    // agent_pub_key NULL (seed-humans sends agentPubKey:null).
+    db::humans::create_human(
+        &mut conn,
+        db::humans::CreateHumanInput {
+            id: "human-matthew-manager".into(),
+            agent_pub_key: None,
+            display_name: "Matthew".into(),
+            bio: None,
+            affinities: "[]".into(),
+            profile_reach: "commons".into(),
+            location: None,
+            profile_photo_url: None,
+            h_app_id: "lamad".into(),
+            household_id: Some(household.into()),
+        },
+    )
+    .unwrap();
+
+    // Provider-side row already coherent (seed-provide-rows wrote provider=uhCAk).
+    seed_collective(&mut conn, household, Some("us-east"));
+    seed_commitment(
+        &mut conn,
+        "stopgap-commit",
+        agent_key, // provider == the uhCAk agent key
+        "provide",
+        "active",
+        "content:commons",
+    );
+
+    // BEFORE heal: agent_pub_key is NULL → join empty → column dark.
+    let before = household_resilience::snapshot(&pool, &ctx(), content_id, None).unwrap();
+    assert_eq!(
+        before.commitment_backed_collectives, 0,
+        "with agent_pub_key NULL the direct-equality join is structurally empty (the dark-card root cause)"
+    );
+
+    // STOPGAP: heal the NULL agent_pub_key to the truthful uhCAk key.
+    let healed =
+        db::humans::heal_human_identity(&mut conn, "human-matthew-manager", Some(agent_key), None)
+            .unwrap();
+    assert_eq!(healed.agent_pub_key.as_deref(), Some(agent_key));
+    // household_id was already set — heal must not have touched it.
+    assert_eq!(healed.household_id.as_deref(), Some(household));
+
+    // AFTER heal: the SAME unchanged join lights commitment_backed.
+    let after = household_resilience::snapshot(&pool, &ctx(), content_id, None).unwrap();
+    assert!(
+        after.commitment_backed_collectives >= 1,
+        "after healing agent_pub_key=uhCAk the direct join lights: got {}",
+        after.commitment_backed_collectives
+    );
+}
