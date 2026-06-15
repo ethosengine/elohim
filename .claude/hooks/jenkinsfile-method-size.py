@@ -63,6 +63,42 @@ SCRIPT_DEFAULT = (10000, 11000)
 DEF_WARN = 6000
 DEF_HARD = 8000
 
+# Declarative `stages { }` block — the BLIND SPOT that let genesis #1146-#1151
+# through every check above. The declarative engine compiles the whole stages
+# list into one CPS method (the stage-model builder). Its bytecode is driven by
+# stage COUNT × per-stage when/steps wiring — NOT source bytes: holochain's
+# stages{} is 54,456B / 18 stages and COMPILES, while genesis's 43,114B / 32
+# stages FAILS (MethodTooLargeException WorkflowScript.___cps___21136, #1151) —
+# even though pipeline-total (47KB) / largest script{} (5.3KB) / largest def
+# (4.4KB) all passed. So the gate is STAGE COUNT. Known-good max: 23 (root app
+# pipeline). Known-fail: 31-32 (genesis). HARD flags the genesis range while
+# passing every compiling file; target ≤23 for a proven-safe margin. Relief:
+# merge adjacent stages, simplify when{} to one precomputed flag, or move stage
+# bodies into a shared library.
+STAGES_COUNT_WARN = 25
+STAGES_COUNT_HARD = 28
+
+
+def stages_block_size(text: str, start: int, end: int) -> dict | None:
+    """Size of the single top-level `stages { ... }` block inside the pipeline.
+    This whole block compiles into the declarative stage-model CPS method —
+    the one the per-script/per-def checks structurally cannot see."""
+    m = re.search(r"\bstages\s*\{", text)
+    if not m or m.start() < start or m.end() > end:
+        return None
+    open_pos = m.end() - 1
+    depth = 0
+    for i in range(open_pos, end + 1):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return {"size": i - open_pos + 1,
+                        "line": text[:open_pos].count("\n") + 1,
+                        "stages": len(re.findall(r"\bstage\s*\(", text[open_pos:i]))}
+    return None
+
 
 def find_pipeline_block(text: str) -> tuple[int, int] | None:
     """Return (start_pos, end_pos) of the top-level `pipeline { ... }` block.
@@ -173,21 +209,26 @@ def main() -> int:
     scripts = script_block_sizes(text, start, end)
     largest_script = scripts[0] if scripts else None
     largest_def = largest_def_body(text, start)
+    stages = stages_block_size(text, start, end)
     s_warn, s_hard = script_thresholds(file_path)
 
-    # Decide verdict — failure on any of the three checks.
+    # Decide verdict — failure on any of the FOUR checks.
     # Per-script is the dominant in-pipeline signal (each is its own CPS
     # method, per-file calibrated); total catches maps of inline closures;
     # per-def catches the top-level helper bodies the first two structurally
-    # cannot see (the unit is the single def — NEVER the region aggregate).
+    # cannot see (the unit is the single def — NEVER the region aggregate);
+    # stages{} catches the declarative stage-model method (stage COUNT × wiring)
+    # that none of the other three can see — the genesis #1146-#1151 breach.
     total_fail = total_size >= TOTAL_HARD
     total_warn = total_size >= TOTAL_WARN
     script_fail = largest_script is not None and largest_script["size"] >= s_hard
     script_warn = largest_script is not None and largest_script["size"] >= s_warn
     def_fail = largest_def is not None and largest_def["size"] >= DEF_HARD
     def_warn = largest_def is not None and largest_def["size"] >= DEF_WARN
+    stages_fail = stages is not None and stages["stages"] >= STAGES_COUNT_HARD
+    stages_warn = stages is not None and stages["stages"] >= STAGES_COUNT_WARN
 
-    if total_fail or script_fail or def_fail:
+    if total_fail or script_fail or def_fail or stages_fail:
         msg = [f"\n❌ {file_path}: Jenkinsfile method-size HARD limit exceeded"]
         if total_fail:
             msg.append(
@@ -207,9 +248,20 @@ def main() -> int:
                 f"   • largest top-level def `{ld['name']}` body: {ld['size']} "
                 f"comment-stripped bytes at line {ld['line']} (HARD {DEF_HARD})"
             )
+        if stages_fail:
+            msg.append(
+                f"   • declarative stages {{}}: {stages['stages']} stages "
+                f"({stages['size']}B) at line {stages['line']} "
+                f"(HARD {STAGES_COUNT_HARD} stages — genesis broke at 31-32, "
+                f"___cps___21136 #1151; holochain compiles at 18, root at 23). "
+                f"The stage-model CPS method is too large: merge adjacent stages "
+                f"to ≤23, simplify each when{{}} to ONE precomputed flag, or move "
+                f"stage bodies into a shared library."
+            )
         msg.append(
-            "   Each `script { }` body AND each top-level `def` compile to "
-            "their own CPS method capped at 64KB JVM bytecode."
+            "   Each `script { }` body, each top-level `def`, AND the "
+            "declarative `stages { }` model compile to their own CPS method "
+            "capped at 64KB JVM bytecode."
         )
         msg.append(
             "   Refactor: split the oversized method — bash bodies move to "
