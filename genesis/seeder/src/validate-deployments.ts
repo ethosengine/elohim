@@ -43,7 +43,7 @@ export const NODE_TYPES = [
 // Types
 // =============================================================================
 
-interface DeploymentRecord {
+export interface DeploymentRecord {
   name: string;
   role: string;
   humanLabel: string;
@@ -91,7 +91,7 @@ function loadJson<T>(path: string): T {
 // Validation
 // =============================================================================
 
-function validateRecord(
+export function validateRecord(
   record: DeploymentRecord,
   knownHumanIds: Set<string>,
   knownDeviceIds: Set<string>,
@@ -127,10 +127,14 @@ function validateRecord(
       errors.push(`${tag} template file missing: ${record.template}`);
     }
   } else if (record.pattern === 'consolidated') {
-    if (!record.manifest) {
-      errors.push(`${tag} pattern=consolidated requires 'manifest' field`);
-    } else if (!existsSync(resolve(REPO_ROOT, record.manifest))) {
-      errors.push(`${tag} manifest file missing: ${record.manifest}`);
+    // adam carries an explicit `manifest`; every other consolidated human
+    // sed-renders the shared `template` (deployments.json's own $comment
+    // documents this convention). Accept whichever is present.
+    const source = record.manifest ?? record.template;
+    if (!source) {
+      errors.push(`${tag} pattern=consolidated requires 'manifest' or 'template' field`);
+    } else if (!existsSync(resolve(REPO_ROOT, source))) {
+      errors.push(`${tag} deployment source file missing: ${source}`);
     }
   }
 
@@ -243,7 +247,13 @@ async function main(): Promise<void> {
   console.log('All deployment records valid.');
 }
 
-main().catch(err => {
-  console.error('Unexpected error:', err);
-  process.exit(1);
-});
+const isCli =
+  process.argv[1]?.endsWith('validate-deployments.ts') ||
+  process.argv[1]?.endsWith('validate-deployments.js');
+
+if (isCli) {
+  main().catch(err => {
+    console.error('Unexpected error:', err);
+    process.exit(1);
+  });
+}

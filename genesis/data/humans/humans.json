@@ -61,6 +61,23 @@
       ]
     },
     {
+      "id": "human-caleb-spouse",
+      "householdId": "household-susan",
+      "displayName": "Caleb",
+      "category": "core-family",
+      "profileReach": "community",
+      "bio": "Susan's husband and second peer in household-susan (Seattle WA metro). With Susan he can hold a Shamir share, project content, and keep the household reachable through any single-device failure — extending multi-peer household redundancy beyond the Dowell household to the Pacific Northwest.",
+      "location": {
+        "layer": "city",
+        "name": "Seattle"
+      },
+      "affinities": [
+        "family-systems",
+        "digital-stewardship",
+        "household-resilience"
+      ]
+    },
+    {
       "id": "human-charlie-challenged",
       "displayName": "Charlie",
       "category": "red-team",
@@ -119,6 +136,24 @@
       ]
     },
     {
+      "id": "human-daniel-brother",
+      "householdId": "household-daniel",
+      "displayName": "Daniel",
+      "category": "core-family",
+      "profileReach": "community",
+      "bio": "Jessica's brother (Matthew's brother-in-law) in the Tulsa OK metro — the fifth replicator in the reciprocal-backup chain and a THIRD independent region: San Antonio TX ↔ Seattle WA ↔ Tulsa OK. As a single-peer household his hub-class node is the whole household's resilience surface, anchoring the Plains-region leg so the chain survives the loss of any single region.",
+      "location": {
+        "layer": "city",
+        "name": "Tulsa"
+      },
+      "affinities": [
+        "family-systems",
+        "digital-stewardship",
+        "household-resilience",
+        "multi-region-backup"
+      ]
+    },
+    {
       "id": "human-dolittle-doctor",
       "displayName": "Dr. Dolittle",
       "category": "red-team",
@@ -150,6 +185,23 @@
         }
       ],
       "notes": "Credentials fraud / authority impersonation."
+    },
+    {
+      "id": "human-emma-spouse",
+      "householdId": "household-daniel",
+      "displayName": "Emma",
+      "category": "core-family",
+      "profileReach": "community",
+      "bio": "Daniel's wife and second peer in household-daniel (Tulsa OK metro). She gives the Plains-region leg its own intra-household redundancy — if one Tulsa device dies the household stays online to the chain — mirroring the Susan+Caleb pattern in Seattle, with a recycled-laptop device shape that adds archetype diversity inside the household.",
+      "location": {
+        "layer": "city",
+        "name": "Tulsa"
+      },
+      "affinities": [
+        "family-systems",
+        "digital-stewardship",
+        "household-resilience"
+      ]
     },
     {
       "id": "human-eve-firstwoman",
