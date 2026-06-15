@@ -171,12 +171,16 @@ impl ZomeCaller {
             // Step 1: Connect to admin interface.
             // Hard-bounded: an unresolvable conductor host (cluster NXDOMAIN) must
             // resolve to an Err within `deadline`, never hang the caller forever.
+            // Resolve via tokio's ASYNC resolver first (off the worker pool), then
+            // connect with an already-resolved SocketAddr so holochain_client's
+            // synchronous std::net getaddrinfo never parks a worker (alpha doorway
+            // crashloop RCA 2026-06-15; see crate::conductor::resolve_host_port).
+            // The per-step `timeout` below can only bound an async resolve, not a
+            // blocking syscall — so this also makes that timeout effective.
+            let admin_socket = crate::conductor::resolve_host_port(&self.admin_addr).await?;
             let admin_ws = tokio::time::timeout(
                 deadline,
-                AdminWebsocket::connect(
-                    &self.admin_addr,
-                    Some(String::from("doorway-zome-caller")),
-                ),
+                AdminWebsocket::connect(admin_socket, Some(String::from("doorway-zome-caller"))),
             )
             .await
             .map_err(|_| {
@@ -267,9 +271,10 @@ impl ZomeCaller {
 
             // Step 5: Connect AppWebsocket with signer
             let signer_arc: Arc<ClientAgentSigner> = Arc::new(signer);
+            let app_socket = crate::conductor::resolve_host_port(&self.app_addr).await?;
             let app_ws = tokio::time::timeout(
                 deadline,
-                AppWebsocket::connect(&self.app_addr, token.token, signer_arc, None),
+                AppWebsocket::connect(app_socket, token.token, signer_arc, None),
             )
             .await
             .map_err(|_| {

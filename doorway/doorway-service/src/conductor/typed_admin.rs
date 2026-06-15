@@ -61,8 +61,13 @@ impl TypedAdminClient {
     /// The URL should be in `ws://host:port` format. The `ws://` prefix is
     /// stripped for `AdminWebsocket::connect()` which expects `host:port`.
     pub async fn connect(admin_url: &str) -> Result<Self, String> {
-        let addr = strip_ws_prefix(admin_url);
-        let admin_ws = AdminWebsocket::connect(&addr, None)
+        // Resolve via tokio's ASYNC resolver first, then hand holochain_client an
+        // already-resolved SocketAddr — its connect() runs a synchronous std::net
+        // getaddrinfo (admin_websocket.rs:112) that otherwise parks a tokio worker
+        // on a flapping/NXDOMAIN conductor (alpha doorway crashloop RCA 2026-06-15;
+        // see super::resolve_host_port).
+        let addr = super::resolve_host_port(&strip_ws_prefix(admin_url)).await?;
+        let admin_ws = AdminWebsocket::connect(addr, None)
             .await
             .map_err(|e| format!("Admin WebSocket connect to {admin_url} failed: {e}"))?;
         Ok(Self {

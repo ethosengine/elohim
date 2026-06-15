@@ -63,19 +63,19 @@ impl TypedAppClient {
             installed_app_id, "Obtained app auth token, connecting to app interface"
         );
 
-        // Step 2: Connect to app interface with token
-        // Strip ws:// prefix — ToSocketAddrs expects "host:port"
-        let app_addr = strip_ws_prefix(app_url);
+        // Step 2: Connect to app interface with token.
+        // Resolve via tokio's ASYNC resolver first, then hand holochain_client an
+        // already-resolved SocketAddr — its connect() runs a synchronous std::net
+        // getaddrinfo (app_websocket_inner.rs:45) that otherwise parks a tokio
+        // worker on a flapping/NXDOMAIN conductor (alpha doorway crashloop RCA
+        // 2026-06-15; see super::resolve_host_port).
+        let app_addr = super::resolve_host_port(&strip_ws_prefix(app_url)).await?;
 
         let signer = ClientAgentSigner::default();
-        let app_ws = AppWebsocket::connect(
-            &*app_addr,
-            token,
-            signer.into(),
-            Some("doorway".to_string()),
-        )
-        .await
-        .map_err(|e| format!("AppWebsocket connect to {app_url} failed: {e}"))?;
+        let app_ws =
+            AppWebsocket::connect(app_addr, token, signer.into(), Some("doorway".to_string()))
+                .await
+                .map_err(|e| format!("AppWebsocket connect to {app_url} failed: {e}"))?;
 
         info!(
             agent = %app_ws.cached_app_info().agent_pub_key,
