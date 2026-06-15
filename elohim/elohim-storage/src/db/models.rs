@@ -3209,6 +3209,11 @@ pub struct PeerBlobInventoryRow {
     /// iroh-side BLAKE3 hash (Phase 4). NULL during transition; cutover
     /// (Phase 11) drops blob_hash and makes this required.
     pub blake3_hash: Option<String>,
+    /// Per-object transport affinity (iroh-toggle sprint). NULL = Auto =
+    /// default policy. Operational, read by `choose_backend`, written by the
+    /// `/admin/blob-transport-affinity` setter. Kept coherent with the table
+    /// column so this row type can read back what the setter writes.
+    pub transport_affinity: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable)]

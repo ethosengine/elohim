@@ -1049,6 +1049,7 @@ impl HttpServer {
             // "prefer-libp2p"|"auto"}. "auto" (or null) clears to default
             // policy. Node-local; makes the choose_backend toggle usable for
             // A/B without waiting on gossip. Inert in libp2p mode.
+            #[cfg(feature = "p2p-iroh")]
             (Method::POST, p) if p.starts_with("/admin/blob-transport-affinity/") => {
                 let hash = p
                     .strip_prefix("/admin/blob-transport-affinity/")
@@ -2660,22 +2661,16 @@ impl HttpServer {
         }
     }
 
-    /// Operator/agent-initiated authority-arc actuation — the explicit POST
-    /// trigger (spec §5). Body: `{"proposedFactor": 0|1, "commitmentCid": "..."}`.
-    /// Reads the authorizing `sets-authority-arc` commitment by CID, reconstructs
-    /// its grant payload, reads observed_N from the conductor, and runs
-    /// `apply_arc_actuation` — which authorizes + runs the coverage gate and, only
-    /// on pass, rewrites the config and RESTARTS the conductor (the only way to
-    /// apply `target_arc_factor` — spec §2). A refusal (out-of-grant / expired /
-    /// would-break-coverage) returns 409 with the finding to elevate; no restart.
-    /// Explicit POST only — deliberately NO auto-subscriber that restarts the
-    /// conductor on a commitment landing (churn risk); node-local (not in
-    /// build_manifest, so not doorway-proxied).
     /// POST /admin/blob-transport-affinity/{hash} — set the per-object blob
     /// transport affinity (iroh-toggle sprint). Writes
     /// `peer_blob_inventory.transport_affinity` for the addressed blob.
     /// `"auto"` (the default) clears the column to NULL. Other values:
     /// `prefer-iroh`, `prefer-libp2p`, `iroh-only`, `libp2p-only`.
+    ///
+    /// Feature-gated: references `http_blob_router::TransportAffinity`, which is
+    /// only compiled under `p2p-iroh`. The matching route arm is gated
+    /// identically, so the default/libp2p build never compiles or reaches this.
+    #[cfg(feature = "p2p-iroh")]
     async fn handle_set_blob_transport_affinity(
         &self,
         hash: &str,
@@ -2734,6 +2729,17 @@ impl HttpServer {
         ))
     }
 
+    /// Operator/agent-initiated authority-arc actuation — the explicit POST
+    /// trigger (spec §5). Body: `{"proposedFactor": 0|1, "commitmentCid": "..."}`.
+    /// Reads the authorizing `sets-authority-arc` commitment by CID, reconstructs
+    /// its grant payload, reads observed_N from the conductor, and runs
+    /// `apply_arc_actuation` — which authorizes + runs the coverage gate and, only
+    /// on pass, rewrites the config and RESTARTS the conductor (the only way to
+    /// apply `target_arc_factor` — spec §2). A refusal (out-of-grant / expired /
+    /// would-break-coverage) returns 409 with the finding to elevate; no restart.
+    /// Explicit POST only — deliberately NO auto-subscriber that restarts the
+    /// conductor on a commitment landing (churn risk); node-local (not in
+    /// build_manifest, so not doorway-proxied).
     async fn handle_arc_policy_actuate(
         &self,
         req: Request<Incoming>,
