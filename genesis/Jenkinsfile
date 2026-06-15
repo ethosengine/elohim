@@ -1369,7 +1369,12 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
         // identical — only the stage-boundary count drops. (Seed dependency
         // order: humans→presences→collectives→accounts→conductor identities→
         // agent bindings→household formation — NEVER reorder.)
-        stage('Seed Substrate') {            steps {
+        stage('Seed Substrate') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
@@ -1609,7 +1614,12 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             // Per genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md
             // and elohim/sdk/schemas/v1/objects/operator-classification.schema.json.
             // Schema v1 (omits custody/steward refs); v2 requires the full
-            // attestation chain — graduate when bootstrap attestations land.            steps {
+            // attestation chain — graduate when bootstrap attestations land.
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
