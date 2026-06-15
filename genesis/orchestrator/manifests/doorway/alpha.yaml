@@ -196,13 +196,34 @@ spec:
             # SIGKILL. The 2nd core buys burst headroom; band-aid, not the pacing fix.)
             # Default in-binary is 4 if unset.
             - name: DOORWAY_WORKER_THREADS
-              value: "4"
+              # 4→8 (2026-06-15 RCA): the cpu 1→2 + warm_stream pacing cure removed
+              # the CFS-CPU-starvation class — post-cure metrics show ZERO CFS throttle
+              # and CPU ~0.05 core — yet the matthew-side doorway still liveness-
+              # SIGKILLs (exit 137 "Error", not OOM; 12 restarts vs adam-side 0 on the
+              # SAME image c6243f34). The residual is a NON-CPU runtime stall:
+              # concurrent blocked awaits (warm_stream Mongo replay at ~5× adam's
+              # volume + the conductor-reconnect storm) park the workers so /health
+              # misses the 150s probe window. A parked worker costs no CPU, so doubling
+              # workers buys direct /health headroom at cpu:2 — same lever as the
+              # 1→4 single-blocked-await fix, now for the N-concurrent-parked case.
+              # BAND-AID; durable fix = watchdog-isolated liveness (see
+              # project_doorway_wedge_unbounded_mongo_await).
+              value: "8"
             # Conductor-call hard deadline (ms). Bounds every zome/admin call so an
             # intermittent cluster NXDOMAIN or a never-settling record_heartbeat can
             # never park the caller forever (the freeze root contributor). Default
             # in-binary is 10000 if unset.
             - name: DOORWAY_ZOME_CALL_TIMEOUT_MS
               value: "10000"
+            # warm_stream inter-batch pace (ms), applied every 64 projected entries
+            # (warm_stream.rs WARMUP_PACE_MS). 8ms default → 50ms (2026-06-15): caps
+            # the cold-start corpus-replay duty cycle harder so warm_stream yields the
+            # runtime more often, widening the scheduling gaps /health needs during
+            # the burst. ~2.8s added over a ~3.6k-doc corpus, well inside the 75s warm
+            # budget. Band-aid paired with DOORWAY_WORKER_THREADS=8; durable fix =
+            # watchdog liveness. Targets the matthew side specifically (5× adam's replay).
+            - name: WARMUP_PACE_MS
+              value: "50"
             # DOORWAY_HEALTH_PORT (dedicated probe listener) intentionally LEFT
             # UNSET: that listener shares the main tokio runtime, so a killer probe
             # (liveness/startup) pointed at it would stay green during a PARTIAL
