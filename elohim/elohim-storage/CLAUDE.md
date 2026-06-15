@@ -146,8 +146,8 @@ A node/agent has three distinct identity namespaces. They are NOT interchangeabl
 
 | Namespace | Example | Home column |
 |-----------|---------|-------------|
-| Holochain agent key (`agent_cid`) | `uhCAk…` | `humans.agent_pub_key` |
-| libp2p transport id | `12D3Koo…` | `shard_locations.peer_id`, `peer_identity_bindings.peer_id` |
+| Holochain agent key (`agent_cid`) | `uhCAk…` | `humans.agent_pub_key`; `shard_locations.peer_id` (⚠ misnamed — stores `agent_cid`, NOT a libp2p id: verified `seed_shard_manifest.rs:55-58` "a libp2p PeerId will NOT join", `peer_selection.rs:253-255`); `peer_statuses.peer_id`; `rea_commitments.provider` (seeder path) |
+| libp2p transport id | `12D3Koo…` | `peer_identity_bindings.peer_id` (handshake-`source` rows); the libp2p swarm |
 | iroh `NodeId` | iroh-format | `peer_transport_manifest.iroh_node_id` |
 
 **Rule: never join or match raw identity strings across namespaces.** Raw-string equality between `agent_cid` and a transport peer id silently empties every join — this caused the all-zeros resilience card in `services/household_resilience.rs` (joins at lines 74, 172–174, 447–449).
@@ -159,7 +159,7 @@ A node/agent has three distinct identity namespaces. They are NOT interchangeabl
 - **`src/node_transport.rs`** — the self-identity seam: resolves the node's own `self_cid` (which namespace it returns depends on transport mode — libp2p returns the peer id string; iroh returns the iroh NodeId). Mismatches between `self_cid` and seeder-written `provider` values are the primary fragmentation source.
 - **`src/p2p/identity_handshake.rs`** — `synthesise_dht_anchor_hash(peer_id, agent_cid)` (line 336) is a fallback anchor when no DHT-truth row exists yet; it is not a substitute resolver.
 
-Pick `agent_cid` as the canonical join key. Resolve transport ids TO `agent_cid` via `peer_transport_manifest` or `peer_identity_bindings` before any cross-table join. The forthcoming resolver spec is `genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md`.
+Pick `agent_cid` as the canonical join key. **Most identities you will join ARE already `agent_cid`** — `shard_locations.peer_id` and (seeder-written) `rea_commitments.provider` both hold `uhCAk`; the live cause of an empty join is usually a NULL `humans.agent_pub_key`, fixed by **populating it**, not by a resolver. ⚠ A general transport-id→`agent_cid` resolver is specced (`genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md`) but is **NOT built and is blocked**: no edge node emits a real `AgentPeerBinding` (projected rows are split-brained placeholders), and the binding is **self-asserted/unsigned today** (`STAGE1_SIGNATURE_SENTINEL`; agent and libp2p keys are uncrossed) — do NOT consume bindings for economic attribution until a cross-signed control proof lands (open security item).
 
 ---
 
