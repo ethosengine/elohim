@@ -231,6 +231,13 @@ pub struct HttpServer {
     /// [`HttpServer::with_self_peer_id`]. Falls back to "unknown-peer"
     /// when not configured (legacy deployments without P2P).
     self_peer_id: String,
+    /// Transport-identity seam (libp2p OR iroh). When `p2p_handle` is absent
+    /// (iroh mode), `/p2p/status` reports this transport's `status_peer_id()`
+    /// as `.peerId` instead of returning 503 — so the iroh dataplane lights the
+    /// resilience card. In libp2p mode the existing `p2p_handle.status()` path
+    /// is unchanged and authoritative; this is only the fallback. `None` when no
+    /// transport identity was resolved (P2P disabled / key load failed).
+    node_transport: Option<Arc<dyn crate::node_transport::NodeTransport>>,
     /// Counter — number of `GET /blob` requests served from iroh.
     /// Read by parity-soak diagnostics; never reset at runtime.
     blob_iroh_served_count: Arc<std::sync::atomic::AtomicU64>,
@@ -402,6 +409,7 @@ impl HttpServer {
             #[cfg(feature = "p2p-iroh")]
             self_transport_manifest: None,
             self_peer_id: "unknown-peer".to_string(),
+            node_transport: None,
             blob_iroh_served_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             blob_libp2p_served_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
@@ -547,6 +555,19 @@ impl HttpServer {
     /// lookup by other peers).
     pub fn with_self_peer_id(mut self, peer_id: String) -> Self {
         self.self_peer_id = peer_id;
+        self
+    }
+
+    /// Wire the transport-identity seam (libp2p OR iroh). Lets `/p2p/status`
+    /// report the active transport's `status_peer_id()` as `.peerId` when the
+    /// libp2p `p2p_handle` is absent (iroh mode) — the seam that lets the iroh
+    /// dataplane light the resilience card. No effect on the libp2p path, where
+    /// `p2p_handle.status()` stays authoritative.
+    pub fn with_node_transport(
+        mut self,
+        transport: Arc<dyn crate::node_transport::NodeTransport>,
+    ) -> Self {
+        self.node_transport = Some(transport);
         self
     }
 
@@ -2536,25 +2557,45 @@ impl HttpServer {
     /// Handle P2P status request
     #[cfg(feature = "p2p")]
     async fn handle_p2p_status(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+        // libp2p path: the swarm-backed handle is authoritative and unchanged —
+        // byte-identical to before (full P2PStatusInfo incl. provideLoop). The
+        // transport seam is NOT consulted here so libp2p behavior is preserved.
         if let Some(ref handle) = self.p2p_handle {
             let status = handle.status();
             let json = serde_json::to_string(&status).map_err(|e| {
                 StorageError::Internal(format!("Failed to serialize P2P status: {}", e))
             })?;
-            Ok(Response::builder()
+            return Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Full::new(Bytes::from(json)))
-                .unwrap())
-        } else {
-            Ok(Response::builder()
-                .status(StatusCode::SERVICE_UNAVAILABLE)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(
-                    r#"{"error": "P2P networking not enabled"}"#,
-                )))
-                .unwrap())
+                .unwrap());
         }
+
+        // iroh path (no libp2p handle): report the transport's status peerId as
+        // `.peerId` so the seeder can key commitments to this node and the
+        // resilience card lights — instead of the legacy 503. The seam is the
+        // ONLY new behavior; libp2p never reaches here.
+        if let Some(peer_id) = self
+            .node_transport
+            .as_ref()
+            .and_then(|t| t.status_peer_id())
+        {
+            let body = serde_json::json!({ "peerId": peer_id });
+            return Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(body.to_string())))
+                .unwrap());
+        }
+
+        Ok(Response::builder()
+            .status(StatusCode::SERVICE_UNAVAILABLE)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(
+                r#"{"error": "P2P networking not enabled"}"#,
+            )))
+            .unwrap())
     }
 
     /// Handle /p2p/peers — connected peers with identify info

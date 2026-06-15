@@ -153,6 +153,10 @@ pub mod trust_verification;
 pub mod content_server;
 pub mod identity;
 
+// Loosely-coupled transport-identity seam (self_cid / status peerId) — pure,
+// feature-flag-free; impls wrap a precomputed identity string. See module docs.
+pub mod node_transport;
+
 // P2P network modules (require p2p feature)
 #[cfg(feature = "p2p")]
 pub mod p2p;
@@ -206,6 +210,7 @@ pub use sharding::{ShardConfig, ShardEncoder, ShardManifest};
 // P2P re-exports
 pub use content_server::{ContentServerBridge, ContentServerConfig, PublisherInfo};
 pub use identity::{NodeCapabilities, NodeIdentityInfo};
+pub use node_transport::{IrohTransport, Libp2pTransport, NodeTransport};
 
 #[cfg(feature = "p2p")]
 pub use identity::NodeIdentity;

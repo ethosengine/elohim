@@ -36,9 +36,16 @@ use ts_rs::TS;
 pub enum SelfCidSource {
     /// `SELF_CID` env was set and non-empty.
     Env,
-    /// Derived at startup from the libp2p `NodeIdentity` peer id (the join key
-    /// the seeder resolves from `/p2p/status .peerId`).
-    DerivedLibp2pPeerId,
+    /// Derived at startup from the active transport's identity key — the libp2p
+    /// `NodeIdentity` peer id OR the iroh `NodeId` (both are the join key the
+    /// seeder resolves from `/p2p/status .peerId`). Resolved through the
+    /// `NodeTransport` seam, so it covers BOTH backends.
+    ///
+    /// The wire string stays `"derived-libp2p-peer-id"` for back-compat: the
+    /// `p2p-status-view` schema enum (in `elohim/sdk/schemas/`) is unchanged,
+    /// and libp2p output is byte-identical. The string is historical; the
+    /// meaning is "derived from the active transport's key."
+    DerivedFromTransport,
     /// Neither — the provide-loop stays dormant (the dark-card cause).
     Unset,
 }
@@ -47,7 +54,8 @@ impl SelfCidSource {
     pub fn as_str(self) -> &'static str {
         match self {
             SelfCidSource::Env => "env",
-            SelfCidSource::DerivedLibp2pPeerId => "derived-libp2p-peer-id",
+            // Wire value frozen for schema/back-compat (see variant docs).
+            SelfCidSource::DerivedFromTransport => "derived-libp2p-peer-id",
             SelfCidSource::Unset => "unset",
         }
     }
@@ -145,7 +153,7 @@ mod tests {
     fn self_cid_source_strings_are_stable_wire_values() {
         assert_eq!(SelfCidSource::Env.as_str(), "env");
         assert_eq!(
-            SelfCidSource::DerivedLibp2pPeerId.as_str(),
+            SelfCidSource::DerivedFromTransport.as_str(),
             "derived-libp2p-peer-id"
         );
         assert_eq!(SelfCidSource::Unset.as_str(), "unset");
@@ -164,7 +172,7 @@ mod tests {
     async fn set_and_snapshot_roundtrip() {
         let state = ProvideLoopState::new();
         state
-            .set_self_cid_source(SelfCidSource::DerivedLibp2pPeerId)
+            .set_self_cid_source(SelfCidSource::DerivedFromTransport)
             .await;
         state.set_active(true).await;
         state.publish_reanchor_sweep(3, 1, 0).await;

@@ -397,7 +397,7 @@ async fn async_main(
     // handed to the P2P node below. Mirrors `ProjectionReconcileState`.
     let provide_loop_state = elohim_storage::services::provide_loop_status::ProvideLoopState::new();
 
-    // ── self_cid derivation (Workstream D — light the resilience card) ────────
+    // ── Transport-identity seam + self_cid derivation (Workstream D) ──────────
     //
     // `self_cid` is the node's own steward identity. It is the JOIN KEY three
     // ways: the custody sweep matches `commitment.provider == self_cid`
@@ -406,60 +406,112 @@ async fn async_main(
     // (genesis/seeder/src/peer-id.ts). All three must agree or the snapshot's
     // joins silently empty (project_resilience_snapshot_humans_junction).
     //
-    // `/p2p/status .peerId` is the libp2p `NodeIdentity::peer_id_string()`
-    // derived from `identity.key`. So when `SELF_CID` is unset (it is set in NO
-    // manifest — the dark-card root cause) AND the libp2p P2P path will be
-    // active, we derive `self_cid` from the SAME identity file the P2P node
-    // loads below. `peer_id` depends only on the keypair (not on `agent_pubkey`)
-    // and `load_or_generate` is idempotent on the file, so the early read here
-    // and the P2P node's later read yield byte-identical peer ids.
+    // Both transports answer "what is my self identity / status peerId?" through
+    // the `NodeTransport` seam, so the (already transport-neutral) provide-loop
+    // below spawns for WHICHEVER backend is active — no branching, no duplicated
+    // transport logic. Before the seam, `self_cid` was derived ONLY in libp2p
+    // mode, so iroh mode left it `None` → the loop stayed dormant → the
+    // resilience card read all zeros.
     //
-    // iroh backend / disabled P2P are left to the env: their node id is a
-    // different identity (a follow-up), and without a libp2p `/p2p/status
-    // .peerId` the seeder cannot key commitments to them anyway, so the loop
-    // staying dormant there is correct, not a regression.
+    // libp2p: `Libp2pTransport` wraps `NodeIdentity::peer_id_string()` read from
+    // the SAME `identity.key` the P2P node loads below. `peer_id` depends only on
+    // the keypair (not `agent_pubkey`) and `load_or_generate` is idempotent, so
+    // the early read here and the node's later read yield byte-identical ids —
+    // the libp2p path is behavior-preserving.
+    //
+    // iroh: `IrohTransport` wraps `secret.public().to_string()` from the SAME
+    // `iroh.key` (via the same `load_or_generate_secret_key`) the iroh boot block
+    // loads — idempotent (same file ⇒ same id), and equal to the iroh view-fed
+    // service's local agent CID, so the resilience join is consistent.
+    let node_transport: Option<Arc<dyn elohim_storage::node_transport::NodeTransport>> = if args
+        .enable_p2p
+        && config.transport_backend == elohim_storage::config::TransportBackend::Libp2p
     {
-        let self_cid_source = if config.self_cid.is_some() {
-            elohim_storage::services::provide_loop_status::SelfCidSource::Env
-        } else if args.enable_p2p
-            && config.transport_backend == elohim_storage::config::TransportBackend::Libp2p
+        let identity_path = config.storage_dir.join("identity.key");
+        // agent_pubkey does not affect peer_id; mirror the P2P node's hint
+        // so a first-run generate writes the same file the node will load.
+        let agent_pubkey = args.agent_pubkey.clone().unwrap_or_else(|| {
+            format!(
+                "uhCAk_{}",
+                &uuid::Uuid::new_v4().to_string().replace('-', "")[..32]
+            )
+        });
+        match NodeIdentity::load_or_generate(&identity_path, agent_pubkey) {
+            Ok(identity) => {
+                let peer_id = identity.peer_id_string();
+                info!(
+                    self_cid = %peer_id,
+                    "NodeTransport=libp2p — self_cid is the libp2p peer id (matches \
+                     /p2p/status peerId join key)"
+                );
+                Some(Arc::new(
+                    elohim_storage::node_transport::Libp2pTransport::new(peer_id),
+                ))
+            }
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    "libp2p transport identity load failed (identity.key unreadable) — \
+                     provide-loop stays dormant; resilience card will read zeros"
+                );
+                None
+            }
+        }
+    } else if args.enable_p2p
+        && config.transport_backend == elohim_storage::config::TransportBackend::Iroh
+    {
+        #[cfg(feature = "p2p-iroh")]
         {
-            let identity_path = config.storage_dir.join("identity.key");
-            // agent_pubkey does not affect peer_id; mirror the P2P node's hint
-            // so a first-run generate writes the same file the node will load.
-            let agent_pubkey = args.agent_pubkey.clone().unwrap_or_else(|| {
-                format!(
-                    "uhCAk_{}",
-                    &uuid::Uuid::new_v4().to_string().replace('-', "")[..32]
-                )
-            });
-            match NodeIdentity::load_or_generate(&identity_path, agent_pubkey) {
-                Ok(identity) => {
-                    let peer_id = identity.peer_id_string();
+            let iroh_cfg =
+                elohim_storage::p2p_iroh::IrohConfig::from_storage_dir(&config.storage_dir);
+            match elohim_storage::p2p_iroh::load_or_generate_secret_key(&iroh_cfg.secret_key_path) {
+                Ok(secret) => {
+                    let node_id = secret.public().to_string();
                     info!(
-                        self_cid = %peer_id,
-                        "self_cid derived from libp2p NodeIdentity (SELF_CID unset) — \
-                         provide-loop will spawn; matches /p2p/status peerId join key"
+                        self_cid = %node_id,
+                        "NodeTransport=iroh — self_cid is the iroh NodeId (matches the \
+                         iroh view-fed agent CID; provide-loop will spawn)"
                     );
-                    config.self_cid = Some(peer_id);
-                    elohim_storage::services::provide_loop_status::SelfCidSource::DerivedLibp2pPeerId
+                    Some(Arc::new(
+                        elohim_storage::node_transport::IrohTransport::new(node_id),
+                    ))
                 }
                 Err(e) => {
                     warn!(
                         error = %e,
-                        "self_cid derivation failed (identity.key unreadable) — \
+                        path = %iroh_cfg.secret_key_path.display(),
+                        "iroh transport identity load failed (iroh.key unreadable) — \
                          provide-loop stays dormant; resilience card will read zeros"
                     );
-                    elohim_storage::services::provide_loop_status::SelfCidSource::Unset
+                    None
                 }
             }
-        } else {
-            elohim_storage::services::provide_loop_status::SelfCidSource::Unset
-        };
-        provide_loop_state
-            .set_self_cid_source(self_cid_source)
-            .await;
-    }
+        }
+        #[cfg(not(feature = "p2p-iroh"))]
+        {
+            warn!(
+                "transport_backend=iroh but the p2p-iroh feature is not compiled in — \
+                     no transport identity; provide-loop stays dormant"
+            );
+            None
+        }
+    } else {
+        None
+    };
+
+    // Env arm stays highest priority; the transport-derived value only fills a
+    // gap when SELF_CID is unset (the dark-card root cause: set in no manifest).
+    let self_cid_source = if config.self_cid.is_some() {
+        elohim_storage::services::provide_loop_status::SelfCidSource::Env
+    } else if let Some(cid) = node_transport.as_ref().and_then(|t| t.self_cid()) {
+        config.self_cid = Some(cid);
+        elohim_storage::services::provide_loop_status::SelfCidSource::DerivedFromTransport
+    } else {
+        elohim_storage::services::provide_loop_status::SelfCidSource::Unset
+    };
+    provide_loop_state
+        .set_self_cid_source(self_cid_source)
+        .await;
 
     // Save default config if it doesn't exist
     let config_path = config.config_path();
@@ -1846,6 +1898,13 @@ async fn async_main(
         .with_write_through_state(write_through_state.clone())
         // T17: race-fetch parameters (timeout, parallelism, self-CID).
         .with_fetch_config(&config);
+
+    // Transport-identity seam — lets `/p2p/status` report the active transport's
+    // peerId (iroh mode) instead of 503, so the resilience join works on iroh.
+    // No effect on libp2p, where `p2p_handle.status()` stays authoritative.
+    if let Some(ref transport) = node_transport {
+        http_server = http_server.with_node_transport(transport.clone());
+    }
 
     if args.embedded_conductor {
         http_server = http_server.with_embedded_conductor();
