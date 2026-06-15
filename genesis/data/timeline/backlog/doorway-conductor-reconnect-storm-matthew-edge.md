@@ -12,6 +12,7 @@ priority: "high"
 ci_status: blocked
 jobs: [elohim-edge]
 relatedNodeIds: []
+nodes: [matthew, doorway-alpha]
 tags: [doorway, alpha, conductor, reconnect-storm, app-ws-session-close, warm-stream, liveness-watchdog, restart-on-hang, upstream-operator-owned, needs-brainstorm, sqlite-read-pool-saturation, matthew-edge, ab-control-adam-healthy]
 cites:
   - genesis/orchestrator/manifests/doorway/alpha.yaml

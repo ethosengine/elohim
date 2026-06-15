@@ -58,6 +58,7 @@ export interface DeploymentRecord {
   edgenodeMemoryLimit?: string;
   edgenodeCpuRequest?: string;
   edgenodeCpuLimit?: string;
+  edgenodeDbPoolSize?: string;
 }
 
 interface DeploymentsJson {
@@ -138,6 +139,13 @@ export function validateRecord(
     }
   }
 
+  // edgenodeDbPoolSize renders STORAGE_DB_POOL_SIZE via sed — must be a positive
+  // integer string (a non-numeric value would render a garbage env the Rust
+  // parser silently discards back to the default, losing the intended override).
+  if (record.edgenodeDbPoolSize !== undefined && !/^[1-9]\d*$/.test(record.edgenodeDbPoolSize)) {
+    errors.push(`${tag} edgenodeDbPoolSize must be a positive integer string: ${JSON.stringify(record.edgenodeDbPoolSize)}`);
+  }
+
   // nodeTypes: non-empty, all in allowed set
   if (!Array.isArray(record.nodeTypes) || record.nodeTypes.length === 0) {
     errors.push(`${tag} nodeTypes must be a non-empty array`);
@@ -180,6 +188,7 @@ export function validateRecord(
     'edgenodeMemoryLimit',
     'edgenodeCpuRequest',
     'edgenodeCpuLimit',
+    'edgenodeDbPoolSize',
     'humanLabel',
     'humanId',
   ] as const;

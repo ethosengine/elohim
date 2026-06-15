@@ -47,7 +47,7 @@ const CLASS_KEYWORDS: Record<ResourceClass, string[]> = {
   cpu: ['cpu', 'throttle', 'cfs', 'cpu starvation', 'starve'],
   // Resource-context only — bare "memory" false-matches MemPalace/"memory kit".
   memory: ['oom', 'oomkill', 'memcg', 'anon-rss', 'rss ', 'memory limit', 'memory pressure', 'out of memory', 'working set'],
-  'db-pool': ['db-pool', 'db pool', 'sqlite pool', 'r2d2', 'connection pool', 'busy_timeout', 'pool size'],
+  'db-pool': ['db-pool', 'db pool', 'sqlite', 'read pool', 'read-pool', 'r2d2', 'connection pool', 'busy_timeout', 'pool size'],
   'arc-dht': ['arc-factor', 'target_arc_factor', 'authority arc', 'dht', 'arc shrink', 'arc-shrink'],
   // Resource-context only — bare "session" false-matches "dev session".
   sessions: ['app-ws', 'app_ws', 'reconnect', 'websocket', 'admin-ws', 'ws session', 'session pressure'],

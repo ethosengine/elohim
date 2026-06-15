@@ -46,6 +46,31 @@ describe('validateRecord — consolidated pattern accepts template OR manifest',
   });
 });
 
+describe('validateRecord — edgenodeDbPoolSize is a sed-interpolated positive integer', () => {
+  it('accepts a positive integer string', () => {
+    expect(validateRecord(consolidated({ edgenodeDbPoolSize: '20' }), knownHumans, knownDevices)).toEqual([]);
+  });
+
+  it('accepts an absent edgenodeDbPoolSize (optional)', () => {
+    expect(validateRecord(consolidated({ edgenodeDbPoolSize: undefined }), knownHumans, knownDevices)).toEqual([]);
+  });
+
+  it('rejects a non-numeric value', () => {
+    const errors = validateRecord(consolidated({ edgenodeDbPoolSize: 'twenty' }), knownHumans, knownDevices);
+    expect(errors.some((e) => /edgenodeDbPoolSize must be a positive integer/.test(e))).toBe(true);
+  });
+
+  it('rejects "0" (a zero pool is meaningless; the Rust parser would discard it)', () => {
+    const errors = validateRecord(consolidated({ edgenodeDbPoolSize: '0' }), knownHumans, knownDevices);
+    expect(errors.some((e) => /edgenodeDbPoolSize must be a positive integer/.test(e))).toBe(true);
+  });
+
+  it('catches a sed-delimiter pipe in the value (sedInterpolatedFields)', () => {
+    const errors = validateRecord(consolidated({ edgenodeDbPoolSize: '20|bad' }), knownHumans, knownDevices);
+    expect(errors.some((e) => /edgenodeDbPoolSize contains '\|'/.test(e))).toBe(true);
+  });
+});
+
 describe('validateRecord — legacy pattern still requires template + sizing (regression)', () => {
   it('accepts a legacy record with template + resource sizing', () => {
     const rec = consolidated({
