@@ -452,17 +452,7 @@ def runContentSeedStage() {
             continue
         }
         dir('genesis/seeder') {
-            sh """#!/bin/bash
-                set -euo pipefail
-                echo "═══════════════════════════════════════════════════════════"
-                echo "🌱 SEEDING GENESIS PEER: ${gp.humanId} (${gp.storageUrl})"
-                echo "═══════════════════════════════════════════════════════════"
-                # Direct seed via SQLite write; replica peers receive it through
-                # P2P identity-driven replication. Idempotent across genesis
-                # peers — each peer's SQLite settles to the same content set.
-                STORAGE_URL="http://${gp.storageUrl}" npx tsx src/seed-sqlite.ts
-                echo "✅ ${gp.humanId} seeded successfully"
-            """
+            sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-genesis-peer.sh' '${gp.humanId}' '${gp.storageUrl}'"
         }
         seededGenesis << gp.humanId
     }
@@ -481,26 +471,7 @@ def runContentSeedStage() {
             laggingReplicas << peer.humanId
             continue
         }
-        def rc = sh(returnStatus: true, script: """#!/bin/bash
-            set -uo pipefail
-            echo "⏳ WAITING FOR REPLICATION: ${peer.humanId} (${peer.storageUrl})"
-            DEADLINE=\$((SECONDS + 600))
-            while [ \$SECONDS -lt \$DEADLINE ]; do
-                STATUS=\$(curl -sf "http://${peer.storageUrl}/p2p/status" 2>/dev/null || echo '{}')
-                CAUGHT_UP=\$(echo "\$STATUS" | jq -r '.replication.caughtUp // false')
-                COMPLETED=\$(echo "\$STATUS" | jq -r '.replication.completed // 0')
-                PENDING=\$(echo "\$STATUS" | jq -r '.replication.pending // 0')
-                # COMPLETED=0 is valid when the peer already had everything.
-                if [ "\$CAUGHT_UP" = "true" ] && [ "\$PENDING" = "0" ]; then
-                    echo "✅ ${peer.humanId} caught up: \$COMPLETED replicated this run, 0 pending"
-                    exit 0
-                fi
-                echo "   ${peer.humanId}: \$COMPLETED completed, \$PENDING pending"
-                sleep 10
-            done
-            echo "⏭️  ${peer.humanId} replication not caught up within 600s"
-            exit 1
-        """)
+        def rc = sh(returnStatus: true, script: "bash '${env.WORKSPACE}/genesis/scripts/ci/wait-for-replication.sh' '${peer.humanId}' '${peer.storageUrl}'")
         if (rc != 0) {
             laggingReplicas << peer.humanId
         }
@@ -585,33 +556,7 @@ def runVerifySeedingStage() {
         return
     }
     def genesisUrl = checkPeer.storageUrl
-    sh """#!/bin/bash
-        set -euo pipefail
-        echo ""
-        echo "🔬 Verifying assessment content on genesis peer (${checkPeer.humanId})..."
-        for ASSESSMENT_ID in assessment-personal-values assessment-values-hierarchy; do
-            ASSESSMENT=\$(curl -sf "http://${genesisUrl}/db/content/\$ASSESSMENT_ID" || echo '{}')
-            FMT=\$(echo "\$ASSESSMENT" | jq -r '.contentFormat // empty')
-            if [ -z "\$FMT" ]; then
-                echo "   ⚠️ Assessment '\$ASSESSMENT_ID' not found"
-                continue
-            fi
-            if [ "\$FMT" = "markdown" ]; then
-                echo "   ❌ Assessment '\$ASSESSMENT_ID' has format 'markdown' (likely defaulted from unknown format)"
-                exit 1
-            fi
-            HAS_WIDGETS=\$(echo "\$ASSESSMENT" | jq -r '.contentBody' | jq -e '.[0].content.widgets | length > 0' 2>/dev/null && echo "yes" || echo "no")
-            if [ "\$HAS_WIDGETS" = "yes" ]; then
-                echo "   ✅ Assessment '\$ASSESSMENT_ID': format=\$FMT, widgets present"
-            else
-                echo "   ⚠️ Assessment '\$ASSESSMENT_ID': format=\$FMT, no widgets in content body"
-            fi
-        done
-        echo ""
-        echo "═══════════════════════════════════════════════════════════"
-        echo "✅ SEEDING VERIFIED"
-        echo "═══════════════════════════════════════════════════════════"
-    """
+    sh "bash '${env.WORKSPACE}/genesis/scripts/ci/verify-assessment-content.sh' '${genesisUrl}' '${checkPeer.humanId}'"
 }
 
 /**
@@ -844,16 +789,7 @@ def seedStewardshipStage() {
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
         dir('genesis/seeder') {
             withEnv(["DOORWAY_API_KEY=${apiKey}"]) {
-                sh """#!/bin/bash
-                    set -euo pipefail
-                    echo "═══════════════════════════════════════════════════════════"
-                    echo "SEED STEWARDSHIP ALLOCATIONS (affinity-based content→steward)"
-                    echo "═══════════════════════════════════════════════════════════"
-                    echo "Doorway: ${doorwayHost}"
-                    echo "Admin key: \$( [ -n "\${DOORWAY_API_KEY:-}" ] && echo provided || echo 'not set' )"
-                    echo ""
-                    DOORWAY_URL="${doorwayHost}" npx tsx src/seed-stewardship.ts
-                """
+                sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-stewardship.sh' '${doorwayHost}'"
             }
         }
     }
@@ -909,16 +845,7 @@ def seedProjectionsStage() {
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
         dir('genesis/seeder') {
             withEnv(["DOORWAY_API_KEY=${apiKey}"]) {
-                sh """#!/bin/bash
-                    set -euo pipefail
-                    echo "═══════════════════════════════════════════════════════════"
-                    echo "SEED PROJECTIONS (EPR project-epr commitments)"
-                    echo "═══════════════════════════════════════════════════════════"
-                    echo "Doorway: ${doorwayHost}"
-                    echo "Admin key: \$( [ -n "\${DOORWAY_API_KEY:-}" ] && echo provided || echo 'not set' )"
-                    echo ""
-                    DOORWAY_URL="${doorwayHost}" npx tsx src/seed-projections.ts
-                """
+                sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-projections.sh' '${doorwayHost}'"
             }
         }
     }
@@ -1279,16 +1206,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 ═══════════════════════════════════════════════════════════
 """
                         for (human in humans) {
-                            sh """#!/bin/bash
-                                set -euo pipefail
-                                echo "Resetting ${human.service}..."
-
-                                # Delete content.db and restart pod for fresh migrations
-                                kubectl exec -n ${human.namespace} ${human.service}-0 -c elohim-storage -- rm -f /data/content.db 2>/dev/null || true
-                                kubectl delete pod -n ${human.namespace} ${human.service}-0 --wait=false
-
-                                echo "   ✅ ${human.humanId} reset initiated"
-                            """
+                            sh "bash '${env.WORKSPACE}/genesis/scripts/ci/reset-storage-pod.sh' '${human.service}' '${human.namespace}' '${human.humanId}'"
                         }
 
                         // Wait for pods to begin restarting
@@ -1349,16 +1267,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
             steps {
                 container('builder') {
-                    sh '''#!/bin/bash
-                        set -euo pipefail
-
-                        echo "Generating TypeScript enum constants from protocol JSON schemas..."
-
-                        # JSON Schema is the single source of truth — codegen produces both TS and Rust
-                        pnpm run schema:codegen:ts
-
-                        echo "✅ Schema types generated"
-                    '''
+                    sh "bash '${env.WORKSPACE}/genesis/scripts/ci/generate-schema-types.sh'"
                 }
             }
         }
@@ -1387,27 +1296,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                     //     echo "✅ Manifest codegen verified"
                     // '''
                     dir('genesis/seeder') {
-                        sh '''#!/bin/bash
-                            set -euo pipefail
-
-                            echo "Type-checking seeder (compile-time enum enforcement)..."
-                            # Filter out workspace package resolution errors (TS2307) —
-                            # these are CI install issues, not code bugs. Fail only on
-                            # real type errors (enum mismatches, invalid assignments, etc.)
-                            TSC_OUTPUT=$(npx tsc --noEmit 2>&1 || true)
-                            REAL_ERRORS=$(echo "$TSC_OUTPUT" | grep "error TS" | grep -v "TS2307" || true)
-                            if [ -n "$REAL_ERRORS" ]; then
-                                echo "$REAL_ERRORS"
-                                echo "❌ TypeScript type errors found — fix before seeding"
-                                exit 1
-                            fi
-                            echo "✅ Type check passed"
-
-                            echo "Running constants sync tests..."
-                            npx vitest run --reporter=verbose
-
-                            echo "✅ Constants validation passed"
-                        '''
+                        sh "bash '${env.WORKSPACE}/genesis/scripts/ci/typecheck-seeder.sh'"
                     }
                 }
             }
@@ -1490,16 +1379,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/seeder') {
                                 withEnv(["API_KEY_ADMIN=${adminKey}"]) {
-                                    sh """#!/bin/bash
-                                        set -euo pipefail
-                                        echo "═══════════════════════════════════════════════════════════"
-                                        echo "SEED HUMANS"
-                                        echo "═══════════════════════════════════════════════════════════"
-                                        echo "Doorway: ${doorwayHost}"
-                                        echo "Admin key: \$( [ -n "\${API_KEY_ADMIN:-}" ] && echo provided || echo 'not set' )"
-                                        echo ""
-                                        DOORWAY_URL="${doorwayHost}" npx tsx src/seed-humans.ts
-                                    """
+                                    sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-humans.sh' '${doorwayHost}'"
                                 }
                             }
                         }
@@ -1528,16 +1408,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/seeder') {
                                 withEnv(["API_KEY_ADMIN=${adminKey}"]) {
-                                    sh """#!/bin/bash
-                                        set -euo pipefail
-                                        echo "═══════════════════════════════════════════════════════════"
-                                        echo "SEED PRESENCES"
-                                        echo "═══════════════════════════════════════════════════════════"
-                                        echo "Doorway: ${doorwayHost}"
-                                        echo "Admin key: \$( [ -n "\${API_KEY_ADMIN:-}" ] && echo provided || echo 'not set' )"
-                                        echo ""
-                                        DOORWAY_URL="${doorwayHost}" npx tsx src/seed-presences.ts
-                                    """
+                                    sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-presences.sh' '${doorwayHost}'"
                                 }
                             }
                         }
@@ -1557,15 +1428,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/seeder') {
-                                sh """#!/bin/bash
-                                    set -euo pipefail
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "SEED COLLECTIVES"
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "Doorway: ${doorwayHost}"
-                                    echo ""
-                                    DOORWAY_URL="${doorwayHost}" npx tsx src/seed-collectives.ts
-                                """
+                                sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-collectives.sh' '${doorwayHost}'"
                             }
                         }
                     }
@@ -1611,21 +1474,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         }
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/seeder') {
-                                sh """#!/bin/bash
-                                    set -euo pipefail
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "SEED ACCOUNTS"
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    if [ -n "${targetPeers}" ]; then
-                                      echo "Targets: ${targetPeers}"
-                                    else
-                                      echo "Doorway: ${doorwayHost}  (single target; set SEEDER_TARGET_PEERS to split)"
-                                    fi
-                                    echo ""
-                                    DOORWAY_URL="${doorwayHost}" \\
-                                    SEEDER_TARGET_PEERS="${targetPeers}" \\
-                                      npx tsx src/seed-accounts.ts
-                                """
+                                sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-accounts.sh' '${doorwayHost}' '${targetPeers}'"
                             }
                         }
                     }
@@ -1804,19 +1653,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         def blobSize = env.CONTENT_BLOB_SIZE_BYTES ?: '0'
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/seeder') {
-                                sh """#!/bin/bash
-                                    set -euo pipefail
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "SEED CUSTODY COMMITMENTS (default custody pair set — seeder prints the actual pairs)"
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "Doorway: ${doorwayHost}"
-                                    echo "Blob:    ${blobHash} (${blobSize} bytes)"
-                                    echo ""
-                                    DOORWAY_URL="${doorwayHost}" \\
-                                    CONTENT_BLOB_HASH="${blobHash}" \\
-                                    CONTENT_BLOB_SIZE_BYTES="${blobSize}" \\
-                                      npx tsx src/seed-commitments.ts
-                                """
+                                sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-custody-commitments.sh' '${doorwayHost}' '${blobHash}' '${blobSize}'"
                             }
                         }
                     }
@@ -1844,16 +1681,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/seeder') {
-                                sh """#!/bin/bash
-                                    set -euo pipefail
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "SEED OPERATOR BINDINGS (M5 matthew → alpha-elohim-host + apex-elohim-host)"
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "Doorway: ${doorwayHost}"
-                                    echo ""
-                                    DOORWAY_URL="${doorwayHost}" \\
-                                      npx tsx src/seed-operator-bindings.ts
-                                """
+                                sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-operator-bindings.sh' '${doorwayHost}'"
                             }
                         }
                     }
@@ -1941,28 +1769,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
-                        sh """#!/bin/bash
-                            set -euo pipefail
-
-                            echo "═══════════════════════════════════════════════════════════"
-                            echo "🔄 WARMING PROJECTION CACHE"
-                            echo "═══════════════════════════════════════════════════════════"
-                            echo "Doorway: ${doorwayHost}"
-                            echo ""
-
-                            RESP=\$(curl -sf -X POST "${doorwayHost}/admin/cache/warm" || echo '{}')
-                            STATUS=\$(echo "\$RESP" | jq -r '.status // "error"')
-                            PEERS=\$(echo "\$RESP" | jq -r '.peers // 0')
-
-                            if [ "\$STATUS" = "warming" ]; then
-                                echo "   ✅ Cache warm-up triggered (\$PEERS peer(s))"
-                                echo "   ⏳ Waiting 10s for warm-up to complete..."
-                                sleep 10
-                            else
-                                echo "   ⚠️ Cache warm-up returned: \$RESP"
-                                echo "   Doorway may need restart to refresh projection cache"
-                            fi
-                        """
+                        sh "bash '${env.WORKSPACE}/genesis/scripts/ci/warm-projection-cache.sh' '${doorwayHost}'"
                     }
                 }
             }
@@ -2040,38 +1847,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/a2o') {
                                 withEnv(["E2E_ADMIN_BOOTSTRAP_KEY=${e2eAdminKey}"]) {
-                                sh """#!/bin/bash
-                                    set -euo pipefail
-
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "🧪 E2E VERIFICATION (API)"
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "Doorway: ${doorwayHost}"
-                                    echo "Substrate: ELOHIM_REMOTE_COMPUTE_STATUS=${env.ELOHIM_REMOTE_COMPUTE_STATUS ?: 'unknown'} (remote-only scenarios auto-skip when unavailable)"
-                                    echo ""
-
-                                    E2E_DOORWAY_ALPHA="${doorwayHost}" \
-                                    E2E_DOORWAY_STAGING="${doorwayHost}" \
-                                    E2E_STORAGE_URL="http://${env.INTERNAL_STORAGE_URL}" \
-                                    ELOHIM_REMOTE_COMPUTE_STATUS="${env.ELOHIM_REMOTE_COMPUTE_STATUS ?: 'unknown'}" \
-                                        npx cucumber-js --tags '@e2e and not @browser-only and not @local and not @wip' \
-                                        --format progress-bar \
-                                        --format json:reports/cucumber-report.json \
-                                        --format html:reports/cucumber-report.html || CUCUMBER_EXIT=\$?
-
-                                    # Snapshot the API run's JSON before the browser stage clobbers it:
-                                    # cucumber.mjs's base config writes reports/cucumber-report.json on
-                                    # EVERY run (including the browser one), so without this copy the
-                                    # API sprint-report is silently built from BROWSER-stage data
-                                    # (diagnosed on genesis #1077: "API" report = 42 @browser-only scenarios).
-                                    cp -f reports/cucumber-report.json reports/cucumber-report-api.json || true
-
-                                    if [ "\${CUCUMBER_EXIT:-0}" -ne 0 ]; then
-                                        exit "\${CUCUMBER_EXIT}"
-                                    fi
-
-                                    echo "✅ API E2E tests passed"
-                                """
+                                sh "bash '${env.WORKSPACE}/genesis/scripts/ci/e2e-verify-api.sh' '${doorwayHost}' '${env.INTERNAL_STORAGE_URL}' '${env.ELOHIM_REMOTE_COMPUTE_STATUS ?: 'unknown'}'"
                                 }
                             }
                         }
@@ -2084,34 +1860,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             container('playwright') {
                                 dir('genesis/a2o') {
-                                    sh """#!/bin/bash
-                                        set -euo pipefail
-
-                                        echo "═══════════════════════════════════════════════════════════"
-                                        echo "🧪 E2E VERIFICATION (BROWSER)"
-                                        echo "═══════════════════════════════════════════════════════════"
-                                        echo "Doorway: ${doorwayHost}"
-                                        echo ""
-
-                                        # Ensure the chromium build matches the workspace's
-                                        # pnpm-resolved Playwright version. The sidecar image
-                                        # bundles browsers, but a Playwright minor bump in the
-                                        # workspace expects a different chromium build (see
-                                        # 'chromium_headless_shell-XXXX' suffix). Idempotent.
-                                        echo "🎭 ensuring matching chromium browser..."
-                                        npx playwright install chromium 2>&1 | tail -5
-
-                                        E2E_DEVICE_MODE=playwright \\
-                                        E2E_DOORWAY_ALPHA="${doorwayHost}" \\
-                                        E2E_STORAGE_URL="http://${env.INTERNAL_STORAGE_URL}" \\
-                                        ELOHIM_REMOTE_COMPUTE_STATUS="${env.ELOHIM_REMOTE_COMPUTE_STATUS ?: 'unknown'}" \\
-                                            npx cucumber-js --tags '@e2e and @browser-only and not @wip' \\
-                                            --format progress-bar \\
-                                            --format json:reports/cucumber-report-browser.json \\
-                                            --format html:reports/cucumber-report-browser.html
-
-                                        echo "✅ Browser E2E tests passed"
-                                    """
+                                    sh "bash '${env.WORKSPACE}/genesis/scripts/ci/e2e-verify-browser.sh' '${doorwayHost}' '${env.INTERNAL_STORAGE_URL}' '${env.ELOHIM_REMOTE_COMPUTE_STATUS ?: 'unknown'}'"
                                 }
                             }
                         }
@@ -2137,32 +1886,14 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         // flags (default cucumber path, default out paths, default profile).
                         // Reads the cucumber-report-api.json snapshot (see API stage) so the API
                         // report reflects the API run, not the browser run's clobbered JSON.
-                        sh """
-                          cd genesis/a2o
-                          pnpm exec tsx scripts/build-sprint-report.ts \\
-                            --run-id \"${env.BUILD_TAG}\" \\
-                            --profile \"\${CUCUMBER_PROFILE:-alpha}\" \\
-                            --doorway \"\${E2E_DOORWAY_ALPHA:-}\" \\
-                            --cucumber reports/cucumber-report-api.json \\
-                            || echo 'Sprint-report aggregator (API) failed (non-blocking)'
-                        """
+                        sh "bash '${env.WORKSPACE}/genesis/scripts/ci/sprint-report-api.sh' '${env.BUILD_TAG}'"
 
                         // --- Sprint-report aggregator (Browser run) ---
                         // Only emits when the browser stage actually ran. Profile=browser
                         // unlocks the Visual Validation 2x2 buckets and visual-regression
                         // findings in the markdown.
                         if (env.PLAYWRIGHT_AVAILABLE == 'true') {
-                            sh """
-                              cd genesis/a2o
-                              pnpm exec tsx scripts/build-sprint-report.ts \\
-                                --run-id \"${env.BUILD_TAG}\" \\
-                                --profile browser \\
-                                --doorway \"\${E2E_DOORWAY_ALPHA:-}\" \\
-                                --cucumber reports/cucumber-report-browser.json \\
-                                --out-json reports/sprint-report-browser.json \\
-                                --out-md reports/sprint-report-browser.md \\
-                                || echo 'Sprint-report aggregator (Browser) failed (non-blocking)'
-                            """
+                            sh "bash '${env.WORKSPACE}/genesis/scripts/ci/sprint-report-browser.sh' '${env.BUILD_TAG}'"
                         }
 
                         // Archive reports — includes per-feature screenshot subdirs
