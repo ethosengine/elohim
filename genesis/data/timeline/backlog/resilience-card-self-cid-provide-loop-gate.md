@@ -6,7 +6,7 @@ contentFormat: "markdown"
 title: "EPR resilience card zeros — APP-LAYER (in-pod conductor cell-readiness + SELF_CID unset), NOT netpol; reseed is not the lever"
 slug: "resilience-card-self-cid-provide-loop-gate"
 written: "2026-06-14"
-updated: "2026-06-14"
+updated: "2026-06-15"
 author: "agentic-developer (felt-status shift, operator OPEN #1 diagnosis — corrected after operator cluster-read + runtime-triage)"
 status: "partially-resolved"
 priority: "high"
@@ -224,3 +224,35 @@ fix + related storage changes):
 5. `stewardingCollectives` lights once distribute_shards runs against online peers
 6. For `distribution_state: measured` — add `PUT /admin/seed/shard-manifest` to
    elohim-storage and a corresponding genesis seed stage (tracked here as the open item)
+
+## Reconciliation 2026-06-15 (code is DONE on dev; deploy+reseed is the remaining lever)
+
+Verified against the tree, not this doc's older text — the branch is **ahead** of the
+sequence above:
+
+- **Step 1 (action filter) + Step 3 (self_cid derive)** are landed: `main.rs:400-462`
+  derives `self_cid` from the libp2p `NodeIdentity` when `SELF_CID` is unset AND
+  `enable_p2p && transport_backend == Libp2p`. The consolidated template ships
+  `ENABLE_P2P=true` and leaves `TransportBackend` at its `Libp2p` default, so on a
+  deploy of `dev` the provide-loop spawns and `commitmentBackedCollectives` lights
+  with REAL data (provider = the conductor `agent_pub_key`).
+- **Step 6 endpoint** is landed: `PUT /admin/seed/shard-manifest` +
+  `services/seed_shard_manifest.rs` exist, gated by `ALLOW_SEED_SHARD_MANIFEST=1`,
+  stamping `status="seeded"` for audit legibility.
+- `seed-provide-rows.sh` is wired into `elohim/holochain/Jenkinsfile:1496` (folded into
+  the conductor-seeding stage, gated on `CONDUCTOR_SEEDING_READY`).
+
+So the card is dark on the **deployed** alpha only because alpha has not been
+redeployed+reseeded from `dev` since these landed — an operator/pipeline action, not a
+code bug. **No seeder code change is warranted for `commitmentBackedCollectives`.**
+
+**Remaining (unchanged in kind, honest about ownership):**
+- Steps 2/4/5 — redeploy `dev` to alpha + reseed (provide-rows stage runs); genuine
+  `stewardingCollectives` needs live `distribute_shards` against online peers (runtime).
+- Step 6 seed stage — a `seed-shard-manifests.ts` calling the gated endpoint would light
+  `stewardingCollectives` for inline content as an **auditable claim** (`status="seeded"`).
+  Deferred deliberately: it asserts that named households hold content, which is an
+  operator-policy decision (which content × which stewards), not something to fabricate
+  unverified. The endpoint is ready when that policy is set. Self_cid derivation for the
+  **iroh** backend (currently libp2p-only) is folded into the iroh transport sprint
+  (see spec `node-resource-tunables-and-exhaustion-shape`, workstream A2).

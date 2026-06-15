@@ -195,3 +195,14 @@ The two backlog commits (`5e88ff521`, `14959b973`) are `0 behind / 2 ahead` of `
 2. It does not enable fractional arc (upstream-blocked).
 3. It does not manufacture real peer replication for the resilience card — it writes honest, auditable substrate rows and surfaces the genuine-replication gap as operator/pipeline work.
 4. It does not run anything against the live cluster — it makes the repo coherent for the next reconcile/seed.
+
+## Implementation status (2026-06-15)
+
+- **A1 — `STORAGE_DB_POOL_SIZE`** ✅ landed (`db/mod.rs`; 4 unit tests pass).
+- **A3 — matthew cpu band-aid + per-node `edgenodeDbPoolSize` wiring** ✅ landed (deployments.json + consolidated template + Jenkinsfile sed; `validate:deployments` 0 errors).
+- **A2 — arc-factor deploy knob** ⏸ **deferred + folded into the iroh transport sprint, with a design correction.** The conductor config is a **read-only configMap subPath mount** (`_edgenode-consolidated.template.yaml` lines 326–328/365–369; `CONDUCTOR_CONFIG_PATH` points at it), so **"design B" (a Rust boot-write of the YAML) cannot work on alpha** — the filesystem is read-only, and the runtime actuator's temp+rename would fail there too (a real latent bug worth confirming separately). The correct deploy-time knob is **option A: template `target_arc_factor` into the configMap itself** (parameterized per-node like the cpu placeholders). Because the boot path lives in `main.rs`/`config.rs` — owned by the parallel iroh transport sprint — A2 is folded there: that sprint owns transport-config, and arc-factor + the iroh `self_cid` derive are the same surface.
+- **B — a2o limit documentation** ✅ landed (`features/deployment/node-resource-tunables.feature`; gherkin parse-validated; references the A1/arc Rust tests by name).
+- **C — exhaustion-shape report** ✅ landed (`scripts/build-resource-shape-report.ts` + schema + 11 unit tests; real run = 24 entries; every class currently has a documented tunable).
+- **D1/D2 — seeder validator + caleb/daniel/emma** ✅ landed (`validate:deployments` 16→0 errors).
+- **E — resilience card** ✅ reconciled, not coded: the commitment-backed path (provide-loop + `self_cid` derive + `seed-provide-rows` wiring) is already on `dev`; alpha is dark only pending a redeploy+reseed (operator/pipeline). Genuine stewarding needs live `distribute_shards` or the gated `PUT /admin/seed/shard-manifest` lever (operator-policy claim). See the `resilience-card-self-cid-provide-loop-gate` reconciliation note.
+- **F — push** ⏳ operator-owned (the 2 backlog commits + this session's work fast-forward onto `origin/dev`).
