@@ -507,12 +507,21 @@ mod pool_size_tests {
     #[test]
     fn zero_falls_back_to_the_default() {
         // A zero-size pool would deadlock every pool.get(); never honor it.
-        assert_eq!(parse_db_pool_size(Some("0".to_string())), DB_POOL_SIZE_DEFAULT);
+        assert_eq!(
+            parse_db_pool_size(Some("0".to_string())),
+            DB_POOL_SIZE_DEFAULT
+        );
     }
 
     #[test]
     fn garbage_falls_back_to_the_default() {
-        assert_eq!(parse_db_pool_size(Some("not-a-number".to_string())), DB_POOL_SIZE_DEFAULT);
-        assert_eq!(parse_db_pool_size(Some("".to_string())), DB_POOL_SIZE_DEFAULT);
+        assert_eq!(
+            parse_db_pool_size(Some("not-a-number".to_string())),
+            DB_POOL_SIZE_DEFAULT
+        );
+        assert_eq!(
+            parse_db_pool_size(Some("".to_string())),
+            DB_POOL_SIZE_DEFAULT
+        );
     }
 }
