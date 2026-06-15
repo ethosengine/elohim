@@ -629,6 +629,9 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         "s|EDGENODE_MEMORY_LIMIT_PLACEHOLDER|${humanConfig.edgenodeMemoryLimit ?: ''}|g",
         "s|EDGENODE_CPU_REQUEST_PLACEHOLDER|${humanConfig.edgenodeCpuRequest ?: ''}|g",
         "s|EDGENODE_CPU_LIMIT_PLACEHOLDER|${humanConfig.edgenodeCpuLimit ?: ''}|g",
+        // SQLite pool size (consolidated template only). Defaults to '10' (the
+        // code default) so an unset node never leaves an unresolved placeholder.
+        "s|STORAGE_DB_POOL_SIZE_PLACEHOLDER|${humanConfig.edgenodeDbPoolSize ?: '10'}|g",
         // Consolidated-template env-var placeholders (no-ops on the legacy
         // template and on Adam's hand-rendered manifest, which either omit
         // these tokens entirely or pre-bake their values).

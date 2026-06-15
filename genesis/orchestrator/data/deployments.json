@@ -37,8 +37,11 @@
       "$comment": "TEMP BUMP (2026-04-17): seeder routes all /account/import traffic through matthew-alpha's storage; 4Gi/2000m OOMed with RESTARTS=2 serving 3409 content items to 33 parallel imports. Archetype floor for device-family-node-base is 1Gi/4Gi + 500m/2000m \u2014 restore once seeder import is split across peers or backpressure lands.",
       "edgenodeMemoryRequest": "2Gi",
       "edgenodeMemoryLimit": "8Gi",
-      "edgenodeCpuRequest": "1000m",
-      "edgenodeCpuLimit": "3000m"
+      "edgenodeCpuRequest": "1500m",
+      "edgenodeCpuLimit": "4000m",
+      "edgenodeDbPoolSize": "20",
+      "$cpuBumpComment": "2026-06-15: edgenodeCpuLimit 3000m→4000m (request 1000m→1500m) — band-aid headroom for the matthew-edge reconnect-storm (conductor closing app-ws sessions ~40/min; backlog doorway-conductor-reconnect-storm-matthew-edge). The TARGETED lever is the SQLite read pool (edgenodeDbPoolSize=20 → STORAGE_DB_POOL_SIZE; default 10), not raw CPU — this is insurance while pool sizing is measured on the live edge. Restore to 3000m once the reconnect-storm root (session/pool pressure) is confirmed resolved.",
+      "$dbPoolComment": "2026-06-15: edgenodeDbPoolSize renders STORAGE_DB_POOL_SIZE on the elohim-node container (elohim/elohim-storage/src/db/mod.rs init_pool; default 10). 20 doubles the shared r2d2 read/write pool over content.db to relieve read contention under the reconnect-storm load. Nodes that leave it unset render the default 10."
     },
     {
       "$comment": "TEMPORARY BUMP (2026-05-05): jessica's edgenode OOM-flapping at 1536Mi limit (7 restarts in 26h, last OOMKilled 2026-05-05T18:43Z while serving content + handling app-WS authentication during a2o sweep). Cluster is also in scaled-down mode with shem decommissioned, so jessica picks up extra registration load via the hosted conductor pool (matthew/jessica/terrance is the only path for the 25 humans newly seeded by the iter-3 agencyPhase fix). Bumping 1536Mi \u2192 3Gi to give ~2\u00d7 headroom over observed RSS \u2014 same pattern as Terrance's 2026-04-21 chromebook bump (see Terrance's $comment block for the restoration chain). Restoration: when shem returns and the hosted-pool load drops back to baseline, restore to the device-recycled-laptop archetype floor at 512Mi/1536Mi.",

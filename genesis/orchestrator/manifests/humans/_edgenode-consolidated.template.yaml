@@ -261,6 +261,11 @@ spec:
               value: "true"
             - name: ENABLE_CONTENT_DB
               value: "true"
+            # SQLite read/write pool size over content.db (elohim-storage
+            # init_pool). Per-node tunable: deployments.json edgenodeDbPoolSize
+            # renders this; rendered "10" when unset (the code default).
+            - name: STORAGE_DB_POOL_SIZE
+              value: "STORAGE_DB_POOL_SIZE_PLACEHOLDER"
             - name: IMPORT_CHUNK_SIZE
               value: "50"
             - name: IMPORT_CHUNK_DELAY_MS

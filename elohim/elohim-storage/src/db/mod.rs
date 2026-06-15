@@ -243,12 +243,33 @@ impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for SqlitePragma
     }
 }
 
+/// Default r2d2 pool size when `STORAGE_DB_POOL_SIZE` is unset. Preserves the
+/// historical hardcoded value so an unset env is a no-op.
+pub const DB_POOL_SIZE_DEFAULT: u32 = 10;
+
+/// Pure parser for the `STORAGE_DB_POOL_SIZE` knob (doorway two-function idiom:
+/// pure parse + thin env wrapper). A `0`/garbage value falls back to the default
+/// — a zero-size pool would deadlock every `pool.get()`, so 0 is never honored.
+fn parse_db_pool_size(raw: Option<String>) -> u32 {
+    raw.and_then(|v| v.parse::<u32>().ok())
+        .filter(|&v| v > 0)
+        .unwrap_or(DB_POOL_SIZE_DEFAULT)
+}
+
+/// Read the configured SQLite read/write pool size. The Matthew edge sizes this
+/// up via `STORAGE_DB_POOL_SIZE` to relieve read contention under load (the
+/// heartbeat, signal subscriber, reconcile controller, import drain, HTTP
+/// handlers and bulk seeding all share this single pool).
+fn db_pool_size() -> u32 {
+    parse_db_pool_size(std::env::var("STORAGE_DB_POOL_SIZE").ok())
+}
+
 /// Initialize a Diesel connection pool
 pub fn init_pool(database_url: &str) -> Result<DbPool, StorageError> {
     let manager = ConnectionManager::<SqliteConnection>::new(database_url);
 
     Pool::builder()
-        .max_size(10)
+        .max_size(db_pool_size())
         .connection_timeout(Duration::from_secs(30))
         .connection_customizer(Box::new(SqlitePragmas))
         .build(manager)
@@ -466,5 +487,32 @@ mod pragma_order_tests {
 
         // Explicit drop for clarity — lock released here.
         drop(blocker);
+    }
+}
+
+#[cfg(test)]
+mod pool_size_tests {
+    use super::{parse_db_pool_size, DB_POOL_SIZE_DEFAULT};
+
+    #[test]
+    fn unset_uses_the_default() {
+        assert_eq!(parse_db_pool_size(None), DB_POOL_SIZE_DEFAULT);
+    }
+
+    #[test]
+    fn a_valid_override_is_honored() {
+        assert_eq!(parse_db_pool_size(Some("20".to_string())), 20);
+    }
+
+    #[test]
+    fn zero_falls_back_to_the_default() {
+        // A zero-size pool would deadlock every pool.get(); never honor it.
+        assert_eq!(parse_db_pool_size(Some("0".to_string())), DB_POOL_SIZE_DEFAULT);
+    }
+
+    #[test]
+    fn garbage_falls_back_to_the_default() {
+        assert_eq!(parse_db_pool_size(Some("not-a-number".to_string())), DB_POOL_SIZE_DEFAULT);
+        assert_eq!(parse_db_pool_size(Some("".to_string())), DB_POOL_SIZE_DEFAULT);
     }
 }
