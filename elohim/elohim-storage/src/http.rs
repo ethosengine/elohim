@@ -1043,6 +1043,20 @@ impl HttpServer {
                 self.handle_seed_shard_manifest(req).await
             }
 
+            // Operator setter for per-object blob transport affinity
+            // (iroh-toggle sprint). POST /admin/blob-transport-affinity/{hash}
+            // body {"affinity":"iroh-only"|"libp2p-only"|"prefer-iroh"|
+            // "prefer-libp2p"|"auto"}. "auto" (or null) clears to default
+            // policy. Node-local; makes the choose_backend toggle usable for
+            // A/B without waiting on gossip. Inert in libp2p mode.
+            (Method::POST, p) if p.starts_with("/admin/blob-transport-affinity/") => {
+                let hash = p
+                    .strip_prefix("/admin/blob-transport-affinity/")
+                    .unwrap_or("")
+                    .to_string();
+                self.handle_set_blob_transport_affinity(&hash, req).await
+            }
+
             // SSE event stream — must be matched before the /api/v1/ catch-all
             (Method::GET, "/api/v1/events") => {
                 if let Some(ref services) = self.services {
@@ -2105,6 +2119,22 @@ impl HttpServer {
                     _ => None,
                 };
 
+                // Per-object transport affinity (Category C). NULL → Auto
+                // (today's behavior). Read from the same inventory row.
+                let affinity = conn_opt
+                    .as_mut()
+                    .and_then(|c| {
+                        crate::db::peer_blob_inventory::lookup_transport_affinity(
+                            c,
+                            &normalized_for_router,
+                        )
+                        .ok()
+                        .flatten()
+                    })
+                    .as_deref()
+                    .map(crate::http_blob_router::TransportAffinity::parse)
+                    .unwrap_or_default();
+
                 let choice = crate::http_blob_router::choose_backend(
                     crate::http_blob_router::ChooseInputs {
                         normalized_hash: &normalized_for_router,
@@ -2112,6 +2142,7 @@ impl HttpServer {
                         sha256_alias_for_blake3: sha256_alias,
                         self_manifest: self.self_transport_manifest.as_deref(),
                         caller_manifest: caller_manifest.as_ref(),
+                        affinity,
                     },
                 );
 
@@ -2640,6 +2671,69 @@ impl HttpServer {
     /// Explicit POST only — deliberately NO auto-subscriber that restarts the
     /// conductor on a commitment landing (churn risk); node-local (not in
     /// build_manifest, so not doorway-proxied).
+    /// POST /admin/blob-transport-affinity/{hash} — set the per-object blob
+    /// transport affinity (iroh-toggle sprint). Writes
+    /// `peer_blob_inventory.transport_affinity` for the addressed blob.
+    /// `"auto"` (the default) clears the column to NULL. Other values:
+    /// `prefer-iroh`, `prefer-libp2p`, `iroh-only`, `libp2p-only`.
+    async fn handle_set_blob_transport_affinity(
+        &self,
+        hash: &str,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Normalize to the router's form: sha256-{hex} or blake3-{hex}.
+        let normalized: String = if hash.starts_with("blake3-") {
+            hash.to_string()
+        } else {
+            match crate::blob_store::BlobStore::parse_content_address(hash) {
+                Ok(h) => format!("sha256-{}", h),
+                Err(_) => return Ok(response::bad_request("Invalid content address")),
+            }
+        };
+
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("read body: {e}")))?
+            .to_bytes();
+        #[derive(serde::Deserialize)]
+        struct AffinityReq {
+            affinity: String,
+        }
+        let parsed: AffinityReq = match serde_json::from_slice(&body) {
+            Ok(v) => v,
+            Err(e) => return Ok(response::bad_request(&format!("Invalid JSON: {e}"))),
+        };
+
+        // Validate against the known vocabulary; unknown strings are rejected
+        // here (the read-path `parse` is lenient, but a setter should be
+        // strict). "auto" clears the column.
+        let affinity = crate::http_blob_router::TransportAffinity::parse(&parsed.affinity);
+        if affinity == crate::http_blob_router::TransportAffinity::Auto && parsed.affinity != "auto"
+        {
+            return Ok(response::bad_request(&format!(
+                "unknown affinity '{}'",
+                parsed.affinity
+            )));
+        }
+        let stored: Option<&str> = match affinity {
+            crate::http_blob_router::TransportAffinity::Auto => None, // clear → default
+            other => Some(other.as_str()),
+        };
+
+        let mut conn = self.get_diesel_conn()?;
+        let updated =
+            crate::db::peer_blob_inventory::set_transport_affinity(&mut conn, &normalized, stored)?;
+        Ok(response::json_response(
+            StatusCode::OK,
+            &serde_json::json!({
+                "hash": normalized,
+                "affinity": affinity.as_str(),
+                "rowsUpdated": updated,
+            }),
+        ))
+    }
+
     async fn handle_arc_policy_actuate(
         &self,
         req: Request<Incoming>,

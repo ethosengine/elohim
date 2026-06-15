@@ -1281,12 +1281,13 @@ diesel::table! {
 
 diesel::table! {
     peer_blob_inventory (peer_id, blob_hash) {
-        peer_id      -> Text,
-        blob_hash    -> Text,
-        last_seen_at -> Text,
-        source       -> Text,
-        sequence     -> BigInt,
-        blake3_hash  -> Nullable<Text>,
+        peer_id            -> Text,
+        blob_hash          -> Text,
+        last_seen_at       -> Text,
+        source             -> Text,
+        sequence           -> BigInt,
+        blake3_hash        -> Nullable<Text>,
+        transport_affinity -> Nullable<Text>,
     }
 }
 

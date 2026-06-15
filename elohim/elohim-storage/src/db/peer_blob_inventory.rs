@@ -210,6 +210,9 @@ pub fn lookup_hosts(
             // computed boolean. For now, fetch in two passes and merge.
             dsl::last_seen_at.desc(),
         ))
+        // Explicit select so adding columns to the table (e.g.
+        // transport_affinity) does not break this load by column count.
+        .select(PeerBlobInventoryRow::as_select())
         .load::<PeerBlobInventoryRow>(conn)
         .map(|rows| {
             // Stable partition: fetch-success first, then the rest in last_seen_at desc order.
@@ -267,6 +270,57 @@ pub fn lookup_sha256_for_blake3(
         .first::<String>(conn)
         .optional()
         .map_err(|e| StorageError::Database(format!("lookup_sha256_for_blake3: {e}")))
+}
+
+/// Look up the per-object `transport_affinity` for a blob addressed by its
+/// normalized hash (either `sha256-{hex}` via `blob_hash`, or
+/// `blake3-{hex}` via `blake3_hash`). Returns the first non-NULL value
+/// observed across peers; content-addressed identity guarantees rows agree.
+/// `None` when no row sets it (→ caller maps to `TransportAffinity::Auto`).
+pub fn lookup_transport_affinity(
+    conn: &mut SqliteConnection,
+    normalized_hash: &str,
+) -> Result<Option<String>, StorageError> {
+    use peer_blob_inventory::dsl;
+    let by_column = if normalized_hash.starts_with("blake3-") {
+        dsl::peer_blob_inventory
+            .filter(dsl::blake3_hash.eq(normalized_hash))
+            .filter(dsl::transport_affinity.is_not_null())
+            .select(dsl::transport_affinity)
+            .first::<Option<String>>(conn)
+    } else {
+        dsl::peer_blob_inventory
+            .filter(dsl::blob_hash.eq(normalized_hash))
+            .filter(dsl::transport_affinity.is_not_null())
+            .select(dsl::transport_affinity)
+            .first::<Option<String>>(conn)
+    };
+    by_column
+        .optional()
+        .map(|opt_opt| opt_opt.flatten())
+        .map_err(|e| StorageError::Database(format!("lookup_transport_affinity: {e}")))
+}
+
+/// Set the per-object `transport_affinity` for all `peer_blob_inventory`
+/// rows that address this blob (matching `blob_hash` OR `blake3_hash`).
+/// Used by the operator setter route. `None` clears the affinity back to
+/// `Auto` (default policy). Returns the number of rows updated.
+pub fn set_transport_affinity(
+    conn: &mut SqliteConnection,
+    normalized_hash: &str,
+    affinity: Option<&str>,
+) -> Result<usize, StorageError> {
+    use peer_blob_inventory::dsl;
+    let updated = if normalized_hash.starts_with("blake3-") {
+        diesel::update(dsl::peer_blob_inventory.filter(dsl::blake3_hash.eq(normalized_hash)))
+            .set(dsl::transport_affinity.eq(affinity))
+            .execute(conn)
+    } else {
+        diesel::update(dsl::peer_blob_inventory.filter(dsl::blob_hash.eq(normalized_hash)))
+            .set(dsl::transport_affinity.eq(affinity))
+            .execute(conn)
+    };
+    updated.map_err(|e| StorageError::Database(format!("set_transport_affinity: {e}")))
 }
 
 /// Outcome of `apply_delta`. Used by the caller to decide whether to request
