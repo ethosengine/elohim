@@ -113,6 +113,11 @@ spec:
             - name: gateway-ws
               containerPort: 8080
               protocol: TCP
+            # Dedicated liveness-watchdog port (own OS-thread runtime) — see
+            # DOORWAY_HEALTH_PORT below and the livenessProbe.
+            - name: health-wd
+              containerPort: 8079
+              protocol: TCP
           env:
             - name: RUST_LOG
               value: "info,doorway=debug"
@@ -224,11 +229,23 @@ spec:
             # watchdog liveness. Targets the matthew side specifically (5× adam's replay).
             - name: WARMUP_PACE_MS
               value: "50"
-            # DOORWAY_HEALTH_PORT (dedicated probe listener) intentionally LEFT
-            # UNSET: that listener shares the main tokio runtime, so a killer probe
-            # (liveness/startup) pointed at it would stay green during a PARTIAL
-            # wedge — defeating restart-on-hang for exactly the serving-nothing case.
-            # Probes below stay on 8080 (the real request path) on purpose.
+            # DOORWAY_HEALTH_PORT — the dedicated liveness WATCHDOG (2026-06-15).
+            # The doorway now serves this port from its OWN OS-thread tokio runtime
+            # (server/http.rs spawn_health_listener), NOT a tokio::spawn on the main
+            # runtime — so a full main-worker-pool stall (e.g. the blocking
+            # getaddrinfo during a conductor DNS flap that was the crashloop root,
+            # now also fixed in conductor::resolve_host_port) can no longer silence
+            # the probe. The /health verdict here is HEARTBEAT-GATED: it returns 503
+            # only when the MAIN runtime stops making progress (stale > 15s, override
+            # DOORWAY_HEALTH_STALE_MS), so a genuine wedge still restarts the pod
+            # (restart-on-hang preserved) while a transient park no longer false-
+            # kills — curing the old shared-runtime footgun. ORDERING INVARIANT:
+            # this only works with the image that contains the watchdog code; it
+            # ships in the SAME branch/deploy so the pipeline builds+applies them
+            # together — never set this against an older image. livenessProbe → 8079;
+            # readiness/startup stay on 8080 (the real request path) on purpose.
+            - name: DOORWAY_HEALTH_PORT
+              value: "8079"
             # Federation peer: doorway-alpha-b in the same elohim-alpha namespace,
             # apex hostname (elohim.host). Both doorways back onto the shared alpha
             # conductor pool — this surfaces multi-projection federation without
@@ -301,18 +318,21 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 15
             failureThreshold: 5
+          # Liveness now targets the dedicated WATCHDOG port (8079, own OS-thread
+          # runtime, heartbeat-gated — see DOORWAY_HEALTH_PORT above). It answers
+          # instantly even when the main worker pool is fully stalled, and returns
+          # 503 ONLY when the MAIN runtime stops making progress (heartbeat stale
+          # >15s). That removes the false-kill class the old 8080 probe had to widen
+          # around (build #1075: a healthy-but-slow /health on the shared runtime),
+          # so a GENUINE wedge can restart fast: 10s × 3 = 30s budget. The watchdog
+          # answer is sub-ms, so timeoutSeconds:5 is ample.
           livenessProbe:
             httpGet:
               path: /health
-              port: 8080
-            periodSeconds: 30
-            # Default timeoutSeconds=1 + failureThreshold=3 SIGKILLed a HEALTHY,
-            # serving pod: under SSR/conductor load /health stalls >1s, and 3
-            # such stalls in 90s tripped the kill (build #1075 → exit 137,
-            # reason=Error, logs showed it serving bootstrap PUTs to the end —
-            # a liveness kill, not a crash). Widened to 15s/5 (150s budget).
-            timeoutSeconds: 15
-            failureThreshold: 5
+              port: 8079
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
         # Doorway Operator Dashboard - Angular app for node operators
         # Provides: federated OAuth, node metrics, configuration UI
         - name: doorway-app

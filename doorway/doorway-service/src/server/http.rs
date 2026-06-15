@@ -975,25 +975,101 @@ fn resolve_agent_cid_from_request<B>(state: &AppState, req: &Request<B>) -> Opti
     result.claims.map(|c| c.human_id)
 }
 
-/// Start the HTTP server
-/// Minimal health-probe dispatch for the dedicated health listener.
+/// Heartbeat interval (ms): how often the MAIN runtime stamps the liveness
+/// heartbeat. Must be well below `HEALTH_STALE_MS_DEFAULT` so a healthy runtime
+/// keeps the heartbeat fresh between watchdog reads.
+const HEARTBEAT_INTERVAL_MS: u64 = 2_000;
+
+/// Default staleness threshold (ms): how long the MAIN runtime may go without
+/// stamping the heartbeat before the watchdog declares it WEDGED and fails the
+/// liveness probe (so kubelet restarts the pod). Generous enough to ride out a
+/// transient full-pool park, far below the kubelet liveness budget. Override via
+/// `DOORWAY_HEALTH_STALE_MS`.
+const HEALTH_STALE_MS_DEFAULT: u64 = 15_000;
+
+fn health_stale_threshold_ms() -> u64 {
+    std::env::var("DOORWAY_HEALTH_STALE_MS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|&v| v > 0)
+        .unwrap_or(HEALTH_STALE_MS_DEFAULT)
+}
+
+/// Pure liveness verdict: the MAIN runtime is WEDGED when it has not stamped the
+/// heartbeat within `threshold_ms`. Unit-testable without a runtime.
+fn main_runtime_wedged(heartbeat_age_ms: u64, threshold_ms: u64) -> bool {
+    heartbeat_age_ms > threshold_ms
+}
+
+/// Spawn the liveness heartbeat task on the MAIN runtime. It stamps `heartbeat`
+/// with elapsed-millis-since-`start` every `HEARTBEAT_INTERVAL_MS`. If the main
+/// worker pool is fully wedged (e.g. every worker parked in a blocking syscall)
+/// this task cannot run, the stamp goes stale, and the watchdog — running on its
+/// own OS thread — fails the liveness probe so kubelet restarts the pod.
+fn spawn_liveness_heartbeat(
+    start: std::time::Instant,
+    heartbeat: Arc<std::sync::atomic::AtomicU64>,
+) {
+    tokio::spawn(async move {
+        let mut tick =
+            tokio::time::interval(std::time::Duration::from_millis(HEARTBEAT_INTERVAL_MS));
+        loop {
+            tick.tick().await;
+            heartbeat.store(
+                start.elapsed().as_millis() as u64,
+                std::sync::atomic::Ordering::Relaxed,
+            );
+        }
+    });
+}
+
+/// Build the watchdog liveness response from the heartbeat age: 200 while the
+/// MAIN runtime is making progress, 503 once it is wedged past `threshold_ms`.
+fn watchdog_liveness_response(
+    start: std::time::Instant,
+    heartbeat: &std::sync::atomic::AtomicU64,
+    threshold_ms: u64,
+) -> Response<Full<Bytes>> {
+    let last = heartbeat.load(std::sync::atomic::Ordering::Relaxed);
+    let age = (start.elapsed().as_millis() as u64).saturating_sub(last);
+    let wedged = main_runtime_wedged(age, threshold_ms);
+    let status = if wedged {
+        StatusCode::SERVICE_UNAVAILABLE
+    } else {
+        StatusCode::OK
+    };
+    let body = serde_json::json!({
+        "healthy": !wedged,
+        "check": "main-runtime-heartbeat",
+        "heartbeatAgeMs": age,
+        "thresholdMs": threshold_ms,
+    })
+    .to_string();
+    Response::builder()
+        .status(status)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body)))
+        .expect("infallible watchdog liveness response")
+}
+
+/// Minimal health-probe dispatch for the dedicated health WATCHDOG listener.
 ///
 /// Serves ONLY the liveness/readiness/startup probes, with no CORS, no gate, no
-/// route-registry lookup, and no blocking work. Anything else returns 404 so the
-/// listener can never be dragged into the heavy request path.
-///
-/// LIVE-INCIDENT INVARIANT (2026-06-13 doorway freeze): the probes shared the
-/// main listener, so a wedged request path made `/health` time out too, which
-/// defeated kubelet's restart-on-hang. This listener runs on a separate port and
-/// its handlers touch only cached state — it reflects "process alive / ready",
-/// not "request path drained".
-async fn handle_health_probe(
+/// route-registry lookup, and no blocking work. `/health` (liveness) reflects
+/// whether the MAIN runtime is scheduling (heartbeat-gated), NOT this listener's
+/// own liveness — so it tells the truth even though it answers from a separate
+/// OS-thread runtime. `/ready` and `/startup` delegate to the normal handlers
+/// (cached-state reads). Anything else 404s.
+async fn handle_watchdog_probe(
     state: Arc<AppState>,
+    start: std::time::Instant,
+    heartbeat: Arc<std::sync::atomic::AtomicU64>,
+    threshold_ms: u64,
     req: Request<Incoming>,
 ) -> Response<Full<Bytes>> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/health") | (&Method::GET, "/healthz") => {
-            routes::health_check(Arc::clone(&state))
+            watchdog_liveness_response(start, &heartbeat, threshold_ms)
         }
         (&Method::GET, "/health/startup") => routes::startup_check(Arc::clone(&state)).await,
         (&Method::GET, "/ready") | (&Method::GET, "/readyz") => {
@@ -1003,36 +1079,68 @@ async fn handle_health_probe(
             .status(StatusCode::NOT_FOUND)
             .header("Content-Type", "application/json")
             .body(Full::new(Bytes::from_static(
-                br#"{"error":"health listener serves only /health, /ready, /health/startup"}"#,
+                br#"{"error":"health watchdog serves only /health, /ready, /health/startup"}"#,
             )))
             .expect("infallible 404"),
     }
 }
 
-/// Spawn a dedicated lightweight listener that serves only the health probes,
-/// isolated from the main request path. Bound to `DOORWAY_HEALTH_PORT` on the
-/// same host as the main `--listen` address.
+#[cfg(test)]
+mod watchdog_tests {
+    use super::*;
+
+    #[test]
+    fn wedged_only_past_threshold() {
+        assert!(!main_runtime_wedged(0, 15_000));
+        assert!(!main_runtime_wedged(15_000, 15_000)); // boundary ⇒ alive
+        assert!(main_runtime_wedged(15_001, 15_000));
+    }
+
+    #[test]
+    fn liveness_200_when_heartbeat_fresh() {
+        let start = std::time::Instant::now();
+        let hb = std::sync::atomic::AtomicU64::new(start.elapsed().as_millis() as u64);
+        assert_eq!(
+            watchdog_liveness_response(start, &hb, 60_000).status(),
+            StatusCode::OK
+        );
+    }
+
+    #[test]
+    fn liveness_503_when_heartbeat_stale() {
+        let start = std::time::Instant::now();
+        let hb = std::sync::atomic::AtomicU64::new(0); // never stamped
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        // 5ms elapsed, heartbeat still 0, threshold 1ms ⇒ wedged.
+        assert_eq!(
+            watchdog_liveness_response(start, &hb, 1).status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+    }
+}
+
+/// Spawn the dedicated health WATCHDOG: a probe listener on its OWN OS thread
+/// with its OWN pinned tokio runtime, isolated from the main worker pool. Opt-in
+/// via `DOORWAY_HEALTH_PORT` (unset ⇒ probes stay on the main listener).
 ///
-/// Opt-in: when `DOORWAY_HEALTH_PORT` is unset the probes remain on the main
-/// listener (backward-compatible — existing manifests are unaffected). When set,
-/// point the manifest's liveness/readiness/startup probes at this port so a
-/// wedged request path can never silence them.
+/// This is the durable form the older shared-runtime listener's FOOTGUN comment
+/// prescribed. Two properties make it a TRUE watchdog rather than a probe that
+/// lies:
+///   1. Its own OS-thread runtime means a FULL main-runtime worker stall (every
+///      worker parked — e.g. blocking `getaddrinfo` during a conductor DNS flap,
+///      the 2026-06-15 crashloop root) can never silence the probe listener.
+///   2. The `/health` verdict is gated on a heartbeat the MAIN runtime stamps
+///      (`spawn_liveness_heartbeat`). A genuinely wedged main runtime still FAILS
+///      liveness → kubelet restarts it (restart-on-hang preserved); a transient
+///      park the runtime recovers from does NOT trip a kill.
 ///
-/// FOOTGUN — left unset by design (do not enable casually). This isolates the
-/// probes only at the *listener/port* axis: a wedged request *handler* can't
-/// silence them. It does NOT isolate them at the *runtime* axis. The spawned
-/// listener and its connection tasks run via `tokio::spawn` on the SAME main
-/// tokio runtime as the request path — they share the worker-thread pool. So a
-/// full worker-thread STALL (every worker blocked — the exact cpu-limited freeze
-/// this sprint hardens against) would starve these probes too, yet because they
-/// answer on a separate port the manifest could keep them GREEN long enough that
-/// kubelet never restarts the hung pod — DEFEATING restart-on-hang, the one thing
-/// that recovers a wedged worker pool. Enable a health listener for true stall
-/// resilience ONLY with a DEDICATED, pinned `tokio::runtime::Runtime` on its own
-/// OS thread (so it survives a main-runtime stall); the shared-runtime form here
-/// is safe only for the narrower request-handler-wedge case, which is why it
-/// stays opt-in and unset.
-async fn spawn_health_listener(state: Arc<AppState>) {
+/// Point the manifest's livenessProbe at this port; keep readiness/startup on
+/// the main `:8080` listener so they reflect real request-path serving.
+fn spawn_health_listener(
+    state: Arc<AppState>,
+    start: std::time::Instant,
+    heartbeat: Arc<std::sync::atomic::AtomicU64>,
+) {
     let Some(port) = std::env::var("DOORWAY_HEALTH_PORT")
         .ok()
         .and_then(|v| v.parse::<u16>().ok())
@@ -1041,47 +1149,80 @@ async fn spawn_health_listener(state: Arc<AppState>) {
         return;
     };
 
+    let threshold_ms = health_stale_threshold_ms();
     let mut health_addr = state.args.listen;
     health_addr.set_port(port);
 
-    let listener = match TcpListener::bind(health_addr).await {
-        Ok(l) => l,
-        Err(e) => {
-            error!(
-                "Health listener failed to bind {}: {} — probes stay on main listener",
-                health_addr, e
-            );
-            return;
-        }
-    };
-    info!(
-        "Dedicated health listener bound on {} (isolated from request path)",
-        health_addr
-    );
-
-    tokio::spawn(async move {
-        loop {
-            match listener.accept().await {
-                Ok((stream, addr)) => {
-                    let state = Arc::clone(&state);
-                    tokio::spawn(async move {
-                        let io = TokioIo::new(stream);
-                        let service = service_fn(move |req: Request<Incoming>| {
-                            let state = Arc::clone(&state);
-                            async move { Ok::<_, hyper::Error>(handle_health_probe(state, req).await) }
-                        });
-                        if let Err(err) = http1::Builder::new().serve_connection(io, service).await
-                        {
-                            debug!("Health listener connection error from {}: {:?}", addr, err);
-                        }
-                    });
-                }
+    let spawned = std::thread::Builder::new()
+        .name("doorway-health-wd".to_string())
+        .spawn(move || {
+            let rt = match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
                 Err(e) => {
-                    error!("Health listener accept error: {:?}", e);
+                    error!(
+                        "Health watchdog runtime build failed: {e} — probes stay on main listener"
+                    );
+                    return;
                 }
-            }
-        }
-    });
+            };
+            rt.block_on(async move {
+                let listener = match TcpListener::bind(health_addr).await {
+                    Ok(l) => l,
+                    Err(e) => {
+                        error!(
+                            "Health watchdog failed to bind {}: {} — probes stay on main listener",
+                            health_addr, e
+                        );
+                        return;
+                    }
+                };
+                info!(
+                    "Health watchdog bound on {} (own OS-thread runtime; heartbeat-gated, stale>{}ms ⇒ wedged)",
+                    health_addr, threshold_ms
+                );
+                loop {
+                    match listener.accept().await {
+                        Ok((stream, addr)) => {
+                            let state = Arc::clone(&state);
+                            let heartbeat = Arc::clone(&heartbeat);
+                            tokio::spawn(async move {
+                                let io = TokioIo::new(stream);
+                                let service = service_fn(move |req: Request<Incoming>| {
+                                    let state = Arc::clone(&state);
+                                    let heartbeat = Arc::clone(&heartbeat);
+                                    async move {
+                                        Ok::<_, hyper::Error>(
+                                            handle_watchdog_probe(
+                                                state, start, heartbeat, threshold_ms, req,
+                                            )
+                                            .await,
+                                        )
+                                    }
+                                });
+                                if let Err(err) =
+                                    http1::Builder::new().serve_connection(io, service).await
+                                {
+                                    debug!(
+                                        "Health watchdog connection error from {}: {:?}",
+                                        addr, err
+                                    );
+                                }
+                            });
+                        }
+                        Err(e) => {
+                            error!("Health watchdog accept error: {:?}", e);
+                        }
+                    }
+                }
+            });
+        });
+
+    if let Err(e) = spawned {
+        error!("Failed to spawn health watchdog thread: {e} — probes stay on main listener");
+    }
 }
 
 pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
@@ -1092,10 +1233,16 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
         state.args.listen, state.args.node_id
     );
 
-    // Dedicated health listener (opt-in via DOORWAY_HEALTH_PORT) — isolates the
-    // liveness/readiness/startup probes from the main request path so a wedged
-    // handler can never silence kubelet's restart-on-hang. See the freeze RCA.
-    spawn_health_listener(Arc::clone(&state)).await;
+    // Liveness watchdog (opt-in via DOORWAY_HEALTH_PORT): stamp a heartbeat from
+    // the MAIN runtime and serve the liveness probe from a dedicated OS-thread
+    // runtime, so a full worker-pool stall (e.g. blocking getaddrinfo during a
+    // conductor DNS flap — 2026-06-15 crashloop) can't silence the probe, yet a
+    // genuine wedge still restarts the pod. Point livenessProbe at the watchdog
+    // port; keep readiness/startup on this main listener. See the freeze RCA.
+    let liveness_start = std::time::Instant::now();
+    let liveness_heartbeat = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    spawn_liveness_heartbeat(liveness_start, Arc::clone(&liveness_heartbeat));
+    spawn_health_listener(Arc::clone(&state), liveness_start, liveness_heartbeat);
 
     if state.args.dev_mode {
         warn!("Development mode enabled - authentication disabled");
