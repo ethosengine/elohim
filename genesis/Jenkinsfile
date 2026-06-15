@@ -1359,12 +1359,17 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
-        stage('Seed Humans') {
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
+        // Seed Substrate — merged from the adjacent same-when{} (none) "Seed *"
+        // stages Humans · Presences · Collectives · Accounts · Conductor
+        // Identities (incl. folded Content Provide Rows) · Agent Peer Bindings ·
+        // Household Formation, folded into one declarative stage to keep the
+        // stage-model CPS method under the 64KB JVM limit (31→23 stages). Each
+        // original stage's container('builder'){ script{ } } body is preserved
+        // VERBATIM as a sequential step, same order, same scope. Behavior is
+        // identical — only the stage-boundary count drops. (Seed dependency
+        // order: humans→presences→collectives→accounts→conductor identities→
+        // agent bindings→household formation — NEVER reorder.)
+        stage('Seed Substrate') {            steps {
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
@@ -1385,15 +1390,6 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         }
                     }
                 }
-            }
-        }
-
-        stage('Seed Presences') {
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
@@ -1414,15 +1410,6 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         }
                     }
                 }
-            }
-        }
-
-        stage('Seed Collectives') {
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
@@ -1433,15 +1420,6 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         }
                     }
                 }
-            }
-        }
-
-        stage('Seed Accounts') {
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
@@ -1479,15 +1457,6 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         }
                     }
                 }
-            }
-        }
-
-        stage('Seed Conductor Identities') {
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
                 container('builder') {
                     script {
                         def res = runProbedSeeder(
@@ -1523,15 +1492,6 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         }
                     }
                 }
-            }
-        }
-
-        stage('Seed Agent Peer Bindings') {
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
                 container('builder') {
                     script {
                         def res = runProbedSeeder(
@@ -1550,15 +1510,6 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         }
                     }
                 }
-            }
-        }
-
-        stage('Seed Household Formation') {
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
                 container('builder') {
                     script {
                         // Ceremony driver (rung 3): collective + affirmations + stewardship
@@ -1594,12 +1545,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             // The mesh is the precondition for everything downstream:
             // per-pod libp2p peer counts, source↔target adjacency (the
             // cross-pod fetch races CONNECTED peers), binary-version parity
-            // (partial-rollout = DHT-partition risk class).
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
+            // (partial-rollout = DHT-partition risk class).            steps {
                 container('builder') {
                     script {
                         // Downstream coupling: propagation/delivery/projection/
@@ -1620,12 +1566,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             // probe blob's hash never existed before this build, so Verify
             // Substrate Propagation can only pass via live cross-pod
             // replication (genesis #1100/#1110 "passed" on a fossil replica
-            // of the previous manifesto hash — never again).
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
+            // of the previous manifesto hash — never again).            steps {
                 container('builder') {
                     script { uploadBlobContentStage() }
                 }
@@ -1654,7 +1595,12 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
-        stage('Seed Operator Bindings') {
+        // Seed REA Commitments — merged from the adjacent same-when{} (none)
+        // "Seed *" stages Operator Bindings · Stewardship Allocations ·
+        // Projections, folded into one declarative stage (CPS method-size
+        // relief, 31→23). Each body preserved VERBATIM as a sequential step,
+        // same order. Behavior is identical — only the stage boundary drops.
+        stage('Seed REA Commitments') {
             // Registers Matthew as primary operator of both alpha-cluster
             // doorways via REA operate-doorway commitments. Same human, two
             // doorway IDs (alpha-elohim-host + apex-elohim-host) — the
@@ -1663,12 +1609,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             // Per genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md
             // and elohim/sdk/schemas/v1/objects/operator-classification.schema.json.
             // Schema v1 (omits custody/steward refs); v2 requires the full
-            // attestation chain — graduate when bootstrap attestations land.
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
+            // attestation chain — graduate when bootstrap attestations land.            steps {
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
@@ -1679,35 +1620,17 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         }
                     }
                 }
-            }
-        }
-
-        stage('Seed Stewardship Allocations') {
-            // Affinity-based content→steward allocations. Body in
-            // seedStewardshipStage() helper (64KB CPS limit). The seeder
-            // existed but was never wired — six a2o stewardship scenarios
-            // asserted on data no stage produced (genesis #1079).
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
+                // Affinity-based content→steward allocations. Body in
+                // seedStewardshipStage() helper (64KB CPS limit). The seeder
+                // existed but was never wired — six a2o stewardship scenarios
+                // asserted on data no stage produced (genesis #1079).
                 container('builder') {
                     script { seedStewardshipStage() }
                 }
-            }
-        }
-
-        stage('Seed Projections') {
-            // Seeds the EPR-projection REA commitments. Body extracted
-            // to seedProjectionsStage() helper above pipeline {} to stay
-            // under the 64KB CPS method-size limit. See helper for the
-            // full rationale.
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
+                // Seeds the EPR-projection REA commitments. Body extracted
+                // to seedProjectionsStage() helper above pipeline {} to stay
+                // under the 64KB CPS method-size limit. See helper for the
+                // full rationale.
                 container('builder') {
                     script { seedProjectionsStage() }
                 }
@@ -1753,12 +1676,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
-        stage('Warm Projection Cache') {
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
+        stage('Warm Projection Cache') {            steps {
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
@@ -1772,12 +1690,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             // Projector cursor lag per pod + replication/pull/
             // projection-reconcile stream caught-up flags from /p2p/status.
             // null streams are "not computable" — warned, never treated as
-            // caught up (spec §4.3 in P2PStatusInfo docs).
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
+            // caught up (spec §4.3 in P2PStatusInfo docs).            steps {
                 container('builder') {
                     script { substrateVerifyStage('projection') }
                 }
@@ -1787,12 +1700,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
         stage('Verify Federation Layer') {
             // Doorway federation membership + the p2p bootstrap surface.
             // Cross-doorway breadth is shem-dependent and reported, not
-            // asserted (a2o @requires:shem vocabulary).
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.SEED_DATA }
-            }}
-            steps {
+            // asserted (a2o @requires:shem vocabulary).            steps {
                 container('builder') {
                     script { substrateVerifyStage('federation') }
                 }
