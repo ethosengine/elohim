@@ -140,6 +140,29 @@ The Track 2 substrate plane for observations is `IROH_OBSERVATION_ALPN` / libp2p
 
 Storage and distribution language — `quilt` (RS-encoded distribution of a content unit), `pantry` (peer-tended container), `stock`/`draw` (deposit/retrieve verbs), `shard`, `RS(N,K)` — is defined in `genesis/graphos/vocabulary.md`. Wire-level identifiers (`/blob/{hash}`, `BlobStore`, `sha256-{hex}`) keep their existing names. New design discussion, signal/event names, and any fresh identifiers should use the new vocabulary. Legacy `/store/{hash}` paths were retired 2026-04-30 — the canonical HTTP path is `/blob/{hash}`.
 
+## Identity & Transport-Identity Coherence
+
+A node/agent has three distinct identity namespaces. They are NOT interchangeable:
+
+| Namespace | Example | Home column |
+|-----------|---------|-------------|
+| Holochain agent key (`agent_cid`) | `uhCAk…` | `humans.agent_pub_key` |
+| libp2p transport id | `12D3Koo…` | `shard_locations.peer_id`, `peer_identity_bindings.peer_id` |
+| iroh `NodeId` | iroh-format | `peer_transport_manifest.iroh_node_id` |
+
+**Rule: never join or match raw identity strings across namespaces.** Raw-string equality between `agent_cid` and a transport peer id silently empties every join — this caused the all-zeros resilience card in `services/household_resilience.rs` (joins at lines 74, 172–174, 447–449).
+
+### Canonical resolver substrate
+
+- **`peer_transport_manifest`** (`src/p2p_iroh/peer_map.rs`) — the Category C operational projection that maps `agent_cid ↔ libp2p_peer_id ↔ iroh_node_id`; exposes `lookup_by_iroh_node_id` and `select_transport`.
+- **`AgentPeerBinding`** — a notarized DHT integrity entry (listed in `is_integrity_kind` at `src/write_through.rs:211`); emitted as `AppSignal::AgentPeerBindingCreated` (`src/signals.rs:1194`); projected by `ReconcileController::on_agent_peer_binding` (`src/reconcile/controller.rs:549`) into the `peer_identity_bindings` table.
+- **`src/node_transport.rs`** — the self-identity seam: resolves the node's own `self_cid` (which namespace it returns depends on transport mode — libp2p returns the peer id string; iroh returns the iroh NodeId). Mismatches between `self_cid` and seeder-written `provider` values are the primary fragmentation source.
+- **`src/p2p/identity_handshake.rs`** — `synthesise_dht_anchor_hash(peer_id, agent_cid)` (line 336) is a fallback anchor when no DHT-truth row exists yet; it is not a substitute resolver.
+
+Pick `agent_cid` as the canonical join key. Resolve transport ids TO `agent_cid` via `peer_transport_manifest` or `peer_identity_bindings` before any cross-table join. The forthcoming resolver spec is `genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md`.
+
+---
+
 ## P2P Data Plane & Reach (concern routing)
 
 - **Data-plane architecture truth** is the tiered-quilt design (cited above): three truth layers, pantry-temperature classes, custody commitments. The April 2026 design-arc lineage (dual-plane bet, paths not taken) is the `storage-dual-plane-design-arc` history record (cited above) — read the canon, not retired drafts.

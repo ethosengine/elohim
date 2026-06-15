@@ -221,6 +221,17 @@ These are known regressions — design choices that have caused real bugs or arc
 | Missing source-of-truth declaration | A table exists but nobody documented whether Holochain or SQLite is authoritative. Bugs appear when they disagree. | Every table's migration or schema file includes a comment: `-- Source of truth: DHT` or `-- Source of truth: local (operational)`. |
 | Creating new entry type when one already exists | Lamad DNA is at ~73/~100, Mishpat at 11/~100. Adding another wastes scarce capacity and fragments the data model. | Check existing entry types first. Use Links (Category A2) for relationships. Only create new types if nothing fits and DNA has headroom. |
 | Putting granular data on the DHT | Every quiz answer, scroll event, or preference on the DHT bloats gossip and exceeds the ~3000 entry budget. | Agent-scoped with attestation (Category B2): raw data stays private, signed proof of outcome is notarized. |
+| Cross-namespace identity string-equality | The same agent has three identities (Holochain `uhCAk…` key, libp2p `12D3Koo…` peer id, iroh NodeId). Joining/matching one against another by raw string silently empties the join (caused the all-zeros resilience card, repeatedly). | Resolve through the canonical agent↔transport resolver (the `AgentPeerBinding` projection / `peer_transport_manifest`). Never string-compare identities across namespaces; pick `agent_cid` as the canonical join key and resolve transport ids TO it. |
+
+---
+
+## Identity & Transport-Identity Coherence
+
+`agent_cid` (`uhCAk…`) is the canonical agent identity throughout the protocol. The libp2p peer id (`12D3Koo…`) and the iroh `NodeId` are transport-plane identities that resolve TO `agent_cid` — they are NOT interchangeable with it.
+
+The resolution substrate is the notarized `AgentPeerBinding` DHT integrity entry (projected by `ReconcileController::on_agent_peer_binding` into the `peer_identity_bindings` table), materialized locally in `peer_transport_manifest` (`elohim/elohim-storage/src/p2p_iroh/peer_map.rs`).
+
+**Rule**: any new entity that references a peer, provider, or steward identity must declare which namespace it stores, and must resolve through the canonical resolver when joining or matching across namespaces. Never raw-compare `agent_cid` against a transport id.
 
 ---
 
