@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "elohim:a2o:resource-shape-report",
+  "title": "Resource-Exhaustion Shape Report",
+  "description": "Aggregates self-heal/resilience backlog entries + ci-findings into a stack-shape view: where (which node) runaway-resource issues occur, of what class, and whether a tunable limit is documented for that class.",
+  "type": "object",
+  "required": ["generatedFrom", "entryCount", "entries", "shape"],
+  "additionalProperties": false,
+  "properties": {
+    "generatedFrom": {
+      "type": "object",
+      "required": ["backlogDir", "ciFindings"],
+      "additionalProperties": true,
+      "properties": {
+        "backlogDir": { "type": "string" },
+        "ciFindings": { "type": "string" }
+      }
+    },
+    "entryCount": { "type": "integer", "minimum": 0 },
+    "resourceClasses": { "type": "array", "items": { "type": "string" } },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["slug", "classes", "nodes"],
+        "additionalProperties": true,
+        "properties": {
+          "slug": { "type": "string" },
+          "title": { "type": "string" },
+          "severity": { "type": ["string", "null"] },
+          "selfHealStatus": { "type": ["string", "null"] },
+          "nodes": { "type": "array", "items": { "type": "string" } },
+          "classes": { "type": "array", "items": { "type": "string" } },
+          "fingerprints": { "type": "array", "items": { "type": "string" } },
+          "ciOccurrences": { "type": "integer", "minimum": 0 },
+          "hasExhaustedSection": { "type": "boolean" },
+          "documentedTunables": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "shape": {
+      "type": "object",
+      "required": ["byNode", "byClass", "byLifecycle", "matrix"],
+      "additionalProperties": false,
+      "properties": {
+        "byNode": { "type": "object", "additionalProperties": true },
+        "byClass": { "type": "object", "additionalProperties": true },
+        "byLifecycle": { "type": "object", "additionalProperties": { "type": "integer" } },
+        "matrix": {
+          "type": "object",
+          "required": ["nodes", "classes", "cells"],
+          "additionalProperties": false,
+          "properties": {
+            "nodes": { "type": "array", "items": { "type": "string" } },
+            "classes": { "type": "array", "items": { "type": "string" } },
+            "cells": { "type": "object", "additionalProperties": true }
+          }
+        }
+      }
+    }
+  }
+}
