@@ -116,6 +116,7 @@ fn inventory_snapshot_byte_parity() {
             BlobAddress::new(format!("sha256-{}", "a".repeat(64))).unwrap(),
             BlobAddress::new(format!("sha256-{}", "b".repeat(64))).unwrap(),
         ],
+        hints: vec![],
         sequence: 7,
         snapshot_at: 1_700_000_000_000_000,
         signature: vec![1u8; 32],

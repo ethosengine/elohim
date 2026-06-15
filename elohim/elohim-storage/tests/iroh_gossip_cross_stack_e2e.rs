@@ -143,6 +143,7 @@ fn provider_dual_publishes_all_wire_types_to_both_subscribers() {
             BlobAddress::new(format!("sha256-{}", "a".repeat(64))).unwrap(),
             BlobAddress::new(format!("sha256-{}", "b".repeat(64))).unwrap(),
         ],
+        hints: vec![],
         sequence: 1,
         snapshot_at: 1_700_000_000_000_000,
         signature: vec![0xAAu8; 32],
@@ -322,6 +323,7 @@ fn provider_iroh_absent_all_types_delivered_via_libp2p() {
     let snapshot = BlobInventorySnapshot {
         peer_id: "12D3KooWLibp2pOnly".to_string(),
         hashes: vec![BlobAddress::new(format!("sha256-{}", "c".repeat(64))).unwrap()],
+        hints: vec![],
         sequence: 2,
         snapshot_at: 1_700_000_001_000_000,
         signature: vec![0xBBu8; 32],

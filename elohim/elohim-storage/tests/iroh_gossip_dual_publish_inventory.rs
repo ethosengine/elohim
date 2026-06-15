@@ -72,6 +72,7 @@ fn dual_publisher_routes_inventory_snapshot_to_both_transports() {
             BlobAddress::new(format!("sha256-{}", "b".repeat(64))).unwrap(),
             BlobAddress::new(format!("sha256-{}", "c".repeat(64))).unwrap(),
         ],
+        hints: vec![],
         sequence: 42,
         snapshot_at: 1_700_000_000_000_000,
         signature: vec![0u8; 32],
@@ -148,6 +149,7 @@ fn inventory_snapshot_reaches_libp2p_when_iroh_absent() {
     let snapshot = BlobInventorySnapshot {
         peer_id: "test-peer".to_string(),
         hashes: vec![BlobAddress::new(format!("sha256-{}", "0".repeat(64))).unwrap()],
+        hints: vec![],
         sequence: 1,
         snapshot_at: 1_000_000,
         signature: vec![],
