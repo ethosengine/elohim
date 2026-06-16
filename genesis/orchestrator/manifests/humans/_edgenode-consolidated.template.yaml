@@ -96,6 +96,13 @@ data:
       signal_url: "SIGNAL_URL_PLACEHOLDER"
       enable_mdns: false
       enable_relaying: true
+      # Authority arc factor: 1 = full DHT authority (kitsune2 default), 0 = leecher.
+      # Per-node via deployments.json edgenodeArcFactor (default 1). Set 0 to relieve a
+      # NON-ANCHOR node OOM-crash-looping on the full-arc working set (conductor RAM is
+      # proportional to corpus at factor 1; fractional is upstream-blocked at {0,1}).
+      # The runtime arc_actuator can NOT change this at runtime (this configMap is a
+      # read-only subPath mount) — the lever lives here, baked at deploy.
+      target_arc_factor: TARGET_ARC_FACTOR_PLACEHOLDER
       webrtc_config:
         ice_servers:
           - urls: ["stun:stun.cloudflare.com:3478"]

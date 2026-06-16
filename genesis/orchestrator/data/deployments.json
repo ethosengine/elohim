@@ -70,6 +70,8 @@
       "edgenodeMemoryLimit": "4Gi",
       "edgenodeCpuRequest": "250m",
       "edgenodeCpuLimit": "2000m",
+      "edgenodeArcFactor": "0",
+      "$arcFactorComment": "2026-06-15: target_arc_factor 1->0 (leecher). jessica OOM-crash-loops on the full DHT authority arc (conductor RAM proportional to corpus) at her 4Gi limit -- exactly the 'jessica is the next to OOM under load -- same fix [arc-shrink], do not chase it with more RAM' that james's $memoryBumpComment2 predicted. arc {0,1} is the only deployed lever (fractional upstream-blocked in kitsune2). As a leecher she stops holding the full arc (RAM bounded), serving from her local store + peers; household DHT authority stays with matthew+james (full arc) and her household resilience continues on the storage plane (corpus on disk). Non-anchor, so no partition risk (the genesis pair adam/matthew stay full). Revert to 1 to undo. See genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md.",
       "$cpuLimitBump": "2026-05-27: bumped 1000m \u2192 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 \u2014 accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md"
     },
     {

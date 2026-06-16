@@ -632,6 +632,10 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         // SQLite pool size (consolidated template only). Defaults to '10' (the
         // code default) so an unset node never leaves an unresolved placeholder.
         "s|STORAGE_DB_POOL_SIZE_PLACEHOLDER|${humanConfig.edgenodeDbPoolSize ?: '10'}|g",
+        // Authority arc factor (consolidated template only). Default '1' (full arc =
+        // kitsune2 default) so an unset node never leaves an unresolved placeholder;
+        // '0' = leecher (deploy-time arc-shrink for a non-anchor OOMing on the full arc).
+        "s|TARGET_ARC_FACTOR_PLACEHOLDER|${humanConfig.edgenodeArcFactor ?: '1'}|g",
         // Consolidated-template env-var placeholders (no-ops on the legacy
         // template and on Adam's hand-rendered manifest, which either omit
         // these tokens entirely or pre-bake their values).

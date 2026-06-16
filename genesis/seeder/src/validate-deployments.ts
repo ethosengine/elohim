@@ -59,6 +59,7 @@ export interface DeploymentRecord {
   edgenodeCpuRequest?: string;
   edgenodeCpuLimit?: string;
   edgenodeDbPoolSize?: string;
+  edgenodeArcFactor?: string;
 }
 
 interface DeploymentsJson {
@@ -170,6 +171,20 @@ export function validateRecord(
     );
   }
 
+  // edgenodeArcFactor renders network.target_arc_factor via sed — the deployed
+  // lever is {0,1} ONLY (0 = leecher, 1 = full authority arc; fractional is
+  // upstream-blocked in kitsune2). Anything else renders an invalid conductor
+  // network factor.
+  if (
+    record.edgenodeArcFactor !== undefined &&
+    record.edgenodeArcFactor !== "0" &&
+    record.edgenodeArcFactor !== "1"
+  ) {
+    errors.push(
+      `${tag} edgenodeArcFactor must be "0" (leecher) or "1" (full arc): ${JSON.stringify(record.edgenodeArcFactor)}`,
+    );
+  }
+
   // nodeTypes: non-empty, all in allowed set
   if (!Array.isArray(record.nodeTypes) || record.nodeTypes.length === 0) {
     errors.push(`${tag} nodeTypes must be a non-empty array`);
@@ -213,6 +228,7 @@ export function validateRecord(
     "edgenodeCpuRequest",
     "edgenodeCpuLimit",
     "edgenodeDbPoolSize",
+    "edgenodeArcFactor",
     "humanLabel",
     "humanId",
   ] as const;

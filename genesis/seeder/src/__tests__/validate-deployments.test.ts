@@ -117,6 +117,60 @@ describe("validateRecord — edgenodeDbPoolSize is a sed-interpolated positive i
   });
 });
 
+describe("validateRecord — edgenodeArcFactor is a {0,1} sed-interpolated lever", () => {
+  it('accepts "0" (leecher)', () => {
+    expect(
+      validateRecord(
+        consolidated({ edgenodeArcFactor: "0" }),
+        knownHumans,
+        knownDevices,
+      ),
+    ).toEqual([]);
+  });
+
+  it('accepts "1" (full arc)', () => {
+    expect(
+      validateRecord(
+        consolidated({ edgenodeArcFactor: "1" }),
+        knownHumans,
+        knownDevices,
+      ),
+    ).toEqual([]);
+  });
+
+  it("accepts an absent edgenodeArcFactor (optional; sed defaults to full arc)", () => {
+    expect(
+      validateRecord(
+        consolidated({ edgenodeArcFactor: undefined }),
+        knownHumans,
+        knownDevices,
+      ),
+    ).toEqual([]);
+  });
+
+  it("rejects a fractional/other value (the deployed lever is {0,1} only)", () => {
+    const errors = validateRecord(
+      consolidated({ edgenodeArcFactor: "0.5" }),
+      knownHumans,
+      knownDevices,
+    );
+    expect(
+      errors.some((e) => /edgenodeArcFactor must be "0" .* or "1"/.test(e)),
+    ).toBe(true);
+  });
+
+  it("catches a sed-delimiter pipe in the value (sedInterpolatedFields)", () => {
+    const errors = validateRecord(
+      consolidated({ edgenodeArcFactor: "0|bad" }),
+      knownHumans,
+      knownDevices,
+    );
+    expect(errors.some((e) => /edgenodeArcFactor contains '\|'/.test(e))).toBe(
+      true,
+    );
+  });
+});
+
 describe("validateRecord — legacy pattern still requires template + sizing (regression)", () => {
   it("accepts a legacy record with template + resource sizing", () => {
     const rec = consolidated({
