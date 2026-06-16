@@ -87,7 +87,7 @@ impl ConductorCommitmentAuthor {
 /// { "action":"replicates-commons", "variant":"content", "head_ref":"<cid>",
 ///   "reach":"<content-reach>",
 ///   "bounds":{ "rate_per_minute":<int>=1>, "reach_ceiling":"commons" },
-///   "provider":"<self_cid>", "valid_from":"<ISO>", "valid_until":"<ISO>" }
+///   "provider":"<provider>", "valid_from":"<ISO>", "valid_until":"<ISO>" }
 /// ```
 ///
 /// Stage B: `reach` is the CONTENT's own reach (threaded from the pin/content
@@ -101,7 +101,7 @@ impl ConductorCommitmentAuthor {
 /// to `delegates-compute` / `replicates-dwelling`, not a content re-publish).
 /// `closure_rule` is optional and omitted here.
 pub fn build_content_payload(
-    self_cid: &str,
+    provider: &str,
     head_ref: &str,
     reach: &str,
     valid_from: &str,
@@ -119,7 +119,7 @@ pub fn build_content_payload(
             // invariant; the content's own `reach` (above) is what generalizes.
             "reach_ceiling": "commons",
         },
-        "provider": self_cid,
+        "provider": provider,
         "valid_from": valid_from,
         "valid_until": valid_until,
     })
@@ -148,14 +148,19 @@ pub fn build_content_payload(
 /// provide (`fulfills == []`); `bounded_by` is the new Mishpat commitment CID.
 pub fn build_provide_announce_input(
     self_cid: &str,
+    provider: &str,
     head_ref: &str,
     commitment_cid: &str,
     has_point_in_time: &str,
 ) -> EmitEconomicEventInput {
     EmitEconomicEventInput {
+        // `id` stays keyed by `self_cid` — the dedup/idempotency logical key the
+        // provide-reconcile loop relies on (changing it would re-author every
+        // existing runtime provide row once). Only `provider` (the join column)
+        // becomes the agent_cid.
         id: format!("provide:{self_cid}:{head_ref}"),
         action: "replicates-commons".to_string(),
-        provider: self_cid.to_string(),
+        provider: provider.to_string(),
         receiver: head_ref.to_string(),
         has_point_in_time: has_point_in_time.to_string(),
         commitment_cid: commitment_cid.to_string(),
@@ -163,6 +168,19 @@ pub fn build_provide_announce_input(
         target_epr_id: head_ref.to_string(),
         // STAYS "commons" — see fn doc. NOT the content's reach.
         reach: "commons".to_string(),
+    }
+}
+
+/// Resolve the `provider` to write for a content provide. Prefers the node's
+/// holochain `agent_cid` (`uhCAk…`) — the canonical key the resilience-card join
+/// (`humans.agent_pub_key = rea_commitments.provider`) expects — when a valid one
+/// is available from the active local session, else falls back to `self_cid`.
+/// NEVER yields an empty/degraded provider: a known-flagged `self_cid` is safer
+/// than a wrong key. PURE.
+fn resolve_provider(session_agent_cid: Option<&str>, self_cid: &str) -> String {
+    match session_agent_cid {
+        Some(k) if crate::identity_namespace::is_agent_cid(k) => k.to_string(),
+        _ => self_cid.to_string(),
     }
 }
 
@@ -206,23 +224,36 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
         let valid_from = deterministic_valid_from(now);
         let valid_until = validity_until(&valid_from)?;
 
-        // CID enforcement (rung 2b, observation-only): the `provider` we are about
-        // to write (below + in the ProvideAnnounce event) is this node's `self_cid`,
-        // which on the libp2p transport is a `12D3Koo…` transport id — NOT the
-        // `uhCAk…` agent_cid the resilience-card joins on `rea_commitments.provider`
-        // expect. Surface the namespace mismatch (WARN + the
-        // `elohim_identity_namespace_violation_total` counter) so the drift shakes
-        // out in metrics; NEVER rejects. See `identity_namespace` module docs +
-        // backlog `cid-enforcement-rollout.md`.
+        // CID enforcement (rung 3): resolve the node's holochain agent_cid
+        // (`uhCAk…`) for the `provider` field. The resilience-card join is
+        // `humans.agent_pub_key = rea_commitments.provider`, which expects the
+        // agent_cid — NOT the libp2p `self_cid` (`12D3Koo…`). Source it from the
+        // active local session (the same key `GET /auth/me` returns); fall back to
+        // `self_cid` when no session is registered yet — never write a degraded or
+        // empty provider (a known-flagged self_cid beats a wrong key).
+        let session_cid = {
+            let mut sconn = self.pool.get().map_err(|e| {
+                StorageError::Internal(format!("pool checkout for provider resolution: {e}"))
+            })?;
+            crate::db::local_sessions::get_active_session(&mut sconn)
+                .ok()
+                .flatten()
+                .map(|s| s.agent_pub_key)
+        };
+        let provider = resolve_provider(session_cid.as_deref(), &self.self_cid);
+
+        // Observe what we ACTUALLY write: a clean uhCAk → silent; a self_cid
+        // fallback (12D3Koo) → WARN + elohim_identity_namespace_violation_total so
+        // the residual drift stays visible. NEVER rejects.
         crate::identity_namespace::observe_agent_cid_write(
             "rea_commitments.provider",
-            Some(&self.self_cid),
+            Some(&provider),
         );
 
         // Step 1 — notarise the replicates-content Commitment. The content's own
         // reach (Stage B) rides the request; `reach_ceiling` stays commons.
         let payload_json = build_content_payload(
-            &self.self_cid,
+            &provider,
             &req.head_ref,
             &req.reach,
             &valid_from,
@@ -267,6 +298,7 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
         };
         let emit_input = build_provide_announce_input(
             &self.self_cid,
+            &provider,
             &req.head_ref,
             &new_cid,
             &now.to_rfc3339(),
@@ -424,7 +456,8 @@ mod tests {
         // author. This test is the guard against a future edit re-threading the
         // content reach here.
         let input = build_provide_announce_input(
-            "agent:self",
+            "12D3KooSelfTransportId",
+            "uhCAkProviderAgentCid",
             "epr:household-record",
             "uhCkk-commit-1",
             "2026-06-13T00:00:00Z",
@@ -434,7 +467,14 @@ mod tests {
             "the ProvideAnnounce event reach must stay commons (schema-8 / bounds gate)"
         );
         assert_eq!(input.action, "replicates-commons");
-        assert_eq!(input.provider, "agent:self");
+        assert_eq!(
+            input.provider, "uhCAkProviderAgentCid",
+            "provider is the resolved agent_cid, NOT the self_cid (the join key)"
+        );
+        assert!(
+            input.id.starts_with("provide:12D3KooSelfTransportId:"),
+            "id stays keyed by self_cid for dedup stability"
+        );
         assert_eq!(input.receiver, "epr:household-record");
         assert_eq!(input.target_epr_id, "epr:household-record");
         assert_eq!(input.commitment_cid, "uhCkk-commit-1");
@@ -442,6 +482,24 @@ mod tests {
             input.content_store_commitment_cid.is_none(),
             "a pure provide carries no content-store commitment (fulfills == [])"
         );
+    }
+
+    #[test]
+    fn resolve_provider_prefers_agent_cid_else_falls_back_to_self_cid() {
+        // A valid uhCAk session key wins — the join-correct provider.
+        assert_eq!(
+            resolve_provider(Some("uhCAkExampleAgentCid"), "12D3KooSelf"),
+            "uhCAkExampleAgentCid"
+        );
+        // A non-uhCAk session value (e.g. a stray transport id) is ignored — never
+        // write a wrong key; fall back to self_cid (which observe() then flags).
+        assert_eq!(
+            resolve_provider(Some("12D3KooStray"), "12D3KooSelf"),
+            "12D3KooSelf"
+        );
+        // No session / empty → self_cid fallback (never empty/degraded).
+        assert_eq!(resolve_provider(None, "12D3KooSelf"), "12D3KooSelf");
+        assert_eq!(resolve_provider(Some(""), "12D3KooSelf"), "12D3KooSelf");
     }
 
     #[test]
