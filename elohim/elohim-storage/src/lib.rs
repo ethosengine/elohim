@@ -157,6 +157,11 @@ pub mod identity;
 // feature-flag-free; impls wrap a precomputed identity string. See module docs.
 pub mod node_transport;
 
+// Identity-namespace coherence — enforcement-by-observation (agent_cid vs
+// transport ids). Pure; never rejects. See module docs + CLAUDE.md "Identity &
+// Transport-Identity Coherence".
+pub mod identity_namespace;
+
 // P2P network modules (require p2p feature)
 #[cfg(feature = "p2p")]
 pub mod p2p;
@@ -257,9 +262,9 @@ pub use views::{
     EprCouplingView, EprEnvelopeView, EprListView, EprProvidersView, EprPublishInput,
     EprSignatureView, EprVerifyErrorView, EprVerifyView, EprView,
 };
-pub use views::{IrohTransportProfileView, Libp2pTransportProfileView, PeerTransportManifestView};
 pub use views::{
     FeltFloorView, FeltStatusView, OnlinePeersView, PlacementGapKind, PlacementGapRow,
     PlacementGapShortfall, PlacementGapView, RegionalDistributionView,
     ResilienceSnapshotDetailsView, ResilienceSnapshotView, StewardingCollectiveEntry,
 };
+pub use views::{IrohTransportProfileView, Libp2pTransportProfileView, PeerTransportManifestView};
