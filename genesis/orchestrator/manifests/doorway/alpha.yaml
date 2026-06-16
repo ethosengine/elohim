@@ -323,16 +323,26 @@ spec:
           # instantly even when the main worker pool is fully stalled, and returns
           # 503 ONLY when the MAIN runtime stops making progress (heartbeat stale
           # >15s). That removes the false-kill class the old 8080 probe had to widen
-          # around (build #1075: a healthy-but-slow /health on the shared runtime),
-          # so a GENUINE wedge can restart fast: 10s × 3 = 30s budget. The watchdog
-          # answer is sub-ms, so timeoutSeconds:5 is ample.
+          # around (build #1075: a healthy-but-slow /health on the shared runtime).
+          # The watchdog answer is sub-ms, so timeoutSeconds:5 is ample.
+          #
+          # 2026-06-15 flap RCA (.claude/data/matthew-edge-resiliency-rca-fanout-2026-06-15.md
+          # experiment 8): the matthew doorway self-kills HERE during RECOVERABLE
+          # main-runtime parks driven by the matthew conductor's app-ws session-close
+          # storm + co-location memory pressure on ethosengine (the conductor sawtooths
+          # to its 8 GiB OOM ceiling). Proof it is recoverable, not a genuine wedge:
+          # ~14 restarts here while doorway-alpha-b (adam, on shem, SAME image) holds 0.
+          # The 30s budget was too tight for a conductor stall, so the watchdog churned
+          # the pod instead of riding it out. Widen 3→12 = 120s. The ROOT (conductor
+          # OOM + DHT-read saturation) is upstream-blocked (fractional arc) / capacity-
+          # gated (matthew RAM) — this is the proximate stabilizer, revert to 3 to undo.
           livenessProbe:
             httpGet:
               path: /health
               port: 8079
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 3
+            failureThreshold: 12  # 12 × 10s = 120s (was 3 = 30s; see RCA note above)
         # Doorway Operator Dashboard - Angular app for node operators
         # Provides: federated OAuth, node metrics, configuration UI
         - name: doorway-app
