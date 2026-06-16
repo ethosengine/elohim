@@ -197,6 +197,197 @@ pub fn load_average() -> Option<(f64, f64, f64)> {
     Some((buf[0], buf[1], buf[2]))
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Memory-attribution instrument (leak-vs-cache discriminator).
+//
+// The consolidated `elohim-node` container fuses the Holochain conductor child +
+// the elohim-storage parent into ONE cgroup with ONE working-set number, so
+// `container_memory_working_set_bytes` cannot attribute the OOM climb. These
+// readers split it two ways:
+//   1. cgroup `memory.stat` → anon / file / slab — the VERDICT (heap-leak vs page
+//      cache). SQLite uses pread/pwrite (NOT mmap), so its cache lands in the
+//      kernel page cache = the cgroup `file` counter, invisible to per-process
+//      RssFile — which is exactly why this cgroup-level read is the primary tool.
+//   2. per-process `/proc/<pid>/status` RssAnon — ATTRIBUTION (conductor vs
+//      storage). Σ(per-proc RssAnon) ≈ cgroup `anon` confirms attribution.
+// See plan: genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// cgroup `memory.stat` breakdown — the leak-vs-cache verdict, in bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct CgroupMemBreakdown {
+    /// Anonymous (heap) memory. Unreclaimable when swap is off, so an OOM leans
+    /// toward this being the driver — the heap-leak suspect.
+    pub anon: u64,
+    /// File-backed (kernel page cache) memory. SQLite pread/pwrite cache lands
+    /// here — the page-cache suspect.
+    pub file: u64,
+    /// Kernel slab (dentry/inode/socket). Rarely the OOM driver; surfaced anyway.
+    pub slab: u64,
+}
+
+/// Per-process RSS split from `/proc/<pid>/status`, in bytes (threads = count).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ProcRss {
+    pub rss_anon: u64,
+    pub rss_file: u64,
+    pub vm_rss: u64,
+    pub threads: u64,
+}
+
+/// Parse a cgroup `memory.stat` body into the anon/file/slab breakdown. Pure —
+/// unit-tested independently of the filesystem. Handles cgroup **v2** keys
+/// (`anon`, `file`, `slab` or `slab_reclaimable`+`slab_unreclaimable`) and falls
+/// back to cgroup **v1** vocabulary (`rss`→anon, `cache`→file). `memory.stat`
+/// values are already in bytes (unlike `/proc/<pid>/status`, which is kB).
+/// Returns `None` when neither an `anon` nor a v1 `rss` line is present.
+pub fn parse_cgroup_memory_stat(raw: &str) -> Option<CgroupMemBreakdown> {
+    let mut anon: Option<u64> = None;
+    let mut file: Option<u64> = None;
+    let mut slab: Option<u64> = None;
+    let mut slab_recl: Option<u64> = None;
+    let mut slab_unrecl: Option<u64> = None;
+    for line in raw.lines() {
+        let mut it = line.split_whitespace();
+        let (Some(key), Some(val)) = (it.next(), it.next()) else {
+            continue;
+        };
+        let Ok(v) = val.parse::<u64>() else {
+            continue;
+        };
+        match key {
+            "anon" => anon = Some(v),                    // cgroup v2
+            "rss" if anon.is_none() => anon = Some(v),   // cgroup v1 fallback
+            "file" => file = Some(v),                    // cgroup v2
+            "cache" if file.is_none() => file = Some(v), // cgroup v1 fallback
+            "slab" => slab = Some(v),                    // cgroup v2 explicit
+            "slab_reclaimable" => slab_recl = Some(v),
+            "slab_unreclaimable" => slab_unrecl = Some(v),
+            _ => {}
+        }
+    }
+    let anon = anon?;
+    let file = file.unwrap_or(0);
+    let slab = slab
+        .or(match (slab_recl, slab_unrecl) {
+            (Some(a), Some(b)) => Some(a.saturating_add(b)),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        })
+        .unwrap_or(0);
+    Some(CgroupMemBreakdown { anon, file, slab })
+}
+
+/// Parse a `/proc/<pid>/status` body into the RSS split. Pure — unit-tested
+/// independently of the filesystem. `RssAnon`/`RssFile`/`VmRSS` are in kB
+/// (converted to bytes here); `Threads` is a count. Returns `None` when `VmRSS`
+/// is absent (the process is gone or the body is malformed).
+pub fn parse_proc_status(raw: &str) -> Option<ProcRss> {
+    let mut rss_anon = 0u64;
+    let mut rss_file = 0u64;
+    let mut vm_rss: Option<u64> = None;
+    let mut threads = 0u64;
+    for line in raw.lines() {
+        let Some((key, rest)) = line.split_once(':') else {
+            continue;
+        };
+        // The value is the first whitespace-separated token after the colon.
+        let val_str = rest.split_whitespace().next().unwrap_or("");
+        let Ok(v) = val_str.parse::<u64>() else {
+            continue;
+        };
+        match key.trim() {
+            "RssAnon" => rss_anon = v.saturating_mul(1024),
+            "RssFile" => rss_file = v.saturating_mul(1024),
+            "VmRSS" => vm_rss = Some(v.saturating_mul(1024)),
+            "Threads" => threads = v,
+            _ => {}
+        }
+    }
+    let vm_rss = vm_rss?;
+    Some(ProcRss {
+        rss_anon,
+        rss_file,
+        vm_rss,
+        threads,
+    })
+}
+
+/// Read the cgroup memory breakdown (anon/file/slab) — the leak-vs-cache verdict.
+/// cgroup v2 `/sys/fs/cgroup/memory.stat` first, then the v1 hierarchy. `None`
+/// when neither is readable / parseable.
+#[cfg(target_os = "linux")]
+pub fn cgroup_memory_breakdown() -> Option<CgroupMemBreakdown> {
+    let raw = std::fs::read_to_string("/sys/fs/cgroup/memory.stat")
+        .or_else(|_| std::fs::read_to_string("/sys/fs/cgroup/memory/memory.stat"))
+        .ok()?;
+    parse_cgroup_memory_stat(&raw)
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn cgroup_memory_breakdown() -> Option<CgroupMemBreakdown> {
+    None
+}
+
+/// Current swap charged to this cgroup, in bytes (cgroup v2 `memory.swap.current`).
+/// With swap OFF this reads `0`, which is why an OOM leans toward `anon`
+/// (unreclaimable) being the driver. `None` when the file is absent.
+#[cfg(target_os = "linux")]
+pub fn cgroup_swap_current_bytes() -> Option<u64> {
+    std::fs::read_to_string("/sys/fs/cgroup/memory.swap.current")
+        .ok()
+        .and_then(|s| s.trim().parse::<u64>().ok())
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn cgroup_swap_current_bytes() -> Option<u64> {
+    None
+}
+
+/// Effective CPU quota in cores from cgroup v2 `/sys/fs/cgroup/cpu.max`
+/// (`"<quota> <period>"`; `"max"` ⇒ unbounded ⇒ `None`). Logged at boot next to
+/// the derived `db_max_readers` so the host-vs-cgroup pool-size question is
+/// answerable from one line (RCA §4.4).
+#[cfg(target_os = "linux")]
+pub fn cgroup_cpu_quota_cores() -> Option<f64> {
+    let s = std::fs::read_to_string("/sys/fs/cgroup/cpu.max").ok()?;
+    let mut it = s.split_whitespace();
+    let quota = it.next()?;
+    let period = it.next()?;
+    if quota == "max" {
+        return None;
+    }
+    let q: f64 = quota.parse().ok()?;
+    let p: f64 = period.parse().ok()?;
+    if p > 0.0 {
+        Some(q / p)
+    } else {
+        None
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn cgroup_cpu_quota_cores() -> Option<f64> {
+    None
+}
+
+/// Read a process's RSS split from `/proc/<pid>/status` (Linux only). Used to
+/// attribute the fused-cgroup working set to the conductor child vs the storage
+/// parent. `None` on non-Linux or when the process is gone / unreadable.
+pub fn proc_rss(pid: u32) -> Option<ProcRss> {
+    #[cfg(target_os = "linux")]
+    {
+        let raw = std::fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
+        parse_proc_status(&raw)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = pid;
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -298,6 +489,67 @@ mod tests {
         // never exceed the 1 PiB sanity ceiling.
         if let Some(v) = container_memory_limit_bytes() {
             assert!(v > 0 && v < (1u64 << 50));
+        }
+    }
+
+    #[test]
+    fn parse_cgroup_memory_stat_v2_and_v1() {
+        // cgroup v2 shape: slab from reclaimable + unreclaimable when no `slab` key.
+        let v2 =
+            "anon 6442450944\nfile 1610612736\nkernel_stack 1000\nslab_reclaimable 50\nslab_unreclaimable 150\nsock 0\n";
+        let b = parse_cgroup_memory_stat(v2).expect("v2 parses");
+        assert_eq!(b.anon, 6_442_450_944);
+        assert_eq!(b.file, 1_610_612_736);
+        assert_eq!(
+            b.slab, 200,
+            "slab = reclaimable + unreclaimable when no `slab` key"
+        );
+        // An explicit v2 `slab` key wins over the reclaimable split.
+        let v2s = "anon 1\nfile 2\nslab 999\nslab_reclaimable 1\n";
+        assert_eq!(parse_cgroup_memory_stat(v2s).unwrap().slab, 999);
+        // cgroup v1 vocabulary fallback: rss -> anon, cache -> file.
+        let v1 = "cache 3221225472\nrss 2147483648\nrss_huge 0\n";
+        let b1 = parse_cgroup_memory_stat(v1).expect("v1 parses");
+        assert_eq!(b1.anon, 2_147_483_648, "v1 rss -> anon");
+        assert_eq!(b1.file, 3_221_225_472, "v1 cache -> file");
+        assert_eq!(b1.slab, 0, "no slab lines -> 0");
+        // Garbage / empty -> None (no anon/rss key).
+        assert_eq!(parse_cgroup_memory_stat(""), None);
+        assert_eq!(parse_cgroup_memory_stat("totally unrelated\n"), None);
+        assert_eq!(
+            parse_cgroup_memory_stat("file 5\n"),
+            None,
+            "file without anon -> None"
+        );
+    }
+
+    #[test]
+    fn parse_proc_status_extracts_rss_split_kb_to_bytes() {
+        let s = "Name:\tholochain\nThreads:\t42\nVmRSS:\t  8388608 kB\nRssAnon:\t  6291456 kB\nRssFile:\t  2097152 kB\nVmSwap:\t 0 kB\n";
+        let r = parse_proc_status(s).expect("parses");
+        assert_eq!(r.vm_rss, 8_388_608 * 1024);
+        assert_eq!(r.rss_anon, 6_291_456 * 1024);
+        assert_eq!(r.rss_file, 2_097_152 * 1024);
+        assert_eq!(r.threads, 42);
+        // No VmRSS line -> None (process gone / malformed).
+        assert_eq!(parse_proc_status("Name:\tx\nThreads:\t1\n"), None);
+    }
+
+    #[test]
+    fn proc_rss_self_is_some_on_linux() {
+        // We are running, so our own /proc/self status must read with VmRSS > 0.
+        if cfg!(target_os = "linux") {
+            let r = proc_rss(std::process::id()).expect("self proc status readable on linux");
+            assert!(r.vm_rss > 0, "running process must have VmRSS > 0");
+        }
+    }
+
+    #[test]
+    fn cgroup_memory_breakdown_is_sane_if_present() {
+        // Environment-dependent: Some in a cgroup, None on a bare host. When Some,
+        // anon+file must be below the 1 PiB sanity ceiling.
+        if let Some(b) = cgroup_memory_breakdown() {
+            assert!(b.anon.saturating_add(b.file) < (1u64 << 50));
         }
     }
 }

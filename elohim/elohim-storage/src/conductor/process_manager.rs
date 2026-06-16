@@ -163,6 +163,14 @@ impl ConductorManager {
         self.admin_port
     }
 
+    /// PID of the live conductor child process, or `None` if not started or
+    /// already reaped. The memory-attribution sampler reads this each tick to
+    /// attribute the fused-cgroup working set to the conductor child vs the
+    /// storage parent (`std::process::id()`).
+    pub fn child_pid(&self) -> Option<u32> {
+        self.child.as_ref().and_then(|c| c.id())
+    }
+
     /// Path to the conductor-config the process is (re)spawned with.
     pub fn config_path(&self) -> &std::path::Path {
         &self.config_path
@@ -211,4 +219,22 @@ pub enum ConductorError {
 
     #[error("Failed to stop conductor: {0}")]
     StopFailed(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn child_pid_is_none_before_start() {
+        // A fresh manager has no spawned child, so the memory-attribution sampler
+        // gets None and samples only the storage parent until the conductor starts.
+        let mgr = ConductorManager::new(
+            PathBuf::from("/nonexistent/holochain"),
+            PathBuf::from("/nonexistent/conductor-config.yaml"),
+            PathBuf::from("/tmp"),
+            4444,
+        );
+        assert_eq!(mgr.child_pid(), None, "no child before start()");
+    }
 }

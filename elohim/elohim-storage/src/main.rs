@@ -638,6 +638,71 @@ async fn async_main(
         None
     };
 
+    // Memory-attribution sampler — the leak-vs-cache discriminator (P-ARC §B gate).
+    // The fused `elohim-node` cgroup hides whether the OOM climb is the conductor
+    // child's heap, the storage parent's heap, or the SQLite kernel page cache. Emit
+    // a cgroup memory.stat breakdown (the VERDICT: anon=heap/leak, file=page-cache)
+    // plus a per-process RSS split (the ATTRIBUTION: conductor child vs storage
+    // parent) every 60s as structured `tracing` lines under target="memory_attribution".
+    // Loki is the surface (no Prometheus app-scrape exists for elohim-storage).
+    // Plan: genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md
+    if let Some(cm) = &conductor_manager {
+        let cm = Arc::clone(cm);
+        let parent_pid = std::process::id();
+        tokio::spawn(async move {
+            use elohim_storage::services::system_metrics as sm;
+            let cpus = sm::cpu_count().unwrap_or(0);
+            // The conductor's own default: calculate_default_db_max_readers = max(2*cpus, 8).
+            let db_max_readers = (2 * cpus).max(8);
+            info!(
+                target: "elohim_storage::memory_attribution",
+                event = "boot",
+                cpu_count = cpus,
+                db_max_readers = db_max_readers,
+                cgroup_cpu_quota_cores = ?sm::cgroup_cpu_quota_cores(),
+                cgroup_mem_limit_bytes = ?sm::container_memory_limit_bytes(),
+                "memory-attribution sampler started"
+            );
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(60));
+            loop {
+                tick.tick().await;
+                if let Some(b) = sm::cgroup_memory_breakdown() {
+                    info!(
+                        target: "elohim_storage::memory_attribution",
+                        scope = "cgroup",
+                        anon_bytes = b.anon,
+                        file_bytes = b.file,
+                        slab_bytes = b.slab,
+                        swap_bytes = ?sm::cgroup_swap_current_bytes(),
+                        "cgroup memory breakdown (VERDICT: anon=heap/leak, file=page-cache)"
+                    );
+                }
+                // Read the live child pid under a brief lock, then release before sampling.
+                let child_pid = { cm.lock().await.child_pid() };
+                for (name, pid) in [
+                    ("holochain", child_pid),
+                    ("elohim-storage", Some(parent_pid)),
+                ] {
+                    if let Some(pid) = pid {
+                        if let Some(r) = sm::proc_rss(pid) {
+                            info!(
+                                target: "elohim_storage::memory_attribution",
+                                scope = "proc",
+                                proc = name,
+                                pid = pid,
+                                rss_anon_bytes = r.rss_anon,
+                                rss_file_bytes = r.rss_file,
+                                vm_rss_bytes = r.vm_rss,
+                                threads = r.threads,
+                                "per-process rss split (attribution)"
+                            );
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     // Initialize blob store
     let blob_store = Arc::new(BlobStore::new(config.blobs_dir()).await?);
 
