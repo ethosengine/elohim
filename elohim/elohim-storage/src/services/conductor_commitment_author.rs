@@ -206,6 +206,19 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
         let valid_from = deterministic_valid_from(now);
         let valid_until = validity_until(&valid_from)?;
 
+        // CID enforcement (rung 2b, observation-only): the `provider` we are about
+        // to write (below + in the ProvideAnnounce event) is this node's `self_cid`,
+        // which on the libp2p transport is a `12D3Koo…` transport id — NOT the
+        // `uhCAk…` agent_cid the resilience-card joins on `rea_commitments.provider`
+        // expect. Surface the namespace mismatch (WARN + the
+        // `elohim_identity_namespace_violation_total` counter) so the drift shakes
+        // out in metrics; NEVER rejects. See `identity_namespace` module docs +
+        // backlog `cid-enforcement-rollout.md`.
+        crate::identity_namespace::observe_agent_cid_write(
+            "rea_commitments.provider",
+            Some(&self.self_cid),
+        );
+
         // Step 1 — notarise the replicates-content Commitment. The content's own
         // reach (Stage B) rides the request; `reach_ceiling` stays commons.
         let payload_json = build_content_payload(
