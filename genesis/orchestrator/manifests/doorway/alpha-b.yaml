@@ -190,6 +190,13 @@ spec:
             # mongo. Federation reconciliation is the test surface.
             - name: MONGODB_DB
               value: "doorway-alpha-b"
+            # Shared kitsune2 bootstrap table — IDENTICAL value to doorway-A so
+            # the genesis pair (matthew/A, adam/B) discover each other in ONE
+            # table instead of disjoint per-pod islands. Distinct from the
+            # per-doorway MONGODB_DB projection cache above (the whole point:
+            # bootstrap is shared even though projection state is divergent).
+            - name: BOOTSTRAP_MONGODB_DB
+              value: "elohim-bootstrap"
             # Identifier doorway-A sees when this peer registers itself in
             # the DHT + federation peer cache. Must differ from doorway-A's
             # "alpha-elohim-host".
