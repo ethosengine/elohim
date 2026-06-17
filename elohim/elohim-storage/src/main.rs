@@ -708,6 +708,32 @@ async fn async_main(
                                 "per-process rss split (attribution)"
                             );
                         }
+                        // Conductor child: deeper anon attribution (heap vs malloc
+                        // arenas vs stacks) via smaps — the confirmed leak lives
+                        // here (conductor-memory-attribution-verdict.md). smaps is
+                        // heavier, so only the leak target is sampled this deeply.
+                        if name == "holochain" {
+                            if let Some(s) = sm::proc_smaps_anon(pid) {
+                                metrics::set_conductor_smaps(
+                                    s.heap_bytes,
+                                    s.stack_bytes,
+                                    s.other_anon_bytes,
+                                    s.anon_mapping_count,
+                                    s.largest_anon_bytes,
+                                );
+                                info!(
+                                    target: "elohim_storage::memory_attribution",
+                                    scope = "smaps",
+                                    proc = "holochain",
+                                    heap_bytes = s.heap_bytes,
+                                    stack_bytes = s.stack_bytes,
+                                    other_anon_bytes = s.other_anon_bytes,
+                                    anon_mapping_count = s.anon_mapping_count,
+                                    largest_anon_bytes = s.largest_anon_bytes,
+                                    "conductor anon smaps breakdown (leak locus: heap vs arenas)"
+                                );
+                            }
+                        }
                     }
                 }
             }

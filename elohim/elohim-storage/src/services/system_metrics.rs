@@ -388,6 +388,128 @@ pub fn proc_rss(pid: u32) -> Option<ProcRss> {
     }
 }
 
+/// Anonymous-memory breakdown by mapping class from `/proc/<pid>/smaps` — the
+/// heap-leak ATTRIBUTION instrument for a process we do NOT compile (the
+/// Holochain conductor child). [`proc_rss`] says HOW MUCH anon; this says WHERE
+/// in the address space it lives — a growing `[heap]` vs proliferating malloc
+/// arenas (unnamed anon mmaps) vs thread stacks — localizing the leak without
+/// recompiling the conductor.
+///
+/// Limitation: modern Linux does NOT label thread stacks `[stack]` (only the
+/// main thread is), so thread stacks fall under `other_anon_bytes`. With a flat
+/// thread count the growth still cleanly separates heap-growth from arena-growth.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct SmapsAnonBreakdown {
+    /// Anonymous bytes in the `[heap]` mapping (brk-grown heap).
+    pub heap_bytes: u64,
+    /// Anonymous bytes in `[stack]` mappings (main-thread stack on modern kernels).
+    pub stack_bytes: u64,
+    /// Anonymous bytes in unnamed anon mappings (malloc/jemalloc arenas, large
+    /// allocations, thread stacks) — the leak's usual home.
+    pub other_anon_bytes: u64,
+    /// Count of mappings contributing anon (arena-proliferation signal).
+    pub anon_mapping_count: u64,
+    /// Largest single mapping's anon bytes (a lone growing mapping = the leak locus).
+    pub largest_anon_bytes: u64,
+}
+
+#[derive(Clone, Copy)]
+enum MappingClass {
+    Heap,
+    Stack,
+    OtherAnon,
+    File,
+}
+
+/// True if `line` is a smaps mapping header (`<hex>-<hex> perms …`), as opposed
+/// to a `Key: value` detail line.
+fn is_smaps_header(line: &str) -> bool {
+    match line.split_whitespace().next() {
+        Some(tok) => match tok.split_once('-') {
+            Some((a, b)) => {
+                !a.is_empty()
+                    && !b.is_empty()
+                    && a.bytes().all(|c| c.is_ascii_hexdigit())
+                    && b.bytes().all(|c| c.is_ascii_hexdigit())
+            }
+            None => false,
+        },
+        None => false,
+    }
+}
+
+/// Classify a smaps mapping header by its trailing pathname field (index 5):
+/// `[heap]`, `[stack…]`, `[anon…]`/none → anon, else a file/special path.
+fn classify_mapping(header: &str) -> MappingClass {
+    match header.split_whitespace().nth(5) {
+        None => MappingClass::OtherAnon, // anonymous mapping (no pathname)
+        Some("[heap]") => MappingClass::Heap,
+        Some(n) if n.starts_with("[stack") => MappingClass::Stack,
+        Some(n) if n.starts_with("[anon") => MappingClass::OtherAnon,
+        Some(_) => MappingClass::File,
+    }
+}
+
+/// Parse a `/proc/<pid>/smaps` body into the anon breakdown. Pure — unit-tested
+/// independently of the filesystem. `None` when no anon is found.
+pub fn parse_smaps_anon(raw: &str) -> Option<SmapsAnonBreakdown> {
+    let mut b = SmapsAnonBreakdown::default();
+    let mut class = MappingClass::File;
+    let mut seen_any = false;
+    for line in raw.lines() {
+        if is_smaps_header(line) {
+            class = classify_mapping(line);
+            continue;
+        }
+        let Some(rest) = line.strip_prefix("Anonymous:") else {
+            continue;
+        };
+        let kb = rest
+            .trim()
+            .trim_end_matches("kB")
+            .trim()
+            .parse::<u64>()
+            .unwrap_or(0);
+        if kb == 0 {
+            continue;
+        }
+        let bytes = kb.saturating_mul(1024);
+        match class {
+            MappingClass::Heap => b.heap_bytes = b.heap_bytes.saturating_add(bytes),
+            MappingClass::Stack => b.stack_bytes = b.stack_bytes.saturating_add(bytes),
+            MappingClass::OtherAnon => {
+                b.other_anon_bytes = b.other_anon_bytes.saturating_add(bytes)
+            }
+            MappingClass::File => continue, // CoW anon in a file mapping — not our attribution target
+        }
+        seen_any = true;
+        b.anon_mapping_count += 1;
+        if bytes > b.largest_anon_bytes {
+            b.largest_anon_bytes = bytes;
+        }
+    }
+    if seen_any {
+        Some(b)
+    } else {
+        None
+    }
+}
+
+/// Read a process's smaps anon breakdown (Linux only; the heap-leak attribution
+/// reader). `None` on non-Linux or when the process is gone / unreadable.
+pub fn proc_smaps_anon(pid: u32) -> Option<SmapsAnonBreakdown> {
+    #[cfg(target_os = "linux")]
+    {
+        let raw = std::fs::read_to_string(format!("/proc/{pid}/smaps")).ok()?;
+        parse_smaps_anon(&raw)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = pid;
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -550,6 +672,58 @@ mod tests {
         // anon+file must be below the 1 PiB sanity ceiling.
         if let Some(b) = cgroup_memory_breakdown() {
             assert!(b.anon.saturating_add(b.file) < (1u64 << 50));
+        }
+    }
+
+    #[test]
+    fn parse_smaps_anon_buckets_by_mapping_class() {
+        let smaps = "\
+561e1a000-561e1b000 rw-p 00000000 00:00 0                                  [heap]
+Size:                  4 kB
+Rss:                   4 kB
+Anonymous:             4 kB
+7ffd00000-7ffd21000 rw-p 00000000 00:00 0                                  [stack]
+Anonymous:           132 kB
+7f0000000000-7f0000800000 rw-p 00000000 00:00 0
+Anonymous:          2048 kB
+7f0001000000-7f0001100000 rw-p 00000000 00:00 0
+Anonymous:           256 kB
+7f5500000000-7f5500001000 r-xp 00000000 08:01 1234   /usr/lib/libc.so.6
+Anonymous:             0 kB
+";
+        let b = parse_smaps_anon(smaps).expect("has anon");
+        assert_eq!(b.heap_bytes, 4 * 1024);
+        assert_eq!(b.stack_bytes, 132 * 1024);
+        assert_eq!(
+            b.other_anon_bytes,
+            (2048 + 256) * 1024,
+            "two unnamed anon mmaps sum into other"
+        );
+        assert_eq!(
+            b.anon_mapping_count, 4,
+            "heap + stack + 2 anon; the 0-anon file mapping is excluded"
+        );
+        assert_eq!(
+            b.largest_anon_bytes,
+            2048 * 1024,
+            "biggest single anon mapping = the leak locus"
+        );
+        // A mapping with no Anonymous line at all -> None.
+        assert_eq!(
+            parse_smaps_anon("561e-561f rw-p 0 0 0\nSize:  4 kB\n"),
+            None
+        );
+    }
+
+    #[test]
+    fn proc_smaps_anon_self_is_some_on_linux() {
+        if cfg!(target_os = "linux") {
+            // We are running, so our own smaps has at least a [heap] with anon.
+            let b = proc_smaps_anon(std::process::id()).expect("self smaps readable on linux");
+            assert!(
+                b.heap_bytes + b.other_anon_bytes > 0,
+                "a running process has resident anon"
+            );
         }
     }
 }

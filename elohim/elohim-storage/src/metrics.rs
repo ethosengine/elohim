@@ -76,6 +76,33 @@ lazy_static! {
     )
     .unwrap();
 
+    // ── Conductor heap-leak attribution (P2: smaps anon breakdown of the child) ──
+
+    /// Conductor (child) anonymous memory by smaps mapping class — localizes the
+    /// confirmed heap leak. label: class = "heap" | "stack" | "other".
+    pub static ref NODE_CONDUCTOR_SMAPS_ANON_BYTES: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_node_conductor_smaps_anon_bytes",
+            "Conductor child anonymous memory by smaps mapping class (heap/stack/other).",
+        ),
+        &["class"],
+    )
+    .unwrap();
+
+    /// Conductor (child) count of anon-bearing mappings (arena-proliferation signal).
+    pub static ref NODE_CONDUCTOR_ANON_MAPPING_COUNT: IntGauge = IntGauge::new(
+        "elohim_node_conductor_anon_mapping_count",
+        "Conductor child count of anon-bearing mappings (arena-proliferation signal).",
+    )
+    .unwrap();
+
+    /// Conductor (child) largest single mapping's anon bytes (the leak locus).
+    pub static ref NODE_CONDUCTOR_LARGEST_ANON_BYTES: IntGauge = IntGauge::new(
+        "elohim_node_conductor_largest_anon_bytes",
+        "Conductor child largest single mapping's anon bytes (leak locus).",
+    )
+    .unwrap();
+
     // ── Identity-namespace coherence (P1: promote the atomic+log counter) ──
 
     /// A non-`agent_cid` value written to a column the joins treat as `agent_cid`
@@ -104,6 +131,9 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CGROUP_SWAP_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(NODE_DB_MAX_READERS.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CPU_QUOTA_MILLICORES.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_SMAPS_ANON_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_MAPPING_COUNT.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_LARGEST_ANON_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
     });
 }
@@ -156,6 +186,21 @@ pub fn set_boot_tunables(db_max_readers: u32, cpu_quota_cores: Option<f64>) {
     if let Some(c) = cpu_quota_cores {
         NODE_CPU_QUOTA_MILLICORES.set((c * 1000.0) as i64);
     }
+}
+
+/// Set the conductor (child) smaps anon breakdown (the heap-leak locus gauges).
+pub fn set_conductor_smaps(heap: u64, stack: u64, other: u64, count: u64, largest: u64) {
+    NODE_CONDUCTOR_SMAPS_ANON_BYTES
+        .with_label_values(&["heap"])
+        .set(heap as i64);
+    NODE_CONDUCTOR_SMAPS_ANON_BYTES
+        .with_label_values(&["stack"])
+        .set(stack as i64);
+    NODE_CONDUCTOR_SMAPS_ANON_BYTES
+        .with_label_values(&["other"])
+        .set(other as i64);
+    NODE_CONDUCTOR_ANON_MAPPING_COUNT.set(count as i64);
+    NODE_CONDUCTOR_LARGEST_ANON_BYTES.set(largest as i64);
 }
 
 /// Increment the identity-namespace violation counter (paired with the WARN +
