@@ -1034,6 +1034,16 @@ fn watchdog_liveness_response(
     let age = (start.elapsed().as_millis() as u64).saturating_sub(last);
     let wedged = main_runtime_wedged(age, threshold_ms);
     let status = if wedged {
+        // The proximate trigger of the doorway self-kill restart (RCA Theory 3:
+        // WEDGED precedes each restart). Record it for the durable /metrics
+        // surface AND leave a Loki trace — because during a FATAL wedge the main
+        // listener can't answer /metrics, so this warn! is the only signal home
+        // besides the scrape target's `up == 0`.
+        crate::metrics::inc_watchdog_wedged();
+        warn!(
+            heartbeat_age_ms = age,
+            threshold_ms, "watchdog WEDGED — MAIN runtime heartbeat stale (liveness 503)"
+        );
         StatusCode::SERVICE_UNAVAILABLE
     } else {
         StatusCode::OK
@@ -1241,6 +1251,11 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
     // port; keep readiness/startup on this main listener. See the freeze RCA.
     let liveness_start = std::time::Instant::now();
     let liveness_heartbeat = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    // Register the /metrics collectors and hand the metrics module the SAME
+    // heartbeat atomic the watchdog stamps, so `gather_text()` can derive
+    // `doorway_heartbeat_age_ms` at scrape time without a sampler task.
+    crate::metrics::register_all();
+    crate::metrics::set_heartbeat_handle(liveness_start, Arc::clone(&liveness_heartbeat));
     spawn_liveness_heartbeat(liveness_start, Arc::clone(&liveness_heartbeat));
     spawn_health_listener(Arc::clone(&state), liveness_start, liveness_heartbeat);
 
@@ -1502,6 +1517,10 @@ fn is_service_path(path: &str) -> bool {
         "/ready",
         "/readyz",
         "/version",
+        // /metrics has an explicit arm; without this the EPR router (GET +
+        // !is_service_path) would shadow it whenever a root projection is
+        // registered — the /auth/portal incident shape.
+        "/metrics",
         "/status",
         "/debug",
         "/admin",
@@ -1706,6 +1725,13 @@ mod shakeout_tests {
         // Regression guard: real service prefixes stay service paths.
         assert!(is_service_path("/db/rea_commitments"));
         assert!(is_service_path("/apps/lamad/index.html"));
+    }
+    #[test]
+    fn shakeout_service_path_guards_metrics() {
+        // /metrics MUST be a service path or the EPR router shadows it whenever a
+        // root projection (url_path="/") is registered — the scrape would render
+        // the SPA bundle instead of the exposition body.
+        assert!(is_service_path("/metrics"));
     }
 
     // ── derive_app_subpath — projection url_path → storage sub-path ───────────
@@ -2277,6 +2303,7 @@ async fn handle_request(
                     available = state.inbound_semaphore.available_permits(),
                     "inbound admission at ceiling — shedding (503 + Retry-After)"
                 );
+                crate::metrics::inc_admission_shed();
                 return Ok(to_boxed(catching_up_response(
                     DOORWAY_ADMISSION_RETRY_AFTER_SECS,
                 )));
@@ -2390,6 +2417,13 @@ async fn handle_request(
 
         // Version info for deployment verification
         (Method::GET, "/version") => to_boxed(routes::version_info()),
+
+        // Prometheus exposition — doorway-local Operational metrics (the
+        // complement surface; storage owns the per-node memory/corpus surface).
+        // On the MAIN listener, admission-exempt, no auth (in-cluster scrape).
+        // Needs doorway-specific logic (renders the in-process registry, not a
+        // storage proxy) → an explicit arm above the registry fallback is correct.
+        (Method::GET, "/metrics") => to_boxed(routes::handle_metrics()),
 
         // Comprehensive status (runtime stats, cluster health, storage diagnostics)
         (Method::GET, "/status") => to_boxed(routes::status_page(req, Arc::clone(&state)).await),
@@ -3884,7 +3918,15 @@ fn admission_exempt(path: &str, is_upgrade: bool) -> bool {
     }
     matches!(
         path,
-        "/health" | "/healthz" | "/health/startup" | "/ready" | "/readyz" | "/version"
+        "/health"
+            | "/healthz"
+            | "/health/startup"
+            | "/ready"
+            | "/readyz"
+            | "/version"
+            // A scrape endpoint that gets 503'd under admission pressure is dead
+            // exactly when you need it — never shed /metrics.
+            | "/metrics"
     )
 }
 
@@ -4647,6 +4689,16 @@ mod admission_tests {
             "WS upgrades hold the socket; never gate"
         );
         assert!(admission_exempt("/debug/stream", true));
+    }
+
+    #[test]
+    fn metrics_is_admission_exempt() {
+        // A scrape endpoint that gets 503'd under admission pressure is dead
+        // exactly when you need it.
+        assert!(
+            admission_exempt("/metrics", false),
+            "/metrics must be exempt"
+        );
     }
 
     #[test]

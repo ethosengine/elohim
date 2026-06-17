@@ -26,6 +26,7 @@ pub mod custodial_keys;
 pub mod db;
 pub mod hosts;
 pub mod logging;
+pub mod metrics;
 pub mod nats;
 pub mod orchestrator;
 pub mod projection;

@@ -632,8 +632,16 @@ impl SignalSubscriber {
                         Some(Ok(Message::Pong(_))) => {
                             debug!("Received pong");
                         }
-                        Some(Ok(Message::Close(_))) => {
-                            info!("Conductor closed connection");
+                        Some(Ok(Message::Close(frame))) => {
+                            // The subscriber path used to DROP the frame (`_`); the
+                            // worker path kept it. Both conductor-wire paths now
+                            // report the close + code (handoff §M2 / RCA §4.3).
+                            let code = frame.as_ref().map(|f| u16::from(f.code));
+                            crate::metrics::inc_reconnect(crate::metrics::REASON_CLOSE_FRAME);
+                            if let Some(code) = code {
+                                crate::metrics::inc_close_code(code);
+                            }
+                            info!(close_code = ?code, "Conductor closed connection");
                             return Ok(());
                         }
                         Some(Err(e)) => {
