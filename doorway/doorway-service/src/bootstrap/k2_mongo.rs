@@ -181,6 +181,7 @@ impl K2Store for MongoK2Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bootstrap::k2::current_time_micros;
 
     #[tokio::test]
     async fn mongo_store_rejects_invalid_body_before_db() {
@@ -189,5 +190,70 @@ mod tests {
         // live DB needed.
         let e = validate_put("bad", "bad", b"{}", 0);
         assert!(e.is_err(), "invalid body must be rejected pre-DB");
+    }
+
+    /// Build a valid signed kitsune2 agent-info body (the way the client does):
+    /// `(space_b64, agent_b64, body)` for the given key/space/window.
+    fn signed_fixture(
+        key_seed: u8,
+        space: &[u8],
+        created_at: i64,
+        expires_at: i64,
+    ) -> (String, String, Vec<u8>) {
+        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        use base64::Engine;
+        use ed25519_dalek::{Signer, SigningKey};
+
+        let key = SigningKey::from_bytes(&[key_seed; 32]);
+        let agent_b64 = URL_SAFE_NO_PAD.encode(key.verifying_key().as_bytes());
+        let space_b64 = URL_SAFE_NO_PAD.encode(space);
+        let inner = serde_json::json!({
+            "agent": agent_b64,
+            "space": space_b64,
+            "createdAt": created_at.to_string(),
+            "expiresAt": expires_at.to_string(),
+            "isTombstone": false,
+            "url": "wss://example/sig",
+            "storageArc": [0, 4294967295u32],
+        })
+        .to_string();
+        let signature = key.sign(inner.as_bytes());
+        let body = serde_json::json!({
+            "agentInfo": inner,
+            "signature": URL_SAFE_NO_PAD.encode(signature.to_bytes()),
+        });
+        (space_b64, agent_b64, serde_json::to_vec(&body).unwrap())
+    }
+
+    /// Cross-pod proof: two `MongoK2Store` handles built from two `MongoClient`s
+    /// with DISTINCT per-doorway db_names (doorway-alpha vs doorway-alpha-b) but
+    /// both targeting the SAME shared `elohim-bootstrap` DB. A PUT on handle A is
+    /// visible on handle B — the cross-edge visibility the per-pod store could
+    /// never express. This is the genesis-pair islanding fix, end to end.
+    ///
+    /// `#[ignore]` — needs a reachable mongo at `MONGODB_TEST_URI`; the default
+    /// suite stays green with no infra.
+    #[tokio::test]
+    #[ignore = "needs a reachable mongo at MONGODB_TEST_URI"]
+    async fn put_on_a_is_visible_on_b_across_distinct_db_names() {
+        let uri = std::env::var("MONGODB_TEST_URI")
+            .expect("set MONGODB_TEST_URI to run this ignored test");
+        let a = MongoClient::new(&uri, "doorway-alpha").await.unwrap();
+        let b = MongoClient::new(&uri, "doorway-alpha-b").await.unwrap();
+        let sa = MongoK2Store::new(&a, "elohim-bootstrap");
+        let sb = MongoK2Store::new(&b, "elohim-bootstrap");
+
+        let now = current_time_micros();
+        // Unique space per run so reruns don't collide with stale rows.
+        let space = format!("xpod-{now}");
+        let (space_b64, agent_b64, body) =
+            signed_fixture(42, space.as_bytes(), now, now + 1_200_000_000);
+
+        sa.put_at(&space_b64, &agent_b64, &body, now).await.unwrap();
+        let got = sb.get_at(&space_b64, now).await;
+        assert!(
+            got.windows(body.len()).any(|w| w == body.as_slice()),
+            "doorway-B must see doorway-A's PUT through the shared bootstrap table"
+        );
     }
 }
