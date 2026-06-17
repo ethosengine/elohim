@@ -4,6 +4,7 @@
 
 mod api_key;
 mod app_file_cache;
+pub mod bootstrap_entry;
 mod host;
 mod metadata;
 mod oauth_session;
