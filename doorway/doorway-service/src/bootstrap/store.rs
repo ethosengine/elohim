@@ -65,8 +65,10 @@ pub struct BootstrapStore {
     space_index: DashMap<SpaceKey, Vec<Agent>>,
     /// Kitsune2-protocol store (HC 0.6 conductors) — lives inside the legacy
     /// store so both protocols share the one `state.bootstrap` handle and the
-    /// one cleanup task.
-    k2: super::k2::K2BootstrapStore,
+    /// one cleanup task. Behind a trait object so a mongo-backed impl can share
+    /// one bootstrap table across doorway replicas/edges (kills genesis-pair
+    /// islanding); env-selected in [`BootstrapStore::new`].
+    k2: Box<dyn super::k2::K2Store>,
 }
 
 impl BootstrapStore {
@@ -75,13 +77,13 @@ impl BootstrapStore {
         Self {
             agents: DashMap::new(),
             space_index: DashMap::new(),
-            k2: super::k2::K2BootstrapStore::new(),
+            k2: Box::new(super::k2::MemK2Store::new()),
         }
     }
 
     /// The kitsune2-protocol store (PUT /bootstrap/{space}/{agent}).
-    pub fn k2(&self) -> &super::k2::K2BootstrapStore {
-        &self.k2
+    pub fn k2(&self) -> &dyn super::k2::K2Store {
+        self.k2.as_ref()
     }
 
     /// Store agent info, returning the key string
@@ -161,8 +163,8 @@ impl BootstrapStore {
         result
     }
 
-    /// Cleanup expired entries
-    pub fn cleanup(&self) -> usize {
+    /// Cleanup expired entries (async — the k2 leg may be a mongo-backed store).
+    pub async fn cleanup(&self) -> usize {
         let now = Instant::now();
         let mut removed = 0;
 
@@ -193,8 +195,10 @@ impl BootstrapStore {
         // Remove empty space indices
         self.space_index.retain(|_, agents| !agents.is_empty());
 
-        // Kitsune2-protocol entries age out on the same sweep.
-        removed + self.k2.cleanup()
+        // Kitsune2-protocol entries age out on the same sweep (the mem backend
+        // prunes; the mongo backend is a TTL no-op).
+        let k2_now = super::k2::current_time_micros();
+        removed + self.k2.cleanup(k2_now).await
     }
 
     /// Get stats about the store
@@ -225,7 +229,7 @@ pub fn spawn_cleanup_task(store: Arc<BootstrapStore>) {
         let interval = Duration::from_secs(60); // Run every minute
         loop {
             tokio::time::sleep(interval).await;
-            let removed = store.cleanup();
+            let removed = store.cleanup().await;
             if removed > 0 {
                 debug!("Bootstrap cleanup: removed {} expired entries", removed);
             }
