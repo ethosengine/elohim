@@ -1,7 +1,14 @@
 # --- Extract holochain binaries from edgenode image ---
-# This copies the conductor binary we've been running in production.
-# When we own the conductor version pin, replace this with a direct build.
-FROM ghcr.io/holo-host/edgenode:v0.0.8-alpha31-hc0.6.0-go-pion-custom AS conductor-source
+# This copies the conductor binary embedded into elohim-storage (embedded-conductor mode).
+# CONDUCTOR_SOURCE_IMAGE selects where it comes from. Default = the holo-host base, so
+# production builds are byte-identical. Override with our custom-built patched edgenode
+# (harbor.ethosengine.com/ethosengine/elohim-edgenode:<tag>, built by che-devworkspaces
+# jenkins/Jenkinsfile-elohim-edgenode) to embed a fixed conductor — e.g. the tx5
+# zombie-PeerConnection leak fix (tx5 #194/#199 + holochain #5719). This is the
+# "own the conductor version pin" path the original comment anticipated.
+#   Canary: docker/podman build --build-arg CONDUCTOR_SOURCE_IMAGE=<patched-edgenode> ...
+ARG CONDUCTOR_SOURCE_IMAGE=ghcr.io/holo-host/edgenode:v0.0.8-alpha31-hc0.6.0-go-pion-custom
+FROM ${CONDUCTOR_SOURCE_IMAGE} AS conductor-source
 
 # Build stage
 # NOTE: Build context should be repo root directory
