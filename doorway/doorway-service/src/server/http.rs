@@ -401,7 +401,8 @@ impl AppState {
     /// Create AppState without external services (dev mode, direct proxy)
     pub fn new(args: Args) -> Self {
         let bootstrap = if args.bootstrap_enabled {
-            Some(Arc::new(BootstrapStore::new()))
+            // Dev/direct-proxy mode: no mongo client → always the mem k2 store.
+            Some(Arc::new(BootstrapStore::new(None)))
         } else {
             None
         };
@@ -501,7 +502,7 @@ impl AppState {
     pub fn with_services(args: Args, mongo: Option<MongoClient>, nats: Option<NatsClient>) -> Self {
         let router = HostRouter::new(nats.clone());
         let bootstrap = if args.bootstrap_enabled {
-            Some(Arc::new(BootstrapStore::new()))
+            Some(Arc::new(BootstrapStore::new(mongo.as_ref())))
         } else {
             None
         };
@@ -610,7 +611,7 @@ impl AppState {
     ) -> Self {
         let router = HostRouter::new(nats.clone());
         let bootstrap = if args.bootstrap_enabled {
-            Some(Arc::new(BootstrapStore::new()))
+            Some(Arc::new(BootstrapStore::new(mongo.as_ref())))
         } else {
             None
         };
@@ -721,7 +722,7 @@ impl AppState {
     ) -> Result<Self, DoorwayError> {
         let router = HostRouter::new(nats.clone());
         let bootstrap = if args.bootstrap_enabled {
-            Some(Arc::new(BootstrapStore::new()))
+            Some(Arc::new(BootstrapStore::new(Some(&mongo))))
         } else {
             None
         };

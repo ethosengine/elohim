@@ -72,12 +72,26 @@ pub struct BootstrapStore {
 }
 
 impl BootstrapStore {
-    /// Create a new bootstrap store
-    pub fn new() -> Self {
+    /// Create a new bootstrap store.
+    ///
+    /// Safe-by-default: the k2 backend is the in-memory [`super::k2::MemK2Store`]
+    /// UNLESS BOTH a `mongo` client is provided AND `BOOTSTRAP_MONGODB_DB` is set
+    /// — only then does it select the shared mongo-backed [`super::k2::MongoK2Store`]
+    /// that kills genesis-pair islanding. With the env unset, behavior is
+    /// byte-identical to the pre-mongo store.
+    pub fn new(mongo: Option<&crate::db::mongo::MongoClient>) -> Self {
+        let k2: Box<dyn super::k2::K2Store> =
+            match (mongo, std::env::var("BOOTSTRAP_MONGODB_DB").ok()) {
+                (Some(m), Some(db)) => {
+                    info!("k2 bootstrap store: shared mongo-backed DB '{}'", db);
+                    Box::new(super::k2_mongo::MongoK2Store::new(m, &db))
+                }
+                _ => Box::new(super::k2::MemK2Store::new()),
+            };
         Self {
             agents: DashMap::new(),
             space_index: DashMap::new(),
-            k2: Box::new(super::k2::MemK2Store::new()),
+            k2,
         }
     }
 
@@ -212,7 +226,7 @@ impl BootstrapStore {
 
 impl Default for BootstrapStore {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }
 
@@ -261,9 +275,17 @@ mod tests {
 
     #[test]
     fn test_store_stats() {
-        let store = BootstrapStore::new();
+        let store = BootstrapStore::new(None);
         let stats = store.stats();
         assert_eq!(stats.total_agents, 0);
         assert_eq!(stats.total_spaces, 0);
+    }
+
+    #[tokio::test]
+    async fn bootstrap_store_selects_mem_when_no_mongo() {
+        // Safe-by-default: with no mongo client the k2 backend is MemK2Store,
+        // matching the pre-mongo behavior exactly (env-gated mongo path is off).
+        let s = BootstrapStore::new(None);
+        assert_eq!(s.k2().stats().await, (0, 0));
     }
 }
