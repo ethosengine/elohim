@@ -10,10 +10,12 @@
 //! - POST /bootstrap/now   - Get server timestamp (empty body)
 
 pub mod k2;
+pub mod k2_mongo;
 pub mod store;
 mod types;
 
 pub use k2::{K2PutOutcome, K2Store, MemK2Store};
+pub use k2_mongo::MongoK2Store;
 pub use store::BootstrapStore;
 pub use types::*;
 
