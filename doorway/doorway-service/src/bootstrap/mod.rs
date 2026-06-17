@@ -13,7 +13,7 @@ pub mod k2;
 pub mod store;
 mod types;
 
-pub use k2::{K2BootstrapStore, K2PutOutcome};
+pub use k2::{K2PutOutcome, K2Store, MemK2Store};
 pub use store::BootstrapStore;
 pub use types::*;
 

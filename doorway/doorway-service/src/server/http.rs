@@ -3562,7 +3562,16 @@ async fn handle_k2_bootstrap_put(
         }
     };
 
-    match store.k2().put(&space_b64, &agent_b64, &body) {
+    match store
+        .k2()
+        .put_at(
+            &space_b64,
+            &agent_b64,
+            &body,
+            crate::bootstrap::k2::current_time_micros(),
+        )
+        .await
+    {
         Ok(outcome) => {
             debug!(
                 "k2 bootstrap PUT {:?} space={} agent={}",
@@ -3600,7 +3609,10 @@ async fn handle_k2_bootstrap_get(state: Arc<AppState>, path: &str) -> Response<B
         return to_boxed(bad_request_response("Expected GET /bootstrap/{space}"));
     }
 
-    let body = store.k2().get(rest);
+    let body = store
+        .k2()
+        .get_at(rest, crate::bootstrap::k2::current_time_micros())
+        .await;
     to_boxed(
         Response::builder()
             .status(StatusCode::OK)
