@@ -165,6 +165,12 @@ spec:
               value: "mongodb://mongodb.elohim-alpha:27017"
             - name: MONGODB_DB
               value: "doorway-alpha"
+            # Shared kitsune2 bootstrap table — IDENTICAL on both doorways so
+            # the genesis pair (matthew/A, adam/B) discover each other in ONE
+            # table instead of disjoint per-pod islands. Independent of the
+            # per-doorway MONGODB_DB projection cache above.
+            - name: BOOTSTRAP_MONGODB_DB
+              value: "elohim-bootstrap"
             - name: DOORWAY_ID
               value: "alpha-elohim-host"
             - name: DOORWAY_URL
