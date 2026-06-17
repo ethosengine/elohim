@@ -159,6 +159,13 @@ lru = "0.12"
 # Filesystem-capacity stays on fs4 (heartbeat::measure_free_pct convention).
 libc = "0.2"
 
+# Prometheus app-metrics surface — durable /metrics exposition for the
+# design-decision toolkit (memory-attribution gauges, identity-namespace
+# violation counter, RCA instruments). Composes elohim-bitswap's prometheus 0.13
+# + lazy_static idiom; src/metrics.rs registers everything into one Registry.
+prometheus = "0.13"
+lazy_static = "1"
+
 # Error handling
 thiserror = "1"
 anyhow = "1"

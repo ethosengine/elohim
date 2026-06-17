@@ -638,28 +638,36 @@ async fn async_main(
         None
     };
 
+    // Durable Prometheus app-metrics surface (design-decision toolkit P0): register
+    // the toolkit collectors once, unconditionally, so GET /metrics serves them even
+    // without an embedded conductor (e.g. the identity-namespace violation counter).
+    elohim_storage::metrics::register_all();
+
     // Memory-attribution sampler — the leak-vs-cache discriminator (P-ARC §B gate).
     // The fused `elohim-node` cgroup hides whether the OOM climb is the conductor
-    // child's heap, the storage parent's heap, or the SQLite kernel page cache. Emit
-    // a cgroup memory.stat breakdown (the VERDICT: anon=heap/leak, file=page-cache)
-    // plus a per-process RSS split (the ATTRIBUTION: conductor child vs storage
-    // parent) every 60s as structured `tracing` lines under target="memory_attribution".
-    // Loki is the surface (no Prometheus app-scrape exists for elohim-storage).
+    // child's heap, the storage parent's heap, or the SQLite kernel page cache. Every
+    // 60s it emits BOTH a structured `tracing` line (Loki) AND sets Prometheus gauges
+    // (the durable, graphable surface): a cgroup memory.stat breakdown (the VERDICT:
+    // anon=heap/leak, file=page-cache) plus a per-process RSS split (the ATTRIBUTION:
+    // conductor child vs storage parent).
     // Plan: genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md
     if let Some(cm) = &conductor_manager {
         let cm = Arc::clone(cm);
         let parent_pid = std::process::id();
         tokio::spawn(async move {
+            use elohim_storage::metrics;
             use elohim_storage::services::system_metrics as sm;
             let cpus = sm::cpu_count().unwrap_or(0);
             // The conductor's own default: calculate_default_db_max_readers = max(2*cpus, 8).
             let db_max_readers = (2 * cpus).max(8);
+            let cpu_quota = sm::cgroup_cpu_quota_cores();
+            metrics::set_boot_tunables(db_max_readers, cpu_quota);
             info!(
                 target: "elohim_storage::memory_attribution",
                 event = "boot",
                 cpu_count = cpus,
                 db_max_readers = db_max_readers,
-                cgroup_cpu_quota_cores = ?sm::cgroup_cpu_quota_cores(),
+                cgroup_cpu_quota_cores = ?cpu_quota,
                 cgroup_mem_limit_bytes = ?sm::container_memory_limit_bytes(),
                 "memory-attribution sampler started"
             );
@@ -667,13 +675,15 @@ async fn async_main(
             loop {
                 tick.tick().await;
                 if let Some(b) = sm::cgroup_memory_breakdown() {
+                    let swap = sm::cgroup_swap_current_bytes();
+                    metrics::set_cgroup_mem(b.anon, b.file, b.slab, swap);
                     info!(
                         target: "elohim_storage::memory_attribution",
                         scope = "cgroup",
                         anon_bytes = b.anon,
                         file_bytes = b.file,
                         slab_bytes = b.slab,
-                        swap_bytes = ?sm::cgroup_swap_current_bytes(),
+                        swap_bytes = ?swap,
                         "cgroup memory breakdown (VERDICT: anon=heap/leak, file=page-cache)"
                     );
                 }
@@ -685,6 +695,7 @@ async fn async_main(
                 ] {
                     if let Some(pid) = pid {
                         if let Some(r) = sm::proc_rss(pid) {
+                            metrics::set_proc_rss(name, r.rss_anon, r.rss_file, r.threads);
                             info!(
                                 target: "elohim_storage::memory_attribution",
                                 scope = "proc",

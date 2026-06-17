@@ -159,6 +159,9 @@ pub fn observe_agent_cid_write(column: &'static str, value: Option<&str>) {
 
     let detected = classify(trimmed);
     IDENTITY_NAMESPACE_VIOLATIONS.fetch_add(1, Ordering::Relaxed);
+    // Durable scrapeable counter (design-decision toolkit P1) — the `counter=` log
+    // tag below was a stand-in for a real metric; now both fire. Loki-independent.
+    crate::metrics::inc_identity_namespace_violation(column, detected.label());
     tracing::warn!(
         target: "identity_coherence",
         counter = "elohim_identity_namespace_violation_total",

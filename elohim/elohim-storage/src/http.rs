@@ -836,6 +836,19 @@ impl HttpServer {
                     .unwrap())
             }
 
+            // Prometheus app-metrics surface (design-decision toolkit P0).
+            // text/plain exposition of the toolkit Registry — scraped by the
+            // Prometheus Operator via PodMonitor. No auth (in-cluster scrape;
+            // same posture as /p2p/status).
+            (Method::GET, "/metrics") => {
+                let body = crate::metrics::gather_text();
+                Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "text/plain; version=0.0.4")
+                    .body(Full::new(Bytes::from(body)))
+                    .unwrap())
+            }
+
             // Shard API
             (Method::PUT, p) if p.starts_with("/shard/") => {
                 let hash = p.strip_prefix("/shard/").unwrap_or("");
