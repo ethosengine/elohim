@@ -57,11 +57,19 @@ struct SpaceKey {
     space: Space,
 }
 
-/// Bootstrap store with concurrent access
+/// Bootstrap store with concurrent access.
+///
+/// LEGACY (kitsune1 path): the `agents` / `space_index` DashMaps below speak the
+/// kitsune1 bootstrap protocol (`POST /bootstrap` + `X-Op`, MessagePack). They
+/// have the SAME per-pod islanding defect the k2 path just fixed — each pod
+/// holds a disjoint in-memory table — but they are dead weight for the HC-0.6
+/// genesis pair, which is kitsune2-exclusive (the live discovery path is `k2`).
+/// A mongo-backing migration for kitsune1 is deferred unless a kitsune1 peer
+/// reappears; only the `k2` backend is shared/coherent today. (Review S/LOW.)
 pub struct BootstrapStore {
-    /// Agent info storage: key -> entry
+    /// LEGACY kitsune1 agent info storage: key -> entry (per-pod, NOT shared).
     agents: DashMap<AgentKey, AgentEntry>,
-    /// Index of agents per space: (network, space) -> list of agents
+    /// LEGACY kitsune1 index of agents per space (per-pod, NOT shared).
     space_index: DashMap<SpaceKey, Vec<Agent>>,
     /// Kitsune2-protocol store (HC 0.6 conductors) — lives inside the legacy
     /// store so both protocols share the one `state.bootstrap` handle and the
