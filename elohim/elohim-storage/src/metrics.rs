@@ -103,6 +103,18 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Node corpus size — content rows held, by app scope. label: app =
+    /// "lamad" | "elohim". Pairs with the conductor RSS gauges to confirm
+    /// (durably) that the heap leak is NOT corpus-proportional (RCA §4.5).
+    pub static ref NODE_CORPUS_DOCS: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_node_corpus_docs",
+            "Content rows held by this node, by app scope (corpus size).",
+        ),
+        &["app"],
+    )
+    .unwrap();
+
     // ── Identity-namespace coherence (P1: promote the atomic+log counter) ──
 
     /// A non-`agent_cid` value written to a column the joins treat as `agent_cid`
@@ -134,6 +146,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_SMAPS_ANON_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_MAPPING_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_LARGEST_ANON_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_CORPUS_DOCS.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
     });
 }
@@ -201,6 +214,11 @@ pub fn set_conductor_smaps(heap: u64, stack: u64, other: u64, count: u64, larges
         .set(other as i64);
     NODE_CONDUCTOR_ANON_MAPPING_COUNT.set(count as i64);
     NODE_CONDUCTOR_LARGEST_ANON_BYTES.set(largest as i64);
+}
+
+/// Set the node corpus size for an app scope (content rows held).
+pub fn set_corpus_docs(app: &str, docs: u64) {
+    NODE_CORPUS_DOCS.with_label_values(&[app]).set(docs as i64);
 }
 
 /// Increment the identity-namespace violation counter (paired with the WARN +

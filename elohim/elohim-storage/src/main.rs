@@ -654,6 +654,7 @@ async fn async_main(
     if let Some(cm) = &conductor_manager {
         let cm = Arc::clone(cm);
         let parent_pid = std::process::id();
+        let corpus_pool = db_pool.clone();
         tokio::spawn(async move {
             use elohim_storage::metrics;
             use elohim_storage::services::system_metrics as sm;
@@ -732,6 +733,24 @@ async fn async_main(
                                     largest_anon_bytes = s.largest_anon_bytes,
                                     "conductor anon smaps breakdown (leak locus: heap vs arenas)"
                                 );
+                            }
+                        }
+                    }
+                }
+                // Corpus size (toolkit P2): content rows held, by app scope —
+                // pairs with the conductor RSS gauges to confirm (durably) the
+                // heap leak is NOT corpus-proportional (jessica, arc=0, holds
+                // ~no corpus, yet leaks). RCA §4.5.
+                if let Some(pool) = corpus_pool.as_ref() {
+                    if let Ok(mut conn) = pool.get() {
+                        for ctx in [
+                            elohim_storage::db::AppContext::default_lamad(),
+                            elohim_storage::db::AppContext::default_elohim(),
+                        ] {
+                            if let Ok(n) =
+                                elohim_storage::db::content_diesel::content_count(&mut conn, &ctx)
+                            {
+                                metrics::set_corpus_docs(ctx.h_app_id(), n.max(0) as u64);
                             }
                         }
                     }
