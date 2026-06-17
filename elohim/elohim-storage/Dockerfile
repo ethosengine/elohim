@@ -1,13 +1,15 @@
 # --- Extract holochain binaries from edgenode image ---
 # This copies the conductor binary embedded into elohim-storage (embedded-conductor mode).
-# CONDUCTOR_SOURCE_IMAGE selects where it comes from. Default = the holo-host base, so
-# production builds are byte-identical. Override with our custom-built patched edgenode
-# (harbor.ethosengine.com/ethosengine/elohim-edgenode:<tag>, built by che-devworkspaces
-# jenkins/Jenkinsfile-elohim-edgenode) to embed a fixed conductor — e.g. the tx5
-# zombie-PeerConnection leak fix (tx5 #194/#199 + holochain #5719). This is the
-# "own the conductor version pin" path the original comment anticipated.
-#   Canary: docker/podman build --build-arg CONDUCTOR_SOURCE_IMAGE=<patched-edgenode> ...
-ARG CONDUCTOR_SOURCE_IMAGE=ghcr.io/holo-host/edgenode:v0.0.8-alpha31-hc0.6.0-go-pion-custom
+# CONDUCTOR_SOURCE_IMAGE = OUR patched edgenode (tx5 zombie-PeerConnection leak fix #194/#199
+# + holochain #5719), built by che-devworkspaces jenkins/Jenkinsfile-elohim-edgenode and
+# published as elohim-edgenode:latest. NOTE: only that job pushes :latest — the edge pipeline
+# pushes :dev-latest for images (Jenkinsfile:1627-1648) — so :latest is unambiguously the
+# patched build, never clobbered. Every elohim-storage build now embeds the patched conductor;
+# the genesis pipeline deploys it fleet-wide and every re-run picks it up. To refresh the fix,
+# re-run the che-dw elohim-edgenode job (updates :latest), then rebuild storage.
+# ROLLBACK: set this back to ghcr.io/holo-host/edgenode:v0.0.8-alpha31-hc0.6.0-go-pion-custom
+# and push to dev → next edge build reverts production storage to the stock conductor.
+ARG CONDUCTOR_SOURCE_IMAGE=harbor.ethosengine.com/ethosengine/elohim-edgenode:latest
 FROM ${CONDUCTOR_SOURCE_IMAGE} AS conductor-source
 
 # Build stage
