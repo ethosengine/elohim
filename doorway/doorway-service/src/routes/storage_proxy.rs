@@ -499,6 +499,12 @@ where
                             max = blob_pantry_max_bytes(),
                             "Blob exceeds pantry budget — not stocking"
                         );
+                    } else {
+                        // Any other 2xx that isn't a cacheable 200 (e.g. 204/203;
+                        // unreachable for a blob GET in practice). Keep the pantry
+                        // outcomes exhaustive — exactly one per fetched request.
+                        crate::metrics::inc_blob_pantry("skipped");
+                        debug!(hash = %hash, status = %status, "2xx non-200 — not stocking pantry");
                     }
 
                     Response::builder()

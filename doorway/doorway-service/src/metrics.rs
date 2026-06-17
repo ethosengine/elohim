@@ -77,13 +77,14 @@ lazy_static! {
 
     // ── M2: conductor reconnect churn — classifies reconnect-storm cause ──────
 
-    /// Conductor↔doorway transport sessions that ended, by close cause. Storage
+    /// Conductor↔doorway reconnect events, by cause — a session that ended OR a
+    /// connect attempt that never became a session (`connect_refused`). Storage
     /// does not observe doorway's WS lifecycle. label: reason ∈
     /// {connect_refused, close_frame, ws_error, channel_closed}.
     pub static ref CONDUCTOR_RECONNECT_TOTAL: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "doorway_conductor_reconnect_total",
-            "Conductor WS sessions ended, by close cause (the reconnect classifier).",
+            "Conductor WS reconnect events by cause (session-end or connect failure).",
         ),
         &["reason"],
     )
@@ -120,14 +121,16 @@ lazy_static! {
 
     // ── M5: live session fan-out — the multiplication the RCA wants bounded ────
 
-    /// Live conductor app-WS sessions held by the connection pool workers
-    /// (`worker::conductor::run_session`). This is doorway's session
-    /// multiplication (`worker_count` × conductors); the subscriber and admin
-    /// connections run their own loops and are NOT counted here. Storage cannot
-    /// see doorway's session count.
+    /// Live conductor app-WS sessions across EVERY `ConductorConnection` —
+    /// inc/dec live in `worker::conductor::run_session`, the convergence point
+    /// for all of them: the per-conductor pool workers (the bulk — `worker_count`
+    /// × conductors, the RCA's fan-out), plus the NATS processor and the
+    /// import/seed client. The signal subscriber runs its OWN loop (not a
+    /// `ConductorConnection`) and is NOT counted here. Storage cannot see
+    /// doorway's session count.
     pub static ref CONDUCTOR_SESSIONS: IntGauge = IntGauge::new(
         "doorway_conductor_sessions",
-        "Live conductor app-WS sessions held by the pool workers.",
+        "Live conductor app-WS sessions across all ConductorConnection instances.",
     )
     .unwrap();
 
