@@ -1,0 +1,61 @@
+# NetworkPolicy — admit the observability namespace to the elohim-alpha app /metrics ports
+#
+# WHY THIS EXISTS (the missing half of the toolkit metrics surface):
+#   The toolkit ships /metrics on elohim-storage (:8090 `storage-http`) and
+#   doorway (:8080 `gateway-ws`), and the PodMonitors that target them already
+#   exist (infra/alpha-edgenode-podmonitor.yaml, infra/alpha-doorway-podmonitor.yaml).
+#   BUT elohim-alpha runs `default-deny-cross-env` (podSelector {}, Ingress) which
+#   admits only same-namespace + ingress + kube-system(DNS) + jenkins. The
+#   observability namespace (where the Prometheus Operator's scrape pods live) has
+#   NO ingress lane, so without this policy the PodMonitor targets resolve but the
+#   scrape times out → target DOWN and the `elohim_node_*` gauges stay empty
+#   (observed live 2026-06-17: cadvisor/kube-state scrape fine because they read the
+#   kubelet, not the pod; app /metrics needs a direct pod-IP:port connection).
+#
+# WHY A STANDALONE FILE (not appended to network-policies.yaml):
+#   network-policies.yaml carries a DRIFT WARNING — the LIVE default-deny-cross-env
+#   objects also carry an ipBlock rule (Calico VXLAN node-tunnel /32s) that is
+#   intentionally NOT committed, and a blind `kubectl apply -f network-policies.yaml`
+#   STRIPS it and re-breaks cross-node ingress. This policy is ADDITIVE (k8s unions
+#   ingress across all policies selecting a pod), so it can be applied on its own
+#   (`kubectl apply -f infra/alpha-metrics-networkpolicy.yaml`) without touching the
+#   default-deny object or its ipBlock rule.
+#
+# ⚠ OPERATOR-OWNED (cluster is operator's; repo is the surface, pipeline reconciles;
+#    never kubectl from dev). For this to take effect, the same pipeline that applies
+#    infra/*.yaml (alpha-nats.yaml / alpha-mongodb.yaml / the podmonitors) must apply
+#    this file. If the PodMonitors are not yet live (0 monitors in elohim-alpha as of
+#    2026-06-17), the apply-path for infra/*.yaml is the separate gap to close.
+#
+# Scope rationale: observability is trusted shared infra (same reasoning as the
+#   jenkins carve-out already in default-deny-cross-env), scoped to exactly the two
+#   /metrics ports — not a blanket open.
+#
+# Lineage:
+#   genesis/docs/superpowers/plans/2026-06-17-design-decision-toolkit-plan.md (P1/P2)
+#   genesis/data/timeline/backlog/conductor-anon-leak-mechanism-smaps-verdict.md (Brake #4)
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-metrics-from-observability
+  namespace: elohim-alpha
+  labels:
+    app.kubernetes.io/name: network-policy
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: manual
+spec:
+  podSelector: {} # all elohim-alpha pods; the ports below scope it to /metrics
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - protocol: TCP
+          port: 8090 # elohim-storage storage-http /metrics (edgenode PodMonitor)
+        - protocol: TCP
+          port: 8080 # doorway gateway-ws /metrics (doorway PodMonitor)
