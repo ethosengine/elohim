@@ -183,6 +183,16 @@ lazy_static! {
         "Inbound requests shed by the global admission gate (at ceiling).",
     )
     .unwrap();
+
+    /// The configured inbound admission ceiling (DOORWAY_MAX_INFLIGHT). Doorway's
+    /// own config — storage can't see it. Set once at boot; also the
+    /// `maxInflight` source for the self_healing AdmissionView (one accessor,
+    /// both surfaces — handoff §6 co-delivery).
+    pub static ref INBOUND_MAX_INFLIGHT: IntGauge = IntGauge::new(
+        "doorway_inbound_max_inflight",
+        "Configured inbound admission ceiling (DOORWAY_MAX_INFLIGHT).",
+    )
+    .unwrap();
 }
 
 /// Boot-set handle the watchdog stamps: (`start`, `heartbeat`). `gather_text`
@@ -210,6 +220,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(UPSTREAM_BREAKER_OPEN_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(UPSTREAM_BACKPRESSURE_HONORED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(ADMISSION_SHED_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(INBOUND_MAX_INFLIGHT.clone()));
     });
 }
 
@@ -298,6 +309,24 @@ pub fn inc_backpressure_honored() {
 /// M4: an inbound request was shed by the global admission gate.
 pub fn inc_admission_shed() {
     ADMISSION_SHED_TOTAL.inc();
+}
+
+/// Record the configured inbound admission ceiling (call once at boot).
+pub fn set_inbound_max(max: usize) {
+    INBOUND_MAX_INFLIGHT.set(max as i64);
+}
+
+/// The configured inbound admission ceiling (0 until `set_inbound_max`). The
+/// `maxInflight` source for the self_healing AdmissionView.
+pub fn inbound_max() -> i64 {
+    INBOUND_MAX_INFLIGHT.get()
+}
+
+/// Current `doorway_admission_shed_total` value — the `shedTotal` source for
+/// the self_healing AdmissionView (one home for the count; the counter IS the
+/// shed atomic the handoff §6 calls for).
+pub fn admission_shed_total() -> u64 {
+    ADMISSION_SHED_TOTAL.get()
 }
 
 #[cfg(test)]
