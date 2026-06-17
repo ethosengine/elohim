@@ -176,6 +176,10 @@ impl K2Store for MongoK2Store {
         };
         (agents, spaces)
     }
+
+    fn backend_name(&self) -> &'static str {
+        "mongo"
+    }
 }
 
 #[cfg(test)]

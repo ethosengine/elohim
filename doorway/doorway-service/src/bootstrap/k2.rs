@@ -74,6 +74,9 @@ pub trait K2Store: Send + Sync {
 
     /// (agents, spaces) currently held.
     async fn stats(&self) -> (usize, usize);
+
+    /// Backend label for the coherence read-model (`"mem"` | `"mongo"`).
+    fn backend_name(&self) -> &'static str;
 }
 
 /// In-memory kitsune2 bootstrap store: space (b64url) → agent (b64url) → entry.
@@ -245,6 +248,10 @@ impl K2Store for MemK2Store {
     async fn stats(&self) -> (usize, usize) {
         let agents = self.spaces.iter().map(|s| s.len()).sum();
         (agents, self.spaces.len())
+    }
+
+    fn backend_name(&self) -> &'static str {
+        "mem"
     }
 }
 

@@ -9,6 +9,7 @@ pub mod api;
 pub mod apps;
 pub mod auth_routes;
 pub mod blob;
+pub mod bootstrap_coherence;
 pub mod collectives;
 pub mod dashboard_ws;
 // `db` module retired 2026-05-25 as part of Pattern Z anti-pattern cleanup —

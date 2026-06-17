@@ -2598,6 +2598,14 @@ async fn handle_request(
             to_boxed(routes::handle_route_registry(Arc::clone(&state)).await)
         }
 
+        // Kitsune2 bootstrap coherence read-model (Cat-C node-local Operational
+        // state): spaces/agents held + backend (mem|mongo). With the shared
+        // mongo backend live, this is the surface that shows the genesis pair
+        // converged on ONE bootstrap table. Same class as /admin/self-healing.
+        (Method::GET, "/admin/bootstrap-coherence") => to_boxed(
+            routes::bootstrap_coherence::handle_bootstrap_coherence(Arc::clone(&state)).await,
+        ),
+
         // Conductor agents listing
         (Method::GET, p) if p.starts_with("/admin/conductors/") && p.ends_with("/agents") => {
             let conductor_id = p
