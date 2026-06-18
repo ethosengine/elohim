@@ -600,73 +600,108 @@ pub fn new_peer_coherence_cache() -> PeerCoherenceCache {
     Arc::new(tokio::sync::RwLock::new(Vec::new()))
 }
 
-/// Fetch one peer's `CoherenceManifest`. Bounded timeout; reuses the federation
-/// HTTP idiom. Returns `None` when the peer is unreachable OR pre-F-COHERENCE
-/// (404 on the coherence route) — both read as "not reachable" downstream, so a
-/// still-deploying sibling never fires a false divergence alarm.
+/// Fetch one peer's `CoherenceManifest`, returning a TRI-STATE
+/// `(reachable, Option<CoherenceManifest>)` so a 200-with-garbage-body is
+/// distinguished from a down / not-yet-deployed peer (fix 2):
+///
+///   - transport error, 404, or ANY non-200 (incl. 5xx during a rolling deploy)
+///     → `(false, None)`: down or not-yet-deployed; never fires a false
+///     divergence alarm while a sibling is still deploying.
+///   - HTTP 200 but the body fails to deserialize → `(true, None)`: a peer
+///     serving a 200 garbage/incompatible body IS a real (mixed-version)
+///     divergence to surface, NOT "still deploying".
+///   - HTTP 200 + a parseable manifest → `(true, Some(manifest))`.
+///
+/// The 5xx → `(false, None)` mapping is deliberate: a 503 during a rolling
+/// deploy mapping to `reachable=true` would manufacture exactly the deploy-noise
+/// WARN this feature exists to avoid. ONLY `200 && body-parse-fails` is the
+/// reachable-but-divergent case.
+///
+/// NO per-request timeout here — the `coherence_client` already carries a
+/// client-level 5s timeout (fix 10: one timeout, not two).
 ///
 /// (X-COH-DEF: retry cadence DEFERS to `elohim_compute::backoff::jittered` when
 /// present — until then the existing loop interval is the cadence.)
 async fn fetch_peer_coherence(
     client: &reqwest::Client,
     peer_url: &str,
-) -> Option<crate::routes::coherence::CoherenceManifest> {
+) -> (bool, Option<crate::routes::coherence::CoherenceManifest>) {
     let url = format!(
         "{}/api/v1/federation/coherence",
         peer_url.trim_end_matches('/')
     );
-    match client
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await
-    {
-        Ok(r) if r.status().is_success() => r.json().await.ok(),
-        _ => None,
+    match client.get(&url).send().await {
+        // 200 OK → reachable; body may or may not deserialize.
+        Ok(r) if r.status().is_success() => match r.json().await {
+            Ok(manifest) => (true, Some(manifest)),
+            // 200 but the body is garbage/incompatible → reachable, no manifest.
+            // This IS a divergence (mixed version), so reachable=true is correct.
+            Err(_) => (true, None),
+        },
+        // Any non-200 (404 not-yet-deployed, 5xx rolling deploy) → not reachable.
+        _ => (false, None),
     }
 }
 
-/// Probe each known peer's coherence manifest, compare it to OUR self-manifest,
-/// store the per-peer verdicts in `cache`, and emit a structured WARN alarm for
-/// every reachable peer that does NOT agree (Task 4).
+/// Probe each known peer's coherence manifest CONCURRENTLY, compare each to OUR
+/// self-manifest, store the per-peer verdicts in `cache`, and emit a structured
+/// WARN alarm ONLY for peers whose divergence is NEW or CHANGED since the prior
+/// tick (edge-triggered — fix 5).
 ///
-/// `self_manifest` is recomputed by the caller each tick (its `generation` bumps
-/// as projections refresh). `peers` is a snapshot of the federation peer cache
-/// — `(id, url)` pairs to probe.
+/// Fix 1 — concurrency: the per-peer probes run via `join_all`, so a tick's
+/// latency is ~max(timeout), not the sum of N serial 5s probes. This keeps the
+/// 60s discovery cadence (which also feeds `PeerCache` / `/p2p-peers`) from
+/// drifting when several siblings are slow.
+///
+/// Fix 6 — empty `peer_url`s are skipped (an empty url builds a relative URL
+/// reqwest rejects, swallowed as `(false, None)` forever).
+///
+/// Fix 5 — the WARN is edge-triggered: we read the PRIOR cache snapshot before
+/// overwriting it and warn only on newly/changed-divergent peers
+/// (`divergences_to_warn`). This kills the per-tick log-spam AND makes
+/// `coherence_cache` a real READER, not a write-only dead store.
+///
+/// `self_manifest` is supplied by the caller each tick (the caller gen-gates the
+/// recompute). `peers` is a snapshot of the federation peer cache — `(id, url)`
+/// pairs to probe.
 pub async fn refresh_coherence(
     self_manifest: &crate::routes::coherence::CoherenceManifest,
     peers: &[(String, String)],
     client: &reqwest::Client,
     cache: &PeerCoherenceCache,
 ) {
-    use crate::routes::coherence::compare_to_peer;
+    use crate::routes::coherence::{compare_to_peer, divergences_to_warn};
 
-    let mut results = Vec::with_capacity(peers.len());
-    for (peer_id, peer_url) in peers {
-        let peer_manifest = fetch_peer_coherence(client, peer_url).await;
-        let reachable = peer_manifest.is_some();
-        let verdict = compare_to_peer(self_manifest, peer_id, reachable, peer_manifest.as_ref());
-        results.push(verdict);
-    }
+    // Fix 1 + 6: probe every non-empty-url peer CONCURRENTLY; each future does
+    // fetch + compare and yields its `PeerCoherence` verdict.
+    let probes = peers
+        .iter()
+        .filter(|(_, peer_url)| !peer_url.trim().is_empty())
+        .map(|(peer_id, peer_url)| async move {
+            let (reachable, peer_manifest) = fetch_peer_coherence(client, peer_url).await;
+            compare_to_peer(self_manifest, peer_id, reachable, peer_manifest.as_ref())
+        });
+    let results: Vec<crate::routes::coherence::PeerCoherence> =
+        futures::future::join_all(probes).await;
 
-    // Task 4 — divergence ALARM. Make the degraded state LOUD (FallbackOutcome
-    // precedent: the EPR-router degraded state hid for days at DEBUG). Naming
-    // BOTH doorway_ids + the build SHAs lets the operator instantly tell
-    // content-skew (digests differ, builds equal) from deploy-skew (builds
-    // differ — the actual "two EPR heads" symptom).
-    for pc in &results {
-        if pc.reachable && !pc.agrees {
-            warn!(
-                self_doorway = %self_manifest.doorway_id,
-                peer_doorway = %pc.doorway_id,
-                self_digest = %self_manifest.digest,
-                peer_digest = ?pc.digest,
-                self_build = ?self_manifest.build_id,
-                peer_build = ?pc.build_id,
-                divergent_paths = ?pc.divergent_paths,
-                "CROSS-EDGE EPR HEAD DIVERGENCE — two doorways serving different heads"
-            );
-        }
+    // Fix 5 — edge-triggered divergence ALARM. Read the PRIOR verdicts BEFORE
+    // overwriting the cache, and warn only on the newly/changed-divergent subset.
+    // Make the degraded state LOUD (FallbackOutcome precedent: the EPR-router
+    // degraded state hid for days at DEBUG). Naming BOTH doorway_ids + the build
+    // SHAs lets the operator instantly tell content-skew (digests differ, builds
+    // equal) from deploy-skew (builds differ — the actual "two EPR heads" symptom).
+    let prior = cache.read().await.clone();
+    for pc in divergences_to_warn(&prior, &results) {
+        warn!(
+            self_doorway = %self_manifest.doorway_id,
+            peer_doorway = %pc.doorway_id,
+            self_digest = %self_manifest.digest,
+            peer_digest = ?pc.digest,
+            self_build = ?self_manifest.build_id,
+            peer_build = ?pc.build_id,
+            divergent_paths = ?pc.divergent_paths,
+            "CROSS-EDGE EPR HEAD DIVERGENCE — two doorways serving different heads"
+        );
     }
 
     let mut cache_write = cache.write().await;
@@ -765,6 +800,11 @@ async fn fetch_single_peer(client: &reqwest::Client, peer_url: &str) -> Vec<Peer
 /// the first occurrence wins.
 pub async fn refresh_peer_cache(peer_urls: &[String], self_id: Option<&str>, cache: &PeerCache) {
     if peer_urls.is_empty() {
+        // Fix 12: no configured peers → clear the cache rather than stranding a
+        // stale set. A stale entry left here would be a phantom peer the
+        // coherence probe alarms against even after federation was emptied.
+        let mut cache_write = cache.write().await;
+        cache_write.clear();
         return;
     }
 
@@ -831,30 +871,65 @@ pub fn spawn_peer_discovery_task(
         // BuildInfo is process-constant — construct once, reuse the commit SHA
         // for every per-tick self-manifest.
         let build = elohim_compute::BuildInfo::new("elohim-doorway");
-        let coherence_doorway_id = self_id.clone().unwrap_or_else(|| "unknown".to_string());
+        // Fix 3: cross-edge coherence is meaningless without a self-identity. If
+        // `doorway_id` is unknown, the self-exclusion in `refresh_peer_cache`
+        // (keyed on the real id) can't drop a self-echo, so the doorway would
+        // coherence-probe ITSELF. `Some(id)` only when we have a real id (never
+        // the "unknown" fallback).
+        let coherence_self_id: Option<String> = match self_id.as_deref() {
+            Some(id) if !id.is_empty() && id != "unknown" => Some(id.to_string()),
+            _ => None,
+        };
         let coherence_client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(5))
             .build()
             .unwrap_or_default();
 
+        // Fix 8 — generation-gate cache: last `(generation, CoherenceManifest)`.
+        // The self-manifest is only re-minted when the router generation changed.
+        let mut cached_self_manifest: Option<(u64, crate::routes::coherence::CoherenceManifest)> =
+            None;
+
         loop {
+            // ALWAYS refresh the peer cache — it feeds /p2p-peers and the 60s
+            // discovery cadence, independent of coherence. (`self_id`, including
+            // the "unknown" fallback, is still used for self-exclusion here.)
             let urls = peer_urls.read().await.clone();
             refresh_peer_cache(&urls, self_id.as_deref(), &cache).await;
 
-            // F-COHERENCE cross-edge probe: recompute the self-manifest (its
-            // generation bumps as projections refresh) and compare against the
-            // freshly-discovered peers.
-            let self_manifest = crate::routes::coherence::router_fingerprint(
-                epr_router.as_ref(),
-                &coherence_doorway_id,
-                Some(&build.commit),
-            );
-            let peers: Vec<(String, String)> = get_cached_peers(&cache)
-                .await
-                .into_iter()
-                .map(|p| (p.id, p.url))
-                .collect();
-            refresh_coherence(&self_manifest, &peers, &coherence_client, &coherence_cache).await;
+            // F-COHERENCE cross-edge probe — runs only when we have a real
+            // self-identity (fix 3).
+            if let Some(coherence_id) = coherence_self_id.as_deref() {
+                // Fix 8: recompute the self-manifest only when the generation moved.
+                let gen = epr_router.generation();
+                if crate::routes::coherence::should_recompute_self_manifest(
+                    cached_self_manifest.as_ref(),
+                    gen,
+                ) {
+                    let minted = crate::routes::coherence::router_fingerprint(
+                        epr_router.as_ref(),
+                        coherence_id,
+                        Some(&build.commit),
+                    );
+                    cached_self_manifest = Some((gen, minted));
+                }
+                // Safe: just set above when None.
+                let self_manifest = &cached_self_manifest.as_ref().unwrap().1;
+
+                // Fix 4: before the EPR router populates (boot / pre-first
+                // projection) the self-manifest has zero heads → its digest is the
+                // empty-set CID, which mismatches any populated peer → a spurious
+                // divergence WARN. Skip the probe/compare/WARN entirely this tick.
+                if !self_manifest.heads.is_empty() {
+                    let peers: Vec<(String, String)> = get_cached_peers(&cache)
+                        .await
+                        .into_iter()
+                        .map(|p| (p.id, p.url))
+                        .collect();
+                    refresh_coherence(self_manifest, &peers, &coherence_client, &coherence_cache)
+                        .await;
+                }
+            }
 
             tokio::time::sleep(interval).await;
         }
@@ -927,5 +1002,176 @@ mod tests {
         let bytes = rmp_serde::to_vec_named(&input).unwrap();
         let decoded: RegisterDoorwayInput = rmp_serde::from_slice(&bytes).unwrap();
         assert_eq!(decoded.id, "test-doorway");
+    }
+
+    // ── F-COHERENCE: tri-state fetch + edge-trigger + empty-clear ─────────────
+    mod coherence_probe {
+        use super::super::{
+            fetch_peer_coherence, new_peer_cache, new_peer_coherence_cache, refresh_coherence,
+            refresh_peer_cache, PeerDoorway,
+        };
+        use crate::projection::EprRouter;
+        use crate::routes::coherence::{router_fingerprint, CoherenceManifest, EprHeadFingerprint};
+        use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+        /// Build this edge's self-manifest from a head set (real digest path).
+        fn self_manifest(heads: &[(&str, &str)]) -> CoherenceManifest {
+            let router = EprRouter::new();
+            router.replace_all(
+                heads
+                    .iter()
+                    .map(|(p, e)| crate::routes::coherence::sample_projection(p, e))
+                    .collect(),
+            );
+            router_fingerprint(&router, "alpha", Some("build-alpha"))
+        }
+
+        /// Serialize a CoherenceManifest body for a mock peer to return.
+        fn manifest_body(id: &str, heads: &[(&str, &str)]) -> CoherenceManifest {
+            let mut hv: Vec<EprHeadFingerprint> = heads
+                .iter()
+                .map(|(p, e)| EprHeadFingerprint {
+                    url_path: (*p).to_string(),
+                    epr_id: (*e).to_string(),
+                })
+                .collect();
+            let digest = crate::routes::coherence::mint_head_set_digest(&mut hv);
+            CoherenceManifest {
+                doorway_id: id.to_string(),
+                generation: 1,
+                heads: hv,
+                digest,
+                build_id: Some("build-peer".to_string()),
+            }
+        }
+
+        async fn mount_coherence(server: &MockServer, body: &CoherenceManifest) {
+            Mock::given(matchers::method("GET"))
+                .and(matchers::path("/api/v1/federation/coherence"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(body))
+                .mount(server)
+                .await;
+        }
+
+        #[tokio::test]
+        async fn fetch_404_is_unreachable() {
+            let server = MockServer::start().await;
+            // No mock mounted → 404 on the coherence path.
+            let client = reqwest::Client::new();
+            let (reachable, manifest) = fetch_peer_coherence(&client, &server.uri()).await;
+            assert!(!reachable, "404 → not reachable (not-yet-deployed)");
+            assert!(manifest.is_none());
+        }
+
+        #[tokio::test]
+        async fn fetch_transport_error_is_unreachable() {
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_millis(200))
+                .build()
+                .unwrap();
+            // Dead port → transport error.
+            let (reachable, manifest) =
+                fetch_peer_coherence(&client, "http://127.0.0.1:1/never").await;
+            assert!(!reachable);
+            assert!(manifest.is_none());
+        }
+
+        #[tokio::test]
+        async fn fetch_200_garbage_body_is_reachable_no_manifest() {
+            // Fix 2: a peer that answers 200 with an undeserializable body is a
+            // reachable divergence (reachable=true, manifest=None), NOT "down".
+            let server = MockServer::start().await;
+            Mock::given(matchers::method("GET"))
+                .and(matchers::path("/api/v1/federation/coherence"))
+                .respond_with(ResponseTemplate::new(200).set_body_string("not json at all"))
+                .mount(&server)
+                .await;
+            let client = reqwest::Client::new();
+            let (reachable, manifest) = fetch_peer_coherence(&client, &server.uri()).await;
+            assert!(reachable, "200 garbage body IS reachable (a divergence)");
+            assert!(manifest.is_none(), "garbage body yields no manifest");
+        }
+
+        #[tokio::test]
+        async fn fetch_200_5xx_is_unreachable() {
+            // A 5xx (rolling-deploy state) must map to not-reachable so it never
+            // manufactures deploy-noise WARNs.
+            let server = MockServer::start().await;
+            Mock::given(matchers::method("GET"))
+                .and(matchers::path("/api/v1/federation/coherence"))
+                .respond_with(ResponseTemplate::new(503))
+                .mount(&server)
+                .await;
+            let client = reqwest::Client::new();
+            let (reachable, _m) = fetch_peer_coherence(&client, &server.uri()).await;
+            assert!(!reachable, "503 → not reachable (deploy state, no alarm)");
+        }
+
+        #[tokio::test]
+        async fn fetch_200_valid_manifest_is_reachable_with_manifest() {
+            let server = MockServer::start().await;
+            mount_coherence(&server, &manifest_body("apex", &[("/lamad", "A")])).await;
+            let client = reqwest::Client::new();
+            let (reachable, manifest) = fetch_peer_coherence(&client, &server.uri()).await;
+            assert!(reachable);
+            let m = manifest.expect("valid manifest parses");
+            assert_eq!(m.doorway_id, "apex");
+        }
+
+        #[tokio::test]
+        async fn refresh_coherence_writes_verdicts_into_cache() {
+            // The cache must become a real reader/writer: a divergent peer lands
+            // a verdict with reachable=true, agrees=false.
+            let server = MockServer::start().await;
+            mount_coherence(&server, &manifest_body("apex", &[("/lamad", "DIFFERENT")])).await;
+            let me = self_manifest(&[("/lamad", "MINE")]);
+            let cache = new_peer_coherence_cache();
+            let client = reqwest::Client::new();
+            let peers = vec![("apex".to_string(), server.uri())];
+
+            refresh_coherence(&me, &peers, &client, &cache).await;
+
+            let stored = cache.read().await.clone();
+            assert_eq!(stored.len(), 1);
+            assert!(stored[0].reachable);
+            assert!(!stored[0].agrees, "divergent peer → !agrees");
+            // Fix 7: labeled from the manifest's self-report.
+            assert_eq!(stored[0].doorway_id, "apex");
+        }
+
+        #[tokio::test]
+        async fn refresh_coherence_skips_empty_peer_url() {
+            // Fix 6: an empty url must be skipped, not produce a dead verdict.
+            let me = self_manifest(&[("/lamad", "MINE")]);
+            let cache = new_peer_coherence_cache();
+            let client = reqwest::Client::new();
+            let peers = vec![("ghost".to_string(), "".to_string())];
+
+            refresh_coherence(&me, &peers, &client, &cache).await;
+
+            let stored = cache.read().await.clone();
+            assert!(stored.is_empty(), "empty-url peer must not yield a verdict");
+        }
+
+        #[tokio::test]
+        async fn refresh_peer_cache_clears_on_empty_urls() {
+            // Fix 12: an empty peer-url list clears any stale cache entry.
+            let cache = new_peer_cache();
+            // Seed a stale peer directly.
+            cache.write().await.push(PeerDoorway {
+                id: "stale".into(),
+                url: "https://stale.example".into(),
+                region: None,
+                capabilities: vec![],
+                source_peer: "seed".into(),
+            });
+            assert_eq!(cache.read().await.len(), 1);
+
+            refresh_peer_cache(&[], Some("alpha"), &cache).await;
+            assert!(
+                cache.read().await.is_empty(),
+                "empty peer-url list must clear the stale cache"
+            );
+        }
     }
 }
