@@ -3754,24 +3754,79 @@ impl P2PNode {
                         if let Some((content_id, blob_hash)) = blob_pull_entry {
                             match response {
                                 ShardResponse::Data(data) => {
-                                    let blob_store = self.blob_store.clone();
-                                    match blob_store.store(&data).await {
-                                        Ok(result) => {
-                                            info!(
+                                    // A proactive quilt-draw IS a serve-transfer (the peer served
+                                    // us the bytes), so route it through finalize_quilt_draw to
+                                    // leave the REA delivery trail (serve-blob event) AND the
+                                    // peer_blob_inventory row — exactly like an on-demand fetch.
+                                    // p2p-design-gate 2026-06-18 (see blob_fetch::finalize_quilt_draw).
+                                    // Falls back to a bare store only when no db pool is wired.
+                                    if let Some(ref pool) = self.db_pool {
+                                        match pool.get() {
+                                            Ok(mut conn) => {
+                                                let self_cid = self
+                                                    .config
+                                                    .self_cid
+                                                    .clone()
+                                                    .unwrap_or_default();
+                                                match crate::p2p::blob_fetch::finalize_quilt_draw(
+                                                    &mut conn,
+                                                    &blob_hash,
+                                                    &peer.to_string(),
+                                                    &data,
+                                                    &self_cid,
+                                                    &self.blob_store,
+                                                )
+                                                .await
+                                                {
+                                                    Ok(true) => info!(
+                                                        content_id = %content_id,
+                                                        blob_hash = %blob_hash,
+                                                        size = data.len(),
+                                                        source_peer = %peer,
+                                                        "quilt draw: blob stocked + serve-blob delivery event booked"
+                                                    ),
+                                                    Ok(false) => warn!(
+                                                        content_id = %content_id,
+                                                        blob_hash = %blob_hash,
+                                                        source_peer = %peer,
+                                                        "quilt draw: pulled bytes failed hash verification; discarded"
+                                                    ),
+                                                    Err(e) => warn!(
+                                                        content_id = %content_id,
+                                                        blob_hash = %blob_hash,
+                                                        error = %e,
+                                                        "quilt draw: finalize_quilt_draw failed"
+                                                    ),
+                                                }
+                                            }
+                                            Err(e) => {
+                                                // Pool exhausted: preserve the stock even though we
+                                                // cannot book the delivery event this round (a later
+                                                // on-demand serve / parity sweep reconciles).
+                                                warn!(
+                                                    content_id = %content_id,
+                                                    blob_hash = %blob_hash,
+                                                    error = %e,
+                                                    "quilt draw: db pool unavailable; storing blob without delivery event"
+                                                );
+                                                let _ = self.blob_store.store(&data).await;
+                                            }
+                                        }
+                                    } else {
+                                        match self.blob_store.store(&data).await {
+                                            Ok(result) => info!(
                                                 content_id = %content_id,
                                                 blob_hash = %blob_hash,
                                                 size = data.len(),
                                                 already_existed = result.already_existed,
-                                                "quilt draw: blob stocked in pantry after replication"
-                                            );
-                                        }
-                                        Err(e) => {
-                                            warn!(
+                                                "quilt draw: blob stocked in pantry after replication (no db pool; delivery event skipped)"
+                                            ),
+                                            Err(e) => warn!(
                                                 content_id = %content_id,
                                                 blob_hash = %blob_hash,
                                                 error = %e,
                                                 "quilt draw: failed to stock blob in pantry"
-                                            );
+                                            ),
                                         }
                                     }
                                 }

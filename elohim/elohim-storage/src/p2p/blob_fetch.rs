@@ -256,6 +256,47 @@ pub async fn finalize_fetch_success(
     })
 }
 
+/// Finalize a **proactive quilt-draw** (replication pull): a remote peer served
+/// us the blob bytes in response to our `ShardRequest::Get`, so — exactly like
+/// the on-demand race-fetch — this is a serve-transfer that belongs on the REA
+/// delivery surface. p2p-design-gate (2026-06-18): book a `serve-blob` event
+/// (provider = the serving peer, receiver = `self_cid`) via the SAME atomic
+/// pair as `finalize_fetch_success`, NOT a distinct `blob-hosted` action — the
+/// hosting/observation fact is the `peer_blob_inventory` row that the same
+/// finalize writes; `blob-hosted` would duplicate the propagation surface and
+/// has zero consumers. The verify script (`substrate-verify.sh` delivery) keeps
+/// its `action=serve-blob` query unchanged, so emitter and verify speak one
+/// vocabulary and cannot re-diverge.
+///
+/// Unlike the race-fetch path (which verifies bytes BEFORE `finalize_fetch_success`),
+/// the quilt-draw arm has NOT verified the reply, so verify here first. Without
+/// it a mismatched reply would write an inventory row + `serve-blob` event
+/// claiming we host `blob_hash` while `BlobStore::store` filed the bytes under
+/// their real (different) hash. Returns `Ok(false)` when the bytes fail
+/// verification (discarded, no writes); `Ok(true)` when stocked + booked.
+pub async fn finalize_quilt_draw(
+    conn: &mut SqliteConnection,
+    blob_hash: &str,
+    source_peer: &str,
+    bytes: &[u8],
+    self_cid: &str,
+    blob_store: &BlobStore,
+) -> Result<bool, StorageError> {
+    // Verify FIRST — the quilt-draw arm has not validated the reply (unlike the
+    // race-fetch path). A mismatched reply must be discarded, never booked:
+    // BlobStore::store files bytes under their REAL hash, so an inventory row +
+    // serve-blob event keyed on `blob_hash` would otherwise claim we host
+    // content we never stored.
+    if !verify_blob_hash(bytes, blob_hash) {
+        return Ok(false);
+    }
+    // Verified: same atomic pair as an on-demand serve (store + inventory row +
+    // serve-blob delivery event). Reuse — do not fork — to keep the T18 parity
+    // contract (inventory row ⟺ serve-blob event) coherent across both paths.
+    finalize_fetch_success(conn, blob_hash, source_peer, bytes, self_cid, blob_store).await?;
+    Ok(true)
+}
+
 /// Verify that `bytes` has the sha256 hex digest matching `expected_hex`.
 /// Comparison is case-insensitive (both sides lowercased).
 ///
@@ -501,5 +542,127 @@ mod tests {
             "peer_blob_inventory row must be rolled back when serve-blob \
              insert fails; got rows: {rows:?}"
         );
+    }
+
+    /// #3 regression (Verify Delivery Events): a proactive quilt-draw moves
+    /// bytes but must ALSO leave the REA delivery trail. `finalize_quilt_draw`
+    /// books exactly one `serve-blob` event with the on-demand direction
+    /// (provider = the serving peer, receiver = self) AND writes the
+    /// `peer_blob_inventory` row — so the proactive replication path is no
+    /// longer invisible to both delivery verification and replica_count.
+    /// RED before the fix: the production arm called bare `blob_store.store()`,
+    /// booking zero events.
+    #[tokio::test]
+    async fn quilt_draw_books_serve_blob_event() {
+        use crate::blob_store::BlobStore;
+        use crate::db::peer_blob_inventory::lookup_hosts;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let blob_store = BlobStore::new_memory();
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let bytes = b"quilt-draw-payload".to_vec();
+        let hash = {
+            let mut h = Sha256::new();
+            h.update(&bytes);
+            format!("sha256-{}", hex::encode(h.finalize()))
+        };
+
+        let booked = finalize_quilt_draw(
+            &mut conn,
+            &hash,
+            "peer_Q",
+            &bytes,
+            "self_cid_Q",
+            &blob_store,
+        )
+        .await
+        .expect("finalize_quilt_draw ok");
+        assert!(booked, "verified bytes must be stocked + booked");
+
+        assert!(
+            blob_store.exists(&hash).await,
+            "blob persisted to filesystem"
+        );
+
+        let inv = lookup_hosts(&mut conn, &hash, "2020-01-01T00:00:00Z").unwrap();
+        assert!(
+            inv.iter().any(|r| r.peer_id == "peer_Q"),
+            "peer_blob_inventory row written for the proactive draw; got: {inv:?}"
+        );
+
+        use crate::db::diesel_schema::economic_events::dsl as ee;
+        let count: i64 = ee::economic_events
+            .filter(ee::action.eq("serve-blob"))
+            .filter(ee::resource_inventoried_as.eq(&hash))
+            .filter(ee::provider.eq("peer_Q"))
+            .filter(ee::receiver.eq("self_cid_Q"))
+            .count()
+            .get_result(&mut conn)
+            .unwrap();
+        assert_eq!(
+            count, 1,
+            "exactly one serve-blob event, provider=serving peer, receiver=self"
+        );
+    }
+
+    /// `finalize_quilt_draw` must verify the pulled bytes against the expected
+    /// hash before booking — the quilt-draw arm does NOT pre-verify like the
+    /// race-fetch path. A peer returning mismatched bytes must be discarded
+    /// (`Ok(false)`), leaving NO inventory row and NO `serve-blob` event that
+    /// would falsely claim we host `blob_hash` (the bytes would have been
+    /// filed under their real, different hash). RED before the fix: the stub
+    /// stored unverified bytes and returned `Ok(true)`.
+    #[tokio::test]
+    async fn quilt_draw_discards_mismatched_bytes() {
+        use crate::blob_store::BlobStore;
+        use crate::db::peer_blob_inventory::lookup_hosts;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let blob_store = BlobStore::new_memory();
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        // The hash the peer claimed to be serving (hash of OTHER content)…
+        let claimed = {
+            let mut h = Sha256::new();
+            h.update(b"the-content-we-asked-for");
+            format!("sha256-{}", hex::encode(h.finalize()))
+        };
+        // …but it actually returned these (mismatched) bytes.
+        let bytes = b"a-different-payload-entirely".to_vec();
+
+        let booked = finalize_quilt_draw(
+            &mut conn,
+            &claimed,
+            "peer_M",
+            &bytes,
+            "self_cid_M",
+            &blob_store,
+        )
+        .await
+        .expect("finalize_quilt_draw ok");
+        assert!(!booked, "mismatched bytes must be discarded (Ok(false))");
+
+        assert!(
+            !blob_store.exists(&claimed).await,
+            "no blob stored under the claimed hash"
+        );
+        let inv = lookup_hosts(&mut conn, &claimed, "2020-01-01T00:00:00Z").unwrap();
+        assert!(
+            !inv.iter().any(|r| r.peer_id == "peer_M"),
+            "no inventory row for a mismatched draw; got: {inv:?}"
+        );
+        use crate::db::diesel_schema::economic_events::dsl as ee;
+        let count: i64 = ee::economic_events
+            .filter(ee::action.eq("serve-blob"))
+            .filter(ee::resource_inventoried_as.eq(&claimed))
+            .count()
+            .get_result(&mut conn)
+            .unwrap();
+        assert_eq!(count, 0, "no serve-blob event for a discarded draw");
     }
 }
