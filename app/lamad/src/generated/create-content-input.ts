@@ -140,4 +140,8 @@ export interface CreateContentInput {
    * Categorization tags
    */
   tags?: string[];
+  /**
+   * Content-derived provenance anchor set at ingest (seed/import) so the row satisfies the require_provenance read gate on hub-optional/peer-starved stacks where the libp2p publish drain never runs. A CIDv1 (bafkrei…) over the canonical content bytes. Superseded by the real ActionHash when a ContentCommitted notarization later runs. Optional — omit on the peered path where the drain stamps p2pPublishedAt.
+   */
+  dhtAnchorHash?: string;
 }

@@ -29,6 +29,7 @@ import type { Section, Item } from './generated/body-types.js';
 import { waitForDrain } from './wait-for-drain.js';
 import { applyPathThumbnail } from './path-thumbnail.js';
 import { recordBlobUploadOutcome } from './blob-upload-result.js';
+import { computeCid } from './doorway-client.js';
 
 // Directory setup
 const __filename = fileURLToPath(import.meta.url);
@@ -603,6 +604,45 @@ function getReachForContent(contentId: string, authoredReach?: string): Reach {
   return earnedReach({ authored: authoredReach, advisory });
 }
 
+/**
+ * Compute a content-derived CIDv1 provenance anchor for a CreateContentInput.
+ *
+ * The anchor satisfies the storage `require_provenance` read gate
+ * (`dht_anchor_hash IS NOT NULL OR p2p_published_at IS NOT NULL`) on
+ * hub-optional / peer-starved stacks where the libp2p publish drain never
+ * runs. Using a real CIDv1 (raw codec 0x55, sha2-256) is the HONEST
+ * alternative to stamping `p2pPublishedAt` (which asserts a DHT publication
+ * that never happened). The value will be superseded by the real ActionHash
+ * when a `ContentCommitted` notarization later runs.
+ *
+ * Canonical byte selection (in priority order):
+ *   1. `contentBody` UTF-8 bytes — the primary content payload.
+ *   2. `blobHash`/`blobCid` as UTF-8 bytes — blob-backed / video items with
+ *      no inline body; the hash string itself is canonical per-item.
+ *   3. `id + title` UTF-8 — ultimate fallback for placeholder entries.
+ *
+ * Exported for unit testing.
+ */
+export async function deriveContentAnchor(input: {
+  id: string;
+  title: string;
+  contentBody?: string;
+  blobHash?: string;
+  blobCid?: string;
+}): Promise<string> {
+  let bytes: Uint8Array;
+  if (input.contentBody) {
+    bytes = new TextEncoder().encode(input.contentBody);
+  } else if (input.blobCid) {
+    bytes = new TextEncoder().encode(input.blobCid);
+  } else if (input.blobHash) {
+    bytes = new TextEncoder().encode(input.blobHash);
+  } else {
+    bytes = new TextEncoder().encode(`${input.id}\x00${input.title}`);
+  }
+  return computeCid(bytes);
+}
+
 function transformContent(json: ConceptJson): CreateContentInput {
   // Serialize content body to string
   let contentBody: string | undefined;
@@ -900,15 +940,14 @@ async function seedContent(items: CreateContentInput[]): Promise<{ inserted: num
 }
 
 /**
- * Stamp `p2pPublishedAt` on freshly-seeded content so it passes the storage
- * `require_provenance` read gate (`dht_anchor_hash IS NOT NULL OR
- * p2p_published_at IS NOT NULL` — content_diesel.rs). The drain loop is the
- * canonical writer in a peered stack, but household/local stacks have no DHT
- * peers, so without this stamp the bulk-seeded rows stay invisible to every
- * external read (the local-stack DHT-anchor gap). We PATCH per id rather than
- * extend the bulk-create input so the create path stays untouched.
+ * Reconcile the authored `reach` onto already-present rows via PATCH.
  *
- * The same PATCH reconciles the authored `reach` onto already-present rows:
+ * Provenance is now carried at CREATE time via `dhtAnchorHash` in the bulk
+ * POST body (see `deriveContentAnchor` above) — a content-derived CIDv1 that
+ * satisfies the `require_provenance` read gate honestly, without asserting a
+ * DHT publication that never happened. This function's sole remaining job is
+ * reach reconciliation:
+ *
  * `/db/content/bulk` is strict skip-on-exists (content_diesel.rs
  * bulk_create_content — never UPDATEs), so a row seeded before its authored
  * reach changed keeps the stale value forever (the manifesto reach=null gap —
@@ -916,21 +955,25 @@ async function seedContent(items: CreateContentInput[]): Promise<{ inserted: num
  * re-seed). Carrying `reach` here makes re-seeds reconcile the authored value
  * idempotently without wiping content.
  *
- * Best-effort: a failed stamp is logged but does not abort seeding (the drain
- * loop may still publish later in a peered stack). Mirrors seedContent's
- * batch/catch structure.
+ * NOTE: pre-existing NULL-provenance rows (seeded before the dhtAnchorHash
+ * create-path fix) are NOT healed by this path — `UpdateContentInputView` in
+ * storage does not expose `dhtAnchorHash`. Those rows will pass the gate once
+ * the p2p drain stamps `p2p_published_at` when peers are available.
+ *
+ * Best-effort: a failed PATCH is logged but does not abort seeding. Mirrors
+ * seedContent's batch/catch structure.
  */
 async function stampProvenance(
   items: Array<{ id: string; reach?: string | null }>,
 ): Promise<{ stamped: number; failed: number }> {
-  if (DRY_RUN || items.length === 0) {
-    return { stamped: DRY_RUN ? items.length : 0, failed: 0 };
+  // Filter to only items that carry a reach value — nothing to PATCH otherwise.
+  const reachItems = items.filter(item => Boolean(item.reach));
+  if (DRY_RUN || reachItems.length === 0) {
+    return { stamped: DRY_RUN ? reachItems.length : 0, failed: 0 };
   }
 
-  const publishedAt = new Date().toISOString();
   let stamped = 0;
   let failed = 0;
-  let reachSkipped = 0;
 
   // Substrate-correct storage routes reach-carrying PATCHes through the
   // conductor (re-notarize in the DHT) — which FAILS for bulk-seeded rows
@@ -940,14 +983,13 @@ async function stampProvenance(
   // skipped the fallback entirely) and hit the pipeline cap. Hardening:
   // per-request timeout, fallback on BOTH non-OK and thrown errors, a
   // circuit breaker that stops paying the conductor cost after it has
-  // clearly failed, and bounded concurrency. The authored reach reconciles
-  // when the bulk-seed anchor step lands (timeline backlog:
-  // ci-seeder-stamp-conductor-anchor-circularity).
+  // clearly failed, and bounded concurrency.
   const PATCH_TIMEOUT_MS = 5000;
   const REACH_BREAKER_THRESHOLD = 5;
   const CONCURRENCY = 10;
   let consecutiveReachFailures = 0;
   let reachCircuitOpen = false;
+  let reachCircuitSkipped = 0;
 
   const patchContent = async (id: string, body: Record<string, string>): Promise<boolean> => {
     const controller = new AbortController();
@@ -967,44 +1009,34 @@ async function stampProvenance(
     }
   };
 
-  const stampOne = async (item: { id: string; reach?: string | null }): Promise<void> => {
-    const tryReach = Boolean(item.reach) && !reachCircuitOpen;
-    if (tryReach) {
-      const ok = await patchContent(item.id, {
-        p2pPublishedAt: publishedAt,
-        reach: item.reach as string,
-      });
-      if (ok) {
-        consecutiveReachFailures = 0;
-        stamped++;
-        return;
-      }
-      consecutiveReachFailures++;
-      if (consecutiveReachFailures >= REACH_BREAKER_THRESHOLD && !reachCircuitOpen) {
-        reachCircuitOpen = true;
-        console.warn(
-          `   stampProvenance: reach circuit OPEN after ${consecutiveReachFailures} consecutive conductor-path failures — remaining rows stamp provenance-only (no per-row conductor cost)`,
-        );
-      }
+  const reconcileReach = async (item: { id: string; reach?: string | null }): Promise<void> => {
+    if (reachCircuitOpen) {
+      reachCircuitSkipped++;
+      return;
     }
-    // Provenance-only (diesel path) — either the reach attempt failed, the
-    // circuit is open, or the item carries no reach.
-    const ok = await patchContent(item.id, { p2pPublishedAt: publishedAt });
+    const ok = await patchContent(item.id, { reach: item.reach as string });
     if (ok) {
+      consecutiveReachFailures = 0;
       stamped++;
-      if (item.reach) reachSkipped++;
-    } else {
-      failed++;
+      return;
+    }
+    consecutiveReachFailures++;
+    failed++;
+    if (consecutiveReachFailures >= REACH_BREAKER_THRESHOLD && !reachCircuitOpen) {
+      reachCircuitOpen = true;
+      console.warn(
+        `   stampProvenance: reach circuit OPEN after ${consecutiveReachFailures} consecutive conductor-path failures — remaining ${reachItems.length - stamped - failed} rows skipped (reach re-notarization needs conductor; not DHT-anchored)`,
+      );
     }
   };
 
-  for (let i = 0; i < items.length; i += CONCURRENCY) {
-    await Promise.all(items.slice(i, i + CONCURRENCY).map(stampOne));
+  for (let i = 0; i < reachItems.length; i += CONCURRENCY) {
+    await Promise.all(reachItems.slice(i, i + CONCURRENCY).map(reconcileReach));
   }
 
-  if (reachSkipped > 0) {
+  if (reachCircuitSkipped > 0) {
     console.warn(
-      `   stampProvenance: ${reachSkipped} row(s) stamped provenance-only — reach re-notarization needs the conductor and these rows are not DHT-anchored (bulk-seed anchor gap)`,
+      `   stampProvenance: ${reachCircuitSkipped} row(s) skipped after circuit open — reach re-notarization needs the conductor and these rows are not DHT-anchored (bulk-seed anchor gap)`,
     );
   }
 
@@ -1217,15 +1249,19 @@ async function main() {
     }
 
     console.log(`\nTransforming content...`);
-    const contentInputs = content.map(c => {
+    const contentInputs = await Promise.all(content.map(async c => {
       const input = transformContent(c);
       // Add blob_hash if we uploaded one for this content
       const blobHash = uploadedContentBlobs.get(c.id);
       if (blobHash) {
         input.blobHash = blobHash;
       }
+      // Attach a content-derived CIDv1 anchor so the row satisfies the
+      // require_provenance read gate at ingest (honest alternative to the
+      // p2pPublishedAt false-stamp on hub-optional/peer-starved stacks).
+      input.dhtAnchorHash = await deriveContentAnchor(input);
       return input;
-    });
+    }));
     console.log(`   Transformed ${formatCount(contentInputs.length)} items`);
 
     // Inverted-burden surprise guard: the `private` default silently migrates
@@ -1299,14 +1335,18 @@ async function main() {
     }
 
     console.log(`\nTransforming paths to content nodes...`);
-    const pathContentInputs = paths.map(p => {
+    const pathContentInputs = await Promise.all(paths.map(async p => {
       const input = transformPathToContent(p);
       const thumbnailHash =
         p.thumbnailUrl && uploadedThumbnails.has(p.thumbnailUrl)
           ? uploadedThumbnails.get(p.thumbnailUrl)
           : undefined;
-      return applyPathThumbnail(input, thumbnailHash);
-    });
+      const withThumbnail = applyPathThumbnail(input, thumbnailHash);
+      // Attach a content-derived CIDv1 anchor for the path row (same
+      // require_provenance gate applies to paths seeded as content nodes).
+      withThumbnail.dhtAnchorHash = await deriveContentAnchor(withThumbnail);
+      return withThumbnail;
+    }));
 
     // Count steps for logging
     const totalSteps = pathContentInputs.reduce((sum, p) => {

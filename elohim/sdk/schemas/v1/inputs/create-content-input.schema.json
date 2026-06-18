@@ -19,7 +19,11 @@
     "metadata": { "type": "object", "description": "Domain-specific metadata" },
     "reach": { "$ref": "../enums/reach.schema.json", "description": "Visibility/access level" },
     "createdBy": { "type": "string", "description": "Creator agent ID" },
-    "tags": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Categorization tags" }
+    "tags": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Categorization tags" },
+    "dhtAnchorHash": {
+      "type": "string",
+      "description": "Content-derived provenance anchor set at ingest (seed/import) so the row satisfies the require_provenance read gate on hub-optional/peer-starved stacks where the libp2p publish drain never runs. A CIDv1 (bafkrei…) over the canonical content bytes. Superseded by the real ActionHash when a ContentCommitted notarization later runs. Optional — omit on the peered path where the drain stamps p2pPublishedAt."
+    }
   },
   "additionalProperties": false
 }
