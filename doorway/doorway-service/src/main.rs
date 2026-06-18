@@ -1089,10 +1089,20 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         let cache = state.peer_cache.clone();
         let peer_count = args.federation_peers.len();
 
+        // F-COHERENCE: the cross-edge probe rides the existing discovery loop.
+        // It needs the EprRouter (to recompute this edge's self-manifest each
+        // tick) and a PeerCoherenceCache to store the per-peer verdicts. The
+        // cache is owned by the spawned task here (surfacing it on a route /
+        // SelfHealingView is the Wave-F3 X-COH-DIAG follow-on, out of scope).
+        let coherence_epr_router = Arc::clone(&state.epr_router);
+        let coherence_cache = services::federation::new_peer_coherence_cache();
+
         services::federation::spawn_peer_discovery_task(
             peer_url_list,
             self_id,
             cache,
+            coherence_epr_router,
+            coherence_cache,
             std::time::Duration::from_secs(10), // initial delay (let peers boot)
             std::time::Duration::from_secs(60), // refresh interval
         );

@@ -583,6 +583,96 @@ pub fn new_peer_cache() -> PeerCache {
     Arc::new(tokio::sync::RwLock::new(Vec::new()))
 }
 
+// =============================================================================
+// Cross-Edge Coherence Probe (F-COHERENCE)
+// =============================================================================
+
+/// Probe results from sibling doorways' `/api/v1/federation/coherence`.
+///
+/// Cat-C node-local read-model (transport-only here; the DATA type +
+/// comparison logic live in `crate::routes::coherence`). Refreshed inside the
+/// existing peer-discovery loop — observability-only, NEVER reconciled.
+pub type PeerCoherenceCache =
+    Arc<tokio::sync::RwLock<Vec<crate::routes::coherence::PeerCoherence>>>;
+
+/// Create a new empty peer-coherence cache.
+pub fn new_peer_coherence_cache() -> PeerCoherenceCache {
+    Arc::new(tokio::sync::RwLock::new(Vec::new()))
+}
+
+/// Fetch one peer's `CoherenceManifest`. Bounded timeout; reuses the federation
+/// HTTP idiom. Returns `None` when the peer is unreachable OR pre-F-COHERENCE
+/// (404 on the coherence route) — both read as "not reachable" downstream, so a
+/// still-deploying sibling never fires a false divergence alarm.
+///
+/// (X-COH-DEF: retry cadence DEFERS to `elohim_compute::backoff::jittered` when
+/// present — until then the existing loop interval is the cadence.)
+async fn fetch_peer_coherence(
+    client: &reqwest::Client,
+    peer_url: &str,
+) -> Option<crate::routes::coherence::CoherenceManifest> {
+    let url = format!(
+        "{}/api/v1/federation/coherence",
+        peer_url.trim_end_matches('/')
+    );
+    match client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+    {
+        Ok(r) if r.status().is_success() => r.json().await.ok(),
+        _ => None,
+    }
+}
+
+/// Probe each known peer's coherence manifest, compare it to OUR self-manifest,
+/// store the per-peer verdicts in `cache`, and emit a structured WARN alarm for
+/// every reachable peer that does NOT agree (Task 4).
+///
+/// `self_manifest` is recomputed by the caller each tick (its `generation` bumps
+/// as projections refresh). `peers` is a snapshot of the federation peer cache
+/// — `(id, url)` pairs to probe.
+pub async fn refresh_coherence(
+    self_manifest: &crate::routes::coherence::CoherenceManifest,
+    peers: &[(String, String)],
+    client: &reqwest::Client,
+    cache: &PeerCoherenceCache,
+) {
+    use crate::routes::coherence::compare_to_peer;
+
+    let mut results = Vec::with_capacity(peers.len());
+    for (peer_id, peer_url) in peers {
+        let peer_manifest = fetch_peer_coherence(client, peer_url).await;
+        let reachable = peer_manifest.is_some();
+        let verdict = compare_to_peer(self_manifest, peer_id, reachable, peer_manifest.as_ref());
+        results.push(verdict);
+    }
+
+    // Task 4 — divergence ALARM. Make the degraded state LOUD (FallbackOutcome
+    // precedent: the EPR-router degraded state hid for days at DEBUG). Naming
+    // BOTH doorway_ids + the build SHAs lets the operator instantly tell
+    // content-skew (digests differ, builds equal) from deploy-skew (builds
+    // differ — the actual "two EPR heads" symptom).
+    for pc in &results {
+        if pc.reachable && !pc.agrees {
+            warn!(
+                self_doorway = %self_manifest.doorway_id,
+                peer_doorway = %pc.doorway_id,
+                self_digest = %self_manifest.digest,
+                peer_digest = ?pc.digest,
+                self_build = ?self_manifest.build_id,
+                peer_build = ?pc.build_id,
+                divergent_paths = ?pc.divergent_paths,
+                "CROSS-EDGE EPR HEAD DIVERGENCE — two doorways serving different heads"
+            );
+        }
+    }
+
+    let mut cache_write = cache.write().await;
+    *cache_write = results;
+}
+
 /// Shared mutable list of federation peer URLs.
 /// Seeded from FEDERATION_PEERS env var, mutable via admin API at runtime.
 pub type PeerUrlList = Arc<tokio::sync::RwLock<Vec<String>>>;
@@ -718,10 +808,19 @@ pub async fn refresh_peer_cache(peer_urls: &[String], self_id: Option<&str>, cac
 /// Spawn a background task that periodically refreshes the peer cache.
 /// Initial fetch happens after `initial_delay`, then every `interval`.
 /// Reads peer URLs from the shared mutable list on each iteration.
+///
+/// Also runs the F-COHERENCE cross-edge probe on each tick (additive): it
+/// recomputes THIS edge's self-manifest from `epr_router` and compares it
+/// against every discovered peer's coherence manifest, storing the verdicts in
+/// `coherence_cache` and alarming on divergence. Detection-only — never
+/// reconciles.
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_peer_discovery_task(
     peer_urls: PeerUrlList,
     self_id: Option<String>,
     cache: PeerCache,
+    epr_router: Arc<crate::projection::EprRouter>,
+    coherence_cache: PeerCoherenceCache,
     initial_delay: std::time::Duration,
     interval: std::time::Duration,
 ) -> JoinHandle<()> {
@@ -729,9 +828,34 @@ pub fn spawn_peer_discovery_task(
         // Wait for startup to settle (peer doorways may still be booting)
         tokio::time::sleep(initial_delay).await;
 
+        // BuildInfo is process-constant — construct once, reuse the commit SHA
+        // for every per-tick self-manifest.
+        let build = elohim_compute::BuildInfo::new("elohim-doorway");
+        let coherence_doorway_id = self_id.clone().unwrap_or_else(|| "unknown".to_string());
+        let coherence_client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .unwrap_or_default();
+
         loop {
             let urls = peer_urls.read().await.clone();
             refresh_peer_cache(&urls, self_id.as_deref(), &cache).await;
+
+            // F-COHERENCE cross-edge probe: recompute the self-manifest (its
+            // generation bumps as projections refresh) and compare against the
+            // freshly-discovered peers.
+            let self_manifest = crate::routes::coherence::router_fingerprint(
+                epr_router.as_ref(),
+                &coherence_doorway_id,
+                Some(&build.commit),
+            );
+            let peers: Vec<(String, String)> = get_cached_peers(&cache)
+                .await
+                .into_iter()
+                .map(|p| (p.id, p.url))
+                .collect();
+            refresh_coherence(&self_manifest, &peers, &coherence_client, &coherence_cache).await;
+
             tokio::time::sleep(interval).await;
         }
     })

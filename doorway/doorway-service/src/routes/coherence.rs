@@ -24,7 +24,7 @@ use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::{Response, StatusCode};
 use multihash_codetable::{Code, MultihashDigest};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::projection::epr_router::EprRouter;
 use crate::server::AppState;
@@ -37,7 +37,7 @@ const DAG_CBOR_CODEC: u64 = 0x71;
 /// EPR atom CID (`EprProjectionView.epr_id`) — itself already a CID, NOT a blob
 /// hash and NOT a deploy build SHA (those are distinct — see
 /// `CoherenceManifest.build_id`).
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EprHeadFingerprint {
     pub url_path: String,
@@ -50,7 +50,7 @@ pub struct EprHeadFingerprint {
 /// (the operator's "two EPR heads" symptom was actually build_id skew, not
 /// content divergence) — carried alongside so deploy-skew is reported, never
 /// confused with content skew.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CoherenceManifest {
     pub doorway_id: String,
@@ -88,6 +88,102 @@ pub fn router_fingerprint(
         heads,
         digest,
         build_id: build_id.map(str::to_string),
+    }
+}
+
+/// Per-peer divergence verdict (Cat-C, observability-only). `agrees` = the peer
+/// was reachable AND its `digest` matches ours. `divergent_paths` names the
+/// pillars whose heads differ (operator-actionable). This is NEVER reconciled —
+/// the doorway surfaces divergence, it never authors cross-edge truth.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PeerCoherence {
+    pub doorway_id: String,
+    pub reachable: bool,
+    pub digest: Option<String>,
+    pub build_id: Option<String>,
+    pub agrees: bool,
+    pub divergent_paths: Vec<String>,
+}
+
+/// Cross-edge coherence view (Cat-C, observability-only — NEVER reconciles).
+/// `in_agreement` is true iff every compared peer agrees.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoherenceView {
+    pub self_digest: String,
+    pub self_build_id: Option<String>,
+    pub peers: Vec<PeerCoherence>,
+    pub in_agreement: bool,
+}
+
+/// Compare this edge's manifest against one peer's. PURE — no I/O.
+///
+/// `reachable` carries a precise meaning: the coherence probe returned a
+/// manifest. A peer that is up but pre-F-COHERENCE (404 on the coherence route)
+/// reads as NOT reachable, so it can never fire a false divergence alarm while
+/// the sibling edge is still deploying.
+pub fn compare_to_peer(
+    me: &CoherenceManifest,
+    peer_id: &str,
+    reachable: bool,
+    peer: Option<&CoherenceManifest>,
+) -> PeerCoherence {
+    match (reachable, peer) {
+        (true, Some(p)) => {
+            let agrees = p.digest == me.digest;
+            let mut divergent: Vec<String> = Vec::new();
+            if !agrees {
+                let mine: std::collections::HashMap<&str, &str> = me
+                    .heads
+                    .iter()
+                    .map(|h| (h.url_path.as_str(), h.epr_id.as_str()))
+                    .collect();
+                // Pillars present on the peer with a different (or our-missing) head.
+                for h in &p.heads {
+                    match mine.get(h.url_path.as_str()) {
+                        Some(my_epr) if *my_epr == h.epr_id => {}
+                        _ => divergent.push(h.url_path.clone()),
+                    }
+                }
+                // Pillars we have that the peer is missing entirely.
+                for path in mine.keys() {
+                    if !p.heads.iter().any(|h| h.url_path == *path) {
+                        divergent.push((*path).to_string());
+                    }
+                }
+                divergent.sort();
+                divergent.dedup();
+            }
+            PeerCoherence {
+                doorway_id: peer_id.to_string(),
+                reachable: true,
+                digest: Some(p.digest.clone()),
+                build_id: p.build_id.clone(),
+                agrees,
+                divergent_paths: divergent,
+            }
+        }
+        _ => PeerCoherence {
+            doorway_id: peer_id.to_string(),
+            reachable,
+            digest: None,
+            build_id: None,
+            agrees: false,
+            divergent_paths: Vec::new(),
+        },
+    }
+}
+
+/// Compose the cross-edge view from this edge's manifest + the per-peer verdicts.
+/// `in_agreement` is true iff every peer agrees (vacuously true with no peers).
+pub fn build_coherence_view(me: &CoherenceManifest, peers: Vec<PeerCoherence>) -> CoherenceView {
+    let in_agreement = peers.iter().all(|p| p.agrees);
+    CoherenceView {
+        self_digest: me.digest.clone(),
+        self_build_id: me.build_id.clone(),
+        peers,
+        in_agreement,
     }
 }
 
@@ -196,5 +292,61 @@ mod tests {
         let m = router_fingerprint(&router, "x", None);
         assert!(m.heads.is_empty());
         assert!(m.digest.starts_with("bafy"), "got {}", m.digest);
+    }
+
+    /// Build a `CoherenceManifest` directly from `(url_path, epr_id)` pairs,
+    /// minting the same CIDv1 dag-cbor digest `router_fingerprint` would so the
+    /// comparison tests exercise the real digest-equality path.
+    fn sample_manifest(id: &str, heads: &[(&str, &str)]) -> CoherenceManifest {
+        let mut heads: Vec<EprHeadFingerprint> = heads
+            .iter()
+            .map(|(url_path, epr_id)| EprHeadFingerprint {
+                url_path: (*url_path).to_string(),
+                epr_id: (*epr_id).to_string(),
+            })
+            .collect();
+        heads.sort_by(|a, b| a.url_path.cmp(&b.url_path).then(a.epr_id.cmp(&b.epr_id)));
+        let preimage = serde_ipld_dagcbor::to_vec(&heads).expect("dag-cbor encode");
+        let mh = Code::Sha2_256.digest(&preimage);
+        let digest = Cid::new_v1(DAG_CBOR_CODEC, mh).to_string();
+        CoherenceManifest {
+            doorway_id: id.to_string(),
+            generation: 1,
+            heads,
+            digest,
+            build_id: None,
+        }
+    }
+
+    #[test]
+    fn compare_marks_agreement_and_divergent_paths() {
+        let me = sample_manifest("alpha", &[("/lamad", "A"), ("/qahal", "B")]);
+        let peer = sample_manifest("apex", &[("/lamad", "A"), ("/qahal", "C")]);
+        let pc = compare_to_peer(&me, "apex", true, Some(&peer));
+        assert_eq!(pc.doorway_id, "apex");
+        assert!(pc.reachable);
+        assert!(!pc.agrees);
+        assert_eq!(pc.divergent_paths, vec!["/qahal".to_string()]);
+    }
+
+    #[test]
+    fn compare_unreachable_peer_does_not_agree() {
+        let me = sample_manifest("alpha", &[("/lamad", "A")]);
+        let pc = compare_to_peer(&me, "apex", false, None);
+        assert!(!pc.reachable);
+        assert!(!pc.agrees);
+    }
+
+    #[test]
+    fn coherence_view_in_agreement_when_all_peers_match() {
+        let me = sample_manifest("alpha", &[("/lamad", "A")]);
+        let peers = vec![compare_to_peer(
+            &me,
+            "apex",
+            true,
+            Some(&sample_manifest("apex", &[("/lamad", "A")])),
+        )];
+        let view = build_coherence_view(&me, peers);
+        assert!(view.in_agreement);
     }
 }
