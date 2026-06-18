@@ -658,6 +658,12 @@ async fn async_main(
         tokio::spawn(async move {
             use elohim_storage::metrics;
             use elohim_storage::services::system_metrics as sm;
+            use std::collections::HashMap;
+            // Cross-tick state for conductor anon-VMA growth localization: the prior
+            // sample's resident anon keyed by mapping start address, plus the pid it
+            // belonged to (cleared on conductor restart — addresses are then meaningless).
+            let mut prev_anon_by_addr: HashMap<u64, u64> = HashMap::new();
+            let mut prev_smaps_pid: Option<u32> = None;
             let cpus = sm::cpu_count().unwrap_or(0);
             // The conductor's own default: calculate_default_db_max_readers = max(2*cpus, 8).
             let db_max_readers = (2 * cpus).max(8);
@@ -710,11 +716,15 @@ async fn async_main(
                             );
                         }
                         // Conductor child: deeper anon attribution (heap vs malloc
-                        // arenas vs stacks) via smaps — the confirmed leak lives
-                        // here (conductor-memory-attribution-verdict.md). smaps is
-                        // heavier, so only the leak target is sampled this deeply.
+                        // arenas vs stacks) via smaps — the leak lives here. smaps is
+                        // heavier, so only the leak target is sampled this deeply. One
+                        // read feeds the scalar breakdown AND two localizers added
+                        // 2026-06-18 (the leak grows at FLAT mapping-count / FLAT-largest,
+                        // so the scalars can't say WHERE: the size-bucket histogram gives
+                        // shape, the per-VMA growth delta gives the exact ranges).
                         if name == "holochain" {
-                            if let Some(s) = sm::proc_smaps_anon(pid) {
+                            let vmas = sm::proc_smaps_vmas(pid);
+                            if let Some(s) = sm::SmapsAnonBreakdown::from_vmas(&vmas) {
                                 metrics::set_conductor_smaps(
                                     s.heap_bytes,
                                     s.stack_bytes,
@@ -733,6 +743,43 @@ async fn async_main(
                                     largest_anon_bytes = s.largest_anon_bytes,
                                     "conductor anon smaps breakdown (leak locus: heap vs arenas)"
                                 );
+
+                                // Size-bucket histogram (SHAPE): Go-arena vs stack vs
+                                // small-buffer bands. Durable gauges + one Loki summary.
+                                let hist = sm::anon_size_histogram(&vmas);
+                                metrics::set_conductor_anon_buckets(&hist);
+                                let hist_str = hist
+                                    .iter()
+                                    .map(|(l, c, by)| {
+                                        format!("{l}={c}/{:.0}MB", (*by as f64) / 1_048_576.0)
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(" ");
+                                info!(
+                                    target: "elohim_storage::memory_attribution",
+                                    scope = "smaps_hist",
+                                    proc = "holochain",
+                                    histogram = %hist_str,
+                                    "conductor anon size-bucket histogram (arena vs stack vs small-buffer)"
+                                );
+
+                                // Growth localization (WHERE): top anon VMAs by
+                                // resident-anon delta vs the prior sample. Only meaningful
+                                // within one conductor lifetime — reset on restart.
+                                if prev_smaps_pid == Some(pid) && !prev_anon_by_addr.is_empty() {
+                                    let grow = sm::top_growing_vmas(&prev_anon_by_addr, &vmas, 8);
+                                    if !grow.is_empty() {
+                                        info!(
+                                            target: "elohim_storage::memory_attribution",
+                                            scope = "smaps_growth",
+                                            proc = "holochain",
+                                            growing_vmas = %sm::fmt_vma_deltas(&grow),
+                                            "top growing conductor anon VMAs since last sample (leak localization)"
+                                        );
+                                    }
+                                }
+                                prev_anon_by_addr = sm::snapshot_anon_by_addr(&vmas);
+                                prev_smaps_pid = Some(pid);
                             }
                         }
                     }

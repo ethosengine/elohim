@@ -450,15 +450,110 @@ fn classify_mapping(header: &str) -> MappingClass {
     }
 }
 
-/// Parse a `/proc/<pid>/smaps` body into the anon breakdown. Pure — unit-tested
-/// independently of the filesystem. `None` when no anon is found.
-pub fn parse_smaps_anon(raw: &str) -> Option<SmapsAnonBreakdown> {
-    let mut b = SmapsAnonBreakdown::default();
-    let mut class = MappingClass::File;
-    let mut seen_any = false;
+/// Anon class of a single mapping (the public face of [`MappingClass`], minus
+/// `File` — file-backed mappings are never reported as anon VMAs).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnonClass {
+    Heap,
+    Stack,
+    OtherAnon,
+}
+
+impl AnonClass {
+    /// The Loki/Prometheus label form (matches `set_conductor_smaps`' `class`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AnonClass::Heap => "heap",
+            AnonClass::Stack => "stack",
+            AnonClass::OtherAnon => "other",
+        }
+    }
+}
+
+/// One anonymous-bearing mapping, with the fields needed to LOCALIZE a leak that
+/// grows at flat mapping-count/flat-largest (the 2026-06-18 alpha conductor
+/// signature): the `start_addr` is the cross-sample diff key (which exact ranges
+/// grow), `anon_bytes` the resident anon in it, `neighbor` the nearest preceding
+/// file mapping (a hint at what allocator/runtime region this sits next to).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnonVma {
+    /// Mapping start address (hex header) — the stable key for cross-tick deltas.
+    pub start_addr: u64,
+    /// Virtual size of the mapping (header end-start) in bytes.
+    pub size_bytes: u64,
+    /// Resident anonymous bytes in this mapping (`Anonymous:` line).
+    pub anon_bytes: u64,
+    /// Mapping class (heap / stack / other-anon).
+    pub class: AnonClass,
+    /// Basename of the nearest preceding file mapping (localization hint; "" if none).
+    pub neighbor: String,
+}
+
+/// Per-mapping anon-size buckets (by resident anon bytes). The SHAPE discriminator:
+/// Go heap arenas, thread stacks, and small per-op buffers land in distinct bands,
+/// so a shift in the histogram localizes a leak the scalar gauges can't.
+pub const ANON_SIZE_BUCKETS: &[(&str, u64)] = &[
+    ("0-64k", 64 * 1024),
+    ("64k-1m", 1024 * 1024),
+    ("1m-8m", 8 * 1024 * 1024),
+    ("8m-64m", 64 * 1024 * 1024),
+    ("64m-256m", 256 * 1024 * 1024),
+    ("256m+", u64::MAX),
+];
+
+/// A VMA's growth vs a prior snapshot — the leak-localization signal (WHICH
+/// address ranges accumulate resident anon between samples).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VmaDelta {
+    pub vma: AnonVma,
+    /// Resident-anon change since the prior sample (bytes; positive = grew).
+    pub delta_bytes: i64,
+    /// True if this mapping did not exist at the prior sample.
+    pub is_new: bool,
+}
+
+/// Parse the `<hex>-<hex>` range from a smaps header → (start, size).
+fn parse_header_range(header: &str) -> (u64, u64) {
+    let tok = header.split_whitespace().next().unwrap_or("");
+    match tok.split_once('-') {
+        Some((a, b)) => {
+            let start = u64::from_str_radix(a, 16).unwrap_or(0);
+            let end = u64::from_str_radix(b, 16).unwrap_or(start);
+            (start, end.saturating_sub(start))
+        }
+        None => (0, 0),
+    }
+}
+
+/// Basename of a smaps header's pathname field (index 5), or `None` for special
+/// `[…]` regions and anonymous mappings.
+fn header_pathname_basename(header: &str) -> Option<String> {
+    let p = header.split_whitespace().nth(5)?;
+    if p.starts_with('[') {
+        return None;
+    }
+    Some(p.rsplit('/').next().unwrap_or(p).to_string())
+}
+
+/// Parse a `/proc/<pid>/smaps` body into the list of anon-bearing mappings. Pure,
+/// unit-tested. This is the single parse path; [`parse_smaps_anon`] folds over it.
+pub fn parse_smaps_vmas(raw: &str) -> Vec<AnonVma> {
+    let mut out = Vec::new();
+    let mut cur_class = MappingClass::File;
+    let mut cur_start = 0u64;
+    let mut cur_size = 0u64;
+    let mut neighbor = String::new();
     for line in raw.lines() {
         if is_smaps_header(line) {
-            class = classify_mapping(line);
+            cur_class = classify_mapping(line);
+            let (start, size) = parse_header_range(line);
+            cur_start = start;
+            cur_size = size;
+            if let MappingClass::File = cur_class {
+                if let Some(name) = header_pathname_basename(line) {
+                    neighbor = name;
+                }
+            }
             continue;
         }
         let Some(rest) = line.strip_prefix("Anonymous:") else {
@@ -473,26 +568,132 @@ pub fn parse_smaps_anon(raw: &str) -> Option<SmapsAnonBreakdown> {
         if kb == 0 {
             continue;
         }
-        let bytes = kb.saturating_mul(1024);
-        match class {
-            MappingClass::Heap => b.heap_bytes = b.heap_bytes.saturating_add(bytes),
-            MappingClass::Stack => b.stack_bytes = b.stack_bytes.saturating_add(bytes),
-            MappingClass::OtherAnon => {
-                b.other_anon_bytes = b.other_anon_bytes.saturating_add(bytes)
-            }
+        let class = match cur_class {
+            MappingClass::Heap => AnonClass::Heap,
+            MappingClass::Stack => AnonClass::Stack,
+            MappingClass::OtherAnon => AnonClass::OtherAnon,
             MappingClass::File => continue, // CoW anon in a file mapping — not our attribution target
-        }
-        seen_any = true;
-        b.anon_mapping_count += 1;
-        if bytes > b.largest_anon_bytes {
-            b.largest_anon_bytes = bytes;
-        }
+        };
+        out.push(AnonVma {
+            start_addr: cur_start,
+            size_bytes: cur_size,
+            anon_bytes: kb.saturating_mul(1024),
+            class,
+            neighbor: neighbor.clone(),
+        });
     }
-    if seen_any {
+    out
+}
+
+impl SmapsAnonBreakdown {
+    /// Fold a parsed VMA list into the scalar breakdown (the existing gauges).
+    pub fn from_vmas(vmas: &[AnonVma]) -> Option<Self> {
+        if vmas.is_empty() {
+            return None;
+        }
+        let mut b = SmapsAnonBreakdown::default();
+        for v in vmas {
+            match v.class {
+                AnonClass::Heap => b.heap_bytes = b.heap_bytes.saturating_add(v.anon_bytes),
+                AnonClass::Stack => b.stack_bytes = b.stack_bytes.saturating_add(v.anon_bytes),
+                AnonClass::OtherAnon => {
+                    b.other_anon_bytes = b.other_anon_bytes.saturating_add(v.anon_bytes)
+                }
+            }
+            b.anon_mapping_count += 1;
+            if v.anon_bytes > b.largest_anon_bytes {
+                b.largest_anon_bytes = v.anon_bytes;
+            }
+        }
         Some(b)
-    } else {
-        None
     }
+}
+
+/// Parse a `/proc/<pid>/smaps` body into the anon breakdown. Pure — unit-tested
+/// independently of the filesystem. `None` when no anon is found.
+pub fn parse_smaps_anon(raw: &str) -> Option<SmapsAnonBreakdown> {
+    SmapsAnonBreakdown::from_vmas(&parse_smaps_vmas(raw))
+}
+
+/// Bucket anon VMAs by resident-anon size → `(label, count, total_anon_bytes)`
+/// per [`ANON_SIZE_BUCKETS`] band. Pure.
+pub fn anon_size_histogram(vmas: &[AnonVma]) -> Vec<(&'static str, u64, u64)> {
+    let mut acc = vec![(0u64, 0u64); ANON_SIZE_BUCKETS.len()];
+    for v in vmas {
+        let idx = ANON_SIZE_BUCKETS
+            .iter()
+            .position(|(_, hi)| v.anon_bytes <= *hi)
+            .unwrap_or(ANON_SIZE_BUCKETS.len() - 1);
+        acc[idx].0 += 1;
+        acc[idx].1 = acc[idx].1.saturating_add(v.anon_bytes);
+    }
+    ANON_SIZE_BUCKETS
+        .iter()
+        .enumerate()
+        .map(|(i, (label, _))| (*label, acc[i].0, acc[i].1))
+        .collect()
+}
+
+/// Snapshot anon-bytes keyed by mapping start address (the prior-sample state
+/// [`top_growing_vmas`] diffs against).
+pub fn snapshot_anon_by_addr(vmas: &[AnonVma]) -> std::collections::HashMap<u64, u64> {
+    vmas.iter().map(|v| (v.start_addr, v.anon_bytes)).collect()
+}
+
+/// The top-`n` anon VMAs by resident-anon GROWTH since `prev` (and any that are
+/// brand-new since `prev`). This is the leak localizer: at flat mapping-count /
+/// flat-largest, the leak is resident growth spread across a stable population —
+/// these are the exact ranges accumulating it. Pure.
+pub fn top_growing_vmas(
+    prev: &std::collections::HashMap<u64, u64>,
+    cur: &[AnonVma],
+    n: usize,
+) -> Vec<VmaDelta> {
+    let mut deltas: Vec<VmaDelta> = cur
+        .iter()
+        .filter_map(|v| match prev.get(&v.start_addr) {
+            Some(&p) => {
+                let d = v.anon_bytes as i64 - p as i64;
+                (d > 0).then(|| VmaDelta {
+                    vma: v.clone(),
+                    delta_bytes: d,
+                    is_new: false,
+                })
+            }
+            None => Some(VmaDelta {
+                vma: v.clone(),
+                delta_bytes: v.anon_bytes as i64,
+                is_new: true,
+            }),
+        })
+        .collect();
+    deltas.sort_by(|a, b| b.delta_bytes.cmp(&a.delta_bytes));
+    deltas.truncate(n);
+    deltas
+}
+
+/// Compact one-line rendering of VMA deltas for a Loki log field, e.g.
+/// `0x7f12+12.3MB(other,sz150MB,near=holochain,NEW)`.
+pub fn fmt_vma_deltas(deltas: &[VmaDelta]) -> String {
+    deltas
+        .iter()
+        .map(|d| {
+            format!(
+                "0x{:x}+{:.1}MB({},sz{:.0}MB{}{})",
+                d.vma.start_addr,
+                (d.delta_bytes as f64) / 1_048_576.0,
+                d.vma.class.as_str(),
+                (d.vma.size_bytes as f64) / 1_048_576.0,
+                if d.vma.neighbor.is_empty() {
+                    String::new()
+                } else {
+                    format!(",near={}", d.vma.neighbor)
+                },
+                if d.is_new { ",NEW" } else { "" },
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Read a process's smaps anon breakdown (Linux only; the heap-leak attribution
@@ -507,6 +708,23 @@ pub fn proc_smaps_anon(pid: u32) -> Option<SmapsAnonBreakdown> {
     {
         let _ = pid;
         None
+    }
+}
+
+/// Read a process's full anon-VMA list (Linux only; the leak-localization reader).
+/// One smaps read feeds both the scalar breakdown ([`SmapsAnonBreakdown::from_vmas`])
+/// and the histogram / growth-delta localizers. Empty on non-Linux or if unreadable.
+pub fn proc_smaps_vmas(pid: u32) -> Vec<AnonVma> {
+    #[cfg(target_os = "linux")]
+    {
+        std::fs::read_to_string(format!("/proc/{pid}/smaps"))
+            .map(|raw| parse_smaps_vmas(&raw))
+            .unwrap_or_default()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = pid;
+        Vec::new()
     }
 }
 
@@ -713,6 +931,108 @@ Anonymous:             0 kB
             parse_smaps_anon("561e-561f rw-p 0 0 0\nSize:  4 kB\n"),
             None
         );
+    }
+
+    const SMAPS_FIXTURE: &str = "\
+561e1a000-561e1b000 rw-p 00000000 00:00 0                                  [heap]
+Anonymous:             4 kB
+7f5500000000-7f5500010000 r-xp 00000000 08:01 1234   /usr/local/bin/holochain
+Anonymous:             0 kB
+7f0000000000-7f0000800000 rw-p 00000000 00:00 0
+Anonymous:          2048 kB
+7f0001000000-7f0001100000 rw-p 00000000 00:00 0
+Anonymous:           256 kB
+";
+
+    #[test]
+    fn parse_smaps_vmas_captures_addr_size_neighbor_and_class() {
+        let vmas = parse_smaps_vmas(SMAPS_FIXTURE);
+        assert_eq!(
+            vmas.len(),
+            3,
+            "heap + 2 anon; the 0-anon file mapping is skipped"
+        );
+        // [heap]
+        assert_eq!(vmas[0].start_addr, 0x561e1a000);
+        assert_eq!(vmas[0].size_bytes, 0x1000);
+        assert_eq!(vmas[0].anon_bytes, 4 * 1024);
+        assert_eq!(vmas[0].class, AnonClass::Heap);
+        assert_eq!(vmas[0].neighbor, "", "no file mapping precedes the heap");
+        // First unnamed anon — sits AFTER the holochain file mapping, so neighbor carries it.
+        assert_eq!(vmas[1].start_addr, 0x7f0000000000);
+        assert_eq!(vmas[1].size_bytes, 0x800000);
+        assert_eq!(vmas[1].anon_bytes, 2048 * 1024);
+        assert_eq!(vmas[1].class, AnonClass::OtherAnon);
+        assert_eq!(
+            vmas[1].neighbor, "holochain",
+            "neighbor = basename of the nearest preceding file mapping"
+        );
+        // Breakdown derived from the same VMAs matches the legacy parse.
+        let b = SmapsAnonBreakdown::from_vmas(&vmas).unwrap();
+        assert_eq!(b, parse_smaps_anon(SMAPS_FIXTURE).unwrap());
+        assert_eq!(b.other_anon_bytes, (2048 + 256) * 1024);
+        assert_eq!(b.largest_anon_bytes, 2048 * 1024);
+    }
+
+    #[test]
+    fn anon_size_histogram_bins_by_resident_anon() {
+        let vmas = parse_smaps_vmas(SMAPS_FIXTURE);
+        let hist = anon_size_histogram(&vmas);
+        // bucket layout: 0-64k, 64k-1m, 1m-8m, 8m-64m, 64m-256m, 256m+
+        let by = |label: &str| hist.iter().find(|(l, _, _)| *l == label).copied().unwrap();
+        assert_eq!(by("0-64k").1, 1, "the 4kB heap lands in 0-64k");
+        assert_eq!(by("0-64k").2, 4 * 1024);
+        assert_eq!(by("64k-1m").1, 1, "the 256kB anon lands in 64k-1m");
+        assert_eq!(by("1m-8m").1, 1, "the 2MB anon lands in 1m-8m");
+        assert_eq!(by("8m-64m").1, 0);
+        // Total count across buckets == anon mapping count.
+        assert_eq!(hist.iter().map(|(_, c, _)| *c).sum::<u64>(), 3);
+    }
+
+    #[test]
+    fn top_growing_vmas_ranks_growth_and_flags_new() {
+        let prev: std::collections::HashMap<u64, u64> =
+            [(0x1000, 100), (0x2000, 5_000)].into_iter().collect();
+        let cur = vec![
+            AnonVma {
+                start_addr: 0x1000,
+                size_bytes: 0x1000,
+                anon_bytes: 1_100,
+                class: AnonClass::OtherAnon,
+                neighbor: String::new(),
+            }, // +1000
+            AnonVma {
+                start_addr: 0x2000,
+                size_bytes: 0x1000,
+                anon_bytes: 5_000,
+                class: AnonClass::OtherAnon,
+                neighbor: String::new(),
+            }, // +0 -> dropped
+            AnonVma {
+                start_addr: 0x3000,
+                size_bytes: 0x1000,
+                anon_bytes: 9_000,
+                class: AnonClass::Heap,
+                neighbor: "libc.so.6".into(),
+            }, // NEW
+        ];
+        let top = top_growing_vmas(&prev, &cur, 8);
+        assert_eq!(top.len(), 2, "the unchanged VMA is excluded (delta == 0)");
+        assert_eq!(
+            top[0].vma.start_addr, 0x3000,
+            "new VMA's full size ranks first"
+        );
+        assert!(top[0].is_new);
+        assert_eq!(top[0].delta_bytes, 9_000);
+        assert_eq!(top[1].vma.start_addr, 0x1000);
+        assert!(!top[1].is_new);
+        assert_eq!(top[1].delta_bytes, 1_000);
+        // Truncation honored.
+        assert_eq!(top_growing_vmas(&prev, &cur, 1).len(), 1);
+        let rendered = fmt_vma_deltas(&top);
+        assert!(rendered.contains("0x3000+"));
+        assert!(rendered.contains("NEW"));
+        assert!(rendered.contains("near=libc.so.6"));
     }
 
     #[test]
