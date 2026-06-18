@@ -124,6 +124,7 @@ pub struct NewContent<'a> {
     pub reach: &'a str,
     pub created_by: Option<&'a str>,
     pub content_body: Option<&'a str>,
+    pub dht_anchor_hash: Option<&'a str>,
 }
 
 /// Content tag row

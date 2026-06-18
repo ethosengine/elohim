@@ -3991,6 +3991,10 @@ impl P2PNode {
                                             created_by: record.created_by,
                                             tags: record.tags,
                                             content_body: record.content_body,
+                                            // Provenance is stamped by the drain
+                                            // (p2p_published_at) post-arrival; no
+                                            // ingest anchor on the replication path.
+                                            dht_anchor_hash: None,
                                         };
 
                                         let app_ctx = crate::db::AppContext::default_lamad();

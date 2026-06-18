@@ -308,6 +308,7 @@ mod tests {
                 reach: "commons",
                 created_by: None,
                 content_body: None,
+                dht_anchor_hash: None,
             })
             .execute(conn)
             .expect("insert content");

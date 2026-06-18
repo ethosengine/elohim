@@ -45,6 +45,11 @@ pub struct CreateContentInput {
     pub tags: Vec<String>,
     #[serde(default)]
     pub content_body: Option<String>,
+    /// Content-derived provenance anchor written at ingest. See
+    /// `CreateContentInputView::dht_anchor_hash`. None → column stays NULL
+    /// (the peered drain or `ContentCommitted` projection stamps it later).
+    #[serde(default)]
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// Input for partially updating a content item (PATCH semantics).
@@ -352,6 +357,7 @@ pub fn create_content(
             reach: &input.reach,
             created_by: input.created_by.as_deref(),
             content_body: input.content_body.as_deref(),
+            dht_anchor_hash: input.dht_anchor_hash.as_deref(),
         };
 
         diesel::insert_into(content::table)
@@ -427,6 +433,7 @@ pub fn bulk_create_content(
                 reach: &input.reach,
                 created_by: input.created_by.as_deref(),
                 content_body: input.content_body.as_deref(),
+                dht_anchor_hash: input.dht_anchor_hash.as_deref(),
             };
 
             match diesel::insert_into(content::table)
@@ -759,6 +766,7 @@ pub fn upsert_with_anchor(
             reach,
             created_by: None,
             content_body: None,
+            dht_anchor_hash: None,
         };
 
         diesel::insert_into(content::table)
@@ -1146,6 +1154,7 @@ mod tests {
             created_by: None,
             tags: vec!["core".to_string()],
             content_body: None,
+            dht_anchor_hash: None,
         };
         create_content(&mut conn, &lamad_ctx, lamad_content).unwrap();
 
@@ -1164,6 +1173,7 @@ mod tests {
             created_by: None,
             tags: vec!["infrastructure".to_string()],
             content_body: None,
+            dht_anchor_hash: None,
         };
         create_content(&mut conn, &elohim_ctx, elohim_content).unwrap();
 
@@ -1216,6 +1226,7 @@ mod tests {
             created_by: None,
             tags: vec![],
             content_body: None,
+            dht_anchor_hash: None,
         };
         create_content(&mut conn, &ctx, mk("epr:commons-1", "commons")).unwrap();
         create_content(&mut conn, &ctx, mk("epr:private-1", "private")).unwrap();
@@ -1274,6 +1285,7 @@ mod tests {
             created_by: None,
             tags: vec![],
             content_body: None,
+            dht_anchor_hash: None,
         };
         create_content(&mut conn, &ctx, mk("epr:commons-2", "commons")).unwrap();
         create_content(&mut conn, &ctx, mk("epr:household-2", "household")).unwrap();
@@ -1323,6 +1335,7 @@ mod tests {
                 created_by: None,
                 tags: vec![],
                 content_body: None,
+                dht_anchor_hash: None,
             },
             CreateContentInput {
                 id: "content-2".to_string(),
@@ -1338,6 +1351,7 @@ mod tests {
                 created_by: None,
                 tags: vec![],
                 content_body: None,
+                dht_anchor_hash: None,
             },
         ];
 
@@ -1360,6 +1374,7 @@ mod tests {
             created_by: None,
             tags: vec![],
             content_body: None,
+            dht_anchor_hash: None,
         }];
 
         let result2 = bulk_create_content(&mut conn, &lamad_ctx, items2).unwrap();
@@ -1387,6 +1402,7 @@ mod tests {
             created_by: None,
             tags: vec![],
             content_body: None,
+            dht_anchor_hash: None,
         };
         let unpublished = CreateContentInput {
             id: "cid-unpublished".to_string(),
@@ -1459,6 +1475,7 @@ mod tests {
             created_by: None,
             tags: vec![],
             content_body: None,
+            dht_anchor_hash: None,
         };
         let unpublished = CreateContentInput {
             id: "cid-unpublished".to_string(),
@@ -1499,6 +1516,7 @@ mod tests {
             created_by: None,
             tags: vec![],
             content_body: None,
+            dht_anchor_hash: None,
         };
         create_content(&mut conn, &ctx, row).unwrap();
 
@@ -1517,6 +1535,54 @@ mod tests {
             "ungated get_content must still return unpublished rows for internal callers"
         );
         assert_eq!(ungated.unwrap().id, "cid-unpublished");
+    }
+
+    #[test]
+    fn test_create_content_with_dht_anchor_passes_provenance_at_ingest() {
+        // The seed/ingest fix (seed-provenance-anchor-gap): content created WITH
+        // a content-derived `dht_anchor_hash` must satisfy the
+        // `require_provenance=true` read gate IMMEDIATELY — no libp2p publish
+        // drain round-trip — so hub-optional / peer-starved seed stacks can serve
+        // it. Content created WITHOUT an anchor (and never published) stays hidden.
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        let anchored = CreateContentInput {
+            id: "cid-anchored".to_string(),
+            title: "Anchored at ingest".to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "commons".to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: Some("hello".to_string()),
+            dht_anchor_hash: Some("bafy-content-derived-anchor".to_string()),
+        };
+        let unanchored = CreateContentInput {
+            id: "cid-unanchored".to_string(),
+            dht_anchor_hash: None,
+            ..anchored.clone()
+        };
+        create_content(&mut conn, &ctx, anchored).unwrap();
+        create_content(&mut conn, &ctx, unanchored).unwrap();
+
+        // Gated (external) read: the ingest-anchored row is visible WITHOUT any
+        // p2p_published_at stamp; the un-anchored row is hidden.
+        let anchored_read = get_content(&mut conn, &ctx, "cid-anchored", true).unwrap();
+        assert!(
+            anchored_read.is_some(),
+            "ingest dht_anchor_hash must satisfy require_provenance at create time"
+        );
+        let unanchored_read = get_content(&mut conn, &ctx, "cid-unanchored", true).unwrap();
+        assert!(
+            unanchored_read.is_none(),
+            "content with neither anchor nor publish must stay hidden from external reads"
+        );
     }
 
     /// Regression guard for the A4 critical fix: the external HTTP handler
@@ -1542,6 +1608,7 @@ mod tests {
             created_by: None,
             tags: vec![],
             content_body: None,
+            dht_anchor_hash: None,
         };
         create_content(&mut conn, &ctx, row).unwrap();
 
@@ -1589,6 +1656,7 @@ mod tests {
             created_by: None,
             tags: vec![],
             content_body: None,
+            dht_anchor_hash: None,
         };
         create_content(&mut conn, &ctx, row).unwrap();
 
@@ -1631,6 +1699,7 @@ mod tests {
                     created_by: None,
                     tags: vec![],
                     content_body: None,
+                    dht_anchor_hash: None,
                 },
             )
             .unwrap();
@@ -1667,6 +1736,7 @@ mod tests {
                 created_by: None,
                 tags: vec![],
                 content_body: None,
+                dht_anchor_hash: None,
             },
         )
         .unwrap();
@@ -1735,6 +1805,7 @@ mod tests {
                     created_by: None,
                     tags: vec![],
                     content_body: None,
+                    dht_anchor_hash: None,
                 },
             )
             .unwrap();
@@ -1791,6 +1862,7 @@ mod tests {
             reach: "public".to_string(),
             created_by: None,
             content_body: None,
+            dht_anchor_hash: None,
             tags: vec![],
         };
         bulk_create_content(&mut conn, &ctx, vec![create]).unwrap();
@@ -1845,6 +1917,7 @@ mod tests {
             reach: "public".to_string(),
             created_by: None,
             content_body: None,
+            dht_anchor_hash: None,
             tags: vec![],
         };
         bulk_create_content(&mut conn, &ctx, vec![create]).unwrap();

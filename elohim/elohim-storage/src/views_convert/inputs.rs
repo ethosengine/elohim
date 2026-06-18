@@ -46,6 +46,7 @@ impl From<CreateContentInputView> for CreateContentInput {
             created_by: v.created_by,
             tags: v.tags,
             content_body: v.content_body,
+            dht_anchor_hash: v.dht_anchor_hash,
         }
     }
 }

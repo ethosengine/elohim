@@ -166,6 +166,17 @@ pub struct CreateContentInputView {
     pub created_by: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
+    /// Content-derived provenance anchor, set at INGEST (seed/import) so the
+    /// row satisfies the `require_provenance` read gate (`dht_anchor_hash IS
+    /// NOT NULL OR p2p_published_at IS NOT NULL`) on hub-optional / peer-starved
+    /// stacks where the libp2p publish drain never runs. This is the HONEST
+    /// alternative to stamping `p2pPublishedAt` (which would assert a DHT
+    /// publication that never happened): the value is the content's
+    /// content-address, superseded by the real ActionHash when a
+    /// `ContentCommitted` notarization later runs. Optional — omit on the
+    /// peered path where the drain stamps `p2pPublishedAt`.
+    #[serde(default)]
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// Input for partially updating a content item — PATCH /db/content/{id}

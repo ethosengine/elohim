@@ -4666,6 +4666,7 @@ impl HttpServer {
                                 created_by: head.author.clone(),
                                 tags: head.lamad.tags.clone(),
                                 content_body: Some(body_str),
+                                dht_anchor_hash: None,
                             };
                             match svc.content.create(input) {
                                 Ok(content_with_tags) => {
@@ -9214,6 +9215,7 @@ impl HttpServer {
                 created_by: Some("elohim-storage".to_string()),
                 tags: vec!["observation".to_string(), "diagnostic".to_string()],
                 content_body: Some(report_body),
+                dht_anchor_hash: None,
             };
 
             // Non-fatal: if content already exists (idempotent scenario), just log
