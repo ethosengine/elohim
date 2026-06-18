@@ -384,6 +384,17 @@ impl EprRouter {
         table.values().map(|p| p.url_path.clone()).collect()
     }
 
+    /// Snapshot of the live `(url_path, epr_id)` head fingerprints — the input
+    /// to the cross-edge coherence digest (`routes::coherence::router_fingerprint`).
+    /// Pure read; sibling of `mount_url_paths`.
+    pub fn head_fingerprints(&self) -> Vec<(String, String)> {
+        let table = self.table.read().expect("router lock poisoned");
+        table
+            .values()
+            .map(|p| (p.url_path.clone(), p.epr_id.clone()))
+            .collect()
+    }
+
     /// Mint the pretty-mount Location for a claimed contentType (spec §5.1).
     /// The id is substituted as-received from the request path — already
     /// percent-encoded, never re-encoded.

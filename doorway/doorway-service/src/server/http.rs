@@ -2467,6 +2467,12 @@ async fn handle_request(
             to_boxed(routes::handle_federation_p2p_peers(Arc::clone(&state)).await)
         }
 
+        // Cross-edge EPR-head coherence — this edge's self-fingerprint (CIDv1
+        // dag-cbor digest). Detect-only; F-DEPLOY/F-EDGE consume the route.
+        (Method::GET, "/api/v1/federation/coherence") => to_boxed(
+            routes::coherence::handle_federation_coherence(Arc::clone(&state)).await,
+        ),
+
         // ====================================================================
         // Threshold (operator dashboard) - Angular SPA at /threshold/*
         // ====================================================================
