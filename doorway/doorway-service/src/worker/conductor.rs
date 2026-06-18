@@ -85,8 +85,13 @@ impl ReconnectBackoff {
 enum SessionEnd {
     /// All request senders dropped — the owning handle is gone, shut down.
     ChannelClosed,
-    /// The WebSocket closed or errored — reconnect.
-    ConnectionClosed,
+    /// The WebSocket closed or errored — reconnect. Carries the close *cause*
+    /// (one of `metrics::REASON_*`) and the optional WS close code, so the
+    /// reconnect counter classifies churn (T3 connect-storm vs T8 auth-reject).
+    ConnectionClosed {
+        reason: &'static str,
+        close_code: Option<u16>,
+    },
 }
 
 /// Conductor connection manager
@@ -237,6 +242,7 @@ async fn connection_loop(
                         // The socket died under the auth send — same unstable
                         // signature as an accept-then-drop session, so the
                         // token may be stale here too.
+                        crate::metrics::inc_reconnect(crate::metrics::REASON_WS_ERROR);
                         remint_if_due(&token_minter, &token_slot, &mut last_remint).await;
                         Some(backoff.next_after_connect_failure())
                     } else {
@@ -269,6 +275,7 @@ async fn connection_loop(
             }
             Err(e) => {
                 error!("Failed to connect to conductor: {}", e);
+                crate::metrics::inc_reconnect(crate::metrics::REASON_CONNECT_REFUSED);
                 Some(backoff.next_after_connect_failure())
             }
         };
@@ -302,13 +309,31 @@ async fn run_session(
     last_remint: &mut Option<Instant>,
 ) -> Option<Duration> {
     *connected.write().await = true;
+    crate::metrics::inc_sessions(); // M5: live pool-worker session begins.
     info!("Connected to conductor");
     let session_start = Instant::now();
 
     let session_end = handle_messages(ws_sink, ws_stream, rx).await;
 
     *connected.write().await = false;
+    crate::metrics::dec_sessions(); // M5: session ended.
     let session_len = session_start.elapsed();
+    // M3: observe every session's lifetime — a pile in the <1s buckets is the
+    // accept-then-drop/auth-reject signature; a pile at the long end is healthy.
+    crate::metrics::observe_session_duration(session_len.as_secs_f64());
+
+    // M2: classify the session ending for the reconnect counter (+ close code).
+    match &session_end {
+        SessionEnd::ChannelClosed => {
+            crate::metrics::inc_reconnect(crate::metrics::REASON_CHANNEL_CLOSED);
+        }
+        SessionEnd::ConnectionClosed { reason, close_code } => {
+            crate::metrics::inc_reconnect(reason);
+            if let Some(code) = close_code {
+                crate::metrics::inc_close_code(*code);
+            }
+        }
+    }
 
     if matches!(session_end, SessionEnd::ChannelClosed) {
         return None;
@@ -491,13 +516,20 @@ async fn handle_messages(
                 error!("Failed to send to conductor: {}", e);
                 let mut pending = pending_for_send.lock().await;
                 pending.remove(&req_id);
-                break SessionEnd::ConnectionClosed;
+                break SessionEnd::ConnectionClosed {
+                    reason: crate::metrics::REASON_WS_ERROR,
+                    close_code: None,
+                };
             }
         }
     };
 
     // Task to handle responses from conductor
     let response_handler = async {
+        // Track WHY the stream ended so the reconnect counter can classify it.
+        // Default = stream ended (None) with no Close/Err frame.
+        let mut reason = crate::metrics::REASON_WS_ERROR;
+        let mut close_code: Option<u16> = None;
         while let Some(msg) = ws_stream.next().await {
             match msg {
                 Ok(Message::Binary(data)) => {
@@ -530,17 +562,22 @@ async fn handle_messages(
                     let _ = sink.send(Message::Pong(data)).await;
                 }
                 Ok(Message::Close(frame)) => {
+                    // Capture the close code BEFORE logging — the worker path
+                    // kept the frame; we now also classify it (handoff §M2).
+                    close_code = frame.as_ref().map(|f| u16::from(f.code));
                     info!("Conductor closed connection: {:?}", frame);
+                    reason = crate::metrics::REASON_CLOSE_FRAME;
                     break;
                 }
                 Err(e) => {
                     error!("Conductor WebSocket error: {}", e);
+                    reason = crate::metrics::REASON_WS_ERROR;
                     break;
                 }
                 _ => {}
             }
         }
-        SessionEnd::ConnectionClosed
+        SessionEnd::ConnectionClosed { reason, close_code }
     };
 
     // Run both handlers concurrently

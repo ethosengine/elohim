@@ -103,6 +103,31 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Conductor (child) anon resident bytes by per-mapping SIZE bucket — the SHAPE
+    /// discriminator. At flat mapping-count / flat-largest (the 2026-06-18 leak
+    /// signature) a scalar `other` can't say WHERE the growth lands; a shift in this
+    /// histogram localizes it (Go-arena band vs thread-stack band vs small-buffer
+    /// band). label: bucket (see `system_metrics::ANON_SIZE_BUCKETS`).
+    pub static ref NODE_CONDUCTOR_ANON_BUCKET_BYTES: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_node_conductor_anon_bucket_bytes",
+            "Conductor child anon resident bytes by per-mapping size bucket.",
+        ),
+        &["bucket"],
+    )
+    .unwrap();
+
+    /// Conductor (child) count of anon mappings by per-mapping SIZE bucket (pairs
+    /// with `_anon_bucket_bytes`: count-flat + bytes-up in a band = arena fill).
+    pub static ref NODE_CONDUCTOR_ANON_BUCKET_COUNT: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_node_conductor_anon_bucket_count",
+            "Conductor child count of anon mappings by per-mapping size bucket.",
+        ),
+        &["bucket"],
+    )
+    .unwrap();
+
     /// Node corpus size — content rows held, by app scope. label: app =
     /// "lamad" | "elohim". Pairs with the conductor RSS gauges to confirm
     /// (durably) that the heap leak is NOT corpus-proportional (RCA §4.5).
@@ -146,6 +171,8 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_SMAPS_ANON_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_MAPPING_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_LARGEST_ANON_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_BUCKET_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_BUCKET_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CORPUS_DOCS.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
     });
@@ -216,6 +243,20 @@ pub fn set_conductor_smaps(heap: u64, stack: u64, other: u64, count: u64, larges
     NODE_CONDUCTOR_LARGEST_ANON_BYTES.set(largest as i64);
 }
 
+/// Set the conductor (child) anon size-bucket histogram. `buckets` is
+/// `(label, count, bytes)` per band, as produced by
+/// `system_metrics::anon_size_histogram`.
+pub fn set_conductor_anon_buckets(buckets: &[(&str, u64, u64)]) {
+    for (label, count, bytes) in buckets {
+        NODE_CONDUCTOR_ANON_BUCKET_COUNT
+            .with_label_values(&[label])
+            .set(*count as i64);
+        NODE_CONDUCTOR_ANON_BUCKET_BYTES
+            .with_label_values(&[label])
+            .set(*bytes as i64);
+    }
+}
+
 /// Set the node corpus size for an app scope (content rows held).
 pub fn set_corpus_docs(app: &str, docs: u64) {
     NODE_CORPUS_DOCS.with_label_values(&[app]).set(docs as i64);
@@ -241,6 +282,11 @@ mod tests {
         set_proc_rss("holochain", 5_000_000_000, 130_000_000, 42);
         set_cgroup_mem(5_000_000_000, 130_000_000, 50_000_000, Some(0));
         set_boot_tunables(8, Some(4.0));
+        set_conductor_smaps(4_096, 132_096, 6_000_000_000, 5_600, 158_265_344);
+        set_conductor_anon_buckets(&[
+            ("1m-8m", 4_200, 5_800_000_000),
+            ("64m-256m", 1, 158_265_344),
+        ]);
         inc_identity_namespace_violation("rea_commitments.provider", "libp2p");
 
         let text = gather_text();
@@ -251,8 +297,11 @@ mod tests {
         assert!(text.contains("elohim_node_cgroup_mem_bytes"));
         assert!(text.contains("elohim_node_db_max_readers"));
         assert!(text.contains("elohim_identity_namespace_violation_total"));
+        assert!(text.contains("elohim_node_conductor_anon_bucket_bytes"));
+        assert!(text.contains("elohim_node_conductor_anon_bucket_count"));
         // Label rendering sanity (the attribution dimension).
         assert!(text.contains("proc=\"holochain\""), "{text}");
         assert!(text.contains("kind=\"anon\""));
+        assert!(text.contains("bucket=\"1m-8m\""), "{text}");
     }
 }

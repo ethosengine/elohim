@@ -338,10 +338,22 @@ impl DoorwayResolver {
 
             match result {
                 Ok((_, _source, tier, _)) => {
+                    // M4: mirror the tier tally onto the doorway-resident metric.
+                    // The projection cache is doorway-local — storage never sees a
+                    // hit here (the request never reaches it).
                     match tier {
-                        SourceTier::Projection => stats.projection_hits += 1,
-                        SourceTier::Authoritative => stats.conductor_fallbacks += 1,
-                        SourceTier::External => stats.external_fallbacks += 1,
+                        SourceTier::Projection => {
+                            stats.projection_hits += 1;
+                            crate::metrics::inc_resolve("projection");
+                        }
+                        SourceTier::Authoritative => {
+                            stats.conductor_fallbacks += 1;
+                            crate::metrics::inc_resolve("conductor");
+                        }
+                        SourceTier::External => {
+                            stats.external_fallbacks += 1;
+                            crate::metrics::inc_resolve("external");
+                        }
                         SourceTier::Local => {} // Not used in doorway
                     }
                 }

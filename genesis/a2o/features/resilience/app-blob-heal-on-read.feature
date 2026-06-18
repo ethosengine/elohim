@@ -34,6 +34,22 @@ Feature: App ZIP blobs heal on read via peer race-fetch
     When I list economic events with action "serve-blob" for the healed blob hash
     Then at least one event names the source peer as provider
 
+  # @regression for the #3 serve-blob gap (RCA .claude/data/genesis-seed-stages-rca-2026-06-18.md):
+  # the PROACTIVE quilt-draw replication path moved bytes via a bare blob_store.store()
+  # and booked NO serve-blob event — so "Verify Delivery Events" read 0 even though
+  # propagation passed. finalize_quilt_draw now routes the proactive draw through the
+  # SAME atomic pair as an on-demand heal (store + peer_blob_inventory row + serve-blob
+  # event), so a steward who replicates content is recognized in the REA ledger too —
+  # not just one who serves an on-demand read.
+  @wip @regression
+  Scenario: Proactive replication leaves a serve-blob delivery trail, like an on-demand heal
+    Given content "replicated-target" with a blob held by a peer the steward replicates from
+    And the steward's local blob store is missing the blob for "replicated-target"
+    When the steward proactively draws the blob during content replication
+    Then the steward's local blob store now holds the blob for "replicated-target"
+    And listing economic events with action "serve-blob" for that blob hash returns at least one event
+    And that event names the peer it drew from as provider
+
   @wip
   Scenario: No peer holds the bytes — the 404 names the missing blob
     Given content "orphan-target" is an "html5-app" whose ZIP blob no peer holds

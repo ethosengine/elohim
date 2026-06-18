@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::Instant;
 
-use elohim_compute::CircuitBreaker;
+use elohim_compute::{CircuitBreaker, CircuitState};
 
 /// Consecutive failed upstream outcomes before a circuit opens.
 pub const UPSTREAM_CIRCUIT_FAIL_THRESHOLD: u32 = 3;
@@ -59,6 +59,41 @@ impl UpstreamBreakers {
             .or_insert_with(|| CircuitBreaker::new(self.fail_threshold, self.cooldown_ticks));
         cb.record_outcome(ok, tick);
     }
+
+    /// Read-only snapshot of every known endpoint's breaker — the accessor the
+    /// self_healing UpstreamView needs (handoff §6 co-delivery). Uses `state()`,
+    /// NOT `should_skip()`, so it never admits a half-open trial as a side
+    /// effect of being observed.
+    pub fn snapshot(&self) -> Vec<BreakerSnapshot> {
+        let map = self.breakers.lock().unwrap();
+        map.iter()
+            .map(|(endpoint, cb)| {
+                let (circuit, skipped) = match cb.state() {
+                    CircuitState::Closed => ("closed", false),
+                    CircuitState::HalfOpen => ("half-open", false),
+                    CircuitState::Open => ("open", true),
+                };
+                BreakerSnapshot {
+                    endpoint: endpoint.clone(),
+                    circuit,
+                    error_streak: cb.error_streak(),
+                    skipped,
+                }
+            })
+            .collect()
+    }
+}
+
+/// A read-only point-in-time view of one upstream's breaker, for the
+/// self_healing read model. (last-good time is not tracked by the breaker, so
+/// the view's `lastGood` stays null until that's added upstream.)
+pub struct BreakerSnapshot {
+    pub endpoint: String,
+    /// "closed" | "half-open" | "open"
+    pub circuit: &'static str,
+    pub error_streak: u32,
+    /// True when the circuit is OPEN (currently shedding, no trial admitted).
+    pub skipped: bool,
 }
 
 impl Default for UpstreamBreakers {
@@ -102,5 +137,20 @@ mod tests {
         b.record("http://a", false); // a opens
         assert!(b.is_open("http://a"));
         assert!(!b.is_open("http://b"), "b unaffected by a");
+    }
+
+    #[test]
+    fn snapshot_reports_open_without_admitting_trial() {
+        let b = UpstreamBreakers::new(1, 1_000_000); // huge cooldown — stays open
+        b.record("http://x", false); // opens (threshold 1)
+        let snap = b.snapshot();
+        assert_eq!(snap.len(), 1);
+        assert_eq!(snap[0].endpoint, "http://x");
+        assert_eq!(snap[0].circuit, "open");
+        assert!(snap[0].skipped, "open circuit is shedding");
+        assert_eq!(snap[0].error_streak, 1);
+        // snapshot() must NOT have advanced Open→HalfOpen (it used state(), not
+        // should_skip): the breaker is still open on the next read.
+        assert!(b.is_open("http://x"));
     }
 }

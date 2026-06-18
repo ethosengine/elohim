@@ -227,6 +227,7 @@ where
             path = %path,
             "upstream circuit OPEN — shedding without calling storage (503 + Retry-After)"
         );
+        crate::metrics::inc_breaker_open();
         return catching_up_proxy_response(
             crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
         );
@@ -257,6 +258,7 @@ where
                     retry_after,
                     "honoring upstream backpressure — surfacing catching-up to client"
                 );
+                crate::metrics::inc_backpressure_honored();
                 return catching_up_proxy_response(retry_after);
             }
 
@@ -353,6 +355,7 @@ where
     let has_range_header = req.headers().contains_key(hyper::header::RANGE);
     if has_range_header {
         debug!(hash = %hash, "Range request — skipping pantry, forwarding directly");
+        crate::metrics::inc_blob_pantry("skipped");
         return forward_to_storage(req, storage_url, path, client, breakers, ctx).await;
     }
 
@@ -360,6 +363,7 @@ where
     if let Some(size) = cache.blob_size(&hash) {
         debug!(hash = %hash, size = size, "Blob drawn from pantry (cache hit)");
         if let Some(entry) = cache.get(&hash) {
+            crate::metrics::inc_blob_pantry("hit");
             return Response::builder()
                 .status(StatusCode::OK)
                 .header("Content-Type", &entry.content_type)
@@ -385,6 +389,7 @@ where
             hash = %hash,
             "upstream circuit OPEN — shedding blob without calling storage (503 + Retry-After)"
         );
+        crate::metrics::inc_breaker_open();
         return catching_up_proxy_response(
             crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
         );
@@ -443,6 +448,7 @@ where
                     retry_after,
                     "honoring upstream blob backpressure — surfacing catching-up"
                 );
+                crate::metrics::inc_backpressure_honored();
                 return catching_up_proxy_response(retry_after);
             }
 
@@ -469,6 +475,7 @@ where
 
                     if should_cache {
                         cache.set(&hash, body.to_vec(), &content_type, BLOB_PANTRY_TTL);
+                        crate::metrics::inc_blob_pantry("stocked");
                         debug!(
                             hash = %hash,
                             size = body.len(),
@@ -477,16 +484,27 @@ where
                             body.len()
                         );
                     } else if status == StatusCode::PARTIAL_CONTENT {
+                        crate::metrics::inc_blob_pantry("skipped");
                         debug!(hash = %hash, "206 Partial Content — not stocking pantry");
                     } else if !status.is_success() {
+                        // Non-2xx (typically 404 under no-fanout) — the genuine
+                        // pantry miss the doorway can't stock.
+                        crate::metrics::inc_blob_pantry("miss");
                         debug!(hash = %hash, status = %status, "Non-2xx — not stocking pantry");
                     } else if (body.len() as u64) > blob_pantry_max_bytes() {
+                        crate::metrics::inc_blob_pantry("skipped");
                         debug!(
                             hash = %hash,
                             size = body.len(),
                             max = blob_pantry_max_bytes(),
                             "Blob exceeds pantry budget — not stocking"
                         );
+                    } else {
+                        // Any other 2xx that isn't a cacheable 200 (e.g. 204/203;
+                        // unreachable for a blob GET in practice). Keep the pantry
+                        // outcomes exhaustive — exactly one per fetched request.
+                        crate::metrics::inc_blob_pantry("skipped");
+                        debug!(hash = %hash, status = %status, "2xx non-200 — not stocking pantry");
                     }
 
                     Response::builder()

@@ -661,6 +661,8 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     // storage_proxy_client + upstream_breakers are already ctor-set to identical
     // defaults — not reassigned here.
     state.inbound_semaphore = Arc::new(tokio::sync::Semaphore::new(inbound_max()));
+    // Expose the ceiling on /metrics + as the AdmissionView maxInflight source.
+    doorway::metrics::set_inbound_max(inbound_max());
     info!(
         max_inflight = inbound_max(),
         "inbound admission ceiling set"

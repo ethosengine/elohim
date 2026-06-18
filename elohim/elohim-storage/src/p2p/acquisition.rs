@@ -101,7 +101,12 @@ impl AcquisitionState {
             // Slice-1 item pins (tiny sets); revisit with a shared Arc or a
             // borrow variant when cluster closures bring large desired sets.
             tracker.set_local_ids(local_has.clone());
+            let want_ids_for_local = want_ids.clone();
             let gaps = tracker.reconcile_desired(want_ids);
+            // Already-local wants are satisfied (bytes present), not pending —
+            // count them as fetched so the rollup can reach caught_up on a
+            // content-holder node. See GapTracker::mark_local_wants_satisfied.
+            tracker.mark_local_wants_satisfied(&want_ids_for_local);
             to_dispatch.extend(gaps);
         }
         to_dispatch
@@ -289,8 +294,33 @@ mod tests {
             .await;
         assert_eq!(dispatch.len(), 2);
         let r = acq.rollup().await;
-        assert_eq!((r.total, r.fetched, r.pending), (3, 0, 2));
+        // have-1 is already local → now counted as fetched (satisfied), so
+        // fetched=1; need-1/need-2 are still pending. Not caught_up (3 != 1).
+        assert_eq!((r.total, r.fetched, r.pending), (3, 1, 2));
         assert!(!r.caught_up);
+    }
+
+    #[tokio::test]
+    async fn all_pinned_items_already_local_is_caught_up() {
+        // The content-holder case (matthew holds the seeded corpus): a pin
+        // whose every item is already present locally must report caught_up.
+        // Today total counts already-local items but fetched does not, so the
+        // pull stream is pull=false forever and Verify Projection Sync fails.
+        let acq = AcquisitionState::new();
+        let local: HashSet<String> = ["have-1".to_string()].into_iter().collect();
+        let dispatch = acq
+            .reconcile(vec![(1, vec!["have-1".into()])], &local)
+            .await;
+        assert!(
+            dispatch.is_empty(),
+            "already-local item needs no fetch dispatch"
+        );
+        let r = acq.rollup().await;
+        assert_eq!((r.total, r.fetched, r.pending), (1, 1, 0));
+        assert!(
+            r.caught_up,
+            "a pin whose every item is already local must be caught_up"
+        );
     }
 
     #[tokio::test]

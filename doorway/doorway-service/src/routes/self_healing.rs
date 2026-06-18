@@ -7,13 +7,11 @@
 //! OWN runtime state). Same legitimate doorway-local class as /admin/capability
 //! and /admin/render-stats.
 //!
-//! Agent-consumable: plain HTTP JSON, camelCase, stable keys. PENDING sibling
-//! fields (autoPreset, admission, upstreams) are emitted as null/empty with a
-//! `// FOLLOW-ON` seam so each sibling plan's landing is a one-line wire-up.
-//! (admission/upstreams now have landed sources — inbound_semaphore +
-//! WarmStreamHealth/UpstreamBreakers — but exposing them needs new accessors
-//! [semaphore max, a shed counter, a breaker snapshot]; that wiring is its own
-//! follow-on, kept out of this read-model task.)
+//! Agent-consumable: plain HTTP JSON, camelCase, stable keys. `autoPreset`
+//! remains a reserved PENDING field (null) until the auto-config sibling lands;
+//! `admission` and `upstreams` are now LANDED — the §6 co-delivery wired the
+//! shared accessors (metrics inbound-max gauge + admission_shed counter +
+//! UpstreamBreakers::snapshot()), one home each, also feeding /metrics.
 
 use std::sync::Arc;
 
@@ -34,14 +32,10 @@ pub struct SelfHealingView {
     /// FOLLOW-ON: wire when the auto-config plan lands
     /// (AppState.auto_preset via elohim_compute::limits).
     pub auto_preset: Option<serde_json::Value>,
-    /// Inbound admission: { maxInflight, available, shedTotal }.
-    /// FOLLOW-ON: inbound-admission sibling has LANDED (state.inbound_semaphore);
-    /// exposing it here needs a stored max + a shed atomic — separate wire-up.
+    /// Inbound admission: { maxInflight, available, shedTotal }. LANDED (metrics
+    /// inbound-max gauge + admission_shed counter + live semaphore permits).
     pub admission: Option<AdmissionView>,
-    /// Per-upstream circuit/health state.
-    /// FOLLOW-ON: upstream-self-protection sibling has LANDED
-    /// (WarmStreamHealth::snapshot / UpstreamBreakers); exposing it needs a
-    /// breaker-snapshot accessor — separate wire-up.
+    /// Per-upstream circuit/health state. LANDED (UpstreamBreakers::snapshot()).
     pub upstreams: Vec<UpstreamView>,
     pub projector: ProjectorView,
     pub peers: Vec<PeerView>,
@@ -50,7 +44,7 @@ pub struct SelfHealingView {
     pub conductor: ConductorView,
 }
 
-/// PENDING (inbound-admission wire-up). Shape reserved for forward-compat.
+/// Inbound admission ceiling + headroom + shed count (LANDED).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AdmissionView {
@@ -59,7 +53,7 @@ pub struct AdmissionView {
     pub shed_total: u64,
 }
 
-/// PENDING (upstream-self-protection wire-up). One upstream entry.
+/// One upstream's circuit/health entry (LANDED — from UpstreamBreakers::snapshot).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpstreamView {
@@ -131,6 +125,10 @@ pub struct SelfHealingInputs {
     pub warmup: Option<(bool, u32, bool, Option<String>)>,
     /// (connected, connected_workers, total_workers)
     pub conductor: (bool, usize, usize),
+    /// (maxInflight, available, shedTotal) for the AdmissionView (LANDED).
+    pub admission: (usize, usize, u64),
+    /// Per-upstream breaker snapshots for the UpstreamView (LANDED).
+    pub upstreams: Vec<crate::routes::upstream_health::BreakerSnapshot>,
 }
 
 /// PURE: compose the read model from injected snapshots. No I/O, no AppState.
@@ -163,14 +161,28 @@ pub fn compose_self_healing(inputs: SelfHealingInputs) -> SelfHealingView {
     };
 
     let (connected, connected_workers, total_workers) = inputs.conductor;
+    let (max_inflight, available, shed_total) = inputs.admission;
+    let upstreams = inputs
+        .upstreams
+        .into_iter()
+        .map(|b| UpstreamView {
+            endpoint: b.endpoint,
+            circuit: b.circuit.to_string(),
+            error_streak: b.error_streak,
+            last_good: None, // the breaker does not track a last-good timestamp yet
+            skipped: b.skipped,
+        })
+        .collect();
 
     SelfHealingView {
         // FOLLOW-ON: auto-config sibling sets this from AppState.auto_preset.
         auto_preset: None,
-        // FOLLOW-ON: inbound-admission wire-up (landed source: inbound_semaphore).
-        admission: None,
-        // FOLLOW-ON: upstream-self-protection wire-up (landed: WarmStreamHealth).
-        upstreams: Vec::new(),
+        admission: Some(AdmissionView {
+            max_inflight,
+            available,
+            shed_total,
+        }),
+        upstreams,
         projector: ProjectorView {
             lag_seconds: inputs.projector_lag_seconds,
             caught_up: inputs.p2p_caught_up,
@@ -251,6 +263,18 @@ pub async fn handle_self_healing(state: Arc<crate::server::AppState>) -> Respons
         None => (false, 0, 0),
     };
 
+    // Admission (LANDED): ceiling from the metrics gauge, headroom from the live
+    // semaphore, shed count from the metrics counter — one home for the count,
+    // shared with /metrics (handoff §6 co-delivery).
+    let admission = (
+        crate::metrics::inbound_max() as usize,
+        state.inbound_semaphore.available_permits(),
+        crate::metrics::admission_shed_total(),
+    );
+    // Upstreams (LANDED): read-only breaker snapshot — never admits a half-open
+    // trial as a side effect of being observed.
+    let upstreams = state.upstream_breakers.snapshot();
+
     let projector_lag_seconds = fetch_projector_status(&state).await;
 
     let view = compose_self_healing(SelfHealingInputs {
@@ -261,6 +285,8 @@ pub async fn handle_self_healing(state: Arc<crate::server::AppState>) -> Respons
         render,
         warmup,
         conductor,
+        admission,
+        upstreams,
     });
 
     match serde_json::to_string_pretty(&view) {
@@ -303,6 +329,13 @@ mod tests {
             render: RenderTraceSnapshot::default(),
             warmup: Some((false, 4u32, true, Some("boom".to_string()))),
             conductor: (true, 2, 4),
+            admission: (256, 200, 3),
+            upstreams: vec![crate::routes::upstream_health::BreakerSnapshot {
+                endpoint: "http://storage:8090".to_string(),
+                circuit: "open",
+                error_streak: 4,
+                skipped: true,
+            }],
         }
     }
 
@@ -316,15 +349,19 @@ mod tests {
             render: RenderTraceSnapshot::default(),
             warmup: Some((false, 0, true, None)),
             conductor: (true, 1, 1),
+            admission: (128, 100, 0),
+            upstreams: vec![],
         });
         let json = serde_json::to_value(&view).unwrap();
-        // Reserved PENDING keys present and null/empty, never absent/faked.
+        // autoPreset stays reserved (null); admission + upstreams now LANDED.
         assert!(
             json.get("autoPreset").is_some(),
             "autoPreset key must be present"
         );
         assert_eq!(json["autoPreset"], serde_json::Value::Null);
-        assert_eq!(json["admission"], serde_json::Value::Null);
+        assert_eq!(json["admission"]["maxInflight"], serde_json::json!(128));
+        assert_eq!(json["admission"]["available"], serde_json::json!(100));
+        assert_eq!(json["admission"]["shedTotal"], serde_json::json!(0));
         assert_eq!(json["upstreams"], serde_json::json!([]));
         // LANDED scalars present and camelCase.
         assert_eq!(json["projector"]["caughtUp"], serde_json::json!(true));
@@ -337,10 +374,18 @@ mod tests {
     #[test]
     fn compose_maps_landed_fields_and_reserves_pending() {
         let view = compose_self_healing(sample_inputs());
-        // PENDING reserved
+        // auto_preset stays reserved; admission + upstreams now LANDED.
         assert!(view.auto_preset.is_none());
-        assert!(view.admission.is_none());
-        assert!(view.upstreams.is_empty());
+        let adm = view.admission.expect("admission landed");
+        assert_eq!(adm.max_inflight, 256);
+        assert_eq!(adm.available, 200);
+        assert_eq!(adm.shed_total, 3);
+        assert_eq!(view.upstreams.len(), 1);
+        assert_eq!(view.upstreams[0].endpoint, "http://storage:8090");
+        assert_eq!(view.upstreams[0].circuit, "open");
+        assert_eq!(view.upstreams[0].error_streak, 4);
+        assert!(view.upstreams[0].skipped);
+        assert_eq!(view.upstreams[0].last_good, None);
         // LANDED projector
         assert_eq!(view.projector.lag_seconds, Some(7));
         assert_eq!(view.projector.caught_up, Some(false));
@@ -409,7 +454,15 @@ mod tests {
 
         assert!(json.get("autoPreset").is_some());
         assert_eq!(json["autoPreset"], serde_json::Value::Null);
-        assert_eq!(json["admission"], serde_json::Value::Null);
+        // admission is now LANDED (an object with the three keys); a bare state
+        // has no breaker records, so upstreams stays empty.
+        assert!(
+            json["admission"].is_object(),
+            "admission landed as an object"
+        );
+        assert!(json["admission"].get("maxInflight").is_some());
+        assert!(json["admission"].get("available").is_some());
+        assert!(json["admission"].get("shedTotal").is_some());
         assert_eq!(json["upstreams"], serde_json::json!([]));
         assert!(json.get("projector").is_some());
         assert!(json.get("peers").is_some());
