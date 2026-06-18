@@ -101,6 +101,25 @@ impl GapTracker {
         self.local_ids.insert(id.to_string());
     }
 
+    /// Acquisition-only: count wanted ids that are ALREADY present locally as
+    /// completed, so the acquisition rollup's `total == fetched` holds for
+    /// content the node already holds. `enqueue_missing` skips already-local
+    /// ids (neither pending nor completed), so without this they inflate
+    /// `total` but never `fetched` → the pull stream reports `caughtUp=false`
+    /// forever on a content-holder node (the live matthew case).
+    ///
+    /// This is NOT a false-complete: R-A's "never claim done before bytes
+    /// ARRIVE" is satisfied — the bytes ARE present locally (that is what
+    /// `local_ids` means). Distinct from `mark_completed` (the cross-stream
+    /// byte-ARRIVAL signal). Idempotent; leaves `pending`/`failed` untouched.
+    pub fn mark_local_wants_satisfied(&mut self, want_ids: &[String]) {
+        for id in want_ids {
+            if self.local_ids.contains(id) {
+                self.completed.insert(id.clone());
+            }
+        }
+    }
+
     /// Removed from pending, NOT re-queued — the next reconcile/discover
     /// cycle re-includes it while fail_count < max_retries (R-E).
     pub fn mark_failed(&mut self, id: &str) {
