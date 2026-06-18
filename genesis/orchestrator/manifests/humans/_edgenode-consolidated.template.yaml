@@ -234,6 +234,13 @@ spec:
               value: "/etc/holochain/conductor-config.yaml"
             - name: CONDUCTOR_DATA_DIR
               value: "/var/local/lib/holochain"
+            # --- TEMP: conductor heap-leak PROFILING canary (REMOVE after the leak hunt) ---
+            # Inherited by the embedded holochain child. The jemalloc-prof conductor
+            # (elohim-edgenode-prof, embedded via the storage Dockerfile CONDUCTOR_SOURCE_IMAGE)
+            # auto-dumps a jeprof heap profile to the data-dir PVC every ~1 GiB allocated.
+            # Inert on a non-jemalloc (glibc) conductor, which ignores _RJEM_MALLOC_CONF.
+            - name: _RJEM_MALLOC_CONF
+              value: "prof:true,prof_active:true,lg_prof_sample:19,lg_prof_interval:30,prof_prefix:/var/local/lib/holochain/jeprof"
             - name: HAPP_PATH
               value: "/opt/holochain/elohim.happ"
             # Path to the peer-policy mount — enables conductor forwarders.

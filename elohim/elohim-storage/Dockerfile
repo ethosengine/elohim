@@ -9,7 +9,12 @@
 # re-run the che-dw elohim-edgenode job (updates :latest), then rebuild storage.
 # ROLLBACK: set this back to ghcr.io/holo-host/edgenode:v0.0.8-alpha31-hc0.6.0-go-pion-custom
 # and push to dev → next edge build reverts production storage to the stock conductor.
-ARG CONDUCTOR_SOURCE_IMAGE=harbor.ethosengine.com/ethosengine/elohim-edgenode:latest
+#
+# ⚠ TEMP — conductor heap-leak PROFILING CANARY (2026-06-18, REVERT after the leak hunt):
+# pointed at the jemalloc-prof build (elohim-edgenode-prof:e87a680) so the fleet runs the
+# native heap profiler paired with the _RJEM_MALLOC_CONF env in the edgenode manifest. This
+# is a DEBUG build — revert this default to elohim-edgenode:latest once the leak site is named.
+ARG CONDUCTOR_SOURCE_IMAGE=harbor.ethosengine.com/ethosengine/elohim-edgenode-prof:e87a680
 FROM ${CONDUCTOR_SOURCE_IMAGE} AS conductor-source
 
 # Build stage
