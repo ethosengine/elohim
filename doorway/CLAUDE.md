@@ -147,6 +147,8 @@ Known enforcement gap (HIGH, open): the storage HTTP path behind the proxy appli
 
 The protocol's storage/distribution language — `quilt`, `pantry`, `stock`, `draw`, `shard`, `RS(N,K)` — is defined in `genesis/graphos/vocabulary.md`. Wire-level identifiers (HTTP `/blob/{hash}`, `BlobStore`, `sha256-{hex}`) keep their existing names; the new vocabulary applies to design discussion, signal/event names, and any new identifier we invent. The legacy `/store/{hash}` and `/api/blob/{hash}` paths were retired in the 2026-04-30 vocabulary cleanup; the canonical path is `/blob/{hash}` (registry-routed via storage's manifest).
 
+**Addressing canon (CID-first).** The canonical content/blob *address* is a CIDv1 — `bafyrei…` (dag-cbor) for atoms / DAG-CBOR content and projection/coherence fingerprints, `bafkrei…` (raw codec over `Sha2_256(bytes)`, see `src/routes/blob.rs`) for blobs. The bare `sha256-<hex>` blob marker on the live `/blob/<hash>` path is **legacy/in-migration**: sha2-256 is only the multihash *inside* the CID, and a `cid` field must never hold a `sha256-<hex>`. New doorway surfaces design CID-first — e.g. the F-COHERENCE `digest` is a CIDv1 over the sorted head set, not a bare sha. Bare sha stays only for non-addressing uses (dedup, byte-verify, `cite-gen` `sha256:` fingerprints). Rule: `.claude/skills/p2p-design-gate` Step 2 "Canonical address forms."
+
 ## Reference Documentation
 
 Detailed design docs live in `doorway-service/`:

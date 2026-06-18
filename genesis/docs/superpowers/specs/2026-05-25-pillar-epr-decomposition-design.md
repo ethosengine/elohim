@@ -119,7 +119,7 @@ The existing `operate-doorway` Commitment pattern (Phase 2 L3, landed) demonstra
 
 Both reuse:
 - The same `Commitment` entry type in `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs`
-- The same content-addressed deterministic id (`sha256(provider_peer_id|action|scope)` → idempotent on re-seed, 409 on duplicate)
+- The same pre-DHT idempotency key (`sha256(provider_peer_id|action|scope)` → idempotent on re-seed, 409 on duplicate) — **not the notarized CID identity; the Commitment's Mishpat entry_hash (`uhCAk…`) is the identity**
 - The same projection store in `elohim/elohim-storage/src/db/rea_commitments.rs`
 - The same seeder pattern (`genesis/seeder/src/seed-operator-bindings.ts` → mirror as `seed-projections.ts`)
 - The same JWT capability-snapshot resolver pattern (`find_active_operator_binding` → mirror as `find_active_projections` keyed by doorway_id)
@@ -134,7 +134,7 @@ Both reuse:
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct EprProjectionView {
-    pub commitment_id: String,            // sha256(...) deterministic
+    pub commitment_id: String,            // sha256(...) pre-DHT idempotency key, not the notarized CID identity (Mishpat entry_hash uhCAk)
     pub epr_id: String,                   // e.g. "lamad-spa"
     pub doorway_id: String,               // e.g. "doorway:alpha-elohim-host"
     pub url_path: String,                 // e.g. "/lamad" or "/"
@@ -386,6 +386,8 @@ Next browser request to /lamad/anything:
   3. Fall through to storage → returns sha256-xyz...
   4. Extract from new ZIP, serve, repopulate cache.
 ```
+
+> The `sha256-xyz...` blob marker shown here is the live `blobHash`/`/admin/seed/blob` wire form (legacy; CID-canonical target is a raw CIDv1 `bafkrei…` over `Sha2_256(bytes)` per gospel — blob-plane migration is a named downstream arc).
 
 ### 5.4 Scenario D — Reach-gated EPR (substrate-ready, MVP doesn't exercise)
 
@@ -673,6 +675,8 @@ Feature: Doorway natively projects EPRs at author-declared URL paths
     And the lamad bundle's <base href> is "/lamad/"
     And Angular client-side router handles "/concept/fair-exchange"
 
+  # blobHash markers below are the live sha256-<hex> wire form (legacy; CID-canonical
+  # target is a raw CIDv1 bafkrei… per gospel — blob-plane migration is a downstream arc)
   Scenario: Bundle redeploy evicts doorway cache
     Given the lamad-spa EPR's blob is sha256-OLD
     When a deploy PATCHes the lamad-spa EPR with blobHash sha256-NEW
@@ -867,7 +871,7 @@ Per `.claude/skills/p2p-design-gate/SKILL.md`:
 
 2. **Existing DHT entry type**: YES — `Commitment` exists. New `action="project-epr"` value reuses the existing entry type.
 
-3. **Identity**: Content-derived via `sha256(steward_peer_id|action|scope)` where scope is `doorway:{doorway_id}|epr:{epr_id}`. Deterministic, idempotent, re-runs collapse to 409.
+3. **Identity**: The notarized identity is the Commitment's Mishpat entry_hash (`uhCAk…`). A pre-DHT idempotency key — `sha256(steward_peer_id|action|scope)` where scope is `doorway:{doorway_id}|epr:{epr_id}` — dedups re-seeds (deterministic, idempotent, re-runs collapse to 409) but is **not** the canonical CID identity.
 
 4. **Coordinator function**: `create_rea_commitment` (existing) with new action discriminator. New validator (§2.4) enforces project-epr-specific constraints. Signal: `ProjectionRegistered`/`ProjectionRevoked` events on the existing SSE bus.
 

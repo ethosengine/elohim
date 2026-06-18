@@ -143,6 +143,23 @@ The identity of the entity IS a hash of its content. If the content changes, the
 
 **Implication**: No `UPDATE` semantics. New version = new CID. Version chains link CIDs together.
 
+#### Canonical address forms — CID IS the address; sha256 is only the hash *inside* it
+
+**The recurring mistake this kills:** exposing a bare `sha256-<hex>` (or a UUID) as a content/blob *address*, or putting a `sha256-<hex>` value in a field named `cid`. A CID is not a *different* hash — it is the **same sha2-256 of the bytes, wrapped in a self-describing multihash + codec**. "Use a CID" means *stop exposing the bare hash; expose the CID that wraps it.*
+
+| What is being addressed | Canonical form | How it is minted | Example |
+|---|---|---|---|
+| Atom / DAG-CBOR content (EPR heads & atoms, manifests, content-set fingerprints, projection digests) | **CIDv1, dag-cbor codec** → `bafyrei…` | `Cid::new_v1(0x71 dag-cbor, Sha2_256(canonical-bytes))` — see `elohim-storage/src/epr_codec.rs` (`DAG_CBOR_CODEC`) | `bafyrei…` |
+| Raw blob bytes | **CIDv1, raw codec** → `bafkrei…` | `Cid::new_v1(0x55 raw, Sha2_256(bytes))` — see `doorway/src/routes/blob.rs`; the **same** sha256 you already compute, wrapped | `bafkrei…` |
+| Agent / action identity | **Holochain hash** → `uhCAk…` (agent key), action hash for actions | conductor-minted; NOT a CID, NOT a bare sha | `uhCAk…` |
+
+**NOT addresses — keep these as bare sha256.** The discriminator: *does something resolve / dereference / fetch it?* If no, it is not an address — leave it.
+- **Dedup / fingerprint keys** — e.g. `fp = sha256(node|class|provenance)[:12]` (findings / runtime sentinels). An internal index key, never fetched.
+- **Byte-equality verification** — e.g. `sha256-verify the ts-rs codegen diff`, blob-arrival integrity checks. Comparing bytes, not naming content.
+- **Cite fingerprints** — `cites:` frontmatter `sha256:<hex>` is the `cite-gen` tool's content-address *of a citation*; it is tool-generated, a SEPARATE system — **never hand-edit, never migrate to CID.**
+
+**Legacy / in-migration:** the bare `sha256-<hex>` blob wire marker (currently described in `elohim-storage/CLAUDE.md` / `doorway/CLAUDE.md`, on the `/blob/<hash>` path) is the **legacy** form; the canonical target is the wrapping CID `bafkrei…`. Moving the blob plane (`/blob`, `BlobStore`, inventory-gossip wire, seeder) from bare-hash to CID is a named **downstream migration arc** — describe *current* behavior accurately, design *new* surfaces CID-first.
+
 ### Option 2: Agent-Scoped Composite
 
 The identity is a tuple of `(AgentPubKey, ContentEntryHash, type_discriminator)`. The agent's relationship to a piece of content is the identity.
@@ -218,6 +235,7 @@ These are known regressions — design choices that have caused real bugs or arc
 | CID stored as a relational foreign key | The entity IS its content address. Storing a CID as an FK in another table creates a dangling reference when the content is versioned. | Use Holochain links between EntryHashes. Storage projections denormalize for query convenience. |
 | Standalone table for agent state | Agent preferences/bookmarks/drafts in a shared table leak private data and create P2P sync conflicts. | Private source-chain entry with local storage projection. No shared table. |
 | Three address formats left undefined | The same entity referenced by CID in one place, UUID in another, and slug in a third. Conversion bugs everywhere. | Declare one canonical address format per entity. Document it. All other formats are display aliases resolved at the edge. |
+| Bare `sha256-<hex>` exposed as a content/blob address, or a `cid:` field holding a `sha256-<hex>` | A bare hash is not self-describing (no codec, no hash-fn tag) and silently competes with the CID it should be. Calling a sha a "cid" is the conflation that recurs. | Expose the CID that wraps the SAME bytes: `bafyrei…` (dag-cbor) for atoms/content, `bafkrei…` (raw) for blobs — sha2-256 is only the multihash inside it. Bare sha is for dedup keys / byte-verify / cite-fps only, never an address. See Step 2 "Canonical address forms." |
 | Missing source-of-truth declaration | A table exists but nobody documented whether Holochain or SQLite is authoritative. Bugs appear when they disagree. | Every table's migration or schema file includes a comment: `-- Source of truth: DHT` or `-- Source of truth: local (operational)`. |
 | Creating new entry type when one already exists | Lamad DNA is at ~73/~100, Mishpat at 11/~100. Adding another wastes scarce capacity and fragments the data model. | Check existing entry types first. Use Links (Category A2) for relationships. Only create new types if nothing fits and DNA has headroom. |
 | Putting granular data on the DHT | Every quiz answer, scroll event, or preference on the DHT bloats gossip and exceeds the ~3000 entry budget. | Agent-scoped with attestation (Category B2): raw data stays private, signed proof of outcome is notarized. |

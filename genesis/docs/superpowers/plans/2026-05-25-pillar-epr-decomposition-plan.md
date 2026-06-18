@@ -415,7 +415,7 @@ Create `elohim/sdk/schemas/v1/views/epr-projection-view.schema.json`:
     "seededAt", "seededBy"
   ],
   "properties": {
-    "commitmentId": { "type": "string", "description": "sha256(provider_peer_id|action|scope)" },
+    "commitmentId": { "type": "string", "description": "Pre-DHT idempotency/dedup key: sha256(provider_peer_id|action|scope)[:16] — NOT the notarized CID identity (that is the Mishpat Commitment entry_hash, uhCAk…)" },
     "eprId":        { "type": "string", "description": "Content row id of the projected EPR" },
     "doorwayId":    { "type": "string", "pattern": "^doorway:" },
     "urlPath":      { "type": "string", "pattern": "^/" },
@@ -1136,7 +1136,7 @@ mod tests {
             pillar: "elohim-core".into(),
             elements: vec![ElementEntry {
                 tag_name: "elohim-button".into(),
-                cid: "sha256-abc".into(),
+                cid: "bafkreiabc".into(),
                 version: "1.0.0".into(),
                 view_deps: vec![],
             }],
@@ -1182,7 +1182,7 @@ Create `elohim/sdk/schemas/v1/views/element-registry-view.schema.json`:
       "required": ["tagName", "cid", "version", "viewDeps"],
       "properties": {
         "tagName":  { "type": "string", "pattern": "^[a-z][a-z0-9]*-[a-z0-9-]+$" },
-        "cid":      { "type": "string", "pattern": "^sha256-" },
+        "cid":      { "type": "string", "pattern": "^baf" },
         "version":  { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+" },
         "viewDeps": { "type": "array", "items": { "type": "string" } }
       }
@@ -1215,7 +1215,7 @@ fn element_registry_view_matches_schema() {
         pillar: "elohim-core".into(),
         elements: vec![ElementEntry {
             tag_name: "elohim-button".into(),
-            cid: "sha256-0000000000000000000000000000000000000000000000000000000000000000".into(),
+            cid: "bafkreieaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
             version: "1.0.0".into(),
             view_deps: vec![],
         }],
@@ -1718,15 +1718,15 @@ Create `genesis/data/elements/elohim-core-registry.json`:
     "eprId": "elohim-core-elements",
     "pillar": "elohim-core",
     "elements": [
-      { "tagName": "elohim-button", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": [] },
-      { "tagName": "elohim-card", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": [] },
-      { "tagName": "elohim-compute-tile", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": ["ComputeTileView"] },
-      { "tagName": "elohim-epr-link", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": ["EprHead"] },
-      { "tagName": "elohim-page-chrome", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": [] },
-      { "tagName": "elohim-default-omnibar", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": ["CurrentUserView"] },
-      { "tagName": "elohim-skeleton", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": [] },
-      { "tagName": "elohim-mention-base", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": [] },
-      { "tagName": "elohim-context-menu", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": [] }
+      { "tagName": "elohim-button", "cid": "bafkrei-pending-build", "version": "1.0.0", "viewDeps": [] },
+      { "tagName": "elohim-card", "cid": "bafkrei-pending-build", "version": "1.0.0", "viewDeps": [] },
+      { "tagName": "elohim-compute-tile", "cid": "bafkrei-pending-build", "version": "1.0.0", "viewDeps": ["ComputeTileView"] },
+      { "tagName": "elohim-epr-link", "cid": "bafkrei-pending-build", "version": "1.0.0", "viewDeps": ["EprHead"] },
+      { "tagName": "elohim-page-chrome", "cid": "bafkrei-pending-build", "version": "1.0.0", "viewDeps": [] },
+      { "tagName": "elohim-default-omnibar", "cid": "bafkrei-pending-build", "version": "1.0.0", "viewDeps": ["CurrentUserView"] },
+      { "tagName": "elohim-skeleton", "cid": "bafkrei-pending-build", "version": "1.0.0", "viewDeps": [] },
+      { "tagName": "elohim-mention-base", "cid": "bafkrei-pending-build", "version": "1.0.0", "viewDeps": [] },
+      { "tagName": "elohim-context-menu", "cid": "bafkrei-pending-build", "version": "1.0.0", "viewDeps": [] }
     ]
   },
   "contentFormat": "element-registry-manifest",
@@ -1983,8 +1983,10 @@ class FakeTransport implements LoaderTransport {
 
 describe('Loader', () => {
   const SAMPLE_BYTES = new Uint8Array([1, 2, 3, 4]);
-  const SAMPLE_CID = 'sha256-9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a';
-  // (CID computed for SAMPLE_BYTES; replace with actual hash in real test)
+  // CIDv1 raw (0x55) wrapping sha2-256(SAMPLE_BYTES) — a blob CID (bafkrei…).
+  // The multihash wraps the SAME sha2-256 digest the byte-verify below computes;
+  // compute the real CID for SAMPLE_BYTES (e.g. via Cid::new_v1 / multiformats) in the real test.
+  const SAMPLE_CID = 'bafkreie7q42dt4n2l7etd5lnwsi4lwznpgaqdz47m6kvloy57re3nkqanu';
 
   it('resolves from the first available transport (localCache hit)', async () => {
     const loader = new Loader([
@@ -2026,11 +2028,12 @@ describe('Loader', () => {
   });
 
   it('verifies CID matches returned bytes when verifyCid is true', async () => {
-    // SAMPLE_BYTES has a known sha256; resolve with a WRONG CID should fail
+    // SAMPLE_BYTES has a known sha2-256; resolve with a WRONG CID should fail.
+    // (Wrong CID = a well-formed bafkrei… raw CID whose wrapped digest ≠ sha2-256(bytes).)
     const loader = new Loader([
       new FakeTransport('doorway', SAMPLE_BYTES),
     ], { verifyCid: true });
-    await expect(loader.resolve('sha256-wrongwrongwrong')).rejects.toThrow(/CID mismatch/);
+    await expect(loader.resolve('bafkreial3l3llllllllllllllllllllllllllllllllllllllllllllllllll')).rejects.toThrow(/CID mismatch/);
   });
 });
 ```
@@ -2115,15 +2118,18 @@ export class Loader {
   }
 
   private async verifyCidMatches(cid: string, bytes: Uint8Array): Promise<void> {
-    // CID format: "sha256-<hex>"
-    const [algo, expected] = cid.split('-');
-    if (algo !== 'sha256') throw new Error(`Unsupported CID algo: ${algo}`);
+    // CID format: a self-describing CIDv1 (multibase 'b' base32). Blob bytes →
+    // raw codec (0x55) → bafkrei…; DAG-CBOR atoms → bafyrei…. The multihash
+    // inside the CID wraps the SAME sha2-256 digest we recompute here — "use a
+    // CID" means verify against the wrapped hash, not expose a bare sha256-<hex>.
+    const decoded = decodeCid(cid); // { codec, multihash: { code: 0x12 /* sha2-256 */, digest: Uint8Array } }
+    if (decoded.multihash.code !== 0x12) {
+      throw new Error(`Unsupported CID multihash code: ${decoded.multihash.code}`);
+    }
     const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
-    const actual = Array.from(new Uint8Array(hashBuffer))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-    if (actual !== expected) {
-      throw new Error(`CID mismatch: expected ${expected}, got ${actual}`);
+    const actual = new Uint8Array(hashBuffer);
+    if (!equalBytes(actual, decoded.multihash.digest)) {
+      throw new Error(`CID mismatch: ${cid} does not wrap sha2-256 of the returned bytes`);
     }
   }
 }
@@ -2135,13 +2141,14 @@ export class Loader {
 pnpm vitest run src/loader/loader.spec.ts 2>&1 | tail -10
 ```
 
-- [ ] **Step 5: Fix the CID-verification test with a real hash**
+- [ ] **Step 5: Fix the CID-verification test with a real CID**
 
-Compute the actual sha256 of `[1, 2, 3, 4]`:
+Compute the actual sha2-256 of `[1, 2, 3, 4]` — this is the raw digest the blob CID *wraps* (CIDv1 raw 0x55 + multihash 0x12 over this hash → `bafkrei…`); the byte-verify demonstrates the bytes, then derive `SAMPLE_CID` from it:
 
 ```bash
 echo -ne '\x01\x02\x03\x04' | sha256sum
 # Output: 9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a
+# Wrap this digest as a CIDv1 raw multihash to get the SAMPLE_CID (bafkrei…) above.
 ```
 
 Confirm the SAMPLE_CID in the test matches this. If not, update.
@@ -3934,7 +3941,9 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey) {
   //   [distDir: "dist/lamad/browser",      slug: "lamad-spa"],
   // ]
   for (bundle in bundles) {
-    // For each: zip, sha256, upload, patch+verify
+    // For each: zip, sha2-256 → wrap as CIDv1 raw (bafkrei…), upload, patch+verify
+    // (the bafkrei CID is what fills elements[*].cid / the blob address; the
+    //  sha2-256 is the digest the CID wraps — not a bare sha256-<hex> address)
     // (mostly the existing logic, parameterized)
   }
 }

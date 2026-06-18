@@ -140,6 +140,8 @@ The Track 2 substrate plane for observations is `IROH_OBSERVATION_ALPN` / libp2p
 
 Storage and distribution language — `quilt` (RS-encoded distribution of a content unit), `pantry` (peer-tended container), `stock`/`draw` (deposit/retrieve verbs), `shard`, `RS(N,K)` — is defined in `genesis/graphos/vocabulary.md`. Wire-level identifiers (`/blob/{hash}`, `BlobStore`, `sha256-{hex}`) keep their existing names. New design discussion, signal/event names, and any fresh identifiers should use the new vocabulary. Legacy `/store/{hash}` paths were retired 2026-04-30 — the canonical HTTP path is `/blob/{hash}`.
 
+**Addressing canon (CID-first).** The canonical content/blob *address* is a CIDv1 — `bafyrei…` (dag-cbor codec) for EPR atoms / DAG-CBOR content and content-set fingerprints, `bafkrei…` (raw codec, `Cid::new_v1(0x55, Sha2_256(bytes))` — see `src/epr_codec.rs`) for blob bytes. The bare `sha256-<hex>` blob marker still in use on the live `/blob/<hash>` path is the **legacy** form: sha2-256 is only the multihash *inside* a CID, never a standalone address, and a `cid` field must never hold a `sha256-<hex>`. Migrating the blob plane (`/blob`, `BlobStore`, inventory-gossip wire, seeder) from bare-hash to wrapping-CID is a named **downstream arc** — design new surfaces CID-first; describe current behavior accurately. Bare sha stays only for *non-addressing* uses (dedup keys, byte-equality verification, `cite-gen` `sha256:` cite fingerprints). Rule: `.claude/skills/p2p-design-gate` Step 2 "Canonical address forms."
+
 ## Identity & Transport-Identity Coherence
 
 A node/agent has three distinct identity namespaces. They are NOT interchangeable:
