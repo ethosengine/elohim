@@ -259,6 +259,10 @@ export const PATH_OVERVIEW = {
 /** Cross-pillar resource viewer (shell-rendered at /resource/:id and /epr/:id). */
 export const CONTENT_VIEWER = {
   ROOT: 'content-viewer',
+  // The raw fallback's "Content format: {format}" notice — rendered ONLY when no
+  // renderer is registered for the content format (content-viewer.component.html).
+  // Its presence is the negative signal that the markdown renderer did NOT mount.
+  FALLBACK_NOTICE: '.fallback-notice', // CSS selector — used via locate(), not testId()
 } as const;
 
 /** Raw-node inspector (elohim-app: epr-raw-node.component, shell-rendered at /epr/:id/raw). */
@@ -460,6 +464,11 @@ export const MARKDOWN = {
   // content-viewer renders the body into .content-body (verified live —
   // unification of the two markdown paths is a tracked content-viewer concern).
   CONTENT: '.markdown-content, .content-viewer .content-body, .content-body', // CSS selector — used via locate(), not testId()
+  // The markdown renderer's component host. Present ONLY when MarkdownRendererComponent
+  // actually instantiated — unlike CONTENT above, this does NOT match the static
+  // .content-body wrapper, so it distinguishes a FORMATTED render from the raw
+  // <pre> fallback (the renderer-registration gap on standalone /epr routes).
+  RENDERER_HOST: 'app-markdown-renderer', // CSS selector — used via locate(), not testId()
 } as const;
 
 // Shared exploration sidebar (lamad: exploration-sidebar.component.ts +

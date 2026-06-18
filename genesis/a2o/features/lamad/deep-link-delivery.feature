@@ -73,6 +73,32 @@ Feature: Deep links to lamad land on the rendered page, not a 404 shell
     And the rendered surface is not a raw error response
 
   @browser-only @wip
+  Scenario: A shared markdown EPR link renders FORMATTED content, not the raw fallback
+    # story-harvest (renderer-registration fix, 2026-06-18): the /epr/:resourceId,
+    # /resource/:resourceId, and /deliver/:slug routes mount their content
+    # component OUTSIDE LamadLayoutComponent. Renderer registration is a
+    # side-effect of injecting RendererInitializerService, which only
+    # LamadLayoutComponent triggered — so on these standalone routes the
+    # RendererRegistryService stayed empty, getRenderer('markdown') returned null,
+    # and the body dropped to the raw <pre> fallback (headers flattened, text
+    # overflowing). Confirmed live on elohim.host/epr/theology.
+    #
+    # Why existing coverage MISSED it: "the cross-pillar resource viewer renders"
+    # only proves the viewer chrome mounted, and "the markdown content body is
+    # rendered" matches the shared .content-body wrapper (present in BOTH the
+    # formatted render and the fallback) — both false-green on the broken state.
+    # This scenario's assertion proves the markdown renderer ACTUALLY mounted
+    # (app-markdown-renderer) and the "Content format:" fallback notice is absent.
+    #
+    # Constraint: every standalone renderer-consumer route must trigger renderer
+    # registration itself. Capability proof — un-@wip to @regression once the fix
+    # is deployed to alpha and verified green (RED on alpha until then, by design).
+    Given a learner opens the deep link "/epr/theology"
+    Then the cross-pillar resource viewer renders
+    And the content renders as formatted markdown, not the raw fallback
+    And the rendered surface is not a raw error response
+
+  @browser-only @wip
   Scenario: View Resource Details crosses the bundle boundary
     # REACH-PINNED (alpha verification 2026-06-06): the FCT step's resource is
     # community-gated (403 requiredReach:community for anon) — the correct anon

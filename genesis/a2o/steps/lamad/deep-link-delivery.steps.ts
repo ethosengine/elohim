@@ -46,6 +46,7 @@ import {
   PATH_OVERVIEW,
   RAW_NODE,
 } from '../../src/framework/pages/selectors.js';
+import { EprContentPage } from '../../src/framework/pages/epr-content.page.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
 import { AppResponse, fetchApp, responseStore } from '../delivery.steps.js';
@@ -314,6 +315,33 @@ Then('the cross-pillar resource viewer renders', async function (this: E2EWorld)
       `URL is "${device.page.url()}"`
   );
 });
+
+/**
+ * "Then the content renders as formatted markdown, not the raw fallback" —
+ * proves the markdown renderer actually mounted (app-markdown-renderer present)
+ * and the raw "Content format: …" fallback is absent. Distinct from "the
+ * cross-pillar resource viewer renders" (which only proves the viewer chrome
+ * mounted): a standalone /epr route with an empty renderer registry still
+ * mounts the viewer but drops the body to the raw <pre> fallback. This is the
+ * assertion that catches the renderer-registration gap.
+ *
+ * Example: Then the content renders as formatted markdown, not the raw fallback
+ */
+Then(
+  'the content renders as formatted markdown, not the raw fallback',
+  async function (this: E2EWorld) {
+    const device = await ensureVisitor(this);
+    if (!device) {
+      return PENDING;
+    }
+    const page = new EprContentPage(device.page);
+    assert.ok(
+      await page.isFormattedMarkdownRendered(),
+      'Expected formatted markdown (app-markdown-renderer mounted, no "Content format:" ' +
+        `fallback notice); URL is "${device.page.url()}"`
+    );
+  }
+);
 
 /**
  * "Then the lamad composite outline renders" — a claimed epr-composite (a path)

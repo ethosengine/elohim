@@ -9,7 +9,7 @@
  */
 
 import { BasePage } from './base.page.js';
-import { EPR, EXPLORATION, MARKDOWN } from './selectors.js';
+import { CONTENT_VIEWER, EPR, EXPLORATION, MARKDOWN } from './selectors.js';
 
 export class EprContentPage extends BasePage {
   /** Wait until at least one EPR link is rendered on the page. */
@@ -33,6 +33,27 @@ export class EprContentPage extends BasePage {
       .waitFor({ state: 'visible', timeout: timeoutMs })
       .then(() => true)
       .catch(() => false);
+  }
+
+  /**
+   * Whether the body rendered as FORMATTED markdown rather than the raw <pre>
+   * fallback. Distinguishes the two states that `isMarkdownBodyRendered` cannot:
+   * the markdown renderer's component host (MARKDOWN.RENDERER_HOST) is present
+   * ONLY when MarkdownRendererComponent actually instantiated, and the raw
+   * fallback's "Content format: …" notice (CONTENT_VIEWER.FALLBACK_NOTICE) must
+   * be absent. This is the assertion that catches the renderer-registration gap
+   * on standalone /epr, /resource, /deliver routes.
+   */
+  async isFormattedMarkdownRendered(timeoutMs = 15_000): Promise<boolean> {
+    const rendererMounted = await this.locate(MARKDOWN.RENDERER_HOST)
+      .first()
+      .waitFor({ state: 'visible', timeout: timeoutMs })
+      .then(() => true)
+      .catch(() => false);
+    if (!rendererMounted) return false;
+    // Negative signal: the raw-fallback notice must NOT be present.
+    const fallbackCount = await this.locate(CONTENT_VIEWER.FALLBACK_NOTICE).count();
+    return fallbackCount === 0;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
