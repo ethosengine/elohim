@@ -1,0 +1,390 @@
+diff --git a/elohim/elohim-storage/src/http.rs b/elohim/elohim-storage/src/http.rs
+index cc5ded2e2..a9a5e05fc 100644
+--- a/elohim/elohim-storage/src/http.rs
++++ b/elohim/elohim-storage/src/http.rs
+@@ -4461,6 +4461,108 @@ impl HttpServer {
+         }
+     }
+ 
++    /// Req-free, testable core of the HTTP reach gate. Returns `None` when the
++    /// requester is allowed to receive `content_id` at `reach` (commons/public,
++    /// any tier <= community, or an authorized human); returns
++    /// `Some((status, json_body))` when access must be denied.
++    ///
++    /// Behavior-equivalent to the former inline Layer-1.5 block in
++    /// `handle_db_content_by_id`: deny-by-default when the requester cannot be
++    /// resolved for restricted content, and delegate the per-tier decision to
++    /// `epr_service::authorize_reach_for_human` (the single source of truth).
++    /// Pulled out so BOTH the local serve path and the P2P cross-node fallback
++    /// can apply the identical gate (closes FINDING 1 of
++    /// `http-reach-cross-node-fallback-bypass`).
++    fn reach_gate_decision(
++        conn: &mut diesel::SqliteConnection,
++        app_ctx: &db::AppContext,
++        reach: &str,
++        identity: Option<String>,
++        content_id: &str,
++    ) -> Option<(StatusCode, String)> {
++        // Tiers at or below community are ambient on the HTTP path (the coarse
++        // is_public/auth-required gate already ran upstream). Only tiers ABOVE
++        // community (familiar / trusted / intimate / self) get the steward gate.
++        if crate::epr_service::reach_level_index(reach)
++            <= crate::epr_service::reach_level_index("community")
++        {
++            return None;
++        }
++
++        let requester = match identity {
++            Some(idv) => match crate::db::humans::get_human_by_id(conn, &idv)
++                .ok()
++                .flatten()
++            {
++                Some(h) => Some(h),
++                None => crate::db::humans::get_human_by_agent_key(conn, &idv)
++                    .ok()
++                    .flatten(),
++            },
++            None => None,
++        };
++
++        match requester {
++            Some(human) => {
++                let reach_gate = crate::epr_service::EprService::new(
++                    None,
++                    None,
++                    None,
++                    crate::p2p::trust_cache::PeerTrustCache::new(),
++                );
++                if let Err(reason) =
++                    reach_gate.authorize_reach_for_human(conn, app_ctx, reach, &human, content_id)
++                {
++                    Some((
++                        StatusCode::FORBIDDEN,
++                        format!(
++                            r#"{{"error":"Reach denied","requiredReach":"{}","reason":"{}"}}"#,
++                            reach, reason
++                        ),
++                    ))
++                } else {
++                    None
++                }
++            }
++            // Deny-by-default: restricted content + unresolvable requester.
++            None => Some((
++                StatusCode::FORBIDDEN,
++                format!(
++                    r#"{{"error":"Reach authorization required","requiredReach":"{}"}}"#,
++                    reach
++                ),
++            )),
++        }
++    }
++
++    /// HTTP wrapper around `reach_gate_decision`: resolves the requester's
++    /// identity from the request (X-Agent-Cid header / active session, the
++    /// pre-existing doorway-injected trust boundary — NOT widened here), then
++    /// applies the reach gate. Returns `Some(403_response)` to deny, `None` to
++    /// allow. Called from BOTH the local serve path (Layer 1.5) and the P2P
++    /// cross-node fallback so coverage is symmetric.
++    fn enforce_http_reach(
++        &self,
++        req: &Request<Incoming>,
++        conn: &mut diesel::SqliteConnection,
++        reach: &str,
++        content_id: &str,
++    ) -> Option<Response<Full<Bytes>>> {
++        let identity = crate::api::account::extract_agent_cid(req, conn)
++            .ok()
++            .flatten();
++        let app_ctx = db::AppContext::default_lamad();
++        Self::reach_gate_decision(conn, &app_ctx, reach, identity, content_id).map(
++            |(status, body)| {
++                Response::builder()
++                    .status(status)
++                    .header(header::CONTENT_TYPE, "application/json")
++                    .body(Full::new(Bytes::from(body)))
++                    .unwrap()
++            },
++        )
++    }
++
+     /// GET/DELETE /db/content/{id} - Get or delete content by ID
+     async fn handle_db_content_by_id(
+         &self,
+@@ -4522,65 +4624,13 @@ impl HttpServer {
+                     // can't be resolved. NOTE: live-alpha end-to-end enforcement
+                     // is coupled to humans.agent_pub_key population (the
+                     // resilience-card-self-cid-provide-loop-gate fork); the
+-                    // household stack (id populated) proves it now.
+-                    if crate::epr_service::reach_level_index(&view.reach)
+-                        > crate::epr_service::reach_level_index("community")
++                    // household stack (id populated) proves it now. Shared with
++                    // the P2P cross-node fallback via enforce_http_reach so both
++                    // serving paths apply the identical gate.
++                    if let Some(resp) =
++                        self.enforce_http_reach(&req, &mut conn, &view.reach, content_id)
+                     {
+-                        let identity = crate::api::account::extract_agent_cid(&req, &mut conn)
+-                            .ok()
+-                            .flatten();
+-                        let requester = match identity {
+-                            Some(idv) => {
+-                                match crate::db::humans::get_human_by_id(&mut conn, &idv)
+-                                    .ok()
+-                                    .flatten()
+-                                {
+-                                    Some(h) => Some(h),
+-                                    None => {
+-                                        crate::db::humans::get_human_by_agent_key(&mut conn, &idv)
+-                                            .ok()
+-                                            .flatten()
+-                                    }
+-                                }
+-                            }
+-                            None => None,
+-                        };
+-                        match requester {
+-                            Some(human) => {
+-                                let reach_gate = crate::epr_service::EprService::new(
+-                                    None,
+-                                    None,
+-                                    None,
+-                                    crate::p2p::trust_cache::PeerTrustCache::new(),
+-                                );
+-                                if let Err(reason) = reach_gate.authorize_reach_for_human(
+-                                    &mut conn,
+-                                    &app_ctx,
+-                                    &view.reach,
+-                                    &human,
+-                                    content_id,
+-                                ) {
+-                                    return Ok(Response::builder()
+-                                        .status(StatusCode::FORBIDDEN)
+-                                        .header(header::CONTENT_TYPE, "application/json")
+-                                        .body(Full::new(Bytes::from(format!(
+-                                            r#"{{"error":"Reach denied","requiredReach":"{}","reason":"{}"}}"#,
+-                                            view.reach, reason
+-                                        ))))
+-                                        .unwrap());
+-                                }
+-                            }
+-                            None => {
+-                                return Ok(Response::builder()
+-                                    .status(StatusCode::FORBIDDEN)
+-                                    .header(header::CONTENT_TYPE, "application/json")
+-                                    .body(Full::new(Bytes::from(format!(
+-                                        r#"{{"error":"Reach authorization required","requiredReach":"{}"}}"#,
+-                                        view.reach
+-                                    ))))
+-                                    .unwrap());
+-                            }
+-                        }
++                        return Ok(resp);
+                     }
+ 
+                     // Policy enforcement: check device policy ceiling
+@@ -4705,6 +4755,26 @@ impl HttpServer {
+                     {
+                         info!(id = %content_id, size = content_bytes.len(), "Content resolved via P2P");
+ 
++                        // FINDING 1 fix (http-reach-cross-node-fallback-bypass):
++                        // resolve_and_fetch carries the FETCHING NODE's identity,
++                        // not the HTTP requester's, so the serving peer never
++                        // gated against the caller. Re-apply the SAME reach gate
++                        // the local serve path uses (enforce_http_reach) against
++                        // the HTTP requester before persisting or returning the
++                        // fetched bytes. Uses the exact reach value persisted
++                        // below (head.qahal.reach, default commons). This guards
++                        // BOTH fallback return arms (Ok and Err) in one place.
++                        let fetched_reach = head
++                            .qahal
++                            .reach
++                            .clone()
++                            .unwrap_or_else(|| "commons".to_string());
++                        if let Some(resp) =
++                            self.enforce_http_reach(&req, &mut conn, &fetched_reach, content_id)
++                        {
++                            return Ok(resp);
++                        }
++
+                         // Store blob
+                         let blob_result = self.blob_store.store(&content_bytes).await;
+ 
+@@ -13250,3 +13320,177 @@ mod admission_tests {
+         assert!(sem.try_acquire().is_err(), "0 permits => gated path sheds");
+     }
+ }
++
++// =============================================================================
++// reach_gate_decision — the req-free core of the HTTP reach gate, shared by the
++// local serve path (Layer 1.5) and the P2P cross-node fallback. These DB-backed
++// tests prove the decision the FALLBACK now applies against the HTTP requester
++// (FINDING 1 of http-reach-cross-node-fallback-bypass). They mirror the
++// epr_service reach harness (households stack, humans.id populated).
++// =============================================================================
++#[cfg(test)]
++mod reach_gate_decision_tests {
++    use super::*;
++
++    fn mk_human(conn: &mut diesel::SqliteConnection, id: &str, agent_key: Option<&str>) {
++        use diesel::RunQueryDsl;
++        diesel::insert_or_ignore_into(crate::db::diesel_schema::humans::table)
++            .values(&crate::db::models::NewHuman {
++                id: id.to_string(),
++                agent_pub_key: agent_key.map(|s| s.to_string()),
++                display_name: id.to_string(),
++                bio: None,
++                affinities: "[]".to_string(),
++                profile_reach: "commons".to_string(),
++                location: None,
++                profile_photo_url: None,
++                h_app_id: "lamad".to_string(),
++                household_id: None,
++            })
++            .execute(conn)
++            .expect("insert human");
++    }
++
++    fn mk_content(
++        conn: &mut diesel::SqliteConnection,
++        ctx: &db::AppContext,
++        id: &str,
++        reach: &str,
++        created_by: Option<&str>,
++    ) {
++        crate::db::content_diesel::create_content(
++            conn,
++            ctx,
++            crate::db::content_diesel::CreateContentInput {
++                id: id.to_string(),
++                title: id.to_string(),
++                description: None,
++                content_type: "concept".to_string(),
++                content_format: "markdown".to_string(),
++                blob_hash: None,
++                blob_cid: None,
++                content_size_bytes: None,
++                metadata_json: None,
++                reach: reach.to_string(),
++                created_by: created_by.map(|s| s.to_string()),
++                tags: vec![],
++                content_body: Some("body".to_string()),
++                dht_anchor_hash: None,
++            },
++        )
++        .expect("create content");
++    }
++
++    /// commons/public is ambient — allowed regardless of requester identity
++    /// (including no identity at all). Matches the pre-refactor inline gate,
++    /// which never fired for reach <= community.
++    #[test]
++    fn commons_allows_anyone_including_anonymous() {
++        let pool = crate::test_util::test_pool();
++        let mut conn = pool.get().unwrap();
++        let ctx = db::AppContext::new("lamad");
++        mk_content(&mut conn, &ctx, "c-commons", "commons", None);
++        assert!(
++            HttpServer::reach_gate_decision(&mut conn, &ctx, "commons", None, "c-commons")
++                .is_none(),
++            "commons must be allowed with no requester identity"
++        );
++    }
++
++    /// community-tier is left at coarse auth on the HTTP path (FINDING 2 design
++    /// choice): the gate does not fire for reach <= community, so the decision
++    /// is None even for an unresolvable requester.
++    #[test]
++    fn community_tier_is_not_gated_here() {
++        let pool = crate::test_util::test_pool();
++        let mut conn = pool.get().unwrap();
++        let ctx = db::AppContext::new("lamad");
++        mk_content(&mut conn, &ctx, "c-comm", "community", None);
++        assert!(
++            HttpServer::reach_gate_decision(&mut conn, &ctx, "community", None, "c-comm").is_none(),
++            "community is ambient on the HTTP path (coarse auth upstream)"
++        );
++    }
++
++    /// Restricted content + unresolvable requester ⇒ deny-by-default with the
++    /// "Reach authorization required" body. This is the core fallback-bypass
++    /// fix: a cross-node fetch whose HTTP caller can't be resolved is refused.
++    #[test]
++    fn restricted_unresolvable_requester_denied_by_default() {
++        let pool = crate::test_util::test_pool();
++        let mut conn = pool.get().unwrap();
++        let ctx = db::AppContext::new("lamad");
++        mk_content(&mut conn, &ctx, "c-priv", "private", Some("human-creator"));
++        let decision = HttpServer::reach_gate_decision(
++            &mut conn, &ctx, "private", None, // unresolvable
++            "c-priv",
++        );
++        match decision {
++            Some((status, body)) => {
++                assert_eq!(status, StatusCode::FORBIDDEN);
++                assert!(
++                    body.contains("Reach authorization required"),
++                    "unexpected body: {body}"
++                );
++            }
++            None => panic!("restricted + unresolvable must be denied"),
++        }
++    }
++
++    /// Restricted content fetched on behalf of an UNAUTHORIZED resolvable human
++    /// ⇒ deny with the "Reach denied" body (authorize_reach_for_human Err). This
++    /// is the disclosure case the finding warns about, now closed on the
++    /// fallback path.
++    #[test]
++    fn restricted_unauthorized_human_denied() {
++        let pool = crate::test_util::test_pool();
++        let mut conn = pool.get().unwrap();
++        let ctx = db::AppContext::new("lamad");
++        mk_human(&mut conn, "human-creator", Some("uhCAk-creator"));
++        mk_human(&mut conn, "human-other", Some("uhCAk-other"));
++        mk_content(&mut conn, &ctx, "c-priv2", "private", Some("human-creator"));
++        let decision = HttpServer::reach_gate_decision(
++            &mut conn,
++            &ctx,
++            "private",
++            Some("human-other".to_string()),
++            "c-priv2",
++        );
++        match decision {
++            Some((status, body)) => {
++                assert_eq!(status, StatusCode::FORBIDDEN);
++                assert!(body.contains("Reach denied"), "unexpected body: {body}");
++            }
++            None => panic!("non-creator must be denied private content"),
++        }
++    }
++
++    /// Restricted content fetched on behalf of its CREATOR ⇒ allowed (None). The
++    /// gate is strictly tightening, not blanket-denying: the authorized
++    /// principal still passes.
++    #[test]
++    fn restricted_creator_allowed() {
++        let pool = crate::test_util::test_pool();
++        let mut conn = pool.get().unwrap();
++        let ctx = db::AppContext::new("lamad");
++        mk_human(&mut conn, "human-creator2", Some("uhCAk-creator2"));
++        mk_content(
++            &mut conn,
++            &ctx,
++            "c-priv3",
++            "private",
++            Some("human-creator2"),
++        );
++        assert!(
++            HttpServer::reach_gate_decision(
++                &mut conn,
++                &ctx,
++                "private",
++                Some("human-creator2".to_string()),
++                "c-priv3",
++            )
++            .is_none(),
++            "creator may read own private content"
++        );
++    }
++}

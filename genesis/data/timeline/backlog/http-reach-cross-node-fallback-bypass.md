@@ -97,3 +97,47 @@ unknown-tier-deny). NOTE: live-alpha end-to-end enforcement of the steward/relat
 arms is additionally coupled to `humans.agent_pub_key` population (the
 `resilience-card-self-cid-provide-loop-gate` fork) — household-provable now, live-gated on
 that fork.
+
+## REFRAME + DEFER (2026-06-18) — the delivery-filter is the INVERTED frame
+
+Operator review flagged that this whole line of work (Layer 1.5 + this FINDING 1 fix)
+treats reach as a **delivery-side deny-filter** (403 the reader by content reach tier),
+which is the frame the protocol **explicitly inverted**. The canonical reach model is
+**author-side earning + receiver-side pre-authorization (AttentionTending) + reach-by-consent
+(invitations)** — NOT a per-message serve gate:
+- `elohim/elohim-storage/src/p2p/reach_authorization.rs`: receiver-side pre-auth "decides
+  which topics this node subscribes to, which Kad provider records it advertises … **It is
+  NOT a per-message filter**." ("Email collapsed because anyone could publish to anyone,
+  putting the cost of filtering on receivers.")
+- History `2026-06-11-storage-dual-plane-design-arc.md`: "its **delivery-side reach
+  filtering was inverted by author-side earning**."
+- `AttentionTending` (`p2p/attention_tending.rs`, `p2p/attention-tending.schema.json`): a
+  peer-private, TTL-bounded *tending of the shape of one's attention* — discernment that
+  informs distribution/discovery, NOT a server gate. This is the "thinner" receiver mechanism.
+- Theology/values: "Intimate belonging is never gated; only reach is" — reach governs
+  spread/teaching-office, earned up front.
+
+**The red-team confirms the frame (not just the impl) is wrong:** `EprHead.qahal.reach` is
+**forgeable by any relay** (unsigned, not CID-bound; `p2p/mod.rs:1591-1620` verifies only
+content-bytes-vs-blob-CID). You cannot reliably *filter* on forgeable wire data — real
+enforcement belongs at the **distribution/discovery layer** (`classify_pre_authorization`:
+which provider records a node advertises / which scopes it subscribes to), so restricted
+content is never providable to a non-authorized peer in the first place.
+
+**`reach-by-consent`/invitations is also design-incomplete** (doorway `"invited"` =
+"authenticated only", `cache/access_control.rs`). Operator: defer until that design lands.
+
+**DECISION:**
+- **FINDING 1 cross-node delivery-filter fix → DEFERRED.** The implemented + red-team-cleared
+  draft (helper `reach_gate_decision`/`enforce_http_reach` + the pre-persist fallback gate) is
+  saved at `.claude/data/reach-cross-node-delivery-filter-draft-2026-06-18.patch` (recoverable).
+  NOT committed. The correct fix is at the distribution/attention-tending layer, pending the
+  reach-by-consent design.
+- **The committed local gate (`d09928387`, Layer 1.5 + `authorize_reach_for_human`) is KEPT as
+  transitional defense-in-depth** — it closes a real intimate-content leak in the *current*
+  shared-projection architecture — but it is the inverted frame, not the canonical model.
+  Operator decision pending: carry the stopgap, or remove it in favor of the
+  earning/attention-tending mechanism when the reach design finishes.
+- R1 (forgeable head reach) + R2 (cross-node `community` served to anon; fallback lacks
+  Layer 1) from the red-team are recorded as why the filter is leaky-by-construction — not new
+  serve-layer bugs to patch, but evidence the layer is wrong.
