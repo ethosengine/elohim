@@ -185,7 +185,7 @@ pub fn handle_doorway_keys(state: Arc<AppState>) -> Response<Full<Bytes>> {
 // =============================================================================
 
 /// P2P peer info for bootstrap discovery
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct P2PPeerInfo {
     pub peer_id: String,
     pub multiaddrs: Vec<String>,
@@ -194,17 +194,32 @@ pub struct P2PPeerInfo {
 }
 
 /// Response for GET /api/v1/federation/p2p-peers
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct P2PPeersResponse {
     pub peers: Vec<P2PPeerInfo>,
     pub total: usize,
+    /// Honest mesh peer count from the routed storage's `connectedPeers`
+    /// (`/p2p/status`). `None` when storage is unreachable or the field is
+    /// absent. `total` mirrors this when present (the OLD `total` =
+    /// backend-count bug: it reported 1 even when 13 peers were connected —
+    /// see plan §1). Emitted as `connectedPeerCount` (camelCase wire key —
+    /// snake_case never leaves the Rust boundary).
+    #[serde(rename = "connectedPeerCount")]
+    pub connected_peer_count: Option<usize>,
 }
 
 /// Handle GET /api/v1/federation/p2p-peers
 ///
 /// Returns P2P peer information for desktop stewards to bootstrap into the mesh.
-/// Queries local elohim-storage's /p2p/status endpoint and transforms the result.
-/// For StatefulSet pods (replicas > 1), iterates headless DNS names.
+/// Fetches the routed storage's `/p2p/status` ONCE and projects the mesh
+/// `connectedPeers` count honestly (NOT one row per storage backend — the old
+/// behavior reported `total:1` while 13 peers were connected because it never
+/// read `connectedPeers`; see plan F-EDGE §1).
+///
+/// Cat-C node-local Operational read-model: any doorway computes its own view
+/// from its own routed storage `/p2p/status`. The `connectedPeers` field name
+/// is the dataplane P-DIAGNOSTIC `/p2p/status` contract (X-EDGE-PEERS); this
+/// projection consumes it verbatim, never a parallel vocabulary.
 pub async fn handle_federation_p2p_peers(state: Arc<AppState>) -> Response<Full<Bytes>> {
     let storage_url = state
         .args
@@ -212,54 +227,30 @@ pub async fn handle_federation_p2p_peers(state: Arc<AppState>) -> Response<Full<
         .clone()
         .unwrap_or_else(|| "http://localhost:8090".to_string());
 
-    let mut peers = Vec::new();
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
         .build()
         .unwrap_or_else(|_| reqwest::Client::new());
 
-    // Query local elohim-storage's P2P status
-    match query_storage_p2p_status(&client, &storage_url).await {
-        Ok(peer) => peers.push(peer),
+    // Fetch the routed storage's /p2p/status once; project the mesh view.
+    // On any fetch/parse failure project from a null value → honest zero
+    // (peers: [], total: 0, connectedPeerCount: null) — preserves the old
+    // debug-log-and-continue posture without faking a self row.
+    let status = match fetch_storage_p2p_status(&client, &storage_url).await {
+        Ok(value) => value,
         Err(e) => {
             tracing::debug!("Failed to query local storage P2P status: {}", e);
+            serde_json::Value::Null
         }
-    }
-
-    // For K8s StatefulSet, also query headless DNS peers
-    // Pattern: elohim-edgenode-{env}-{N}.elohim-edgenode-{env}-headless:8090
-    if let Some(ref headless_base) = state.args.headless_service_base {
-        let replicas = state.args.statefulset_replicas.unwrap_or(2);
-        for i in 0..replicas {
-            let peer_url = format!(
-                "http://{}-{}.{}-headless:8090",
-                headless_base, i, headless_base
-            );
-            // Skip if same as local storage
-            if peer_url.contains("localhost") {
-                continue;
-            }
-            match query_storage_p2p_status(&client, &peer_url).await {
-                Ok(peer) => {
-                    // Deduplicate by peer_id
-                    if !peers.iter().any(|p| p.peer_id == peer.peer_id) {
-                        peers.push(peer);
-                    }
-                }
-                Err(e) => {
-                    tracing::debug!("Failed to query peer at {}: {}", peer_url, e);
-                }
-            }
-        }
-    }
-
-    let total = peers.len();
-    let response = P2PPeersResponse { peers, total };
+    };
+    let response = project_p2p_peers(&status);
 
     match serde_json::to_string_pretty(&response) {
         Ok(json) => Response::builder()
             .status(StatusCode::OK)
             .header("Content-Type", "application/json")
+            // /p2p-peers is mutable (mesh state changes) — short TTL, NOT
+            // CDN-cacheable. Keep the 30s window.
             .header("Cache-Control", "public, max-age=30")
             .body(Full::new(Bytes::from(json)))
             .unwrap(),
@@ -273,11 +264,12 @@ pub async fn handle_federation_p2p_peers(state: Arc<AppState>) -> Response<Full<
     }
 }
 
-/// Query a single elohim-storage instance's /p2p/status and transform to P2PPeerInfo
-async fn query_storage_p2p_status(
+/// Fetch one storage instance's `/p2p/status` body as a raw JSON value.
+/// Side-effecting (HTTP); the pure projection lives in `project_p2p_peers`.
+async fn fetch_storage_p2p_status(
     client: &reqwest::Client,
     base_url: &str,
-) -> Result<P2PPeerInfo, String> {
+) -> Result<serde_json::Value, String> {
     let url = format!("{}/p2p/status", base_url.trim_end_matches('/'));
     let resp = client
         .get(&url)
@@ -289,36 +281,50 @@ async fn query_storage_p2p_status(
         return Err(format!("Non-200 status: {}", resp.status()));
     }
 
-    let body: serde_json::Value = resp
-        .json()
+    resp.json()
         .await
-        .map_err(|e| format!("JSON parse error: {}", e))?;
+        .map_err(|e| format!("JSON parse error: {}", e))
+}
 
-    let peer_id = body["peerId"].as_str().ok_or("Missing peerId")?.to_string();
-
-    let multiaddrs: Vec<String> = body["listenAddresses"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default();
-
-    let nat_status = body["natStatus"].as_str().map(String::from);
-
-    let relay_mode = body["relayMode"].as_str().unwrap_or("client");
-    let mut capabilities = vec!["shard".to_string(), "sync".to_string()];
-    if relay_mode == "server" || relay_mode == "both" {
-        capabilities.push("relay".to_string());
+/// Pure projection of one storage `/p2p/status` body → the federation peers
+/// response. `total` = mesh `connectedPeers` when present, else the self-row
+/// count (degraded honesty: "we can only see ourselves"). When `peerId` is
+/// absent (storage unreachable / null value) there is no self row and the
+/// view is an honest zero. Cat-C node-local read-model — no DHT entry, no
+/// table, no coordinator fn.
+fn project_p2p_peers(status: &serde_json::Value) -> P2PPeersResponse {
+    let mut peers = Vec::new();
+    if let Some(peer_id) = status["peerId"].as_str() {
+        let multiaddrs = status["listenAddresses"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let nat_status = status["natStatus"].as_str().map(String::from);
+        let relay_mode = status["relayMode"].as_str().unwrap_or("client");
+        let mut capabilities = vec!["shard".to_string(), "sync".to_string()];
+        if relay_mode == "server" || relay_mode == "both" {
+            capabilities.push("relay".to_string());
+        }
+        peers.push(P2PPeerInfo {
+            peer_id: peer_id.to_string(),
+            multiaddrs,
+            capabilities,
+            nat_status,
+        });
     }
 
-    Ok(P2PPeerInfo {
-        peer_id,
-        multiaddrs,
-        capabilities,
-        nat_status,
-    })
+    let connected_peer_count = status["connectedPeers"].as_u64().map(|n| n as usize);
+    let total = connected_peer_count.unwrap_or(peers.len());
+
+    P2PPeersResponse {
+        peers,
+        total,
+        connected_peer_count,
+    }
 }
 
 // =============================================================================
@@ -597,5 +603,83 @@ mod tests {
         assert!(json.contains("\"kty\":\"OKP\""));
         assert!(json.contains("\"crv\":\"Ed25519\""));
         assert!(json.contains("\"use\":\"sig\""));
+    }
+
+    #[test]
+    fn p2p_peers_reports_mesh_connected_count_not_backend_count() {
+        // storage /p2p/status shape: one backend, but 13 connected mesh peers.
+        let status = serde_json::json!({
+            "peerId": "12D3KooSELF",
+            "listenAddresses": ["/ip4/10.0.0.1/tcp/4001"],
+            "natStatus": "public",
+            "relayMode": "client",
+            "connectedPeers": 13
+        });
+        let resp = project_p2p_peers(&status);
+        // self is one row; the mesh count is surfaced honestly and is 13, not 1.
+        assert_eq!(resp.connected_peer_count, Some(13), "{resp:?}");
+        assert_eq!(
+            resp.total, 13,
+            "total must be mesh count, not backend count"
+        );
+        assert_eq!(resp.peers.len(), 1, "self row still present");
+        assert_eq!(resp.peers[0].peer_id, "12D3KooSELF");
+    }
+
+    #[test]
+    fn p2p_peers_tolerates_missing_connected_peers_field() {
+        let status = serde_json::json!({
+            "peerId": "12D3KooSELF",
+            "listenAddresses": [],
+            "relayMode": "client"
+        });
+        let resp = project_p2p_peers(&status);
+        assert_eq!(resp.connected_peer_count, None);
+        assert_eq!(resp.total, 1, "fallback: self-only when mesh count absent");
+    }
+
+    #[test]
+    fn p2p_peers_unreachable_storage_is_honest_zero() {
+        // A null/empty status (storage unreachable or no peerId) → no self row,
+        // honest zero, no mesh count claimed.
+        let resp = project_p2p_peers(&serde_json::Value::Null);
+        assert_eq!(resp.peers.len(), 0);
+        assert_eq!(resp.total, 0);
+        assert_eq!(resp.connected_peer_count, None);
+    }
+
+    #[test]
+    fn p2p_peers_relay_capability_when_relay_mode_server() {
+        let status = serde_json::json!({
+            "peerId": "12D3KooRELAY",
+            "listenAddresses": ["/ip4/10.0.0.2/tcp/4001"],
+            "relayMode": "server",
+            "connectedPeers": 4
+        });
+        let resp = project_p2p_peers(&status);
+        assert!(
+            resp.peers[0].capabilities.contains(&"relay".to_string()),
+            "relay capability advertised when relayMode=server"
+        );
+    }
+
+    #[test]
+    fn p2p_peers_response_serializes_camelcase_connected_peer_count() {
+        // snake_case never leaves the Rust boundary: the new field must emit
+        // `connectedPeerCount`, not `connected_peer_count`.
+        let status = serde_json::json!({
+            "peerId": "12D3KooSELF",
+            "connectedPeers": 7
+        });
+        let resp = project_p2p_peers(&status);
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(
+            json.contains("connectedPeerCount"),
+            "must emit camelCase wire key: {json}"
+        );
+        assert!(
+            !json.contains("connected_peer_count"),
+            "must NOT leak snake_case: {json}"
+        );
     }
 }
