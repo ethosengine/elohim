@@ -325,15 +325,46 @@ impl EprService {
             // For familiar+ tiers, fall through — need content-specific steward match
         }
 
+        // commons/public need no identity check.
+        if reach == "commons" || reach == "public" {
+            return Ok(());
+        }
+
+        // All higher tiers require the requester resolved to a Human. The P2P
+        // transport path resolves by Holochain agent key (here); the HTTP serve
+        // path resolves by the reliable `humans.id` column and calls
+        // `authorize_reach_for_human` directly. The tier arms live in ONE place.
+        let (mut conn, app_ctx, human) = self.resolve_agent(agent_pubkey)?;
+        self.authorize_reach_for_human(&mut conn, &app_ctx, reach, &human, content_id)
+    }
+
+    /// Reach-authorization core operating on an ALREADY-RESOLVED requester
+    /// `Human` — the single source of truth shared by the P2P transport path
+    /// (`check_reach_authorization`, which resolves by Holochain agent key) and
+    /// the HTTP serve handlers (which resolve by the reliable `humans.id`
+    /// column). The caller owns namespace-aware identity resolution; this
+    /// function never raw-matches identity strings across namespaces.
+    ///
+    /// NOTE: live-alpha end-to-end enforcement of the steward/relationship arms
+    /// is coupled to `humans.agent_pub_key` population (the
+    /// resilience-card-self-cid-provide-loop-gate fork). On the household stack
+    /// (where `humans.id` and relationships are populated) the gate is fully
+    /// provable today — that is what the unit tests exercise.
+    pub fn authorize_reach_for_human(
+        &self,
+        conn: &mut diesel::SqliteConnection,
+        app_ctx: &AppContext,
+        reach: &str,
+        human: &crate::db::models::Human,
+        content_id: &str,
+    ) -> Result<(), String> {
         match reach {
             "commons" | "public" => Ok(()),
 
             "community" => {
-                let (mut conn, app_ctx, human) = self.resolve_agent(agent_pubkey)?;
-                let participations = crate::db::collectives::get_participations_for_human(
-                    &mut conn, &app_ctx, &human.id,
-                )
-                .map_err(|e| format!("Participation lookup failed: {}", e))?;
+                let participations =
+                    crate::db::collectives::get_participations_for_human(conn, app_ctx, &human.id)
+                        .map_err(|e| format!("Participation lookup failed: {}", e))?;
 
                 if participations
                     .iter()
@@ -346,22 +377,19 @@ impl EprService {
             }
 
             "familiar" => {
-                let (mut conn, app_ctx, human) = self.resolve_agent(agent_pubkey)?;
-                let steward_human_ids =
-                    self.get_steward_human_ids(&mut conn, &app_ctx, content_id)?;
+                let steward_human_ids = self.get_steward_human_ids(conn, app_ctx, content_id)?;
 
-                let participations = crate::db::collectives::get_participations_for_human(
-                    &mut conn, &app_ctx, &human.id,
-                )
-                .map_err(|e| format!("Participation lookup failed: {}", e))?;
+                let participations =
+                    crate::db::collectives::get_participations_for_human(conn, app_ctx, &human.id)
+                        .map_err(|e| format!("Participation lookup failed: {}", e))?;
 
                 for participation in &participations {
                     if participation.consent_state != "consented" {
                         continue;
                     }
                     let members = crate::db::collectives::get_participants_of_collective(
-                        &mut conn,
-                        &app_ctx,
+                        conn,
+                        app_ctx,
                         &participation.collective_id,
                     )
                     .map_err(|e| format!("Members lookup failed: {}", e))?;
@@ -378,12 +406,10 @@ impl EprService {
             }
 
             "trusted" => {
-                let (mut conn, app_ctx, human) = self.resolve_agent(agent_pubkey)?;
-                let steward_human_ids =
-                    self.get_steward_human_ids(&mut conn, &app_ctx, content_id)?;
+                let steward_human_ids = self.get_steward_human_ids(conn, app_ctx, content_id)?;
 
                 let relationships = crate::db::human_relationships::get_relationships_for_human(
-                    &mut conn, &app_ctx, &human.id,
+                    conn, app_ctx, &human.id,
                 )
                 .map_err(|e| format!("Relationship lookup failed: {}", e))?;
 
@@ -411,12 +437,10 @@ impl EprService {
             }
 
             "intimate" => {
-                let (mut conn, app_ctx, human) = self.resolve_agent(agent_pubkey)?;
-                let steward_human_ids =
-                    self.get_steward_human_ids(&mut conn, &app_ctx, content_id)?;
+                let steward_human_ids = self.get_steward_human_ids(conn, app_ctx, content_id)?;
 
                 let relationships = crate::db::human_relationships::get_relationships_for_human(
-                    &mut conn, &app_ctx, &human.id,
+                    conn, app_ctx, &human.id,
                 )
                 .map_err(|e| format!("Relationship lookup failed: {}", e))?;
 
@@ -439,24 +463,20 @@ impl EprService {
             }
 
             "self" | "private" => {
-                let agent_key = agent_pubkey
-                    .ok_or_else(|| "Agent identity required for private content".to_string())?;
-                let pool = self
-                    .db_pool
-                    .as_ref()
-                    .ok_or_else(|| "Database not available".to_string())?;
-                let mut conn = pool
-                    .get()
-                    .map_err(|e| format!("DB connection failed: {}", e))?;
-                let app_ctx = AppContext::default_lamad();
-
                 let content = crate::db::content_diesel::get_content_with_tags(
-                    &mut conn, &app_ctx, content_id, false,
+                    conn, app_ctx, content_id, false,
                 )
                 .map_err(|e| format!("Content lookup failed: {}", e))?
                 .ok_or_else(|| "Content not found".to_string())?;
 
-                if content.content.created_by.as_deref() == Some(agent_key) {
+                // `created_by` may hold either the agent key or the human id
+                // depending on the writer; match the creator in either namespace.
+                let created_by = content.content.created_by.as_deref();
+                let is_creator = created_by == Some(human.id.as_str())
+                    || (human.agent_pub_key.is_some()
+                        && created_by == human.agent_pub_key.as_deref());
+
+                if is_creator {
                     Ok(())
                 } else {
                     Err("Content is private — only the creator can access it".to_string())
@@ -601,5 +621,165 @@ mod tests {
             }
             other => panic!("expected DeliveryInfo, got {other:?}"),
         }
+    }
+
+    // ---- authorize_reach_for_human: the single-source-of-truth reach core ----
+    // These DB-backed tests prove the reach gate on the household stack
+    // (humans.id populated), independent of the live-alpha agent_pub_key fork.
+
+    fn reach_svc() -> EprService {
+        EprService::new(None, None, None, PeerTrustCache::new())
+    }
+
+    fn mk_human(conn: &mut diesel::SqliteConnection, id: &str, agent_key: Option<&str>) {
+        use diesel::RunQueryDsl;
+        diesel::insert_or_ignore_into(crate::db::diesel_schema::humans::table)
+            .values(&crate::db::models::NewHuman {
+                id: id.to_string(),
+                agent_pub_key: agent_key.map(|s| s.to_string()),
+                display_name: id.to_string(),
+                bio: None,
+                affinities: "[]".to_string(),
+                profile_reach: "commons".to_string(),
+                location: None,
+                profile_photo_url: None,
+                h_app_id: "lamad".to_string(),
+                household_id: None,
+            })
+            .execute(conn)
+            .expect("insert human");
+    }
+
+    fn mk_content(
+        conn: &mut diesel::SqliteConnection,
+        ctx: &AppContext,
+        id: &str,
+        reach: &str,
+        created_by: Option<&str>,
+    ) {
+        crate::db::content_diesel::create_content(
+            conn,
+            ctx,
+            crate::db::content_diesel::CreateContentInput {
+                id: id.to_string(),
+                title: id.to_string(),
+                description: None,
+                content_type: "concept".to_string(),
+                content_format: "markdown".to_string(),
+                blob_hash: None,
+                blob_cid: None,
+                content_size_bytes: None,
+                metadata_json: None,
+                reach: reach.to_string(),
+                created_by: created_by.map(|s| s.to_string()),
+                tags: vec![],
+                content_body: Some("body".to_string()),
+                dht_anchor_hash: None,
+            },
+        )
+        .expect("create content");
+    }
+
+    #[test]
+    fn authorize_reach_commons_allows_any_human() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        mk_human(&mut conn, "human-anon", Some("uhCAk-anon"));
+        mk_content(&mut conn, &ctx, "c-commons", "commons", None);
+        let h = crate::db::humans::get_human_by_id(&mut conn, "human-anon")
+            .unwrap()
+            .unwrap();
+        assert!(reach_svc()
+            .authorize_reach_for_human(&mut conn, &ctx, "commons", &h, "c-commons")
+            .is_ok());
+    }
+
+    #[test]
+    fn authorize_reach_private_allows_creator_denies_others() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        mk_human(&mut conn, "human-creator", Some("uhCAk-creator"));
+        mk_human(&mut conn, "human-other", Some("uhCAk-other"));
+        // created_by in the humans.id namespace.
+        mk_content(&mut conn, &ctx, "c-priv", "private", Some("human-creator"));
+        let creator = crate::db::humans::get_human_by_id(&mut conn, "human-creator")
+            .unwrap()
+            .unwrap();
+        let other = crate::db::humans::get_human_by_id(&mut conn, "human-other")
+            .unwrap()
+            .unwrap();
+        assert!(
+            reach_svc()
+                .authorize_reach_for_human(&mut conn, &ctx, "private", &creator, "c-priv")
+                .is_ok(),
+            "creator may read own private content"
+        );
+        assert!(
+            reach_svc()
+                .authorize_reach_for_human(&mut conn, &ctx, "private", &other, "c-priv")
+                .is_err(),
+            "non-creator must be denied private content"
+        );
+    }
+
+    #[test]
+    fn authorize_reach_private_matches_creator_by_agent_key() {
+        // created_by in the agent-key namespace; the creator's human row carries
+        // that agent_pub_key, so the gate still recognizes them.
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        mk_human(&mut conn, "human-creator", Some("uhCAk-creator-key"));
+        mk_content(
+            &mut conn,
+            &ctx,
+            "c-priv2",
+            "self",
+            Some("uhCAk-creator-key"),
+        );
+        let creator = crate::db::humans::get_human_by_id(&mut conn, "human-creator")
+            .unwrap()
+            .unwrap();
+        assert!(reach_svc()
+            .authorize_reach_for_human(&mut conn, &ctx, "self", &creator, "c-priv2")
+            .is_ok());
+    }
+
+    #[test]
+    fn authorize_reach_intimate_denies_unrelated_human() {
+        // THE security assertion (http-reach-enforcement-gap): an authenticated
+        // but unrelated human must NOT receive intimate-reach content. Before
+        // this gate the HTTP path returned 200 to ANY authenticated caller.
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        mk_human(&mut conn, "human-jessica", Some("uhCAk-jessica"));
+        mk_content(&mut conn, &ctx, "love-map", "intimate", Some("human-adam"));
+        let jessica = crate::db::humans::get_human_by_id(&mut conn, "human-jessica")
+            .unwrap()
+            .unwrap();
+        assert!(
+            reach_svc()
+                .authorize_reach_for_human(&mut conn, &ctx, "intimate", &jessica, "love-map")
+                .is_err(),
+            "unrelated human must be denied intimate content"
+        );
+    }
+
+    #[test]
+    fn authorize_reach_unknown_tier_denies() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        mk_human(&mut conn, "human-x", Some("uhCAk-x"));
+        mk_content(&mut conn, &ctx, "c-x", "garbage-tier", None);
+        let h = crate::db::humans::get_human_by_id(&mut conn, "human-x")
+            .unwrap()
+            .unwrap();
+        assert!(reach_svc()
+            .authorize_reach_for_human(&mut conn, &ctx, "garbage-tier", &h, "c-x")
+            .is_err());
     }
 }

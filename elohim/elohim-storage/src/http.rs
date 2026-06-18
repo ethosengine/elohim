@@ -4512,6 +4512,77 @@ impl HttpServer {
                         }
                     }
 
+                    // Layer 1.5: Steward-specific reach authorization for tiers
+                    // ABOVE community (familiar / trusted / intimate / self). The
+                    // is_public check above only refuses anonymous; this enforces
+                    // the SAME reach gate the P2P transport path uses
+                    // (epr_service::authorize_reach_for_human — single source of
+                    // truth), resolving the requester by the reliable humans.id
+                    // column (then agent key). Deny-by-default when the requester
+                    // can't be resolved. NOTE: live-alpha end-to-end enforcement
+                    // is coupled to humans.agent_pub_key population (the
+                    // resilience-card-self-cid-provide-loop-gate fork); the
+                    // household stack (id populated) proves it now.
+                    if crate::epr_service::reach_level_index(&view.reach)
+                        > crate::epr_service::reach_level_index("community")
+                    {
+                        let identity = crate::api::account::extract_agent_cid(&req, &mut conn)
+                            .ok()
+                            .flatten();
+                        let requester = match identity {
+                            Some(idv) => {
+                                match crate::db::humans::get_human_by_id(&mut conn, &idv)
+                                    .ok()
+                                    .flatten()
+                                {
+                                    Some(h) => Some(h),
+                                    None => {
+                                        crate::db::humans::get_human_by_agent_key(&mut conn, &idv)
+                                            .ok()
+                                            .flatten()
+                                    }
+                                }
+                            }
+                            None => None,
+                        };
+                        match requester {
+                            Some(human) => {
+                                let reach_gate = crate::epr_service::EprService::new(
+                                    None,
+                                    None,
+                                    None,
+                                    crate::p2p::trust_cache::PeerTrustCache::new(),
+                                );
+                                if let Err(reason) = reach_gate.authorize_reach_for_human(
+                                    &mut conn,
+                                    &app_ctx,
+                                    &view.reach,
+                                    &human,
+                                    content_id,
+                                ) {
+                                    return Ok(Response::builder()
+                                        .status(StatusCode::FORBIDDEN)
+                                        .header(header::CONTENT_TYPE, "application/json")
+                                        .body(Full::new(Bytes::from(format!(
+                                            r#"{{"error":"Reach denied","requiredReach":"{}","reason":"{}"}}"#,
+                                            view.reach, reason
+                                        ))))
+                                        .unwrap());
+                                }
+                            }
+                            None => {
+                                return Ok(Response::builder()
+                                    .status(StatusCode::FORBIDDEN)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(format!(
+                                        r#"{{"error":"Reach authorization required","requiredReach":"{}"}}"#,
+                                        view.reach
+                                    ))))
+                                    .unwrap());
+                            }
+                        }
+                    }
+
                     // Policy enforcement: check device policy ceiling
                     let agent_id = Self::extract_agent_id(&req);
                     if let (Some(ref enforcement), Some(ref agent)) =
