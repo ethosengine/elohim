@@ -137,7 +137,10 @@ describe('ContentViewerComponent', () => {
       returnToPath: vi.fn(),
       context$: pathContextSubject.asObservable(),
     };
-    const rendererRegistrySpyObj = { getRenderer: vi.fn().mockReturnValue(null) };
+    // register() is invoked when ContentViewer triggers RendererInitializerService
+    // (standalone-route registration); the spy must absorb it. getRenderer stays
+    // null so these tests continue to exercise the fallback path.
+    const rendererRegistrySpyObj = { getRenderer: vi.fn().mockReturnValue(null), register: vi.fn() };
     // Use a real Router (from provideRouter) so RouterLink directives work;
     // routerSpy is set after inject below
     const routerSpyObj = null;

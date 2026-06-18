@@ -20,6 +20,7 @@ import {
   ContentRenderer,
   RendererRegistryService,
 } from '@app/lamad/renderers/renderer-registry.service';
+import { RendererInitializerService } from '@app/lamad/renderers/renderer-initializer.service';
 import { ContentService } from '@app/lamad/services/content.service';
 
 import { SeoService } from '../../../services/seo.service';
@@ -65,6 +66,11 @@ export class ContentDeliveryComponent implements OnInit, OnDestroy, AfterViewChe
   private readonly route = inject(ActivatedRoute);
   private readonly contentService = inject(ContentService);
   private readonly rendererRegistry = inject(RendererRegistryService);
+  // Injecting RendererInitializerService triggers manifest-driven renderer
+  // registration. This full-page delivery view (/deliver/:slug) is mounted
+  // OUTSIDE LamadLayoutComponent, so it must trigger registration itself —
+  // otherwise getRenderer() returns null and markdown drops to the raw fallback.
+  private readonly _rendererInit = inject(RendererInitializerService);
   private readonly seoService = inject(SeoService);
 
   ngOnInit(): void {

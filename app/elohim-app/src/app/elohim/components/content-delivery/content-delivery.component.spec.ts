@@ -37,6 +37,9 @@ describe('ContentDeliveryComponent', () => {
 
     const rendererRegistrySpy = {
       getRenderer: vi.fn().mockReturnValue(null),
+      // Absorbs RendererInitializerService registration, which ContentDelivery
+      // now triggers (it is mounted outside LamadLayout).
+      register: vi.fn(),
     };
 
     seoServiceSpy = {

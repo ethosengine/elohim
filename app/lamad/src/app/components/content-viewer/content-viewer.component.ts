@@ -85,6 +85,7 @@ import {
   RendererCompletionEvent,
   RendererRegistryService,
 } from '../../renderers/renderer-registry.service';
+import { RendererInitializerService } from '../../renderers/renderer-initializer.service';
 import { ContentService } from '../../services/content.service';
 import { HouseholdResilienceService } from '../../services/household-resilience.service';
 import { PathContextService } from '../../services/path-context.service';
@@ -210,6 +211,12 @@ export class ContentViewerComponent
   private readonly affinityService: ILamadAffinityTracking = inject(LAMAD_AFFINITY_TRACKING);
   private readonly agentService = inject(LAMAD_AGENT);
   private readonly rendererRegistry = inject(RendererRegistryService);
+  // Injecting RendererInitializerService triggers manifest-driven renderer
+  // registration. This viewer is a standalone route (/epr/:resourceId,
+  // /resource/:resourceId) mounted OUTSIDE LamadLayoutComponent, so it must
+  // trigger registration itself — otherwise getRenderer() returns null and
+  // markdown content drops to the raw <pre> fallback.
+  private readonly _rendererInit = inject(RendererInitializerService);
   private readonly contentService = inject(ContentService);
   private readonly dataLoader = inject(DataLoaderService);
   private readonly trustBadgeService = inject(TrustBadgeService);
