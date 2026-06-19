@@ -114,16 +114,34 @@ impl PeerSelection {
         // action="provide" + state="active" + not finished.
         let scope = format!("content:{}", input.content_reach);
 
-        let committed_agents: Vec<String> = rea_commitments::table
-            .filter(rea_commitments::h_app_id.eq(input.h_app_id))
-            .filter(rea_commitments::action.eq("provide"))
-            .filter(rea_commitments::state.eq("active"))
-            .filter(rea_commitments::finished.eq(0))
-            .filter(rea_commitments::resource_classified_as.eq(&scope))
-            .select(rea_commitments::provider)
-            .distinct()
-            .load::<String>(&mut conn)
-            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        // `resource_classified_as` is a JSON list by contract (non-commons spec
+        // §11.2, Option A); the scope match is membership over the parsed list,
+        // not a scalar `.eq()` (which silently misses array-wrapped rows). Load
+        // candidates, filter membership in Rust, then dedup providers.
+        let committed_agents: Vec<String> = {
+            let candidates: Vec<(String, Option<String>)> = rea_commitments::table
+                .filter(rea_commitments::h_app_id.eq(input.h_app_id))
+                .filter(rea_commitments::action.eq("provide"))
+                .filter(rea_commitments::state.eq("active"))
+                .filter(rea_commitments::finished.eq(0))
+                .select((
+                    rea_commitments::provider,
+                    rea_commitments::resource_classified_as,
+                ))
+                .load::<(String, Option<String>)>(&mut conn)
+                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+            let mut seen = std::collections::HashSet::new();
+            candidates
+                .into_iter()
+                .filter(|(_, classified)| {
+                    crate::db::rea_commitments::classifications_of(classified.as_deref())
+                        .iter()
+                        .any(|c| c == &scope)
+                })
+                .filter_map(|(provider, _)| seen.insert(provider.clone()).then_some(provider))
+                .collect()
+        };
 
         if committed_agents.is_empty() {
             return Ok(SelectionOutcome::Short {

@@ -596,6 +596,71 @@ async fn details_steward_includes_commitment_references() {
     );
 }
 
+/// `resource_classified_as` is a JSON list by contract (non-commons spec §11.2,
+/// Option A). A custody-blob row whose hash is **array-wrapped** (`["<hash>"]`)
+/// must still match the blob via membership. (RED before the membership fix —
+/// the scalar `.eq(blob_hash)` missed the `["<hash>"]` literal.)
+#[tokio::test]
+async fn details_steward_commitment_references_match_array_wrapped() {
+    let pool = test_pool();
+    let hash = "hash_array_wrapped";
+    let agent_cid = "agent-steward-list";
+    let my_peer = "peer_list_desktop";
+    {
+        let mut conn = pool.get().unwrap();
+        seed_content_with_reach(&mut conn, hash, "household");
+        seed_inventory(&mut conn, my_peer, hash);
+        seed_binding(&mut conn, my_peer, agent_cid);
+        // Store the blob hash array-wrapped, as the seeder/HTTP path does.
+        let classified = serde_json::to_string(&vec![hash]).unwrap();
+        diesel::insert_or_ignore_into(rea_commitments::table)
+            .values(&NewReaCommitment {
+                id: "commitment_list_id",
+                h_app_id: "lamad",
+                action: "custody-blob",
+                provider: my_peer,
+                receiver: "peer-other",
+                resource_conforms_to: None,
+                resource_classified_as: Some(&classified),
+                resource_quantity_value: Some(1024.0),
+                resource_quantity_unit: Some("bytes"),
+                effort_quantity_value: None,
+                effort_quantity_unit: None,
+                has_beginning: None,
+                has_end: None,
+                due: None,
+                clause_of: None,
+                in_scope_of: None,
+                medium_of_exchange_id: None,
+                state: "active",
+                finished: 0,
+                note: None,
+                metadata_json: None,
+                dht_anchor_hash: None,
+            })
+            .execute(&mut conn)
+            .expect("seed array-wrapped custody commitment");
+    }
+
+    let bindings = load_bindings_for_agent(&pool, agent_cid);
+    let details = compose_distribution_details(
+        &pool,
+        hash,
+        DistributionContext::Steward {
+            agent_cid,
+            bindings: &bindings,
+        },
+    )
+    .await
+    .expect("compose should succeed");
+
+    assert_eq!(
+        details.commitment_references,
+        Some(vec!["commitment_list_id".to_string()]),
+        "an array-wrapped [\"<hash>\"] custody row must match via membership"
+    );
+}
+
 /// C4: `load_placement_gaps_for` now emits real `HubDiversity` gap rows via
 /// `hub_summary`. Content replicated to only one peer (one computed hub) falls
 /// below the C4 target of 2 hubs → a gap row must be present.

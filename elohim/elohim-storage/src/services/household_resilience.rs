@@ -165,36 +165,49 @@ pub fn snapshot(
         .unwrap_or_else(|_| "commons".to_string());
     let scope = format!("content:{}", content_reach);
 
-    #[allow(deprecated)]
-    let commitment_backed_collectives: i32 = {
-        rea_commitments::table
-            .inner_join(
-                humans::table.on(humans::agent_pub_key
-                    .nullable()
-                    .eq(rea_commitments::provider.nullable())),
-            )
-            .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
-            // Count provide commitments under BOTH conventions: the seeder writes
-            // the REA action literal `provide`; the runtime mishpat projection
-            // writes the DHT action discriminator (`replicates-content`, and its
-            // migration-window alias `replicates-commons`) for the same economic
-            // act (a household committing to hold content). Filtering only
-            // `provide` silently dropped every runtime-authored commitment.
-            .filter(
-                rea_commitments::action
-                    .eq_any(["provide", "replicates-content", "replicates-commons"]),
-            )
-            .filter(rea_commitments::state.eq("active"))
-            .filter(
-                rea_commitments::resource_classified_as
-                    .nullable()
-                    .eq(&scope),
-            )
-            .filter(humans::household_id.is_not_null())
-            .select(diesel::dsl::count_distinct(humans::household_id))
-            .first::<i64>(&mut conn)
-            .unwrap_or(0) as i32
-    };
+    // The scope membership test is applied in Rust, not SQL: `resource_classified_as`
+    // is a JSON list by contract (non-commons spec §11.2, Option A), and a scalar
+    // `.eq(&scope)` silently misses an array-wrapped `["content:commons"]` row (U1,
+    // 2026-06-19 — the dark card). Load the candidate `(household_id,
+    // resource_classified_as)` pairs (small — provide rows per content), keep only
+    // those whose classifications contain the scope, and count distinct households.
+    let candidate_rows: Vec<(Option<String>, Option<String>)> = rea_commitments::table
+        .inner_join(
+            humans::table.on(humans::agent_pub_key
+                .nullable()
+                .eq(rea_commitments::provider.nullable())),
+        )
+        .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+        // Count provide commitments under BOTH conventions: the seeder writes
+        // the REA action literal `provide`; the runtime mishpat projection
+        // writes the DHT action discriminator (`replicates-content`, and its
+        // migration-window alias `replicates-commons`) for the same economic
+        // act (a household committing to hold content). Filtering only
+        // `provide` silently dropped every runtime-authored commitment.
+        .filter(rea_commitments::action.eq_any([
+            "provide",
+            "replicates-content",
+            "replicates-commons",
+        ]))
+        .filter(rea_commitments::state.eq("active"))
+        .filter(humans::household_id.is_not_null())
+        .select((
+            humans::household_id,
+            rea_commitments::resource_classified_as,
+        ))
+        .load::<(Option<String>, Option<String>)>(&mut conn)
+        .map_err(|e| StorageError::Internal(format!("commitment-backed query: {e}")))?;
+
+    let commitment_backed_collectives: i32 = candidate_rows
+        .into_iter()
+        .filter(|(_, classified)| {
+            crate::db::rea_commitments::classifications_of(classified.as_deref())
+                .iter()
+                .any(|c| c == &scope)
+        })
+        .filter_map(|(household_id, _)| household_id)
+        .collect::<HashSet<String>>()
+        .len() as i32;
 
     // diversity_score: min(stewarding_collectives, max(commitment_backed,1)) / desired
     // RS 4+3 baseline target = 7. Per-content override deferred to Plan 3.

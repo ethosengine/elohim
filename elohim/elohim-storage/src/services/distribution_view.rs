@@ -551,16 +551,27 @@ fn load_commitment_refs(
         return Ok(vec![]);
     }
     use crate::db::diesel_schema::rea_commitments::dsl as rc;
-    let rows: Vec<String> = rc::rea_commitments
+    // `resource_classified_as` is a JSON list by contract (non-commons spec
+    // §11.2, Option A); match the blob hash by membership over the parsed list,
+    // not a scalar `.eq()` (which misses array-wrapped `["sha256-…"]` rows).
+    let candidates: Vec<(String, Option<String>)> = rc::rea_commitments
         .filter(rc::action.eq("custody-blob"))
-        .filter(rc::resource_classified_as.eq(blob_hash))
         .filter(
             rc::provider
                 .eq_any(my_peers)
                 .or(rc::receiver.eq_any(my_peers)),
         )
-        .select(rc::id)
-        .load::<String>(conn)?;
+        .select((rc::id, rc::resource_classified_as))
+        .load::<(String, Option<String>)>(conn)?;
+    let rows: Vec<String> = candidates
+        .into_iter()
+        .filter(|(_, classified)| {
+            crate::db::rea_commitments::classifications_of(classified.as_deref())
+                .iter()
+                .any(|c| c == blob_hash)
+        })
+        .map(|(id, _)| id)
+        .collect();
     Ok(rows)
 }
 

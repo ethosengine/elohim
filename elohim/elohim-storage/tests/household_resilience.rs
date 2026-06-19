@@ -450,6 +450,112 @@ fn d3_commitment_backing_edges() {
 }
 
 // =============================================================================
+// D3b — `resource_classified_as` is a JSON list by contract (non-commons spec
+// §11.2, Option A). The scope match is membership over the parsed list, NOT a
+// scalar `.eq()`. These are the rows that read the dark card on alpha (U1,
+// 2026-06-19): the seeder/HTTP path stores `["content:commons"]` (JSON list),
+// which a scalar equality silently misses.
+// =============================================================================
+
+/// KEYSTONE: an array-wrapped `["content:commons"]` provide row counts (it did
+/// not under the scalar `.eq("content:commons")` — this is the card-lighting fix).
+#[test]
+fn d3b_json_list_commons_scope_counts() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let content_id = seed_protection_case(&mut conn, "d3b-list", &[("home-a", 0)]);
+    let agent_a = "agent-d3b-list-home-a";
+
+    seed_commitment(
+        &mut conn,
+        "c1",
+        agent_a,
+        "provide",
+        "active",
+        r#"["content:commons"]"#,
+    );
+
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), &content_id, None).unwrap();
+    assert_eq!(
+        snapshot.commitment_backed_collectives, 1,
+        "an array-wrapped [\"content:commons\"] row must count via membership"
+    );
+}
+
+/// A list whose only element is a different scope does NOT count (non-membership).
+#[test]
+fn d3b_json_list_wrong_scope_does_not_count() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let content_id = seed_protection_case(&mut conn, "d3b-wrong", &[("home-a", 0)]);
+    let agent_a = "agent-d3b-wrong-home-a";
+
+    seed_commitment(
+        &mut conn,
+        "c1",
+        agent_a,
+        "provide",
+        "active",
+        r#"["content:household"]"#,
+    );
+
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), &content_id, None).unwrap();
+    assert_eq!(
+        snapshot.commitment_backed_collectives, 0,
+        "a [\"content:household\"] list must NOT match scope content:commons"
+    );
+}
+
+/// A multi-element list counts when the scope is one of its members.
+#[test]
+fn d3b_json_list_multi_element_membership_counts() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let content_id = seed_protection_case(&mut conn, "d3b-multi", &[("home-a", 0)]);
+    let agent_a = "agent-d3b-multi-home-a";
+
+    seed_commitment(
+        &mut conn,
+        "c1",
+        agent_a,
+        "provide",
+        "active",
+        r#"["content:household","content:commons"]"#,
+    );
+
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), &content_id, None).unwrap();
+    assert_eq!(
+        snapshot.commitment_backed_collectives, 1,
+        "scope content:commons is a member of the multi-element list"
+    );
+}
+
+/// A provider whose `humans` row carries NULL household_id counts zero —
+/// correct-but-dormant honesty (the substrate junction must light it).
+#[test]
+fn d3b_null_household_id_counts_zero() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let content_id = seed_protection_case(&mut conn, "d3b-null", &[]);
+
+    seed_human(&mut conn, "agent-d3b-null-ghost", None);
+    seed_commitment(
+        &mut conn,
+        "c1",
+        "agent-d3b-null-ghost",
+        "provide",
+        "active",
+        r#"["content:commons"]"#,
+    );
+
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), &content_id, None).unwrap();
+    assert_eq!(
+        snapshot.commitment_backed_collectives, 0,
+        "a provider with NULL household_id is correct-but-dormant (counts 0)"
+    );
+}
+
+// =============================================================================
 // D4 — Diversity score: min(stewarding, max(commitment_backed, 1)) / 7,
 // clamped 0..1.
 // =============================================================================
@@ -729,7 +835,11 @@ fn resilience_card_lights_with_coherent_agent_keyed_substrate() {
         seed_stewarded_node(&mut conn, agent, Some(household));
         // R2 coverage: mix the seeder convention ("provide") with the runtime
         // mishpat-projection convention ("replicates-content") — both must count.
-        let action = if i == 0 { "replicates-content" } else { "provide" };
+        let action = if i == 0 {
+            "replicates-content"
+        } else {
+            "provide"
+        };
         seed_commitment(
             &mut conn,
             &format!("commit-{agent}"),
@@ -745,7 +855,10 @@ fn resilience_card_lights_with_coherent_agent_keyed_substrate() {
     // distribution_state flips unmeasured -> measured (a manifest exists).
     assert_eq!(snapshot.distribution_state, "measured");
     // Steward join lights — 3 distinct households hold the shard.
-    assert_eq!(snapshot.stewarding_collectives, 3, "steward join must light");
+    assert_eq!(
+        snapshot.stewarding_collectives, 3,
+        "steward join must light"
+    );
     // Commitment join lights under BOTH action conventions (R2).
     assert_eq!(
         snapshot.commitment_backed_collectives, 3,
@@ -765,9 +878,16 @@ fn resilience_card_lights_with_coherent_agent_keyed_substrate() {
     let details = snapshot.details.expect("details present");
     assert_eq!(details.stewarding_collectives.len(), 3);
     for entry in &details.stewarding_collectives {
-        assert!(entry.label.is_some(), "each holder must render a name: {entry:?}");
+        assert!(
+            entry.label.is_some(),
+            "each holder must render a name: {entry:?}"
+        );
     }
-    assert!(details.online_peers.live >= 2, "online peers: {:?}", details.online_peers);
+    assert!(
+        details.online_peers.live >= 2,
+        "online peers: {:?}",
+        details.online_peers
+    );
 
     // The felt projection — names, not nines — reads "protected" with all holders.
     let felt = snapshot.felt_status.expect("felt_status present");

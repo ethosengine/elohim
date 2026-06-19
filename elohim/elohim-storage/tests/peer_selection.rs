@@ -85,9 +85,63 @@ fn seed_rea_commitment(conn: &mut diesel::SqliteConnection, provider: &str, cont
         .unwrap();
 }
 
+/// Insert a provide commitment whose `resource_classified_as` is **array-wrapped**
+/// (`["content:<scope>"]`) — the JSON-list form the seeder/HTTP path writes
+/// (non-commons spec §11.2, Option A). Before the membership fix a scalar `.eq()`
+/// missed this row.
+fn seed_rea_commitment_list(
+    conn: &mut diesel::SqliteConnection,
+    provider: &str,
+    content_scope: &str,
+) {
+    let classified = serde_json::to_string(&vec![format!("content:{content_scope}")]).unwrap();
+    diesel::insert_into(rea_commitments::table)
+        .values((
+            rea_commitments::id.eq(format!("cmt-list-{provider}-{content_scope}")),
+            rea_commitments::h_app_id.eq("lamad"),
+            rea_commitments::action.eq("provide"),
+            rea_commitments::provider.eq(provider),
+            rea_commitments::receiver.eq(""),
+            rea_commitments::resource_classified_as.eq(Some(classified)),
+            rea_commitments::state.eq("active"),
+            rea_commitments::finished.eq(0),
+            rea_commitments::created_at.eq("2026-04-19T00:00:00Z"),
+        ))
+        .execute(conn)
+        .unwrap();
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+/// An array-wrapped `["content:commons"]` commitment is matched by the
+/// membership filter — selection succeeds where the old scalar `.eq()` would
+/// have reported `contracts-short`. (RED before the membership fix.)
+#[test]
+fn selects_peer_with_array_wrapped_classified() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+
+    seed_human(&mut conn, "alpha1", "agent-alpha-1", Some("home-alpha"));
+    seed_peer_status(&mut conn, "agent-alpha-1", "accepting");
+    seed_rea_commitment_list(&mut conn, "agent-alpha-1", "commons");
+
+    let sel = PeerSelection::new(pool.clone());
+    let outcome = sel
+        .select(&SelectionInput {
+            h_app_id: "lamad",
+            content_id: "content-list",
+            content_reach: "commons",
+            desired_count: 1,
+        })
+        .unwrap();
+
+    match outcome {
+        SelectionOutcome::Ok(peers) => assert_eq!(peers.len(), 1),
+        other => panic!("expected Ok with the array-wrapped commitment matched, got {other:?}"),
+    }
+}
 
 #[test]
 fn selects_distinct_households_first() {

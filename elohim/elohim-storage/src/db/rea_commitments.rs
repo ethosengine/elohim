@@ -19,6 +19,159 @@ use super::models::{NewReaCommitment, ReaCommitment};
 use crate::error::StorageError;
 
 // ============================================================================
+// Classification accessor (the typed seam — non-commons spec §11.2, Option A)
+// ============================================================================
+//
+// `rea_commitments.resource_classified_as` is, by contract, **uniformly a JSON
+// list** (e.g. `["content:commons"]`, `["sha256-…"]`, the operate-doorway
+// capability list). It was historically action-polymorphic — single-valued
+// actions (`provide`/`custody-blob`) stored a *bare* scalar while
+// `operate-doorway` stored a JSON list — which silently broke the scalar-`.eq()`
+// readers against array-wrapped rows (the dark resilience card, U1 2026-06-19).
+//
+// No reader touches the raw string: all access goes through this seam so the
+// stored form (bare string, in-flight, or JSON list, canonical) is a reader
+// non-concern. Correctness lives in the readers, not the stored form.
+
+/// Parse a raw `resource_classified_as` column value into its classifications,
+/// tolerant of every stored form. The ONE parse home — the [`ReaCommitment`]
+/// accessor methods and any reader that holds only the raw column (e.g. a join
+/// that selects the column without the full row) both route through here.
+///
+/// - JSON array string (`["a","b"]`) → its elements
+/// - bare non-JSON string (`a`)      → `vec!["a".into()]`
+/// - NULL / empty / JSON `[]`        → `vec![]`
+///
+/// Reuses [`crate::rea_projection::parse_json_strings`] for the array case,
+/// wrapping the bare-string fallback locally (that helper returns `[]` for a
+/// non-array string, so the wrap is this function's responsibility).
+pub fn classifications_of(raw: Option<&str>) -> Vec<String> {
+    match raw {
+        None => Vec::new(),
+        Some(s) if s.is_empty() => Vec::new(),
+        Some(s) => {
+            let parsed = crate::rea_projection::parse_json_strings(Some(s));
+            if parsed.is_empty() {
+                // Either a genuinely bare scalar (in-flight pre-migration form)
+                // or a JSON `[]`/`[""]` that parsed to nothing. A value that
+                // *looks* like a JSON array keeps its (empty) array meaning; a
+                // bare scalar surfaces as a single element.
+                if s.trim_start().starts_with('[') {
+                    Vec::new()
+                } else {
+                    vec![s.to_string()]
+                }
+            } else {
+                parsed
+            }
+        }
+    }
+}
+
+impl ReaCommitment {
+    /// All classifications on this commitment — see [`classifications_of`].
+    pub fn classifications(&self) -> Vec<String> {
+        classifications_of(self.resource_classified_as.as_deref())
+    }
+
+    /// Membership test over [`classifications`](Self::classifications).
+    pub fn has_classification(&self, c: &str) -> bool {
+        self.classifications().iter().any(|s| s == c)
+    }
+
+    /// The first classification, or `None`. Used by readers that historically
+    /// treated the column as a single bare value (e.g. a custody blob hash).
+    pub fn primary_classification(&self) -> Option<String> {
+        self.classifications().into_iter().next()
+    }
+}
+
+#[cfg(test)]
+mod classification_accessor_tests {
+    use super::*;
+
+    /// Build a bare `ReaCommitment` carrying only the `resource_classified_as`
+    /// we want to exercise; every other field is a placeholder.
+    fn commitment_with(classified: Option<&str>) -> ReaCommitment {
+        ReaCommitment {
+            id: "c".into(),
+            h_app_id: "lamad".into(),
+            action: "provide".into(),
+            provider: "agent:a".into(),
+            receiver: String::new(),
+            resource_conforms_to: None,
+            resource_classified_as: classified.map(str::to_string),
+            resource_quantity_value: None,
+            resource_quantity_unit: None,
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_beginning: None,
+            has_end: None,
+            due: None,
+            clause_of: None,
+            in_scope_of: None,
+            medium_of_exchange_id: None,
+            state: "active".into(),
+            finished: 0,
+            note: None,
+            metadata_json: None,
+            dht_anchor_hash: None,
+            created_at: "2026-06-19T00:00:00Z".into(),
+        }
+    }
+
+    #[test]
+    fn classifications_parses_json_array() {
+        let c = commitment_with(Some(r#"["a","b"]"#));
+        assert_eq!(c.classifications(), vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn classifications_wraps_bare_string() {
+        let c = commitment_with(Some("content:commons"));
+        assert_eq!(c.classifications(), vec!["content:commons".to_string()]);
+    }
+
+    #[test]
+    fn classifications_empty_for_null_and_empty() {
+        assert_eq!(
+            commitment_with(None).classifications(),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            commitment_with(Some("")).classifications(),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn has_classification_over_single_element_list() {
+        let c = commitment_with(Some(r#"["content:commons"]"#));
+        assert!(c.has_classification("content:commons"));
+        assert!(!c.has_classification("content:household"));
+    }
+
+    #[test]
+    fn has_classification_over_bare_string() {
+        let c = commitment_with(Some("content:commons"));
+        assert!(c.has_classification("content:commons"));
+    }
+
+    #[test]
+    fn primary_classification_first_element_or_none() {
+        assert_eq!(
+            commitment_with(Some(r#"["sha256-deadbeef","sha256-cafe"]"#)).primary_classification(),
+            Some("sha256-deadbeef".to_string())
+        );
+        assert_eq!(
+            commitment_with(Some("sha256-bare")).primary_classification(),
+            Some("sha256-bare".to_string())
+        );
+        assert_eq!(commitment_with(None).primary_classification(), None);
+    }
+}
+
+// ============================================================================
 // Query Types
 // ============================================================================
 
@@ -348,7 +501,9 @@ pub fn provide_projection_id(provider: &str, reach: &str) -> String {
 ///
 /// ## Shape contract (must match the snapshot + peer_selection reads)
 /// - `action = "provide"`, `state = "active"`, `finished = 0`
-/// - `resource_classified_as = "content:<reach>"` (the scope both readers filter)
+/// - `resource_classified_as = ["content:<reach>"]` (a JSON list — the uniform
+///   contract per non-commons spec §11.2 Option A; readers test membership via
+///   [`ReaCommitment::has_classification`], never scalar equality)
 /// - `provider` is the commitment's provider == the conductor agent key, which
 ///   is the SAME vocabulary as `humans.agent_pub_key` (the snapshot join key)
 /// - `dht_anchor_hash` carries the commitment's `action_hash` (provenance; the
@@ -368,7 +523,14 @@ pub fn record_provide_from_content_commitment(
     dht_anchor_hash: Option<&str>,
 ) -> Result<bool, StorageError> {
     let id = provide_projection_id(provider, reach);
+    // `resource_classified_as` is uniformly a JSON list (non-commons spec §11.2,
+    // Option A) — write the one-element list `["content:<reach>"]`, never a bare
+    // scalar. Readers go through the accessor (`classifications`/
+    // `has_classification`), which tolerates both forms, but the canonical
+    // stored form is the list so the column is unambiguous going forward.
     let scope = format!("content:{reach}");
+    let classified = serde_json::to_string(&vec![&scope])
+        .map_err(|e| StorageError::Internal(format!("classify provide scope: {e}")))?;
 
     let new = NewReaCommitment {
         id: &id,
@@ -377,7 +539,7 @@ pub fn record_provide_from_content_commitment(
         provider,
         receiver: "",
         resource_conforms_to: None,
-        resource_classified_as: Some(&scope),
+        resource_classified_as: Some(&classified),
         resource_quantity_value: None,
         resource_quantity_unit: None,
         effort_quantity_value: None,
@@ -1515,10 +1677,9 @@ mod provide_reach_tests {
         assert_eq!(row.action, "provide");
         assert_eq!(row.state, "active");
         assert_eq!(row.finished, 0);
-        assert_eq!(
-            row.resource_classified_as.as_deref(),
-            Some("content:commons")
-        );
+        // Stored as the uniform JSON list; read via the accessor.
+        assert_eq!(row.classifications(), vec!["content:commons".to_string()]);
+        assert!(row.has_classification("content:commons"));
         assert_eq!(row.provider, "agent:steward-a");
         assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-anchor"));
     }
@@ -1545,12 +1706,43 @@ mod provide_reach_tests {
         let row = get_commitment(&mut conn, &ctx, &id).unwrap().expect("row");
         assert_eq!(row.action, "provide");
         assert_eq!(row.state, "active");
+        // Stored as the uniform JSON list; the non-commons reach is read through.
         assert_eq!(
-            row.resource_classified_as.as_deref(),
-            Some("content:household"),
-            "non-commons reach is read through to the scope"
+            row.classifications(),
+            vec!["content:household".to_string()],
+            "non-commons reach is read through to the scope (as a JSON list)"
         );
+        assert!(row.has_classification("content:household"));
         assert_eq!(row.provider, "agent:steward-b");
+    }
+
+    /// A side-projection provide row now round-trips through `ReaCommitmentView`
+    /// with a **non-None** `resource_classified_as`. On the old bare form
+    /// (`"content:commons"`) the view's `serde_json::from_str::<Vec<String>>`
+    /// failed and nulled the field (api/rea_commitments.rs:110); the JSON-list
+    /// form parses cleanly.
+    #[test]
+    fn record_provide_row_roundtrips_through_view_non_none() {
+        let mut conn = setup();
+        record_provide_from_content_commitment(
+            &mut conn,
+            "lamad",
+            "agent:steward-a",
+            "commons",
+            Some("uhCkk-anchor"),
+        )
+        .unwrap();
+
+        let ctx = AppContext::default_lamad();
+        let id = provide_projection_id("agent:steward-a", "commons");
+        let row = get_commitment(&mut conn, &ctx, &id).unwrap().expect("row");
+
+        let view: elohim_views::shefa::ReaCommitmentView = row.into();
+        assert_eq!(
+            view.resource_classified_as,
+            Some(vec!["content:commons".to_string()]),
+            "the JSON-list form round-trips to a non-None parsed list (was None on bare)"
+        );
     }
 
     /// Idempotent: a second commitment for the same (provider, reach) is a no-op.

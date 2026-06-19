@@ -1891,6 +1891,13 @@ pub struct ReaCommitment {
     pub provider: String,
     pub receiver: String,
     pub resource_conforms_to: Option<String>,
+    /// Classifications, uniformly a **JSON list** by contract (non-commons spec
+    /// §11.2, Option A): `["content:<reach>"]` for provide rows, `["sha256-…"]`
+    /// for custody-blob rows, the capability list for operate-doorway. Never
+    /// read this raw — go through [`ReaCommitment::classifications`] /
+    /// [`has_classification`](ReaCommitment::has_classification) /
+    /// [`primary_classification`](ReaCommitment::primary_classification), which
+    /// tolerate the legacy bare-scalar in-flight form.
     pub resource_classified_as: Option<String>,
     pub resource_quantity_value: Option<f32>,
     pub resource_quantity_unit: Option<String>,

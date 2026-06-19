@@ -142,19 +142,24 @@ pub fn reconcile_pass(
 
     for commitment in custody_rows {
         outcome.commitments_examined += 1;
-        let Some(blob_hash) = commitment.resource_classified_as.as_ref() else {
+        // `resource_classified_as` is a JSON list by contract (non-commons spec
+        // §11.2, Option A); a custody-blob row carries a single blob hash as the
+        // list's primary element. Reading the raw column directly was
+        // latent-buggy on array-wrapped `["sha256-…"]` rows (U1, 2026-06-19) —
+        // route through the accessor so both bare and list forms resolve.
+        let Some(blob_hash) = commitment.primary_classification() else {
             continue;
         };
 
         if commitment.provider == self_cid {
             // Own commitment — act if missing.
-            if !local_store.has(blob_hash) {
+            if !local_store.has(&blob_hash) {
                 let candidates =
-                    crate::db::peer_blob_inventory::lookup_hosts(conn, blob_hash, &stale_before)?;
+                    crate::db::peer_blob_inventory::lookup_hosts(conn, &blob_hash, &stale_before)?;
                 if !candidates.is_empty() {
                     let candidate_peers: Vec<String> =
                         candidates.into_iter().map(|c| c.peer_id).collect();
-                    fetch_kicker.kick(blob_hash, candidate_peers);
+                    fetch_kicker.kick(&blob_hash, candidate_peers);
                     outcome.kicks_fired += 1;
                 } else if !connected_peers.is_empty() {
                     // Inventory-blind fallback: gossip inventory publish dies
@@ -167,7 +172,7 @@ pub fn reconcile_pass(
                         .take(FALLBACK_CANDIDATE_CAP)
                         .cloned()
                         .collect();
-                    fetch_kicker.kick(blob_hash, fallback);
+                    fetch_kicker.kick(&blob_hash, fallback);
                     outcome.kicks_fired += 1;
                     outcome.fallback_kicks += 1;
                 }
@@ -176,7 +181,7 @@ pub fn reconcile_pass(
             // Other peer's commitment to me — observe; signal on stale.
             let last_seen: Option<String> = peer_blob_inventory::table
                 .filter(peer_blob_inventory::peer_id.eq(&commitment.provider))
-                .filter(peer_blob_inventory::blob_hash.eq(blob_hash))
+                .filter(peer_blob_inventory::blob_hash.eq(&blob_hash))
                 .select(peer_blob_inventory::last_seen_at)
                 .first::<String>(conn)
                 .optional()
@@ -405,6 +410,138 @@ mod tests {
         assert_eq!(kicks.len(), 1);
         assert_eq!(kicks[0].0, blob_hash);
         assert_eq!(kicks[0].1, vec!["peer_X".to_string()]);
+    }
+
+    /// Insert a custody-blob commitment whose `resource_classified_as` is
+    /// **array-wrapped** (`["<hash>"]`) — the JSON-list form the seeder/HTTP
+    /// path writes (non-commons spec §11.2, Option A). Before the accessor fix
+    /// this row read its raw `["<hash>"]` literal as the blob hash and never
+    /// matched inventory.
+    fn insert_custody_commitment_list(
+        conn: &mut SqliteConnection,
+        id: &str,
+        provider: &str,
+        receiver: &str,
+        blob_hash: &str,
+    ) {
+        let classified = serde_json::to_string(&vec![blob_hash]).unwrap();
+        let row = NewReaCommitment {
+            id,
+            h_app_id: "test",
+            action: "custody-blob",
+            provider,
+            receiver,
+            resource_conforms_to: None,
+            resource_classified_as: Some(&classified),
+            resource_quantity_value: Some(1024.0),
+            resource_quantity_unit: Some("bytes"),
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_beginning: None,
+            has_end: None,
+            due: None,
+            clause_of: None,
+            in_scope_of: None,
+            medium_of_exchange_id: None,
+            state: "active",
+            finished: 0,
+            note: None,
+            metadata_json: None,
+            dht_anchor_hash: Some("hash1"),
+        };
+        diesel::insert_into(rea_commitments::table)
+            .values(&row)
+            .execute(conn)
+            .unwrap();
+    }
+
+    /// THE INTEGRATION TRAP: a custody-blob row stored array-wrapped
+    /// (`["<hash>"]`) must still resolve to the real hash and fire the heal kick.
+    /// The reader routes through `primary_classification()`, so the wrap is
+    /// transparent. (RED before the accessor fix — the raw `["<hash>"]` string
+    /// missed inventory and `kicks_fired == 0`.)
+    #[test]
+    fn own_commitment_array_wrapped_classified_kicks() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        let blob_hash = "b".repeat(64);
+        insert_custody_commitment_list(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+
+        let now = chrono::Utc::now();
+        let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        apply_snapshot(
+            &mut conn,
+            "peer_X",
+            std::slice::from_ref(&blob_hash),
+            1,
+            &when,
+        )
+        .unwrap();
+
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let outcome = reconcile_pass(
+            &mut conn,
+            "self_cid",
+            &StaticStore(vec![]), // local store empty
+            &kicker,
+            default_cfg(),
+            now,
+            &[],
+        )
+        .unwrap();
+
+        assert_eq!(
+            outcome.kicks_fired, 1,
+            "array-wrapped custody row must resolve to the real hash and kick"
+        );
+        let kicks = kicker.kicks.lock().unwrap();
+        assert_eq!(kicks.len(), 1);
+        assert_eq!(
+            kicks[0].0, blob_hash,
+            "the kicked hash is the unwrapped real blob hash, not the [..] literal"
+        );
+    }
+
+    /// Bare-form regression: the pre-migration bare scalar still resolves
+    /// (the accessor wraps it to a single-element list).
+    #[test]
+    fn own_commitment_bare_classified_still_kicks() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        let blob_hash = "c".repeat(64);
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+
+        let now = chrono::Utc::now();
+        let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        apply_snapshot(
+            &mut conn,
+            "peer_X",
+            std::slice::from_ref(&blob_hash),
+            1,
+            &when,
+        )
+        .unwrap();
+
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let outcome = reconcile_pass(
+            &mut conn,
+            "self_cid",
+            &StaticStore(vec![]),
+            &kicker,
+            default_cfg(),
+            now,
+            &[],
+        )
+        .unwrap();
+
+        assert_eq!(outcome.kicks_fired, 1, "bare custody row still resolves");
+        assert_eq!(kicker.kicks.lock().unwrap()[0].0, blob_hash);
     }
 
     #[test]
