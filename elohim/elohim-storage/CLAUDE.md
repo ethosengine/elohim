@@ -25,6 +25,8 @@ A single HTTP surface (`http.rs` + `views.rs`) serves both deployment modes:
 
 `HTTP (camelCase JSON) ↔ http.rs (handlers) ↔ views.rs (View/InputView transforms + ts-rs export) ↔ db/*.rs (Diesel, snake_case, String JSON) ↔ SQLite (TEXT for JSON, INTEGER 0/1 for booleans)`. The `db/*` layer is never exposed to HTTP directly.
 
+**Resiliency facing — pure lens folds in `elohim-facings`.** The select→fold→aggregate folds for the resiliency facing (`stewarding_hubs`, `intra_hub_peers`, `regional_distribution`, `floor_for_tier`, `build_felt_status`) live in the **`elohim-facings`** crate — DB-free by construction (no `diesel` dep; the absence IS the boundary). `services/household_resilience.rs` is a **thin adapter**: it loads the holder-relation (`load_holder_relation`, impure — takes `&mut conn`) and calls the folds. Add a new lens there and in `elohim-facings`, not as a new query — see `elohim/elohim-facings/CLAUDE.md` and the facings design §11 (`genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md`).
+
 ---
 
 ## views.rs Patterns

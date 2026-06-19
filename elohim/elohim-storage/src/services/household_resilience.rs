@@ -9,13 +9,15 @@
 use std::collections::HashSet;
 
 use diesel::prelude::*;
+use elohim_facings::folds::resiliency;
+use elohim_facings::relation::HolderRow;
 
 use crate::db::{peer_statuses, placement_gaps, AppContext, DbPool};
 use crate::error::StorageError;
 use crate::views::{
-    CommitmentBackedReplication, FeltFloorView, FeltStatusView, HouseholdResilienceDetails,
-    HouseholdResilienceView, OnlinePeersView, PlacementGapView, RegionalDistributionView,
-    ResilienceSnapshotDetailsView, ResilienceSnapshotView, StewardingCollectiveEntry,
+    CommitmentBackedReplication, HouseholdResilienceDetails, HouseholdResilienceView,
+    OnlinePeersView, PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
+    ResilienceSnapshotView, StewardingCollectiveEntry,
 };
 
 /// Compute per-content household resilience. The viewer's household id is
@@ -73,8 +75,7 @@ pub fn compute(
     // fold away, not a new query. See the resilience-facings select→fold→aggregate
     // design (2026-06-19).
     let relation = load_holder_relation(&mut conn, &ctx.h_app_id, &shard_hashes)?;
-    let steward_households: HashSet<String> =
-        relation.iter().filter_map(|r| r.hub_id.clone()).collect();
+    let steward_households: HashSet<String> = resiliency::stewarding_hubs(&relation);
 
     let households_stewarding = steward_households.len() as i32;
 
@@ -157,7 +158,7 @@ pub fn snapshot(
             let shard_hashes: Vec<String> =
                 serde_json::from_str(&m.shard_hashes_json).unwrap_or_default();
             let relation = load_holder_relation(&mut conn, &ctx.h_app_id, &shard_hashes)?;
-            intra_hub_peers(&relation)
+            resiliency::intra_hub_peers(&relation)
         }
         None => std::collections::HashMap::new(),
     };
@@ -289,7 +290,7 @@ pub fn snapshot(
     // genesis/data/timeline/backlog/resilience-tier-content-declared-floor.md);
     // it is deliberately NOT derived from reach (that mapping is the conflation
     // the tier primitive corrects).
-    let felt_status = Some(build_felt_status(
+    let felt_status = Some(resiliency::build_felt_status(
         &distribution_state,
         &gaps,
         steward_collective_entries.clone(),
@@ -340,130 +341,18 @@ pub fn snapshot(
     })
 }
 
-/// Resilience FLOOR (households wanted) for a tier — the content-relative
-/// denominator. Value-driven and owner-declarable; the declared-tier primitive
-/// (genesis/data/timeline/backlog/resilience-tier-content-declared-floor.md)
-/// will set the tier per content. Until then the tier is "standard" (the legacy
-/// `≥3 households` protected bar). Deliberately NOT derived from reach.
-fn floor_for_tier(tier: &str) -> i32 {
-    match tier {
-        "vault" => 5,
-        "keepsake" => 4,
-        "ephemeral" => 1,
-        // "standard" and any undeclared / unknown tier
-        _ => 3,
-    }
-}
-
-/// Build the household-addressed felt projection. Pure (no DB) so the honesty
-/// rules are exhaustively unit-testable.
-///
-/// Honest by construction:
-/// - **Unmeasured-aware**: `distribution_state == "unmeasured"` (never entered
-///   the distribution plane) → `"not-yet-seen"`, never a fake verdict.
-/// - **Floor-relative**: "protected" requires meeting the tier's floor
-///   (`has >= wants`), so a vault-floor content held only at the standard bar
-///   reads `"watching"`, never `"protected"` (no false reassurance); an
-///   ephemeral content at its floor of 1 reads `"protected"` (no false alarm).
-pub(crate) fn build_felt_status(
-    distribution_state: &str,
-    placement_gaps: &[PlacementGapView],
-    held_by: Vec<StewardingCollectiveEntry>,
-    tier: &str,
-    tier_declared: bool,
-) -> FeltStatusView {
-    let has_households = held_by.len() as i32;
-    let wants_households = floor_for_tier(tier);
-    let has_gap = !placement_gaps.is_empty();
-    let meets_floor = has_households >= wants_households;
-
-    let reassurance = if distribution_state == "unmeasured" {
-        "not-yet-seen"
-    } else if meets_floor && !has_gap {
-        "protected"
-    } else if !meets_floor && has_households <= 1 {
-        "needs-help"
-    } else {
-        // meets the floor but a lapse is active, OR below the floor while still
-        // holding (>1 household, gap or not) — keeping watch, not alarming.
-        "watching"
-    };
-
-    let names: Vec<String> = held_by.iter().filter_map(|h| h.label.clone()).collect();
-    let all_named = !held_by.is_empty() && names.len() as i32 == has_households;
-
-    let headline = match reassurance {
-        "not-yet-seen" => "We can't confirm these are backed up yet".to_string(),
-        "needs-help" => {
-            if has_households == 0 {
-                "No household is holding these yet — invite one to help".to_string()
-            } else {
-                "Held by only 1 household — invite another to help hold these".to_string()
-            }
-        }
-        "watching" => {
-            if has_gap {
-                format!("Still safe — {has_households} households are holding these")
-            } else {
-                format!(
-                    "Held by {has_households} of the {wants_households} households this should live in"
-                )
-            }
-        }
-        // "protected"
-        _ => {
-            if all_named {
-                format!("Held by {has_households} households: {}", names.join(", "))
-            } else {
-                format!("Held by {has_households} households")
-            }
-        }
-    };
-
-    let suggested_action = match reassurance {
-        "needs-help" | "not-yet-seen" => Some("Invite a household to help hold these".to_string()),
-        _ => None,
-    };
-
-    FeltStatusView {
-        headline,
-        reassurance: reassurance.to_string(),
-        held_by,
-        floor: FeltFloorView {
-            tier: tier.to_string(),
-            tier_declared,
-            wants_households,
-            has_households,
-        },
-        suggested_action,
-    }
-}
-
-/// One materialized read of the holder-relation for a content: every
-/// `(household, agent, region)` that holds one of the content's shards, joined on
+/// Impure loader: one materialized read of the holder-relation for a content —
+/// every `(hub, agent, region)` that holds one of the content's shards, joined on
 /// the canonical agent identity (`humans.agent_pub_key == shard_locations.peer_id`,
 /// both `agent_cid` — never a transport id; see `elohim-storage/CLAUDE.md`
 /// Identity & Transport Coherence). This is the SINGLE query the resiliency facing
-/// folds over — it replaces the previously-divergent steward join (`compute`) and
-/// regional join (`compute_regional_distribution`), and RETAINS the per-agent
-/// dimension so intra-household peer counts are a fold away, not a new query.
-///
-/// The grouping dimension is `hub_id` — the HUB abstraction (a household,
-/// dwelling, or collective), the unifying edge-key that reconciles the otherwise
-/// divergent edge stores (dwelling-hub-id vs household_id). v1 sources `hub_id`
-/// from `humans.household_id`; dwelling/collective grouping populates the same
-/// field from those sources without touching the folds. `hub_id` is `None` for a
-/// holder with no hub (bucketed `unknown` by the regional fold; excluded by the
-/// stewarding fold, which counts only non-null hubs — preserving prior behavior).
+/// folds over (the pure folds live in `elohim_facings::folds::resiliency`); it
+/// replaces the previously-divergent steward join (`compute`) and regional join
+/// (`compute_regional_distribution`), and RETAINS the per-agent dimension so
+/// intra-hub peer counts are a fold away, not a new query. STAYS in storage
+/// because it takes `&mut conn`; returns the crate's `HolderRow`.
 ///
 /// Design: `genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md` §3.
-#[derive(Debug, Clone)]
-pub(crate) struct HolderRow {
-    pub hub_id: Option<String>,
-    pub agent_id: String,
-    pub region: Option<String>,
-}
-
 pub(crate) fn load_holder_relation(
     conn: &mut diesel::SqliteConnection,
     h_app_id: &str,
@@ -504,27 +393,6 @@ pub(crate) fn load_holder_relation(
         .collect())
 }
 
-/// Fold the holder-relation into distinct intra-hub peer counts: for each hub
-/// (collective), how many distinct agents hold the content (the operator's
-/// "james ↔ matthew ↔ jessica = 3" intra-hub resiliency). Pure; the composability
-/// demonstration — a new lens is a new fold over the SAME relation.
-pub(crate) fn intra_hub_peers(relation: &[HolderRow]) -> std::collections::HashMap<String, i32> {
-    let mut per_hub: std::collections::HashMap<String, HashSet<String>> =
-        std::collections::HashMap::new();
-    for r in relation {
-        if let Some(hub) = &r.hub_id {
-            per_hub
-                .entry(hub.clone())
-                .or_default()
-                .insert(r.agent_id.clone());
-        }
-    }
-    per_hub
-        .into_iter()
-        .map(|(hub, agents)| (hub, agents.len() as i32))
-        .collect()
-}
-
 fn compute_regional_distribution(
     conn: &mut diesel::SqliteConnection,
     h_app_id: &str,
@@ -559,28 +427,11 @@ fn compute_regional_distribution(
             .unwrap_or(None),
     };
 
-    // Dedupe by household so two peers in the same household count once.
-    let mut seen: HashSet<Option<String>> = Default::default();
-    let mut dist = RegionalDistributionView {
-        local: 0,
-        regional: 0,
-        global: 0,
-        unknown: 0,
-    };
-    for r in &relation {
-        if !seen.insert(r.hub_id.clone()) {
-            continue;
-        }
-        match (viewer_region.as_deref(), r.region.as_deref()) {
-            (None, None) => dist.unknown += 1,
-            (None, Some(_)) => dist.global += 1,
-            (Some(_), None) => dist.unknown += 1,
-            (Some(vr), Some(sr)) if vr == sr => dist.local += 1,
-            (Some(_), Some(_)) => dist.regional += 1,
-        }
-    }
-
-    Ok(dist)
+    // The pure dedupe-by-hub bucket loop now lives in the facings crate.
+    Ok(resiliency::regional_distribution(
+        &relation,
+        viewer_region.as_deref(),
+    ))
 }
 
 fn count_online_peers_in_households(
@@ -601,175 +452,4 @@ fn count_online_peers_in_households(
         }
     }
     Ok(count)
-}
-
-#[cfg(test)]
-mod felt_status_tests {
-    //! Exhaustive honesty rules for the household-addressed felt projection.
-    //! Pure (no DB). These ARE the spec for the felt surface's reassurance state
-    //! machine — the executable form of the grandma-vertical scenarios + the
-    //! operator's content-declared resilience-floor note.
-    use super::*;
-
-    fn holder(id: &str, label: Option<&str>) -> StewardingCollectiveEntry {
-        StewardingCollectiveEntry {
-            id: id.to_string(),
-            kind: "household".to_string(),
-            label: label.map(str::to_string),
-            intra_hub_peers: None,
-        }
-    }
-
-    fn a_gap() -> PlacementGapView {
-        PlacementGapView {
-            id: "gap-1".to_string(),
-            content_id: "c1".to_string(),
-            shard_hash: "shard-1".to_string(),
-            requested_steward_count: 4,
-            achieved_steward_count: 3,
-            contract_coverage: 0.75,
-            gap_kind: "peers-unavailable".to_string(),
-            first_seen_at: "2026-06-14T00:00:00Z".to_string(),
-            last_seen_at: "2026-06-14T00:00:00Z".to_string(),
-        }
-    }
-
-    #[test]
-    fn felt_unmeasured_is_not_yet_seen() {
-        // Honesty gate (highest precedence): never seen the distribution plane.
-        let felt = build_felt_status("unmeasured", &[], vec![], "standard", false);
-        assert_eq!(felt.reassurance, "not-yet-seen");
-        assert!(felt.headline.contains("can't confirm"), "{}", felt.headline);
-        assert_eq!(
-            felt.suggested_action.as_deref(),
-            Some("Invite a household to help hold these")
-        );
-        assert_eq!(felt.floor.tier, "standard");
-        assert!(!felt.floor.tier_declared);
-        assert_eq!(felt.floor.wants_households, 3);
-        assert_eq!(felt.floor.has_households, 0);
-    }
-
-    #[test]
-    fn felt_protected_names_the_holders() {
-        // Scenario 1: 3 households, all named, no gaps, standard tier → protected.
-        let held = vec![
-            holder("h-dowell", Some("the Dowells")),
-            holder("h-ruth", Some("Aunt Ruth")),
-            holder("c-church", Some("First Church")),
-        ];
-        let felt = build_felt_status("measured", &[], held, "standard", false);
-        assert_eq!(felt.reassurance, "protected");
-        assert_eq!(
-            felt.headline,
-            "Held by 3 households: the Dowells, Aunt Ruth, First Church"
-        );
-        assert!(felt.suggested_action.is_none());
-        assert_eq!(felt.floor.has_households, 3);
-        assert_eq!(felt.held_by.len(), 3);
-    }
-
-    #[test]
-    fn felt_protected_without_all_labels_falls_back_to_count() {
-        let held = vec![
-            holder("a", Some("Home A")),
-            holder("b", None),
-            holder("c", Some("Home C")),
-        ];
-        let felt = build_felt_status("measured", &[], held, "standard", false);
-        assert_eq!(felt.reassurance, "protected");
-        assert_eq!(felt.headline, "Held by 3 households");
-    }
-
-    #[test]
-    fn felt_lapse_but_covered_is_watching() {
-        // Scenario 2: a holder lapsed (gap), 2 still hold → watching, reassure.
-        let held = vec![
-            holder("a", Some("the Dowells")),
-            holder("b", Some("First Church")),
-        ];
-        let felt = build_felt_status("measured", &[a_gap()], held, "standard", false);
-        assert_eq!(felt.reassurance, "watching");
-        assert_eq!(felt.headline, "Still safe — 2 households are holding these");
-        assert!(felt.suggested_action.is_none());
-    }
-
-    #[test]
-    fn felt_single_household_needs_help() {
-        // Scenario 4: held by only 1 household → needs-help + pro-social action.
-        let held = vec![holder("a", Some("the Dowells"))];
-        let felt = build_felt_status("measured", &[], held, "standard", false);
-        assert_eq!(felt.reassurance, "needs-help");
-        assert!(
-            felt.headline.contains("only 1 household"),
-            "{}",
-            felt.headline
-        );
-        assert_eq!(
-            felt.suggested_action.as_deref(),
-            Some("Invite a household to help hold these")
-        );
-        assert_eq!(felt.floor.has_households, 1);
-        assert_eq!(felt.floor.wants_households, 3);
-    }
-
-    #[test]
-    fn felt_vault_floor_underclaims_no_false_reassurance() {
-        // Operator note: a vault-tier content held only at the standard bar (3)
-        // must NOT read "protected" — its floor wants 5. (False-reassurance closed.)
-        let held = vec![
-            holder("a", Some("the Dowells")),
-            holder("b", Some("Aunt Ruth")),
-            holder("c", Some("First Church")),
-        ];
-        let felt = build_felt_status("measured", &[], held, "vault", true);
-        assert_eq!(felt.reassurance, "watching");
-        assert_eq!(
-            felt.headline,
-            "Held by 3 of the 5 households this should live in"
-        );
-        assert_eq!(felt.floor.tier, "vault");
-        assert!(felt.floor.tier_declared);
-        assert_eq!(felt.floor.wants_households, 5);
-        assert_eq!(felt.floor.has_households, 3);
-    }
-
-    #[test]
-    fn felt_ephemeral_floor_protected_at_one_no_false_alarm() {
-        // Operator note: an ephemeral content (e.g. a dropdown-map) at its floor
-        // of 1 must NOT read "needs-help" — 1 holder meets the ephemeral floor.
-        let held = vec![holder("a", Some("Commons Cache"))];
-        let felt = build_felt_status("measured", &[], held, "ephemeral", true);
-        assert_eq!(felt.reassurance, "protected");
-        assert_eq!(felt.floor.wants_households, 1);
-        assert!(felt.suggested_action.is_none());
-    }
-
-    #[test]
-    fn felt_below_standard_floor_two_held_is_watching() {
-        // 2 of 3 (standard), no gap → watching with the floor-relative headline.
-        let held = vec![holder("a", Some("Home A")), holder("b", Some("Home B"))];
-        let felt = build_felt_status("measured", &[], held, "standard", false);
-        assert_eq!(felt.reassurance, "watching");
-        assert_eq!(
-            felt.headline,
-            "Held by 2 of the 3 households this should live in"
-        );
-    }
-
-    #[test]
-    fn felt_zero_holders_needs_help() {
-        let felt = build_felt_status("measured", &[], vec![], "standard", false);
-        assert_eq!(felt.reassurance, "needs-help");
-        assert!(felt.headline.contains("No household"), "{}", felt.headline);
-    }
-
-    #[test]
-    fn felt_floor_for_tier_mapping() {
-        assert_eq!(floor_for_tier("vault"), 5);
-        assert_eq!(floor_for_tier("keepsake"), 4);
-        assert_eq!(floor_for_tier("standard"), 3);
-        assert_eq!(floor_for_tier("ephemeral"), 1);
-        assert_eq!(floor_for_tier("anything-undeclared"), 3);
-    }
 }

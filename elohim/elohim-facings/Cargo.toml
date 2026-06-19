@@ -1,0 +1,21 @@
+# Nested single-crate workspace (mirrors elohim-views) so this crate self-excludes
+# from the parent `elohim/Cargo.toml` workspace and resolves standalone. There is
+# NO root monorepo workspace — crates wire via path deps.
+[workspace]
+
+[package]
+name = "elohim-facings"
+version = "0.1.0"
+edition = "2021"
+description = "Pure lens crate — select→fold→aggregate folds over the holder-relation. DB-free BY CONSTRUCTION: the absence of `diesel` from these dependencies IS the boundary (a `use diesel;` in a fold fails to compile). A new resiliency lens is a new fold over the same relation, never a new query."
+license = "CAL-1.0"
+repository = "https://github.com/ethosengine/elohim"
+keywords = ["elohim", "facings", "folds", "resilience"]
+categories = ["data-structures"]
+
+[dependencies]
+# The wire-shape view types the folds return/assemble (FeltStatusView,
+# RegionalDistributionView, StewardingCollectiveEntry, PlacementGapView, …).
+# This + std is the ENTIRE dependency surface — deliberately NO diesel, no
+# elohim-storage, no serde/chrono (add per-lens only when a moved type needs it).
+elohim-views = { path = "../elohim-views" }

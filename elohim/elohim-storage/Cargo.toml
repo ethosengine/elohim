@@ -16,6 +16,11 @@ elohim-sdk = { path = "../../crates/elohim-sdk" }
 # Wire-shape view types (ts-rs-anchored) — atomic migration from views.rs (VIEWS.T2)
 elohim-views = { path = "../elohim-views" }
 
+# Pure lens crate — select→fold→aggregate folds over the holder-relation. The
+# resiliency facing's folds live here (DB-free); household_resilience.rs is a thin
+# adapter that loads the relation and calls them. See 2026-06-19 facings design §11.
+elohim-facings = { path = "../elohim-facings" }
+
 # Shefa-types — canonical wire-shape for content_store coordinator function inputs
 # (CreateReaCommitmentInput, ReaCommitmentOutput, etc.). Required by the
 # services::conductor_writes facade per 2026-05-26-substrate-rea-replication-fix.md

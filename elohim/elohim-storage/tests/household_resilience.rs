@@ -1034,3 +1034,110 @@ fn stopgap_heal_lights_commitment_backed_via_direct_join() {
         after.commitment_backed_collectives
     );
 }
+
+// =============================================================================
+// GOLDEN BYTE-IDENTICAL-JSON BASELINE — the cutover gate for the elohim-facings
+// crate extraction (2026-06-19 facings design §11). Captures the serialized
+// ResilienceSnapshotView for 3 representative cases. The same 3 strings must
+// reproduce across the behavior-preserving refactor (folds → elohim-facings).
+//
+// Determinism: each helper computes snapshot() TWICE from scratch (fresh queries,
+// fresh HashMaps with fresh RandomState) and asserts the serializations are
+// byte-identical — catching any HashMap-iteration-order leak into a serialized
+// Vec. Cross-PROCESS stability was additionally confirmed by running this binary
+// 3× during Phase 0 capture. This is a PERMANENT regression guard.
+// =============================================================================
+
+fn det_snapshot_json(pool: &elohim_storage::db::DbPool, content_id: &str, case: &str) -> String {
+    let s1 =
+        serde_json::to_string(&household_resilience::snapshot(pool, &ctx(), content_id, None).unwrap())
+            .unwrap();
+    let s2 =
+        serde_json::to_string(&household_resilience::snapshot(pool, &ctx(), content_id, None).unwrap())
+            .unwrap();
+    assert_eq!(
+        s1, s2,
+        "{case}: snapshot JSON is non-deterministic across fresh computations \
+         (a HashSet/HashMap order leaked into a serialized Vec — sort before serialize)"
+    );
+    s1
+}
+
+fn golden_lit_card_json() -> String {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let content_id = "lit-card-content";
+    let shard = "lit-card-shard-1";
+    seed_shard_manifest(&mut conn, content_id, &format!(r#"["{shard}"]"#));
+    let households = [
+        ("home-dowell", "agent-dowell", Some("us-east")),
+        ("home-ruth", "agent-ruth", Some("us-west")),
+        ("church-bethel", "agent-bethel", Some("us-east")),
+    ];
+    for (i, (household, agent, region)) in households.iter().enumerate() {
+        seed_collective(&mut conn, household, *region);
+        seed_human(&mut conn, agent, Some(household));
+        seed_shard_location(&mut conn, shard, agent);
+        seed_peer_status(&mut conn, agent, "online");
+        seed_stewarded_node(&mut conn, agent, Some(household));
+        let action = if i == 0 { "replicates-content" } else { "provide" };
+        seed_commitment(
+            &mut conn,
+            &format!("commit-{agent}"),
+            agent,
+            action,
+            "active",
+            "content:commons",
+        );
+    }
+    drop(conn);
+    det_snapshot_json(&pool, content_id, "lit-card")
+}
+
+fn golden_unmeasured_json() -> String {
+    let pool = test_pool();
+    det_snapshot_json(&pool, "content-never-seeded", "unmeasured")
+}
+
+fn golden_intra_json() -> String {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let content_id = "content-intra";
+    let shard = "shard-intra";
+    seed_shard_manifest(&mut conn, content_id, &format!(r#"["{shard}"]"#));
+    seed_human(&mut conn, "agent-multi-a", Some("home-multi"));
+    seed_human(&mut conn, "agent-multi-b", Some("home-multi"));
+    seed_shard_location(&mut conn, shard, "agent-multi-a");
+    seed_shard_location(&mut conn, shard, "agent-multi-b");
+    seed_human(&mut conn, "agent-solo", Some("home-solo"));
+    seed_shard_location(&mut conn, shard, "agent-solo");
+    drop(conn);
+    det_snapshot_json(&pool, content_id, "intra-hub")
+}
+
+#[test]
+fn golden_resilience_snapshot_json_baseline() {
+    let lit = golden_lit_card_json();
+    let unmeasured = golden_unmeasured_json();
+    let intra = golden_intra_json();
+
+    // Byte-identical gate. Captured 2026-06-19 (Phase 0, BEFORE the elohim-facings
+    // refactor) and reproduced across 3 fresh processes. The behavior-preserving
+    // refactor must reproduce these EXACT serializations; any drift fails here.
+    const GOLDEN_LIT_CARD: &str = r#"{"contentId":"lit-card-content","distributionState":"measured","stewardingCollectives":3,"commitmentBackedCollectives":3,"diversityScore":0.42857143,"regionalDistribution":{"local":0,"regional":0,"global":3,"unknown":0},"placementGaps":[],"protectionStatus":"protected","reciprocatingCollectives":0,"details":{"stewardingCollectives":[{"id":"church-bethel","kind":"household","label":"church-bethel","intraHubPeers":1},{"id":"home-dowell","kind":"household","label":"home-dowell","intraHubPeers":1},{"id":"home-ruth","kind":"household","label":"home-ruth","intraHubPeers":1}],"onlinePeers":{"live":3,"known":3},"healthScore":1.0},"feltStatus":{"headline":"Held by 3 households: church-bethel, home-dowell, home-ruth","reassurance":"protected","heldBy":[{"id":"church-bethel","kind":"household","label":"church-bethel","intraHubPeers":1},{"id":"home-dowell","kind":"household","label":"home-dowell","intraHubPeers":1},{"id":"home-ruth","kind":"household","label":"home-ruth","intraHubPeers":1}],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":3}}}"#;
+    const GOLDEN_UNMEASURED: &str = r#"{"contentId":"content-never-seeded","distributionState":"unmeasured","stewardingCollectives":0,"commitmentBackedCollectives":0,"diversityScore":0.0,"regionalDistribution":{"local":0,"regional":0,"global":0,"unknown":0},"placementGaps":[],"protectionStatus":"at-risk","reciprocatingCollectives":0,"details":{"stewardingCollectives":[],"onlinePeers":{"live":0,"known":0},"healthScore":0.0},"feltStatus":{"headline":"We can't confirm these are backed up yet","reassurance":"not-yet-seen","heldBy":[],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":0},"suggestedAction":"Invite a household to help hold these"}}"#;
+    const GOLDEN_INTRA: &str = r#"{"contentId":"content-intra","distributionState":"measured","stewardingCollectives":2,"commitmentBackedCollectives":0,"diversityScore":0.14285715,"regionalDistribution":{"local":0,"regional":0,"global":0,"unknown":2},"placementGaps":[],"protectionStatus":"partial","reciprocatingCollectives":0,"details":{"stewardingCollectives":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"onlinePeers":{"live":0,"known":0},"healthScore":0.0},"feltStatus":{"headline":"Held by 2 of the 3 households this should live in","reassurance":"watching","heldBy":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":2}}}"#;
+
+    assert_eq!(
+        lit, GOLDEN_LIT_CARD,
+        "lit-card snapshot JSON drifted from the Phase-0 golden baseline"
+    );
+    assert_eq!(
+        unmeasured, GOLDEN_UNMEASURED,
+        "unmeasured snapshot JSON drifted from the Phase-0 golden baseline"
+    );
+    assert_eq!(
+        intra, GOLDEN_INTRA,
+        "intra-hub snapshot JSON drifted from the Phase-0 golden baseline"
+    );
+}
