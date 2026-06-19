@@ -210,6 +210,13 @@ spec:
           env:
             - name: HUMAN_ID
               value: "human-adam-firstman"
+            # Genesis self-heal (OPERATOR-AUTHORIZED bootstrap) — same as the consolidated template:
+            # the pod populates its own human's agent_pub_key from its own cell key (uhCAk),
+            # NULL-only, + mints a session so the provide-rows seeder's /auth/me returns 200.
+            - name: GENESIS_SELF_HEAL_IDENTITY
+              value: "1"
+            - name: SELF_HUMAN_ID
+              value: "human-adam-firstman"
             - name: RUST_LOG
               value: "info,elohim_storage=debug"
             # --- Embedded conductor mode ---

@@ -225,6 +225,17 @@ spec:
           env:
             - name: HUMAN_ID
               value: "HUMAN_ID_PLACEHOLDER"
+            # Genesis self-heal (OPERATOR-AUTHORIZED bootstrap): each pod populates its own
+            # human's agent_pub_key from its own conductor cell key (uhCAk), NULL-only, and mints
+            # a local session so the provide-rows seeder's /auth/me returns 200 — lights every
+            # household resilience card. SELF_HUMAN_ID reuses the per-human HUMAN_ID_PLACEHOLDER
+            # so each pod heals only its OWN identity. Household_id is left to the seeder (the
+            # deploy HOUSEHOLD_ID differs from the seeded one). Superseded later by the
+            # cross-signed coherent-transport-identity-resolver (this heal rotates over cleanly).
+            - name: GENESIS_SELF_HEAL_IDENTITY
+              value: "1"
+            - name: SELF_HUMAN_ID
+              value: "HUMAN_ID_PLACEHOLDER"
             - name: RUST_LOG
               value: "info,elohim_storage=debug"
             # --- Embedded conductor mode ---
@@ -234,6 +245,13 @@ spec:
               value: "/etc/holochain/conductor-config.yaml"
             - name: CONDUCTOR_DATA_DIR
               value: "/var/local/lib/holochain"
+            # --- TEMP: conductor heap-leak PROFILING canary (REMOVE after the leak hunt) ---
+            # Inherited by the embedded holochain child. The jemalloc-prof conductor
+            # (elohim-edgenode-prof, embedded via the storage Dockerfile CONDUCTOR_SOURCE_IMAGE)
+            # auto-dumps a jeprof heap profile to the data-dir PVC every ~1 GiB allocated.
+            # Inert on a non-jemalloc (glibc) conductor, which ignores _RJEM_MALLOC_CONF.
+            - name: _RJEM_MALLOC_CONF
+              value: "prof:true,prof_active:true,lg_prof_sample:19,lg_prof_interval:30,prof_prefix:/var/local/lib/holochain/jeprof"
             - name: HAPP_PATH
               value: "/opt/holochain/elohim.happ"
             # Path to the peer-policy mount — enables conductor forwarders.
