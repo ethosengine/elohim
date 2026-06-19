@@ -288,11 +288,33 @@ existing fill-NULL heal, and the card join is `agent_cid=agent_cid` (not transpo
 display; **name it** before this join feeds anything weightier (durable replacement: the blocked
 `coherent-transport-identity-resolver`). Not a Sprint 2 blocker.
 
-### Sprint 2 operator step
-Land Task 2.1 → **redeploy** (adam's pod boots with the new self-heal → mints session — deploy BEFORE seed)
-→ **reseed** (seed-humans lays adam's matthew-row; seed-provide-rows fetches adam's key, heals + active-
-provide-rows it onto matthew). Verify count==2. jessica is dowell (matthew's household) → does not raise the
-count; eden (adam) is the only second household in this seed.
+### Sprint 2 operator step (staged diagnostic — isolates Sprint 1 from Sprint 2)
+Sprint 1 + Sprint 2 are both committed storage changes on one branch → **one deploy + one reseed verifies
+both, staged:**
+1. **Deploy** (image rebuild + rolling restart; deploy BEFORE reseed — adam's pod must boot the new
+   self-heal so it self-inserts + mints a session at cell-enable).
+2. **Before reseed**, read the card → expect **count=1** (matthew; Sprint 1 needs no reseed). This isolates
+   Sprint 1 as green independently.
+3. **Reseed** (seed-humans lays adam's matthew-row; seed-provide-rows fetches adam's now-available key, heals
+   + active-provide-rows it onto matthew).
+4. Read the card → expect **count=2**. If count=1 holds but =2 doesn't, the failure is localized to the
+   adam cell-readiness / session / seed-humans path — cleanly separated from Sprint 1.
+
+> **⚠ Deploy watch-item (cell-readiness timing — the gap between "tests green" and "card reads 2").** The
+> self-heal fires only once adam's infrastructure cell **enables**: `connect_role_forever` retries until
+> `HcClient::connect` succeeds (`hc_client_registry.rs:189` — "cells may still be CellDisabled"), THEN the
+> self-heal runs as a fast post-connect DB write with a non-empty cell-derived key (`agent_key_uhcak()` =
+> `cell_id.agent_pubkey()`, not gated on cell-enable). So **confirm adam's pod is Ready (cell enabled, session
+> minted — `/auth/me → 200`) BEFORE running the seeder.** Pod-Ready gating + deploy-before-reseed usually
+> ensures this; the residual risk is adam's cell being *persistently* `CellDisabled` (the conductor-leak
+> blocker — separate, known). Optional hardening if the race bites: a bounded retry on `seed-provide-rows.ts`
+> `fetchAgentPubKey` (wait for the session) instead of skip-on-first-401.
+
+**Task 2.0 success criterion (tighten):** count=2 needs BOTH adam's `humans.agent_pub_key` **non-NULL** AND
+the adam provide-row — the heal can 404 (humans row absent) while the provide-row still creates, leaving a
+provide-row next to a NULL-keyed humans row → silent count=1. Don't read "adam provide-row present" alone as
+success. jessica is dowell (matthew's household) → does not raise the count; eden (adam) is the only second
+household in this seed.
 
 ---
 
