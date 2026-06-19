@@ -49,9 +49,11 @@ use crate::error::StorageError;
 /// Idempotent and NULL-only:
 /// 1. [`heal_human_identity`](crate::db::humans::heal_human_identity) fills the
 ///    NULL `agent_pub_key` (and NULL `household_id`) from the inputs; a set
-///    value is never overwritten. A missing human row is a **logged skip**
-///    (returns `Ok(())`), not an error — a pod may be configured with a human
-///    that this node never seeded.
+///    value is never overwritten. A missing human row is **self-INSERTED** from
+///    the cell key + configured household (the pod's own `SELF_HUMAN_ID`), so a
+///    non-matthew pod becomes sessionable for the provide-rows seeder — the
+///    `register` stage single-targets the card pod, so this is the only writer
+///    of a non-card pod's own human row.
 /// 2. If no local session exists yet, create one so the provide-rows seeder's
 ///    `/auth/me` clears its no-session 401 gate. `/auth/me` reads identity
 ///    (human_id, agent_pub_key, identifier) straight off the session row, so the
@@ -79,14 +81,41 @@ pub fn genesis_self_heal_identity(
     match db::humans::heal_human_identity(conn, human_id, Some(uhcak), household_id) {
         Ok(_) => {}
         Err(StorageError::NotFound(_)) => {
-            // A configured human this node never seeded — not an error. Skip the
-            // session arm too: there is no human to bind a session to.
-            tracing::warn!(
+            // The configured human row is absent on this pod. Genesis bootstrap
+            // self-INSERT: create the pod's OWN human from its OWN cell key +
+            // configured household so the session arm (below) can mint a session.
+            // WHY beyond matthew: the provide-rows seeder fetches THIS pod's key
+            // via `/auth/me`, then writes the healed key + active provide-row to
+            // the card pod (matthew) through the doorway — so a non-matthew pod
+            // (e.g. adam) must be *sessionable* for its household to count, and it
+            // can only be sessionable if its own human row exists here. The
+            // `register` stage single-targets matthew, so this self-insert is the
+            // only thing that lays adam's row on adam's pod. Same bootstrap-trust
+            // basis as the NULL-fill heal above: own cell key, own configured
+            // `SELF_HUMAN_ID`, never a claim about another agent. The card join is
+            // agent_cid=agent_cid (no AgentPeerBinding consumed) → not
+            // transport-binding-gated.
+            db::humans::create_human(
+                conn,
+                db::humans::CreateHumanInput {
+                    id: human_id.to_string(),
+                    agent_pub_key: Some(uhcak.to_string()),
+                    display_name: human_id.to_string(),
+                    bio: None,
+                    affinities: "[]".to_string(),
+                    profile_reach: "commons".to_string(),
+                    location: None,
+                    profile_photo_url: None,
+                    h_app_id: "imagodei".to_string(),
+                    household_id: household_id.map(|h| h.to_string()),
+                },
+            )?;
+            tracing::info!(
                 human_id,
+                uhcak,
                 source = "genesis-self-heal-from-cell-key",
-                "genesis self-heal skipped: configured human row not present on this pod"
+                "genesis self-heal: inserted own human row (was absent) — pod now sessionable"
             );
-            return Ok(());
         }
         Err(e) => return Err(e),
     }
@@ -228,21 +257,35 @@ mod tests {
     }
 
     #[test]
-    fn missing_human_is_logged_skip_not_panic() {
+    fn missing_human_is_self_inserted_and_sessioned() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
-        // No human inserted — the configured human is absent on this pod.
+        // No human inserted — the configured SELF_HUMAN_ID is absent on this pod
+        // (the `register` stage single-targets the card pod). Self-heal must
+        // self-INSERT it from the cell key so the pod is sessionable for the
+        // provide-rows seeder (adam's count=2 path).
 
-        let result = genesis_self_heal_identity(
+        genesis_self_heal_identity(
             &mut conn,
-            "human-not-on-this-pod",
-            "uhCAkGHOST",
-            Some("household-nowhere"),
-        );
+            "human-adam-firstman",
+            "uhCAkADAM",
+            Some("household-eden"),
+        )
+        .expect("self-insert heal");
 
-        assert!(result.is_ok(), "missing human must be Ok(()) skip, not Err");
-        // And no session should have been minted for an absent human.
-        assert!(!db::local_sessions::has_any_session(&mut conn).unwrap());
+        // The configured human is now present, keyed + householded from the cell.
+        let healed = get_human_by_id(&mut conn, "human-adam-firstman")
+            .unwrap()
+            .expect("human self-inserted (was absent)");
+        assert_eq!(healed.agent_pub_key.as_deref(), Some("uhCAkADAM"));
+        assert_eq!(healed.household_id.as_deref(), Some("household-eden"));
+
+        // And a session IS minted — so /auth/me returns the key for the seeder.
+        let session = db::local_sessions::get_active_session(&mut conn)
+            .unwrap()
+            .expect("session minted after self-insert");
+        assert_eq!(session.human_id, "human-adam-firstman");
+        assert_eq!(session.agent_pub_key, "uhCAkADAM");
     }
 
     #[test]
@@ -251,8 +294,13 @@ mod tests {
         let mut conn = pool.get().unwrap();
         insert_null_human(&mut conn, "human-matthew-manager");
 
-        genesis_self_heal_identity(&mut conn, "human-matthew-manager", "", Some("household-dowell"))
-            .expect("empty uhcak skip");
+        genesis_self_heal_identity(
+            &mut conn,
+            "human-matthew-manager",
+            "",
+            Some("household-dowell"),
+        )
+        .expect("empty uhcak skip");
 
         let healed = get_human_by_id(&mut conn, "human-matthew-manager")
             .unwrap()
