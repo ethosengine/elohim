@@ -368,6 +368,24 @@ async fn async_main(
             config.self_cid = Some(v);
         }
     }
+    // GENESIS BOOTSTRAP STOPGAP (operator-authorized, default OFF). Gate +
+    // target human for the self-heal-identity act wired into the
+    // infrastructure-role block below. Superseded by the cross-signed
+    // coherent-transport-identity-resolver.
+    if let Ok(v) = std::env::var("GENESIS_SELF_HEAL_IDENTITY") {
+        let v = v.trim();
+        config.genesis_self_heal_identity = matches!(v, "1" | "true" | "TRUE" | "yes" | "on");
+    }
+    if let Ok(v) = std::env::var("SELF_HUMAN_ID") {
+        if !v.is_empty() {
+            config.self_human_id = Some(v);
+        }
+    }
+    if let Ok(v) = std::env::var("SELF_HOUSEHOLD_ID") {
+        if !v.is_empty() {
+            config.self_household_id = Some(v);
+        }
+    }
 
     // Iroh parallel-stack toggle (see plan
     // genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md).
@@ -925,6 +943,19 @@ async fn async_main(
                     let peer_policy_path = peer_policy_path.clone();
                     let device_archetype = config.device_archetype.clone();
                     let infra_app_id = args.app_id.clone();
+                    // GENESIS BOOTSTRAP STOPGAP captures (operator-authorized,
+                    // default OFF). Cloned out of `config` here because the
+                    // spawned task is `async move` and must not move all of
+                    // `config` (used later for self_cid / p2p config). The
+                    // household falls back to HOUSEHOLD_ID when SELF_HOUSEHOLD_ID
+                    // is unset — both project onto the same humans.household_id
+                    // resilience junction.
+                    let genesis_self_heal = config.genesis_self_heal_identity;
+                    let self_human_id = config.self_human_id.clone();
+                    let self_household_id = config
+                        .self_household_id
+                        .clone()
+                        .or_else(|| config.household_id.clone());
                     tokio::spawn(async move {
                         let hc = match infra_boot {
                             Some(hc) => hc,
@@ -952,6 +983,40 @@ async fn async_main(
                             }
                         };
                         let agent = hc.cell_id().agent_pubkey().clone();
+
+                        // GENESIS BOOTSTRAP STOPGAP (operator-authorized, default
+                        // OFF). Fill the configured human's NULL agent_pub_key
+                        // (+ household_id) from THIS pod's own conductor cell key
+                        // — the truthful uhCAk… the resilience snapshot join
+                        // compares against — and mint a local session so the
+                        // provide-rows seeder's /auth/me clears its 401. NULL-only
+                        // and idempotent (never clobbers a set key), so a later
+                        // cross-signed key rotation is not blocked. Runs here
+                        // because this is the post-cell-ready block that holds a
+                        // connected HcClient + the db pool. Superseded by the
+                        // coherent-transport-identity-resolver.
+                        if genesis_self_heal {
+                            if let Some(hid) = self_human_id.as_deref() {
+                                let uhcak = hc.agent_key_uhcak();
+                                match db_pool.as_ref().map(|p| p.get()) {
+                                    Some(Ok(mut conn)) => {
+                                        if let Err(e) = elohim_storage::services::genesis_self_heal::genesis_self_heal_identity(
+                                            &mut conn,
+                                            hid,
+                                            &uhcak,
+                                            self_household_id.as_deref(),
+                                        ) {
+                                            warn!(error = %e, human_id = hid, "genesis self-heal failed (non-fatal)");
+                                        }
+                                    }
+                                    Some(Err(e)) => warn!(error = %e, "genesis self-heal: DB connection unavailable"),
+                                    None => warn!("genesis self-heal: shared DB pool unavailable"),
+                                }
+                            } else {
+                                warn!("GENESIS_SELF_HEAL_IDENTITY set but SELF_HUMAN_ID is empty — skipping");
+                            }
+                        }
+
                         let publisher =
                             elohim_storage::heartbeat::ZomeCallPublisher::new(hc.clone(), agent);
                         let probe = elohim_storage::heartbeat::DefaultProbe::new(

@@ -277,6 +277,19 @@ impl HcClient {
         self.cell_id.agent_pubkey().get_raw_39().to_vec()
     }
 
+    /// Get the cell's owner agent key as the canonical `uhCAk…` string.
+    ///
+    /// This is the `agent_cid` namespace used as the JOIN KEY across
+    /// `humans.agent_pub_key`, `shard_locations.peer_id`, and
+    /// `rea_commitments.provider` (see `CLAUDE.md` Identity table). It is NOT
+    /// the same as `agent_pub_key()` (raw bytes) or `agent_key_hex()` (hex) —
+    /// those are different encodings and silently empty any join against an
+    /// `agent_cid` column. Used by the genesis self-heal-identity bootstrap to
+    /// fill the pod's own `humans.agent_pub_key` from its own cell key.
+    pub fn agent_key_uhcak(&self) -> String {
+        self.cell_id.agent_pubkey().to_string()
+    }
+
     /// Get conductor health metrics for backpressure decisions
     ///
     /// Fetches storage info, network stats, and network metrics from the conductor.

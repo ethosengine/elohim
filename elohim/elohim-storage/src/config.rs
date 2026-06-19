@@ -182,6 +182,33 @@ pub struct Config {
     /// key. Defaults to `Libp2p` so existing deployments are unaffected.
     #[serde(default)]
     pub transport_backend: TransportBackend,
+
+    /// GENESIS BOOTSTRAP STOPGAP — gate for the self-heal-identity act.
+    /// When true (env `GENESIS_SELF_HEAL_IDENTITY=1`), at boot the node fills
+    /// its own configured human's NULL `humans.agent_pub_key` (and
+    /// `household_id`) from its OWN conductor cell key, and clears the no-session
+    /// 401 gate so the provide-rows seeder's `/auth/me` succeeds. Default
+    /// **false** — this is an operator-authorized act, never on by default.
+    /// Superseded by the cross-signed `coherent-transport-identity-resolver`.
+    #[serde(default)]
+    pub genesis_self_heal_identity: bool,
+
+    /// GENESIS BOOTSTRAP STOPGAP — the stable `humans.id` (slug) this pod
+    /// self-heals when `genesis_self_heal_identity` is set. Loaded from env
+    /// `SELF_HUMAN_ID` (e.g. `human-matthew-manager`). Only this one row is
+    /// touched; a missing row is a logged skip, not an error.
+    #[serde(default)]
+    pub self_human_id: Option<String>,
+
+    /// GENESIS BOOTSTRAP STOPGAP — the household collective id healed into the
+    /// configured human's NULL `humans.household_id`. Loaded from env
+    /// `SELF_HOUSEHOLD_ID`; falls back to `household_id` (env `HOUSEHOLD_ID`)
+    /// when unset. Load-bearing: the resilience snapshot's collective join
+    /// filters out rows with a NULL `household_id`, so without it the card
+    /// stays dark even after the agent key is healed
+    /// (`services/household_resilience.rs:194-195`).
+    #[serde(default)]
+    pub self_household_id: Option<String>,
 }
 
 fn default_peer_policy_path() -> PathBuf {
@@ -284,6 +311,9 @@ impl Default for Config {
             fetch_blob_parallelism: default_fetch_blob_parallelism(),
             self_cid: None,
             transport_backend: TransportBackend::default(),
+            genesis_self_heal_identity: false,
+            self_human_id: None,
+            self_household_id: None,
         }
     }
 }
