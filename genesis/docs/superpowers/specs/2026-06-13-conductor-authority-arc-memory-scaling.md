@@ -12,6 +12,16 @@ cites:
 
 # Conductor Authority-Arc Memory Scaling
 
+> ## ⚠ EVIDENCE CORRECTED — 2026-06-19 (the corpus-scaling rationale stands on first principles, not this OOM)
+> This spec cites alpha james OOM-flapping (3Gi/~9min; 8Gi only moved the ceiling) as live evidence for the
+> corpus-authority-arc memory concern, and proposes a `target_arc_factor:0` ablation. That OOM was NOT
+> corpus-arc — it was a native glibc-malloc arena leak, arc-INDEPENDENT (arc=0 leaked the same shape), now
+> CURED by glibc→jemalloc (conductors flat ~2.1–2.9GB). So the alpha evidence here is void and the ablation is
+> moot. The "per-node RAM ∝ corpus at full arc" scaling argument remains valid on first principles as a
+> future-scale concern — but it was never demonstrated by the alpha OOM.
+> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-rca-native-heap-reframe-2026-06-18.md
+
+
 **The per-node memory problem is not a code leak — it is the authority-arc replication topology, and the fix is the sharding the design already specifies.**
 
 ## The through-line (write this down)

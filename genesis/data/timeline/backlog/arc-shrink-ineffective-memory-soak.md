@@ -1,5 +1,14 @@
 # Backlog: conductor `target_arc_factor=0` does NOT bound memory — instrument the real driver
 
+> ## ✅ RESOLVED — 2026-06-19 — this falsification holds; the "real driver" was the glibc allocator, cured by jemalloc
+> This record's finding stands: arc=0 does NOT bound the conductor's memory (arc-independent leak). The "real
+> driver" it called for instrumenting was found via the smaps sampler: **glibc-malloc secondary-arena
+> retention** in the conductor child (Rust/C allocations; Go heap flat ~52MB; tx5/go-pion exonerated). CURED
+> by swapping the global allocator glibc→jemalloc — flat past the old OOM cadence, DNA hash unchanged. The
+> "memory ∝ corpus × arc" theory remains falsified for this OOM.
+> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-rca-native-heap-reframe-2026-06-18.md
+
+
 **Status:** open · **Captured:** 2026-06-16 (shift `alpha-conductor-oom-arc-leecher`) · **Class:** self-heal / runtime memory · **Env:** alpha-cluster (observed live)
 
 ## Finding (decisive, soak-evidenced)

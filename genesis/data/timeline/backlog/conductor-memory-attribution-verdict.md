@@ -1,5 +1,14 @@
 # Verdict: the conductor OOM is an ANONYMOUS-HEAP leak — not page cache, not corpus, arc-independent
 
+> ## ✅ RESOLVED — 2026-06-19 — attribution was RIGHT; cured by the jemalloc allocator swap
+> This attribution stands: the OOM was an anonymous-heap leak in the holochain conductor child,
+> arc-independent, not page cache / corpus / storage. What was still open here (the in-conductor mechanism +
+> fix) is now closed: the anon was **glibc-malloc secondary-arena retention** (Rust/C allocations; Go heap
+> flat ~52MB), CURED by swapping the conductor's global allocator glibc→jemalloc — flat past the old OOM
+> cadence, DNA hash unchanged. NOT more RAM, NOT a SQLite cap, NOT arc — exactly as this verdict predicted.
+> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-rca-native-heap-reframe-2026-06-18.md
+
+
 **Status:** verdict CONFIRMED + attribution CONFIRMED (2026-06-17 ~00:52 UTC) · **Class:** runtime memory / self-heal · **Env:** alpha (observed live) · **Resolves:** the P-ARC §B "leak-vs-bounded-large" hard gate · **Plan:** `genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md`
 
 > **TL;DR:** anonymous-heap leak (not page cache, not corpus, arc-independent) located in the **Holochain conductor child** (not the elohim-storage parent). The brake is a conductor/kitsune2 heap-leak hunt — NOT more RAM, NOT a SQLite cache cap, NOT arc sharding, and NOT in our storage code.

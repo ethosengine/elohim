@@ -22,6 +22,16 @@ informed-by:
 
 # Genesis seed/verify stabilization (post-leak-fix) Implementation Plan
 
+> ## ⚠ CURE COMMIT CORRECTED — 2026-06-19 (Tasks 1–2 leak-independent repo bugs STAND)
+> The operator-runbook step 1 names `2af2607e7` ("embed the patched conductor by default") as "the conductor
+> leak fix … already on origin/dev." That commit is the tx5 #194/#199 connection-patch conductor, which was
+> deployed fleet-wide and DID NOT cure the leak. The actual cure was glibc→jemalloc (temp-prof `b8481f090`;
+> prod che-dw build #13 / Part C `ed111a5cc`). The plan's "leak fix deployed → healthy mesh" precondition IS
+> now met — by jemalloc, not by `2af2607e7`. Tasks 1 (acquisition rollup) and 2 (quilt-draw serve-blob event)
+> are leak-INDEPENDENT repo bugs and stand unchanged.
+> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-jemalloc-prod-changeset-2026-06-19.md
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development or superpowers:executing-plans, task-by-task. The **p2p-design-gate skill is MANDATORY** before implementing Task 2 (a new economic-event emission point) and Task 3-as-design (a new session-write path / identity surface). Story-first: land the a2o scenario with the implementation, same commit.
 
 **Goal:** Drive the five genesis stages (Seed Substrate, Seed Custody Commitments, Seed REA Commitments, Verify Delivery Events, Verify Projection Sync) from Unstable→Success and light the `elohim-host-landing` resilience card, by fixing the genuinely leak-independent repo bugs now and handing the operator a precise runbook for the deploy-gated remainder.

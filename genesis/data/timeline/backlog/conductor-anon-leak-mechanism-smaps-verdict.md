@@ -8,6 +8,17 @@ occurred_at: 2026-06-17
 
 # Conductor anon leak is mmap-count accumulation, not in-place buffer / heap / arena / stack growth
 
+> ## ⛔ SUPERSEDED — 2026-06-19 — RCA corrected: it WAS the glibc allocator (H4 family), cured by jemalloc
+> This mechanism verdict (H3 per-op kitsune2 mapping accumulation "leading"; H4 "glibc arena, not the slope";
+> H1 falsified) is overturned on the H-ranking. The leak was native **glibc-malloc arena retention** in the
+> conductor child — H4's family, which this record down-ranked. The discriminator wasn't a kitsune2/receipt
+> code path; it was the allocator: swapping glibc→jemalloc (decay/munmap returns what glibc pinned in chained
+> 64MB sub-heaps) flattened it for hours past the old OOM cadence. go-pion exonerated (Go heap flat ~52MB);
+> tx5 #194/#199 deployed fleet-wide and the leak persisted. The smaps instrument + methodology here were RIGHT
+> and led to the cure; only the hypothesis-ranking conclusion is corrected. DNA hash unchanged.
+> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-rca-native-heap-reframe-2026-06-18.md · conductor-leak-jemalloc-prod-changeset-2026-06-19.md
+
+
 This is the **mechanism** companion to `conductor-memory-attribution-verdict.md` (which settled *where*: the
 holochain conductor child). It settles *what shape* of leak, and ranks the §4 hypotheses of
 `HANDOFF-2026-06-17-conductor-leak-hunt.md` against the per-class smaps evidence. Per that handoff §7, the

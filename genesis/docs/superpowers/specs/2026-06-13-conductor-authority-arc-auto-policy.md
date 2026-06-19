@@ -13,6 +13,15 @@ cites:
 
 # Conductor Authority-Arc Auto Policy
 
+> ## ⚠ LEAK-CLAIM CORRECTED — 2026-06-19 (the arc-policy design + verified {0,1} infeasibility STAND)
+> The "if it is a genuine leak, arc-shrink shrinks the structure that leaks" claim (and the
+> leak-vs-bounded-large discriminator framing) is RESOLVED and falsified for the alpha OOM: it was a native
+> glibc-malloc arena leak, arc-INDEPENDENT (arc=0 nodes leaked the same shape), CURED by glibc→jemalloc.
+> Arc-shrink does NOT touch it. The forward corpus-memory-scaling design and the spike-verified "fractional
+> arc infeasible on kitsune2 0.3.2/0.4.1 without forking holochain_p2p" finding are unaffected and stand.
+> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-rca-native-heap-reframe-2026-06-18.md
+
+
 ## 1. Problem & through-line
 
 Every alpha node runs the embedded Holochain 0.6 / kitsune2 conductor at `network.target_arc_factor = 1` (full authority arc). The value is set *nowhere* in any deployed config — `elohim/holochain/edgenode/conductor-config.yaml`'s `network:` block (lines 24–35) declares only `bootstrap_url`, `signal_url`, `enable_mdns`, `enable_relaying`, `webrtc_config`, so kitsune2 defaults to full. At full arc **each node holds a DHT working set proportional to the whole corpus** (region/op-hash sets, arc-set diffs, the fetch pool, per-round gossip op batches — all resident), so **per-node RAM ∝ total corpus** and grows forever on every node. This is the "every node mirrors everything" model, and it does not scale. Live evidence: james (largest corpus, 3654 docs, the deliberately-lean `device-chromebook-edu` archetype) OOM-flapped against 3Gi every ~9 min for hours; an 8Gi bump only moved the ceiling (sealed scaling note §Evidence, lines 31–38). We are several RAM bumps deep on a treadmill that re-OOMs at the next ceiling.
