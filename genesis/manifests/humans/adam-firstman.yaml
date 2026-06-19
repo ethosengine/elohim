@@ -237,6 +237,17 @@ spec:
               value: "elohim"
             - name: HUMAN_ID
               value: "human-adam-firstman"
+            # Genesis self-heal (OPERATOR-AUTHORIZED bootstrap): the pod populates its own
+            # human's agent_pub_key from its own conductor cell key (uhCAk), NULL-only, and
+            # mints a local session so the provide-rows seeder's /auth/me returns 200. Lights
+            # the household resilience card. Superseded later by the cross-signed
+            # coherent-transport-identity-resolver (this heal rotates over cleanly — NULL-only).
+            - name: GENESIS_SELF_HEAL_IDENTITY
+              value: "1"
+            - name: SELF_HUMAN_ID
+              value: "human-adam-firstman"
+            - name: SELF_HOUSEHOLD_ID
+              value: "household-eden"
             - name: ENABLE_IMPORT_API
               value: "true"
             # SQLite content database for fast seeding (bypasses DHT)
