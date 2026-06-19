@@ -1053,11 +1053,13 @@ fn resilience_snapshot_view_matches_schema() {
                     id: "household-matthew".to_string(),
                     kind: "household".to_string(),
                     label: Some("Matthew's Home".to_string()),
+                    intra_hub_peers: Some(2),
                 },
                 StewardingCollectiveEntry {
                     id: "church-bethel".to_string(),
                     kind: "church".to_string(),
                     label: None,
+                    intra_hub_peers: Some(1),
                 },
             ],
             online_peers: OnlinePeersView { live: 5, known: 7 },
@@ -1071,11 +1073,13 @@ fn resilience_snapshot_view_matches_schema() {
                     id: "household-matthew".to_string(),
                     kind: "household".to_string(),
                     label: Some("Matthew's Home".to_string()),
+                    intra_hub_peers: Some(2),
                 },
                 StewardingCollectiveEntry {
                     id: "church-bethel".to_string(),
                     kind: "church".to_string(),
                     label: None,
+                    intra_hub_peers: Some(1),
                 },
             ],
             floor: FeltFloorView {

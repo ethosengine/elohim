@@ -800,6 +800,59 @@ fn snapshot_includes_placement_gaps_and_regional_distribution() {
 }
 
 // =============================================================================
+// INTRA-HUB FOLD — the composability demonstration (resilience-facings design §3).
+// The SAME materialized holder-relation yields BOTH the inter-hub count
+// (stewardingCollectives, distinct hubs) AND the intra-hub count (distinct agents
+// WITHIN a hub) as folds — "a new lens is a new fold over the same relation".
+// home-multi has 2 distinct agents holding; home-solo has 1.
+// =============================================================================
+
+#[test]
+fn intra_hub_peers_counts_distinct_agents_per_hub() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+
+    let content_id = "content-intra";
+    let shard = "shard-intra";
+    seed_shard_manifest(&mut conn, content_id, &format!(r#"["{shard}"]"#));
+
+    // hub home-multi: two distinct agents both hold the shard → intra = 2.
+    seed_human(&mut conn, "agent-multi-a", Some("home-multi"));
+    seed_human(&mut conn, "agent-multi-b", Some("home-multi"));
+    seed_shard_location(&mut conn, shard, "agent-multi-a");
+    seed_shard_location(&mut conn, shard, "agent-multi-b");
+    // hub home-solo: one agent holds → intra = 1.
+    seed_human(&mut conn, "agent-solo", Some("home-solo"));
+    seed_shard_location(&mut conn, shard, "agent-solo");
+
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), content_id, None).unwrap();
+
+    // Inter-hub fold: 2 distinct hubs steward the content.
+    assert_eq!(
+        snapshot.stewarding_collectives, 2,
+        "inter-hub count = distinct hubs"
+    );
+
+    // Intra-hub fold: distinct agents per hub, off the SAME relation.
+    let details = snapshot.details.expect("details present");
+    let by_id: std::collections::HashMap<&str, Option<i32>> = details
+        .stewarding_collectives
+        .iter()
+        .map(|e| (e.id.as_str(), e.intra_hub_peers))
+        .collect();
+    assert_eq!(
+        by_id.get("home-multi").copied().flatten(),
+        Some(2),
+        "two distinct agents in home-multi: {by_id:?}"
+    );
+    assert_eq!(
+        by_id.get("home-solo").copied().flatten(),
+        Some(1),
+        "one agent in home-solo: {by_id:?}"
+    );
+}
+
+// =============================================================================
 // LIT-CARD PROOF — the resilience card lights with coherent agent-keyed substrate.
 //
 // This is the deterministic proof for the dark-card investigation (2026-06-14):

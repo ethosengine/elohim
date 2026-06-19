@@ -48,6 +48,10 @@ export interface ResilienceSnapshotView {
        * Optional human-readable display label.
        */
       label?: string;
+      /**
+       * Distinct agents/devices WITHIN this collective holding the content — the intra-hub resiliency lens. stewardingCollectives (top-level) is the inter-hub count; this is the intra count per entry. Folded from the holder-relation's retained per-agent dimension (2026-06-19-resilience-facings design).
+       */
+      intraHubPeers?: number;
     }[];
     /**
      * Live/known peer pair — honest denominators. live = peers with an active online|degraded PeerStatus across the stewarding collectives; known = stewarded nodes registered across those collectives. Renderers show 'live/known peers live' (e.g. '2/3'); '0/0' only when genuinely nothing is known.
@@ -80,6 +84,10 @@ export interface ResilienceSnapshotView {
        * Human-readable collective name (collectives.name).
        */
       label?: string;
+      /**
+       * Distinct agents/devices WITHIN this collective holding the content — the intra-hub resiliency lens (same shape as details.stewardingCollectives).
+       */
+      intraHubPeers?: number;
     }[];
     /**
      * The resilience FLOOR this content is measured against — the content-relative denominator. Expresses 'held by M of the N homes this should live in'. See genesis/data/timeline/backlog/resilience-tier-content-declared-floor.md.

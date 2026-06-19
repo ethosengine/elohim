@@ -52,7 +52,8 @@
             "properties": {
               "id":   { "type": "string" },
               "kind": { "type": "string", "description": "Collective kind: 'household', 'church', 'patron-circle', 'dao', or any future collective kind declared in the collectives table." },
-              "label": { "type": "string", "description": "Optional human-readable display label." }
+              "label": { "type": "string", "description": "Optional human-readable display label." },
+              "intraHubPeers": { "type": "integer", "minimum": 0, "description": "Distinct agents/devices WITHIN this collective holding the content — the intra-hub resiliency lens. stewardingCollectives (top-level) is the inter-hub count; this is the intra count per entry. Folded from the holder-relation's retained per-agent dimension (2026-06-19-resilience-facings design)." }
             }
           }
         },
@@ -87,7 +88,8 @@
             "properties": {
               "id":    { "type": "string" },
               "kind":  { "type": "string" },
-              "label": { "type": "string", "description": "Human-readable collective name (collectives.name)." }
+              "label": { "type": "string", "description": "Human-readable collective name (collectives.name)." },
+              "intraHubPeers": { "type": "integer", "minimum": 0, "description": "Distinct agents/devices WITHIN this collective holding the content — the intra-hub resiliency lens (same shape as details.stewardingCollectives)." }
             }
           }
         },

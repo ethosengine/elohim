@@ -66,22 +66,15 @@ pub fn compute(
         })?,
     };
 
-    use crate::db::diesel_schema::{humans, shard_locations};
-
-    let steward_households: HashSet<String> = {
-        let raw_households: Vec<Option<String>> = shard_locations::table
-            .inner_join(
-                humans::table.on(humans::agent_pub_key.eq(shard_locations::peer_id.nullable())),
-            )
-            .filter(shard_locations::h_app_id.eq(&ctx.h_app_id))
-            .filter(humans::household_id.is_not_null())
-            .filter(shard_locations::shard_hash.eq_any(&shard_hashes))
-            .select(humans::household_id)
-            .load::<Option<String>>(&mut conn)
-            .map_err(|e| StorageError::Internal(format!("household query: {e}")))?;
-
-        raw_households.into_iter().flatten().collect()
-    };
+    // Stage 1 fold: materialize the holder-relation ONCE (the canonical agent
+    // join — `humans.agent_pub_key == shard_locations.peer_id`, both agent_cid),
+    // then fold distinct non-null households. The per-agent dimension is RETAINED
+    // in the relation (HolderRow.agent_id) so intra-household peer counts are a
+    // fold away, not a new query. See the resilience-facings select→fold→aggregate
+    // design (2026-06-19).
+    let relation = load_holder_relation(&mut conn, &ctx.h_app_id, &shard_hashes)?;
+    let steward_households: HashSet<String> =
+        relation.iter().filter_map(|r| r.hub_id.clone()).collect();
 
     let households_stewarding = steward_households.len() as i32;
 
@@ -147,12 +140,27 @@ pub fn snapshot(
     // no shard manifest has never entered the distribution plane — every
     // count below is a non-measurement, not a measured zero. Renderers show a
     // distinct "not yet distributed" state instead of a fake at-risk verdict.
-    let distribution_state =
-        match crate::db::shard_manifests::get_manifest(&mut conn, &ctx.h_app_id, content_id)? {
-            Some(_) => "measured",
-            None => "unmeasured",
+    let manifest_for_state =
+        crate::db::shard_manifests::get_manifest(&mut conn, &ctx.h_app_id, content_id)?;
+    let distribution_state = match &manifest_for_state {
+        Some(_) => "measured",
+        None => "unmeasured",
+    }
+    .to_string();
+
+    // Intra-household fold (composability demonstration): materialize the
+    // holder-relation ONCE and fold distinct agents per household — the operator's
+    // "james ↔ matthew ↔ jessica = 3" intra-household resiliency. A new lens is a
+    // new fold over the SAME relation, not a new query.
+    let intra_by_hub: std::collections::HashMap<String, i32> = match &manifest_for_state {
+        Some(m) => {
+            let shard_hashes: Vec<String> =
+                serde_json::from_str(&m.shard_hashes_json).unwrap_or_default();
+            let relation = load_holder_relation(&mut conn, &ctx.h_app_id, &shard_hashes)?;
+            intra_hub_peers(&relation)
         }
-        .to_string();
+        None => std::collections::HashMap::new(),
+    };
 
     // commitment_backed_collectives: distinct households with an active provide
     // commitment whose resource_classified_as matches this content's reach.
@@ -271,6 +279,7 @@ pub fn snapshot(
             id: id.clone(),
             kind: "household".to_string(),
             label: collective_labels.get(id).cloned(),
+            intra_hub_peers: Some(intra_by_hub.get(id).copied().unwrap_or(0)),
         })
         .collect();
 
@@ -430,13 +439,99 @@ pub(crate) fn build_felt_status(
     }
 }
 
+/// One materialized read of the holder-relation for a content: every
+/// `(household, agent, region)` that holds one of the content's shards, joined on
+/// the canonical agent identity (`humans.agent_pub_key == shard_locations.peer_id`,
+/// both `agent_cid` — never a transport id; see `elohim-storage/CLAUDE.md`
+/// Identity & Transport Coherence). This is the SINGLE query the resiliency facing
+/// folds over — it replaces the previously-divergent steward join (`compute`) and
+/// regional join (`compute_regional_distribution`), and RETAINS the per-agent
+/// dimension so intra-household peer counts are a fold away, not a new query.
+///
+/// The grouping dimension is `hub_id` — the HUB abstraction (a household,
+/// dwelling, or collective), the unifying edge-key that reconciles the otherwise
+/// divergent edge stores (dwelling-hub-id vs household_id). v1 sources `hub_id`
+/// from `humans.household_id`; dwelling/collective grouping populates the same
+/// field from those sources without touching the folds. `hub_id` is `None` for a
+/// holder with no hub (bucketed `unknown` by the regional fold; excluded by the
+/// stewarding fold, which counts only non-null hubs — preserving prior behavior).
+///
+/// Design: `genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md` §3.
+#[derive(Debug, Clone)]
+pub(crate) struct HolderRow {
+    pub hub_id: Option<String>,
+    pub agent_id: String,
+    pub region: Option<String>,
+}
+
+pub(crate) fn load_holder_relation(
+    conn: &mut diesel::SqliteConnection,
+    h_app_id: &str,
+    shard_hashes: &[String],
+) -> Result<Vec<HolderRow>, StorageError> {
+    use crate::db::diesel_schema::{collectives, humans, shard_locations};
+
+    if shard_hashes.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // shard_locations → humans (canonical agent join) → collectives (left join;
+    // a holder without a collective gets NULL region → unknown bucket).
+    let rows: Vec<(Option<String>, String, Option<String>)> = shard_locations::table
+        .inner_join(
+            humans::table.on(humans::agent_pub_key
+                .nullable()
+                .eq(shard_locations::peer_id.nullable())),
+        )
+        .left_join(collectives::table.on(collectives::id.nullable().eq(humans::household_id)))
+        .filter(shard_locations::h_app_id.eq(h_app_id))
+        .filter(shard_locations::shard_hash.eq_any(shard_hashes))
+        .select((
+            humans::household_id,
+            humans::id,
+            collectives::region.nullable(),
+        ))
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("holder relation: {e}")))?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(hub_id, agent_id, region)| HolderRow {
+            hub_id,
+            agent_id,
+            region,
+        })
+        .collect())
+}
+
+/// Fold the holder-relation into distinct intra-hub peer counts: for each hub
+/// (collective), how many distinct agents hold the content (the operator's
+/// "james ↔ matthew ↔ jessica = 3" intra-hub resiliency). Pure; the composability
+/// demonstration — a new lens is a new fold over the SAME relation.
+pub(crate) fn intra_hub_peers(relation: &[HolderRow]) -> std::collections::HashMap<String, i32> {
+    let mut per_hub: std::collections::HashMap<String, HashSet<String>> =
+        std::collections::HashMap::new();
+    for r in relation {
+        if let Some(hub) = &r.hub_id {
+            per_hub
+                .entry(hub.clone())
+                .or_default()
+                .insert(r.agent_id.clone());
+        }
+    }
+    per_hub
+        .into_iter()
+        .map(|(hub, agents)| (hub, agents.len() as i32))
+        .collect()
+}
+
 fn compute_regional_distribution(
     conn: &mut diesel::SqliteConnection,
     h_app_id: &str,
     content_id: &str,
     viewer_household_id: Option<&str>,
 ) -> Result<RegionalDistributionView, StorageError> {
-    use crate::db::diesel_schema::{collectives, humans, shard_locations};
+    use crate::db::diesel_schema::collectives;
 
     // Find the content's shard hashes via the manifest.
     let manifest = crate::db::shard_manifests::get_manifest(conn, h_app_id, content_id)?;
@@ -452,25 +547,8 @@ fn compute_regional_distribution(
         }
     };
 
-    // Join shard_locations → humans → collectives to get each steward's region.
-    // humans.household_id → collectives.id (left join; stewards without a
-    // collective get NULL region → unknown bucket).
-    let rows: Vec<(String, Option<String>, Option<String>)> = shard_locations::table
-        .inner_join(
-            humans::table.on(humans::agent_pub_key
-                .nullable()
-                .eq(shard_locations::peer_id.nullable())),
-        )
-        .left_join(collectives::table.on(collectives::id.nullable().eq(humans::household_id)))
-        .filter(shard_locations::h_app_id.eq(h_app_id))
-        .filter(shard_locations::shard_hash.eq_any(&shard_hashes))
-        .select((
-            humans::id,
-            humans::household_id,
-            collectives::region.nullable(),
-        ))
-        .load(conn)
-        .unwrap_or_default();
+    // Fold over the SAME materialized holder-relation (no second divergent join).
+    let relation = load_holder_relation(conn, h_app_id, &shard_hashes)?;
 
     let viewer_region: Option<String> = match viewer_household_id {
         None => None,
@@ -489,11 +567,11 @@ fn compute_regional_distribution(
         global: 0,
         unknown: 0,
     };
-    for (_human_id, household_id, steward_region) in rows {
-        if !seen.insert(household_id.clone()) {
+    for r in &relation {
+        if !seen.insert(r.hub_id.clone()) {
             continue;
         }
-        match (viewer_region.as_deref(), steward_region.as_deref()) {
+        match (viewer_region.as_deref(), r.region.as_deref()) {
             (None, None) => dist.unknown += 1,
             (None, Some(_)) => dist.global += 1,
             (Some(_), None) => dist.unknown += 1,
@@ -538,6 +616,7 @@ mod felt_status_tests {
             id: id.to_string(),
             kind: "household".to_string(),
             label: label.map(str::to_string),
+            intra_hub_peers: None,
         }
     }
 

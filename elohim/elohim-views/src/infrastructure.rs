@@ -1484,6 +1484,15 @@ pub struct StewardingCollectiveEntry {
     pub kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+    /// Distinct agents/devices WITHIN this hub (collective) that hold the content —
+    /// the intra-hub resiliency lens ("james ↔ matthew ↔ jessica = 3"), folded from
+    /// the holder-relation's retained per-agent dimension. `stewardingCollectives`
+    /// (top-level) is the inter-hub count; this is the intra count per entry.
+    /// `None` when a projection did NOT select the intra lens (select→fold→aggregate:
+    /// a facing carries only the folds it computes).
+    /// See `2026-06-19-resilience-facings-select-fold-aggregate-design.md` §3.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intra_hub_peers: Option<i32>,
 }
 
 /// Optional detail layer for `ResilienceSnapshotView`. Source of truth:
