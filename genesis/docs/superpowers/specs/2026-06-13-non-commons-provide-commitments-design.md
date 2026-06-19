@@ -466,3 +466,132 @@ out of scope.
   bytes to an authorized peer?) — that is the receiver-side resolution path, gated by the same
   pre-authorization; this spec closes the *counting* gap (the commitment-backed verdict), not
   the serve path, which is its own slice.
+
+---
+
+## 11. Addendum (2026-06-19) — `resource_classified_as` is set-valued; the join is membership-aware; the weighted-affinity on-ramp
+
+> **Composes, does not fork.** This addendum **revises §5.2** ("the snapshot reader needs no
+> change") and **extends §9.6** (the consent-model / inverse-scaling draft). Surfaced by a live
+> alpha probe (`resilience-card-membership-humans-projection-gap-2026-06-19.md`, operator U1–U4
+> queries 2026-06-19) while finishing the membership→`humans` work, and an operator design
+> intuition: classification should be **fractional/weighted**, not binary.
+
+### 11.1 What the probe found (the serialization split is real)
+
+The card reads `commitmentBackedCollectives: 0` on alpha **not** because the commitment is
+missing, proposed, or mis-`h_app_id`'d — matthew's provide row is present, `active`,
+`provider == humans.agent_pub_key`, `h_app_id='lamad'`, content reach `commons` both sides
+(U1/U2/U4, all green). The **sole** deviation: `rea_commitments.resource_classified_as` is
+stored as the **JSON-array string `["content:commons"]`**, while the join
+(`household_resilience.rs:189–193`) does **scalar** equality against `content:commons` → no
+match → 0. The column is **inconsistently serialized across the table** (custody rows appear
+both bare `sha256-…` and array-wrapped `["sha256-…"]`) — two producers disagree:
+
+- the **side-projection** (`record_provide_from_…_commitment`, the §5 path) writes the **scalar**
+  `content:<reach>` this spec assumed;
+- the **HTTP `POST /commitments`** path (`api/rea_commitments.rs::normalize_create_input:131–135`,
+  the seeder's path) JSON-array-wraps `resourceClassifiedAs` (it is array-typed in the
+  `CreateReaCommitmentInputView`, ValueFlows-canonical) and stores `["content:commons"]`.
+
+§5.2's "no snapshot change" assumed every producer wrote the scalar. They do not. The seeder
+took the View path; the array landed.
+
+### 11.2 The column is action-polymorphic — the real fork (DECISION PENDING, operator)
+
+A full reader census (2026-06-19) shows `rea_commitments.resource_classified_as` is used **two
+different ways by action**, which is the true source of the drift:
+
+- **Single-valued actions** — `provide`/`replicates-content` carry one scope `content:<reach>`;
+  `custody-blob` carries one `sha256-…` hash. **Three internal joins do scalar `.eq()`** against
+  that lone value: the resilience card (`household_resilience.rs:189`), peer selection
+  (`peer_selection.rs:122`), distribution (`distribution_view.rs:556`).
+- **Multi-valued action** — `operate-doorway` carries a **JSON list of capabilities**
+  (`["doorway:bootstrap","doorway:signal",…]`); the **doorway operator AUTH path**
+  (`project_doorway_operator_binding`, `views_convert/shefa.rs:181`) and the output
+  `ReaCommitmentView` (`shefa.rs:119`) both `serde_json::from_str::<Vec<String>>` it.
+
+So **pure scalar-everywhere is off the table** — forcing scalar would null the operate-doorway
+capability list and break doorway operator auth. The genuine choice is **uniform-list vs
+documented-polymorphism**:
+
+- **(A) Uniform JSON-list, every reader parses it.** The three scalar-`.eq()` readers move to a
+  membership test (`parse_json_strings` seam, `rea_projection.rs:401` — tolerant of bare + array).
+  One storage form for all actions; operate-doorway-safe; removes the polymorphism that caused
+  this bug. **Lights the card on existing alpha data with NO reseed.** Cost: 3 reader changes +
+  a documented "this column is always a JSON list" contract. Forward-fits the weighted model
+  (§11.3): list→map is a clean evolution.
+- **(B) Keep the per-action convention, make it explicit, fix the producer.** Single-valued
+  actions persist a **bare scalar** (matching §5.2 + the 3 `.eq()` readers, unchanged);
+  `operate-doorway` stays a list. Fix the seeder (`seed-provide-rows.ts:241` sends `[scope]`) to
+  write the bare scalar, **reseed matthew's existing `["content:commons"]` row**, and document
+  the action-polymorphic contract. Cost: a reseed + a permanent (now-documented) footgun — the
+  column means different things by action, which is exactly what misled the live probe.
+
+**DECIDED (2026-06-19, operator): Option A — uniform JSON-list + a typed accessor.** The
+operator's first instinct was "normalize on scalar" (→ B), but the operate-doorway constraint
+(surfaced after) makes pure scalar impossible (it nulls the capability list / breaks doorway
+auth), and B would *preserve* the action-polymorphism that caused this bug and misled the live
+probe. A removes the polymorphism outright: the column is **always a JSON list**, accessed only
+through a typed seam (`classifications()` / `has_classification(x)` / `primary()`) so no reader
+ever touches the raw string; the readers move to that seam. **Correctness comes from the
+*readers*, not the stored form** (advisor 2026-06-19) — so the safe order is **accessor → migrate
+EVERY reader → only then converge writers** (a writer change cannot break anyone once all readers
+are form-agnostic). The full production reader census (2026-06-19): `household_resilience.rs:189`
+(card), `peer_selection.rs:122`, `distribution_view.rs:556`, **and `reconcile/custody.rs:145`**
+(reads the raw column as a bare blob hash — **latent-buggy *today*** on the array-wrapped custody
+rows the probe found; it must route through `primary_classification()`). `conductor_writes.rs:387`
+is a `#[test]` round-trip (form-symmetric, safe); the scalar-asserting unit tests at
+`rea_commitments.rs:1519/1549` are updated to the list form with the writer.
+
+**Reseed (operator 2026-06-19): reseed is cheap — prioritize CLEAN CODE over a no-reseed
+cleverness.** The data is migrated to the uniform list form by a reseed (seeder source already
+sends `[scope]` — aligned); the accessor's bare-string tolerance stays as defensive *in-flight*
+handling, not the correctness mechanism. This revises §5.2: the snapshot join changes from
+`.eq(&scope)` to `has_classification(&scope)`; the per-`(provider, reach)` row scheme and the
+rest of §5 stand.
+
+> **⚠ Invariant is READER-enforced, NOT producer-enforced (do not over-read "always a list").** As of
+> Sprint 1 (2026-06-19, `27746ce6e`), the *readers* all route through the accessor (tolerant of bare +
+> list), but the DHT **signal/reconcile producer still writes bare** and truncates operate-doorway lists
+> via `first_or_none` ([[rea-classified-signal-path-bare-producer]] — not yet landed). So the column is
+> NOT uniformly a list table-wide; correctness holds because **every reader tolerates both forms**. **Do
+> NOT add a list-only reader** (bypassing the accessor) — it will break on signal-authored bare rows. The
+> true "uniform list" end-state arrives only when the signal producer converges too.
+
+### 11.3 Extension of §9.6 — weighted (fractional) affinity as the future arc
+
+§9.6 captured *consent strength inversely scaling with reach* (commons opt-out / intimate
+opt-in). The operator's intuition pushes the **representation** one step further: a content unit
+or stewardship commitment carrying **fractional affinity to multiple targets at once** — e.g.
+`{commons: 0.1, agent:bob: 0.1, agent:susan: 0.3, …}` — rather than a flat set of equal-weight
+classifications. This is the weighted generalization the set (§11.2) is the unit-weight case of.
+
+Where it would compose (NOT built here — captured born-linked):
+- **Representation:** `resource_classified_as` graduates from `Set<classification>` to
+  `Map<classification, weight>` (the set is `weight = 1` for each member). The membership join
+  (§11.2) becomes a **weight lookup**; `commitment_backed_collectives` could weight a household's
+  contribution by its affinity share rather than count it 0/1.
+- **Kinship with existing fractional substrate:** **RS(N,K) shard shares are already fractional
+  stewardship** (k-of-n) — weighted affinity is the *authoring/intent* analog of what erasure
+  coding does at the *distribution* layer. It also meets `humans.affinities` and qahal affinity
+  (the human↔scope weights), and reach-as-distribution rather than a single enum value.
+- **Mandatory gate:** if the weight-bearing affinity becomes a **first-class grant/invitation
+  entry** (the [[project_rea_compute_commitment_primitive]] shape §9.6 already names), it is a
+  **new/changed DHT entry type carrying economic-attribution weight → the p2p-design-gate fires,
+  and it is operator/security-owned** — the same gate §9.6 attaches, compounded by the storage
+  gospel's bar on consuming self-asserted agent↔transport bindings for economic attribution until
+  a cross-signed control proof lands (`2026-06-15-coherent-transport-identity-resolver-design.md`,
+  blocked). **Do NOT auto-build.** Captured here as the design direction; its own brainstorm →
+  p2p-design-gate → plan when the operator opens it.
+
+### 11.4 Card-lighting consequence (the near-term, this addendum's only buildable scope)
+
+Once §11.2 lands (Option A), **`commitmentBackedCollectives: 0 → 1` (matthew)** — no reseed, no
+DNA change, no identity work (U2 proved matthew's `humans` row is already healed: `agent_pub_key`
++ `household_id` both set; his existing `["content:commons"]` row matches via membership). Reaching
+**2** (adam) is per-pod-seeding +
+the self-asserted-session gate (its own backlog item); **≥3 / `protected`** is structurally
+unreachable with the current 3-human/2-household seed; `stewardingCollectives` needs live P2P
+`distribute_shards` (the durability arc). Stated plainly so the "deploy+reseed is the whole
+lever" walk-back does not recur a third time.
