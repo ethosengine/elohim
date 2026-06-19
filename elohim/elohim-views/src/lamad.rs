@@ -176,6 +176,7 @@ pub struct CreateContentInputView {
     /// `ContentCommitted` notarization later runs. Optional — omit on the
     /// peered path where the drain stamps `p2pPublishedAt`.
     #[serde(default)]
+    #[ts(optional)]
     pub dht_anchor_hash: Option<String>,
 }
 

@@ -20,4 +20,4 @@ metadata: JsonValue | null, reach: string | null, createdBy: string | null, tags
  * `ContentCommitted` notarization later runs. Optional — omit on the
  * peered path where the drain stamps `p2pPublishedAt`.
  */
-dhtAnchorHash: string | null, };
+dhtAnchorHash?: string, };
