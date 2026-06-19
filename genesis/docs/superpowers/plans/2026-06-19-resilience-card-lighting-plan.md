@@ -237,76 +237,62 @@ no DNA change). **No reseed needed** (matthew's existing row matches via members
 
 ---
 
-## SPRINT 2 — Raise the count to the ceiling (adam → count = 2). Seeder-to-matthew orchestration. **(REVISED 2026-06-19 on a verified cross-pod trace — `sprint2-crosspod-count2-trace` workflow.)**
+## SPRINT 2 — Raise the count to the ceiling (adam → count = 2). **ONE storage change: self-heal self-INSERT.** (RE-VERIFIED 2026-06-19 against the actual seeder + state code — supersedes the cross-trace draft.)
 
-> **The original framing ("per-pod registration so adam's self-heal runs") was WRONG — discarded.**
-> The card reads **matthew's** local `content.db` only (`household_resilience.rs:134-144` — one pooled
-> local SqliteConnection, no peer/DHT read; doorway single-targets matthew, `route_registry.rs:704-709`).
-> Healing adam on *adam's* pod puts nothing on matthew. So count=2 requires adam's rows **physically in
-> matthew's db**, and per-pod self-heal can't deliver that.
+> **Card reads matthew's local `content.db` only** (`household_resilience.rs:134-144`; doorway single-targets
+> matthew, `route_registry.rs:704-709`) → count=2 needs adam's healed humans row + active provide-row
+> **physically in matthew's db**. **NOT economic-attribution-gated** — the join is `agent_cid = agent_cid`,
+> consuming ZERO `AgentPeerBinding`s (cross-pod trace).
 >
-> **This is NOT economic-attribution-gated** (corrects the prior gate note). The join
-> `humans.agent_pub_key = rea_commitments.provider` is `agent_cid = agent_cid`, intra-namespace,
-> consuming ZERO `AgentPeerBinding`s — the gospel's transport-binding gate (`elohim-storage/CLAUDE.md`)
-> does **not** fire here. It's an orchestration/wiring fix, not a security-gated design change.
+> **What the seeder ALREADY does right (verified — do NOT rebuild):** `seed-provide-rows.ts` writes to the
+> **doorway** (`DOORWAY_URL`, line 397 → matthew) and **activates** (`PATCH state='active'`, line 339) after
+> the `proposed` create, and heals through the doorway (line 437). So it lands a healed key + an **active**
+> provide-row on matthew for any human it runs on (matthew's count=1 proves it). The earlier "state
+> silent-failure gate" + "seeder write-target" tasks are **MOOT** — the seeder already handles both.
+>
+> **The SOLE gap:** `seed-provide-rows.ts:418` fetches adam's key from **adam's own pod** `/auth/me`, which
+> 401s (no `LocalSession`) → adam **skipped** (line 420-426): no heal, no provide-row. adam's pod has no
+> session because it has no humans row (`register` single-targets matthew) → boot self-heal `NotFound`-skips
+> (`genesis_self_heal.rs:81-90`). **Fix that one thing; the existing seeder does the rest.**
+>
+> **Option (i) "per-pod register" is TIMING-BROKEN (rejected):** self-heal runs at pod **boot**, before any
+> seeder `register` stage → the boot heal already NotFound-skipped before the row exists → no session. A
+> later register can't retro-trigger the boot heal. **Option (ii) — self-heal self-INSERTs at boot — is the fix.**
 
-### The real mechanism (verified)
-Two rows must land in **matthew's** content.db, both via the **seeder POSTing through the doorway** (so
-matthew's conductor authors them — `create_rea_commitment` has no `provider==author` guard, integrity
-`_ => Ok(Valid)`):
-- **(a) adam `humans` row** — `id=human-adam-firstman`, `household_id='household-eden'`,
-  `agent_pub_key=`adam's real `uhCAk…`. `seed-humans.ts:270-280` already deposits the row but with
-  `agent_pub_key=NULL`; `seed-provide-rows.ts:281` `POST /api/v1/identity/heal` stamps adam's fetched key.
-- **(b) adam provide-row** — `provider=`adam's `uhCAk…`, `action='provide'`, **`state='active'`**,
-  `h_app_id='lamad'`, `resource_classified_as ⊇ content:commons`. `seed-provide-rows.ts:257`
-  `POST /api/v1/commitments`.
+### Task 2.1 — Self-heal self-INSERT (Option ii — storage-only, boot-time, timing-correct)
+`genesis_self_heal.rs`: on `heal_human_identity` → `NotFound`, **INSERT the pod's own configured human**
+(`id=SELF_HUMAN_ID`, `agent_pub_key=`own cell `uhcak`, `household_id=SELF_HOUSEHOLD_ID`, `h_app_id=imagodei`)
+then proceed to the session arm (instead of returning early). Same bootstrap-trust basis as the existing
+NULL-fill heal — own cell key, own configured human, never a claim about another agent. adam's pod boots →
+self-inserts adam + mints session → `/auth/me` 200 → the seeder fetches adam's key and lands his rows on matthew.
+TDD: self-heal on a pod with NO row + non-empty `uhcak` + household → row INSERTED (`agent_pub_key=uhcak`,
+`household_id` set) + a session minted (RED today: NotFound → skip, no row, no session). Rewrite the existing
+`missing_human_is_logged_skip_not_panic` test to the new self-insert+session behavior.
 
-NOT via the live signal path (`post_commit` is author-local, `content_store/src/lib.rs:10616`) NOR
-membership projection (`on_membership_projected` is a NULL-only `household_id` UPDATE that never sets
-`agent_pub_key` / never inserts, `controller.rs:1105-1115`). Both confirmed-absent for this purpose.
+### Task 2.0 — operator probe (confirms the seed-humans dependency; runs at deploy)
+After redeploy+reseed, query matthew's `content.db`:
+- `SELECT id, agent_pub_key, household_id FROM humans WHERE household_id='household-eden';` — expect adam's
+  row present, `agent_pub_key` non-NULL (the seeder's heal stamped it). **If ABSENT**, seed-humans isn't
+  laying adam's matthew-row → the seeder's heal 404s (`seed-provide-rows.ts:440-444`) → also fix seed-humans.
+- `SELECT provider, action, state FROM rea_commitments WHERE provider LIKE 'uhCAk%' AND action='provide';` —
+  expect an adam-provider `active` row (the seeder activates).
 
-### Task 2.0 — PROBE FIRST (operator, blocking — decides "confirm" vs "fix")
-Query matthew's `content.db`:
-- `SELECT id, agent_pub_key, household_id, h_app_id FROM humans WHERE id='human-adam-firstman' OR household_id='household-eden';`
-- `SELECT provider, action, state, resource_classified_as, h_app_id FROM rea_commitments WHERE provider LIKE 'uhCAk%' AND action IN ('provide','replicates-content','replicates-commons');`
-Expected: adam humans row present, `household_id=eden`, `agent_pub_key=NULL` (→ Gap 1 live). A
-`provider=adam` commitment absent (seeder didn't reach matthew for adam) OR present-but-`proposed` (→ Gap 2 live).
-
-### Task 2.1 — Confirm seed order + target (seed-humans → seed-provide-rows, both to matthew)
-Verify `seed-humans` runs before `seed-provide-rows`, both POST through `RESOLVED_DOORWAY_HOST`
-(= matthew single-target). TDD: after `seed-humans`, matthew's db has the adam `household-eden` row
-(`agent_pub_key=NULL`). The heal 404s if the row is absent (`seed-provide-rows.ts:281-287,440-444`).
-
-### Task 2.2 — Stamp adam's real key (Gap 1 — plain wiring)
-Ensure `seed-provide-rows.ts` `fetchAgentPubKey` (adam's `/auth/me`) + `healHumanIdentity` run **for
-adam against matthew**. TDD: matthew's adam row ends with `agent_pub_key` = the fetched key (non-NULL,
-byte-identical to the provide-row `provider`).
-
-### Task 2.3 — Provide-commitment state = `active` (Gap 2 — **THE silent-failure gate**, verify-first)
-**This is the gap that silently fails count=2 even with everything else correct:** adam's key stamped
-right, the humans row present, the provide-row authored with the right `provider` — and the card STILL
-reads 1, not 2, if that row landed `state='proposed'`. No amount of identity wiring lights eden past a
-`proposed` row. Treat Task 2.0's state probe as blocking, not advisory.
-`household_resilience.rs:192` filters `state='active'`. DHT wire projections force `proposed`; the
-`POST /api/v1/commitments` → `rea_commitment_service.rs:247-250` path must land `active` (or add an
-activation/graduate step). **Confirm the actual written state (Task 2.0) before choosing the fix** —
-memory `project_resilience_snapshot_humans_junction` warns POST commitments inserts `'proposed'`.
-TDD: matthew's `rea_commitments` has `provider=adam, action='provide', state='active', resource ⊇ content:commons`.
-
-### Task 2.4 — End-to-end card assertion (the Sprint 2 done-gate)
+### Task 2.2 — End-to-end card assertion (the Sprint 2 done-gate)
 Through doorway: `GET /api/v1/resilience/evolution-of-trust/household → commitment_backed_collectives == 2`.
-Story-harvest a regression scenario capturing the two-row precondition.
+Story-harvest a regression scenario capturing the two-row precondition on matthew's pod.
 
-### Task 2.5 — (FLAG, not block) name the self-asserted `provider` seam
-`provider` is a self-asserted payload field with no `provider==author` integrity check
-(`mishpat_integrity/src/lib.rs:766-804`). Acceptable for low-stakes card display; **must be named**
-before this join feeds anything weightier. Record as a p2p-design-gate note (distinct from the
-transport-binding gate) — not a Sprint 2 blocker.
+### Task 2.3 — (FLAG, not block) name the self-asserted identity seam
+The self-insert asserts "this pod IS `SELF_HUMAN_ID` with this cell key" — same self-asserted basis as the
+existing fill-NULL heal, and the card join is `agent_cid=agent_cid` (not transport-binding-gated). Also
+`provider` carries no `provider==author` integrity check (`mishpat_integrity:766-804`). Acceptable for card
+display; **name it** before this join feeds anything weightier (durable replacement: the blocked
+`coherent-transport-identity-resolver`). Not a Sprint 2 blocker.
 
 ### Sprint 2 operator step
-Redeploy + reseed (seed-humans → seed-provide-rows reach matthew for adam). Verify
-`commitment_backed_collectives == 2`. jessica shares matthew's household (dowell) so she does **not**
-raise the count — eden (adam) is the only second household in this seed.
+Land Task 2.1 → **redeploy** (adam's pod boots with the new self-heal → mints session — deploy BEFORE seed)
+→ **reseed** (seed-humans lays adam's matthew-row; seed-provide-rows fetches adam's key, heals + active-
+provide-rows it onto matthew). Verify count==2. jessica is dowell (matthew's household) → does not raise the
+count; eden (adam) is the only second household in this seed.
 
 ---
 
