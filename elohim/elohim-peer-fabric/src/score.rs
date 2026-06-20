@@ -141,6 +141,32 @@ mod tests {
     }
 
     #[test]
+    fn bonded_ranks_higher_all_else_equal() {
+        let cs = vec![
+            cand("unbonded", 5, 0.1, Some(10), "h1", false, 1.0),
+            cand("bonded", 5, 0.1, Some(10), "h2", true, 1.0),
+        ];
+        let r = rank(&cs, 0);
+        assert_eq!(
+            r[0].agent_cid, "bonded",
+            "a bonded peer outranks an unbonded one, all else equal"
+        );
+    }
+
+    #[test]
+    fn higher_delivery_ranks_higher_all_else_equal() {
+        let cs = vec![
+            cand("flaky", 5, 0.1, Some(10), "h1", true, 0.2),
+            cand("reliable", 5, 0.1, Some(10), "h2", true, 0.95),
+        ];
+        let r = rank(&cs, 0);
+        assert_eq!(
+            r[0].agent_cid, "reliable",
+            "higher decaying delivery-success outranks lower, all else equal"
+        );
+    }
+
+    #[test]
     fn saturated_peers_are_excluded_so_caller_can_shed() {
         let cs = vec![cand("full", 5, 1.0, Some(10), "h1", true, 1.0)];
         assert!(

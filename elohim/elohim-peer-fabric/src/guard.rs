@@ -15,6 +15,11 @@ pub trait Clock {
 }
 
 /// Pluggable defense state. Storage backs this with SQLite; doorway with an in-memory/edge store.
+///
+/// **Windowing is the implementer's responsibility.** `assess` only ever asks for the in-window
+/// count via `count_since(source, since)`, so an implementer should evict/ignore hits older than the
+/// window (SQLite `DELETE WHERE ts < since`; in-memory sweep) to bound state for a high-rate but
+/// not-yet-banned source. The crate guarantees only that a *banned* source is never recorded.
 pub trait GuardStore {
     fn record(&mut self, source: &str, ts_secs: u64);
     fn count_since(&self, source: &str, since_secs: u64) -> u32;
@@ -62,7 +67,7 @@ pub fn assess<S: GuardStore, C: Clock>(
     let since = now.saturating_sub(cfg.window_secs);
     let count = store.count_since(source, since);
     if count > cfg.ban_threshold {
-        store.ban_until(source, now + cfg.ban_secs);
+        store.ban_until(source, now.saturating_add(cfg.ban_secs));
         Verdict::Deny
     } else if count > cfg.challenge_threshold {
         Verdict::Challenge

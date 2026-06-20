@@ -5,8 +5,10 @@ edition = "2021"
 description = "Shared pure-logic peer-traffic fabric: defense-in-depth (guard) + capability-aware peer ranking (score). No I/O, no diesel — the dependency graph is the purity boundary."
 
 [features]
-default = []
-# Node-role gates — a consuming runtime enables what its role drives.
+# Default compiles ALL code so dev/CI build + the unit tests cover everything; a consumer slims a
+# build with `default-features = false` + only its node-role feature(s).
+default = ["edge-defense", "peer-defense", "serve-routing"]
+# Node-role gates — a consuming runtime enables what its role drives (gate the modules in lib.rs).
 edge-defense = []      # doorway: guard at the membrane
 peer-defense = []      # storage: guard on directly-exposed surfaces
 serve-routing = []     # storage: score.rank at serve time
