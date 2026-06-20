@@ -90,7 +90,11 @@ mod tests {
         ];
         let rollup = build_stewarding_rollup("content-y", 3, &stewards);
         assert_eq!(rollup.constituents.len() as i32, 3);
-        assert_eq!(rollup.deficit.measure(), 0, "at floor: deficit must be zero");
+        assert_eq!(
+            rollup.deficit.measure(),
+            0,
+            "at floor: deficit must be zero"
+        );
         assert!(rollup.is_covered(), "at floor: is_covered must be true");
     }
 

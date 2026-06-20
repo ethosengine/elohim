@@ -62,7 +62,10 @@ impl Node {
 
     async fn wait_connected(&self, peer: PeerId) {
         let (tx, rx) = oneshot::channel();
-        self.cmd_tx.send(Cmd::WaitConnected(peer, tx)).await.unwrap();
+        self.cmd_tx
+            .send(Cmd::WaitConnected(peer, tx))
+            .await
+            .unwrap();
         rx.await.unwrap();
     }
 
@@ -284,11 +287,7 @@ async fn chaos_failover_to_surviving_provider() {
     let bytes = payload("chaos-b", 512 * 1024);
     let hash = sha256_hex(&bytes);
     // Two independent providers hold the same content-addressed bytes.
-    let provider_a = spawn_node(
-        HashMap::from([(hash.clone(), bytes.clone())]),
-        FAST_TIMEOUT,
-    )
-    .await;
+    let provider_a = spawn_node(HashMap::from([(hash.clone(), bytes.clone())]), FAST_TIMEOUT).await;
     let provider_b = spawn_node(HashMap::from([(hash.clone(), bytes)]), FAST_TIMEOUT).await;
     let fetcher = spawn_node(HashMap::new(), FAST_TIMEOUT).await;
 
@@ -318,11 +317,7 @@ async fn chaos_failover_to_surviving_provider() {
 async fn chaos_returning_provider_serves_again() {
     let bytes = payload("chaos-c", 128 * 1024);
     let hash = sha256_hex(&bytes);
-    let provider = spawn_node(
-        HashMap::from([(hash.clone(), bytes.clone())]),
-        FAST_TIMEOUT,
-    )
-    .await;
+    let provider = spawn_node(HashMap::from([(hash.clone(), bytes.clone())]), FAST_TIMEOUT).await;
     let fetcher = spawn_node(HashMap::new(), FAST_TIMEOUT).await;
 
     fetcher.dial(provider.addr.clone()).await;
@@ -347,11 +342,7 @@ async fn chaos_kill_during_transfer_is_bounded_and_failover_completes() {
     // Large enough that the kill lands mid-conversation on loopback.
     let bytes = payload("chaos-d", 8 * 1024 * 1024);
     let hash = sha256_hex(&bytes);
-    let provider_a = spawn_node(
-        HashMap::from([(hash.clone(), bytes.clone())]),
-        FAST_TIMEOUT,
-    )
-    .await;
+    let provider_a = spawn_node(HashMap::from([(hash.clone(), bytes.clone())]), FAST_TIMEOUT).await;
     let provider_b = spawn_node(HashMap::from([(hash.clone(), bytes)]), FAST_TIMEOUT).await;
     let fetcher = spawn_node(HashMap::new(), FAST_TIMEOUT).await;
 

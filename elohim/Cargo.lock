@@ -931,6 +931,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-peer-fabric"
+version = "0.1.0"
+
+[[package]]
 name = "elohim-render"
 version = "0.1.0"
 dependencies = [

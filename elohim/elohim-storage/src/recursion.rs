@@ -352,7 +352,7 @@ mod tests {
         );
         assert_eq!(ab.rollup_hash, ba.rollup_hash);
         assert!(ab.is_covered()); // 0..32 ∪ 32..64 = full(64)
-        // a different scope or domain → a different content address
+                                  // a different scope or domain → a different content address
         let other_domain = CoverageRollup::rollup(
             "collective:church",
             CoverageDomain::CareFloor,
@@ -384,17 +384,23 @@ mod tests {
     fn rollup_composes_transitively_at_two_levels_preserving_descent() {
         // Two councils, each a rollup of its households (level 1).
         let council_a = CoverageRollup::rollup(
-            "council:a", CoverageDomain::CorpusBytes, CoverageSet::full(50),
-            &[child("h1", 0, 30), child("h2", 30, 50)],   // covered 0..50 — fully covered
+            "council:a",
+            CoverageDomain::CorpusBytes,
+            CoverageSet::full(50),
+            &[child("h1", 0, 30), child("h2", 30, 50)], // covered 0..50 — fully covered
         );
         let council_b = CoverageRollup::rollup(
-            "council:b", CoverageDomain::CorpusBytes, CoverageSet::full(50),
-            &[child("h3", 0, 20)],                          // covered 0..20 — deficit 20..50
+            "council:b",
+            CoverageDomain::CorpusBytes,
+            CoverageSet::full(50),
+            &[child("h3", 0, 20)], // covered 0..20 — deficit 20..50
         );
         // The region rolls up the two councils (level 2): each council is a child whose
         // covered-set is its own covered, lifted into the region's 0..100 keyspace.
         let region = CoverageRollup::rollup(
-            "region:x", CoverageDomain::CorpusBytes, CoverageSet::full(100),
+            "region:x",
+            CoverageDomain::CorpusBytes,
+            CoverageSet::full(100),
             &[
                 ChildCoverage::readable("council:a", CoverageSet::interval(0, 50)),
                 ChildCoverage::readable("council:b", CoverageSet::interval(50, 70)),
@@ -405,12 +411,22 @@ mod tests {
         // (2) the externality is the region's descent target
         assert_eq!(region.deficit, CoverageSet::interval(70, 100));
         // (3) descent preserved at the top: both councils reachable (sorted CIDs)
-        assert_eq!(region.descend(), &["council:a".to_string(), "council:b".to_string()]);
+        assert_eq!(
+            region.descend(),
+            &["council:a".to_string(), "council:b".to_string()]
+        );
         // (4) two-level descent: a household trapped in council_b's deficit is reachable by
         //     walking constituents region -> council_b -> its households.
-        let by_cid = [(&council_a.scope_cid, &council_a), (&council_b.scope_cid, &council_b)];
-        let cb = by_cid.iter().find(|(c, _)| *c == "council:b").map(|(_, r)| *r).unwrap();
-        assert!(!cb.is_covered());                          // council_b has a real gap
-        assert_eq!(cb.descend(), &["h3".to_string()]);      // and you can descend to its leaf
+        let by_cid = [
+            (&council_a.scope_cid, &council_a),
+            (&council_b.scope_cid, &council_b),
+        ];
+        let cb = by_cid
+            .iter()
+            .find(|(c, _)| *c == "council:b")
+            .map(|(_, r)| *r)
+            .unwrap();
+        assert!(!cb.is_covered()); // council_b has a real gap
+        assert_eq!(cb.descend(), &["h3".to_string()]); // and you can descend to its leaf
     }
 }

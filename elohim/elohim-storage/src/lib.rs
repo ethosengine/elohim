@@ -259,6 +259,7 @@ pub use views::{
     NodeShapeView, PeerStatusView, RenderCapabilityProfile, RendererKind,
 };
 pub use views::{AttestationView, GovernanceActionTallyView, GovernanceActionView};
+pub use views::{ComputeTriptych, WeaveView};
 pub use views::{
     EprCouplingView, EprEnvelopeView, EprListView, EprProvidersView, EprPublishInput,
     EprSignatureView, EprVerifyErrorView, EprVerifyView, EprView,
@@ -268,5 +269,4 @@ pub use views::{
     PlacementGapShortfall, PlacementGapView, RegionalDistributionView,
     ResilienceSnapshotDetailsView, ResilienceSnapshotView, StewardingCollectiveEntry,
 };
-pub use views::{ComputeTriptych, WeaveView};
 pub use views::{IrohTransportProfileView, Libp2pTransportProfileView, PeerTransportManifestView};

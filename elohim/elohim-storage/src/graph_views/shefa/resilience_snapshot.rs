@@ -42,7 +42,11 @@ pub fn build(engine: &GraphEngine, cid: &str) -> Result<ResilienceSnapshotView, 
         &[("cid", DataValue::from(cid))],
     )?;
     // Extract steward CIDs from Cozo rows (column 0 is steward_cid).
-    let steward_cids: Vec<String> = steward_result.rows.iter().map(|row| str_at(row, 0)).collect();
+    let steward_cids: Vec<String> = steward_result
+        .rows
+        .iter()
+        .map(|row| str_at(row, 0))
+        .collect();
 
     // Diversity floor for the "standard" tier (default when undeclared). Returns i32=3.
     let floor = floor_for_tier("standard") as u64;

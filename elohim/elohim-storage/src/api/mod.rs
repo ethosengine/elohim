@@ -266,10 +266,8 @@ pub async fn handle_api_request(
         }
         let mut conn = get_conn(&pool)?;
         let measured_at = chrono::Utc::now().to_rfc3339();
-        let view = crate::services::operational_weave_facing::build_weave_view(
-            &mut conn,
-            measured_at,
-        );
+        let view =
+            crate::services::operational_weave_facing::build_weave_view(&mut conn, measured_at);
         Ok(response::ok(&view))
     } else if sub_path.starts_with("comments") {
         let resource_path = sub_path.strip_prefix("comments").unwrap_or("");
@@ -841,4 +839,3 @@ mod routing_tests {
         }
     }
 }
-

@@ -73,17 +73,21 @@ pub fn load_custodian_relation(conn: &mut SqliteConnection) -> Vec<CustodianRow>
     metrics
         .into_iter()
         .map(|m| {
-            let (free, used) = match serde_json::from_str::<CustodianStorageMetricsView>(
-                &m.storage_json,
-            ) {
-                Ok(s) => (
-                    Some(s.free_bytes.max(0) as u64),
-                    Some(s.used_bytes.max(0) as u64),
-                ),
-                Err(_) => (None, None), // unsampled node — skipped in aggregate
-            };
+            let (free, used) =
+                match serde_json::from_str::<CustodianStorageMetricsView>(&m.storage_json) {
+                    Ok(s) => (
+                        Some(s.free_bytes.max(0) as u64),
+                        Some(s.used_bytes.max(0) as u64),
+                    ),
+                    Err(_) => (None, None), // unsampled node — skipped in aggregate
+                };
             let stewarded = stewarded_map.get(&m.custodian_id).copied();
-            CustodianRow { agent_cid: m.custodian_id, free, used, stewarded }
+            CustodianRow {
+                agent_cid: m.custodian_id,
+                free,
+                used,
+                stewarded,
+            }
         })
         .collect()
 }
