@@ -24,21 +24,26 @@ PREREQUISITE edges, `e413523ff`). A 2026-06-20 sweep found the rest of the surfa
 own careful task; do them as a focused cleanup sprint (NOT a blind bulk delete — `content_attestations`
 showed live consumers hide in unexpected paths).
 
-## A. More dropped-table-still-consumed bugs (same pattern, real migrations)
-Both DROPPED in migration `2026-05-12-100300` (applied via `embed_migrations`), still consumed:
-1. **`gate_decision_attestations`** — 8 files: `signals.rs`, `http.rs`, `db/gate_decision_attestations.rs`,
-   `db/mod.rs`, `db/governance.rs`, `db/models.rs`, `views_convert/qahal.rs`, `db/elohim_reputation.rs`.
-   Migrate consumers to the unified `attestations` / `governance_actions` projection (`GateDecisionAttestation`
-   → `attestation:gate-decision` per the design §6.2/§6.3), then delete the module/schema/models.
-2. **`statement_votes`** — 2 files. Migrate to the unified `governance_actions` child-vote model
-   (`attestation:statement-vote`), delete the dropped-table refs.
-   ⚠ Each: confirm live consumers (the `content_attestations` STOP-guard lesson) before deleting.
+## A. More dropped-table-still-consumed bugs — ✅ BOTH DONE (2026-06-20)
+Both DROPPED in migration `2026-05-12-100300`, still consumed → migrated onto the unified `attestations` table:
+1. **`gate_decision_attestations`** → `attestation:gate-decision` — ✅ DONE, commit `ce3ede44b`. Authoritative
+   mapping (design §3/§6.2/§7.4 + the live DNA bridge `create_gate_decision_attestation`); active WRITER
+   (`signals.rs`) + readers repointed; round-trip test (14 fields preserved); 39 tests pass; grep→0.
+2. **`statement_votes`** → `attestation:statement-vote` — ✅ DONE, commit `b281e0900`. Authoritative mapping
+   (live `create_statement_vote` bridge); latest-wins preserved (deterministic id `sv-{statement}-{voter}`);
+   the load-bearing recount side-effect kept; 5 round-trip tests + full `--lib` 1695 pass; grep→0.
 
-## B. Orphaned ts-rs view types (frontend blast radius)
-`ContentAttestation*View` types in `elohim/elohim-views/src/lamad.rs` — superseded by the unified
-attestation views but kept (ts-rs + Angular consumers). Retire: replace consumers with the unified
-`AttestationView`, regen ts (`cargo test export_bindings` + `schema:codegen:ts`), update the Angular
-imports. Deliberately deferred from the gate rebuild (out of scope).
+## B. `ContentAttestationView` retirement — OPEN (angular-architect task, NOT a quick deletion)
+`ContentAttestationView` (`elohim/elohim-views/src/lamad.rs:259`) feeds generated TS (`storage-client-ts`)
+AND a LIVE Angular surface — **not an orphan** (sized 2026-06-20): `ContentAttestationApiService`
+(`app/elohim-app/src/app/elohim/services/content-attestation-api.service.ts`, `implements IContentAttestation`,
+calls `/api/v1/attestations/*`) is registered in `app.config.ts`, exported from the `services/index.ts` barrel,
+and referenced across interfaces/models. **First determine live-vs-dead:** the gate rebuild deleted the
+`api/attestations.rs:105-186` content_attestations arms — are `/api/v1/attestations/*` still served by the
+unified attestation routes (→ this is a TYPE migration `ContentAttestationView`→`AttestationView`) or gone
+(→ retire the service + its consumers)? Then: regen ts (`cargo test export_bindings` + `schema:codegen:ts`),
+update the Angular service/interface/barrel/`app.config.ts` provider. Hand to **angular-architect** — real
+frontend blast radius, do NOT rush-delete (would break the app build).
 
 ## C. Removed-entry-type references to triage (~10 files)
 Storage files still referencing consolidated-away entry types (`HumanityWitness`, `KeyRevocation`,
@@ -48,6 +53,14 @@ Storage files still referencing consolidated-away entry types (`HumanityWitness`
 `reconcile/signal_stream.rs`. MIXED: some are genuinely stale; some are LEGIT recovery-in-progress
 (owned by `2026-05-15-recovery-m4-completion-shamir-optional-plan.md` — do NOT remove those). Triage
 per-file: stale → remove; recovery-owned → leave for the recovery plan.
+
+**TRIAGED 2026-06-20 → LEAVE (recovery-owned).** Every hit is `KeyRevocation`/`RevocationVote`/recovery-signal
+machinery (`epr_atom_service:291` `"KeyRevocation"=>`, `recovery_revocation`, `revocation_attestation_message`,
+`sweep`, `signal_stream`, `holochain_app_signal`, `write_through:211`; the non-recovery names land only in
+`recovery_witnesses.rs`/`signals.rs`/`models.rs` identity machinery). These are the active recovery/revocation
+path the **recovery-m4 plan owns and is itself migrating** (RecoveryRequest→`governance-action:recovery-request`,
+RecoveryVote→`attestation:recovery-approval`) — NOT stale dead-code for this sprint. §C = no action here;
+folds into recovery-m4. ✅ resolved (leave).
 
 ## D. Stale specs/plans to assess (per-doc)
 12 specs/plans mention old per-type attestation types (`grep ContentAttestation|HealthAttestation|
