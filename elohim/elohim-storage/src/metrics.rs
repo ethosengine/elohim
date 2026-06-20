@@ -69,6 +69,14 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Open shard-placement gaps (under-replicated shards) across the cluster weave.
+    /// Set by the operational-weave facing adapter; the fold is pure (never touches this gauge).
+    pub static ref ELOHIM_PLACEMENT_GAP_COUNT: IntGauge = IntGauge::new(
+        "elohim_placement_gap_count",
+        "Open shard-placement gaps (under-replicated shards) across the cluster weave",
+    )
+    .expect("valid gauge");
+
     /// Boot-time cgroup CPU quota in millicores (0 = unbounded/unknown).
     pub static ref NODE_CPU_QUOTA_MILLICORES: IntGauge = IntGauge::new(
         "elohim_node_cpu_quota_millicores",
@@ -175,6 +183,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_BUCKET_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CORPUS_DOCS.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
+        let _ = REGISTRY.register(Box::new(ELOHIM_PLACEMENT_GAP_COUNT.clone()));
     });
 }
 

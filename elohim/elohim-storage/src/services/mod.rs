@@ -60,6 +60,7 @@ pub mod hazard;
 pub mod holochain_humans_replayer;
 pub mod household_backfill;
 pub mod household_resilience;
+pub mod operational_weave_facing;
 pub mod hub_capacity_service;
 pub mod hub_resolver; // Wave 2 T2 — agent→hub resolver (CID-canonical, slug-alias, seed-compatible)
 pub mod imagodei_lookup; // Phase 4 T5 — display name resolver
