@@ -31,6 +31,19 @@ does NOT deploy — the edge alpha-deploy gate at `elohim/holochain/Jenkinsfile:
 **How to apply:** On a `sprint/*` shift, do NOT expect a CI fresh-trigger from your push and don't chase
 a "missing" orchestrator build as a webhook bug — it's by design (principle-7: no drift). Treat a clean
 independent LOCAL build/test as the numeric done signal and tee up the dev-merge as the operator's
-cross-trigger + deploy + render-validation step. Pushing a `claude/*` branch WOULD get real CI **and
-deploy to alpha** — but the edge deploy restarts the whole edge node (conductor+storage+doorway), a
-heavy cluster-domain action — don't do it unattended.
+cross-trigger + deploy + render-validation step.
+
+**CORRECTION (2026-06-17, empirically retested):** a `claude/*` push does **NOT** auto-deploy either —
+`{PR-*, dev}` (line 13) is the WHOLE indexed set, and `claude/*` ∉ it, so a `claude/*` push behaves
+exactly like `sprint/*`: webhook delivered, orchestrator never runs, no build, `[build:*]` tags inert.
+Verified this session — pushing `claude/fbootstrap-shakeout` spawned zero builds (ci-observer ×2 saw the
+orchestrator multibranch still listing only `[PR-211/212/213, dev]`; operator confirmed "pipelines
+quiet"), whereas the fast-forward to `dev` IMMEDIATELY spawned orchestrator #1270 → edge #1090
+(UpstreamCause). The earlier "`claude/*` WOULD deploy" belief conflated TWO different things: the edge
+*Deploy `when`-clause* matches `branch dev|feat-.+|claude/.+` (true — `elohim/holochain/Jenkinsfile`
+Deploy Edge Node stage), but that only fires once an edge build is **triggered**, which a `claude/*`
+push does not do. So the only real auto-deploy path for a feature is **land it on `dev`** (orchestrator-
+indexed → edge → alpha); otherwise it needs a manual `UserIdCause` edge build (operator-only; MCP
+`triggerBuild` is denied). NB: the alpha deploy restarts ALL conductor StatefulSets incl. the genesis
+pair — see [[project_edge_deploy_restarts_genesis_conductors]] (benign rolling restart, rejoins same
+DHT; only a force-reinstall re-keys).

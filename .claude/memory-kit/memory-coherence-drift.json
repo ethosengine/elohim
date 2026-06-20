@@ -2,14 +2,14 @@
   "schema_version": 1,
   "entries": {
     "project_local_stack_dht_anchor_gap": {
-      "hits": 11,
+      "hits": 24,
       "last_changed": "elohim/elohim-storage/src/db/rea_commitments.rs",
-      "last_signal_at": "2026-06-09T22:24:15Z"
+      "last_signal_at": "2026-06-19T14:20:17Z"
     },
     "project_resilience_snapshot_humans_junction": {
-      "hits": 3,
-      "last_changed": "elohim/elohim-storage/src/api/rea_commitments.rs",
-      "last_signal_at": "2026-06-06T21:39:34Z"
+      "hits": 39,
+      "last_changed": "elohim/elohim-storage/src/services/household_resilience.rs",
+      "last_signal_at": "2026-06-20T16:35:51Z"
     },
     "project_sprint_branch_not_orchestrator_indexed": {
       "hits": 5,
@@ -42,14 +42,14 @@
       "last_signal_at": "2026-06-10T00:39:05Z"
     },
     "project_ci_storage_topology": {
-      "hits": 3,
+      "hits": 4,
       "last_changed": "elohim/holochain/Jenkinsfile",
-      "last_signal_at": "2026-06-11T12:04:47Z"
+      "last_signal_at": "2026-06-16T00:29:43Z"
     },
     "feedback_diesel_migration_timestamp_collision": {
-      "hits": 3,
+      "hits": 6,
       "last_changed": "elohim/elohim-storage/src/db/mod.rs",
-      "last_signal_at": "2026-06-10T01:10:08Z"
+      "last_signal_at": "2026-06-20T21:24:07Z"
     },
     "project_sweettest_native_build_env": {
       "hits": 11,
@@ -57,14 +57,14 @@
       "last_signal_at": "2026-06-09T00:10:35Z"
     },
     "feedback_codegen_prettier_oscillation": {
-      "hits": 15,
+      "hits": 16,
       "last_changed": "elohim/sdk/schemas/scripts/codegen-ts.mjs",
-      "last_signal_at": "2026-06-11T00:17:23Z"
+      "last_signal_at": "2026-06-20T15:17:44Z"
     },
     "project_alpha_topology_bootstrap_pair": {
-      "hits": 1,
+      "hits": 3,
       "last_changed": "genesis/orchestrator/data/deployments.json",
-      "last_signal_at": "2026-06-10T11:50:57Z"
+      "last_signal_at": "2026-06-16T13:41:15Z"
     },
     "feedback_no_brittle_commands_in_poststart": {
       "hits": 1,
@@ -90,6 +90,21 @@
       "hits": 17,
       "last_changed": "app/elohim-elements/elohim-core/src/elohim-skeleton.spec.ts",
       "last_signal_at": "2026-06-11T04:39:59Z"
+    },
+    "project_devspace_disk_cleanup_procedure": {
+      "hits": 30,
+      "last_changed": "genesis/agentic/pool-policy.json",
+      "last_signal_at": "2026-06-20T23:51:34Z"
+    },
+    "project_rust_build_footprint_anatomy": {
+      "hits": 30,
+      "last_changed": "genesis/agentic/pool-policy.json",
+      "last_signal_at": "2026-06-20T23:51:34Z"
+    },
+    "feedback_deterministic_flag_agent_canon_stasis_pattern": {
+      "hits": 2,
+      "last_changed": ".claude/hooks/deprecation-sentinel.py",
+      "last_signal_at": "2026-06-20T21:48:57Z"
     }
   }
 }

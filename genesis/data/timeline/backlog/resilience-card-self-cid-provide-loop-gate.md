@@ -256,3 +256,46 @@ code bug. **No seeder code change is warranted for `commitmentBackedCollectives`
   unverified. The endpoint is ready when that policy is set. Self_cid derivation for the
   **iroh** backend (currently libp2p-only) is folded into the iroh transport sprint
   (see spec `node-resource-tunables-and-exhaustion-shape`, workstream A2).
+
+## Reconciliation 2026-06-18 — CONTRADICTION FLAGGED (do not silently override; one probe settles it)
+
+A fresh root-cause triage of the genesis seed stages + this card
+(`.claude/data/genesis-seed-stages-rca-2026-06-18.md` /
+`genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md`,
+advisor-reviewed) reaches a verdict that **contradicts the 2026-06-15 conclusion above**
+for `commitmentBackedCollectives`. Stating both honestly — the operator (who has the
+cluster-read this triage lacks) decides:
+
+- **This doc (2026-06-15) says:** deploy+reseed `dev` → alpha is the whole lever; *"No
+  seeder code change is warranted for commitmentBackedCollectives,"* on the stated identity
+  contract that **`humans.agent_pub_key` is "set by conductor identity seeder +
+  MembershipProjected signal."**
+- **The 2026-06-18 triage says (primary-source, code-static + CI-empirical):**
+  `humans.agent_pub_key` is written by **nothing** except the seeder heal
+  (`POST /identity/heal` → `humans::heal_human_identity`, `api/identity.rs:149`), which is
+  gated on `GET /auth/me` returning the key. Verified counter-evidence to the identity
+  contract: `on_membership_projected` (`reconcile/controller.rs:1105-1114`) `.set(`s **only
+  `household_id`**, never `agent_pub_key`; the conductor identity seeder
+  (`seed-conductor-identities.ts`) does a DHT zome call, not a storage write. And `/auth/me`
+  needs a `LocalSession` (`http.rs:7385`) that **no genesis/seed/boot path creates on a
+  server pod** (no `POST /session` in seeding, no boot self-session in `main.rs`, portal
+  handoff is browser/Tauri-only) — genesis builds #1170-1172 show `/auth/me → 401` ("pod has
+  no local session"). On this reading the column stays dark **even after a healthy reseed**,
+  because the heal step always skips → `agent_pub_key` stays NULL → the join is empty.
+
+- **The single discriminating test (operator-owned — settles it):** after the conductor
+  leak fix is deployed to alpha and a reseed runs, `GET /auth/me` on a healthy pod (e.g.
+  matthew's `elohim-storage`):
+  - **HTTP 200 with an `agentPubKey`** → THIS doc is right; it is leak-dependent (the heal
+    path works once the conductor is healthy); no code change needed; flip this item resolved.
+  - **HTTP 401** → the 2026-06-18 structural finding is right; a session/key-population path
+    must be added (boot self-session from the conductor *cell* `agent_pub_key` via
+    cell_discovery — note `self_cid` is the *transport* id `12D3Koo`, NOT the `uhCAk`
+    agent_cid — or a seeder `POST /session`).
+- **Either way, do NOT auto-build the fix.** A boot self-session minted from the cell key
+  asserts "this pod IS human-X" *bypassing* the TOFU/portal-handoff trust check; the storage
+  gospel forbids consuming the self-asserted agent↔transport binding for **economic
+  attribution** (the commitment-backed column IS economic attribution) until a cross-signed
+  control proof lands — see the blocked
+  `2026-06-15-coherent-transport-identity-resolver-design.md`. This item carries a
+  p2p-design-gate; it is operator/security-owned, not an autonomous repo fix.

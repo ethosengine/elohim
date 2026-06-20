@@ -300,6 +300,20 @@ both, staged:**
 4. Read the card → expect **count=2**. If count=1 holds but =2 doesn't, the failure is localized to the
    adam cell-readiness / session / seed-humans path — cleanly separated from Sprint 1.
 
+> **✅/⚠ RUN OUTCOME (2026-06-19, integration push `88b3e49b4` → orchestrator #1280 → edge #1097 → genesis
+> #1178).** Staged diagnostic resolved exactly as designed: **count went 0 → 1** on the live card after the
+> edge deploy (Sprint 1 verified in production, no reseed). **count did NOT reach 2** — and the cause is the
+> watch-item below, materialized: **adam's conductor cell is persistently `CellDisabled`** (same `CellId`
+> across 3 genesis #1178 seed stages; adam's conductor process is up — TCP 4444 reachable, binary `88b3e49`
+> = jemalloc-prod deployed, connectedPeers=13 — but the app cell won't enable). So adam's `/auth/me → 401`,
+> seed-provide-rows **SKIPPED adam** (`created=1 exists=1 skipped=1`), and the self-heal self-insert produced
+> **zero log lines** (it's gated on `connect_role_forever`, which waits out `CellDisabled` and never returns).
+> **Sprint 2 code is correct but cannot fire while adam's cell is disabled.** The fix target is adam's
+> cell-enable — the **conductor-leak / deploy domain** (not this storage plan). Once adam's cell is healthy,
+> count=2 is mechanical: self-insert at next boot → session → re-seed. genesis #1178's UNSTABLE was E2E/BDD
+> failures (100 steps), not the seed stages. (jessica unexpectedly sessionable but she is dowell → no count
+> change.)
+
 > **⚠ Deploy watch-item (cell-readiness timing — the gap between "tests green" and "card reads 2").** The
 > self-heal fires only once adam's infrastructure cell **enables**: `connect_role_forever` retries until
 > `HcClient::connect` succeeds (`hc_client_registry.rs:189` — "cells may still be CellDisabled"), THEN the

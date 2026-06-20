@@ -12,14 +12,14 @@ FAIR-GAME subjects (14) — no narrowing, everything in focus:
 NARROWED subjects (3) — a capability is down; focus + options per subject:
 
 ### delivery   ⚠ narrowed — alpha-cluster-6peer down
-  IN FOCUS  : 9 live feature(s), fully testable on available compute
+  IN FOCUS  : 10 live feature(s), fully testable on available compute
               · genesis/a2o/features/delivery/acquisition-pins.feature
               · genesis/a2o/features/delivery/client-resilience.feature
               · genesis/a2o/features/delivery/content-addressing.feature
               · genesis/a2o/features/delivery/delivery-diagnostics.feature
+              · genesis/a2o/features/delivery/happ-coordinator-delivery.feature
               · genesis/a2o/features/delivery/landing-page.feature
-              · genesis/a2o/features/delivery/peer-mesh.feature
-              · … +3 more
+              · … +4 more
   MIXED     : spa-bundle-delivery.feature — 2 scenario(s) need alpha-cluster-6peer (runtime-skipped, NOT failed)
   WHY       : alpha-cluster-6peer unavailable — 6-peer alpha soak cluster (adam+matthew bootstrap pair)
   OPTIONS   : (a) work the in-focus + any household scenarios now  (b) expand the plate: scope-reconcile.py --set alpha-cluster-6peer=on --apply  (c) pivot to a fair-game subject
@@ -37,11 +37,14 @@ NARROWED subjects (3) — a capability is down; focus + options per subject:
   BASELINE/PIVOT: /shift or /brainstorm scoped to elohim's in-focus slice; to pivot, pick a FAIR-GAME subject above
 
 ### federation   ⚠ narrowed — alpha-cluster-6peer down
-  IN FOCUS  : 4 live feature(s), fully testable on available compute
+  IN FOCUS  : 8 live feature(s), fully testable on available compute
               · genesis/a2o/features/federation/cross-doorway-content.feature
+              · genesis/a2o/features/federation/doorway-pool-degrade.feature
               · genesis/a2o/features/federation/epr-cross-peer-resolution.feature
               · genesis/a2o/features/federation/peer-advertisement.feature
-              · genesis/a2o/features/federation/shard-tracking.feature
+              · genesis/a2o/features/federation/peer-loss-failover.feature
+              · genesis/a2o/features/federation/peer-recovery.feature
+              · … +2 more
   HELD      : federation/cross-mesh-discovery.feature — needs alpha-cluster-6peer · returns when alpha-cluster-6peer available
   WHY       : alpha-cluster-6peer unavailable — 6-peer alpha soak cluster (adam+matthew bootstrap pair)
   OPTIONS   : (a) work the in-focus + any household scenarios now  (b) expand the plate: scope-reconcile.py --set alpha-cluster-6peer=on --apply  (c) pivot to a fair-game subject
