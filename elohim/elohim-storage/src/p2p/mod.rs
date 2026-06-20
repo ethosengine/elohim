@@ -532,6 +532,13 @@ pub struct P2PNode {
     acquisition_queue: ReplicationGapQueue,
     /// Extraction cache for delivery capability advertisement
     extraction_cache: Option<Arc<ExtractionCache>>,
+    /// Content graph engine (graph-native feature). Threaded into the
+    /// per-request [`Self::epr_service`] snapshot so the libp2p read path
+    /// enforces the prerequisite-mastery gate (via `PREREQUISITE` edges) and
+    /// enriches EPR-head display — identical to the iroh + HTTP paths.
+    /// `None` (no graph) → prerequisite gate is a no-op (allow).
+    #[cfg(feature = "graph-native")]
+    graph_engine: Option<Arc<crate::graph::engine::GraphEngine>>,
     /// Discovered peers with delivery capabilities (populated from mDNS + identify)
     delivery_peers: Arc<DashMap<String, DeliveryPeer>>,
     /// Cached identify info per peer (populated from identify::Event::Received)
@@ -1787,6 +1794,8 @@ impl P2PNode {
             )),
             acquisition_queue: Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new())),
             extraction_cache: None,
+            #[cfg(feature = "graph-native")]
+            graph_engine: None,
             delivery_peers: Arc::new(DashMap::new()),
             identify_cache: Arc::new(DashMap::new()),
             peer_metrics: Arc::new(DashMap::new()),
@@ -1820,6 +1829,19 @@ impl P2PNode {
                 commitment_fetch_concurrency,
             )),
         })
+    }
+
+    /// Attach the content graph engine so the libp2p EPR read path enforces the
+    /// prerequisite-mastery gate (via `PREREQUISITE` edges) and enriches
+    /// EPR-head display. Threaded into the per-request [`Self::epr_service`]
+    /// snapshot. `None` → prerequisite gate is a no-op (allow).
+    #[cfg(feature = "graph-native")]
+    pub fn with_graph_engine(
+        mut self,
+        graph_engine: Option<Arc<crate::graph::engine::GraphEngine>>,
+    ) -> Self {
+        self.graph_engine = graph_engine;
+        self
     }
 
     /// Set the database pool for EPR Head construction and peer identity lookup.
@@ -6434,12 +6456,15 @@ impl P2PNode {
     /// Used by [`Self::handle_epr_request`] to delegate read-side variants
     /// and by the iroh-mode adapter to share authorization logic.
     pub(crate) fn epr_service(&self) -> crate::epr_service::EprService {
-        crate::epr_service::EprService::new(
+        let svc = crate::epr_service::EprService::new(
             self.db_pool.clone(),
             self.policy_enforcement.clone(),
             self.extraction_cache.clone(),
             self.peer_trust_cache.clone(),
-        )
+        );
+        #[cfg(feature = "graph-native")]
+        let svc = svc.with_graph_engine(self.graph_engine.clone());
+        svc
     }
 
     /// Snapshot the EPR-atom-relevant deps into a transport-neutral

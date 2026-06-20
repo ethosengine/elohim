@@ -739,23 +739,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    content_attestations (id) {
-        id -> Text,
-        content_id -> Text,
-        attestor_presence_id -> Text,
-        scope -> Text,
-        attestation_type -> Text,
-        evidence -> Nullable<Text>,
-        grantor -> Nullable<Text>,
-        is_revoked -> Integer,
-        revocation -> Nullable<Text>,
-        created_at -> Text,
-        updated_at -> Text,
-        dht_anchor_hash -> Nullable<Text>,
-    }
-}
-
-diesel::table! {
     steward_affinity (id) {
         id -> Text,
         h_app_id -> Text,
@@ -1830,7 +1813,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     collective_participations,
     collectives,
     content,
-    content_attestations,
     content_mastery,
     content_tags,
     contributor_dashboards,

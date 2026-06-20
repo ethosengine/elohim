@@ -1547,6 +1547,97 @@ async fn async_main(
     let projection_reconcile_state =
         elohim_storage::p2p::projection_reconcile::ProjectionReconcileState::new();
 
+    // Graph engine init (graph-native feature). Opens CozoDB sled instance at
+    // storage_dir/graph.db, applies core schema, then applies any graph extensions
+    // declared in pillar manifest.json files. Failures are non-fatal — projection
+    // is skipped gracefully and the node continues serving relational views.
+    //
+    // Constructed here (outer scope, BEFORE P2PNode / iroh EprService / HttpServer)
+    // so all three EPR read paths share the SAME engine Arc and the
+    // prerequisite-mastery access gate enforces identically on every transport.
+    #[cfg(feature = "graph-native")]
+    let graph_engine_arc: Option<std::sync::Arc<elohim_storage::graph::engine::GraphEngine>> = {
+        use elohim_storage::graph::engine::GraphEngine;
+        use elohim_storage::graph::registry::{apply_graph_extension, GraphExtension};
+        use elohim_storage::graph::schema::apply_core_schema;
+
+        let graph_db_path = config.storage_dir.join("graph.db");
+        match GraphEngine::open(&graph_db_path) {
+            Ok(eng) => {
+                if let Err(e) = apply_core_schema(&eng) {
+                    tracing::warn!(
+                        error = %e,
+                        "graph schema apply failed; graph projection disabled"
+                    );
+                    None
+                } else {
+                    // Apply graph extensions from pillar manifests on disk.
+                    // Same manifest_dir as write-through layer-1 loader.
+                    let manifest_dir = std::env::var("ELOHIM_PILLAR_MANIFEST_DIR")
+                        .map(std::path::PathBuf::from)
+                        .unwrap_or_else(|_| std::path::PathBuf::from("elohim/sdk/domains"));
+
+                    if let Ok(entries) = std::fs::read_dir(&manifest_dir) {
+                        for entry in entries.flatten() {
+                            let pillar_name = entry.file_name().to_string_lossy().to_string();
+                            let manifest_path = entry.path().join("manifest.json");
+                            if !manifest_path.exists() {
+                                continue;
+                            }
+                            let Ok(body) = std::fs::read_to_string(&manifest_path) else {
+                                continue;
+                            };
+                            let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) else {
+                                continue;
+                            };
+                            if let Some(graph_val) = json.get("graph") {
+                                match serde_json::from_value::<GraphExtension>(graph_val.clone()) {
+                                    Ok(ext) => {
+                                        if let Err(e) =
+                                            apply_graph_extension(&eng, &pillar_name, &ext)
+                                        {
+                                            tracing::warn!(
+                                                pillar = %pillar_name,
+                                                error = %e,
+                                                "graph extension apply failed; pillar rules skipped"
+                                            );
+                                        } else {
+                                            info!(
+                                                pillar = %pillar_name,
+                                                "graph extension applied from manifest"
+                                            );
+                                        }
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            pillar = %pillar_name,
+                                            error = %e,
+                                            "graph extension parse failed; pillar rules skipped"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    info!(
+                        path = ?graph_db_path,
+                        "graph-native: GraphEngine opened + core schema applied"
+                    );
+                    Some(std::sync::Arc::new(eng))
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    path = ?graph_db_path,
+                    error = %e,
+                    "graph engine open failed; graph projection disabled"
+                );
+                None
+            }
+        }
+    };
+
     // Initialize P2P node if enabled.
     // Gated on `transport_backend == Libp2p` so the iroh path can take over
     // the P2P slot when selected (the two stacks are mutually exclusive at
@@ -1652,6 +1743,14 @@ async fn async_main(
                 p2p_node = p2p_node.with_policy_enforcement(enforcement);
                 info!("  P2P EPR resolution: DB pool + policy enforcement wired");
             }
+        }
+
+        // Wire the content graph engine so the libp2p EPR read path enforces the
+        // prerequisite-mastery gate (via PREREQUISITE edges) identically to the
+        // iroh + HTTP paths. Shares the one process-wide engine Arc.
+        #[cfg(feature = "graph-native")]
+        {
+            p2p_node = p2p_node.with_graph_engine(graph_engine_arc.clone());
         }
 
         // Surface the P1 projection-reconcile status on /p2p/status. The sweep
@@ -1857,12 +1956,17 @@ async fn async_main(
                 policy_cache,
             ))
         });
-        let epr_service = Arc::new(EprService::new(
+        let epr_service = EprService::new(
             epr_db_pool,
             epr_policy,
             extraction_cache.clone(),
             PeerTrustCache::new(),
-        ));
+        );
+        // Share the one process-wide graph engine Arc so the iroh EPR read path
+        // enforces the prerequisite-mastery gate identically to libp2p + HTTP.
+        #[cfg(feature = "graph-native")]
+        let epr_service = epr_service.with_graph_engine(graph_engine_arc.clone());
+        let epr_service = Arc::new(epr_service);
         let epr_backend: Arc<dyn elohim_storage::p2p_iroh::EprBackend> =
             Arc::new(EprServiceBackend::new(epr_service));
         let epr_handler = IrohEprProtocol::new(epr_backend);
@@ -2131,6 +2235,15 @@ async fn async_main(
         .with_write_through_state(write_through_state.clone())
         // T17: race-fetch parameters (timeout, parallelism, self-CID).
         .with_fetch_config(&config);
+
+    // Wire the content graph engine so the HTTP prerequisite-mastery gate
+    // enforces via PREREQUISITE edges — the SAME shared gate the P2P paths use.
+    // Dedicated wiring (not via fan_out_ctx) so the gate enforces even in
+    // direct/Tauri single-user mode where no P2P swarm exists.
+    #[cfg(feature = "graph-native")]
+    {
+        http_server = http_server.with_graph_engine(graph_engine_arc.clone());
+    }
 
     // Transport-identity seam — lets `/p2p/status` report the active transport's
     // peerId (iroh mode) instead of 503, so the resilience join works on iroh.
@@ -2483,97 +2596,10 @@ async fn async_main(
             Some(bytes)
         };
 
-        // Graph engine init (graph-native feature). Opens CozoDB sled instance at
-        // storage_dir/graph.db, applies core schema, then applies any graph extensions
-        // declared in pillar manifest.json files. Failures are non-fatal — projection
-        // is skipped gracefully and the node continues serving relational views.
-        #[cfg(feature = "graph-native")]
-        let graph_engine_arc: Option<
-            std::sync::Arc<elohim_storage::graph::engine::GraphEngine>,
-        > = {
-            use elohim_storage::graph::engine::GraphEngine;
-            use elohim_storage::graph::registry::{apply_graph_extension, GraphExtension};
-            use elohim_storage::graph::schema::apply_core_schema;
-
-            let graph_db_path = config.storage_dir.join("graph.db");
-            match GraphEngine::open(&graph_db_path) {
-                Ok(eng) => {
-                    if let Err(e) = apply_core_schema(&eng) {
-                        tracing::warn!(
-                            error = %e,
-                            "graph schema apply failed; graph projection disabled"
-                        );
-                        None
-                    } else {
-                        // Apply graph extensions from pillar manifests on disk.
-                        // Same manifest_dir as write-through layer-1 loader.
-                        let manifest_dir = std::env::var("ELOHIM_PILLAR_MANIFEST_DIR")
-                            .map(std::path::PathBuf::from)
-                            .unwrap_or_else(|_| std::path::PathBuf::from("elohim/sdk/domains"));
-
-                        if let Ok(entries) = std::fs::read_dir(&manifest_dir) {
-                            for entry in entries.flatten() {
-                                let pillar_name = entry.file_name().to_string_lossy().to_string();
-                                let manifest_path = entry.path().join("manifest.json");
-                                if !manifest_path.exists() {
-                                    continue;
-                                }
-                                let Ok(body) = std::fs::read_to_string(&manifest_path) else {
-                                    continue;
-                                };
-                                let Ok(json) = serde_json::from_str::<serde_json::Value>(&body)
-                                else {
-                                    continue;
-                                };
-                                if let Some(graph_val) = json.get("graph") {
-                                    match serde_json::from_value::<GraphExtension>(
-                                        graph_val.clone(),
-                                    ) {
-                                        Ok(ext) => {
-                                            if let Err(e) =
-                                                apply_graph_extension(&eng, &pillar_name, &ext)
-                                            {
-                                                tracing::warn!(
-                                                    pillar = %pillar_name,
-                                                    error = %e,
-                                                    "graph extension apply failed; pillar rules skipped"
-                                                );
-                                            } else {
-                                                info!(
-                                                    pillar = %pillar_name,
-                                                    "graph extension applied from manifest"
-                                                );
-                                            }
-                                        }
-                                        Err(e) => {
-                                            tracing::warn!(
-                                                pillar = %pillar_name,
-                                                error = %e,
-                                                "graph extension parse failed; pillar rules skipped"
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        info!(
-                            path = ?graph_db_path,
-                            "graph-native: GraphEngine opened + core schema applied"
-                        );
-                        Some(std::sync::Arc::new(eng))
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        path = ?graph_db_path,
-                        error = %e,
-                        "graph engine open failed; graph projection disabled"
-                    );
-                    None
-                }
-            }
-        };
+        // Graph engine constructed earlier at outer scope (see
+        // `graph_engine_arc` near the P2P-node init) so the libp2p P2PNode, the
+        // iroh EprService, and the HttpServer prerequisite gate all share the
+        // SAME engine Arc. Re-clone here for the fan-out projection context.
 
         let fan_out_ctx = Arc::new(EprFanOutCtx {
             manifest_registry,
@@ -2585,7 +2611,7 @@ async fn async_main(
             local_pubkey,
             standing_policy_cid,
             #[cfg(feature = "graph-native")]
-            graph_engine: graph_engine_arc,
+            graph_engine: graph_engine_arc.clone(),
         });
 
         http_server = http_server.with_fan_out_ctx(fan_out_ctx);

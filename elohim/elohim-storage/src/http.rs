@@ -243,6 +243,16 @@ pub struct HttpServer {
     blob_iroh_served_count: Arc<std::sync::atomic::AtomicU64>,
     /// Counter — number of `GET /blob` requests served from libp2p.
     blob_libp2p_served_count: Arc<std::sync::atomic::AtomicU64>,
+    /// Content graph engine (graph-native feature). When present, the HTTP
+    /// prerequisite-mastery access gate enforces via `PREREQUISITE` edges
+    /// (`*epr_edge{rel_type: 'PREREQUISITE'}`), mirroring the P2P gate in
+    /// `EprService`. Wired at startup via [`HttpServer::with_graph_engine`].
+    /// `None` (no graph, tests) makes the prerequisite gate a no-op (allow).
+    /// NOTE: this is a DEDICATED field, not reached through `fan_out_ctx` —
+    /// `fan_out_ctx` is `None` in direct/Tauri (:8090) single-user mode where
+    /// the HTTP gate is the only gate; piggybacking would silently fail-open.
+    #[cfg(feature = "graph-native")]
+    graph_engine: Option<Arc<crate::graph::engine::GraphEngine>>,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -412,6 +422,8 @@ impl HttpServer {
             node_transport: None,
             blob_iroh_served_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             blob_libp2p_served_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            #[cfg(feature = "graph-native")]
+            graph_engine: None,
         }
     }
 
@@ -524,6 +536,20 @@ impl HttpServer {
     /// require missing dependencies are skipped gracefully.
     pub fn with_fan_out_ctx(mut self, ctx: Arc<crate::api::epr::EprFanOutCtx>) -> Self {
         self.fan_out_ctx = Some(ctx);
+        self
+    }
+
+    /// Wire the content graph engine so the HTTP prerequisite-mastery gate can
+    /// enforce via `PREREQUISITE` edges (mirrors the P2P gate in `EprService`).
+    /// Dedicated wiring (NOT via `fan_out_ctx`) so the gate enforces even in
+    /// direct/Tauri single-user mode where no P2P swarm — and thus no
+    /// `fan_out_ctx` — exists.
+    #[cfg(feature = "graph-native")]
+    pub fn with_graph_engine(
+        mut self,
+        graph_engine: Option<Arc<crate::graph::engine::GraphEngine>>,
+    ) -> Self {
+        self.graph_engine = graph_engine;
         self
     }
 
@@ -4683,70 +4709,39 @@ impl HttpServer {
                         }
                     }
 
-                    // Layer 2: Attestation gate — prerequisite mastery check
-                    // EPR Heads (discovery) flow freely; body access may require attestations
-                    if let Some(ref agent) = Self::extract_agent_id(&req) {
+                    // Layer 2: Prerequisite-mastery gate — EPR Heads (discovery)
+                    // flow freely; body access requires mastery of every direct
+                    // PREREQUISITE of this content. The requirement is a content
+                    // graph edge (*epr_edge{rel_type:'PREREQUISITE'}); this path
+                    // calls the SAME shared gate as the P2P path
+                    // (`epr_service::check_prerequisite_mastery`) so the two can
+                    // never drift. No graph engine (tests) → no-op allow.
+                    #[cfg(feature = "graph-native")]
+                    if let (Some(ref agent), Some(ref graph)) =
+                        (Self::extract_agent_id(&req), &self.graph_engine)
+                    {
                         if let Ok(mut att_conn) = self.get_conn() {
-                            let attestations =
-                                crate::db::content_attestations::query_attestations_for_content(
+                            let app_ctx = db::AppContext::default_lamad();
+                            if let Ok(Some(human)) =
+                                crate::db::humans::get_human_by_agent_key(&mut att_conn, agent)
+                            {
+                                if crate::epr_service::check_prerequisite_mastery(
+                                    graph,
                                     &mut att_conn,
+                                    &app_ctx,
+                                    &human.id,
                                     content_id,
-                                );
-                            if let Ok(atts) = attestations {
-                                let prereq_atts: Vec<_> = atts
-                                    .iter()
-                                    .filter(|a| {
-                                        a.attestation_type == "prerequisite-mastery"
-                                            && a.is_revoked == 0
-                                    })
-                                    .collect();
-
-                                if !prereq_atts.is_empty() {
-                                    // Requester must have mastery of the prerequisite content
-                                    let app_ctx = db::AppContext::default_lamad();
-                                    let human = crate::db::humans::get_human_by_agent_key(
-                                        &mut att_conn,
-                                        agent,
-                                    );
-                                    if let Ok(Some(human)) = human {
-                                        let mut has_all_prereqs = true;
-                                        for prereq in &prereq_atts {
-                                            // The prereq's content_id is the prerequisite content
-                                            // evidence field stores the prerequisite content ID
-                                            let prereq_content_id = prereq
-                                                .evidence
-                                                .as_deref()
-                                                .unwrap_or(&prereq.content_id);
-                                            let mastery =
-                                                crate::db::content_mastery::get_mastery_for_content(
-                                                    &mut att_conn,
-                                                    &app_ctx,
-                                                    &human.id,
-                                                    prereq_content_id,
-                                                );
-                                            match mastery {
-                                                Ok(Some(m)) if m.mastery_level != "not_started" => {
-                                                }
-                                                _ => {
-                                                    has_all_prereqs = false;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        if !has_all_prereqs {
-                                            return Ok(Response::builder()
-                                                .status(StatusCode::FORBIDDEN)
-                                                .header(
-                                                    header::CONTENT_TYPE,
-                                                    "application/json",
-                                                )
-                                                .body(Full::new(Bytes::from(format!(
-                                                    r#"{{"error":"Prerequisite mastery required","contentId":"{}"}}"#,
-                                                    content_id
-                                                ))))
-                                                .unwrap());
-                                        }
-                                    }
+                                )
+                                .is_err()
+                                {
+                                    return Ok(Response::builder()
+                                        .status(StatusCode::FORBIDDEN)
+                                        .header(header::CONTENT_TYPE, "application/json")
+                                        .body(Full::new(Bytes::from(format!(
+                                            r#"{{"error":"Prerequisite mastery required","contentId":"{}"}}"#,
+                                            content_id
+                                        ))))
+                                        .unwrap());
                                 }
                             }
                         }
@@ -10988,32 +10983,10 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
-        // /api/v1/attestations — Contributor attestations
-        // =====================================================================
-        .route(
-            Route::get("/api/v1/attestations")
-                .handler("list_attestations")
-                .cache_ttl(300)
-                .build(),
-        )
-        .route(
-            Route::post("/api/v1/attestations")
-                .handler("create_attestation")
-                .auth_required()
-                .build(),
-        )
-        .route(
-            Route::post("/api/v1/attestations/{id}/revoke")
-                .handler("revoke_attestation")
-                .auth_required()
-                .build(),
-        )
-        .route(
-            Route::get("/api/v1/attestations/{id}")
-                .handler("get_attestation")
-                .cache_ttl(300)
-                .build(),
-        )
+        // /api/v1/attestations — legacy content-attestation routes REMOVED.
+        // The content-attestations table was dropped (Phase-2a consolidation);
+        // prerequisite requirements are now PREREQUISITE content-graph edges and
+        // the Category-A DHT projection is served by the /unified routes below.
         // =====================================================================
         // /api/v1/attestations/unified — Unified attestation projection (Category A, DHT)
         // =====================================================================

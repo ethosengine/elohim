@@ -6,20 +6,20 @@
 use elohim_views::shared::{parse_json, parse_json_opt};
 use elohim_views::{
     AppealView, AttestationView, ChallengeOutcomeView, ChallengeView, CollectiveParticipationView,
-    CollectiveView, ContentAttestationView, DiscussionView, GateDecisionAttestationView,
-    GateDecisionChallengeView, GovernanceActionTallyView, GovernanceActionView,
-    GovernanceDispositionView, GovernanceSignalView, GovernanceStateView, PrecedentView,
-    ProposalOptionView, ProposalView, RankedVoteView, StatementView, StatementVoteView, VoteView,
+    CollectiveView, DiscussionView, GateDecisionAttestationView, GateDecisionChallengeView,
+    GovernanceActionTallyView, GovernanceActionView, GovernanceDispositionView,
+    GovernanceSignalView, GovernanceStateView, PrecedentView, ProposalOptionView, ProposalView,
+    RankedVoteView, StatementView, StatementVoteView, VoteView,
 };
 
 use crate::db::challenge_outcomes::ChallengeOutcomeRow;
 use crate::db::gate_decision_attestations::GateDecisionAttestationRow;
 use crate::db::gate_decision_challenges::GateDecisionChallengeRow;
 use crate::db::models::{
-    Appeal, AttestationRow, Challenge, Collective, CollectiveParticipation, ContentAttestation,
-    Discussion, GovernanceActionRow, GovernanceActionTallyRow, GovernanceDisposition,
-    GovernanceSignal, GovernanceState, Precedent, Proposal, ProposalOption, RankedVote, Statement,
-    StatementVote, Vote,
+    Appeal, AttestationRow, Challenge, Collective, CollectiveParticipation, Discussion,
+    GovernanceActionRow, GovernanceActionTallyRow, GovernanceDisposition, GovernanceSignal,
+    GovernanceState, Precedent, Proposal, ProposalOption, RankedVote, Statement, StatementVote,
+    Vote,
 };
 
 // ============================================================================
@@ -321,29 +321,6 @@ impl From<GovernanceDisposition> for GovernanceDispositionView {
             last_computed_at: d.last_computed_at,
             created_at: d.created_at,
             updated_at: d.updated_at,
-        }
-    }
-}
-
-// ============================================================================
-// Attestation Views (content-level attestations)
-// ============================================================================
-
-impl From<ContentAttestation> for ContentAttestationView {
-    fn from(c: ContentAttestation) -> Self {
-        Self {
-            id: c.id,
-            content_id: c.content_id,
-            attestor_presence_id: c.attestor_presence_id,
-            scope: c.scope,
-            attestation_type: c.attestation_type,
-            evidence: parse_json_opt(&c.evidence),
-            grantor: parse_json_opt(&c.grantor),
-            is_revoked: c.is_revoked == 1,
-            revocation: parse_json_opt(&c.revocation),
-            created_at: c.created_at,
-            updated_at: c.updated_at,
-            dht_anchor_hash: c.dht_anchor_hash,
         }
     }
 }

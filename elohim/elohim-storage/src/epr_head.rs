@@ -30,11 +30,14 @@
 //! When `true`, the helper issues additional queries to populate:
 //!
 //! - `shefa.stewards` / `shefa.allocations` — from `stewardship_allocations`
-//! - `qahal.attestation_requirements` — from `content_attestations`
 //!
-//! The HTTP handler leaves both empty (no enrichment needed for the public
-//! metadata surface). The P2P handler enriches them so peers receive full
-//! governance context alongside the content envelope.
+//! The HTTP handler leaves shefa empty (no enrichment needed for the public
+//! metadata surface). The P2P handler enriches it so peers receive full
+//! stewardship context alongside the content envelope.
+//!
+//! `qahal.attestation_requirements` is populated downstream (not here) from
+//! `PREREQUISITE` content-graph edges by the enrich=true caller, which holds
+//! the graph engine; this helper stays diesel-only.
 //!
 //! ## Future work — projector-derived contexts (Phase 4)
 //!
@@ -121,33 +124,18 @@ pub fn derive_epr_head(
     };
 
     // ── Qahal — governance pillar ───────────────────────────────────────────
-    let qahal = if enrich_pillars {
-        let mut attestation_requirements = Vec::new();
-        if let Ok(atts) =
-            db::content_attestations::query_attestations_for_content(conn, &content.id)
-        {
-            for att in &atts {
-                if att.is_revoked == 0 {
-                    let req = if let Some(ref evidence) = att.evidence {
-                        format!("{}:{}", att.attestation_type, evidence)
-                    } else {
-                        att.attestation_type.clone()
-                    };
-                    attestation_requirements.push(req);
-                }
-            }
-        }
-        EprQahalContext {
-            reach: Some(content.reach.clone()),
-            layer: None,
-            attestation_requirements,
-        }
-    } else {
-        EprQahalContext {
-            reach: Some(content.reach.clone()),
-            layer: None,
-            attestation_requirements: vec![],
-        }
+    //
+    // `attestation_requirements` is left empty here. The prerequisite
+    // requirement now lives as `PREREQUISITE` content-graph edges, not the
+    // (dropped) content-attestations table. The single enrich=true caller
+    // (`EprService::resolve_epr_head_locally`) holds the graph engine and fills
+    // this field from `query_direct_prerequisites` after derivation, preserving
+    // the legacy wire shape `"prerequisite-mastery:{prereq_id}"`. This helper
+    // stays diesel-only (no graph dependency) for the HTTP enrich=false path.
+    let qahal = EprQahalContext {
+        reach: Some(content.reach.clone()),
+        layer: None,
+        attestation_requirements: vec![],
     };
 
     Ok(Some(EprHead {

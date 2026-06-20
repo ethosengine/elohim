@@ -15,10 +15,10 @@ use ts_rs::TS;
 use super::diesel_schema::{
     access_grants, acquisition_pins, agreements, appeals, apps, challenges,
     collective_participations, collectives, comments, concentration_snapshots, content,
-    content_attestations, content_mastery, content_tags, contributor_dashboards,
-    contributor_presences, custodian_metrics, custodian_shares, device_policies, discussions,
-    economic_events, enum_registry, governance_dispositions, governance_signals, governance_states,
-    hazards, human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
+    content_mastery, content_tags, contributor_dashboards, contributor_presences,
+    custodian_metrics, custodian_shares, device_policies, discussions, economic_events,
+    enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
+    human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
     local_sessions, mishpat_commitments, mutuality_audit_log, node_stewardship,
     observation_diversity_summary, observation_entries, observation_sessions, observations,
     peer_blob_inventory, peer_identity_bindings, peer_inventory_cursor, placement_gaps, places,
@@ -1715,42 +1715,11 @@ pub struct NewGovernanceDisposition<'a> {
 }
 
 // ============================================================================
-// Content Attestation Models
-// ============================================================================
-
-/// Content attestation row from SELECT query
-#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
-#[diesel(table_name = content_attestations)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-pub struct ContentAttestation {
-    pub id: String,
-    pub content_id: String,
-    pub attestor_presence_id: String,
-    pub scope: String,
-    pub attestation_type: String,
-    pub evidence: Option<String>,
-    pub grantor: Option<String>,
-    pub is_revoked: i32,
-    pub revocation: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    /// Source of truth: DHT (Attestation entry in imagodei DNA). Classification: A (Notarized).
-    pub dht_anchor_hash: Option<String>,
-}
-
-/// New content attestation for INSERT
-#[derive(Debug, Clone, Insertable)]
-#[diesel(table_name = content_attestations)]
-pub struct NewContentAttestation<'a> {
-    pub id: &'a str,
-    pub content_id: &'a str,
-    pub attestor_presence_id: &'a str,
-    pub scope: &'a str,
-    pub attestation_type: &'a str,
-    pub evidence: Option<&'a str>,
-    pub grantor: Option<&'a str>,
-}
-
+// Content Attestation Models — REMOVED (Phase-2a consolidation).
+// The content-attestations table was dropped (migration 2026-05-12-100300).
+// Prerequisite requirements are now PREREQUISITE content-graph edges (gated by
+// `epr_service::check_prerequisite_mastery`); the Category-A DHT attestation
+// projection lives in the unified `attestations` table (`AttestationRow`).
 // ============================================================================
 // Steward Credential Models
 // ============================================================================

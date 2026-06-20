@@ -35,6 +35,14 @@ pub struct EprService {
     policy_enforcement: Option<Arc<crate::db::policy_cache::PolicyEnforcement>>,
     extraction_cache: Option<Arc<elohim_cache_core::extraction::ExtractionCache>>,
     peer_trust_cache: PeerTrustCache,
+    /// Content graph engine (graph-native feature). When present, the
+    /// prerequisite-mastery access gate enforces via `PREREQUISITE` edges
+    /// (`*epr_edge{rel_type: 'PREREQUISITE'}`) rather than the dropped
+    /// content-attestations table. `None` (tests, non-graph builds) makes
+    /// the prerequisite gate a no-op (allow) — preserving prior behavior when
+    /// the graph is absent.
+    #[cfg(feature = "graph-native")]
+    graph_engine: Option<Arc<crate::graph::engine::GraphEngine>>,
 }
 
 impl std::fmt::Debug for EprService {
@@ -59,7 +67,21 @@ impl EprService {
             policy_enforcement,
             extraction_cache,
             peer_trust_cache,
+            #[cfg(feature = "graph-native")]
+            graph_engine: None,
         }
+    }
+
+    /// Attach the content graph engine so the prerequisite-mastery gate can
+    /// enforce via `PREREQUISITE` edges. Builder idiom (mirrors
+    /// `HttpServer::with_*`) so test call-sites can stay on the 4-arg `new`.
+    #[cfg(feature = "graph-native")]
+    pub fn with_graph_engine(
+        mut self,
+        graph_engine: Option<Arc<crate::graph::engine::GraphEngine>>,
+    ) -> Self {
+        self.graph_engine = graph_engine;
+        self
     }
 
     /// Dispatch the read-side EPR variants. Returns `None` for `Announce`
@@ -130,48 +152,25 @@ impl EprService {
                         }
                     }
 
-                    // Layer 2: Attestation gate (mirrors HTTP path)
-                    if let Some(ref agent_key) = agent_pubkey {
-                        let attestations =
-                            crate::db::content_attestations::query_attestations_for_content(
-                                &mut conn, &id,
-                            );
-                        if let Ok(atts) = attestations {
-                            let prereq_atts: Vec<_> = atts
-                                .iter()
-                                .filter(|a| {
-                                    a.attestation_type == "prerequisite-mastery"
-                                        && a.is_revoked == 0
-                                })
-                                .collect();
-
-                            if !prereq_atts.is_empty() {
-                                let human =
-                                    crate::db::humans::get_human_by_agent_key(&mut conn, agent_key);
-                                if let Ok(Some(human)) = human {
-                                    for att in &prereq_atts {
-                                        let prereq_content_id =
-                                            att.evidence.as_deref().unwrap_or(&att.content_id);
-                                        let mastery =
-                                            crate::db::content_mastery::get_mastery_for_content(
-                                                &mut conn,
-                                                &app_ctx,
-                                                &human.id,
-                                                prereq_content_id,
-                                            );
-                                        match mastery {
-                                            Ok(Some(m)) if m.mastery_level != "not_started" => {}
-                                            _ => {
-                                                info!(id = %id, "P2P attestation gate: prerequisite mastery required");
-                                                return EprResponse::AccessDenied {
-                                                    required_reach: reach.clone(),
-                                                    reason: "Prerequisite mastery required"
-                                                        .to_string(),
-                                                };
-                                            }
-                                        }
-                                    }
-                                }
+                    // Layer 2: Prerequisite-mastery gate (mirrors HTTP path).
+                    // The requirement is a PREREQUISITE graph edge (content B →
+                    // prerequisite A); the requesting agent must have mastered
+                    // every direct (1-hop) prerequisite. No graph → no-op allow.
+                    #[cfg(feature = "graph-native")]
+                    if let (Some(ref agent_key), Some(ref graph)) =
+                        (&agent_pubkey, &self.graph_engine)
+                    {
+                        if let Ok(Some(human)) =
+                            crate::db::humans::get_human_by_agent_key(&mut conn, agent_key)
+                        {
+                            if let Err(reason) = check_prerequisite_mastery(
+                                graph, &mut conn, &app_ctx, &human.id, &id,
+                            ) {
+                                info!(id = %id, "P2P prerequisite gate: prerequisite mastery required");
+                                return EprResponse::AccessDenied {
+                                    required_reach: reach.clone(),
+                                    reason,
+                                };
                             }
                         }
                     }
@@ -276,13 +275,27 @@ impl EprService {
         // (which also rides this path) can project pre-publish rows.  Pillar
         // enrichment ON: peers receive full stewardship + attestation context.
         match crate::epr_head::derive_epr_head(&mut conn, &app_ctx, id, false, true) {
-            Ok(Some(head)) => match rmp_serde::to_vec(&head) {
-                Ok(bytes) => Some(bytes),
-                Err(e) => {
-                    warn!(id = %id, error = %e, "Failed to encode EPR Head");
-                    None
+            Ok(Some(mut head)) => {
+                // Display enrichment: populate qahal.attestation_requirements
+                // from PREREQUISITE graph edges (the requirement now lives in
+                // the content graph, not the dropped content-attestations
+                // table). Preserves the legacy wire shape
+                // "prerequisite-mastery:{prereq_id}".
+                #[cfg(feature = "graph-native")]
+                if let Some(ref graph) = self.graph_engine {
+                    head.qahal.attestation_requirements = query_direct_prerequisites(graph, id)
+                        .into_iter()
+                        .map(|prereq_id| format!("prerequisite-mastery:{prereq_id}"))
+                        .collect();
                 }
-            },
+                match rmp_serde::to_vec(&head) {
+                    Ok(bytes) => Some(bytes),
+                    Err(e) => {
+                        warn!(id = %id, error = %e, "Failed to encode EPR Head");
+                        None
+                    }
+                }
+            }
             Ok(None) => {
                 debug!(id = %id, "Content not found for EPR resolve");
                 None
@@ -558,6 +571,75 @@ pub fn reach_level_index(reach: &str) -> u8 {
     }
 }
 
+/// Query the **direct (1-hop)** prerequisite content ids for `content_id` from
+/// the content graph (`*epr_edge{from_cid: content_id, to_cid: prereq,
+/// rel_type: 'PREREQUISITE'}`).
+///
+/// Used by both the access gate (to enforce mastery) and the EPR-head display
+/// (to populate `qahal.attestation_requirements`). Returns an empty Vec when
+/// the content has no prerequisites or on query failure (fail-open for the
+/// *display*; the *gate* derives deny from this same list, so an empty list
+/// there means "no prerequisite to enforce" — identical to the prior behavior
+/// when no prerequisite-mastery attestation existed).
+#[cfg(feature = "graph-native")]
+pub fn query_direct_prerequisites(
+    graph: &crate::graph::engine::GraphEngine,
+    content_id: &str,
+) -> Vec<String> {
+    let res = graph.run_script(
+        "?[prereq] := *epr_edge{from_cid: $cid, to_cid: prereq, rel_type: 'PREREQUISITE'}",
+        &[("cid", cozo::DataValue::from(content_id))],
+    );
+    match res {
+        Ok(qr) => qr
+            .rows
+            .into_iter()
+            .filter_map(|row| match row.into_iter().next() {
+                Some(cozo::DataValue::Str(s)) => Some(s.to_string()),
+                _ => None,
+            })
+            .collect(),
+        Err(e) => {
+            warn!(content_id = %content_id, error = %e, "PREREQUISITE edge query failed");
+            Vec::new()
+        }
+    }
+}
+
+/// The shared prerequisite-mastery access gate, called by BOTH the P2P
+/// (`EprService::handle_resolve`) and HTTP (`HttpServer`) read paths so the two
+/// can never drift. Returns `Ok(())` to ALLOW and `Err(reason)` to DENY.
+///
+/// Enforcement: for every direct prerequisite `A` of `content_id` (a
+/// `PREREQUISITE` graph edge), the agent identified by `human_id` must have a
+/// `content_mastery` row for `A` whose `mastery_level != "not_started"`.
+/// Missing mastery, a `not_started` row, or absent content all deny. When the
+/// content has no prerequisite edges, the gate allows (no requirement).
+#[cfg(feature = "graph-native")]
+pub fn check_prerequisite_mastery(
+    graph: &crate::graph::engine::GraphEngine,
+    conn: &mut diesel::SqliteConnection,
+    app_ctx: &AppContext,
+    human_id: &str,
+    content_id: &str,
+) -> Result<(), String> {
+    let prereqs = query_direct_prerequisites(graph, content_id);
+    for prereq_content_id in &prereqs {
+        match crate::db::content_mastery::get_mastery_for_content(
+            conn,
+            app_ctx,
+            human_id,
+            prereq_content_id,
+        ) {
+            Ok(Some(m)) if m.mastery_level != "not_started" => {}
+            _ => {
+                return Err("Prerequisite mastery required".to_string());
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -781,5 +863,172 @@ mod tests {
         assert!(reach_svc()
             .authorize_reach_for_human(&mut conn, &ctx, "garbage-tier", &h, "c-x")
             .is_err());
+    }
+
+    // ---- Prerequisite-mastery access gate (PREREQUISITE edges + content_mastery) ----
+    //
+    // The correctness proof for the gate rebuild: with content B carrying a
+    // PREREQUISITE edge to content A, the shared gate DENIES an agent who has
+    // not mastered A and ALLOWS one who has. The edge is inserted via the REAL
+    // write path (`GraphProjector::project_head` → `upsert_edge` → `epr_edge`),
+    // so this also proves the `query_direct_prerequisites` Cozo read query is
+    // correct against the `asserted_at: Validity` column.
+    #[cfg(feature = "graph-native")]
+    mod prerequisite_gate {
+        use super::*;
+        use crate::db::content_mastery::{upsert_mastery, CreateMasteryInput};
+        use crate::db::models::mastery_levels;
+        use crate::epr_codec::{
+            EprHead, EprLamadContext, EprQahalContext, EprRelationship, EprShefaContext,
+        };
+        use crate::graph::engine::GraphEngine;
+        use crate::graph::projector::GraphProjector;
+        use crate::graph::schema::apply_core_schema;
+
+        /// Open an in-memory-equivalent graph engine (sled temp dir) with the
+        /// core schema applied.
+        fn graph_with_schema(dir: &std::path::Path) -> GraphEngine {
+            let eng = GraphEngine::open(&dir.join("graph.db")).expect("open graph");
+            apply_core_schema(&eng).expect("apply core schema");
+            eng
+        }
+
+        /// Minimal EprHead carrying a single PREREQUISITE relationship to `prereq`.
+        fn head_with_prerequisite(id: &str, prereq: &str) -> EprHead {
+            EprHead {
+                version: 1,
+                id: id.to_string(),
+                content: String::new(),
+                lamad: EprLamadContext {
+                    title: id.to_string(),
+                    content_type: "concept".to_string(),
+                    description: None,
+                    content_format: Some("markdown".to_string()),
+                    tags: vec![],
+                },
+                shefa: EprShefaContext {
+                    stewards: vec![],
+                    allocations: vec![],
+                },
+                qahal: EprQahalContext {
+                    reach: Some("commons".to_string()),
+                    layer: None,
+                    attestation_requirements: vec![],
+                },
+                relationships: vec![EprRelationship {
+                    rel_type: "PREREQUISITE".to_string(),
+                    target: prereq.to_string(),
+                    target_cid: None,
+                }],
+                author: None,
+                updated: None,
+            }
+        }
+
+        #[test]
+        fn query_direct_prerequisites_reads_real_edge() {
+            let tmp = tempfile::tempdir().unwrap();
+            let graph = graph_with_schema(tmp.path());
+            // REAL write path: project content B with a PREREQUISITE edge → A.
+            GraphProjector::new(&graph)
+                .project_head(
+                    "content-b",
+                    &head_with_prerequisite("content-b", "content-a"),
+                )
+                .expect("project head");
+
+            let prereqs = query_direct_prerequisites(&graph, "content-b");
+            assert_eq!(
+                prereqs,
+                vec!["content-a".to_string()],
+                "the PREREQUISITE edge written via the projector must read back"
+            );
+            // Content with no prerequisite edge → empty.
+            assert!(query_direct_prerequisites(&graph, "content-a").is_empty());
+        }
+
+        #[test]
+        fn gate_denies_without_mastery_and_allows_with_mastery() {
+            let pool = crate::test_util::test_pool();
+            let mut conn = pool.get().unwrap();
+            let ctx = AppContext::new("lamad");
+
+            // content-a is the prerequisite; content-b requires mastery of it.
+            mk_content(&mut conn, &ctx, "content-a", "commons", None);
+            mk_content(&mut conn, &ctx, "content-b", "commons", None);
+            mk_human(&mut conn, "human-learner", Some("uhCAk-learner"));
+
+            let tmp = tempfile::tempdir().unwrap();
+            let graph = graph_with_schema(tmp.path());
+            GraphProjector::new(&graph)
+                .project_head(
+                    "content-b",
+                    &head_with_prerequisite("content-b", "content-a"),
+                )
+                .expect("project head");
+
+            // DENY branch — learner has no mastery row for content-a at all.
+            assert!(
+                check_prerequisite_mastery(&graph, &mut conn, &ctx, "human-learner", "content-b",)
+                    .is_err(),
+                "agent with no mastery of the prerequisite must be DENIED"
+            );
+
+            // A not_started mastery row must STILL deny (absent ≡ not_started).
+            upsert_mastery(
+                &mut conn,
+                &ctx,
+                CreateMasteryInput {
+                    id: None,
+                    human_id: "human-learner".to_string(),
+                    content_id: "content-a".to_string(),
+                    mastery_level: mastery_levels::NOT_STARTED.to_string(),
+                    content_version_at_mastery: None,
+                },
+            )
+            .expect("upsert not_started mastery");
+            assert!(
+                check_prerequisite_mastery(&graph, &mut conn, &ctx, "human-learner", "content-b",)
+                    .is_err(),
+                "not_started mastery of the prerequisite must be DENIED"
+            );
+
+            // ALLOW branch — promote mastery of content-a beyond not_started.
+            upsert_mastery(
+                &mut conn,
+                &ctx,
+                CreateMasteryInput {
+                    id: None,
+                    human_id: "human-learner".to_string(),
+                    content_id: "content-a".to_string(),
+                    mastery_level: mastery_levels::UNDERSTAND.to_string(),
+                    content_version_at_mastery: None,
+                },
+            )
+            .expect("upsert understand mastery");
+            assert!(
+                check_prerequisite_mastery(&graph, &mut conn, &ctx, "human-learner", "content-b",)
+                    .is_ok(),
+                "agent who has mastered the prerequisite must be ALLOWED"
+            );
+        }
+
+        #[test]
+        fn gate_allows_when_no_prerequisite_edge() {
+            let pool = crate::test_util::test_pool();
+            let mut conn = pool.get().unwrap();
+            let ctx = AppContext::new("lamad");
+            mk_content(&mut conn, &ctx, "content-free", "commons", None);
+            mk_human(&mut conn, "human-free", Some("uhCAk-free"));
+
+            let tmp = tempfile::tempdir().unwrap();
+            let graph = graph_with_schema(tmp.path());
+            // No edges projected → no requirement → allow.
+            assert!(
+                check_prerequisite_mastery(&graph, &mut conn, &ctx, "human-free", "content-free",)
+                    .is_ok(),
+                "content with no PREREQUISITE edge must be ALLOWED unconditionally"
+            );
+        }
     }
 }

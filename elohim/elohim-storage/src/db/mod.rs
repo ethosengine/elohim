@@ -58,7 +58,11 @@ pub mod upgrade_prompt_view;
 pub mod governance;
 
 // Attestation, steward, and contributor tables (v7)
-pub mod content_attestations;
+// NOTE: the content-attestations table was dropped in the Phase-2a
+// consolidation (migration 2026-05-12-100300). Prerequisite requirements now
+// live as PREREQUISITE content-graph edges; the unified `attestations` table
+// holds the Category-A DHT projection. See
+// `epr_service::check_prerequisite_mastery`.
 pub mod contributors;
 pub mod steward_operations;
 
