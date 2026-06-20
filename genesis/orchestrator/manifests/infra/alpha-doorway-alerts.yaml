@@ -1,0 +1,108 @@
+# PrometheusRule — alert on doorway availability + membrane ban-storm (design-decision toolkit P2)
+#
+# The COMPLEMENT alert leg of alpha-doorway-podmonitor.yaml. That PodMonitor's
+# header notes the wedge-time signal: during a fatal MAIN-runtime wedge the main
+# listener (:8080 `gateway-ws`) cannot answer /metrics — by design, the watchdog
+# port (:8079 `health-wd`) stays minimal — so the scrape target's `up == 0` IS
+# the wedge/self-kill signal. This rule turns that observation into an alert. It
+# also watches the membrane policy stage (doorway-service/src/server/membrane.rs):
+# a sustained-high active-ban count is the calibration-regression early-warning —
+# either coordinated abuse OR a mis-calibrated threshold banning real users.
+#
+# ⚠ OPERATOR CONFIRMS (cluster is operator-owned — repo is the surface, pipeline
+#    reconciles; never kubectl from dev):
+#   1. The Prometheus Operator (kube-prom-stack) `ruleSelector` admits this — the
+#      `release: kube-prom-stack` label is the kube-prometheus-stack default
+#      selector (the SAME release-label default the PodMonitors rely on, but a
+#      SEPARATE selector: ruleSelector ≠ podMonitorSelector). Miss this label and
+#      the rule is silently ignored — looks fine in-repo, never fires.
+#   2. `ruleNamespaceSelector` admits namespace `elohim-alpha` (or the Operator
+#      watches all namespaces).
+#   3. Some pipeline applies genesis/orchestrator/manifests/infra/*.yaml (same path
+#      as alpha-doorway-podmonitor.yaml / alpha-edgenode-podmonitor.yaml).
+# Until (1)-(3) hold, the rule is inert (the metrics are still scrapable; only the
+# automatic alert evaluation is gated). VERIFIED 2026-06-20: the live doorway
+# scrape target exists — `up{job=~".*doorway.*"}` resolves to
+# job="elohim-alpha/elohim-doorway" (the PodMonitor is admitted and scraping).
+#
+# Dashboard: no Grafana board exists for doorway yet (TBD); the annotation points
+# at a Prometheus Explore view of the doorway availability + membrane series. The
+# operator console is the Angular doorway-app (doorway.elohim.host /admin), a
+# separate surface from Grafana.
+#
+# Source metrics: doorway/doorway-service/src/metrics.rs (doorway_membrane_*),
+#   doorway/doorway-service/src/server/membrane.rs (GuardConfig calibration).
+# Plan: genesis/docs/superpowers/plans/2026-06-17-design-decision-toolkit-plan.md
+# Handoff: HANDOFF-2026-06-17-doorway-metrics.md
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: elohim-doorway-alerts
+  namespace: elohim-alpha
+  labels:
+    app: elohim-doorway
+    environment: alpha
+    release: kube-prom-stack
+    app.kubernetes.io/name: doorway
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  groups:
+    - name: elohim-doorway.availability
+      rules:
+        # The doorway scrape target is down — the wedge-time / self-kill signal.
+        # `up == 0` (not `absent()`): the target persists in service discovery, so
+        # `up` flips 1→0 on a fatal MAIN-runtime wedge that silences :8080/metrics,
+        # then 0→1 on recovery. `for: 5m` rides out a single missed scrape + a
+        # normal rollout restart without paging.
+        - alert: DoorwayDown
+          expr: up{job=~".*doorway.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            app: elohim-doorway
+            environment: alpha
+          annotations:
+            summary: "Doorway is down (scrape target unreachable)"
+            description: >-
+              The doorway :8080 main-listener scrape target {{ $labels.instance }}
+              ({{ $labels.pod }}) has reported up == 0 for over 5 minutes. The main
+              request listener cannot answer /metrics during a fatal MAIN-runtime
+              wedge (by design — the watchdog port stays minimal), so up == 0 is the
+              wedge / self-kill signal. Hosted-user auth and projection-cache serving
+              are unavailable while this fires.
+            dashboard: "https://grafana.ethosengine.com/explore?left=%7B%22datasource%22%3A%22prometheus%22%2C%22queries%22%3A%5B%7B%22expr%22%3A%22up%7Bjob%3D~%5C%22.%2Adoorway.%2A%5C%22%7D%22%2C%22refId%22%3A%22A%22%7D%2C%7B%22expr%22%3A%22doorway_membrane_bans_active%22%2C%22refId%22%3A%22B%22%7D%2C%7B%22expr%22%3A%22doorway_membrane_verdict_total%22%2C%22refId%22%3A%22C%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-6h%22%2C%22to%22%3A%22now%22%7D%7D"
+
+    - name: elohim-doorway.membrane
+      rules:
+        # Sustained-high active-ban count = the calibration-regression early-warning.
+        # Steady-state is ≈0: per the 2026-06-20 GuardConfig calibration a real alpha
+        # landing makes ~3-5 non-static counted requests against a 1200/60s ban
+        # threshold (a 60-100x margin), so legit traffic NEVER bans. A sustained
+        # floor of active bans therefore means either coordinated abuse OR a
+        # mis-calibrated threshold banning real users — both want an operator's eyes.
+        # The reliable shape here is "sustained threshold on a near-zero baseline,"
+        # not a rate; the absolute floor (10) is deliberately well above the
+        # essentially-zero baseline and below any plausible benign churn — retune it
+        # alongside the GuardConfig thresholds, not independently. `for: 10m` keeps a
+        # brief abuse burst that the ban window self-clears from paging.
+        - alert: MembraneBanStorm
+          expr: doorway_membrane_bans_active > 10
+          for: 10m
+          labels:
+            severity: warning
+            app: elohim-doorway
+            environment: alpha
+          annotations:
+            summary: "Doorway membrane ban-storm (sustained high active-ban count)"
+            description: >-
+              doorway_membrane_bans_active on {{ $labels.instance }} has held above 10
+              for over 10 minutes (current {{ $value }}). Against the calibrated
+              GuardConfig (legit alpha traffic runs 60-100x under the ban threshold)
+              a sustained ban floor is an anomaly: either coordinated abuse OR a
+              mis-calibrated membrane threshold banning real users. Check
+              doorway_membrane_verdict_total{verdict="deny"} for the source mix before
+              retuning DOORWAY_MEMBRANE_*_THRESHOLD.
+            dashboard: "https://grafana.ethosengine.com/explore?left=%7B%22datasource%22%3A%22prometheus%22%2C%22queries%22%3A%5B%7B%22expr%22%3A%22up%7Bjob%3D~%5C%22.%2Adoorway.%2A%5C%22%7D%22%2C%22refId%22%3A%22A%22%7D%2C%7B%22expr%22%3A%22doorway_membrane_bans_active%22%2C%22refId%22%3A%22B%22%7D%2C%7B%22expr%22%3A%22doorway_membrane_verdict_total%22%2C%22refId%22%3A%22C%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-6h%22%2C%22to%22%3A%22now%22%7D%7D"

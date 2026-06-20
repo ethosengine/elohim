@@ -1,0 +1,421 @@
+# Grafana dashboard (sidecar-provisioned) — doorway membrane + edge observability.
+#
+# The COMPLEMENT view to the alpha-doorway-podmonitor.yaml scrape: that wires the
+# automatic scrape of doorway :8080/metrics; this panels what it collects. Today
+# the membrane (doorway/doorway-service/src/server/membrane.rs + metrics.rs) is
+# unit-test-only — this dashboard is what makes it VERIFIABLE in the alpha
+# deployment (verdict mix, active bans, plus the existing M1-M5 edge signals).
+#
+# DELIVERY (kube-prometheus-stack Grafana dashboard sidecar):
+#   The Grafana sidecar shipped by kube-prometheus-stack watches the cluster for
+#   ConfigMaps labeled `grafana_dashboard: "1"` and loads the JSON under `data`
+#   into Grafana automatically — "dashboard as code", no UI import, no kubectl.
+#   The `release: kube-prom-stack` label (same selector the sibling PodMonitors
+#   use) is the marker that this stack — and therefore the sidecar — is live.
+#   The dashboard JSON is sidecar-PROVISIONED (no `__inputs`/`__requires` import
+#   blocks): panels bind to the `datasource` templating var, which self-selects
+#   the Prometheus datasource at load.
+#
+# ⚠ OPERATOR CONFIRMS (cluster is operator-owned — repo is the surface, the
+#    pipeline reconciles; never kubectl from dev):
+#   1. The Grafana dashboard sidecar is enabled (kube-prometheus-stack default:
+#      `grafana.sidecar.dashboards.enabled=true`) and its label selector is the
+#      default `grafana_dashboard: "1"`. If a custom `searchNamespace` is set,
+#      confirm it admits `elohim-alpha` (default `ALL` admits it).
+#   2. Some pipeline applies genesis/orchestrator/manifests/infra/*.yaml (same
+#      path + *.yaml glob as alpha-doorway-podmonitor.yaml).
+# Until (1)-(2) hold, the dashboard JSON can still be imported by hand in the
+# Grafana UI (Dashboards → Import → paste the `doorway-membrane.json` value).
+#
+# Edge GuardConfig calibration (2026-06-20, confirmed safe — a real alpha landing
+# makes ~3-5 non-static counted requests, a 60-100x margin): window 60s, shape
+# 300, challenge 600, ban 1200, ban_secs 900, shape_delay_ms 250.
+#
+# Source of metric names: doorway/doorway-service/src/metrics.rs
+# Scrape wiring:           genesis/orchestrator/manifests/infra/alpha-doorway-podmonitor.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: doorway-membrane-dashboard
+  namespace: elohim-alpha
+  labels:
+    grafana_dashboard: "1" # kube-prometheus-stack Grafana sidecar selector
+    app: elohim-doorway
+    environment: alpha
+    release: kube-prom-stack
+    app.kubernetes.io/name: doorway
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+data:
+  doorway-membrane.json: |
+    {
+      "title": "Doorway — Membrane & Edge Observability (alpha)",
+      "uid": "doorway-membrane",
+      "tags": ["doorway", "elohim", "alpha", "membrane", "edge"],
+      "timezone": "",
+      "schemaVersion": 39,
+      "version": 1,
+      "editable": true,
+      "graphTooltip": 1,
+      "refresh": "30s",
+      "time": { "from": "now-6h", "to": "now" },
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "label": "Prometheus",
+            "type": "datasource",
+            "query": "prometheus",
+            "current": {},
+            "hide": 0,
+            "refresh": 1,
+            "regex": ""
+          },
+          {
+            "name": "pod",
+            "label": "Doorway pod",
+            "type": "query",
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "query": "label_values(doorway_membrane_verdict_total, pod)",
+            "current": { "text": "All", "value": "$__all" },
+            "includeAll": true,
+            "multi": true,
+            "allValue": ".*",
+            "refresh": 2,
+            "sort": 1,
+            "hide": 0
+          }
+        ]
+      },
+      "panels": [
+        {
+          "type": "row",
+          "title": "Membrane policy",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 1,
+          "panels": []
+        },
+        {
+          "type": "timeseries",
+          "title": "Membrane verdicts — rate by verdict (stacked)",
+          "description": "rate(doorway_membrane_verdict_total{verdict}) over 5m. allow/shape/challenge/deny stacked. A non-zero deny/challenge band is the membrane shedding abusive sources; shape is the +250ms tarpit. Calibrated edge GuardConfig (2026-06-20): window 60s, shape 300, challenge 600, ban 1200, ban_secs 900.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 9, "w": 16, "x": 0, "y": 1 },
+          "id": 2,
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 35,
+                "stacking": { "mode": "normal", "group": "A" },
+                "lineWidth": 1,
+                "showPoints": "never"
+              },
+              "unit": "reqps",
+              "min": 0
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "deny" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] },
+              { "matcher": { "id": "byName", "options": "challenge" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } } ] },
+              { "matcher": { "id": "byName", "options": "shape" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } } ] },
+              { "matcher": { "id": "byName", "options": "allow" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] }
+            ]
+          },
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum", "lastNotNull"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "sum by (verdict) (rate(doorway_membrane_verdict_total{pod=~\"$pod\"}[5m]))",
+              "legendFormat": "{{verdict}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "stat",
+          "title": "Active membrane bans",
+          "description": "doorway_membrane_bans_active — sources currently under a membrane ban (ban_until in the future). Alert target: a sustained non-zero value means the membrane is actively banning, calibrated for a 60-100x margin over real alpha landing traffic.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 9, "w": 8, "x": 16, "y": 1 },
+          "id": 3,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 } ] }
+            },
+            "overrides": []
+          },
+          "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "sum(doorway_membrane_bans_active{pod=~\"$pod\"})",
+              "legendFormat": "bans active",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Active membrane bans — over time",
+          "description": "doorway_membrane_bans_active over time. Updated each maybe_sweep pass from EdgeGuardStore.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 10 },
+          "id": 4,
+          "fieldConfig": {
+            "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 1, "showPoints": "never" }, "unit": "short", "min": 0 },
+            "overrides": []
+          },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["max", "lastNotNull"] }, "tooltip": { "mode": "multi" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "doorway_membrane_bans_active{pod=~\"$pod\"}",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "M1 — Watchdog (wedge precursor)",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+          "id": 10,
+          "panels": []
+        },
+        {
+          "type": "timeseries",
+          "title": "Watchdog wedges — rate",
+          "description": "rate(doorway_watchdog_wedged_total) — the main-runtime wedge precedes a doorway self-kill. Pair with the PodMonitor up==0 of the :8080 target (the main listener can't answer /metrics mid-wedge, by design).",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+          "id": 11,
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 60, "lineWidth": 1 }, "unit": "short", "min": 0, "color": { "mode": "fixed", "fixedColor": "red" } }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "sum by (pod) (rate(doorway_watchdog_wedged_total{pod=~\"$pod\"}[5m]))",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Heartbeat age (ms)",
+          "description": "doorway_heartbeat_age_ms — staleness of the main-runtime heartbeat. A climbing value precedes a wedge.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+          "id": 12,
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "showPoints": "never" }, "unit": "ms", "min": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 5000 }, { "color": "red", "value": 15000 } ] } }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["max", "lastNotNull"] }, "tooltip": { "mode": "multi" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "doorway_heartbeat_age_ms{pod=~\"$pod\"}",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "M2 — Conductor reconnect & close codes",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+          "id": 20,
+          "panels": []
+        },
+        {
+          "type": "timeseries",
+          "title": "Conductor reconnects — rate by reason",
+          "description": "rate(doorway_conductor_reconnect_total{reason}) — reconnect events by cause (session-end vs connect failure).",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "id": 21,
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 25, "stacking": { "mode": "normal", "group": "A" }, "lineWidth": 1, "showPoints": "never" }, "unit": "cps", "min": 0 }, "overrides": [] },
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "sum by (reason) (rate(doorway_conductor_reconnect_total{pod=~\"$pod\"}[5m]))",
+              "legendFormat": "{{reason}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Conductor close codes — rate by code",
+          "description": "rate(doorway_conductor_close_code_total{code}) — WS close codes the conductor sent on graceful close. Kept on a separate axis from reconnect reason (non-conflation).",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "id": 22,
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 25, "stacking": { "mode": "normal", "group": "A" }, "lineWidth": 1, "showPoints": "never" }, "unit": "cps", "min": 0 }, "overrides": [] },
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "sum by (code) (rate(doorway_conductor_close_code_total{pod=~\"$pod\"}[5m]))",
+              "legendFormat": "code {{code}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "M3 / M5 — Session lifetime & live fan-out",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+          "id": 30,
+          "panels": []
+        },
+        {
+          "type": "heatmap",
+          "title": "Conductor session duration — heatmap (s)",
+          "description": "doorway_conductor_session_duration_seconds bucket heatmap. A pile in the sub-1s buckets is accept-then-drop / auth-reject churn; a pile at the long end is healthy long-lived sessions.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 9, "w": 16, "x": 0, "y": 37 },
+          "id": 31,
+          "options": { "calculate": false, "cellGap": 1, "color": { "scheme": "Oranges", "mode": "scheme", "steps": 64 }, "yAxis": { "unit": "s" }, "legend": { "show": true }, "tooltip": { "show": true, "yHistogram": true } },
+          "fieldConfig": { "defaults": { "custom": { "hideFrom": { "tooltip": false, "viz": false, "legend": false } } }, "overrides": [] },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "sum by (le) (rate(doorway_conductor_session_duration_seconds_bucket{pod=~\"$pod\"}[5m]))",
+              "legendFormat": "{{le}}",
+              "format": "heatmap",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "stat",
+          "title": "Live conductor sessions (fan-out)",
+          "description": "doorway_conductor_sessions — live app-WS sessions across every ConductorConnection (the RCA fan-out the leak campaign wants bounded). Excludes the signal subscriber's own loop.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 9, "w": 8, "x": 16, "y": 37 },
+          "id": 32,
+          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 200 }, { "color": "red", "value": 500 } ] } }, "overrides": [] },
+          "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "sum(doorway_conductor_sessions{pod=~\"$pod\"})",
+              "legendFormat": "live sessions",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "M4 — Shed (admission/breaker/backpressure) & absorb (cache/pantry)",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 },
+          "id": 40,
+          "panels": []
+        },
+        {
+          "type": "timeseries",
+          "title": "Load shed — rate (admission / breaker / backpressure)",
+          "description": "rate of doorway_admission_shed_total, doorway_upstream_breaker_open_total, doorway_upstream_backpressure_honored_total — the three ways doorway refuses load before/at the storage hop.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 47 },
+          "id": 41,
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1, "showPoints": "never" }, "unit": "cps", "min": 0 }, "overrides": [] },
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "sum by (pod) (rate(doorway_admission_shed_total{pod=~\"$pod\"}[5m]))",
+              "legendFormat": "admission shed — {{pod}}",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "sum by (pod) (rate(doorway_upstream_breaker_open_total{pod=~\"$pod\"}[5m]))",
+              "legendFormat": "breaker open — {{pod}}",
+              "refId": "B"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "sum by (pod) (rate(doorway_upstream_backpressure_honored_total{pod=~\"$pod\"}[5m]))",
+              "legendFormat": "backpressure honored — {{pod}}",
+              "refId": "C"
+            }
+          ]
+        },
+        {
+          "type": "stat",
+          "title": "Inbound admission ceiling (max in-flight)",
+          "description": "doorway_inbound_max_inflight — the configured DOORWAY_MAX_INFLIGHT ceiling (set once at boot). The denominator for admission-shed pressure.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 47 },
+          "id": 42,
+          "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+          "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "doorway_inbound_max_inflight{pod=~\"$pod\"}",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Content resolve — rate by tier",
+          "description": "rate(doorway_resolve_total{tier}) — projection / conductor / external. A projection hit is served from the doorway-resident cache and never reaches storage.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 55 },
+          "id": 43,
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 25, "stacking": { "mode": "normal", "group": "A" }, "lineWidth": 1, "showPoints": "never" }, "unit": "reqps", "min": 0 }, "overrides": [] },
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "sum by (tier) (rate(doorway_resolve_total{pod=~\"$pod\"}[5m]))",
+              "legendFormat": "{{tier}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Blob pantry — rate by outcome",
+          "description": "rate(doorway_blob_pantry_total{outcome}) — hit / miss / stocked / skipped. A hit is served from the doorway-resident projection cache without reaching storage.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 55 },
+          "id": 44,
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 25, "stacking": { "mode": "normal", "group": "A" }, "lineWidth": 1, "showPoints": "never" }, "unit": "cps", "min": 0 }, "overrides": [] },
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "expr": "sum by (outcome) (rate(doorway_blob_pantry_total{pod=~\"$pod\"}[5m]))",
+              "legendFormat": "{{outcome}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    }

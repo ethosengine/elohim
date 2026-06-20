@@ -232,12 +232,15 @@ pub fn is_static_asset(path: &str) -> bool {
 
 // ─── Edge GuardConfig ─────────────────────────────────────────────────────────
 
-/// Build the edge `GuardConfig` from environment overrides with interim defaults.
+/// Build the edge `GuardConfig` from environment overrides with calibrated defaults.
 ///
-/// Interim thresholds (calibrated for a single-ingress alpha topology):
-/// - window 60s, shape 300, challenge 600, ban 1200, ban_secs 900, shape_delay 250ms
+/// Thresholds — window 60s, shape 300, challenge 600, ban 1200, ban_secs 900, shape_delay 250ms.
 ///
-/// # TODO(calibrate): measure real page-load request count before deploy
+/// CALIBRATED 2026-06-20 against the live alpha landing (`pnpm look https://doorway-alpha.elohim.host`):
+/// a real first page-load makes only ~3-5 NON-static (membrane-counted) requests (the `/version.json`,
+/// `/api/v1/epr/.../nav-context`, `/db/content/manifesto` calls — the JS/CSS/wasm chunks are
+/// static-asset-exempt), so `shape=300` carries a ~60-100x margin and cannot shape a legitimate load.
+/// Re-confirm with the `membrane-rate-limit` a2o scenario + the alert on `doorway_membrane_bans_active`.
 pub fn edge_guard_config() -> GuardConfig {
     fn env_u64(key: &str, default: u64) -> u64 {
         std::env::var(key)
