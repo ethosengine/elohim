@@ -163,6 +163,9 @@ pub fn reconcile_pass(
                     // Wave-3: re-order inventory by capability/headroom/RTT/bond/diversity.
                     // `select_serve_peers` → agent_cids → resolved to libp2p via manifest.
                     // Empty manifest (prod default) → prefix empty → inventory unchanged.
+                    // Resolution requires peer_transport_manifest (iroh feature).
+                    // Without it the prefix is empty → inventory unchanged (safe degradation).
+                    #[cfg(feature = "p2p-iroh")]
                     let score_prefix: Vec<String> =
                         crate::services::serve_routing::select_serve_peers(
                             conn,
@@ -175,9 +178,11 @@ pub fn reconcile_pass(
                             crate::p2p_iroh::peer_map::lookup_by_agent_cid(conn, &cid)
                                 .ok()
                                 .flatten()
-                                .and_then(|m| m.libp2p_peer_id)
+                                .and_then(|m| m.libp2p.map(|l| l.peer_id))
                         })
                         .collect();
+                    #[cfg(not(feature = "p2p-iroh"))]
+                    let score_prefix: Vec<String> = Vec::new();
 
                     let candidate_peers: Vec<String> = if score_prefix.is_empty() {
                         inventory

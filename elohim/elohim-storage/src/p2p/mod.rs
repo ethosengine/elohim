@@ -2771,6 +2771,9 @@ impl P2PNode {
                                 .collect();
 
                             // Score-order: resolve agent_cids → libp2p ids.
+                            // Resolution requires peer_transport_manifest (iroh feature).
+                            // Without it the prefix is empty → inventory unchanged (safe degradation).
+                            #[cfg(feature = "p2p-iroh")]
                             let score_prefix: Vec<String> =
                                 crate::services::serve_routing::select_serve_peers(
                                     &mut c,
@@ -2783,9 +2786,11 @@ impl P2PNode {
                                     crate::p2p_iroh::peer_map::lookup_by_agent_cid(&mut c, &cid)
                                         .ok()
                                         .flatten()
-                                        .and_then(|m| m.libp2p_peer_id)
+                                        .and_then(|m| m.libp2p.map(|l| l.peer_id))
                                 })
                                 .collect();
+                            #[cfg(not(feature = "p2p-iroh"))]
+                            let score_prefix: Vec<String> = Vec::new();
 
                             if score_prefix.is_empty() {
                                 inventory

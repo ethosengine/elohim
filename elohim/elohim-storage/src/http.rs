@@ -2424,12 +2424,15 @@ impl HttpServer {
             // Resolvable entries form a score-ordered prefix; the original `inventory_candidates`
             // (libp2p-keyed, unordered) are appended deduped as the fallback tail.
             //
-            // Partial-coverage caveat: in prod `peer_transport_manifest.libp2p_peer_id` is NULL
+            // Partial-coverage caveat: in prod `peer_transport_manifest.libp2p` is NULL
             // for most entries (the column has only `#[cfg(test)]` writers — the population gap
             // is tracked in genesis/data/timeline/backlog/).  An empty manifest means:
             //   score_ordered_prefix = [] → inventory_candidates unchanged = today's behavior.
             // This is the correct safe degradation — no availability regression.
             let inventory_candidates = {
+                // Resolution requires peer_transport_manifest (iroh feature).
+                // Without it the prefix is empty → inventory unchanged (safe degradation).
+                #[cfg(feature = "p2p-iroh")]
                 let score_ordered_libp2p: Vec<String> = pool
                     .get()
                     .ok()
@@ -2451,11 +2454,13 @@ impl HttpServer {
                                 crate::p2p_iroh::peer_map::lookup_by_agent_cid(&mut conn, &cid)
                                     .ok()
                                     .flatten()
-                                    .and_then(|m| m.libp2p_peer_id)
+                                    .and_then(|m| m.libp2p.map(|l| l.peer_id))
                             })
                             .collect()
                     })
                     .unwrap_or_default();
+                #[cfg(not(feature = "p2p-iroh"))]
+                let score_ordered_libp2p: Vec<String> = Vec::new();
 
                 if score_ordered_libp2p.is_empty() {
                     // Manifest unpopulated (expected in prod this wave) — preserve today's list.
