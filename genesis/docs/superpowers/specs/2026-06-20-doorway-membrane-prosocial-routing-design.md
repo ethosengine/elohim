@@ -331,6 +331,14 @@ donut floor/ceiling). **Heads visible / bytes metered:** commons heads stay visi
 visitors; the toll meters only *bytes*; the economic frontier is enforced **peer-side** (the serving
 peer's standing check), never as a doorway-resident gatekeeper.
 
+**Commons value never accrues to the doorway — the doorway only facilitates the bridge.** Tolls settle to
+the serving peers/stewards and the commons pool; the `bridges/fiat` crate *routes* value THROUGH the
+doorway to the peers, it does not bank it AT the doorway. A doorway operator earns only as a **peer first**
+(by serving content as a peer), never qua doorway — consistent with "served THROUGH not BY" and the trust
+model's "doorways hold no canonical data — only a projection, a cache, and a service contract." This keeps
+the doorway a neutral facilitator: it cannot become a rent-extracting toll-booth, because the value flows
+past it to the commons and the peers who actually did the work.
+
 **It is a `bridges/` crate, not core doorway** — canon is explicit (`epr-reachability-economics`: "the
 finance-bridge belongs at the doorway web2 surface, as a bridge"). `bridges/fiat` plugs into the membrane
 exactly as `atproto`/`activitypub`/`valueflows` do, keeping the membrane thin (this is the operator's
