@@ -47,6 +47,12 @@ COPY elohim/epr ./epr
 # depends on it directly. Without this COPY the build aborts at resolve time:
 # "failed to read /elohim-views/Cargo.toml: No such file".
 COPY elohim/elohim-views ./elohim-views
+# elohim-facings: the pure lens crate (select→fold→aggregate folds over the
+# holder-relation); a path-dep of elohim-storage since the 2026-06-19 facings
+# extraction. Without this COPY the build aborts at resolve time:
+# "failed to read /elohim-facings/Cargo.toml: No such file". (Its own
+# `../elohim-views` dep resolves correctly in the flattened /app layout — no rewrite.)
+COPY elohim/elohim-facings ./elohim-facings
 # Wave 3 — valueflows bridge crates (hREA / VF-GraphQL interop) are
 # unconditional path-deps in Cargo.toml; copy them in so the
 # build-context contains their source.
@@ -74,6 +80,7 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../elohim-cache-core"|path = "elohim-cache-core"|' Cargo.toml && \
     sed -i 's|path = "../elohim-compute"|path = "elohim-compute"|' Cargo.toml && \
     sed -i 's|path = "../elohim-views"|path = "elohim-views"|' Cargo.toml && \
+    sed -i 's|path = "../elohim-facings"|path = "elohim-facings"|' Cargo.toml && \
     sed -i 's|path = "../epr"|path = "epr"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-bridge"|path = "bridges/valueflows/valueflows-bridge"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-types"|path = "bridges/valueflows/valueflows-types"|' Cargo.toml
