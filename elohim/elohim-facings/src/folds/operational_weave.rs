@@ -6,7 +6,40 @@
 
 use std::collections::BTreeMap;
 
+use elohim_views::ComputeTriptych;
 use elohim_views::PlacementGapView;
+
+/// DB-free mirror of a custodian's capacity (custodian_metrics ⨝ system_metrics),
+/// keyed by `agent_cid` (NOT a transport id). The diesel rows are mapped onto this
+/// by the storage loader so the folds stay DB-free.
+#[derive(Debug, Clone)]
+pub struct CustodianRow {
+    pub agent_cid: String,
+    pub free: Option<u64>,
+    pub used: Option<u64>,
+    pub stewarded: Option<u64>,
+}
+
+pub fn node_capacity(c: &CustodianRow) -> ComputeTriptych {
+    ComputeTriptych { free: c.free, used: c.used, stewarded: c.stewarded }
+}
+
+/// Per-field Option-sum rollup across nodes. A field is `Some` iff at least one node
+/// reported it; `None`s are skipped (an unsampled node doesn't zero the cluster).
+pub fn aggregate_capacity(rows: &[CustodianRow]) -> ComputeTriptych {
+    fn sum(vals: impl Iterator<Item = Option<u64>>) -> Option<u64> {
+        let mut acc: Option<u64> = None;
+        for v in vals.flatten() {
+            acc = Some(acc.unwrap_or(0) + v);
+        }
+        acc
+    }
+    ComputeTriptych {
+        free: sum(rows.iter().map(|r| r.free)),
+        used: sum(rows.iter().map(|r| r.used)),
+        stewarded: sum(rows.iter().map(|r| r.stewarded)),
+    }
+}
 
 /// Count the open placement gaps (one row = one under-replicated shard).
 pub fn placement_gap_count(gaps: &[PlacementGapView]) -> usize {
@@ -84,5 +117,24 @@ mod tests {
         b.contract_coverage = 1.0;
         assert!((super::rs_coverage(&[a, b]) - 0.75).abs() < 1e-6);
         assert_eq!(super::rs_coverage(&[]), 1.0, "no gaps ⇒ fully covered");
+    }
+
+    fn cust(free: Option<u64>, used: Option<u64>, stewarded: Option<u64>) -> super::CustodianRow {
+        super::CustodianRow { agent_cid: "a".into(), free, used, stewarded }
+    }
+
+    #[test]
+    fn aggregate_capacity_sums_per_field_skipping_none() {
+        let rows = vec![cust(Some(10), Some(5), None), cust(Some(20), None, Some(3))];
+        let t = super::aggregate_capacity(&rows);
+        assert_eq!(t.free, Some(30));
+        assert_eq!(t.used, Some(5));       // second row's used is None → skipped
+        assert_eq!(t.stewarded, Some(3));
+    }
+
+    #[test]
+    fn aggregate_capacity_all_none_is_none() {
+        let t = super::aggregate_capacity(&[cust(None, None, None)]);
+        assert!(t.free.is_none() && t.used.is_none() && t.stewarded.is_none());
     }
 }
