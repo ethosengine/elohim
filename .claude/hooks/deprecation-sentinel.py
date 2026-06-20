@@ -107,15 +107,25 @@ ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 #   line that contains "deprecations.jsonl" as a source path prefix.
 ECHO_LEDGER_PATH = re.compile(r"deprecations\.jsonl", re.IGNORECASE)
 
-# Guard B — history/museum prose:
-#   Lines sourced from genesis/docs/content/elohim-protocol/history/** narrate
-#   past deprecations.  They appear in grep-with-filename output as a leading
-#   file path, or the command itself directly reads such a file.
-#   Match: grep output prefix "…/history/<file>:<digits>:" OR bare path token
-#   anywhere in the line (cat/head/sed output from those files has no path
-#   prefix, but the command gate below covers that case).
+# Guard B — managed decision-record / museum prose:
+#   Lines sourced from the project's deprecation-narrating managed surfaces:
+#     - genesis/docs/content/elohim-protocol/history/**  (museum / arc records)
+#     - genesis/data/timeline/backlog/**                 (the canonical backlog
+#       decision records THIS sentinel itself writes — every deprecation-*.md
+#       carries "deprecated" in its title/tags/author frontmatter by design)
+#     - genesis/data/timeline/chronicle/**               (graduated-lesson records)
+#   These narrate (or canonicalize) deprecations; reading them back is never a
+#   NEW in-flight finding.  fp-dedupe cannot suppress the class: each new
+#   backlog/chronicle file mints a fresh fingerprint on the next cat/grep, so
+#   only a structural guard collapses it (cf. the 2026-06-17 + 2026-06-20
+#   backlog-frontmatter captures).
+#   They appear in grep-with-filename output as a leading file path, or the
+#   command itself directly reads such a file (cat/head/sed output has no path
+#   prefix — the command gate below covers that case).
 ECHO_HISTORY_PATH_RE = re.compile(
-    r"genesis/docs/content/elohim-protocol/history/", re.IGNORECASE
+    r"genesis/docs/content/elohim-protocol/history/"
+    r"|genesis/data/timeline/(?:backlog|chronicle)/",
+    re.IGNORECASE,
 )
 
 # Guard C — commit-message prose:
@@ -161,7 +171,9 @@ _CMD_GIT_HISTORY_RE = re.compile(
     re.IGNORECASE,
 )
 _CMD_HISTORY_TREE_RE = re.compile(
-    r"genesis/docs/content/elohim-protocol/history/", re.IGNORECASE
+    r"genesis/docs/content/elohim-protocol/history/"
+    r"|genesis/data/timeline/(?:backlog|chronicle)/",
+    re.IGNORECASE,
 )
 
 
