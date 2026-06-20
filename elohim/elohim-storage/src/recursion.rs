@@ -352,7 +352,7 @@ mod tests {
         );
         assert_eq!(ab.rollup_hash, ba.rollup_hash);
         assert!(ab.is_covered()); // 0..32 ∪ 32..64 = full(64)
-                                  // a different scope or domain → a different content address
+        // a different scope or domain → a different content address
         let other_domain = CoverageRollup::rollup(
             "collective:church",
             CoverageDomain::CareFloor,

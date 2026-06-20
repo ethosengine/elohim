@@ -21,7 +21,7 @@ use crate::recursion::{ChildCoverage, CoverageDomain, CoverageRollup, CoverageSe
 /// - `resilience_snapshot::build` — floor = `floor_for_tier("standard")` (3)
 /// - `distribution::build_summary` — target = RS(7,4) replica_target (7)
 ///
-/// Regression invariant: `rollup.constituents.len() as i32 == steward_cids.len() as i32`.
+/// Regression invariant: `rollup.constituents.len() == steward_cids.len()` (each caller casts to its own field type — i32 for resilience_snapshot, u32 for distribution).
 pub(crate) fn build_stewarding_rollup(
     content_cid: &str,
     target: u64,

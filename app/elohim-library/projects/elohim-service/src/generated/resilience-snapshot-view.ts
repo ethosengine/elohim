@@ -63,7 +63,7 @@ export interface ResilienceSnapshotView {
     healthScore?: number;
   };
   /**
-   * How many additional distinct-collective slots short of the diversity floor (CoverageRollup deficit measure). Derived in the graph-backed branch via CoverageRollup.deficit.measure(). Omitted (not-selected) when the relational household_resilience::snapshot path is used — missing means not-selected, never a measured zero.
+   * How many additional distinct-collective slots short of the diversity floor (CoverageRollup deficit measure). Derived in the graph-backed branch via CoverageRollup.deficit.measure(). Present with value 0 when the graph branch measures the floor exactly met; absent (not-selected) only on the relational household_resilience::snapshot path.
    */
   coverageShortfall?: number;
   /**
