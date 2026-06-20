@@ -4041,8 +4041,8 @@ async fn apply_membrane(
     addr: &SocketAddr,
     path: &str,
 ) -> Option<Response<BoxBody>> {
-    use crate::server::membrane::{client_ip_from_xff, derive_source, is_static_asset};
-    use elohim_peer_fabric::guard::{assess, Verdict};
+    use crate::server::membrane::{client_ip_from_xff, derive_source, is_static_asset, EdgeClock};
+    use elohim_peer_fabric::guard::{assess, Clock, Verdict};
 
     // Static assets are high-frequency browser traffic — exempt from scoring.
     if is_static_asset(path) {
@@ -4063,11 +4063,10 @@ async fn apply_membrane(
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(), // fail-open on poison
         };
-        let now = elohim_peer_fabric::guard::Clock::now_secs(
-            &crate::server::membrane::EdgeClock,
-        );
+        let clk = EdgeClock;
+        let now = clk.now_secs();
         guard.maybe_sweep(now);
-        assess(&mut *guard, &crate::server::membrane::EdgeClock, &state.membrane_cfg, &source)
+        assess(&mut *guard, &clk, &state.membrane_cfg, &source)
     };
 
     match verdict {
