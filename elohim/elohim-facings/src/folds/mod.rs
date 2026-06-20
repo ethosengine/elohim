@@ -5,4 +5,5 @@
 //! `epr_content_perspective`) over the same `crate::fold` combinators.
 
 pub mod epr_content;
+pub mod operational_weave;
 pub mod resiliency;
