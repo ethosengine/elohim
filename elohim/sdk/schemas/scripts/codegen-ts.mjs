@@ -86,6 +86,8 @@ const INTERFACE_FILES = [
   { src: 'views/household-resilience-view.ts', dest: 'household-resilience-view.ts' },
   { src: 'views/network-posture-view.ts', dest: 'network-posture-view.ts' },
   { src: 'views/placement-gap-view.ts', dest: 'placement-gap-view.ts' },
+  // Operational-weave Slice 4 — cluster-scoped WeaveView (GET /api/v1/weave).
+  { src: 'views/weave-view.ts', dest: 'weave-view.ts' },
   { src: 'views/resilience-snapshot-view.ts', dest: 'resilience-snapshot-view.ts' },
   { src: 'views/recovery-request.ts', dest: 'recovery-request.ts' },
   { src: 'views/key-rotation.ts', dest: 'key-rotation.ts' },

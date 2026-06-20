@@ -993,6 +993,47 @@ fn household_devices_view_matches_schema() {
     validate_against_schema("views/household-devices-view.schema.json", &json);
 }
 
+// ── Weave View ─────────────────────────────────────────────────
+
+#[test]
+fn weave_view_matches_schema() {
+    use elohim_storage::{ComputeTriptych, WeaveView};
+
+    // Minimal required-only variant (cluster_capacity absent → rsCoverage absent).
+    let minimal = WeaveView {
+        placement_gap_count: 0,
+        rs_coverage: None,
+        cluster_capacity: None,
+        tier_occupancy: None,
+        region_occupancy: None,
+        measured_at: "2026-06-20T12:00:00Z".to_string(),
+    };
+    let json = serde_json::to_value(&minimal).unwrap();
+    // Optional fields must be absent when None (skip_serializing_if).
+    assert!(
+        !json.as_object().unwrap().contains_key("rsCoverage"),
+        "rsCoverage must be absent when None"
+    );
+    validate_against_schema("views/weave-view.schema.json", &json);
+
+    // Full variant: all optional lenses populated.
+    // Use all-Some ComputeTriptych fields to avoid null serialization in clusterCapacity.
+    let full = WeaveView {
+        placement_gap_count: 3,
+        rs_coverage: Some(0.75),
+        cluster_capacity: Some(ComputeTriptych {
+            free: Some(1_000_000_000),
+            used: Some(500_000_000),
+            stewarded: Some(200_000_000),
+        }),
+        tier_occupancy: None,
+        region_occupancy: None,
+        measured_at: "2026-06-20T12:00:00Z".to_string(),
+    };
+    let json = serde_json::to_value(&full).unwrap();
+    validate_against_schema("views/weave-view.schema.json", &json);
+}
+
 // ── Placement Gap + Resilience Snapshot ────────────────────────
 
 #[test]

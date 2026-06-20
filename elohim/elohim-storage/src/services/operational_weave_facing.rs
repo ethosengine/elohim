@@ -6,8 +6,10 @@
 use diesel::dsl::sql;
 use diesel::prelude::*;
 use diesel::sql_types::{Double, Nullable};
-use elohim_facings::folds::operational_weave::{placement_gap_count, CustodianRow};
-use elohim_views::{CustodianStorageMetricsView, PlacementGapView};
+use elohim_facings::folds::operational_weave::{
+    aggregate_capacity, placement_gap_count, rs_coverage, CustodianRow,
+};
+use elohim_views::{CustodianStorageMetricsView, PlacementGapView, WeaveView};
 
 use crate::db::models::CustodianMetrics;
 
@@ -91,6 +93,51 @@ pub fn load_custodian_relation(conn: &mut SqliteConnection) -> Vec<CustodianRow>
 pub fn emit_placement_gap_gauge(gaps: &[PlacementGapView]) {
     let count = placement_gap_count(gaps);
     crate::metrics::ELOHIM_PLACEMENT_GAP_COUNT.set(count as i64);
+}
+
+/// Load ALL placement gaps (node-level, not app-scoped) from the database.
+///
+/// The operational-weave lens is cluster-scoped and viewer-less: the gauge and
+/// the WeaveView reflect the whole node's state, not a single app's.  Using
+/// `list_gaps(conn, h_app_id, …)` would under-count by scoping to one app.
+fn load_all_placement_gaps(conn: &mut SqliteConnection) -> Vec<PlacementGapView> {
+    use crate::db::diesel_schema::placement_gaps::dsl as pg;
+    use crate::db::models::PlacementGapRow;
+
+    match pg::placement_gaps
+        .order(pg::last_seen_at.desc())
+        .load::<PlacementGapRow>(conn)
+    {
+        Ok(rows) => rows.into_iter().map(Into::into).collect(),
+        Err(e) => {
+            tracing::warn!("load_all_placement_gaps: query failed: {e}");
+            Vec::new()
+        }
+    }
+}
+
+/// Build the full [`WeaveView`] from the current DB state.
+///
+/// The caller stamps `measured_at` (passed as an ISO-8601 string); this
+/// function NEVER calls a clock.  Both Prometheus gauges are also set here
+/// as a side-effect so the two wire shapes stay in sync with one load.
+pub fn build_weave_view(conn: &mut SqliteConnection, measured_at: String) -> WeaveView {
+    let gaps = load_all_placement_gaps(conn);
+    let custodians = load_custodian_relation(conn);
+
+    // --- gauges (adapter layer — fold is pure) ---------------------------------
+    emit_placement_gap_gauge(&gaps);
+    crate::metrics::ELOHIM_RS_COVERAGE_MILLI.set((rs_coverage(&gaps) * 1000.0) as i64);
+
+    // --- view ------------------------------------------------------------------
+    WeaveView {
+        placement_gap_count: placement_gap_count(&gaps) as u32,
+        rs_coverage: Some(rs_coverage(&gaps)),
+        cluster_capacity: Some(aggregate_capacity(&custodians)),
+        tier_occupancy: None,
+        region_occupancy: None,
+        measured_at,
+    }
 }
 
 #[cfg(test)]

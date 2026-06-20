@@ -257,6 +257,20 @@ pub async fn handle_api_request(
         // Local SQLite roll-up over the steward's REA projection (no federation),
         // so no `p2p_handle` plumbed. Auth-implicit identity determines scope.
         reciprocity::handle(req, method, &pool, graph_engine_ref).await
+    } else if sub_path == "weave" {
+        // Operational-weave Slice 4: GET /api/v1/weave — cluster-scoped operational
+        // lens (placement gap count, RS coverage, cluster capacity). Viewer-less —
+        // no auth scope, no app-id scope. The handler stamps measured_at.
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+        let mut conn = get_conn(&pool)?;
+        let measured_at = chrono::Utc::now().to_rfc3339();
+        let view = crate::services::operational_weave_facing::build_weave_view(
+            &mut conn,
+            measured_at,
+        );
+        Ok(response::ok(&view))
     } else if sub_path.starts_with("comments") {
         let resource_path = sub_path.strip_prefix("comments").unwrap_or("");
         comments::handle(req, method, resource_path, &pool, &app_ctx, services).await
@@ -747,3 +761,84 @@ pub async fn parse_body<T: serde::de::DeserializeOwned>(
     serde_json::from_slice(&body_bytes)
         .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))
 }
+
+// =============================================================================
+// Routing unit tests
+// =============================================================================
+
+#[cfg(test)]
+mod routing_tests {
+    /// Routing guard: assert the sub-path `"weave"` is exactly matched by the
+    /// `else if sub_path == "weave"` arm and cannot be shadowed by any preceding
+    /// `starts_with` arm.
+    ///
+    /// This crate has no HTTP dispatch test harness (building a `Request` +
+    /// `DbPool` fixture is heavy; integration coverage lives in schema_contract).
+    /// The structural safety here is that the dispatch chain uses exact `==` for
+    /// "weave", not `starts_with` — so no sibling arm can inadvertently eat it.
+    /// We assert the invariant at the string level: no other registered path is a
+    /// prefix of "weave" when trimmed from the left.
+    ///
+    /// Limitation: this does NOT exercise the async handler or the HTTP layer.
+    /// A full integration test requires a live `DbPool`; track as a follow-on.
+    #[test]
+    fn weave_sub_path_is_not_prefix_shadowed_by_any_sibling_arm() {
+        // All `starts_with` prefixes in use by the dispatch chain.
+        // Extend this list if a new arm is added that could collide.
+        let starts_with_arms = [
+            "attention",
+            "account",
+            "agreements",
+            "presence",
+            "stewardship",
+            "economic-events",
+            "epr",
+            "resources",
+            "exchange",
+            "identity",
+            "mastery",
+            "mishpat/recognition",
+            "flow-planning",
+            "governance-actions",
+            "governance",
+            "compute",
+            "custodians",
+            "commitments",
+            "collective",
+            "collab",
+            "attestations",
+            "blob/",
+            "comments",
+            "contributors",
+            "registry",
+            "recognition",
+            "routing",
+            "weather",
+            "resilience",
+            "risk",
+            "hazards",
+            "observations",
+            "placement-gaps",
+            "dashboard",
+            "places",
+            "schedules",
+            "standing",
+            "spatial-contexts",
+            "steward-affinity",
+            "steward",
+            "peer-statuses",
+            "nodes",
+            "households",
+            "peer/",
+            "hub/",
+        ];
+
+        for prefix in starts_with_arms {
+            assert!(
+                !"weave".starts_with(prefix),
+                "starts_with arm \"{prefix}\" would shadow the \"weave\" exact-match arm"
+            );
+        }
+    }
+}
+

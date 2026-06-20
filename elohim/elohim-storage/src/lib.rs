@@ -268,4 +268,5 @@ pub use views::{
     PlacementGapShortfall, PlacementGapView, RegionalDistributionView,
     ResilienceSnapshotDetailsView, ResilienceSnapshotView, StewardingCollectiveEntry,
 };
+pub use views::{ComputeTriptych, WeaveView};
 pub use views::{IrohTransportProfileView, Libp2pTransportProfileView, PeerTransportManifestView};

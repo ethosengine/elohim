@@ -1,0 +1,57 @@
+{
+  "$id": "weave-view.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WeaveView",
+  "description": "Cluster-scoped operational weave projection: placement/coverage/capacity folded per-shard → per-node → per-cluster. Each lens field is optional — a facing carries only the lenses it selected (the not-selected-field contract). Operational Category C — no DHT entry; projection only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["placementGapCount", "measuredAt"],
+  "properties": {
+    "placementGapCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of open shard placement gaps (under-replicated shards) at the time of measurement."
+    },
+    "measuredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp at which this view was assembled."
+    },
+    "rsCoverage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Mean RS contract-coverage across open placement gaps. 1.0 when there are no gaps (fully covered). Optional — absent when the lens was not selected."
+    },
+    "clusterCapacity": {
+      "type": "object",
+      "description": "Aggregated storage capacity across all custodian nodes. Optional — absent when no custodian metrics are available.",
+      "additionalProperties": false,
+      "properties": {
+        "free": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Bytes available across all nodes. null when no node has reported a current sample."
+        },
+        "used": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Bytes occupied by blob storage across all nodes. null when no node has reported a current sample."
+        },
+        "stewarded": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Bytes committed via REA custody-blob commitments. null when no custody rows exist."
+        }
+      }
+    },
+    "tierOccupancy": {
+      "description": "Risk-tier occupancy distribution (deferred — Slice 5 follow-on). Absent in Slice 4 responses.",
+      "type": "object"
+    },
+    "regionOccupancy": {
+      "description": "Regional occupancy distribution (deferred — Slice 5 follow-on). Absent in Slice 4 responses.",
+      "type": "object"
+    }
+  }
+}
