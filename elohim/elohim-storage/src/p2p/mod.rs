@@ -2748,18 +2748,59 @@ impl P2PNode {
                 // Hold permit for lifetime of the task — releases on drop.
                 let _permit = permit;
 
-                // Resolve candidates from peer_blob_inventory.
+                // Resolve candidates from peer_blob_inventory, then re-order by score.
+                //
+                // Wave-3: `select_serve_peers` returns score-ordered agent_cids from the
+                // agent_cid-native `shard_locations` source. Each is resolved to a libp2p
+                // peer id via `peer_transport_manifest`. Resolvable entries form a score-
+                // ordered prefix; the original inventory list is appended deduped as fallback.
+                // In prod the manifest is empty → prefix empty → inventory list unchanged
+                // (today's behavior). No availability regression.
                 let candidates = {
                     match pool.get() {
-                        Ok(mut c) => crate::db::peer_blob_inventory::lookup_hosts(
-                            &mut c,
-                            &hash_owned,
-                            &fresh_after_owned,
-                        )
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(|r| r.peer_id)
-                        .collect::<Vec<_>>(),
+                        Ok(mut c) => {
+                            let inventory: Vec<String> =
+                                crate::db::peer_blob_inventory::lookup_hosts(
+                                    &mut c,
+                                    &hash_owned,
+                                    &fresh_after_owned,
+                                )
+                                .unwrap_or_default()
+                                .into_iter()
+                                .map(|r| r.peer_id)
+                                .collect();
+
+                            // Score-order: resolve agent_cids → libp2p ids.
+                            let score_prefix: Vec<String> =
+                                crate::services::serve_routing::select_serve_peers(
+                                    &mut c,
+                                    &hash_owned,
+                                    inventory.len().max(8),
+                                )
+                                .unwrap_or_default()
+                                .into_iter()
+                                .filter_map(|cid| {
+                                    crate::p2p_iroh::peer_map::lookup_by_agent_cid(&mut c, &cid)
+                                        .ok()
+                                        .flatten()
+                                        .and_then(|m| m.libp2p_peer_id)
+                                })
+                                .collect();
+
+                            if score_prefix.is_empty() {
+                                inventory
+                            } else {
+                                let prefix_set: std::collections::HashSet<&str> =
+                                    score_prefix.iter().map(String::as_str).collect();
+                                let tail: Vec<String> = inventory
+                                    .into_iter()
+                                    .filter(|p| !prefix_set.contains(p.as_str()))
+                                    .collect();
+                                let mut merged = score_prefix;
+                                merged.extend(tail);
+                                merged
+                            }
+                        }
                         Err(_) => return,
                     }
                 };

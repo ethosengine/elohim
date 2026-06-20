@@ -2416,6 +2416,65 @@ impl HttpServer {
                 .map(|rows| rows.into_iter().map(|r| r.peer_id).collect::<Vec<_>>())
                 .unwrap_or_default();
 
+            // Wave-3 serve-routing: re-order `inventory_candidates` by capability/headroom/RTT/bond/delivery/diversity.
+            //
+            // `select_serve_peers` returns score-ordered agent_cids from the `shard_locations`
+            // agent_cid-native source.  Each agent_cid is then resolved to a libp2p peer id via
+            // `peer_transport_manifest` (the agent_cid → libp2p_peer_id direction IS available).
+            // Resolvable entries form a score-ordered prefix; the original `inventory_candidates`
+            // (libp2p-keyed, unordered) are appended deduped as the fallback tail.
+            //
+            // Partial-coverage caveat: in prod `peer_transport_manifest.libp2p_peer_id` is NULL
+            // for most entries (the column has only `#[cfg(test)]` writers — the population gap
+            // is tracked in genesis/data/timeline/backlog/).  An empty manifest means:
+            //   score_ordered_prefix = [] → inventory_candidates unchanged = today's behavior.
+            // This is the correct safe degradation — no availability regression.
+            let inventory_candidates = {
+                let score_ordered_libp2p: Vec<String> = pool
+                    .get()
+                    .ok()
+                    .map(|mut conn| {
+                        // select_serve_peers: load shard_locations → fold → select_diverse.
+                        // Returns agent_cids ordered by score (best first).
+                        let agent_cids = crate::services::serve_routing::select_serve_peers(
+                            &mut conn,
+                            hash,
+                            inventory_candidates.len().max(8),
+                        )
+                        .unwrap_or_default();
+
+                        // Resolve each agent_cid → libp2p_peer_id via peer_transport_manifest.
+                        // Only peers with a populated libp2p_peer_id make it to the prefix.
+                        agent_cids
+                            .into_iter()
+                            .filter_map(|cid| {
+                                crate::p2p_iroh::peer_map::lookup_by_agent_cid(&mut conn, &cid)
+                                    .ok()
+                                    .flatten()
+                                    .and_then(|m| m.libp2p_peer_id)
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                if score_ordered_libp2p.is_empty() {
+                    // Manifest unpopulated (expected in prod this wave) — preserve today's list.
+                    inventory_candidates
+                } else {
+                    // Score-ordered prefix + original list (deduped). Peers already in the
+                    // prefix are not re-added from the tail, preserving score ordering.
+                    let prefix_set: std::collections::HashSet<&str> =
+                        score_ordered_libp2p.iter().map(String::as_str).collect();
+                    let tail: Vec<String> = inventory_candidates
+                        .into_iter()
+                        .filter(|p| !prefix_set.contains(p.as_str()))
+                        .collect();
+                    let mut merged = score_ordered_libp2p;
+                    merged.extend(tail);
+                    merged
+                }
+            };
+
             // Snapshot the connected-peer set via ListPeers command once;
             // used both as the race_fetch membership filter and (on empty
             // inventory) as the connected-fallback candidate set.

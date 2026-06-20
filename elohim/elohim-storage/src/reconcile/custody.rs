@@ -157,8 +157,42 @@ pub fn reconcile_pass(
                 let candidates =
                     crate::db::peer_blob_inventory::lookup_hosts(conn, &blob_hash, &stale_before)?;
                 if !candidates.is_empty() {
-                    let candidate_peers: Vec<String> =
+                    let inventory: Vec<String> =
                         candidates.into_iter().map(|c| c.peer_id).collect();
+
+                    // Wave-3: re-order inventory by capability/headroom/RTT/bond/diversity.
+                    // `select_serve_peers` → agent_cids → resolved to libp2p via manifest.
+                    // Empty manifest (prod default) → prefix empty → inventory unchanged.
+                    let score_prefix: Vec<String> =
+                        crate::services::serve_routing::select_serve_peers(
+                            conn,
+                            &blob_hash,
+                            inventory.len().max(8),
+                        )
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter_map(|cid| {
+                            crate::p2p_iroh::peer_map::lookup_by_agent_cid(conn, &cid)
+                                .ok()
+                                .flatten()
+                                .and_then(|m| m.libp2p_peer_id)
+                        })
+                        .collect();
+
+                    let candidate_peers: Vec<String> = if score_prefix.is_empty() {
+                        inventory
+                    } else {
+                        let prefix_set: std::collections::HashSet<&str> =
+                            score_prefix.iter().map(String::as_str).collect();
+                        let tail: Vec<String> = inventory
+                            .into_iter()
+                            .filter(|p| !prefix_set.contains(p.as_str()))
+                            .collect();
+                        let mut merged = score_prefix;
+                        merged.extend(tail);
+                        merged
+                    };
+
                     fetch_kicker.kick(&blob_hash, candidate_peers);
                     outcome.kicks_fired += 1;
                 } else if !connected_peers.is_empty() {
