@@ -1381,6 +1381,7 @@ dependencies = [
  "ed25519-dalek",
  "elohim-cache-core",
  "elohim-compute",
+ "elohim-peer-fabric",
  "elohim-render",
  "elohim-views",
  "futures",
@@ -1547,6 +1548,10 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "elohim-peer-fabric"
+version = "0.1.0"
 
 [[package]]
 name = "elohim-render"

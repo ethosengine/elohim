@@ -298,7 +298,6 @@ pub struct AppState {
     pub upstream_breakers: Arc<crate::routes::UpstreamBreakers>,
 
     // ── Membrane policy (Pillar 2 layer 3) ────────────────────────────────────
-
     /// Per-source rate-limit store — evicting in-memory implementation.
     /// Guarded by a std Mutex so the non-async `assess` call can hold it;
     /// the lock is ALWAYS dropped before any `.await` (Shape sleep).

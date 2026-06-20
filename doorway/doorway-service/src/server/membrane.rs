@@ -99,10 +99,13 @@ impl EdgeGuardStore {
 impl GuardStore for EdgeGuardStore {
     fn record(&mut self, source: &str, ts_secs: u64) {
         let cutoff = ts_secs.saturating_sub(self.window_secs);
-        let state = self.sources.entry(source.to_string()).or_insert_with(|| SourceState {
-            hits: VecDeque::new(),
-            ban_until: None,
-        });
+        let state = self
+            .sources
+            .entry(source.to_string())
+            .or_insert_with(|| SourceState {
+                hits: VecDeque::new(),
+                ban_until: None,
+            });
         // Prune in-window on record — bound the VecDeque for high-rate sources.
         while state.hits.front().is_some_and(|&t| t < cutoff) {
             state.hits.pop_front();
@@ -111,9 +114,9 @@ impl GuardStore for EdgeGuardStore {
     }
 
     fn count_since(&self, source: &str, since_secs: u64) -> u32 {
-        self.sources
-            .get(source)
-            .map_or(0, |s| s.hits.iter().filter(|&&t| t >= since_secs).count() as u32)
+        self.sources.get(source).map_or(0, |s| {
+            s.hits.iter().filter(|&&t| t >= since_secs).count() as u32
+        })
     }
 
     fn is_banned(&self, source: &str, now_secs: u64) -> bool {
@@ -124,10 +127,13 @@ impl GuardStore for EdgeGuardStore {
     }
 
     fn ban_until(&mut self, source: &str, until_secs: u64) {
-        let state = self.sources.entry(source.to_string()).or_insert_with(|| SourceState {
-            hits: VecDeque::new(),
-            ban_until: None,
-        });
+        let state = self
+            .sources
+            .entry(source.to_string())
+            .or_insert_with(|| SourceState {
+                hits: VecDeque::new(),
+                ban_until: None,
+            });
         let was_banned = state.ban_until.is_some_and(|u| u > 0);
         state.ban_until = Some(until_secs);
         if !was_banned {
@@ -144,7 +150,11 @@ impl GuardStore for EdgeGuardStore {
 /// true client IP.
 ///
 /// Falls back to `peer_addr` when the header is absent or too short.
-pub fn client_ip_from_xff(xff: Option<&str>, peer_addr: &SocketAddr, trusted_proxy_hops: usize) -> String {
+pub fn client_ip_from_xff(
+    xff: Option<&str>,
+    peer_addr: &SocketAddr,
+    trusted_proxy_hops: usize,
+) -> String {
     let header = match xff {
         Some(h) if !h.is_empty() => h,
         _ => return peer_addr.ip().to_string(),
@@ -185,7 +195,10 @@ pub fn is_static_asset(path: &str) -> bool {
     }
     // Extension-based exemption — covers hashed filenames Angular emits.
     let ext_start = path.rfind('.').map(|i| i + 1).unwrap_or(path.len());
-    matches!(&path[ext_start..], "js" | "css" | "woff2" | "woff" | "png" | "ico" | "svg" | "map")
+    matches!(
+        &path[ext_start..],
+        "js" | "css" | "woff2" | "woff" | "png" | "ico" | "svg" | "map"
+    )
 }
 
 // ─── Edge GuardConfig ─────────────────────────────────────────────────────────
@@ -243,7 +256,10 @@ mod tests {
 
     #[test]
     fn xff_no_header_returns_peer() {
-        assert_eq!(client_ip_from_xff(None, &peer([10, 0, 0, 1]), 1), "10.0.0.1");
+        assert_eq!(
+            client_ip_from_xff(None, &peer([10, 0, 0, 1]), 1),
+            "10.0.0.1"
+        );
     }
 
     #[test]
@@ -268,7 +284,11 @@ mod tests {
     fn xff_two_hops_extracts_correct_position() {
         // "1.2.3.4, 172.16.0.1, 10.0.0.1" — 2 trusted hops → client is 1.2.3.4.
         assert_eq!(
-            client_ip_from_xff(Some("1.2.3.4, 172.16.0.1, 10.0.0.1"), &peer([10, 0, 0, 1]), 2),
+            client_ip_from_xff(
+                Some("1.2.3.4, 172.16.0.1, 10.0.0.1"),
+                &peer([10, 0, 0, 1]),
+                2
+            ),
             "1.2.3.4"
         );
     }
@@ -277,7 +297,10 @@ mod tests {
 
     #[test]
     fn derive_source_authenticated_uses_agent_prefix() {
-        assert_eq!(derive_source(Some("human-abc"), "1.2.3.4"), "agent:human-abc");
+        assert_eq!(
+            derive_source(Some("human-abc"), "1.2.3.4"),
+            "agent:human-abc"
+        );
     }
 
     #[test]
@@ -323,7 +346,7 @@ mod tests {
         let mut store = EdgeGuardStore::new(60);
         store.record("ip:1.2.3.4", 900); // old
         store.record("ip:1.2.3.4", 1000); // recent
-        // since=950 → only hit at 1000 counts.
+                                          // since=950 → only hit at 1000 counts.
         assert_eq!(store.count_since("ip:1.2.3.4", 950), 1);
     }
 
@@ -343,7 +366,10 @@ mod tests {
         // At t=1000, cutoff=940, so 930 < 940 → hit is stale.
         store.sweep_idle(1000);
         assert_eq!(store.count_since("ip:old", 0), 0);
-        assert!(!store.sources.contains_key("ip:old"), "idle source must be evicted");
+        assert!(
+            !store.sources.contains_key("ip:old"),
+            "idle source must be evicted"
+        );
     }
 
     #[test]
@@ -351,7 +377,10 @@ mod tests {
         let mut store = EdgeGuardStore::new(60);
         store.ban_until("ip:banned", 5000);
         store.sweep_idle(1000);
-        assert!(store.sources.contains_key("ip:banned"), "banned source must survive sweep");
+        assert!(
+            store.sources.contains_key("ip:banned"),
+            "banned source must survive sweep"
+        );
     }
 
     #[test]
@@ -375,6 +404,9 @@ mod tests {
     #[test]
     fn edge_clock_returns_nonzero_secs() {
         let clk = EdgeClock;
-        assert!(clk.now_secs() > 0, "clock must return a positive unix timestamp");
+        assert!(
+            clk.now_secs() > 0,
+            "clock must return a positive unix timestamp"
+        );
     }
 }
