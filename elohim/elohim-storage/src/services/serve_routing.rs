@@ -96,26 +96,22 @@ pub fn load_serve_rows(
     conn: &mut SqliteConnection,
     blob_hash: &str,
 ) -> Result<Vec<ServeRow>, StorageError> {
-    // Step 1: find the shard_manifests row for this blob_hash, collect shard hashes.
-    #[derive(Queryable)]
-    struct ManifestRow {
-        shard_hashes_json: String,
-    }
-
-    let manifest_rows: Vec<ManifestRow> = shard_manifests::table
+    // Step 1: find the shard_manifests rows for this blob_hash, collect shard hashes.
+    // Load shard_hashes_json as Vec<String> directly (single-column select — no struct wrapper).
+    let manifest_json_rows: Vec<String> = shard_manifests::table
         .filter(shard_manifests::blob_hash.eq(blob_hash))
         .select(shard_manifests::shard_hashes_json)
-        .load::<ManifestRow>(conn)
+        .load::<String>(conn)
         .map_err(|e| StorageError::Database(format!("load_serve_rows manifest: {e}")))?;
 
-    if manifest_rows.is_empty() {
+    if manifest_json_rows.is_empty() {
         return Ok(vec![]);
     }
 
     // Collect all shard hashes across matching manifests (may span h_app_id).
     let mut shard_hashes: Vec<String> = Vec::new();
-    for m in &manifest_rows {
-        let parsed: Vec<String> = serde_json::from_str(&m.shard_hashes_json).unwrap_or_default();
+    for json in &manifest_json_rows {
+        let parsed: Vec<String> = serde_json::from_str(json).unwrap_or_default();
         shard_hashes.extend(parsed);
     }
     shard_hashes.dedup();
@@ -138,17 +134,11 @@ pub fn load_serve_rows(
     }
 
     // Step 3: enrich with household_id from humans.agent_pub_key.
-    #[derive(Queryable)]
-    struct HumanRow {
-        agent_pub_key: Option<String>,
-        household_id: Option<String>,
-        id: String,
-    }
-
-    let human_rows: Vec<HumanRow> = humans::table
+    // Load as tuples: (agent_pub_key, household_id, id).
+    let human_rows: Vec<(Option<String>, Option<String>, String)> = humans::table
         .filter(humans::agent_pub_key.eq_any(&location_rows))
         .select((humans::agent_pub_key, humans::household_id, humans::id))
-        .load::<HumanRow>(conn)
+        .load::<(Option<String>, Option<String>, String)>(conn)
         .map_err(|e| StorageError::Database(format!("load_serve_rows humans: {e}")))?;
 
     // Build maps: agent_cid → household_id, agent_cid → human.id (for node join).
@@ -156,37 +146,32 @@ pub fn load_serve_rows(
         std::collections::HashMap::new();
     let mut human_id_by_agent: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
-    for r in &human_rows {
-        if let Some(ref key) = r.agent_pub_key {
-            household_by_agent.insert(key.clone(), r.household_id.clone());
-            human_id_by_agent.insert(key.clone(), r.id.clone());
+    for (agent_pub_key, household_id, id) in &human_rows {
+        if let Some(ref key) = agent_pub_key {
+            household_by_agent.insert(key.clone(), household_id.clone());
+            human_id_by_agent.insert(key.clone(), id.clone());
         }
     }
 
     // Step 4: resolve capability_level via node_stewardship → stewarded_nodes.
     // Join path: human.id → node_stewardship.human_id → stewarded_nodes.capability_level.
+    // Load as tuples: (human_id, capability_level).
     let human_ids: Vec<&String> = human_id_by_agent.values().collect();
-    #[derive(Queryable)]
-    struct NodeCapRow {
-        human_id: String,
-        capability_level: Option<i32>,
-    }
-
-    let node_cap_rows: Vec<NodeCapRow> = node_stewardship::table
+    let node_cap_rows: Vec<(String, Option<i32>)> = node_stewardship::table
         .inner_join(stewarded_nodes::table.on(stewarded_nodes::id.eq(node_stewardship::node_id)))
         .filter(node_stewardship::human_id.eq_any(&human_ids))
         .select((
             node_stewardship::human_id,
             stewarded_nodes::capability_level,
         ))
-        .load::<NodeCapRow>(conn)
+        .load::<(String, Option<i32>)>(conn)
         .map_err(|e| StorageError::Database(format!("load_serve_rows node_cap: {e}")))?;
 
     // Build map: human_id → capability_level (first match wins).
     let mut cap_by_human: std::collections::HashMap<String, Option<i32>> =
         std::collections::HashMap::new();
-    for r in node_cap_rows {
-        cap_by_human.entry(r.human_id).or_insert(r.capability_level);
+    for (human_id, capability_level) in node_cap_rows {
+        cap_by_human.entry(human_id).or_insert(capability_level);
     }
 
     // Step 5: resolve bonded — active provide/replicates-* REA commitment.
