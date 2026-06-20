@@ -6935,7 +6935,7 @@ impl HttpServer {
         &self,
         req: Request<Incoming>,
         method: Method,
-        ctx: &AppContext,
+        _ctx: &AppContext,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         if method != Method::GET {
             return Ok(response::method_not_allowed());
@@ -6961,40 +6961,28 @@ impl HttpServer {
         // (the individual find_by_* functions don't take a limit parameter — we
         // keep the DB queries simple and trim in application code because the
         // gate-decisions table will remain small — one row per gate evaluation).
+        // Phase-2a consolidation: gate decisions live in the unified `attestations`
+        // table as `attestation:gate-decision` (the per-app gate-decision projection
+        // table was dropped). The unified table is CID-global (no app_id scope), so the
+        // app_id filter is no longer applied. The gate-name / phase fields are read from
+        // `evidence_json` via json_extract; elohim is the issuer_cid.
         let rows = match (&query.elohim, &query.gate, &query.phase) {
-            (Some(elohim_id), _, _) => crate::db::gate_decision_attestations::find_by_elohim(
-                &mut conn,
-                &ctx.h_app_id,
-                elohim_id,
-            )?,
-            (_, Some(gate_name), _) => crate::db::gate_decision_attestations::find_by_gate(
-                &mut conn,
-                &ctx.h_app_id,
-                gate_name,
-            )?,
-            (_, _, Some(phase)) => crate::db::gate_decision_attestations::find_by_phase(
-                &mut conn,
-                &ctx.h_app_id,
-                phase,
-            )?,
-            _ => {
-                // No filter — return all, ordered by decided_at desc, limited
-                use crate::db::diesel_schema::gate_decision_attestations::dsl;
-                use diesel::prelude::*;
-                dsl::gate_decision_attestations
-                    .filter(dsl::app_id.eq(&ctx.h_app_id))
-                    .order(dsl::decided_at.desc())
-                    .limit(raw_limit)
-                    .load::<crate::db::gate_decision_attestations::GateDecisionAttestationRow>(
-                        &mut conn,
-                    )?
+            (Some(elohim_id), _, _) => {
+                crate::db::attestations::gate_decision_find_by_elohim(&mut conn, elohim_id)?
             }
+            (_, Some(gate_name), _) => {
+                crate::db::attestations::gate_decision_find_by_gate(&mut conn, gate_name)?
+            }
+            (_, _, Some(phase)) => {
+                crate::db::attestations::gate_decision_find_by_phase(&mut conn, phase)?
+            }
+            _ => crate::db::attestations::gate_decision_list_all(&mut conn, raw_limit)?,
         };
 
         let views: Vec<GateDecisionAttestationView> = rows
             .into_iter()
             .take(raw_limit as usize)
-            .map(GateDecisionAttestationView::from)
+            .map(crate::views_convert::qahal::gate_decision_view_from_attestation)
             .collect();
 
         let count = views.len();
@@ -7013,7 +7001,7 @@ impl HttpServer {
         _req: Request<Incoming>,
         method: Method,
         decision_id: &str,
-        ctx: &AppContext,
+        _ctx: &AppContext,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         if method != Method::GET {
             return Ok(response::method_not_allowed());
@@ -7021,12 +7009,10 @@ impl HttpServer {
 
         let mut conn = self.get_diesel_conn()?;
 
-        match crate::db::gate_decision_attestations::find_by_id(
-            &mut conn,
-            &ctx.h_app_id,
-            decision_id,
-        )? {
-            Some(row) => Ok(response::ok(&GateDecisionAttestationView::from(row))),
+        match crate::db::attestations::gate_decision_find_by_id(&mut conn, decision_id)? {
+            Some(row) => Ok(response::ok(
+                &crate::views_convert::qahal::gate_decision_view_from_attestation(row),
+            )),
             None => Ok(response::not_found(&format!(
                 "Gate decision not found: {}",
                 decision_id

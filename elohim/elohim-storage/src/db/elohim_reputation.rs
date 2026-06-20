@@ -175,20 +175,27 @@ pub fn compute(conn: &mut SqliteConnection, q: &ReputationQuery) -> QueryResult<
     // ------------------------------------------------------------------
     // Step 1: Load all elohim-active decisions in the window.
     //
-    // We use raw SQL here because Diesel's type-checked DSL becomes
-    // cumbersome for the multi-table join pattern that follows.
+    // Phase-2a consolidation: gate decisions live in the unified `attestations`
+    // table as `attestation:gate-decision` (the per-app gate-decision projection
+    // table was dropped). The decision CID is the row `id`; `elohim_id`, `phase`,
+    // `decided_at`, and `elohim_substance_cid` live inside `evidence_json` and are
+    // read via SQLite `json_extract`. The unified table is CID-global (no app_id
+    // scope), so the app_id filter is dropped; `elohim_id` matches `issuer_cid`.
+    // We use raw SQL because Diesel's type-checked DSL becomes cumbersome for the
+    // multi-table join pattern that follows.
     // ------------------------------------------------------------------
     let decisions: Vec<DecisionRow> = diesel::sql_query(
-        "SELECT decision_id, elohim_substance_cid, decided_at \
-         FROM gate_decision_attestations \
-         WHERE app_id = ? \
-           AND elohim_id = ? \
-           AND phase = 'elohim-active' \
-           AND decided_at >= ? \
-           AND decided_at <= ? \
-         ORDER BY decided_at DESC",
+        "SELECT id AS decision_id, \
+                json_extract(evidence_json, '$.elohim_substance_cid') AS elohim_substance_cid, \
+                json_extract(evidence_json, '$.decided_at') AS decided_at \
+         FROM attestations \
+         WHERE attestation_kind = 'attestation:gate-decision' \
+           AND issuer_cid = ? \
+           AND json_extract(evidence_json, '$.phase') = 'elohim-active' \
+           AND json_extract(evidence_json, '$.decided_at') >= ? \
+           AND json_extract(evidence_json, '$.decided_at') <= ? \
+         ORDER BY json_extract(evidence_json, '$.decided_at') DESC",
     )
-    .bind::<diesel::sql_types::Text, _>(&q.app_id)
     .bind::<diesel::sql_types::Text, _>(&q.elohim_id)
     .bind::<diesel::sql_types::Text, _>(&q.window_start)
     .bind::<diesel::sql_types::Text, _>(&q.window_end)
@@ -294,24 +301,27 @@ mod tests {
 
         conn.batch_execute(
             r#"
-            CREATE TABLE gate_decision_attestations (
-                app_id TEXT NOT NULL,
-                decision_id TEXT NOT NULL,
-                phase TEXT NOT NULL,
-                elohim_id TEXT NOT NULL,
-                elohim_substance_cid TEXT NOT NULL,
-                gate_name TEXT NOT NULL,
-                gate_process_cid TEXT NOT NULL,
-                request_ref_json TEXT NOT NULL,
-                decision TEXT NOT NULL,
-                reasoning_json TEXT NOT NULL,
-                context_summary_cid TEXT NOT NULL,
-                decided_at TEXT NOT NULL,
-                universal_band_cid TEXT NOT NULL,
-                dht_anchor_hash TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-                PRIMARY KEY (app_id, decision_id)
+            CREATE TABLE attestations (
+                id TEXT PRIMARY KEY,
+                dht_anchor_hash BLOB NOT NULL,
+                attestation_kind TEXT NOT NULL,
+                subject_cid TEXT NOT NULL,
+                subject_kind TEXT NOT NULL,
+                issuer_cid TEXT NOT NULL,
+                parent_governance_action_cid TEXT,
+                vote_value TEXT,
+                vote_weight TEXT,
+                proof_class TEXT NOT NULL,
+                proof_evidence_json TEXT NOT NULL,
+                evidence_json TEXT NOT NULL,
+                expires_at TEXT,
+                supersedes_cid TEXT,
+                revocation_reason TEXT,
+                revoked_at TEXT,
+                created_at TEXT NOT NULL,
+                manifest_ref TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT
             );
             CREATE TABLE gate_decision_challenges (
                 app_id TEXT NOT NULL,
@@ -349,6 +359,9 @@ mod tests {
         conn
     }
 
+    /// Insert a gate-decision attestation into the unified `attestations` table,
+    /// with the structured fields packed into `evidence_json` (mirroring the
+    /// production projection in `db::attestations::attestation_row_from_gate_decision`).
     fn insert_decision(
         conn: &mut SqliteConnection,
         decision_id: &str,
@@ -357,27 +370,38 @@ mod tests {
         substance_cid: &str,
         decided_at: &str,
     ) {
+        let evidence_json = serde_json::json!({
+            "decision_id": decision_id,
+            "phase": phase,
+            "elohim_id": elohim_id,
+            "elohim_substance_cid": substance_cid,
+            "gate_name": "gate-a",
+            "gate_process_cid": "bafyPROC",
+            "request_ref_json": "{}",
+            "decision": "allow",
+            "context_summary_cid": "bafyCTX",
+            "decided_at": decided_at,
+            "universal_band_cid": "bafyUNIV",
+        })
+        .to_string();
         diesel::sql_query(
-            "INSERT INTO gate_decision_attestations \
-             (app_id, decision_id, phase, elohim_id, elohim_substance_cid, gate_name, \
-              gate_process_cid, request_ref_json, decision, reasoning_json, \
-              context_summary_cid, decided_at, universal_band_cid, dht_anchor_hash) \
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO attestations \
+             (id, dht_anchor_hash, attestation_kind, subject_cid, subject_kind, issuer_cid, \
+              proof_class, proof_evidence_json, evidence_json, created_at, manifest_ref, title) \
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         )
-        .bind::<diesel::sql_types::Text, _>("test-app")
         .bind::<diesel::sql_types::Text, _>(decision_id)
-        .bind::<diesel::sql_types::Text, _>(phase)
+        .bind::<diesel::sql_types::Binary, _>(b"uhCkkANCHOR".to_vec())
+        .bind::<diesel::sql_types::Text, _>("attestation:gate-decision")
         .bind::<diesel::sql_types::Text, _>(elohim_id)
-        .bind::<diesel::sql_types::Text, _>(substance_cid)
-        .bind::<diesel::sql_types::Text, _>("gate-a")
-        .bind::<diesel::sql_types::Text, _>("bafyPROC")
-        .bind::<diesel::sql_types::Text, _>(r#"{}"#)
-        .bind::<diesel::sql_types::Text, _>("allow")
-        .bind::<diesel::sql_types::Text, _>(r#"{}"#)
-        .bind::<diesel::sql_types::Text, _>("bafyCTX")
+        .bind::<diesel::sql_types::Text, _>("agent")
+        .bind::<diesel::sql_types::Text, _>(elohim_id)
+        .bind::<diesel::sql_types::Text, _>("audit")
+        .bind::<diesel::sql_types::Text, _>(r#"{"class":"audit","reasoning_json":"{}"}"#)
+        .bind::<diesel::sql_types::Text, _>(&evidence_json)
         .bind::<diesel::sql_types::Text, _>(decided_at)
-        .bind::<diesel::sql_types::Text, _>("bafyUNIV")
-        .bind::<diesel::sql_types::Text, _>("uhCkkANCHOR")
+        .bind::<diesel::sql_types::Text, _>("mishpat")
+        .bind::<diesel::sql_types::Text, _>("Gate decision: gate-a")
         .execute(conn)
         .expect("insert decision");
     }

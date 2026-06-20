@@ -13,7 +13,6 @@ use elohim_views::{
 };
 
 use crate::db::challenge_outcomes::ChallengeOutcomeRow;
-use crate::db::gate_decision_attestations::GateDecisionAttestationRow;
 use crate::db::gate_decision_challenges::GateDecisionChallengeRow;
 use crate::db::models::{
     Appeal, AttestationRow, Challenge, Collective, CollectiveParticipation, Discussion,
@@ -373,26 +372,68 @@ impl From<StatementVote> for StatementVoteView {
 
 // ============================================================================
 // Gate Decision Attestation View
+//
+// Phase-2a consolidation: gate decisions now project into the unified
+// `attestations` table as `attestation:gate-decision`. The view reconstructs
+// the legacy wire shape from the row's `evidence_json` + `proof_evidence_json`
+// (mirror of the elohim-DNA bridge `create_gate_decision_attestation`). The
+// `dht_anchor_hash` BLOB stores the UTF-8 bytes of the original base64
+// ActionHash string, so it reconstructs losslessly.
 // ============================================================================
 
-impl From<GateDecisionAttestationRow> for GateDecisionAttestationView {
-    fn from(row: GateDecisionAttestationRow) -> Self {
-        Self {
-            decision_id: row.decision_id,
-            phase: row.phase,
-            elohim_id: row.elohim_id,
-            elohim_substance_cid: row.elohim_substance_cid,
-            gate_name: row.gate_name,
-            gate_process_cid: row.gate_process_cid,
-            request_ref_json: row.request_ref_json,
-            decision: row.decision,
-            reasoning_json: row.reasoning_json,
-            context_summary_cid: row.context_summary_cid,
-            decided_at: row.decided_at,
-            universal_band_cid: row.universal_band_cid,
-            dht_anchor_hash: row.dht_anchor_hash,
-            created_at: row.created_at,
-        }
+/// Reconstruct a `GateDecisionAttestationView` from a unified `AttestationRow`
+/// of kind `attestation:gate-decision`. Structured fields are read from
+/// `evidence_json`; `reasoning_json` is read from `proof_evidence_json`.
+pub fn gate_decision_view_from_attestation(row: AttestationRow) -> GateDecisionAttestationView {
+    let ev: serde_json::Value =
+        serde_json::from_str(&row.evidence_json).unwrap_or(serde_json::Value::Null);
+    let proof: serde_json::Value =
+        serde_json::from_str(&row.proof_evidence_json).unwrap_or(serde_json::Value::Null);
+
+    let s = |v: &serde_json::Value, k: &str| -> String {
+        v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string()
+    };
+
+    GateDecisionAttestationView {
+        // `id` is the decision CID; prefer the evidence copy, fall back to id.
+        decision_id: {
+            let d = s(&ev, "decision_id");
+            if d.is_empty() {
+                row.id.clone()
+            } else {
+                d
+            }
+        },
+        phase: s(&ev, "phase"),
+        // issuer_cid is the deciding elohim; prefer the evidence copy.
+        elohim_id: {
+            let e = s(&ev, "elohim_id");
+            if e.is_empty() {
+                row.issuer_cid.clone()
+            } else {
+                e
+            }
+        },
+        elohim_substance_cid: s(&ev, "elohim_substance_cid"),
+        gate_name: s(&ev, "gate_name"),
+        gate_process_cid: s(&ev, "gate_process_cid"),
+        request_ref_json: s(&ev, "request_ref_json"),
+        decision: s(&ev, "decision"),
+        reasoning_json: s(&proof, "reasoning_json"),
+        context_summary_cid: s(&ev, "context_summary_cid"),
+        decided_at: {
+            let d = s(&ev, "decided_at");
+            if d.is_empty() {
+                row.created_at.clone()
+            } else {
+                d
+            }
+        },
+        universal_band_cid: s(&ev, "universal_band_cid"),
+        // The BLOB holds the UTF-8 bytes of the original base64 ActionHash string.
+        dht_anchor_hash: String::from_utf8(row.dht_anchor_hash)
+            .unwrap_or_else(|e| hex::encode(e.into_bytes())),
+        created_at: row.created_at,
     }
 }
 

@@ -782,26 +782,18 @@ pub fn handle_mishpat_signal(
             author: _,
             entry,
         } => {
-            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-            let row = crate::db::gate_decision_attestations::GateDecisionAttestationRow {
-                app_id: app_id.to_string(),
-                decision_id: entry.decision_id,
-                phase: entry.phase,
-                elohim_id: entry.elohim_id,
-                elohim_substance_cid: entry.elohim_substance_cid,
-                gate_name: entry.gate_name,
-                gate_process_cid: entry.gate_process_cid,
-                request_ref_json: entry.request_ref_json,
-                decision: entry.decision,
-                reasoning_json: entry.reasoning_json,
-                context_summary_cid: entry.context_summary_cid,
-                decided_at: entry.decided_at,
-                universal_band_cid: entry.universal_band_cid,
-                dht_anchor_hash: action_hash.0,
-                created_at: now.clone(),
-                updated_at: now,
-            };
-            crate::db::gate_decision_attestations::upsert(conn, &row)?;
+            // Phase-2a consolidation: gate decisions project into the UNIFIED
+            // `attestations` table as `attestation:gate-decision`, mirroring the
+            // elohim-DNA bridge `create_gate_decision_attestation`
+            // (mishpat/zomes/mishpat/src/lib.rs ~1426). The legacy per-app
+            // gate-decision projection table was dropped in migration
+            // 2026-05-12-100300. The full gate-decision shape (phase, gate_name,
+            // gate_process_cid, request_ref_json, decision, decided_at,
+            // elohim_substance_cid, universal_band_cid) lives in `evidence_json`;
+            // `reasoning_json` lives under `proof_evidence_json` (proof_class=audit).
+            let row =
+                crate::db::attestations::attestation_row_from_gate_decision(&entry, &action_hash.0);
+            crate::db::attestations::upsert(conn, &row)?;
             Ok(())
         }
         MishpatSignal::GateDecisionChallengeCreated {
@@ -2047,26 +2039,32 @@ mod mishpat_signal_tests {
         let mut conn =
             SqliteConnection::establish(":memory:").expect("Failed to create in-memory SQLite");
 
+        // Phase-2a consolidation: gate decisions project into the unified
+        // `attestations` table (the legacy per-app gate-decision projection
+        // table was dropped). Mirror its schema for the round-trip projection tests.
         conn.batch_execute(
             r#"
-            CREATE TABLE gate_decision_attestations (
-                app_id TEXT NOT NULL,
-                decision_id TEXT NOT NULL,
-                phase TEXT NOT NULL,
-                elohim_id TEXT NOT NULL,
-                elohim_substance_cid TEXT NOT NULL,
-                gate_name TEXT NOT NULL,
-                gate_process_cid TEXT NOT NULL,
-                request_ref_json TEXT NOT NULL,
-                decision TEXT NOT NULL,
-                reasoning_json TEXT NOT NULL,
-                context_summary_cid TEXT NOT NULL,
-                decided_at TEXT NOT NULL,
-                universal_band_cid TEXT NOT NULL,
-                dht_anchor_hash TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-                PRIMARY KEY (app_id, decision_id)
+            CREATE TABLE attestations (
+                id TEXT PRIMARY KEY,
+                dht_anchor_hash BLOB NOT NULL,
+                attestation_kind TEXT NOT NULL,
+                subject_cid TEXT NOT NULL,
+                subject_kind TEXT NOT NULL,
+                issuer_cid TEXT NOT NULL,
+                parent_governance_action_cid TEXT,
+                vote_value TEXT,
+                vote_weight TEXT,
+                proof_class TEXT NOT NULL,
+                proof_evidence_json TEXT NOT NULL,
+                evidence_json TEXT NOT NULL,
+                expires_at TEXT,
+                supersedes_cid TEXT,
+                revocation_reason TEXT,
+                revoked_at TEXT,
+                created_at TEXT NOT NULL,
+                manifest_ref TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT
             );
             "#,
         )
@@ -2097,21 +2095,57 @@ mod mishpat_signal_tests {
         }
     }
 
+    /// Round-trip: write a gate decision via the repointed writer
+    /// (`handle_mishpat_signal` → unified `attestations` table) and read it back
+    /// via the repointed readers (`db::attestations::gate_decision_*` +
+    /// the `GateDecisionAttestationView` reconstruction). Every field of the
+    /// legacy wire shape must survive the round-trip through `evidence_json`.
     #[test]
     fn gate_decision_created_projects_row() {
         let mut conn = setup_test_conn();
         let signal = make_signal("bafyDec001", "allow", "elohim-active");
         handle_mishpat_signal(&mut conn, "test-app", signal).unwrap();
 
-        let row =
-            crate::db::gate_decision_attestations::find_by_id(&mut conn, "test-app", "bafyDec001")
-                .unwrap()
-                .expect("Row must be present after signal");
+        // Read back via the by-id reader on the unified table.
+        let row = crate::db::attestations::gate_decision_find_by_id(&mut conn, "bafyDec001")
+            .unwrap()
+            .expect("Row must be present after signal");
+        assert_eq!(row.attestation_kind, "attestation:gate-decision");
+        assert_eq!(row.subject_cid, "uhCAkABCDEF");
+        assert_eq!(row.issuer_cid, "uhCAkABCDEF");
+        assert_eq!(row.proof_class, "audit");
 
-        assert_eq!(row.decision, "allow");
-        assert_eq!(row.phase, "elohim-active");
-        assert_eq!(row.dht_anchor_hash, "uhCkkDEFABC");
-        assert_eq!(row.gate_name, "discernment-gate-v1-mechanical");
+        // Reconstruct the legacy view and assert every structured field survived.
+        let view = crate::views_convert::qahal::gate_decision_view_from_attestation(row);
+        assert_eq!(view.decision_id, "bafyDec001");
+        assert_eq!(view.decision, "allow");
+        assert_eq!(view.phase, "elohim-active");
+        assert_eq!(view.dht_anchor_hash, "uhCkkDEFABC");
+        assert_eq!(view.gate_name, "discernment-gate-v1-mechanical");
+        assert_eq!(view.elohim_id, "uhCAkABCDEF");
+        assert_eq!(view.elohim_substance_cid, "bafySubstance");
+        assert_eq!(view.gate_process_cid, "bafyProcess");
+        assert_eq!(view.request_ref_json, r#"{"eventId":"ev1"}"#);
+        assert_eq!(view.reasoning_json, r#"{"steps":[]}"#);
+        assert_eq!(view.context_summary_cid, "bafyCtx");
+        assert_eq!(view.decided_at, "2026-04-18T12:00:00Z");
+        assert_eq!(view.universal_band_cid, "bafyBand");
+
+        // The gate / phase readers find it too.
+        let by_gate = crate::db::attestations::gate_decision_find_by_gate(
+            &mut conn,
+            "discernment-gate-v1-mechanical",
+        )
+        .unwrap();
+        assert_eq!(by_gate.len(), 1);
+        let by_phase =
+            crate::db::attestations::gate_decision_find_by_phase(&mut conn, "elohim-active")
+                .unwrap();
+        assert_eq!(by_phase.len(), 1);
+        let by_elohim =
+            crate::db::attestations::gate_decision_find_by_elohim(&mut conn, "uhCAkABCDEF")
+                .unwrap();
+        assert_eq!(by_elohim.len(), 1);
     }
 
     #[test]
@@ -2121,12 +2155,8 @@ mod mishpat_signal_tests {
         handle_mishpat_signal(&mut conn, "test-app", signal.clone()).unwrap();
         handle_mishpat_signal(&mut conn, "test-app", signal).unwrap();
 
-        let rows = crate::db::gate_decision_attestations::find_by_phase(
-            &mut conn,
-            "test-app",
-            "dev-context",
-        )
-        .unwrap();
+        let rows =
+            crate::db::attestations::gate_decision_find_by_phase(&mut conn, "dev-context").unwrap();
         assert_eq!(
             rows.len(),
             1,

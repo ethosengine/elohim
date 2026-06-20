@@ -96,9 +96,6 @@ pub mod observation_sessions;
 // Peer status projection (Peer-Stewarded Availability — Phase 1)
 pub mod peer_statuses;
 
-// Gate decision attestation projection (mishpat DNA — Phase 4)
-pub mod gate_decision_attestations;
-
 // Gate decision challenge + outcome projections (mishpat DNA — Phase 11 Task 11.2)
 pub mod challenge_outcomes;
 pub mod gate_decision_challenges;

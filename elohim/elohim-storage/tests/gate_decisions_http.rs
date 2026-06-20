@@ -1,41 +1,50 @@
-//! HTTP handler contract tests for `/db/gate-decisions[/{cid}]` (Task 4.3, Phase 4).
+//! HTTP handler contract tests for `/db/gate-decisions[/{cid}]` (Phase-2a).
 //!
 //! These tests exercise the query functions and view conversion that back the two
 //! HTTP handlers (`handle_gate_decisions_list`, `handle_gate_decision_by_id`).
 //! They do not spin up a full HTTP server — see the note below.
 //!
+//! ## Phase-2a consolidation
+//!
+//! Gate decisions were migrated off the dropped per-app gate-decision projection
+//! table onto the unified `attestations` table as `attestation:gate-decision`
+//! (mirroring the elohim-DNA bridge `create_gate_decision_attestation`). The
+//! structured fields (phase, gate_name, decided_at, …) live in `evidence_json`;
+//! `reasoning_json` lives under `proof_evidence_json` (proof_class=audit). The
+//! unified table is CID-global — there is no app_id scope anymore. The query
+//! layer (`db::attestations::gate_decision_*`) is also unit-tested in
+//! `src/db/attestations.rs` and `src/signals.rs`.
+//!
 //! ## Testing strategy
 //!
-//! The HTTP handlers are thin: they parse query params, call db functions, and
-//! convert rows to views. The DB layer (`gate_decision_attestations`) is already
-//! tested in `src/db/gate_decision_attestations.rs`. What we add here:
-//!
-//! 1. **by_id hit** — find_by_id returns a row, view conversion is correct.
-//! 2. **by_id miss** — find_by_id returns None; handler would 404.
-//! 3. **list by_elohim** — filter by elohim_id.
-//! 4. **list by_gate** — filter by gate_name.
-//! 5. **list by_phase** — filter by phase.
-//! 6. **list unfiltered** — returns all rows up to limit, ordered by decided_at desc.
+//! 1. **by_id hit** — gate_decision_find_by_id returns a row; view conversion correct.
+//! 2. **by_id miss** — gate_decision_find_by_id returns None; handler would 404.
+//! 3. **list by_elohim** — filter by issuer_cid (the deciding agent).
+//! 4. **list by_gate** — filter by gate_name (json_extract from evidence_json).
+//! 5. **list by_phase** — filter by phase (json_extract from evidence_json).
+//! 6. **list unfiltered** — returns all rows up to limit, ordered by created_at desc.
 //! 7. **limit clamping** — raw_limit clamps at 500.
-//! 8. **view field mapping** — all fields of GateDecisionAttestationView are present
-//!    and correctly mapped from the row.
+//! 8. **view field mapping** — all fields of GateDecisionAttestationView round-trip.
+//! 9. **kind isolation** — a non-gate-decision attestation is never returned.
 //!
 //! ## Why no live HTTP test?
 //!
 //! No SweetConductor-based harness exists in this crate's `tests/` directory (see
 //! `peer_status_e2e.rs` for the precedent explanation). Standing up the full
-//! `ContentServer` requires a conductor connection and a Diesel pool. A separate
-//! integration smoke test would need a running elohim-storage process, which is
-//! out of scope for `cargo test`. Flagged as a concern for Task 4.4/4.5.
+//! `ContentServer` requires a conductor connection and a Diesel pool — out of
+//! scope for `cargo test`.
 
 use diesel::connection::SimpleConnection;
-use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
+use diesel::Connection;
 
-use elohim_storage::db::gate_decision_attestations::{
-    find_by_elohim, find_by_gate, find_by_id, find_by_phase, upsert, GateDecisionAttestationRow,
+use elohim_storage::db::attestations::{
+    attestation_row_from_gate_decision, gate_decision_find_by_elohim, gate_decision_find_by_gate,
+    gate_decision_find_by_id, gate_decision_find_by_phase, gate_decision_list_all, upsert,
 };
-use elohim_storage::views::GateDecisionAttestationView;
+use elohim_storage::db::models::AttestationRow;
+use elohim_storage::signals::GateDecisionAttestationEntry;
+use elohim_storage::views_convert::qahal::gate_decision_view_from_attestation;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -47,29 +56,30 @@ fn setup_db() -> SqliteConnection {
 
     conn.batch_execute(
         r#"
-        CREATE TABLE gate_decision_attestations (
-            app_id TEXT NOT NULL,
-            decision_id TEXT NOT NULL,
-            phase TEXT NOT NULL,
-            elohim_id TEXT NOT NULL,
-            elohim_substance_cid TEXT NOT NULL,
-            gate_name TEXT NOT NULL,
-            gate_process_cid TEXT NOT NULL,
-            request_ref_json TEXT NOT NULL,
-            decision TEXT NOT NULL,
-            reasoning_json TEXT NOT NULL,
-            context_summary_cid TEXT NOT NULL,
-            decided_at TEXT NOT NULL,
-            universal_band_cid TEXT NOT NULL,
-            dht_anchor_hash TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-            PRIMARY KEY (app_id, decision_id)
+        CREATE TABLE attestations (
+            id TEXT PRIMARY KEY,
+            dht_anchor_hash BLOB NOT NULL,
+            attestation_kind TEXT NOT NULL,
+            subject_cid TEXT NOT NULL,
+            subject_kind TEXT NOT NULL,
+            issuer_cid TEXT NOT NULL,
+            parent_governance_action_cid TEXT,
+            vote_value TEXT,
+            vote_weight TEXT,
+            proof_class TEXT NOT NULL,
+            proof_evidence_json TEXT NOT NULL,
+            evidence_json TEXT NOT NULL,
+            expires_at TEXT,
+            supersedes_cid TEXT,
+            revocation_reason TEXT,
+            revoked_at TEXT,
+            created_at TEXT NOT NULL,
+            manifest_ref TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT
         );
-        CREATE INDEX idx_gate_decisions_elohim ON gate_decision_attestations(elohim_id);
-        CREATE INDEX idx_gate_decisions_gate ON gate_decision_attestations(gate_name);
-        CREATE INDEX idx_gate_decisions_phase ON gate_decision_attestations(phase);
-        CREATE INDEX idx_gate_decisions_decided_at ON gate_decision_attestations(decided_at);
+        CREATE INDEX attestations_kind ON attestations(attestation_kind);
+        CREATE INDEX attestations_issuer ON attestations(issuer_cid);
         "#,
     )
     .expect("Failed to create test schema");
@@ -77,6 +87,8 @@ fn setup_db() -> SqliteConnection {
     conn
 }
 
+/// Build a gate-decision `AttestationRow` via the production projection helper,
+/// so the test exercises the same mapping the live writer uses.
 fn make_row(
     decision_id: &str,
     gate: &str,
@@ -84,9 +96,8 @@ fn make_row(
     elohim_id: &str,
     decision: &str,
     decided_at: &str,
-) -> GateDecisionAttestationRow {
-    GateDecisionAttestationRow {
-        app_id: "test-app".into(),
+) -> AttestationRow {
+    let entry = GateDecisionAttestationEntry {
         decision_id: decision_id.into(),
         phase: phase.into(),
         elohim_id: elohim_id.into(),
@@ -99,14 +110,12 @@ fn make_row(
         context_summary_cid: "bafyCTX".into(),
         decided_at: decided_at.into(),
         universal_band_cid: "bafyUNIV".into(),
-        dht_anchor_hash: "uhCkkDEF".into(),
-        created_at: "2026-04-18T12:00:00".into(),
-        updated_at: "2026-04-18T12:00:00".into(),
-    }
+    };
+    attestation_row_from_gate_decision(&entry, "uhCkkDEF")
 }
 
 // ---------------------------------------------------------------------------
-// Test 1 — by_id hit: find_by_id returns a row; view conversion is correct
+// Test 1 — by_id hit: gate_decision_find_by_id returns a row; view correct
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -122,12 +131,12 @@ fn by_id_hit_returns_correct_view() {
     );
     upsert(&mut conn, &row).unwrap();
 
-    let found = find_by_id(&mut conn, "test-app", "bafyDEC1")
+    let found = gate_decision_find_by_id(&mut conn, "bafyDEC1")
         .unwrap()
         .expect("row must be present");
 
     // Simulate what the handler does: row → view
-    let view = GateDecisionAttestationView::from(found);
+    let view = gate_decision_view_from_attestation(found);
 
     assert_eq!(view.decision_id, "bafyDEC1");
     assert_eq!(view.gate_name, "discernment-gate-v1");
@@ -141,13 +150,13 @@ fn by_id_hit_returns_correct_view() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 2 — by_id miss: find_by_id returns None (handler would 404)
+// Test 2 — by_id miss: gate_decision_find_by_id returns None (handler 404s)
 // ---------------------------------------------------------------------------
 
 #[test]
 fn by_id_miss_returns_none() {
     let mut conn = setup_db();
-    let result = find_by_id(&mut conn, "test-app", "bafyNONEXISTENT").unwrap();
+    let result = gate_decision_find_by_id(&mut conn, "bafyNONEXISTENT").unwrap();
     assert!(
         result.is_none(),
         "missing decision_id must return None so the handler returns 404"
@@ -187,14 +196,13 @@ fn list_by_elohim_filters_correctly() {
     )
     .unwrap();
 
-    let rows = find_by_elohim(&mut conn, "test-app", "uhCAkABC").unwrap();
+    let rows = gate_decision_find_by_elohim(&mut conn, "uhCAkABC").unwrap();
     assert_eq!(
         rows.len(),
         1,
         "only the matching agent's row should be returned"
     );
-    assert_eq!(rows[0].decision_id, "bafyDEC1");
-    assert_eq!(rows[0].decision, "allow");
+    assert_eq!(rows[0].id, "bafyDEC1");
 }
 
 // ---------------------------------------------------------------------------
@@ -230,13 +238,13 @@ fn list_by_gate_filters_correctly() {
     )
     .unwrap();
 
-    let rows = find_by_gate(&mut conn, "test-app", "discernment-gate-v1").unwrap();
+    let rows = gate_decision_find_by_gate(&mut conn, "discernment-gate-v1").unwrap();
     assert_eq!(
         rows.len(),
         1,
         "only rows for the named gate should be returned"
     );
-    assert_eq!(rows[0].decision_id, "bafyDEC1");
+    assert_eq!(rows[0].id, "bafyDEC1");
 }
 
 // ---------------------------------------------------------------------------
@@ -272,26 +280,24 @@ fn list_by_phase_filters_correctly() {
     )
     .unwrap();
 
-    let dev_rows = find_by_phase(&mut conn, "test-app", "dev-context").unwrap();
+    let dev_rows = gate_decision_find_by_phase(&mut conn, "dev-context").unwrap();
     assert_eq!(dev_rows.len(), 1);
-    assert_eq!(dev_rows[0].decision_id, "bafyDEC1");
+    assert_eq!(dev_rows[0].id, "bafyDEC1");
 
-    let active_rows = find_by_phase(&mut conn, "test-app", "elohim-active").unwrap();
+    let active_rows = gate_decision_find_by_phase(&mut conn, "elohim-active").unwrap();
     assert_eq!(active_rows.len(), 1);
-    assert_eq!(active_rows[0].decision_id, "bafyDEC2");
+    assert_eq!(active_rows[0].id, "bafyDEC2");
 }
 
 // ---------------------------------------------------------------------------
-// Test 6 — unfiltered list: all rows returned ordered by decided_at desc
+// Test 6 — unfiltered list: all rows returned ordered by created_at desc
 // ---------------------------------------------------------------------------
 
 #[test]
 fn list_unfiltered_returns_all_ordered_desc() {
-    use elohim_storage::db::diesel_schema::gate_decision_attestations::dsl;
-
     let mut conn = setup_db();
 
-    // Insert three rows with different timestamps
+    // created_at = decided_at in the projection, so timestamp ordering holds.
     for (cid, ts) in &[
         ("bafyDEC_A", "2026-04-18T08:00:00Z"),
         ("bafyDEC_B", "2026-04-18T09:00:00Z"),
@@ -304,18 +310,13 @@ fn list_unfiltered_returns_all_ordered_desc() {
         .unwrap();
     }
 
-    let rows = dsl::gate_decision_attestations
-        .filter(dsl::app_id.eq("test-app"))
-        .order(dsl::decided_at.desc())
-        .limit(50)
-        .load::<GateDecisionAttestationRow>(&mut conn)
-        .unwrap();
+    let rows = gate_decision_list_all(&mut conn, 50).unwrap();
 
     assert_eq!(rows.len(), 3);
-    // Verify descending order
-    assert_eq!(rows[0].decided_at, "2026-04-18T10:00:00Z");
-    assert_eq!(rows[1].decided_at, "2026-04-18T09:00:00Z");
-    assert_eq!(rows[2].decided_at, "2026-04-18T08:00:00Z");
+    // Verify descending order by created_at (= decided_at).
+    assert_eq!(rows[0].created_at, "2026-04-18T10:00:00Z");
+    assert_eq!(rows[1].created_at, "2026-04-18T09:00:00Z");
+    assert_eq!(rows[2].created_at, "2026-04-18T08:00:00Z");
 }
 
 // ---------------------------------------------------------------------------
@@ -333,7 +334,7 @@ fn limit_clamps_to_valid_range() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 8 — view field completeness: all public fields are mapped
+// Test 8 — view field completeness: all public fields round-trip
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -347,10 +348,9 @@ fn view_has_all_expected_fields() {
         "2026-04-18T12:30:00Z",
     );
 
-    let view = GateDecisionAttestationView::from(row);
+    let view = gate_decision_view_from_attestation(row);
 
-    // Verify every field is mapped (any missing field would fail compilation,
-    // but this test makes the field contract explicit and readable).
+    // Verify every field round-trips through evidence_json / proof_evidence_json.
     assert_eq!(view.decision_id, "bafyFIELD_TEST");
     assert_eq!(view.phase, "elohim-active");
     assert_eq!(view.elohim_id, "uhCAkFIELD");
@@ -364,49 +364,80 @@ fn view_has_all_expected_fields() {
     assert_eq!(view.decided_at, "2026-04-18T12:30:00Z");
     assert_eq!(view.universal_band_cid, "bafyUNIV");
     assert_eq!(view.dht_anchor_hash, "uhCkkDEF");
-    assert_eq!(view.created_at, "2026-04-18T12:00:00");
+    // created_at = decided_at in the projection.
+    assert_eq!(view.created_at, "2026-04-18T12:30:00Z");
 }
 
 // ---------------------------------------------------------------------------
-// Test 9 — cross-app isolation: rows from a different app_id are not visible
+// Test 9 — kind isolation: a non-gate-decision attestation is never returned
+//
+// Replaces the old per-app_id isolation test: the unified table is CID-global,
+// so the meaningful isolation guarantee is now by attestation_kind.
 // ---------------------------------------------------------------------------
 
 #[test]
-fn rows_are_scoped_to_app_id() {
+fn non_gate_decision_attestations_are_excluded() {
     let mut conn = setup_db();
 
-    let mut row_a = make_row(
-        "bafyDEC1",
-        "gate-a",
-        "elohim-active",
-        "uhCAkABC",
-        "allow",
-        "2026-04-18T12:00:00Z",
-    );
-    row_a.app_id = "app-alpha".into();
+    // A real gate-decision row.
+    upsert(
+        &mut conn,
+        &make_row(
+            "bafyDEC1",
+            "gate-a",
+            "elohim-active",
+            "uhCAkABC",
+            "allow",
+            "2026-04-18T12:00:00Z",
+        ),
+    )
+    .unwrap();
 
-    let mut row_b = make_row(
-        "bafyDEC2",
-        "gate-a",
-        "elohim-active",
-        "uhCAkABC",
-        "allow",
-        "2026-04-18T12:00:00Z",
-    );
-    row_b.app_id = "app-beta".into();
+    // A sibling attestation of a DIFFERENT kind, same issuer.
+    let other = AttestationRow {
+        id: "bafyOTHER".into(),
+        dht_anchor_hash: b"uhCkkOTHER".to_vec(),
+        attestation_kind: "attestation:humanness".into(),
+        subject_cid: "uhCAkABC".into(),
+        subject_kind: "agent".into(),
+        issuer_cid: "uhCAkABC".into(),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        vote_weight: None,
+        proof_class: "witness".into(),
+        proof_evidence_json: "{}".into(),
+        evidence_json: r#"{"phase":"elohim-active","gate_name":"gate-a"}"#.into(),
+        expires_at: None,
+        supersedes_cid: None,
+        revocation_reason: None,
+        revoked_at: None,
+        created_at: "2026-04-18T12:00:00Z".into(),
+        manifest_ref: "imagodei".into(),
+        title: "Humanness".into(),
+        description: None,
+    };
+    upsert(&mut conn, &other).unwrap();
 
-    upsert(&mut conn, &row_a).unwrap();
-    upsert(&mut conn, &row_b).unwrap();
+    // None of the gate-decision readers should surface the humanness row,
+    // even though it shares issuer / phase / gate_name strings in evidence_json.
+    let by_elohim = gate_decision_find_by_elohim(&mut conn, "uhCAkABC").unwrap();
+    assert_eq!(by_elohim.len(), 1);
+    assert_eq!(by_elohim[0].id, "bafyDEC1");
 
-    let alpha_rows = find_by_elohim(&mut conn, "app-alpha", "uhCAkABC").unwrap();
-    assert_eq!(alpha_rows.len(), 1);
-    assert_eq!(alpha_rows[0].decision_id, "bafyDEC1");
+    let by_gate = gate_decision_find_by_gate(&mut conn, "gate-a").unwrap();
+    assert_eq!(by_gate.len(), 1);
+    assert_eq!(by_gate[0].id, "bafyDEC1");
 
-    let beta_rows = find_by_elohim(&mut conn, "app-beta", "uhCAkABC").unwrap();
-    assert_eq!(beta_rows.len(), 1);
-    assert_eq!(beta_rows[0].decision_id, "bafyDEC2");
+    let by_phase = gate_decision_find_by_phase(&mut conn, "elohim-active").unwrap();
+    assert_eq!(by_phase.len(), 1);
+    assert_eq!(by_phase[0].id, "bafyDEC1");
 
-    // No cross-contamination
-    let none = find_by_id(&mut conn, "app-alpha", "bafyDEC2").unwrap();
-    assert!(none.is_none(), "app-alpha must not see app-beta's row");
+    let all = gate_decision_list_all(&mut conn, 50).unwrap();
+    assert_eq!(all.len(), 1);
+    assert_eq!(all[0].id, "bafyDEC1");
+
+    // The humanness row is not addressable as a gate decision by id.
+    assert!(gate_decision_find_by_id(&mut conn, "bafyOTHER")
+        .unwrap()
+        .is_none());
 }
