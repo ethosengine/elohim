@@ -10,6 +10,8 @@ informed-by:
 **Status:** Draft
 **Date:** 2026-04-19
 **Owner:** Matthew Dowell
+
+> **⚠ Consolidation note (2026-06-20):** This Draft predates the attestation consolidation (Phase-2a, `34fcf1070`). `GateDecisionAttestation` is now the unified `attestation:gate-decision` — a `Content` entry discriminated by `attestation_kind`, NOT a standalone DHT entry type (see `genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md` §6.2; storage projects it via `attestation:gate-decision` as of commit `ce3ede44b`). When this spec is implemented, `GateDecisionChallenge` should target the unified `attestation:gate-decision` (by `subject_cid` / the attestation CID) rather than re-introduce a `GateDecisionAttestation` entry type, and its own entry-vs-attestation classification should be re-evaluated against the consolidated model (likely `governance-action:gate-decision-challenge`). Do NOT design new standalone attestation entry types.
 **Companion spec:** `elohim/elohim-agent/spec/2026-04-18-gate-interface.md`
 
 ---

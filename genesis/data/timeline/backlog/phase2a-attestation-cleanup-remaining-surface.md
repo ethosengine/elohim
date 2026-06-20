@@ -56,6 +56,16 @@ GateDecisionAttestation`). MOST are generic/historical mentions (fine) or pre-co
 needs a clarification banner like the 3 already fixed: the consolidation design, wave-0 plan, residual-tails
 plan). Do NOT mass-edit — only banner the ones that would mislead a future session into re-planning.
 
+**TRIAGED 2026-06-20:** the one current-design-claim — `2026-04-19-gate-challenge-and-indemnification-design.md`
+(status Draft; describes a `GateDecisionChallenge` entry type targeting `GateDecisionAttestation` with
+entry-type-level validation) — was bannered (GateDecisionAttestation → `attestation:gate-decision`; don't
+re-introduce the entry type). The rest are GENERIC/ILLUSTRATIVE vocabulary mentions, NOT re-plannable
+current-design-claims, left as-is: `recursive-architecture`/`escalated-architecture`/`elohim-sdk` (use
+`GateDecisionAttestation` as an example of a witnessed/governance act), the `2026-06-14-substrate-passes`
+vision batch, and `provenance-manifest-ingestion` (no real match). ONE PENDING: `elohim-peer-fabric-spine-plan`
+references `HealthAttestation.response_time_ms` — but HealthAttestation's OWN consolidation fate (observation
+layer vs `attestation:*`) is unresolved (design §6 open question), so leave until that's decided. §D DONE.
+
 ## Already done (2026-06-20, this session)
 - `content_attestations` migrated + gate rebuilt (`e413523ff`); codegen `$ref` fix (`b78908924`).
 - The 3 load-bearing planning docs banner-corrected (`9f84c0003`): consolidation design → Implemented,
