@@ -77,6 +77,14 @@ lazy_static! {
     )
     .expect("valid gauge");
 
+    /// Mean RS contract-coverage across open gaps, ×1000 (1000 = fully covered).
+    /// Set by the operational-weave facing adapter; the fold is pure (never touches this gauge).
+    pub static ref ELOHIM_RS_COVERAGE_MILLI: IntGauge = IntGauge::new(
+        "elohim_rs_coverage_milli",
+        "Mean RS contract-coverage across open gaps, ×1000 (1000 = fully covered)",
+    )
+    .expect("valid gauge");
+
     /// Boot-time cgroup CPU quota in millicores (0 = unbounded/unknown).
     pub static ref NODE_CPU_QUOTA_MILLICORES: IntGauge = IntGauge::new(
         "elohim_node_cpu_quota_millicores",
@@ -184,6 +192,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CORPUS_DOCS.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_PLACEMENT_GAP_COUNT.clone()));
+        let _ = REGISTRY.register(Box::new(ELOHIM_RS_COVERAGE_MILLI.clone()));
     });
 }
 

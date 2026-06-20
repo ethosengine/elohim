@@ -22,6 +22,15 @@ pub fn gaps_by_kind(gaps: &[PlacementGapView]) -> BTreeMap<String, usize> {
         .collect()
 }
 
+/// Mean RS contract-coverage across the open gaps (`PlacementGapView.contract_coverage`
+/// already = achieved/requested). Empty ⇒ 1.0 (no gaps means nothing under-covered).
+pub fn rs_coverage(gaps: &[PlacementGapView]) -> f32 {
+    if gaps.is_empty() {
+        return 1.0;
+    }
+    gaps.iter().map(|g| g.contract_coverage).sum::<f32>() / gaps.len() as f32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42,14 +51,22 @@ mod tests {
 
     #[test]
     fn placement_gap_count_counts_rows() {
-        let gaps = vec![gap("under_replicated"), gap("unplaced"), gap("under_replicated")];
+        let gaps = vec![
+            gap("under_replicated"),
+            gap("unplaced"),
+            gap("under_replicated"),
+        ];
         assert_eq!(placement_gap_count(&gaps), 3);
         assert_eq!(placement_gap_count(&[]), 0);
     }
 
     #[test]
     fn gaps_by_kind_buckets_deterministically() {
-        let gaps = vec![gap("under_replicated"), gap("unplaced"), gap("under_replicated")];
+        let gaps = vec![
+            gap("under_replicated"),
+            gap("unplaced"),
+            gap("under_replicated"),
+        ];
         let by_kind = gaps_by_kind(&gaps);
         assert_eq!(by_kind.get("under_replicated"), Some(&2));
         assert_eq!(by_kind.get("unplaced"), Some(&1));
@@ -57,5 +74,15 @@ mod tests {
         // 'd' < 'p' so "under_replicated" sorts first — deterministic regardless.
         let keys: Vec<&String> = by_kind.keys().collect();
         assert_eq!(keys, vec!["under_replicated", "unplaced"]);
+    }
+
+    #[test]
+    fn rs_coverage_is_mean_contract_coverage_and_empty_is_full() {
+        let mut a = gap("under_replicated");
+        a.contract_coverage = 0.5;
+        let mut b = gap("under_replicated");
+        b.contract_coverage = 1.0;
+        assert!((super::rs_coverage(&[a, b]) - 0.75).abs() < 1e-6);
+        assert_eq!(super::rs_coverage(&[]), 1.0, "no gaps ⇒ fully covered");
     }
 }

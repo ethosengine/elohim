@@ -2244,6 +2244,31 @@ pub struct ObservationView {
     pub signature_b64: String,
 }
 
+/// Cluster-scoped operational weave projection: placement/coverage/capacity/occupancy
+/// folded per-shard → per-node → per-cluster. Each lens field is OPTIONAL — a facing
+/// carries only the lenses it selected (the not-selected-field contract).
+///
+/// Wire format: `weave-view.schema.json` (added in Slice 4).
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct WeaveView {
+    pub placement_gap_count: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub rs_coverage: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub cluster_capacity: Option<ComputeTriptych>, // populated in Slice 3
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub tier_occupancy: Option<RiskTierDistribution>, // Slice 4
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub region_occupancy: Option<RegionalDistributionView>, // Slice 4
+    pub measured_at: String,
+}
+
 /// HTTP view of a row from the `observation_diversity_summary` SQLite view.
 ///
 /// Diversity rollup over `observations` — one row per (subject_cid,
