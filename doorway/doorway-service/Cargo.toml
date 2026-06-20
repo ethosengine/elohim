@@ -149,6 +149,10 @@ elohim-render = { path = "../../elohim/elohim-render" }
 # default-features = false excludes ts-rs and the testing shims.
 gate-client = { path = "../../elohim/elohim-agent/gate-client", default-features = false }
 
+# Membrane / prosocial-routing spine (pure std, no I/O deps).
+# edge-defense = GuardStore + Verdict for the doorway rate-limit layer.
+elohim-peer-fabric = { path = "../../elohim/elohim-peer-fabric", default-features = false, features = ["edge-defense"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3"

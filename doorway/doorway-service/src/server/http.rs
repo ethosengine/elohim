@@ -296,6 +296,21 @@ pub struct AppState {
 
     /// Per-upstream circuit breakers for the storage proxy (Pillar 2 layer 4).
     pub upstream_breakers: Arc<crate::routes::UpstreamBreakers>,
+
+    // ── Membrane policy (Pillar 2 layer 3) ────────────────────────────────────
+
+    /// Per-source rate-limit store — evicting in-memory implementation.
+    /// Guarded by a std Mutex so the non-async `assess` call can hold it;
+    /// the lock is ALWAYS dropped before any `.await` (Shape sleep).
+    pub membrane_guard: std::sync::Mutex<crate::server::membrane::EdgeGuardStore>,
+
+    /// Threshold config for the membrane stage (shape / challenge / ban).
+    pub membrane_cfg: elohim_peer_fabric::guard::GuardConfig,
+
+    /// Number of trusted proxy hops from `DOORWAY_TRUSTED_PROXY_HOPS`
+    /// (default 1 for single-ingress topology). Used to pick the rightmost-
+    /// untrusted IP from X-Forwarded-For.
+    pub trusted_proxy_hops: usize,
 }
 
 /// Retry-After (seconds) advertised when doorway sheds an inbound request at
@@ -492,6 +507,11 @@ impl AppState {
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             storage_proxy_client: init_storage_proxy_client(),
             upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
+            membrane_cfg: crate::server::membrane::edge_guard_config(),
+            membrane_guard: std::sync::Mutex::new(crate::server::membrane::EdgeGuardStore::new(
+                crate::server::membrane::edge_guard_config().window_secs,
+            )),
+            trusted_proxy_hops: crate::server::membrane::trusted_proxy_hops_from_env(),
         }
     }
 
@@ -592,6 +612,11 @@ impl AppState {
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             storage_proxy_client: init_storage_proxy_client(),
             upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
+            membrane_cfg: crate::server::membrane::edge_guard_config(),
+            membrane_guard: std::sync::Mutex::new(crate::server::membrane::EdgeGuardStore::new(
+                crate::server::membrane::edge_guard_config().window_secs,
+            )),
+            trusted_proxy_hops: crate::server::membrane::trusted_proxy_hops_from_env(),
         }
     }
 
@@ -707,6 +732,11 @@ impl AppState {
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             storage_proxy_client: init_storage_proxy_client(),
             upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
+            membrane_cfg: crate::server::membrane::edge_guard_config(),
+            membrane_guard: std::sync::Mutex::new(crate::server::membrane::EdgeGuardStore::new(
+                crate::server::membrane::edge_guard_config().window_secs,
+            )),
+            trusted_proxy_hops: crate::server::membrane::trusted_proxy_hops_from_env(),
         }
     }
 
@@ -825,6 +855,11 @@ impl AppState {
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             storage_proxy_client: init_storage_proxy_client(),
             upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
+            membrane_cfg: crate::server::membrane::edge_guard_config(),
+            membrane_guard: std::sync::Mutex::new(crate::server::membrane::EdgeGuardStore::new(
+                crate::server::membrane::edge_guard_config().window_secs,
+            )),
+            trusted_proxy_hops: crate::server::membrane::trusted_proxy_hops_from_env(),
         })
     }
 
@@ -2278,6 +2313,21 @@ async fn handle_request(
     // every write that carries impact on others.
     if let Some(gate_resp) = apply_gate_check(&method, &path).await {
         return Ok(gate_resp);
+    }
+
+    // ── Pillar 2 / layer 3: membrane rate-limit policy ────────────────────────
+    // Placed AFTER the wisdom gate and BEFORE the admission semaphore. Health,
+    // /metrics, and WebSocket upgrades are already short-circuited above or
+    // handled by `is_static_asset` inside `apply_membrane`. The membrane only
+    // fires when the caller SHOULD have reached routing — it doesn't replace the
+    // semaphore but it sheds bad actors before they consume a slot.
+    {
+        let is_ws = hyper_tungstenite::is_upgrade_request(&req);
+        if !admission_exempt(&path, is_ws) {
+            if let Some(membrane_resp) = apply_membrane(&state, &req, &addr, &path).await {
+                return Ok(membrane_resp);
+            }
+        }
     }
 
     // ── Pillar 2 / layer 2: global inbound admission ──────────────────────────
@@ -3970,6 +4020,99 @@ fn catching_up_response(retry_after_secs: u64) -> Response<Full<Bytes>> {
         .header("Retry-After", retry_after_secs.to_string())
         .body(Full::new(Bytes::from(body.to_string())))
         .unwrap()
+}
+
+// ─── Membrane policy stage ────────────────────────────────────────────────────
+
+/// Apply the membrane rate-limit policy for one inbound request.
+///
+/// Returns `Some(response)` when the request must be short-circuited (Challenge
+/// or Deny); `None` when the caller should continue dispatching (Allow or Shape —
+/// Shape applies a brief sleep then returns None).
+///
+/// The Mutex lock is held ONLY for the synchronous `assess` call, then dropped
+/// before any `.await`.  This satisfies two requirements:
+///   1. `std::sync::MutexGuard` cannot cross an await boundary (won't compile).
+///   2. Fail-open on poison: `into_inner()` recovers the guard rather than
+///      panicking the entire request handler.
+async fn apply_membrane(
+    state: &AppState,
+    req: &Request<Incoming>,
+    addr: &SocketAddr,
+    path: &str,
+) -> Option<Response<BoxBody>> {
+    use crate::server::membrane::{client_ip_from_xff, derive_source, is_static_asset};
+    use elohim_peer_fabric::guard::{assess, Verdict};
+
+    // Static assets are high-frequency browser traffic — exempt from scoring.
+    if is_static_asset(path) {
+        return None;
+    }
+
+    let xff = req
+        .headers()
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok());
+    let client_ip = client_ip_from_xff(xff, addr, state.trusted_proxy_hops);
+    let human_id = resolve_agent_cid_from_request(state, req);
+    let source = derive_source(human_id.as_deref(), &client_ip);
+
+    // ── Assess under lock; drop lock before any await ─────────────────────
+    let verdict = {
+        let mut guard = match state.membrane_guard.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(), // fail-open on poison
+        };
+        let now = elohim_peer_fabric::guard::Clock::now_secs(
+            &crate::server::membrane::EdgeClock,
+        );
+        guard.maybe_sweep(now);
+        assess(&mut *guard, &crate::server::membrane::EdgeClock, &state.membrane_cfg, &source)
+    };
+
+    match verdict {
+        Verdict::Allow => {
+            crate::metrics::inc_membrane_verdict("allow");
+            None
+        }
+        Verdict::Shape { delay_ms } => {
+            crate::metrics::inc_membrane_verdict("shape");
+            tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+            None
+        }
+        Verdict::Challenge => {
+            crate::metrics::inc_membrane_verdict("challenge");
+            let retry_after = state.membrane_cfg.ban_secs;
+            Some(to_boxed(
+                Response::builder()
+                    .status(StatusCode::TOO_MANY_REQUESTS)
+                    .header("Content-Type", "application/json")
+                    .header("Retry-After", retry_after.to_string())
+                    .header("x-membrane", "challenge")
+                    .body(Full::new(Bytes::from(
+                        serde_json::json!({
+                            "error": "Too Many Requests",
+                            "retryAfter": retry_after,
+                        })
+                        .to_string(),
+                    )))
+                    .unwrap(),
+            ))
+        }
+        Verdict::Deny => {
+            crate::metrics::inc_membrane_verdict("deny");
+            Some(to_boxed(
+                Response::builder()
+                    .status(StatusCode::FORBIDDEN)
+                    .header("Content-Type", "application/json")
+                    .header("x-membrane", "deny")
+                    .body(Full::new(Bytes::from(
+                        serde_json::json!({ "error": "Forbidden" }).to_string(),
+                    )))
+                    .unwrap(),
+            ))
+        }
+    }
 }
 
 // ─── SSR helpers ──────────────────────────────────────────────────────────────

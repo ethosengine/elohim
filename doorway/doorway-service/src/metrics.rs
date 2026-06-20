@@ -196,6 +196,27 @@ lazy_static! {
         "Configured inbound admission ceiling (DOORWAY_MAX_INFLIGHT).",
     )
     .unwrap();
+
+    // ── Membrane policy metrics ───────────────────────────────────────────────
+
+    /// Membrane policy verdicts by outcome. label: verdict ∈ {allow, shape, challenge, deny}.
+    /// Doorway-resident — storage never sees a membrane-denied request.
+    pub static ref MEMBRANE_VERDICT_TOTAL: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "doorway_membrane_verdict_total",
+            "Membrane policy verdicts by outcome (allow/shape/challenge/deny).",
+        ),
+        &["verdict"],
+    )
+    .unwrap();
+
+    /// Active membrane bans (sources with a ban_until in the future).
+    /// Updated on each `maybe_sweep` pass from EdgeGuardStore.
+    pub static ref MEMBRANE_BANS_ACTIVE: IntGauge = IntGauge::new(
+        "doorway_membrane_bans_active",
+        "Number of sources currently under a membrane ban.",
+    )
+    .unwrap();
 }
 
 /// Boot-set handle the watchdog stamps: (`start`, `heartbeat`). `gather_text`
@@ -224,6 +245,8 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(UPSTREAM_BACKPRESSURE_HONORED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(ADMISSION_SHED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(INBOUND_MAX_INFLIGHT.clone()));
+        let _ = REGISTRY.register(Box::new(MEMBRANE_VERDICT_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(MEMBRANE_BANS_ACTIVE.clone()));
     });
 }
 
@@ -332,6 +355,16 @@ pub fn admission_shed_total() -> u64 {
     ADMISSION_SHED_TOTAL.get()
 }
 
+/// Membrane: record one verdict outcome ∈ {allow, shape, challenge, deny}.
+pub fn inc_membrane_verdict(verdict: &str) {
+    MEMBRANE_VERDICT_TOTAL.with_label_values(&[verdict]).inc();
+}
+
+/// Membrane: update the active-ban gauge (called from `EdgeGuardStore::maybe_sweep`).
+pub fn set_membrane_bans_active(count: i64) {
+    MEMBRANE_BANS_ACTIVE.set(count);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -352,6 +385,7 @@ mod tests {
         observe_session_duration(0.2);
         inc_resolve("projection");
         inc_blob_pantry("hit");
+        inc_membrane_verdict("allow");
 
         let text = gather_text();
         for name in [
@@ -366,6 +400,8 @@ mod tests {
             "doorway_upstream_breaker_open_total",
             "doorway_upstream_backpressure_honored_total",
             "doorway_admission_shed_total",
+            "doorway_membrane_verdict_total",
+            "doorway_membrane_bans_active",
         ] {
             assert!(text.contains(name), "missing metric {name}:\n{text}");
         }
@@ -418,5 +454,23 @@ mod tests {
             text.contains("doorway_heartbeat_age_ms"),
             "heartbeat age gauge must render after a scrape:\n{text}"
         );
+    }
+
+    #[test]
+    fn membrane_verdict_counter_increments_by_verdict_delta() {
+        register_all();
+        let before = MEMBRANE_VERDICT_TOTAL.with_label_values(&["deny"]).get();
+        inc_membrane_verdict("deny");
+        let after = MEMBRANE_VERDICT_TOTAL.with_label_values(&["deny"]).get();
+        assert_eq!(after - before, 1);
+    }
+
+    #[test]
+    fn membrane_bans_active_gauge_set() {
+        register_all();
+        set_membrane_bans_active(7);
+        assert_eq!(MEMBRANE_BANS_ACTIVE.get(), 7);
+        set_membrane_bans_active(0);
+        assert_eq!(MEMBRANE_BANS_ACTIVE.get(), 0);
     }
 }
