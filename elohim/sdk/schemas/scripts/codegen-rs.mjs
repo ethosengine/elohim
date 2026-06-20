@@ -162,6 +162,19 @@ async function generateEprOrdinals() {
 }
 
 /**
+ * Resolves a manifest block that may be an inline object or a JSON $ref pointer.
+ * When the block has a "$ref" key, reads and parses the referenced JSON relative
+ * to the manifest file's directory. Returns the resolved object (or {} if absent).
+ */
+async function resolveRefBlock(block, manifestPath) {
+  if (block && typeof block === 'object' && block['$ref']) {
+    const refPath = resolve(dirname(manifestPath), block['$ref']);
+    return JSON.parse(await readFile(refPath, 'utf8'));
+  }
+  return block || {};
+}
+
+/**
  * Walk all 4 pillar manifests and collect attestation kinds + governance-action kinds.
  * Emits a Rust constants file with ATTESTATION_KINDS, GOVERNANCE_ACTION_KINDS,
  * manifest_ref_for_attestation_kind(), and manifest_ref_for_governance_action_kind().
@@ -183,12 +196,12 @@ async function generateAttestationKinds() {
       continue;
     }
 
-    const attestations = manifest['attestations'] || {};
+    const attestations = await resolveRefBlock(manifest['attestations'], manifestPath);
     for (const kind of Object.keys(attestations)) {
       attestationKinds.set(kind, pillar);
     }
 
-    const govActions = manifest['governance-actions'] || {};
+    const govActions = await resolveRefBlock(manifest['governance-actions'], manifestPath);
     for (const kind of Object.keys(govActions)) {
       governanceActionKinds.set(kind, pillar);
     }
