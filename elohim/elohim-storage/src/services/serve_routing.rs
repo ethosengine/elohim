@@ -69,11 +69,11 @@ pub fn fold_candidates(rows: &[ServeRow]) -> Vec<Candidate> {
             Candidate {
                 agent_cid: r.agent_cid.clone(),
                 capability_level,
-                current_load: r.current_load.unwrap_or(0.0),      // full headroom
-                attested_rtt_ms: r.attested_rtt_ms,                // None → neutral 0.5 in score
+                current_load: r.current_load.unwrap_or(0.0), // full headroom
+                attested_rtt_ms: r.attested_rtt_ms,          // None → neutral 0.5 in score
                 household_id: r.household_id.clone().unwrap_or_default(), // None → "" (no false grouping)
                 bonded: r.bonded,
-                delivery_score: r.delivery_score.unwrap_or(1.0),   // optimistic default
+                delivery_score: r.delivery_score.unwrap_or(1.0), // optimistic default
             }
         })
         .collect()
@@ -115,8 +115,7 @@ pub fn load_serve_rows(
     // Collect all shard hashes across matching manifests (may span h_app_id).
     let mut shard_hashes: Vec<String> = Vec::new();
     for m in &manifest_rows {
-        let parsed: Vec<String> =
-            serde_json::from_str(&m.shard_hashes_json).unwrap_or_default();
+        let parsed: Vec<String> = serde_json::from_str(&m.shard_hashes_json).unwrap_or_default();
         shard_hashes.extend(parsed);
     }
     shard_hashes.dedup();
@@ -174,9 +173,7 @@ pub fn load_serve_rows(
     }
 
     let node_cap_rows: Vec<NodeCapRow> = node_stewardship::table
-        .inner_join(
-            stewarded_nodes::table.on(stewarded_nodes::id.eq(node_stewardship::node_id)),
-        )
+        .inner_join(stewarded_nodes::table.on(stewarded_nodes::id.eq(node_stewardship::node_id)))
         .filter(node_stewardship::human_id.eq_any(&human_ids))
         .select((
             node_stewardship::human_id,
@@ -228,9 +225,9 @@ pub fn load_serve_rows(
                 household_id,
                 capability_level,
                 bonded,
-                current_load: None,      // not yet projected
-                attested_rtt_ms: None,   // not yet projected
-                delivery_score: None,    // not yet projected
+                current_load: None,    // not yet projected
+                attested_rtt_ms: None, // not yet projected
+                delivery_score: None,  // not yet projected
             }
         })
         .collect();

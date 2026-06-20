@@ -204,9 +204,18 @@ fn load_serve_rows_returns_three_rows_with_correct_fields() {
     assert_eq!(r1.household_id.as_deref(), Some("h1"));
     assert_eq!(r1.capability_level, Some(5));
     assert!(r1.bonded, "agent-1 should be bonded");
-    assert_eq!(r1.current_load, None, "current_load not projected this wave");
-    assert_eq!(r1.attested_rtt_ms, None, "attested_rtt not projected this wave");
-    assert_eq!(r1.delivery_score, None, "delivery_score not projected this wave");
+    assert_eq!(
+        r1.current_load, None,
+        "current_load not projected this wave"
+    );
+    assert_eq!(
+        r1.attested_rtt_ms, None,
+        "attested_rtt not projected this wave"
+    );
+    assert_eq!(
+        r1.delivery_score, None,
+        "delivery_score not projected this wave"
+    );
 
     // Agent 2: household h2, cap=3, bonded.
     let r2 = by_cid.get(&cids[1]).expect("agent-2 not in rows");
@@ -269,7 +278,10 @@ fn select_serve_peers_returns_two_spread_across_households() {
     let has_h1 = chosen.contains(&cids[0]) || chosen.contains(&cids[2]);
     let has_h2 = chosen.contains(&cids[1]);
     assert!(has_h1, "selection must include at least one h1 peer");
-    assert!(has_h2, "selection must include at least one h2 peer (diverse)");
+    assert!(
+        has_h2,
+        "selection must include at least one h2 peer (diverse)"
+    );
 }
 
 #[test]
