@@ -19,7 +19,7 @@ cites:
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close the two residual tails left after the attestation-consolidation Phase-2a sprint (commit `34fcf1070`, which landed Stage A→G): (1) fix the codegen `$ref` bug so lamad's four `attestation:*` subtypes register and become mint-able (today they fail the F1 validator at both issuance and commit); (2) delete the dead legacy HTTP arms that still query the dropped `content_attestations` table. This is the prerequisite tail that unblocks **new** `attestation:*` subtypes — including tiered-quilt's own tier attestations.
+**Goal:** Close the two residual tails left after the attestation-consolidation Phase-2a sprint (commit `34fcf1070`, which landed Stage A→G): (1) fix the codegen `$ref` bug so lamad's four `attestation:*` subtypes register and become mint-able (today they fail the F1 validator at both issuance and commit); (2) [**SUPERSEDED → backlog**] what was assumed to be dead legacy HTTP arms turned out to be a live-consumer incoherence — `content_attestations` is dropped but still queried by 8 files incl. EPR-head reads; re-scoped to a separate ~8-file migration (see Task 2 banner + backlog `content-attestations-table-dropped-but-still-consumed.md`). Slice 1 alone is the prerequisite tail that unblocks **new** `attestation:*` subtypes — including tiered-quilt's own tier attestations.
 
 **Architecture:** The consolidation primitive is already live — a `Content` entry on elohim DNA with `content_type: "attestation:<subtype>"`, gated by the F1 validator (`content_store_integrity/src/attestation_validator.rs:164`) which fail-closed rejects any kind not in the generated allow-list `content_store_integrity/src/generated_attestation_kinds.rs`. That allow-list is produced by `elohim/sdk/schemas/scripts/codegen-rs.mjs` from the pillar manifests. The bug: lamad declares its attestations via a `$ref` (`lamad/manifest.json:45` → `./manifest/attestations.json`), but the codegen does a flat `Object.keys(manifest['attestations'])` (`codegen-rs.mjs:186`) that never resolves the `$ref` — so it registers a phantom `"$ref"` kind and drops lamad's four real subtypes. Fix the resolver; the four subtypes flow through; the DNA rebuild makes the validator accept them.
 
@@ -86,7 +86,15 @@ Apply the same `$ref` resolution to the governance-actions loop (defensive — e
 
 ---
 
-### Task 2: Slice 2 — delete the dead legacy `content_attestations` HTTP arms
+> **⚠ Task 2 SUPERSEDED → BACKLOG (2026-06-20).** The STOP-guard fired: `content_attestations` is dropped
+> (migration `100300`, applied via `embed_migrations`) but still declared in `diesel_schema:742` and queried
+> by **8 live files including EPR-head reads** (`epr_head`/`epr_service`/`http.rs`) — NOT isolated dead code.
+> A blind api-arm deletion would leave the EPR-head path querying a dropped table. Re-scoped to a coherent
+> ~8-file migration onto the unified `attestations` projection: backlog
+> `content-attestations-table-dropped-but-still-consumed.md` (commit `b95aa3c7f`). The steps below are
+> retained for reference only — **do NOT execute them as-is.**
+
+### Task 2: Slice 2 — delete the dead legacy `content_attestations` HTTP arms (SUPERSEDED — see banner above)
 
 **Files:**
 - Modify: `elohim/elohim-storage/src/api/attestations.rs` (:105-186 — the legacy arms)

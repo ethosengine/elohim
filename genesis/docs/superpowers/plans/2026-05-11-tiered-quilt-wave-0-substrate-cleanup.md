@@ -25,6 +25,16 @@ informed-by:
 
 ## ⚠️ Stage A is now the Attestation Consolidation (supersedes the Option A/B decision)
 
+> **✅ LANDED — 2026-06-20 clarification.** Stage A (the full attestation consolidation) **ALREADY SHIPPED**
+> as the Phase-2a sprint: commit `34fcf1070` (Stage A→G); history `2026-06-02-attestation-consolidation-phase2a-dedup.md`;
+> design now `status: Implemented`. **The three "What still needs your sign-off before dispatch" items below
+> are MOOT** — decided and executed. The only residual tail (a codegen `$ref` bug that left lamad's 4
+> attestation subtypes un-mintable) was closed 2026-06-20 (commit `b78908924`; plan
+> `2026-06-20-attestation-consolidation-residual-tails-plan.md`), with the DNA-build proof deferred to CI +
+> an operator DNA-reinstall pending. One known Phase-2a incompleteness remains (backlog
+> `content-attestations-table-dropped-but-still-consumed.md`). **Wave 0 now reduces to Stage B (the
+> `lamad_event_type` → `elohim_event_type` rename) only — do NOT re-plan or re-dispatch Stage A.**
+
 The original Stage A scope here was "dedupe the two duplicate `Attestation` entry types between imagodei + elohim DNAs," with an outstanding operator decision between two paths (Option A — move ownership to elohim DNA, or Option B — keep imagodei as owner). The Option A/B decision **no longer applies**.
 
 A 2026-05-11 brainstorm pass revealed the duplicate `Attestation` is only the visible tip of a broader pattern: **18+ attestation-shaped entry types are scattered across four DNAs (imagodei, elohim, infrastructure, mishpat) with overlapping but inconsistent fields and no shared validator floor.** The right move is to consolidate ALL of them into a single primitive — `Content` entries with `content_type: "attestation:<subtype>"`, with the per-pillar subtype vocabulary declared in manifests — and to decouple Shamir share material (which the recovery flow conflated with M-of-N social attestations) onto an off-chain libp2p transport.

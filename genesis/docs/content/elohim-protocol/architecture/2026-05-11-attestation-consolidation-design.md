@@ -2,7 +2,7 @@
 title: Attestation Consolidation — Validated Recognition as a Content Discriminator
 id: attestation-consolidation-design
 tier: architecture
-status: Draft (awaiting user review)
+status: Implemented (Phase-2a sprint, commit 34fcf1070, 2026-05-15) — canonical reference; §7 migration executed Stage A→G. Residual codegen-$ref tail closed 2026-06-20 (commit b78908924). One known Phase-2a incompleteness remains: backlog content-attestations-table-dropped-but-still-consumed.md.
 created: 2026-05-11
 authors: Matthew Dowell + Opus 4.7
 pillar coupling: elohim (core primitive), imagodei + lamad + mishpat + infrastructure (manifest layers)
