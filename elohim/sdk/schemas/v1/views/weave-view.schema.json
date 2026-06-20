@@ -24,26 +24,8 @@
       "description": "Mean RS contract-coverage across open placement gaps. 1.0 when there are no gaps (fully covered). Optional — absent when the lens was not selected."
     },
     "clusterCapacity": {
-      "type": "object",
-      "description": "Aggregated storage capacity across all custodian nodes. Optional — absent when no custodian metrics are available.",
-      "additionalProperties": false,
-      "properties": {
-        "free": {
-          "type": ["integer", "null"],
-          "minimum": 0,
-          "description": "Bytes available across all nodes. null when no node has reported a current sample."
-        },
-        "used": {
-          "type": ["integer", "null"],
-          "minimum": 0,
-          "description": "Bytes occupied by blob storage across all nodes. null when no node has reported a current sample."
-        },
-        "stewarded": {
-          "type": ["integer", "null"],
-          "minimum": 0,
-          "description": "Bytes committed via REA custody-blob commitments. null when no custody rows exist."
-        }
-      }
+      "$ref": "compute-triptych.schema.json",
+      "description": "Aggregated storage capacity (free/used/stewarded bytes) summed across all custodian nodes in the cluster weave."
     },
     "tierOccupancy": {
       "description": "Risk-tier occupancy distribution (deferred — Slice 5 follow-on). Absent in Slice 4 responses.",

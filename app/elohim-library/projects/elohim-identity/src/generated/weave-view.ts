@@ -17,23 +17,7 @@ export interface WeaveView {
    * Mean RS contract-coverage across open placement gaps. 1.0 when there are no gaps (fully covered). Optional — absent when the lens was not selected.
    */
   rsCoverage?: number;
-  /**
-   * Aggregated storage capacity across all custodian nodes. Optional — absent when no custodian metrics are available.
-   */
-  clusterCapacity?: {
-    /**
-     * Bytes available across all nodes. null when no node has reported a current sample.
-     */
-    free?: number | null;
-    /**
-     * Bytes occupied by blob storage across all nodes. null when no node has reported a current sample.
-     */
-    used?: number | null;
-    /**
-     * Bytes committed via REA custody-blob commitments. null when no custody rows exist.
-     */
-    stewarded?: number | null;
-  };
+  clusterCapacity?: ComputeTriptych;
   /**
    * Risk-tier occupancy distribution (deferred — Slice 5 follow-on). Absent in Slice 4 responses.
    */
@@ -42,4 +26,21 @@ export interface WeaveView {
    * Regional occupancy distribution (deferred — Slice 5 follow-on). Absent in Slice 4 responses.
    */
   regionOccupancy?: Record<string, unknown>;
+}
+/**
+ * Aggregated storage capacity (free/used/stewarded bytes) summed across all custodian nodes in the cluster weave.
+ */
+export interface ComputeTriptych {
+  /**
+   * Bytes available on device blob filesystem (capacity - used)
+   */
+  free: number | null;
+  /**
+   * Bytes occupied by blob storage on device
+   */
+  used: number | null;
+  /**
+   * Bytes committed via rea_commitments where this peer is provider (action=custody-blob)
+   */
+  stewarded: number | null;
 }

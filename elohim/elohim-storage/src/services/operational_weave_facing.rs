@@ -46,6 +46,7 @@ pub fn load_custodian_relation(conn: &mut SqliteConnection) -> Vec<CustodianRow>
     // --- 2. Stewarded bytes per custodian_id (custody-blob commitments) ----
     let custodian_ids: Vec<&str> = metrics.iter().map(|m| m.custodian_id.as_str()).collect();
 
+    // Join key: custodian_metrics.custodian_id == rea_commitments.provider == agent_cid (the canonical agent identity).
     let stewarded_rows: Vec<(String, Option<f64>)> = match rc::rea_commitments
         .filter(rc::action.eq("custody-blob"))
         .filter(rc::provider.eq_any(&custodian_ids))
@@ -126,13 +127,14 @@ pub fn build_weave_view(conn: &mut SqliteConnection, measured_at: String) -> Wea
     let custodians = load_custodian_relation(conn);
 
     // --- gauges (adapter layer — fold is pure) ---------------------------------
+    let coverage = rs_coverage(&gaps);
     emit_placement_gap_gauge(&gaps);
-    crate::metrics::ELOHIM_RS_COVERAGE_MILLI.set((rs_coverage(&gaps) * 1000.0) as i64);
+    crate::metrics::ELOHIM_RS_COVERAGE_MILLI.set((coverage * 1000.0) as i64);
 
     // --- view ------------------------------------------------------------------
     WeaveView {
         placement_gap_count: placement_gap_count(&gaps) as u32,
-        rs_coverage: Some(rs_coverage(&gaps)),
+        rs_coverage: Some(coverage),
         cluster_capacity: Some(aggregate_capacity(&custodians)),
         tier_occupancy: None,
         region_occupancy: None,
