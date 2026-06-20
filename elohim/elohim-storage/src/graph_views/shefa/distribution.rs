@@ -17,9 +17,17 @@ use cozo::DataValue;
 
 /// Build a graph-backed `DistributionSummary` for the given content `cid`.
 ///
-/// `replica_count` is derived from distinct STEWARDS edges. `reach_class` is
+/// `replica_count` is derived from distinct STEWARDS edges via `CoverageRollup`
+/// (second shefa first-caller, recursive-architecture §3.1). `reach_class` is
 /// derived from the qahal reach field of the atom. Byte-level and projector fields
 /// are zero-filled composition placeholders.
+///
+/// ## Regression invariant
+///
+/// `rollup.constituents.len() as u32 == rows.len() as u32` — the Cozo
+/// `?[steward_cid]` projection is already DISTINCT, so `constituents.len() ==
+/// rows.len()`. `replica_count` and `replica_health` are byte-identical to the
+/// pre-rollup implementation.
 pub fn build_summary(engine: &GraphEngine, cid: &str) -> Result<DistributionSummary, GraphError> {
     // Count stewards via STEWARDS edges.
     let steward_result = engine.run_script(
@@ -27,7 +35,11 @@ pub fn build_summary(engine: &GraphEngine, cid: &str) -> Result<DistributionSumm
             *epr_edge{from_cid: $cid, to_cid: steward_cid, rel_type: 'STEWARDS'}"#,
         &[("cid", DataValue::from(cid))],
     )?;
-    let replica_count = steward_result.rows.len() as u32;
+    // Extract steward CIDs and route through the shared rollup helper.
+    // target = replica_target = 7 (RS(7,4) quilt spec).
+    let steward_cids: Vec<String> = steward_result.rows.iter().map(|r| str_at(r, 0)).collect();
+    let rollup = super::coverage::build_stewarding_rollup(cid, 7, &steward_cids);
+    let replica_count = rollup.constituents.len() as u32;
 
     // Derive reach class from qahal.reach.
     let reach_result = engine.run_script(
