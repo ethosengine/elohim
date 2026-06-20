@@ -281,3 +281,28 @@ Feature: Observable + contract-aware auto-distribute
     # fetch only on tooltip-open and cache the result.
     # Operational parameters: 1 round-trip per blob_hash per session; informs
     # path-page rendering budget (≤1 head fetch + lazy details on demand).
+
+  # --- coverageShortfall: the descent-erasure cure's observable contract -----
+  # Story-harvested 2026-06-20 on the recursive-CoverageRollup branch (Weave Epic #1).
+  # The graph-backed resilience snapshot now aggregates stewards via CoverageRollup
+  # (constituents-preserving), exposing the deficit — so a consumer sees not just
+  # "how many stewards" but "how many distinct-collective slots short of the floor."
+
+  @wip @regression
+  Scenario: Resilience snapshot reports the diversity shortfall, not just a count
+    Given a "standard"-tier content item with 2 distinct stewarding collectives (floor is 3)
+    When the operator requests "/api/v1/resilience/{cid}/household"
+    Then "stewardingCollectives" equals 2
+    And "coverageShortfall" equals 1
+    # Constraint: coverageShortfall = floor - achieved (CoverageRollup.deficit.measure()).
+    # The visible payoff of replacing rows.len() with descent-preserving aggregation —
+    # the count alone could not say "1 collective short of the floor."
+
+  @wip
+  Scenario: coverageShortfall is a present 0 when the floor is met (absent != zero)
+    Given a "standard"-tier content item with 3+ distinct stewarding collectives (floor is 3)
+    When the operator requests "/api/v1/resilience/{cid}/household"
+    Then the response contains "coverageShortfall" with value 0
+    # Constraint: the 3-state contract — present-N (short), present-0 (graph branch
+    # measured the floor met), ABSENT (relational household_resilience path, not computed).
+    # A consumer MUST distinguish "measured: met" (0) from "not computed" (absent).
