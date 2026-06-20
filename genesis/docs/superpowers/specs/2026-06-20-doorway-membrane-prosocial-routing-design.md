@@ -342,7 +342,12 @@ past it to the commons and the peers who actually did the work.
 **It is a `bridges/` crate, not core doorway** — canon is explicit (`epr-reachability-economics`: "the
 finance-bridge belongs at the doorway web2 surface, as a bridge"). `bridges/fiat` plugs into the membrane
 exactly as `atproto`/`activitypub`/`valueflows` do, keeping the membrane thin (this is the operator's
-"bridge crates keep core doorway clean"). The positive complement of EDGE-DESIGN's "a pattern shaped like
+"bridge crates keep core doorway clean"). **Definition (binding):** a *bridge* is a crate that interops with
+a **non-protocol / external system** (fiat payments, atproto, activitypub, ValueFlows/VF-GraphQL) — it
+translates that external system to/from the canonical EPR-REA substrate. The membrane's own edge functions
+(TLS termination, CDN/projection cache, DDoS shedding, DNS resolution, the `guard` rate-limiter) are **NOT
+bridges** — they operate over the *same* substrate (absorbing web2 plumbing/hostility), not an external one.
+The fiat toll is a bridge precisely because money is an external system; DNS/TLS/CDN are edge functions. The positive complement of EDGE-DESIGN's "a pattern shaped like
 a DDoS is structurally *unearned-reach* compute": non-stewarding traffic lacks standing, so it pays the
 externality to earn the cycles it consumes. **v1 ships nothing here** — mutual-aid recognition (§7) is
 the only economic layer that ships. **Gate:** toll receipt = REA `EconomicEvent` (§4·6); commons-pool /
