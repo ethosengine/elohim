@@ -148,10 +148,10 @@ semantics — no fork, no drift. The crate is the write-once home the operator s
 3. **Storage integration (D1 peer):** applies `guard.assess` on directly-exposed surfaces (peers need
    the muscle too); extends `services/distribution_view.rs` placement selector to use `score.rank` at
    **serve** time. Backs `OperationalView`/`GuardStore` with SQLite.
-4. **Self-heal loop driver:** watches local `NodeHeartbeat.status`; on distress flips status to a new
-   `needs-help` value (slow lane) + emits the acute backpressure signal (1b, transport-scoped, *not*
-   broadcast); the `score` layer routes *new* load to headroom peers; the helping peer's serve is
-   metered.
+4. **Self-heal loop driver:** watches local `NodeHeartbeat` (`current_load`/`status`); on distress sets
+   the *existing* `degraded` status + raises `current_load` (no new vocab — see §4·1a) and emits the
+   acute backpressure signal (1b, transport-scoped, *not* broadcast); the `score` layer routes *new*
+   load to headroom peers; the helping peer's serve is metered.
 5. **Recognition** = Weave #3 (consume, not re-spec): per-serve metering (Operational-C) → epoch
    rollup → `compute-fulfilled` EconomicEvent + `appreciation`, joined on `agent_cid`.
 
@@ -189,9 +189,13 @@ semantics — no fork, no drift. The crate is the write-once home the operator s
 **Zero new DHT entry types.** Verdicts:
 
 - **1a · Sustained headroom/load advertisement** — Operational/A, **reuse `NodeHeartbeat`**
-  (`current_load`, `active_connections`, `status`, 30s). Only change: add a `needs-help`/`shedding`
-  value to the `NODE_STATUS` vocab (a value, not a type). Address: agent-scoped composite (node↔agent).
-  Source of truth: DHT. Projection: heartbeat tables (`dht_anchor_hash`: yes).
+  (`current_load`, `active_connections`, `status`, 30s). **No vocab change, no DNA-hash event:** the
+  distress state reuses the *existing* `degraded` status ("Running but with reduced capacity") + a
+  `current_load` threshold, derived Operational-C as `(status == degraded ∨ current_load > θ)`.
+  (Verified: `NODE_STATUS` is an advisory `const [&str; 4]= [online, maintenance, degraded, offline]`;
+  `status` is a free `String` **not** enforced in the integrity zome — so even a future value would not
+  move the DNA hash, but we need none.) Address: agent-scoped composite (node↔agent). Source of truth:
+  DHT. Projection: heartbeat tables (`dht_anchor_hash`: yes).
 - **1b · Acute backpressure** — Operational-C, **transport-plane** (libp2p gossip / SSE), **never DHT**
   (200–2000ms gossip too slow; ephemeral; a public "kick-me" beacon is a privacy/targeting leak).
   Reconstructable from heartbeat + local metrics. It is an *optimization over the 30s heartbeat floor*,
@@ -229,13 +233,13 @@ never DHT.
 - **Serve-routing (byte axis, D1):** storage lacking bytes calls `score.rank(need = content:{reach},
   candidates)` → capable × live × low-attested-RTT × bonded × diverse peer; **storage chooses, not
   doorway**; content-addressed fetch verifies the CID.
-- **Distress / self-heal:** peer P's load climbs → P flips `NodeHeartbeat.status → needs-help` + emits
-  acute backpressure (scoped to current routers) → doorway + siblings' `score` route *new* load to
-  headroom peers Q/R (in-flight on P untouched) → Q's serve metered → epoch rollup → `compute-fulfilled`
-  EconomicEvent + `appreciation` recognizes Q (mutual aid); Q's decaying-score rises ⇒ preferred next
-  time; advertise-then-drop ⇒ score decays + `HealthAttestation{success:false}` from attesters
-  (the commons self-polices without a central judge) → recovery: P's load falls → `status → healthy`,
-  re-enters the candidate pool.
+- **Distress / self-heal:** peer P's load climbs → P sets `NodeHeartbeat.status → degraded` (existing
+  value) + raises `current_load` + emits acute backpressure (scoped to current routers) → doorway +
+  siblings' `score` route *new* load to headroom peers Q/R (in-flight on P untouched) → Q's serve
+  metered → epoch rollup → `compute-fulfilled` EconomicEvent + `appreciation` recognizes Q (mutual aid);
+  Q's decaying-score rises ⇒ preferred next time; advertise-then-drop ⇒ score decays +
+  `HealthAttestation{success:false}` from attesters (the commons self-polices without a central judge) →
+  recovery: P's load falls → `status → online`, re-enters the candidate pool.
 
 ## 6. Error handling & degradation
 
