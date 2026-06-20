@@ -17,7 +17,7 @@ import { PathContextService } from '../../services/path-context.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { SeoService } from '../../shared/services/seo.service';
 import { PathStepView, LearningPath } from '../../models/learning-path.model';
-import { provideElohimClient, GOVERNANCE, CONTENT_ATTESTATION } from '@elohim/service';
+import { provideElohimClient, GOVERNANCE } from '@elohim/service';
 import { vi, Mock } from 'vitest';
 
 describe('PathNavigatorComponent', () => {
@@ -156,7 +156,6 @@ describe('PathNavigatorComponent', () => {
           useValue: { resolve: vi.fn().mockReturnValue(of(null)), resolveEprHead: vi.fn().mockReturnValue(of(null)) },
         },
         { provide: GOVERNANCE, useValue: {} },
-        { provide: CONTENT_ATTESTATION, useValue: {} },
         {
           provide: LAMAD_EPR_NAV,
           useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => true), recordHandoff: vi.fn() },

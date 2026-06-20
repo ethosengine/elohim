@@ -5,7 +5,7 @@ import { provideRouter } from '@angular/router';
 
 import { appConfig } from './app.config';
 import { GOVERNANCE } from '@elohim/service';
-import { CONTENT_ATTESTATION } from '@elohim/service';
+import { AttestationApiService } from './elohim/services/attestation-api.service';
 import { DATA_LOADER } from './elohim/interfaces/data-loader.interface';
 import { BLOB_FETCHER } from './elohim/interfaces/blob-fetcher.interface';
 import { STORAGE_API } from './elohim/interfaces/storage-api.interface';
@@ -49,8 +49,8 @@ describe('App DI Resolution', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should resolve CONTENT_ATTESTATION token', () => {
-    const service = TestBed.inject(CONTENT_ATTESTATION);
+  it('should resolve AttestationApiService (unified attestation read)', () => {
+    const service = TestBed.inject(AttestationApiService);
     expect(service).toBeTruthy();
   });
 

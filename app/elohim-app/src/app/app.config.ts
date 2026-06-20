@@ -8,7 +8,6 @@ import { environment } from '../environments/environment';
 
 import { routes } from './app.routes';
 import { apiBaseUrlInterceptor } from './elohim/interceptors/api-base-url.interceptor';
-import { CONTENT_ATTESTATION } from '@elohim/service';
 import { GOVERNANCE } from '@elohim/service';
 import { ELOHIM_ENV } from '@elohim/service';
 import {
@@ -17,7 +16,6 @@ import {
   ELOHIM_CLIENT as LOCAL_ELOHIM_CLIENT,
 } from './elohim/providers/elohim-client.provider';
 import { ELOHIM_CLIENT } from '@elohim/service';
-import { ContentAttestationApiService } from './elohim/services/content-attestation-api.service';
 import { CustodianCommitmentService } from './elohim/services/custodian-commitment.service';
 import { CustodianMetricsReporterService } from './elohim/services/custodian-metrics-reporter.service';
 import { CustodianSelectionService } from './elohim/services/custodian-selection.service';
@@ -117,7 +115,9 @@ export const appConfig: ApplicationConfig = {
     // API boundary services wired to InjectionToken contracts
     { provide: BLOB_FETCHER, useClass: HeliaFetchService },
     { provide: GOVERNANCE, useExisting: GovernanceApiService },
-    { provide: CONTENT_ATTESTATION, useExisting: ContentAttestationApiService },
+    // CONTENT_ATTESTATION provider retired (attestation-consolidation Phase-2a):
+    // the elohim-app TrustBadgeService twin had no rendering consumer and is removed;
+    // the live trust-badge read (lamad) now uses AttestationApiService directly.
     // Wire rea-runtime's ECONOMIC_EVENT_FACTORY token to the shefa concrete service.
     // Cross-pillar consumers (lamad signal-harness) inject via @elohim/rea-runtime's
     // ECONOMIC_EVENT_FACTORY token, not the shefa-local one, to avoid @app/shefa imports.

@@ -10,7 +10,6 @@ import { Observable, of, from, defer, forkJoin } from 'rxjs';
 
 // Models from lamad pillar (will stay there - content-specific)
 // Using relative imports for now; will update to @app/lamad after full migration
-import { ContentAttestation } from '@app/lamad/models/content-attestation.model';
 import {
   ContentNode,
   ContentGraph,
@@ -41,7 +40,6 @@ import {
   UpstreamProposal,
   ExtensionStats,
 } from '@app/lamad/models/path-extension.model';
-import { CONTENT_ATTESTATION } from '@elohim/service';
 import { GOVERNANCE } from '@elohim/service';
 import { Agent, AgentProgress, AgentAttestation } from '@elohim/service/angular/models/agent.model';
 
@@ -51,7 +49,6 @@ import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
 
-import type { IContentAttestation } from '@elohim/service';
 import type { IGovernance } from '@elohim/service';
 import type {
   GovernanceStateView,
@@ -229,8 +226,6 @@ export class DataLoaderService {
   // Caches to prevent redundant calls (shareReplay pattern)
   private readonly pathCache = new Map<string, Observable<LearningPath>>();
   private readonly contentCache = new Map<string, Observable<ContentNode>>();
-  private attestationCache$: Observable<ContentAttestation[]> | null = null;
-  private readonly attestationsByContentCache = new Map<string, ContentAttestation[]>();
   private graphCache$: Observable<ContentGraph> | null = null;
   private pathIndexCache$: Observable<PathIndex> | null = null;
 
@@ -252,7 +247,6 @@ export class DataLoaderService {
   private readonly logger = inject(LoggerService).createChild('DataLoader');
 
   private readonly governance = inject(GOVERNANCE);
-  private readonly attestation = inject(CONTENT_ATTESTATION);
   private readonly idbCache = inject(IndexedDBCacheService);
 
   constructor() {
@@ -854,8 +848,6 @@ export class DataLoaderService {
   clearCache(includeIndexedDB = false): void {
     this.pathCache.clear();
     this.contentCache.clear();
-    this.attestationCache$ = null;
-    this.attestationsByContentCache.clear();
     this.graphCache$ = null;
     this.relationshipByNodeCache.clear();
     this.pathIndexCache$ = null;
@@ -938,23 +930,16 @@ export class DataLoaderService {
   }
 
   // =========================================================================
-  // Attestation Loading (Bidirectional Trust Model)
+  // Attestation Loading
   // =========================================================================
-
-  /**
-   * Load all content attestations.
-   *
-   * ContentAttestations (trust claims about content) are different from
-   * Agent Attestations (credentials/achievements).
-   *
-   * Use getAgentAttestations() for agent credentials.
-   */
-  getAttestations(): Observable<ContentAttestation[]> {
-    // TODO: IContentAttestation doesn't yet support queryAll with status filter.
-    // For now, return empty. Wire up when attestation list endpoint is added.
-    this.attestationCache$ ??= of([]);
-    return this.attestationCache$;
-  }
+  //
+  // Content-quality attestation reads (getAttestations / getAttestationsForContent /
+  // getActiveAttestations) were retired here in the attestation-consolidation
+  // Phase-2a frontend cleanup: this elohim-app DataLoaderService had no rendering
+  // consumer for them (the elohim-app TrustBadgeService twin was dead and is removed).
+  // The LIVE trust-badge read lives in the lamad DataLoaderService, repointed onto the
+  // unified attestation surface via AttestationApiService.listBySubject(). Agent
+  // credential reads (getAgentAttestations) are a separate concern and remain.
 
   /**
    * Load agent attestations (credentials/achievements) from Holochain.
@@ -965,51 +950,6 @@ export class DataLoaderService {
   // TODO: Create AgentAttestationApiService for agent credential queries
   getAgentAttestations(_agentId?: string, _category?: string): Observable<AgentAttestation[]> {
     return of([]);
-  }
-
-  /**
-   * Get attestations for a specific content node.
-   * Uses dedicated Holochain query for efficiency.
-   */
-  getAttestationsForContent(contentId: string): Observable<ContentAttestation[]> {
-    // Check local cache first
-    if (this.attestationsByContentCache.has(contentId)) {
-      return of(this.attestationsByContentCache.get(contentId)!);
-    }
-
-    return defer(() => from(this.attestation.queryAttestationsForContent(contentId))).pipe(
-      map(results => {
-        const attestations: ContentAttestation[] = results.map(r => ({
-          id: r.id,
-          contentId: r.contentId,
-          attestationType: r.attestationType as ContentAttestation['attestationType'],
-          reachGranted:
-            ((r as Record<string, unknown>)[
-              'reachGranted'
-            ] as ContentAttestation['reachGranted']) ?? 'commons',
-          grantedBy: ((r as Record<string, unknown>)[
-            'grantedBy'
-          ] as ContentAttestation['grantedBy']) ?? { type: 'system', grantorId: 'unknown' },
-          grantedAt: r.createdAt,
-          status: (r.isRevoked ? 'revoked' : 'active') as ContentAttestation['status'],
-          metadata: {} as ContentAttestation['metadata'],
-        }));
-        this.attestationsByContentCache.set(contentId, attestations);
-        return attestations;
-      }),
-      catchError(_err => {
-        return of([]);
-      })
-    );
-  }
-
-  /**
-   * Get all active attestations (not revoked or expired).
-   */
-  getActiveAttestations(): Observable<ContentAttestation[]> {
-    return this.getAttestations().pipe(
-      map(attestations => attestations.filter(att => att.status === 'active'))
-    );
   }
 
   /**

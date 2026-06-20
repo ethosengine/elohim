@@ -7,7 +7,6 @@ import { LearningPath } from '@app/lamad/models/learning-path.model';
 import { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import { DataLoaderService } from './data-loader.service';
 import { GOVERNANCE } from '@elohim/service';
-import { CONTENT_ATTESTATION } from '@elohim/service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
 import { ContentResolverService } from './content-resolver.service';
@@ -19,7 +18,6 @@ import { provideHttpClient } from '@angular/common/http';
 describe('DataLoaderService', () => {
   let service: DataLoaderService;
   let governanceMock: any;
-  let attestationMock: any;
   let idbMock: any;
   let projectionApiMock: any;
   let contentResolverMock: any;
@@ -34,11 +32,6 @@ describe('DataLoaderService', () => {
       queryProposals: vi.fn().mockResolvedValue([]),
       queryPrecedents: vi.fn().mockResolvedValue([]),
       queryDiscussions: vi.fn().mockResolvedValue([]),
-    };
-    const attestationSpy = {
-      queryAttestationsForContent: vi.fn().mockResolvedValue([]),
-      queryAttestationsByAttestor: vi.fn().mockResolvedValue([]),
-      getAttestation: vi.fn().mockResolvedValue(null),
     };
     const idbSpy = {
       init: vi.fn(),
@@ -114,7 +107,6 @@ describe('DataLoaderService', () => {
         provideHttpClientTesting(),
         DataLoaderService,
         { provide: GOVERNANCE, useValue: governanceSpy },
-        { provide: CONTENT_ATTESTATION, useValue: attestationSpy },
         { provide: IndexedDBCacheService, useValue: idbSpy },
         { provide: ProjectionAPIService, useValue: projectionApiSpy },
         { provide: ContentResolverService, useValue: contentResolverSpy },
@@ -125,7 +117,6 @@ describe('DataLoaderService', () => {
 
     service = TestBed.inject(DataLoaderService);
     governanceMock = governanceSpy;
-    attestationMock = attestationSpy;
     idbMock = idbSpy;
     projectionApiMock = projectionApiSpy;
     contentResolverMock = contentResolverSpy;

@@ -3,7 +3,7 @@ import { LamadLayoutComponent } from './lamad-layout.component';
 import { provideRouter } from '@angular/router';
 import { Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
-import { ELOHIM_CLIENT, GOVERNANCE, CONTENT_ATTESTATION } from '@elohim/service';
+import { ELOHIM_CLIENT, GOVERNANCE } from '@elohim/service';
 import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
 import { DataLoaderService } from '../../services/data-loader.service';
 import { RendererInitializerService } from '../../renderers/renderer-initializer.service';
@@ -29,7 +29,6 @@ describe('LamadLayoutComponent', () => {
         provideHttpClient(),
         { provide: ELOHIM_CLIENT, useValue: mockElohimClient },
         { provide: GOVERNANCE, useValue: {} },
-        { provide: CONTENT_ATTESTATION, useValue: {} },
         {
           provide: LAMAD_STORAGE_CLIENT,
           useValue: {

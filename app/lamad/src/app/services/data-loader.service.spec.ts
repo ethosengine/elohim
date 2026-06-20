@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { DataLoaderService } from './data-loader.service';
 import { GOVERNANCE } from '@elohim/service';
-import { CONTENT_ATTESTATION } from '@elohim/service';
+import { AttestationApiService } from '@app/elohim/services/attestation-api.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
 import { ContentResolverService, SourceTier } from './content-resolver.service';
@@ -59,10 +59,11 @@ describe('DataLoaderService', () => {
       queryPrecedents: vi.fn().mockResolvedValue([]),
       queryDiscussions: vi.fn().mockResolvedValue([]),
     };
-    const mockAttestation = {
-      queryAttestationsForContent: vi.fn().mockResolvedValue([]),
-      queryAttestationsByAttestor: vi.fn().mockResolvedValue([]),
-      getAttestation: vi.fn().mockResolvedValue(null),
+    const mockAttestationApi = {
+      listBySubject: vi.fn().mockResolvedValue([]),
+      getById: vi.fn().mockResolvedValue(null),
+      issue: vi.fn().mockResolvedValue(null),
+      revoke: vi.fn().mockResolvedValue(null),
     };
 
     mockIndexedDBCache = {
@@ -173,7 +174,7 @@ describe('DataLoaderService', () => {
         provideHttpClientTesting(),
         DataLoaderService,
         { provide: GOVERNANCE, useValue: mockHolochainContent },
-        { provide: CONTENT_ATTESTATION, useValue: mockAttestation },
+        { provide: AttestationApiService, useValue: mockAttestationApi },
         { provide: IndexedDBCacheService, useValue: mockIndexedDBCache },
         { provide: ProjectionAPIService, useValue: mockProjectionApi },
         { provide: ContentResolverService, useValue: mockContentResolver },

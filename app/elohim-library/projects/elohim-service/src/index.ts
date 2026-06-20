@@ -128,7 +128,9 @@ export * from './angular/models/gated-response.model';
 
 // Interfaces (Angular DI tokens + abstract contracts)
 export * from './angular/interfaces/governance.interface';
-export * from './angular/interfaces/content-attestation.interface';
+// content-attestation.interface retired (attestation-consolidation Phase-2a):
+// the CONTENT_ATTESTATION token + IContentAttestation contract had a single dead
+// implementor; the unified read uses AttestationApiService directly.
 export * from './angular/interfaces/blob-fetcher.interface';
 
 // Environment token

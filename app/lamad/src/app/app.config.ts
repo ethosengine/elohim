@@ -9,7 +9,6 @@ import {
   ELOHIM_CLIENT,
   BLOB_FETCHER,
   GOVERNANCE,
-  CONTENT_ATTESTATION,
   GovernanceApiService,
   provideElohimClient,
   detectClientMode,
@@ -56,7 +55,6 @@ import { ContextAssemblyService } from '@app/elohim/services/context-assembly.se
 import { LensRegistryService } from '@app/elohim/services/lens-registry.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { HeliaFetchService } from '@app/elohim/services/helia-fetch.service';
-import { ContentAttestationApiService } from '@app/elohim/services/content-attestation-api.service';
 import { EconomicEventsApiService } from '@app/shefa/services/economic-events-api.service';
 // Local ELOHIM_CLIENT token used by @app/elohim/services/content.service — aliased to the
 // library token so both consumers resolve to the same instance. The separate local token
@@ -129,9 +127,9 @@ export const appConfig: ApplicationConfig = {
     // GOVERNANCE — GovernanceApiService (from @elohim/service) is a thin HTTP
     // client that only injects HttpClient. Satisfies data-loader.service.ts.
     { provide: GOVERNANCE, useExisting: GovernanceApiService },
-    // CONTENT_ATTESTATION — ContentAttestationApiService (from @app/elohim)
-    // is a thin HTTP client that only injects HttpClient.
-    { provide: CONTENT_ATTESTATION, useExisting: ContentAttestationApiService },
+    // CONTENT_ATTESTATION provider retired (attestation-consolidation Phase-2a):
+    // DataLoaderService now reads the unified attestation surface directly via
+    // AttestationApiService (providedIn:'root'). No token wiring needed.
     // ECONOMIC_EVENT_FACTORY — EconomicEventsApiService (from @app/shefa)
     // is a thin HTTP client that only injects HttpClient. Satisfies
     // signal-harness.service.ts.

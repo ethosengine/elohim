@@ -253,35 +253,17 @@ pub struct ContentAssignmentView {
     pub steward_ratio: Option<f32>,
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ContentAttestationView {
-    pub id: String,
-    pub content_id: String,
-    pub attestor_presence_id: String,
-    pub scope: String,
-    pub attestation_type: String,
-    pub evidence: Option<JsonVal>,
-    pub grantor: Option<JsonVal>,
-    pub is_revoked: bool,
-    pub revocation: Option<JsonVal>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub dht_anchor_hash: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateAttestationInputView {
-    pub content_id: String,
-    pub attestor_presence_id: String,
-    pub scope: String,
-    pub attestation_type: String,
-    pub evidence: Option<JsonVal>,
-    pub grantor: Option<JsonVal>,
-}
+// ContentAttestationView + CreateAttestationInputView retired (attestation-consolidation
+// Phase-2a frontend cleanup): the legacy per-type content-attestation read/write surface
+// was removed; the unified AttestationView (elohim/sdk/schemas/v1/views/attestation-view.schema.json)
+// is the canonical content-quality read. These ts-rs structs had no Rust handler and no live
+// TS consumer after the trust-badge repoint onto the unified surface.
+//
+// NOTE (rust-architect follow-up, not in this frontend slice's scope): the schema-codegen
+// input `elohim/sdk/schemas/v1/inputs/create-attestation-input.schema.json` (a SEPARATE
+// pipeline from these ts-rs structs) is now orphaned of a matching Rust struct. It lives in
+// the protocol-truth schema layer (operator/rust-architect territory) — flagged here for a
+// follow-up decision (retire vs. realign to the unified attestation input), not deleted here.
 
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]

@@ -41,9 +41,10 @@ import {
   UpstreamProposal,
   ExtensionStats,
 } from '../models/path-extension.model';
-import { CONTENT_ATTESTATION } from '@elohim/service';
 import { GOVERNANCE } from '@elohim/service';
 import { Agent, AgentProgress, AgentAttestation } from '@elohim/service/angular/models/agent.model';
+import { AttestationApiService } from '@app/elohim/services/attestation-api.service';
+import type { AttestationView } from '@app/generated/attestation-view';
 
 import { ContentResolverService } from './content-resolver.service';
 import { ContentBackendService } from './content-backend.service';
@@ -52,7 +53,6 @@ import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
 
-import type { IContentAttestation } from '@elohim/service';
 import type { IGovernance } from '@elohim/service';
 import type {
   GovernanceStateView,
@@ -262,7 +262,7 @@ export class DataLoaderService {
   private readonly logger = inject(LoggerService).createChild('DataLoader');
 
   private readonly governance = inject(GOVERNANCE);
-  private readonly attestation = inject(CONTENT_ATTESTATION);
+  private readonly attestationApi = inject(AttestationApiService);
   private readonly idbCache = inject(IndexedDBCacheService);
 
   constructor() {
@@ -966,8 +966,8 @@ export class DataLoaderService {
    * Use getAgentAttestations() for agent credentials.
    */
   getAttestations(): Observable<ContentAttestation[]> {
-    // TODO: IContentAttestation doesn't yet support queryAll with status filter.
-    // For now, return empty. Wire up when attestation list endpoint is added.
+    // No queryAll-with-status-filter surface on the unified attestation API yet.
+    // For now, return empty. Wire up when a content-attestation list endpoint is added.
     this.attestationCache$ ??= of([]);
     return this.attestationCache$;
   }
@@ -984,8 +984,40 @@ export class DataLoaderService {
   }
 
   /**
-   * Get attestations for a specific content node.
-   * Uses dedicated Holochain query for efficiency.
+   * Get content-quality attestations for a specific content node.
+   *
+   * Reads the UNIFIED attestation surface
+   * (`GET /api/v1/attestations/unified?subjectCid=&kind=attestation:content-quality`)
+   * via {@link AttestationApiService.listBySubject}, replacing the removed
+   * per-type `GET /api/v1/attestations?contentId=` route (attestation-consolidation,
+   * Phase-2a). The unified `AttestationView` is adapted to the lamad display model
+   * {@link ContentAttestation} by {@link adaptUnifiedAttestation} so the
+   * TrustBadgeService output shape is unchanged.
+   *
+   * KEYING CAVEAT: the unified query filters `subject_cid`, which (per the
+   * AttestationProjector) is the content CID. The `contentId` we receive here is
+   * the content node's `id` — a SLUG in this codebase, NOT the content CID, and the
+   * ContentNode model exposes no clean content-CID field. We pass the slug as the
+   * subject key for now. This never visibly breaks today because NOTHING mints
+   * `attestation:content-quality` yet, so the result is always empty (the graceful
+   * "unverified" fallback). Once a content-quality minter lands, the slug→CID
+   * resolution MUST be wired here (or the projector must expose a slug-keyed lookup),
+   * or badges will silently never-match.
+   * subject: lamad-domain-gospel
+   * TODO(rust-migration): the projection should expose attestationType / reachGranted /
+   * grantedBy as first-class AttestationView fields instead of the UI parsing the
+   * opaque evidenceJson here. Criteria: domain validation (quality-dimension vocabulary
+   * is subject-owned), multi-agent consistency (every peer must read the same trust),
+   * keeps the UI thin. Hand to rust-architect with the content-quality minter epic.
+   *
+   * EVIDENCE-KEY ASSUMPTION (unconfirmed — reconcile with the minter author): of the
+   * three evidenceJson keys this adapter reads, only `quality_dimension` was specified
+   * by the deliverable. `reach_granted` and `granted_by` are ASSUMED names — no
+   * content-quality producer exists yet to confirm them. Because the adapter skips
+   * unknown dimensions and falls back to 'commons' / a system grantor, a mismatched key
+   * fails SILENTLY (wrong reach/grantor, never an error). When the minter lands, align
+   * these exact keys (or move them first-class per the TODO above) before shipping
+   * visible badges.
    */
   getAttestationsForContent(contentId: string): Observable<ContentAttestation[]> {
     // Check local cache first
@@ -993,23 +1025,13 @@ export class DataLoaderService {
       return of(this.attestationsByContentCache.get(contentId)!);
     }
 
-    return defer(() => from(this.attestation.queryAttestationsForContent(contentId))).pipe(
+    return defer(() =>
+      from(this.attestationApi.listBySubject(contentId, 'attestation:content-quality'))
+    ).pipe(
       map(results => {
-        const attestations: ContentAttestation[] = results.map(r => ({
-          id: r.id,
-          contentId: r.contentId,
-          attestationType: r.attestationType as ContentAttestation['attestationType'],
-          reachGranted:
-            ((r as Record<string, unknown>)[
-              'reachGranted'
-            ] as ContentAttestation['reachGranted']) ?? 'commons',
-          grantedBy: ((r as Record<string, unknown>)[
-            'grantedBy'
-          ] as ContentAttestation['grantedBy']) ?? { type: 'system', grantorId: 'unknown' },
-          grantedAt: r.createdAt,
-          status: (r.isRevoked ? 'revoked' : 'active') as ContentAttestation['status'],
-          metadata: {} as ContentAttestation['metadata'],
-        }));
+        const attestations = results
+          .map(view => this.adaptUnifiedAttestation(view))
+          .filter((a): a is ContentAttestation => a !== null);
         this.attestationsByContentCache.set(contentId, attestations);
         return attestations;
       }),
@@ -1018,6 +1040,79 @@ export class DataLoaderService {
       })
     );
   }
+
+  /**
+   * Adapt a unified {@link AttestationView} into the lamad display model
+   * {@link ContentAttestation}. Returns `null` for rows whose
+   * `evidenceJson.quality_dimension` does not map to a known
+   * {@link ContentAttestationType} — preserving the graceful-empty guarantee rather
+   * than surfacing an invalid badge type.
+   *
+   * Field mapping (legacy ContentAttestationView → unified AttestationView):
+   *  - `attestationType` ← `evidenceJson.quality_dimension`
+   *  - `status`          ← `revokedAt != null ? 'revoked' : 'active'`
+   *  - `reachGranted`    ← `evidenceJson.reach_granted` (fallback 'commons')
+   *  - `grantedBy`       ← `evidenceJson.granted_by` (fallback system grantor)
+   *  - `id`/`grantedAt`  ← `view.id` / `view.createdAt`
+   *  - `contentId`       ← `view.subjectCid`
+   */
+  private adaptUnifiedAttestation(view: AttestationView): ContentAttestation | null {
+    const evidence = this.parseEvidenceJson(view.evidenceJson);
+    const dimension = evidence['quality_dimension'];
+    if (typeof dimension !== 'string' || !DataLoaderService.CONTENT_QUALITY_DIMENSIONS.has(dimension)) {
+      return null;
+    }
+    const attestationType = dimension as ContentAttestation['attestationType'];
+
+    const reachGranted =
+      (evidence['reach_granted'] as ContentAttestation['reachGranted']) ?? 'commons';
+    const grantedBy = (evidence['granted_by'] as ContentAttestation['grantedBy']) ?? {
+      type: 'system',
+      grantorId: view.issuerCid ?? 'unknown',
+    };
+
+    return {
+      id: view.id,
+      contentId: view.subjectCid,
+      attestationType,
+      reachGranted,
+      grantedBy,
+      grantedAt: view.createdAt,
+      status: view.revokedAt != null ? 'revoked' : 'active',
+      metadata: {},
+    };
+  }
+
+  /**
+   * Parse the opaque `evidenceJson` string from a unified AttestationView.
+   * Boundary-only parse of a wire field the backend stores as an opaque string
+   * (not a snake_case→camelCase reshape); returns an empty object on any failure.
+   */
+  private parseEvidenceJson(evidenceJson: string | null | undefined): Record<string, unknown> {
+    if (!evidenceJson) {
+      return {};
+    }
+    try {
+      const parsed: unknown = JSON.parse(evidenceJson);
+      return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  /** Known content-quality dimensions (the {@link ContentAttestationType} vocabulary). */
+  private static readonly CONTENT_QUALITY_DIMENSIONS: ReadonlySet<string> = new Set<string>([
+    'author-verified',
+    'steward-approved',
+    'community-endorsed',
+    'peer-reviewed',
+    'governance-ratified',
+    'curriculum-canonical',
+    'safety-reviewed',
+    'accuracy-verified',
+    'accessibility-checked',
+    'license-cleared',
+  ]);
 
   /**
    * Get all active attestations (not revoked or expired).

@@ -12,7 +12,6 @@ export { LocalSourceChainService } from '@elohim/service';
 export { HolochainClientService } from './holochain-client.service';
 // GovernanceApiService — migrated to @elohim/service (Slice 2.1)
 export { GovernanceApiService } from '@elohim/service';
-export { ContentAttestationApiService } from './content-attestation-api.service';
 export { AttestationApiService } from './attestation-api.service';
 export type { IssueAttestationInput, RevokeAttestationInput } from './attestation-api.service';
 export { GovernanceActionApiService } from './governance-action-api.service';
@@ -26,7 +25,8 @@ export { LearnerBackendApiService } from './learner-backend-api.service';
 // Agent & Trust
 export { AgentService } from './agent.service';
 export { ElohimAgentService } from './elohim-agent.service';
-export { TrustBadgeService } from './trust-badge.service';
+// TrustBadgeService twin retired (attestation-consolidation Phase-2a) — no rendering
+// consumer; the live trust-badge service lives in the lamad bundle.
 
 // Banner notification system
 export { BannerService } from './banner.service';

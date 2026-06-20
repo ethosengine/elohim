@@ -33,8 +33,8 @@ export type {
 } from './storage-writer.interface';
 export { LEARNER_BACKEND } from './learner-backend.interface';
 export type { ILearnerBackend } from './learner-backend.interface';
-// governance.interface, content-attestation.interface — migrated to @elohim/service (Slice 2.1)
+// governance.interface — migrated to @elohim/service (Slice 2.1)
 export { GOVERNANCE } from '@elohim/service/angular/interfaces/governance.interface';
 export type { IGovernance } from '@elohim/service/angular/interfaces/governance.interface';
-export { CONTENT_ATTESTATION } from '@elohim/service/angular/interfaces/content-attestation.interface';
-export type { IContentAttestation } from '@elohim/service/angular/interfaces/content-attestation.interface';
+// CONTENT_ATTESTATION / IContentAttestation retired (attestation-consolidation Phase-2a):
+// the unified attestation read uses AttestationApiService directly — no token/interface.
