@@ -1471,6 +1471,15 @@ pub struct ResilienceSnapshotView {
     /// Wire: `feltStatus` in `resilience-snapshot-view.schema.json`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub felt_status: Option<FeltStatusView>,
+    /// How many additional distinct-collective slots short of the diversity floor.
+    /// Derived from `CoverageRollup::deficit.measure()` in the graph-backed branch.
+    /// `None` when the relational path (household_resilience::snapshot) is used
+    /// (missing ≡ not-selected, never a present null — same contract as
+    /// `intra_hub_peers`). Wire: `coverageShortfall` in
+    /// `resilience-snapshot-view.schema.json`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub coverage_shortfall: Option<u32>,
 }
 
 /// A collective (of any kind) currently stewarding a content item.

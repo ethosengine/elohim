@@ -335,6 +335,9 @@ pub fn snapshot(
             health_score: base.details.health_score,
         }),
         felt_status,
+        // The graph branch computes coverage_shortfall via CoverageRollup;
+        // the relational path does not select that lens — missing ≡ not-selected.
+        coverage_shortfall: None,
     })
 }
 

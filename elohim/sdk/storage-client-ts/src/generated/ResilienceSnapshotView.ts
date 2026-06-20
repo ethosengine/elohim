@@ -25,4 +25,13 @@ distributionState: string, stewardingCollectives: number, commitmentBackedCollec
  * and unmeasured-aware. Computed in `household_resilience.rs::snapshot()`.
  * Wire: `feltStatus` in `resilience-snapshot-view.schema.json`.
  */
-feltStatus: FeltStatusView | null, };
+feltStatus: FeltStatusView | null, 
+/**
+ * How many additional distinct-collective slots short of the diversity floor.
+ * Derived from `CoverageRollup::deficit.measure()` in the graph-backed branch.
+ * `None` when the relational path (household_resilience::snapshot) is used
+ * (missing ≡ not-selected, never a present null — same contract as
+ * `intra_hub_peers`). Wire: `coverageShortfall` in
+ * `resilience-snapshot-view.schema.json`.
+ */
+coverageShortfall?: number, };

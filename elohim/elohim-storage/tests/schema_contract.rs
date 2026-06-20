@@ -1131,6 +1131,7 @@ fn resilience_snapshot_view_matches_schema() {
             },
             suggested_action: None,
         }),
+        coverage_shortfall: None,
     };
 
     let json = serde_json::to_value(&view).unwrap();
@@ -1159,6 +1160,7 @@ fn resilience_snapshot_view_minimal_matches_schema() {
         reciprocating_collectives: None,
         details: None,
         felt_status: None,
+        coverage_shortfall: None,
     };
 
     let json = serde_json::to_value(&view).unwrap();
@@ -1177,6 +1179,45 @@ fn resilience_snapshot_view_minimal_matches_schema() {
     assert!(
         !json.as_object().unwrap().contains_key("feltStatus"),
         "feltStatus must be absent when None"
+    );
+    assert!(
+        !json.as_object().unwrap().contains_key("coverageShortfall"),
+        "coverageShortfall must be absent when None (missing ≡ not-selected)"
+    );
+    validate_against_schema("views/resilience-snapshot-view.schema.json", &json);
+}
+
+#[test]
+fn resilience_snapshot_view_with_coverage_shortfall_validates() {
+    use elohim_storage::{RegionalDistributionView, ResilienceSnapshotView};
+
+    // Graph branch: coverage_shortfall populated when short of the floor.
+    let view = ResilienceSnapshotView {
+        content_id: "content-shortfall-001".to_string(),
+        distribution_state: "measured".to_string(),
+        stewarding_collectives: 2,
+        commitment_backed_collectives: 2,
+        diversity_score: 0.67,
+        regional_distribution: RegionalDistributionView {
+            local: 0,
+            regional: 0,
+            global: 0,
+            unknown: 2,
+        },
+        placement_gaps: vec![],
+        protection_status: "partial".to_string(),
+        reciprocating_collectives: None,
+        details: None,
+        felt_status: None,
+        coverage_shortfall: Some(1), // 1 slot short of floor=3
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    // coverageShortfall must be present and equal 1
+    assert_eq!(
+        json["coverageShortfall"],
+        serde_json::Value::Number(1.into()),
+        "coverageShortfall must serialize when Some"
     );
     validate_against_schema("views/resilience-snapshot-view.schema.json", &json);
 }

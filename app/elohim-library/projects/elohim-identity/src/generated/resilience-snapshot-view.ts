@@ -63,6 +63,10 @@ export interface ResilienceSnapshotView {
     healthScore?: number;
   };
   /**
+   * How many additional distinct-collective slots short of the diversity floor (CoverageRollup deficit measure). Derived in the graph-backed branch via CoverageRollup.deficit.measure(). Omitted (not-selected) when the relational household_resilience::snapshot path is used — missing means not-selected, never a measured zero.
+   */
+  coverageShortfall?: number;
+  /**
    * Household-addressed felt projection of the resilience claim — names, not nines. Computed in household_resilience.rs::snapshot(). Honest by construction: floor-relative (reassurance is measured against the content's resilience floor, not a flat threshold) and unmeasured-aware (distributionState 'unmeasured' → reassurance 'not-yet-seen', never a fake verdict). The inverse of the operator debug Lens; consumed by <elohim-memory-safety>.
    */
   feltStatus?: {
