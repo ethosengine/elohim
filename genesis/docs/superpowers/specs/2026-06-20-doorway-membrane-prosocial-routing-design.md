@@ -18,6 +18,11 @@ cites:
   - genesis/docs/architecture/rea-compute-commitment-primitive.md
   - elohim-facings-crate-extraction-plan | the pure-crate extraction pattern elohim-peer-fabric follows (deps-graph boundary enforcement, no-diesel, byte-identical gate) | sha256:d301f34b3b7e66d4 | path: genesis/docs/superpowers/plans/2026-06-19-elohim-facings-crate-extraction-plan.md
   - vision-gap-limit-governor-stub | home of the limit-governor that bounds the emergent market layer (limitarian ceilings + donut floor/ceiling); v1 ships mutual-aid recognition only | sha256:14ea8f3e81cd87c8 | path: genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md
+  - epr-reachability-economics | KEYSTONE — Role-2 finance-bridge, the immutable-bytes/mutable-heads CDN model, the participation/reachability gradient, the anycast-CDN endgame, and toll-settlement open questions; grounds the §3 CDN two-planes correction AND the §7.1 toll layer | sha256:19e359867f22af5a | path: genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md
+  - mutual-storage-replication-dwelling-hub-design | commons floor (COMMONS_MIN_FLOOR_PCT), free→dwelling→collective→commons graduation, proposed→active on first ProvideAnnounce — the commons-pool + opt-in-hosting backing for §7.1 | sha256:1acbeeec8b7a3956 | path: genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
+  - non-commons-provide-commitments-design | the replicates-content/commons capacity-variant rationale — the commons-pool membership / opt-in hosting backing (§4·7) | sha256:936b660644fde390 | path: genesis/docs/superpowers/specs/2026-06-13-non-commons-provide-commitments-design.md
+  - genesis/data/timeline/backlog/witnessed-records-reach-flywheel.md
+  - doorway-two-axis-scaling | doorway DNS/TLS-gateway self-description + "the K8s expression is the developer test-bench, not the architecture" — grounds the doorway-as-P2P-ingress reframe (§1) | sha256:36fb15e24ceaf8b2 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-11-doorway-two-axis-scaling.md
 informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md
   - doorway/doorway-service/EDGE-DESIGN.md
@@ -108,11 +113,24 @@ volumetric concern upward*, not *implement anti-DDoS*:
 |---|---|---|
 | DNS / name-resolution | **Delegated upstream** (managed anycast) for `elohim.host`; **pkarr behind the membrane** for key→records. Doorway does NOT answer `:53`. | A *doorway* address, never a peer address. The signature (pkarr) is the truth anchor, not the DNS record. |
 | TLS | **AT doorway** (self-terminated, cert-manager/ACME — under sovereign control, unlike Cloudflare Tunnel). | Plaintext stops at the edge. |
-| CDN / cache | **AT doorway** (`TieredBlobCache` pantry + `DeliveryRelay` coalescing + write-on-fetch). | Only cold/uncached, single-target fetches reach a peer. Coalescing kills the thundering-herd. |
+| CDN — bytes | **AT doorway** (`TieredBlobCache` pantry + `DeliveryRelay` coalescing + write-on-fetch). CID-authoritative + immutable ⇒ cached forever, no invalidation. | Only cold/uncached, single-target fetches reach a peer; coalescing kills the thundering-herd. |
+| CDN — projection / head index | **AT doorway, REPLICATED doorway↔doorway** — the mutable name→latest-CID head + the "which doorway projects this EPR" index (reach-earned; informs an EPR/client *which* doorway to reach). | Heads visible at the edge **even for peers without a doorway contract**; only *serving load* is conductor-gated. Bytes still come from the CID — projection replication never makes doorway a byte target-chooser. |
 | Volumetric DDoS (L3/L4) | **UPSTREAM** (anycast scrubbing / BGP / CDN headroom). By the time a packet hits doorway's socket the uplink is already full. | Nothing volumetric reaches the peer; the doorway is the first casualty, not the peer. |
 | Application abuse (L7) | **AT doorway** (`guard`: admission shed, circuit breakers, PoW/challenge, reputation rate-shape). | Only admitted, cost-paid, reputation-cleared requests pass. |
 | Loadbalance | **Split**: L7 + health-aware conductor routing AT doorway (identity axis); GSLB/anycast upstream. | For *bytes*, no balancing crosses the seam — single-target dispatch (no fan-out). |
 | Origin-cloaking of peer addresses | **AT doorway** — the highest-leverage shield. Peers connect outbound; the proxy is the only egress; backend targets are private cluster DNS. | A WAN client never receives a dialable peer address. |
+
+**Doorway IS the P2P-native ingress controller.** The L7/control plane — ingress, L7 load-balancing,
+service discovery, health-aware routing, self-heal — *is* doorway: the operator's **"k8s-like powers
+over a true P2P substrate."** The k8s `Ingress`/ingress-nginx currently in front of it
+(`doorway/prod.yaml`) is the **developer test-bench, not the architecture**
+(`2026-06-11-doorway-two-axis-scaling`: "the K8s expression … is the developer test-bench, not the
+architecture … the model must hold for three blades in a closet"; `feedback_k8s_is_not_the_architecture`:
+"at full protocol maturity it goes away completely, subsumed into peer-native modeling"). This **extends
+P1** (storage = reconciliation-controller over the DHT manifest) from the *data* plane to the
+*ingress/control* plane — the new claim of this arc. **The reframe is the L7/control plane ONLY** — the
+L3/L4 volumetric / anycast / `:53`-delegation seam above stays exactly as stated (upstream /
+operator-altitude; EDGE-DESIGN keeps eBPF/XDP/BGP-anycast at the hub + operator-deployment tier).
 
 ## 2. The shared spine — `elohim/elohim-peer-fabric`
 
@@ -157,11 +175,21 @@ semantics — no fork, no drift. The crate is the write-once home the operator s
 
 ## 3. Per-capability verdict (the operator's four + the meta-cap)
 
-- **CDN / projection cache** — web2-mechanism-AT-doorway is correct and already built (`TieredBlobCache`
-  + `DeliveryRelay`). Do **not** push it into substrate cache-to-cache replication (P1: each doorway
-  reconciles from shared manifest; bytes move by content-addressed fetch). *Residual:* adopt
-  trustless-gateway posture — re-verify the CID **on cache-fill** (not per-serve; keeps the hot path
-  cheap) so the membrane is provably unable to serve corrupted bytes.
+- **CDN / projection cache — two planes, split by mutability** (refinement, not a reversal). **(a)
+  Bytes:** CID-authoritative + immutable ⇒ cached at the edge forever, no invalidation; serving is
+  single-target / no-fan-out (gospel unchanged); *residual:* trustless-gateway CID re-verify **on
+  cache-fill** (not per-serve). **(b) Projection / head / addressing layer:** the mutable
+  name→latest-CID head + the "which doorway projects this EPR" index — **this** replicates
+  cache-to-cache (doorway↔doorway), is **reach-earned**, and informs an EPR/client which doorway to
+  reach. Authoritative bytes still come only from the CID; projection replication never makes doorway a
+  byte target-chooser. Canon: `epr-reachability-economics` §6–§7 ("immutable bytes cached eternally;
+  mutable heads kept fresh cheaply"; "origin = the replicated P2P substrate"). **One principle (this
+  spec's synthesizing contribution — assembled from canon, not yet stated as one anywhere):** *EPR heads
+  from peers without a doorway contract are visible at the edge (head-visibility filter `epr_head.rs`);
+  only serving load is conductor-gated (`epr_service.rs`/`http.rs` reach-gate + universal `/epr/{id}`
+  resolver); projection replication is earned by reach.* **GAP:** the doorway↔doorway projection-index
+  *replication mechanism* is designed-for, not built (`compute_projection_tier` only *describes* observed
+  coverage).
 - **Failover** — doorway-level edge failover on the **identity-hosting axis** (which conductor is
   healthy for a human), backed by peers registering with multiple doorways. For **bytes**, failover is
   substrate re-resolution (Kademlia / `epr-cross-peer-resolution`), **never** a doorway target-chooser
@@ -183,6 +211,15 @@ semantics — no fork, no drift. The crate is the write-once home the operator s
   placement to serve-routing); doorway carries capability routing only on the **identity-hosting axis
   (D8)** (the existing `conductor/registry.rs`). Conflating the two — a doorway-resident *byte*
   target-chooser — is the one move that breaks the constitution.
+- **Reach-earned projection (the gate)** — projection replication is gated by **stewardship-backed
+  reach**: broader *earned* reach ⇒ more doorways project the EPR, where "earned" = backed by
+  `replicates-content`/`replicates-commons` Mishpat commitments accumulated from distributed stewards
+  (doctrine: `witnessed-records-reach-flywheel` — "each steward connection elevates earned reach →
+  blobs shard onto that reach-level"). The **byte analog exists** (`replica_target_for(reach)`:
+  Private=2 … Public=16, `distribution_view.rs:58`). **GAP / the named seam:** there is no
+  `projection_target_for(reach)` yet — `compute_projection_tier` is *descriptive* (counts observed
+  projectors), and the reach-aware target is an explicit `TODO(reach-aware-targeting)`
+  (`distribution_view.rs:501`). `ProjectionTier` is the correct home.
 
 ## 4. P2P Design Gate output
 
@@ -210,6 +247,12 @@ semantics — no fork, no drift. The crate is the write-once home the operator s
   added; not a new DHT type in v1).
 - **5 · Membrane policy layer** — *not a data entity*; a request stage reusing existing admission /
   circuit-breaker operational state.
+- **6 · Toll receipt** (design-only) — **REUSE** REA `EconomicEvent` (fiat is another resource flow);
+  per-toll detail stays Operational-C, **epoch-aggregated** (never notarize per-toll/per-serve). Joined
+  on `agent_cid`.
+- **7 · Commons-pool membership / opt-in hosting offer** (design-only) — **REUSE** `Mishpat::Commitment`
+  `replicates-content`/`replicates-commons` *capacity* variant (verified `commitments.rs:294`);
+  graduates `proposed → active` on first `ProvideAnnounce`. No new entry type.
 
 **Design constraints discovered.** (a) Reuse over create — `NodeRegistration`, `NodeHeartbeat`,
 `HealthAttestation`, `ShardAssignment`, `Mishpat::Commitment` (`delegates-compute`,
@@ -224,7 +267,7 @@ never DHT.
 
 ## 5. Data flow
 
-- **Read (happy path):** DNS → ingress → **doorway:8080** (client never sees a peer address) → wisdom
+- **Read (happy path):** DNS → ingress *(k8s test-bench; at maturity doorway IS the ingress controller)* → **doorway:8080** (client never sees a peer address) → wisdom
   gate → **membrane policy stage** (`guard.assess`; anything but `Allow` ⇒ no peer touched) →
   admission semaphore (503 shed) → EPR router (cache hit ⇒ served at the edge, peer untouched; miss ⇒
   single-target fetch) → trustless-gateway CID re-verify **on cache-fill**.
@@ -273,6 +316,33 @@ evaluation by flourishing. The market layer is **specified, not built in v1**, a
 `limit-governor` (the `2026-06-14-vision-gap-limit-governor-stub` is its home). v1 ships recognition
 only; the decaying delivery-success score closes the pro-social loop (help → standing → preferred
 selection) without any market.
+
+### 7.1 Fiat-interop, the commons toll, and traffic-reward commons pools (design-only; eventual; limit-governed; a `bridges/` crate)
+
+The doorway's web2 surface eventually hosts a **finance-bridge** (Role 2 of `epr-reachability-economics`).
+Non-stewarding clients — search engines, bots, browsers with no standing and no projection contract —
+reach content lacking an explicit projection contract by paying a **toll**: a micro-transaction that
+internalizes the externality web2 hides ("visitors pay rent; stewards grow the commons" — *not* a
+paywall, "honest pricing of an externality"). Tolls flow as **traffic rewards** to small peers who
+**opt-in to host cached EPRs**, building **commons pools** (the `replicates-commons` capacity pledge +
+the `COMMONS_MIN_FLOOR_PCT` floor; graduates `proposed → active` on first `ProvideAnnounce`). This is the
+*bounded, emergent* market — **subordinate to and capped by** the `limit-governor` (limitarian ceiling +
+donut floor/ceiling). **Heads visible / bytes metered:** commons heads stay visible to anonymous
+visitors; the toll meters only *bytes*; the economic frontier is enforced **peer-side** (the serving
+peer's standing check), never as a doorway-resident gatekeeper.
+
+**It is a `bridges/` crate, not core doorway** — canon is explicit (`epr-reachability-economics`: "the
+finance-bridge belongs at the doorway web2 surface, as a bridge"). `bridges/fiat` plugs into the membrane
+exactly as `atproto`/`activitypub`/`valueflows` do, keeping the membrane thin (this is the operator's
+"bridge crates keep core doorway clean"). The positive complement of EDGE-DESIGN's "a pattern shaped like
+a DDoS is structurally *unearned-reach* compute": non-stewarding traffic lacks standing, so it pays the
+externality to earn the cycles it consumes. **v1 ships nothing here** — mutual-aid recognition (§7) is
+the only economic layer that ships. **Gate:** toll receipt = REA `EconomicEvent` (§4·6); commons-pool /
+opt-in hosting = `replicates-*` capacity Commitment (§4·7) — zero new DHT entry types. **Named
+fast-follow:** a `Toll`/`Pay` variant of `guard.assess`'s `Verdict` is the natural enforcement extension
+(not yet specified). **GAP:** no `bridges/fiat` crate exists today (`bridges/` holds `valueflows` + the
+web2 bridges); the chain *toll → traffic-reward → opt-in hosting → commons pool* is a coherent
+composition of existing primitives, not yet written as one flow.
 
 ## 8. Scope — D8 / D1 / D5 and buildable-now vs design-only
 
