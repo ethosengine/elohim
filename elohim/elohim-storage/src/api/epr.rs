@@ -28,6 +28,8 @@ use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{body::Incoming, Method, Request, Response, StatusCode};
 
+use elohim_facings::folds::epr_content;
+
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
 use crate::services::back_prop::OutboundSink;
@@ -36,7 +38,7 @@ use crate::services::epr_store::{default_epr_store, EprStore};
 use crate::services::gossip_flood::GossipPublisher;
 use crate::services::manifest_registry::ManifestRegistry;
 use crate::services::response;
-use crate::views::{EprCouplingView, EprEnvelopeView, EprSignatureView, EprView};
+use crate::views::{EprEnvelopeView, EprSignatureView, EprView};
 
 use super::get_conn;
 
@@ -204,15 +206,21 @@ pub async fn handle(
 // ---------------------------------------------------------------------------
 
 pub(crate) fn to_envelope_view(fetched: &FetchedEpr) -> EprEnvelopeView {
-    let mut coupling = EprCouplingView::default();
-    for row in &fetched.coupling {
-        match row.leg.as_str() {
-            "knowledge" => coupling.knowledge = Some(row.target_cid.clone()),
-            "value" => coupling.value = Some(row.target_cid.clone()),
-            "governance" => coupling.governance = Some(row.target_cid.clone()),
-            _ => {}
-        }
-    }
+    // Leg-pivot fold lifted into the pure facings crate (DB-free). Map the diesel
+    // `EprCouplingRow` onto the crate's DB-free `CouplingRow`, then fold — the same
+    // thin-adapter pattern every lens uses (the pure fold cannot take a diesel row).
+    // Byte-identical to the prior inline kernel (verbatim arms + same iteration order).
+    let coupling = epr_content::fold_coupling_legs(
+        &fetched
+            .coupling
+            .iter()
+            .map(|r| epr_content::CouplingRow {
+                epr_cid: r.epr_cid.clone(),
+                leg: r.leg.clone(),
+                target_cid: r.target_cid.clone(),
+            })
+            .collect::<Vec<_>>(),
+    );
 
     EprEnvelopeView {
         cid: fetched.atom.cid.clone(),

@@ -30,13 +30,14 @@ Add `serde`/`chrono` only when a *moved* fold's own type genuinely needs it — 
 
 ## Adding a lens (the §11 recipe)
 
-1. Add `folds/<facing>.rs` — pure fns over a `&[Row]` slice (define the `Row` in `relation.rs`
-   or alongside the fold). Reuse `fold::bucket_by` / `distinct_count_by`; do not hand-roll
-   iteration when a combinator composes (the `intra_hub_peers` rewrite is the proof:
-   `bucket_by` ∘ `distinct_count_by`).
+1. Add `folds/<facing>.rs` — pure fns over a `&[Row]` slice. **Define your `Row` INSIDE this fold
+   file** (not in `relation.rs` — that is the shared `HolderRow` home; see *Parallel lens sessions*
+   below). Reuse `fold::bucket_by` / `distinct_count_by`; do not hand-roll iteration when a
+   combinator composes (the `intra_hub_peers` rewrite is the proof: `bucket_by` ∘ `distinct_count_by`).
 2. Register it in `folds/mod.rs` (`pub mod <facing>;`).
-3. Storage side: add a `load_<facing>_relation` loader (impure, `&mut conn`) in `elohim-storage`,
-   plus the route, following the charter's proof-fold-first slice.
+3. Storage side: add a `load_<facing>_relation` loader (impure, `&mut conn`) in a NEW
+   `elohim-storage/src/services/<facing>_facing.rs` (not in `household_resilience.rs`), plus the
+   route, following the charter's proof-fold-first slice.
 4. Unit-test the fold DB-free in this crate. The folds return `elohim-views` types — no `ts-rs`
    move, no codegen, no schema change (the cross-crate ts-rs trap cannot bite here).
 
@@ -56,6 +57,37 @@ pub <lens>: Option<T>,
   `#[ts(optional)]` reintroduces the ts-rs `T | null` drift — the `intra_hub_peers` MED finding.)
 - Combinators return `BTreeMap` (deterministic) so a lens may iterate a fold into a serialized
   `Vec` without leaking iteration order onto the wire.
+
+## Parallel lens sessions — isolated vs shared surfaces
+
+The four lens charters (reach-projection · rea-economic · operational-weave · epr-content-perspective)
+can be built in parallel, but **only the fold layer is conflict-free**. The integration surface is
+SHARED — respect this split or the sessions collide.
+
+**Isolated (parallelize freely — one file per lens):**
+- `elohim-facings/src/folds/<facing>.rs` — your folds + your fold unit tests (new file).
+- Your `Row` struct — inside that fold file (NOT `relation.rs`, which is the shared `HolderRow` home).
+- Your loader — a NEW `elohim-storage/src/services/<facing>_facing.rs` (NOT `household_resilience.rs`).
+
+**Shared (must SERIALIZE — land one lens's integration before the next starts its):**
+- `elohim-views/src/infrastructure.rs` — View types (ts-rs anchored): additive, but a shared file feeding global codegen.
+- `elohim-storage/src/http.rs` — your route's match arm (+ the route-shadow guard below).
+- `elohim/sdk/schemas/v1/views/*.schema.json` + `tests/schema_contract.rs` + `codegen-ts.mjs` `INTERFACE_FILES`.
+- The generated TS (`export_bindings` → sdk; `schema:codegen:ts` → 5 app dirs) — **last-writer-wins**.
+
+**Codegen is global and races.** `cargo test export_bindings` (ts-rs) and `pnpm run schema:codegen:ts`
+regenerate SHARED files from the WHOLE crate / schema set. Two sessions running codegen concurrently
+clobber each other. Rule: **run codegen only when integrating your lens, and commit the regenerated
+files in the SAME commit as your View type.** Never run codegen while another session's View edit is in flight.
+
+**Route-shadow guard.** A new `GET` route can be silently shadowed by a catch-all (the `/auth/portal`
+incident: a `starts_with` arm ate the EPR router). Add a routing unit test asserting your path dispatches
+to your handler, not the SPA/EPR fallthrough. (Doorway's main listener additionally needs an
+`is_service_path` arm — memory `project_doorway_main_route_needs_is_service_path`.)
+
+**Operationally:** one worktree per session; **serialize pushes** (concurrent pushes mutually abort the
+orchestrator). Order: land **epr-content-perspective first as the reference** (loaders exist, no
+cross-cutting block), then reach / rea / operational copy the pattern as their loaders + data land.
 
 ## Testing
 
