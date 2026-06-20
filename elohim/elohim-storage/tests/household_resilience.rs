@@ -211,6 +211,69 @@ fn seed_protection_case(
     content_id
 }
 
+/// Seed the lit-card case — 3 coherent agent-keyed households (peer_id == provider
+/// == agent_pub_key), each with an online steward + a provide commitment, mixing the
+/// seeder `provide` and runtime `replicates-content` action conventions. Returns the
+/// content id. Shared by the golden baseline AND the named lit-card proof so their
+/// fixtures cannot drift apart (a one-sided seed change would let the byte-golden
+/// silently pin a scenario its name no longer describes).
+fn seed_lit_card_case(conn: &mut diesel::SqliteConnection) -> &'static str {
+    let content_id = "lit-card-content";
+    let shard = "lit-card-shard-1";
+    seed_shard_manifest(conn, content_id, &format!(r#"["{shard}"]"#));
+
+    // Three households, each with one steward agent. CRITICAL: the steward's
+    // shard_locations.peer_id, the commitment.provider, and humans.agent_pub_key
+    // are all the SAME value (the agent key) — the coherent contract.
+    let households = [
+        ("home-dowell", "agent-dowell", Some("us-east")),
+        ("home-ruth", "agent-ruth", Some("us-west")),
+        ("church-bethel", "agent-bethel", Some("us-east")),
+    ];
+    for (i, (household, agent, region)) in households.iter().enumerate() {
+        seed_collective(conn, household, *region);
+        seed_human(conn, agent, Some(household));
+        seed_shard_location(conn, shard, agent); // peer_id == agent_pub_key
+        seed_peer_status(conn, agent, "online");
+        seed_stewarded_node(conn, agent, Some(household));
+        // R2 coverage: mix the seeder convention ("provide") with the runtime
+        // mishpat-projection convention ("replicates-content") — both must count.
+        let action = if i == 0 {
+            "replicates-content"
+        } else {
+            "provide"
+        };
+        seed_commitment(
+            conn,
+            &format!("commit-{agent}"),
+            agent, // provider == agent_pub_key
+            action,
+            "active",
+            "content:commons",
+        );
+    }
+    content_id
+}
+
+/// Seed the intra-hub case — hub `home-multi` with 2 distinct agents, `home-solo`
+/// with 1. Returns the content id. Shared by the golden baseline AND the named intra
+/// test so their fixtures cannot drift apart.
+fn seed_intra_case(conn: &mut diesel::SqliteConnection) -> &'static str {
+    let content_id = "content-intra";
+    let shard = "shard-intra";
+    seed_shard_manifest(conn, content_id, &format!(r#"["{shard}"]"#));
+
+    // hub home-multi: two distinct agents both hold the shard → intra = 2.
+    seed_human(conn, "agent-multi-a", Some("home-multi"));
+    seed_human(conn, "agent-multi-b", Some("home-multi"));
+    seed_shard_location(conn, shard, "agent-multi-a");
+    seed_shard_location(conn, shard, "agent-multi-b");
+    // hub home-solo: one agent holds → intra = 1.
+    seed_human(conn, "agent-solo", Some("home-solo"));
+    seed_shard_location(conn, shard, "agent-solo");
+    content_id
+}
+
 // =============================================================================
 // D1 — Protection-status ladder
 // (spec: 2026-06-12-resilience-dimensions-proof-suite-design.md)
@@ -811,19 +874,7 @@ fn snapshot_includes_placement_gaps_and_regional_distribution() {
 fn intra_hub_peers_counts_distinct_agents_per_hub() {
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
-
-    let content_id = "content-intra";
-    let shard = "shard-intra";
-    seed_shard_manifest(&mut conn, content_id, &format!(r#"["{shard}"]"#));
-
-    // hub home-multi: two distinct agents both hold the shard → intra = 2.
-    seed_human(&mut conn, "agent-multi-a", Some("home-multi"));
-    seed_human(&mut conn, "agent-multi-b", Some("home-multi"));
-    seed_shard_location(&mut conn, shard, "agent-multi-a");
-    seed_shard_location(&mut conn, shard, "agent-multi-b");
-    // hub home-solo: one agent holds → intra = 1.
-    seed_human(&mut conn, "agent-solo", Some("home-solo"));
-    seed_shard_location(&mut conn, shard, "agent-solo");
+    let content_id = seed_intra_case(&mut conn);
 
     let snapshot = household_resilience::snapshot(&pool, &ctx(), content_id, None).unwrap();
 
@@ -867,41 +918,7 @@ fn intra_hub_peers_counts_distinct_agents_per_hub() {
 fn resilience_card_lights_with_coherent_agent_keyed_substrate() {
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
-
-    let content_id = "lit-card-content";
-    let shard = "lit-card-shard-1";
-    seed_shard_manifest(&mut conn, content_id, &format!(r#"["{shard}"]"#));
-
-    // Three households, each with one steward agent. CRITICAL: the steward's
-    // shard_locations.peer_id, the commitment.provider, and humans.agent_pub_key
-    // are all the SAME value (the agent key) — the coherent contract.
-    let households = [
-        ("home-dowell", "agent-dowell", Some("us-east")),
-        ("home-ruth", "agent-ruth", Some("us-west")),
-        ("church-bethel", "agent-bethel", Some("us-east")),
-    ];
-    for (i, (household, agent, region)) in households.iter().enumerate() {
-        seed_collective(&mut conn, household, *region);
-        seed_human(&mut conn, agent, Some(household));
-        seed_shard_location(&mut conn, shard, agent); // peer_id == agent_pub_key
-        seed_peer_status(&mut conn, agent, "online");
-        seed_stewarded_node(&mut conn, agent, Some(household));
-        // R2 coverage: mix the seeder convention ("provide") with the runtime
-        // mishpat-projection convention ("replicates-content") — both must count.
-        let action = if i == 0 {
-            "replicates-content"
-        } else {
-            "provide"
-        };
-        seed_commitment(
-            &mut conn,
-            &format!("commit-{agent}"),
-            agent, // provider == agent_pub_key
-            action,
-            "active",
-            "content:commons",
-        );
-    }
+    let content_id = seed_lit_card_case(&mut conn);
 
     let snapshot = household_resilience::snapshot(&pool, &ctx(), content_id, None).unwrap();
 
@@ -1049,12 +1066,14 @@ fn stopgap_heal_lights_commitment_backed_via_direct_join() {
 // =============================================================================
 
 fn det_snapshot_json(pool: &elohim_storage::db::DbPool, content_id: &str, case: &str) -> String {
-    let s1 =
-        serde_json::to_string(&household_resilience::snapshot(pool, &ctx(), content_id, None).unwrap())
-            .unwrap();
-    let s2 =
-        serde_json::to_string(&household_resilience::snapshot(pool, &ctx(), content_id, None).unwrap())
-            .unwrap();
+    let s1 = serde_json::to_string(
+        &household_resilience::snapshot(pool, &ctx(), content_id, None).unwrap(),
+    )
+    .unwrap();
+    let s2 = serde_json::to_string(
+        &household_resilience::snapshot(pool, &ctx(), content_id, None).unwrap(),
+    )
+    .unwrap();
     assert_eq!(
         s1, s2,
         "{case}: snapshot JSON is non-deterministic across fresh computations \
@@ -1066,30 +1085,7 @@ fn det_snapshot_json(pool: &elohim_storage::db::DbPool, content_id: &str, case: 
 fn golden_lit_card_json() -> String {
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
-    let content_id = "lit-card-content";
-    let shard = "lit-card-shard-1";
-    seed_shard_manifest(&mut conn, content_id, &format!(r#"["{shard}"]"#));
-    let households = [
-        ("home-dowell", "agent-dowell", Some("us-east")),
-        ("home-ruth", "agent-ruth", Some("us-west")),
-        ("church-bethel", "agent-bethel", Some("us-east")),
-    ];
-    for (i, (household, agent, region)) in households.iter().enumerate() {
-        seed_collective(&mut conn, household, *region);
-        seed_human(&mut conn, agent, Some(household));
-        seed_shard_location(&mut conn, shard, agent);
-        seed_peer_status(&mut conn, agent, "online");
-        seed_stewarded_node(&mut conn, agent, Some(household));
-        let action = if i == 0 { "replicates-content" } else { "provide" };
-        seed_commitment(
-            &mut conn,
-            &format!("commit-{agent}"),
-            agent,
-            action,
-            "active",
-            "content:commons",
-        );
-    }
+    let content_id = seed_lit_card_case(&mut conn);
     drop(conn);
     det_snapshot_json(&pool, content_id, "lit-card")
 }
@@ -1102,15 +1098,7 @@ fn golden_unmeasured_json() -> String {
 fn golden_intra_json() -> String {
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
-    let content_id = "content-intra";
-    let shard = "shard-intra";
-    seed_shard_manifest(&mut conn, content_id, &format!(r#"["{shard}"]"#));
-    seed_human(&mut conn, "agent-multi-a", Some("home-multi"));
-    seed_human(&mut conn, "agent-multi-b", Some("home-multi"));
-    seed_shard_location(&mut conn, shard, "agent-multi-a");
-    seed_shard_location(&mut conn, shard, "agent-multi-b");
-    seed_human(&mut conn, "agent-solo", Some("home-solo"));
-    seed_shard_location(&mut conn, shard, "agent-solo");
+    let content_id = seed_intra_case(&mut conn);
     drop(conn);
     det_snapshot_json(&pool, content_id, "intra-hub")
 }
