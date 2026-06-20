@@ -16,8 +16,8 @@ use crate::db::{peer_statuses, placement_gaps, AppContext, DbPool};
 use crate::error::StorageError;
 use crate::views::{
     CommitmentBackedReplication, HouseholdResilienceDetails, HouseholdResilienceView,
-    OnlinePeersView, PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
-    ResilienceSnapshotView, StewardingCollectiveEntry,
+    OnlinePeersView, PlacementGapView, ResilienceSnapshotDetailsView, ResilienceSnapshotView,
+    StewardingCollectiveEntry,
 };
 
 /// Compute per-content household resilience. The viewer's household id is
@@ -32,66 +32,66 @@ pub fn compute(
     let mut conn = pool
         .get()
         .map_err(|e| StorageError::Internal(format!("pool: {e}")))?;
+    let (_measured, relation) = load_manifest_and_relation(&mut conn, &ctx.h_app_id, content_id)?;
+    compute_base(&mut conn, content_id, viewer_household_id, &relation)
+}
 
-    // Stage 1: household reducer — uses humans.household_id projection joined
-    // from shard_locations to count distinct households stewarding this content.
-    //
-    // Two-step approach: fetch the manifest's shard_hashes_json, parse JSON,
-    // then filter shard_locations by eq_any(&shard_hashes). This is required
-    // because diesel cannot filter on a JSON-encoded column directly.
-    let manifest = crate::db::shard_manifests::get_manifest(&mut conn, &ctx.h_app_id, content_id)?;
-
-    // When no manifest exists for this content_id, return a degenerate
-    // at-risk view immediately — do NOT fall back to aggregating across all
-    // shard_locations for the h_app_id, which would inflate household counts
-    // for orphaned content in any multi-content production database.
-    let shard_hashes: Vec<String> = match manifest {
-        None => {
-            return Ok(HouseholdResilienceView {
-                content_id: content_id.to_string(),
-                households_stewarding: 0,
-                households_reciprocated: 0,
-                protection_status: "at-risk".to_string(),
-                details: HouseholdResilienceDetails {
-                    steward_households: vec![],
-                    online_peer_count: 0,
-                    health_score: 0.0,
-                },
-                // Sprint-3 stub: per-tier commitment counts from rea_commitments land in follow-up
-                commitment_backed_replication: CommitmentBackedReplication::default(),
-            });
+/// Materialize the holder-relation for a content ONCE — the impure step that both
+/// `compute` (standalone) and `snapshot` share, so the canonical
+/// `shard_locations ⋈ humans ⟕ collectives` join runs a SINGLE time per request
+/// (select→fold→aggregate: materialize once, fold many).
+///
+/// Returns `(measured, relation)` where `measured` is whether a shard manifest
+/// exists — the distribution-state tell. No manifest means the content never
+/// entered the distribution plane; we do NOT aggregate across all shard_locations
+/// (that would inflate counts for orphaned content), so the relation is empty and
+/// folds to the degenerate at-risk view. Malformed `shard_hashes_json` is a hard
+/// error (mirrors the prior `compute`).
+fn load_manifest_and_relation(
+    conn: &mut diesel::SqliteConnection,
+    h_app_id: &str,
+    content_id: &str,
+) -> Result<(bool, Vec<HolderRow>), StorageError> {
+    let manifest = crate::db::shard_manifests::get_manifest(conn, h_app_id, content_id)?;
+    let relation = match &manifest {
+        None => vec![],
+        Some(m) => {
+            let shard_hashes: Vec<String> =
+                serde_json::from_str(&m.shard_hashes_json).map_err(|e| {
+                    StorageError::Internal(format!(
+                        "shard manifest for content_id={content_id} has malformed shard_hashes_json: {e}"
+                    ))
+                })?;
+            load_holder_relation(conn, h_app_id, &shard_hashes)?
         }
-        Some(m) => serde_json::from_str(&m.shard_hashes_json).map_err(|e| {
-            StorageError::Internal(format!(
-                "shard manifest for content_id={content_id} has malformed shard_hashes_json: {e}"
-            ))
-        })?,
     };
+    Ok((manifest.is_some(), relation))
+}
 
-    // Stage 1 fold: materialize the holder-relation ONCE (the canonical agent
-    // join — `humans.agent_pub_key == shard_locations.peer_id`, both agent_cid),
-    // then fold distinct non-null households. The per-agent dimension is RETAINED
-    // in the relation (HolderRow.agent_id) so intra-household peer counts are a
-    // fold away, not a new query. See the resilience-facings select→fold→aggregate
-    // design (2026-06-19).
-    let relation = load_holder_relation(&mut conn, &ctx.h_app_id, &shard_hashes)?;
-    let steward_households: HashSet<String> = resiliency::stewarding_hubs(&relation);
-
+/// The base resilience reduction over an already-materialized holder-relation.
+/// Pure except for the online-peer count (a separate projection read). Shared by
+/// `compute` and `snapshot` so the relation is materialized ONCE per request and
+/// threaded to every fold. Folding the empty relation yields the degenerate
+/// at-risk view, so the no-manifest case needs no special-casing here.
+fn compute_base(
+    conn: &mut diesel::SqliteConnection,
+    content_id: &str,
+    viewer_household_id: Option<&str>,
+    relation: &[HolderRow],
+) -> Result<HouseholdResilienceView, StorageError> {
+    // Fold distinct non-null households stewarding this content.
+    let steward_households: HashSet<String> = resiliency::stewarding_hubs(relation);
     let households_stewarding = steward_households.len() as i32;
 
-    // Stage 2: reciprocation — recorded as zero; reverse allocation traversal
-    // is a follow-up concern.
+    // Reciprocation recorded as zero; reverse allocation traversal is a follow-up.
     let _ = viewer_household_id;
     let households_reciprocated: i32 = 0;
 
-    // Stage 3: online peer count — how many nodes across stewarding
-    // households currently have an active PeerStatus.
-    let online_peer_count = count_online_peers_in_households(&mut conn, &steward_households)?;
+    // Online peer count across the stewarding households (a separate projection).
+    let online_peer_count = count_online_peers_in_households(conn, &steward_households)?;
 
-    // Stage 4: status classification. Thresholds mirror the a2o spec:
-    //   protected ← ≥3 households stewarding AND ≥2 online peers
-    //   partial   ← ≥2 households OR ≥1 online peer
-    //   at-risk   ← otherwise
+    // Status classification (a2o spec): protected ← ≥3 households AND ≥2 online;
+    // partial ← ≥2 households OR ≥1 online; at-risk otherwise.
     let protection_status = match (households_stewarding, online_peer_count) {
         (n, o) if n >= 3 && o >= 2 => "protected",
         (n, o) if n >= 2 || o >= 1 => "partial",
@@ -131,37 +131,26 @@ pub fn snapshot(
     content_id: &str,
     viewer_household_id: Option<&str>,
 ) -> Result<ResilienceSnapshotView, StorageError> {
-    let base = compute(pool, ctx, content_id, viewer_household_id)?;
-
     let mut conn = pool
         .get()
         .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-    // Distribution-state honesty (2026-06-12 unmeasured≠zero): a content with
-    // no shard manifest has never entered the distribution plane — every
-    // count below is a non-measurement, not a measured zero. Renderers show a
-    // distinct "not yet distributed" state instead of a fake at-risk verdict.
-    let manifest_for_state =
-        crate::db::shard_manifests::get_manifest(&mut conn, &ctx.h_app_id, content_id)?;
-    let distribution_state = match &manifest_for_state {
-        Some(_) => "measured",
-        None => "unmeasured",
-    }
-    .to_string();
+    // Materialize the manifest + holder-relation ONCE — every fold below reads
+    // this SAME relation (the design's "materialize once, fold many"). Loading on
+    // this single connection also removes the prior cross-connection skew between
+    // the stewarding count and the intra fold (they read on separate `pool.get()`s).
+    let (measured, relation) = load_manifest_and_relation(&mut conn, &ctx.h_app_id, content_id)?;
 
-    // Intra-household fold (composability demonstration): materialize the
-    // holder-relation ONCE and fold distinct agents per household — the operator's
-    // "james ↔ matthew ↔ jessica = 3" intra-household resiliency. A new lens is a
-    // new fold over the SAME relation, not a new query.
-    let intra_by_hub: std::collections::BTreeMap<String, i32> = match &manifest_for_state {
-        Some(m) => {
-            let shard_hashes: Vec<String> =
-                serde_json::from_str(&m.shard_hashes_json).unwrap_or_default();
-            let relation = load_holder_relation(&mut conn, &ctx.h_app_id, &shard_hashes)?;
-            resiliency::intra_hub_peers(&relation)
-        }
-        None => std::collections::BTreeMap::new(),
-    };
+    let base = compute_base(&mut conn, content_id, viewer_household_id, &relation)?;
+
+    // Distribution-state honesty (2026-06-12 unmeasured≠zero): no manifest means
+    // the content never entered the distribution plane — a non-measurement, not a
+    // measured zero. Renderers show "not yet distributed", not a fake at-risk verdict.
+    let distribution_state = if measured { "measured" } else { "unmeasured" }.to_string();
+
+    // Intra-hub fold over the SAME relation (the operator's "james ↔ matthew ↔
+    // jessica = 3"). An empty relation (unmeasured) folds to an empty map.
+    let intra_by_hub = resiliency::intra_hub_peers(&relation);
 
     // commitment_backed_collectives: distinct households with an active provide
     // commitment whose resource_classified_as matches this content's reach.
@@ -231,15 +220,23 @@ pub fn snapshot(
             .clamp(0.0, 1.0)
     };
 
-    // regional_distribution: join steward collectives → collectives.region.
+    // regional_distribution: fold the SAME relation by region, relative to the
+    // viewer's region (the only extra read is the viewer's own region). Pure +
+    // infallible — the relation was already materialized above, so there is no
+    // load to fall back from (a load error already returned at materialization).
+    let viewer_region: Option<String> = match viewer_household_id {
+        None => None,
+        Some(vh) => {
+            use crate::db::diesel_schema::collectives;
+            collectives::table
+                .filter(collectives::id.eq(vh))
+                .select(collectives::region)
+                .first::<Option<String>>(&mut conn)
+                .unwrap_or(None)
+        }
+    };
     let regional_distribution =
-        compute_regional_distribution(&mut conn, &ctx.h_app_id, content_id, viewer_household_id)
-            .unwrap_or(RegionalDistributionView {
-                local: 0,
-                regional: 0,
-                global: 0,
-                unknown: base.households_stewarding,
-            });
+        resiliency::regional_distribution(&relation, viewer_region.as_deref());
 
     // placement_gaps for this content.
     let gap_rows = placement_gaps::list_gaps(
@@ -391,47 +388,6 @@ pub(crate) fn load_holder_relation(
             region,
         })
         .collect())
-}
-
-fn compute_regional_distribution(
-    conn: &mut diesel::SqliteConnection,
-    h_app_id: &str,
-    content_id: &str,
-    viewer_household_id: Option<&str>,
-) -> Result<RegionalDistributionView, StorageError> {
-    use crate::db::diesel_schema::collectives;
-
-    // Find the content's shard hashes via the manifest.
-    let manifest = crate::db::shard_manifests::get_manifest(conn, h_app_id, content_id)?;
-    let shard_hashes: Vec<String> = match &manifest {
-        Some(m) => serde_json::from_str(&m.shard_hashes_json).unwrap_or_default(),
-        None => {
-            return Ok(RegionalDistributionView {
-                local: 0,
-                regional: 0,
-                global: 0,
-                unknown: 0,
-            })
-        }
-    };
-
-    // Fold over the SAME materialized holder-relation (no second divergent join).
-    let relation = load_holder_relation(conn, h_app_id, &shard_hashes)?;
-
-    let viewer_region: Option<String> = match viewer_household_id {
-        None => None,
-        Some(vh) => collectives::table
-            .filter(collectives::id.eq(vh))
-            .select(collectives::region)
-            .first::<Option<String>>(conn)
-            .unwrap_or(None),
-    };
-
-    // The pure dedupe-by-hub bucket loop now lives in the facings crate.
-    Ok(resiliency::regional_distribution(
-        &relation,
-        viewer_region.as_deref(),
-    ))
 }
 
 fn count_online_peers_in_households(
