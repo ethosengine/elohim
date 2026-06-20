@@ -170,6 +170,18 @@ pub fn client_ip_from_xff(
 
 /// Build the rate-limit source key.  Authenticated requests use the human_id
 /// (so multi-IP sessions share a single budget); unauthenticated use the IP.
+///
+/// `human_id` MUST come only from a cryptographically VERIFIED token
+/// (`resolve_agent_cid_from_request` returns `None` on an invalid token) — the
+/// integrity of the `agent:` namespace depends on production JWT validation, so
+/// `dev_mode` (which mints tokens with a well-known secret) MUST be false on
+/// alpha/prod or an attacker could forge arbitrary `agent:` keys.
+///
+/// Known seam (v1, acceptable): an `ip:`-banned source that holds a valid token
+/// can switch to `agent:` keying and resume with a fresh budget. Anonymous
+/// floods (the primary threat) are correctly `ip:`-keyed and bannable;
+/// authenticated abuse is bannable per-human. A future hardening checks BOTH
+/// namespaces and takes the stricter verdict.
 pub fn derive_source(human_id: Option<&str>, client_ip: &str) -> String {
     match human_id {
         Some(id) if !id.is_empty() => format!("agent:{id}"),
@@ -182,18 +194,35 @@ pub fn derive_source(human_id: Option<&str>, client_ip: &str) -> String {
 /// Returns `true` for paths that should skip the membrane stage entirely.
 ///
 /// Static assets are a very-high-request-rate class (every page load fetches
-/// ~dozens of JS/CSS chunks), and their rate is entirely browser-driven rather
-/// than adversarial.  Charging them against the per-session budget would
-/// challenge or ban legitimate users on first page-load.
+/// ~dozens of JS/CSS chunks), browser-driven rather than adversarial. But the
+/// exemption is decided BEFORE routing, so it must NOT be a bare-extension match
+/// on any path: appending `.svg`/`.js`/`.map` to an arbitrary dynamic path
+/// (`/lamad/x.svg`, `/api/v1/content/x.js`) would otherwise bypass the membrane
+/// entirely — a rate-limit-evasion vector. We exempt only (a) dedicated asset
+/// directories and (b) recognized Angular bundle basenames. The high edge
+/// thresholds (shape 300/window) are the PRIMARY protection for legit loads; this
+/// exemption is a secondary optimization, deliberately conservative.
 ///
-/// # TODO(calibrate): measure real page-load request count before deploy
-/// Interim: exempt by extension (.js/.css/.woff2/.png) + bootstrap asset paths.
+/// # TODO(calibrate): measure real page-load request count + asset names before deploy
 pub fn is_static_asset(path: &str) -> bool {
-    // Bootstrap SPA chunks (Angular build output).
-    if path.starts_with("/assets/") || path.starts_with("/chunk-") || path.starts_with("/main.") {
+    // (a) Dedicated static-asset directories — never route to dynamic content.
+    if path.starts_with("/assets/") || path.starts_with("/fonts/") {
         return true;
     }
-    // Extension-based exemption — covers hashed filenames Angular emits.
+    // (b) Angular bundle files: recognized BASENAME + a static extension. NOT a
+    // bare-extension match (see doc above — that is the evasion vector).
+    let basename = path.rsplit('/').next().unwrap_or("");
+    let is_bundle = basename.starts_with("main.")
+        || basename.starts_with("polyfills.")
+        || basename.starts_with("runtime.")
+        || basename.starts_with("styles.")
+        || basename.starts_with("scripts.")
+        || basename.starts_with("vendor.")
+        || basename.starts_with("chunk-")
+        || basename == "favicon.ico";
+    if !is_bundle {
+        return false;
+    }
     let ext_start = path.rfind('.').map(|i| i + 1).unwrap_or(path.len());
     matches!(
         &path[ext_start..],
@@ -329,6 +358,20 @@ mod tests {
         assert!(!is_static_asset("/lamad"));
         assert!(!is_static_asset("/health"));
         assert!(!is_static_asset("/index.html"));
+    }
+
+    #[test]
+    fn evasion_dynamic_path_with_static_ext_not_exempted() {
+        // Appending a static extension to a dynamic/EPR path MUST NOT bypass the
+        // membrane (the rate-limit-evasion vector the whole-change review caught).
+        assert!(!is_static_asset("/lamad/whatever.svg"));
+        assert!(!is_static_asset("/api/v1/content/x.js"));
+        assert!(!is_static_asset("/lamad/x.map"));
+        assert!(!is_static_asset("/anything.css")); // root, but not a recognized bundle name
+                                                    // But genuine bundles + asset dirs stay exempt:
+        assert!(is_static_asset("/lamad/main.abc123.js")); // nested bundle, recognized basename
+        assert!(is_static_asset("/chunk-9f.js"));
+        assert!(is_static_asset("/assets/img/logo.png"));
     }
 
     // ── EdgeGuardStore ──────────────────────────────────────────────────────
