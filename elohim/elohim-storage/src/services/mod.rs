@@ -60,7 +60,6 @@ pub mod hazard;
 pub mod holochain_humans_replayer;
 pub mod household_backfill;
 pub mod household_resilience;
-pub mod operational_weave_facing;
 pub mod hub_capacity_service;
 pub mod hub_resolver; // Wave 2 T2 — agent→hub resolver (CID-canonical, slug-alias, seed-compatible)
 pub mod imagodei_lookup; // Phase 4 T5 — display name resolver
@@ -72,6 +71,7 @@ pub mod manifest_registry;
 pub mod mastery_depth;
 pub mod measure;
 pub mod mutuality_audit_service;
+pub mod operational_weave_facing;
 pub mod peer_capacity_service;
 pub mod peer_diversity; // Phase 4 T8 — archetype-mix diversity helper
 pub mod peer_selection;
@@ -130,6 +130,9 @@ pub mod qahal_service;
 
 // Multi-collective collaboration EPR — M1 Phase D share-routing evaluator (pure function)
 pub mod share_routing;
+
+// Wave-3 doorway-membrane serve-routing — capability-aware peer selection at race_fetch sites
+pub mod serve_routing;
 
 // Attestation Consolidation Sprint — projection signal handler + tally projector
 pub mod attestation_projector;

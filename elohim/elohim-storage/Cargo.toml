@@ -21,6 +21,11 @@ elohim-views = { path = "../elohim-views" }
 # adapter that loads the relation and calls them. See 2026-06-19 facings design §11.
 elohim-facings = { path = "../elohim-facings" }
 
+# Wave-3 serve-routing: capability-aware peer ranking (score module, pure logic).
+# `serve-routing` feature gates only the `score` module; storage never needs `guard`.
+# See genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md
+elohim-peer-fabric = { path = "../elohim-peer-fabric", default-features = false, features = ["serve-routing"] }
+
 # Shefa-types — canonical wire-shape for content_store coordinator function inputs
 # (CreateReaCommitmentInput, ReaCommitmentOutput, etc.). Required by the
 # services::conductor_writes facade per 2026-05-26-substrate-rea-replication-fix.md
