@@ -25,9 +25,9 @@ use super::diesel_schema::{
     portal_hosts, precedents, premium_gates, proposal_options, proposals, ranked_votes,
     rea_commitments, recovery_requests, recovery_witnesses, relationships,
     responsibility_demand_configs, revocation_votes, risk_alerts, schedules, shard_locations,
-    shard_manifests, spatial_contexts, statement_votes, statements, steward_credentials,
-    stewarded_nodes, stewardship_allocations, token_balances, token_decay_events,
-    token_mint_events, token_transfers, votes,
+    shard_manifests, spatial_contexts, statements, steward_credentials, stewarded_nodes,
+    stewardship_allocations, token_balances, token_decay_events, token_mint_events,
+    token_transfers, votes,
 };
 
 // ============================================================================
@@ -2211,30 +2211,25 @@ pub struct NewStatement<'a> {
     pub created_at: &'a str,
 }
 
-/// Statement vote row from SELECT query
-#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
-#[diesel(table_name = statement_votes)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+/// Statement vote — a Polis-style agree/disagree/pass vote on an OpinionStatement.
+///
+/// Phase-2a consolidation: the legacy `statement_votes` table was dropped in
+/// migration `2026-05-12-100300`. Statement votes now project into the unified
+/// `attestations` table as `attestation:statement-vote` (mirror of the elohim-DNA
+/// bridge `create_statement_vote`, mishpat/zomes/mishpat/src/lib.rs ~1324). This is
+/// a plain domain struct — NOT diesel-bound — that the `db::attestations`
+/// statement-vote readers project an `AttestationRow` into, so the consumers
+/// (`sensemaking::clustering`, the `StatementVoteView` converter) keep their shape.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatementVote {
     pub id: String,
     pub statement_id: String,
     pub human_id: String,
     pub vote: String,
     pub created_at: String,
-    /// Source of truth: private source chain (agent-scoped stance). Classification: B2.
-    /// Private stance; dht_anchor_hash populated when clustered aggregate Attestation is issued.
+    /// `None` for direct storage writes (no DHT anchor yet); populated when the
+    /// notarized attestation Content entry's ActionHash is projected.
     pub dht_anchor_hash: Option<String>,
-}
-
-/// New statement vote for INSERT
-#[derive(Debug, Clone, Insertable)]
-#[diesel(table_name = statement_votes)]
-pub struct NewStatementVote<'a> {
-    pub id: &'a str,
-    pub statement_id: &'a str,
-    pub human_id: &'a str,
-    pub vote: &'a str,
-    pub created_at: &'a str,
 }
 
 // ============================================================================

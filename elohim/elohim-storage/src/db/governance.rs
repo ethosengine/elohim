@@ -7,15 +7,13 @@ use diesel::prelude::*;
 
 use super::diesel_schema::{
     appeals, challenges, discussions, governance_dispositions, governance_signals,
-    governance_states, precedents, proposal_options, proposals, ranked_votes, statement_votes,
-    statements, votes,
+    governance_states, precedents, proposal_options, proposals, ranked_votes, statements, votes,
 };
 use super::models::{
     Appeal, Challenge, Discussion, GovernanceDisposition, GovernanceSignal, GovernanceState,
     NewAppeal, NewChallenge, NewDiscussion, NewGovernanceDisposition, NewGovernanceSignal,
-    NewGovernanceState, NewPrecedent, NewProposal, NewProposalOption, NewRankedVote,
-    NewStatementVote, NewVote, Precedent, Proposal, ProposalOption, RankedVote, Statement,
-    StatementVote, Vote,
+    NewGovernanceState, NewPrecedent, NewProposal, NewProposalOption, NewRankedVote, NewVote,
+    Precedent, Proposal, ProposalOption, RankedVote, Statement, StatementVote, Vote,
 };
 use crate::error::StorageError;
 
@@ -609,38 +607,34 @@ pub fn query_statements(
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }
 
-/// Vote on a statement (upsert): delete existing vote for this human+statement,
-/// insert new vote, then recount agree/disagree/pass from statement_votes.
+/// Vote on a statement (latest-wins upsert), then recount agree/disagree/pass
+/// from the unified `attestations` projection and write the counts back into the
+/// `statements` row (load-bearing — `StatementView` exposes those counts).
+///
+/// Phase-2a consolidation: the vote projects into the unified `attestations` table
+/// as `attestation:statement-vote` (the `statement_votes` table was dropped in
+/// migration `2026-05-12-100300`). Latest-wins comes for free from the
+/// deterministic row id (`sv-{statement_id}-{human_id}`): a re-vote upserts the
+/// same row, replacing the prior vote — equivalent to the old delete-then-insert.
 pub fn vote_on_statement(
     conn: &mut SqliteConnection,
-    new_vote: &NewStatementVote,
+    statement_id: &str,
+    human_id: &str,
+    vote: &str,
+    created_at: &str,
 ) -> Result<StatementVote, StorageError> {
-    // Delete existing vote for this human+statement
-    diesel::delete(
-        statement_votes::table
-            .filter(statement_votes::statement_id.eq(new_vote.statement_id))
-            .filter(statement_votes::human_id.eq(new_vote.human_id)),
-    )
-    .execute(conn)
-    .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
+    // Latest-wins upsert into the unified attestations projection.
+    let projected =
+        super::attestations::upsert_statement_vote(conn, statement_id, human_id, vote, created_at)?;
 
-    // Insert new vote
-    diesel::insert_into(statement_votes::table)
-        .values(new_vote)
-        .execute(conn)
-        .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
-
-    // Recount all votes for this statement
-    let all_votes: Vec<StatementVote> = statement_votes::table
-        .filter(statement_votes::statement_id.eq(new_vote.statement_id))
-        .load(conn)
-        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
-
+    // Recount all current votes for this statement from the projection and write
+    // the tallies back into the statements row (the counts are wire-visible).
+    let all_votes = super::attestations::statement_votes_for_statement(conn, statement_id)?;
     let agree_count = all_votes.iter().filter(|v| v.vote == "agree").count() as i32;
     let disagree_count = all_votes.iter().filter(|v| v.vote == "disagree").count() as i32;
     let pass_count = all_votes.iter().filter(|v| v.vote == "pass").count() as i32;
 
-    diesel::update(statements::table.filter(statements::id.eq(new_vote.statement_id)))
+    diesel::update(statements::table.filter(statements::id.eq(statement_id)))
         .set((
             statements::agree_count.eq(agree_count),
             statements::disagree_count.eq(disagree_count),
@@ -649,25 +643,10 @@ pub fn vote_on_statement(
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
 
-    statement_votes::table
-        .filter(statement_votes::id.eq(new_vote.id))
-        .first(conn)
-        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+    Ok(projected)
 }
 
-/// Get all votes for a specific statement
-pub fn get_statement_votes(
-    conn: &mut SqliteConnection,
-    statement_id: &str,
-) -> Result<Vec<StatementVote>, StorageError> {
-    statement_votes::table
-        .filter(statement_votes::statement_id.eq(statement_id))
-        .order(statement_votes::created_at.asc())
-        .load(conn)
-        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
-}
-
-/// Get all votes for all statements of a given entity (for clustering)
+/// Get all votes for all statements of a given entity (for clustering).
 pub fn get_all_votes_for_entity(
     conn: &mut SqliteConnection,
     entity_type: &str,
@@ -680,11 +659,7 @@ pub fn get_all_votes_for_entity(
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
 
-    statement_votes::table
-        .filter(statement_votes::statement_id.eq_any(&statement_ids))
-        .order(statement_votes::created_at.asc())
-        .load(conn)
-        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+    super::attestations::statement_votes_for_statements(conn, &statement_ids)
 }
 
 // ============================================================================
@@ -892,4 +867,80 @@ pub fn get_challenges_by_human(
         .order(challenges::created_at.desc())
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+#[cfg(test)]
+mod statement_vote_tests {
+    use super::*;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    fn setup() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory DB");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    fn seed_statement(conn: &mut SqliteConnection, id: &str) -> Statement {
+        let new = super::super::models::NewStatement {
+            id,
+            entity_type: "proposal",
+            entity_id: "p1",
+            human_id: "author",
+            text: "test statement",
+            created_at: "2026-05-12T09:00:00Z",
+        };
+        create_statement(conn, &new).unwrap()
+    }
+
+    /// The vote projects into the unified attestations table AND the recount writes
+    /// the agree/disagree/pass tallies back into the (wire-visible) statements row.
+    #[test]
+    fn vote_on_statement_projects_and_recounts() {
+        let mut conn = setup();
+        seed_statement(&mut conn, "s1");
+
+        vote_on_statement(&mut conn, "s1", "h1", "agree", "2026-05-12T10:00:00Z").unwrap();
+        vote_on_statement(&mut conn, "s1", "h2", "agree", "2026-05-12T10:01:00Z").unwrap();
+        vote_on_statement(&mut conn, "s1", "h3", "disagree", "2026-05-12T10:02:00Z").unwrap();
+
+        let stmt: Statement = statements::table
+            .filter(statements::id.eq("s1"))
+            .first(&mut conn)
+            .unwrap();
+        assert_eq!(stmt.agree_count, 2);
+        assert_eq!(stmt.disagree_count, 1);
+        assert_eq!(stmt.pass_count, 0);
+
+        // Read-back via the entity reader.
+        let votes = get_all_votes_for_entity(&mut conn, "proposal", "p1").unwrap();
+        assert_eq!(votes.len(), 3);
+    }
+
+    /// Latest-wins: a voter changing their vote re-tallies the counts, not double-counts.
+    #[test]
+    fn vote_on_statement_latest_wins_recount() {
+        let mut conn = setup();
+        seed_statement(&mut conn, "s2");
+
+        vote_on_statement(&mut conn, "s2", "h1", "agree", "2026-05-12T10:00:00Z").unwrap();
+        // Same voter flips to disagree.
+        vote_on_statement(&mut conn, "s2", "h1", "disagree", "2026-05-12T10:05:00Z").unwrap();
+
+        let stmt: Statement = statements::table
+            .filter(statements::id.eq("s2"))
+            .first(&mut conn)
+            .unwrap();
+        assert_eq!(stmt.agree_count, 0, "the original agree must be superseded");
+        assert_eq!(stmt.disagree_count, 1);
+
+        let votes = get_all_votes_for_entity(&mut conn, "proposal", "p1").unwrap();
+        assert_eq!(
+            votes.len(),
+            1,
+            "latest-wins: one row per (statement, voter)"
+        );
+        assert_eq!(votes[0].vote, "disagree");
+    }
 }

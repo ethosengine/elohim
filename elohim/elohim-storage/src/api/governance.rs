@@ -923,22 +923,20 @@ pub async fn handle(
             }
 
             let now = crate::db::models::current_timestamp();
-            let vote_id = format!("sv-{}-{}", statement_id, input.human_id);
-
-            let new_vote = crate::db::models::NewStatementVote {
-                id: &vote_id,
-                statement_id,
-                human_id: &input.human_id,
-                vote: &input.vote,
-                created_at: &now,
-            };
 
             // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
             // Classification B2 (Agent-Scoped + Attestation): statement vote is private to the agent's source chain;
             // dht_anchor_hash set when the clustered aggregate Attestation is notarized.
-            // Currently null for direct storage writes. Backfill needed for pre-coherence data.
+            // Currently None for direct storage writes (Phase-2a: the vote projects into the
+            // unified `attestations` table as `attestation:statement-vote`).
             let mut conn = get_conn(pool)?;
-            let vote = governance::vote_on_statement(&mut conn, &new_vote)?;
+            let vote = governance::vote_on_statement(
+                &mut conn,
+                statement_id,
+                &input.human_id,
+                &input.vote,
+                &now,
+            )?;
             Ok(response::created(&StatementVoteView::from(vote)))
         }
 

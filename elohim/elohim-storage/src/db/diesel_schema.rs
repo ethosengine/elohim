@@ -925,17 +925,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    statement_votes (id) {
-        id -> Text,
-        statement_id -> Text,
-        human_id -> Text,
-        vote -> Text,
-        created_at -> Text,
-        dht_anchor_hash -> Nullable<Text>,
-    }
-}
-
-diesel::table! {
     hazards (id) {
         id -> Text,
         h_app_id -> Text,
@@ -1520,7 +1509,6 @@ diesel::table! {
 diesel::joinable!(epr_coupling -> epr_atoms (epr_cid));
 diesel::joinable!(epr_claims -> epr_atoms (epr_cid));
 
-diesel::joinable!(statement_votes -> statements (statement_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
 diesel::joinable!(node_stewardship -> stewarded_nodes (node_id));
@@ -1859,7 +1847,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     schedules,
     shard_locations,
     shard_manifests,
-    statement_votes,
     standing_view,
     statements,
     steward_affinity,

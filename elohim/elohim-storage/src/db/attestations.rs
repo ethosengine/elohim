@@ -307,6 +307,162 @@ pub fn gate_decision_list_all(
         .map_err(|e| StorageError::Internal(format!("Failed to list gate decisions: {e}")))
 }
 
+// ===========================================================================
+// attestation:statement-vote projection (Phase-2a consolidation)
+//
+// The legacy `statement_votes` table was dropped in migration 2026-05-12-100300.
+// Polis-style agree/disagree/pass votes on an OpinionStatement now project into
+// THIS unified table as `attestation:statement-vote`, mirroring the elohim-DNA
+// bridge `create_statement_vote` (mishpat/zomes/mishpat/src/lib.rs ~1324):
+//
+//   subject_cid                  = statement_id (the OpinionStatement voted on)
+//   subject_kind                 = "governance-action"
+//   issuer_cid                   = the voter (human_id)
+//   parent_governance_action_cid = statement_id (this is a child vote, per §4)
+//   vote_value                   = the vote ("agree" | "disagree" | "pass")
+//   proof_class                  = "witness"
+//   proof_evidence_json          = { "class": "witness" }
+//   evidence_json                = { statement_id, voter_id, vote }
+//   manifest_ref                 = "mishpat"
+//
+// Mapping NOTE (schema drift, honestly recorded — NOT a silent guess): the
+// `statement-vote-metadata.schema.json` describes `{ statement_cid, polis_axis }`
+// under `summary_metric`, but the live DNA bridge writes the flat bag above with
+// the vote in the real `vote_value` column. Storage is the DHT's projection, so
+// it mirrors what the conductor emits (the DNA bridge), exactly as the
+// gate-decision migration mirrored its bridge over the schema's enum shape.
+//
+// Latest-wins (Polis semantics) is FREE: the row `id` is deterministic
+// (`sv-{statement_id}-{human_id}`), so a voter re-voting produces the same `id`
+// and `upsert`'s `on_conflict(id).do_update()` replaces the prior vote in place —
+// equivalent to the old delete-then-insert, no explicit delete needed.
+// ===========================================================================
+
+/// `attestation_kind` discriminator for statement-vote attestations.
+pub const STATEMENT_VOTE_KIND: &str = "attestation:statement-vote";
+
+/// Deterministic, latest-wins row id for a (statement, voter) vote.
+pub fn statement_vote_id(statement_id: &str, human_id: &str) -> String {
+    format!("sv-{statement_id}-{human_id}")
+}
+
+/// Project a statement vote into a unified `AttestationRow`.
+///
+/// `dht_anchor_hash` is a NOT NULL BLOB; statement votes have no DHT anchor on a
+/// direct storage write, so we store empty bytes and project them back to `None`
+/// on read (`statement_vote_from_attestation`) — preserving the legacy
+/// `StatementVote.dht_anchor_hash: Option<String> = None` wire shape.
+pub fn attestation_row_from_statement_vote(
+    statement_id: &str,
+    human_id: &str,
+    vote: &str,
+    created_at: &str,
+) -> AttestationRow {
+    let evidence_json = serde_json::json!({
+        "statement_id": statement_id,
+        "voter_id": human_id,
+        "vote": vote,
+    })
+    .to_string();
+
+    AttestationRow {
+        id: statement_vote_id(statement_id, human_id),
+        dht_anchor_hash: Vec::new(),
+        attestation_kind: STATEMENT_VOTE_KIND.to_string(),
+        subject_cid: statement_id.to_string(),
+        subject_kind: "governance-action".to_string(),
+        issuer_cid: human_id.to_string(),
+        parent_governance_action_cid: Some(statement_id.to_string()),
+        vote_value: Some(vote.to_string()),
+        vote_weight: None,
+        proof_class: "witness".to_string(),
+        proof_evidence_json: serde_json::json!({ "class": "witness" }).to_string(),
+        evidence_json,
+        expires_at: None,
+        supersedes_cid: None,
+        revocation_reason: None,
+        revoked_at: None,
+        created_at: created_at.to_string(),
+        manifest_ref: "mishpat".to_string(),
+        title: format!("Statement vote on {statement_id} by {human_id}"),
+        description: Some(format!("Vote: {vote}")),
+    }
+}
+
+/// Project a statement-vote `AttestationRow` back into the `StatementVote` domain
+/// struct the clustering + view-converter consumers expect.
+pub fn statement_vote_from_attestation(row: AttestationRow) -> crate::db::models::StatementVote {
+    // The empty-BLOB sentinel projects back to None (no DHT anchor).
+    let dht_anchor_hash = if row.dht_anchor_hash.is_empty() {
+        None
+    } else {
+        String::from_utf8(row.dht_anchor_hash).ok()
+    };
+    crate::db::models::StatementVote {
+        id: row.id,
+        statement_id: row.subject_cid,
+        // issuer_cid IS the voter (human_id).
+        human_id: row.issuer_cid,
+        vote: row.vote_value.unwrap_or_default(),
+        created_at: row.created_at,
+        dht_anchor_hash,
+    }
+}
+
+/// Upsert a statement vote (latest-wins on the deterministic id).
+pub fn upsert_statement_vote(
+    conn: &mut SqliteConnection,
+    statement_id: &str,
+    human_id: &str,
+    vote: &str,
+    created_at: &str,
+) -> Result<crate::db::models::StatementVote, StorageError> {
+    let row = attestation_row_from_statement_vote(statement_id, human_id, vote, created_at);
+    upsert(conn, &row)?;
+    Ok(statement_vote_from_attestation(row))
+}
+
+/// List all statement votes cast against a single statement, oldest first.
+pub fn statement_votes_for_statement(
+    conn: &mut SqliteConnection,
+    statement_id: &str,
+) -> Result<Vec<crate::db::models::StatementVote>, StorageError> {
+    let rows = attestations::table
+        .filter(attestations::attestation_kind.eq(STATEMENT_VOTE_KIND))
+        .filter(attestations::subject_cid.eq(statement_id))
+        .order_by(attestations::created_at.asc())
+        .load::<AttestationRow>(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!(
+                "Failed to list statement votes for {statement_id}: {e}"
+            ))
+        })?;
+    Ok(rows
+        .into_iter()
+        .map(statement_vote_from_attestation)
+        .collect())
+}
+
+/// List all statement votes cast against any of the given statement CIDs,
+/// oldest first (for entity-wide clustering).
+pub fn statement_votes_for_statements(
+    conn: &mut SqliteConnection,
+    statement_ids: &[String],
+) -> Result<Vec<crate::db::models::StatementVote>, StorageError> {
+    let rows = attestations::table
+        .filter(attestations::attestation_kind.eq(STATEMENT_VOTE_KIND))
+        .filter(attestations::subject_cid.eq_any(statement_ids))
+        .order_by(attestations::created_at.asc())
+        .load::<AttestationRow>(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!("Failed to list statement votes for entity: {e}"))
+        })?;
+    Ok(rows
+        .into_iter()
+        .map(statement_vote_from_attestation)
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -434,5 +590,114 @@ mod tests {
         let deleted = delete_by_id(&mut conn, "cid-006").unwrap();
         assert_eq!(deleted, 1);
         assert!(get_by_id(&mut conn, "cid-006").unwrap().is_none());
+    }
+
+    // -- attestation:statement-vote (Phase-2a) -------------------------------
+
+    #[test]
+    fn statement_vote_round_trips_through_attestations() {
+        let mut conn = setup();
+        // Write a vote via the repointed writer (projects into unified attestations).
+        let projected = upsert_statement_vote(
+            &mut conn,
+            "stmt-1",
+            "human-A",
+            "agree",
+            "2026-05-12T10:00:00Z",
+        )
+        .unwrap();
+        assert_eq!(projected.id, "sv-stmt-1-human-A");
+        assert_eq!(projected.statement_id, "stmt-1");
+        assert_eq!(projected.human_id, "human-A");
+        assert_eq!(projected.vote, "agree");
+        // No DHT anchor on a direct write → None (empty-BLOB sentinel projected back).
+        assert_eq!(projected.dht_anchor_hash, None);
+
+        // The raw row mirrors the DNA bridge mapping.
+        let row = get_by_id(&mut conn, "sv-stmt-1-human-A").unwrap().unwrap();
+        assert_eq!(row.attestation_kind, STATEMENT_VOTE_KIND);
+        assert_eq!(row.subject_cid, "stmt-1");
+        assert_eq!(row.subject_kind, "governance-action");
+        assert_eq!(row.issuer_cid, "human-A");
+        assert_eq!(row.parent_governance_action_cid.as_deref(), Some("stmt-1"));
+        assert_eq!(row.vote_value.as_deref(), Some("agree"));
+        assert_eq!(row.proof_class, "witness");
+        assert_eq!(row.manifest_ref, "mishpat");
+        assert!(row.dht_anchor_hash.is_empty());
+
+        // Read back via the repointed reader.
+        let votes = statement_votes_for_statement(&mut conn, "stmt-1").unwrap();
+        assert_eq!(votes.len(), 1);
+        assert_eq!(votes[0].vote, "agree");
+        assert_eq!(votes[0].dht_anchor_hash, None);
+    }
+
+    #[test]
+    fn statement_vote_is_latest_wins() {
+        let mut conn = setup();
+        // Same (statement, voter) votes agree, then changes to disagree.
+        upsert_statement_vote(
+            &mut conn,
+            "stmt-2",
+            "human-B",
+            "agree",
+            "2026-05-12T10:00:00Z",
+        )
+        .unwrap();
+        upsert_statement_vote(
+            &mut conn,
+            "stmt-2",
+            "human-B",
+            "disagree",
+            "2026-05-12T10:05:00Z",
+        )
+        .unwrap();
+
+        // Deterministic id → exactly one row survives, holding the latest vote.
+        let votes = statement_votes_for_statement(&mut conn, "stmt-2").unwrap();
+        assert_eq!(
+            votes.len(),
+            1,
+            "latest-wins: one row per (statement, voter)"
+        );
+        assert_eq!(votes[0].vote, "disagree");
+        assert_eq!(votes[0].id, "sv-stmt-2-human-B");
+    }
+
+    #[test]
+    fn statement_votes_for_statements_spans_an_entity() {
+        let mut conn = setup();
+        upsert_statement_vote(
+            &mut conn,
+            "stmt-3",
+            "human-C",
+            "agree",
+            "2026-05-12T10:00:00Z",
+        )
+        .unwrap();
+        upsert_statement_vote(
+            &mut conn,
+            "stmt-4",
+            "human-C",
+            "pass",
+            "2026-05-12T10:01:00Z",
+        )
+        .unwrap();
+        // A vote on an unrelated statement must NOT be returned.
+        upsert_statement_vote(
+            &mut conn,
+            "stmt-X",
+            "human-D",
+            "disagree",
+            "2026-05-12T10:02:00Z",
+        )
+        .unwrap();
+
+        let ids = vec!["stmt-3".to_string(), "stmt-4".to_string()];
+        let votes = statement_votes_for_statements(&mut conn, &ids).unwrap();
+        assert_eq!(votes.len(), 2);
+        assert!(votes
+            .iter()
+            .all(|v| v.statement_id == "stmt-3" || v.statement_id == "stmt-4"));
     }
 }
