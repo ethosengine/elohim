@@ -102,7 +102,7 @@ mod tests {
                 .map_or(0, |v| v.iter().filter(|&&t| t >= since).count() as u32)
         }
         fn is_banned(&self, source: &str, now: u64) -> bool {
-            self.bans.get(source).map_or(false, |&until| until > now)
+            self.bans.get(source).is_some_and(|&until| until > now)
         }
         fn ban_until(&mut self, source: &str, until: u64) {
             self.bans.insert(source.into(), until);
