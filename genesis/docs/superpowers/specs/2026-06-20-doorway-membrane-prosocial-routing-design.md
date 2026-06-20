@@ -331,13 +331,17 @@ donut floor/ceiling). **Heads visible / bytes metered:** commons heads stay visi
 visitors; the toll meters only *bytes*; the economic frontier is enforced **peer-side** (the serving
 peer's standing check), never as a doorway-resident gatekeeper.
 
-**Commons value never accrues to the doorway — the doorway only facilitates the bridge.** Tolls settle to
-the serving peers/stewards and the commons pool; the `bridges/fiat` crate *routes* value THROUGH the
-doorway to the peers, it does not bank it AT the doorway. A doorway operator earns only as a **peer first**
-(by serving content as a peer), never qua doorway — consistent with "served THROUGH not BY" and the trust
-model's "doorways hold no canonical data — only a projection, a cache, and a service contract." This keeps
-the doorway a neutral facilitator: it cannot become a rent-extracting toll-booth, because the value flows
-past it to the commons and the peers who actually did the work.
+**The toll is not a bespoke doorway revenue stream — and we do NOT duplicate core value-flow
+infrastructure for doorways** (a light scoping note, not a claim that doorways go unrewarded). The
+`bridges/fiat` crate *routes* the toll to the serving peers/stewards + the commons pool — the doorway
+doesn't bank the toll AT the doorway as a separate doorway-toll system. But doorway operators **are**
+rewarded for the compute they actually provide (projection, edge, bridge-facilitation): that reward runs
+through the **same** core value-flow rails every compute contribution uses — the one REA compute-commitment
+primitive (`Mishpat::Commitment` `delegates-compute`, instantiated across deploy / hosting / projection /
+…) + `appreciation` recognition — **not** a parallel doorway-specific economic system. So: doorway operation
+is just another instantiation of the existing compute-commitment primitive, recognized on the same rails as
+any peer's contribution (every doorway operator is a peer first); the only thing kept firmly OUT of scope is
+a separate, duplicated toll-accrual mechanism for doorways.
 
 **It is a `bridges/` crate, not core doorway** — canon is explicit (`epr-reachability-economics`: "the
 finance-bridge belongs at the doorway web2 surface, as a bridge"). `bridges/fiat` plugs into the membrane
