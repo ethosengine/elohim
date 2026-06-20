@@ -12,7 +12,11 @@ export type StewardingCollectiveEntry = { id: string, kind: string, label: strin
  * the holder-relation's retained per-agent dimension. `stewardingCollectives`
  * (top-level) is the inter-hub count; this is the intra count per entry.
  * `None` when a projection did NOT select the intra lens (select→fold→aggregate:
- * a facing carries only the folds it computes).
+ * a facing carries only the folds it computes). The wire OMITS the key when
+ * `None` (skip_serializing_if); `#[ts(optional)]` makes the generated type
+ * `intraHubPeers?: number` so the TS contract matches the schema-codegen output
+ * (`intraHubPeers?`) and the omit-on-None wire — i.e. **missing ≡ not-selected**,
+ * never a present `null`.
  * See `2026-06-19-resilience-facings-select-fold-aggregate-design.md` §3.
  */
-intraHubPeers: number | null, };
+intraHubPeers?: number, };

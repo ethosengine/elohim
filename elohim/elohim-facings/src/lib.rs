@@ -22,3 +22,23 @@
 pub mod fold;
 pub mod folds;
 pub mod relation;
+
+#[cfg(test)]
+mod boundary_tests {
+    /// Transitive boundary guard. The crate's no-DB boundary holds only while its
+    /// dependency tree stays diesel-free. The deliberate `use diesel;` compile-fail
+    /// catches only a DIRECT reach; this catches the TRANSITIVE edge — if
+    /// `elohim-views` (the one dependency) ever pulls `diesel`, the lockfile gains a
+    /// diesel package and this test fails, pointing at the broken boundary instead
+    /// of a mystery link error.
+    #[test]
+    fn no_transitive_diesel_in_dep_tree() {
+        let lock = include_str!("../Cargo.lock");
+        assert!(
+            !lock.contains("name = \"diesel\""),
+            "elohim-facings pulled `diesel` transitively (likely via elohim-views) — the \
+             no-DB boundary (a fold must not be able to touch a connection) is broken. Keep \
+             elohim-views diesel-free, or this is no longer a pure lens crate."
+        );
+    }
+}

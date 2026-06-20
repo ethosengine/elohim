@@ -5,18 +5,24 @@
 //! the §11 composability proof: `bucket_by` then per-bucket `distinct_count_by`
 //! reproduces the prior hand-rolled "distinct agents per hub" exactly.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::hash::Hash;
 
 /// Bucket rows by a key projection. Rows whose key is `None` are **dropped**
 /// (this is what preserves the resiliency facing's "exclude null-hub" rule).
-/// Returns a map from key to the borrowed rows in that bucket.
-pub fn bucket_by<R, K, F>(rows: &[R], key: F) -> HashMap<K, Vec<&R>>
+/// Returns a `BTreeMap` from key to the borrowed rows in that bucket.
+///
+/// Returns a `BTreeMap` (NOT `HashMap`) **deliberately**: this is the foundational
+/// combinator every facing reuses, so its iteration order is **deterministic by
+/// construction**. A lens that folds a bucketed result into a serialized `Vec`
+/// therefore cannot leak hash-iteration order onto the wire — the determinism the
+/// resiliency golden test guards is true for every future lens for free.
+pub fn bucket_by<R, K, F>(rows: &[R], key: F) -> BTreeMap<K, Vec<&R>>
 where
-    K: Eq + Hash,
+    K: Ord,
     F: Fn(&R) -> Option<K>,
 {
-    let mut out: HashMap<K, Vec<&R>> = HashMap::new();
+    let mut out: BTreeMap<K, Vec<&R>> = BTreeMap::new();
     for r in rows {
         if let Some(k) = key(r) {
             out.entry(k).or_default().push(r);

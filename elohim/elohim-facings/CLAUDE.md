@@ -40,6 +40,23 @@ Add `serde`/`chrono` only when a *moved* fold's own type genuinely needs it — 
 4. Unit-test the fold DB-free in this crate. The folds return `elohim-views` types — no `ts-rs`
    move, no codegen, no schema change (the cross-crate ts-rs trap cannot bite here).
 
+**The not-selected field contract (select→fold→aggregate).** A facing carries ONLY the lenses it
+computed; a lens it didn't select is **absent**, not zero. So a per-entry lens field on a View type
+(in `elohim-views`) MUST be:
+
+```rust
+#[serde(default, skip_serializing_if = "Option::is_none")]
+#[ts(optional)]
+pub <lens>: Option<T>,
+```
+
+- `skip_serializing_if` → the wire **omits** the key when the lens wasn't selected.
+- `#[ts(optional)]` → the generated TS reads `<lens>?: T` (NOT `T | null`), so ts-rs agrees with
+  schema-codegen and the wire. **Missing ≡ not-selected**, never a present `null`. (Omitting
+  `#[ts(optional)]` reintroduces the ts-rs `T | null` drift — the `intra_hub_peers` MED finding.)
+- Combinators return `BTreeMap` (deterministic) so a lens may iterate a fold into a serialized
+  `Vec` without leaking iteration order onto the wire.
+
 ## Testing
 
 `RUSTFLAGS="" RUSTC_WRAPPER="" CARGO_TARGET_DIR=/tmp/<slot> cargo test --manifest-path elohim/elohim-facings/Cargo.toml`

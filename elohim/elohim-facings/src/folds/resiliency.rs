@@ -9,7 +9,7 @@
 //! Design: `genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md`
 //! §3 (the holder-relation) + §11 (the Lens Framework / migration slice).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
 use elohim_views::{
     FeltFloorView, FeltStatusView, PlacementGapView, RegionalDistributionView,
@@ -34,7 +34,10 @@ pub fn stewarding_hubs(relation: &[HolderRow]) -> HashSet<String> {
 /// Composed from the generic combinators (the §11 composability proof): bucket by
 /// hub (dropping null hubs), then distinct-count agents per bucket. Identical
 /// output to the prior hand loop, no bespoke iteration.
-pub fn intra_hub_peers(relation: &[HolderRow]) -> HashMap<String, i32> {
+///
+/// Returns a `BTreeMap` (deterministic key order) — consumers may iterate it into a
+/// serialized `Vec` without leaking hash order onto the wire.
+pub fn intra_hub_peers(relation: &[HolderRow]) -> BTreeMap<String, i32> {
     bucket_by(relation, |r| r.hub_id.clone())
         .into_iter()
         .map(|(hub, rows)| (hub, distinct_count_by(&rows, |r| r.agent_id.clone()) as i32))

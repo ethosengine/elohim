@@ -153,14 +153,14 @@ pub fn snapshot(
     // holder-relation ONCE and fold distinct agents per household — the operator's
     // "james ↔ matthew ↔ jessica = 3" intra-household resiliency. A new lens is a
     // new fold over the SAME relation, not a new query.
-    let intra_by_hub: std::collections::HashMap<String, i32> = match &manifest_for_state {
+    let intra_by_hub: std::collections::BTreeMap<String, i32> = match &manifest_for_state {
         Some(m) => {
             let shard_hashes: Vec<String> =
                 serde_json::from_str(&m.shard_hashes_json).unwrap_or_default();
             let relation = load_holder_relation(&mut conn, &ctx.h_app_id, &shard_hashes)?;
             resiliency::intra_hub_peers(&relation)
         }
-        None => std::collections::HashMap::new(),
+        None => std::collections::BTreeMap::new(),
     };
 
     // commitment_backed_collectives: distinct households with an active provide
