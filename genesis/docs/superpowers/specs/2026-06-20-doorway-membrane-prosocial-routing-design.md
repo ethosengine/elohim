@@ -30,9 +30,10 @@ informed-by:
 refines: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md
 # Mixed-env arc (CLAUDE.md scope convention): NO doc-level requires_env so the household-nodes-testable
 # spine (the elohim-peer-fabric crate, the membrane policy stage, serve-routing on the local mesh,
-# the self-heal loop) stays fair-game. The cross-WAN legs are tagged inline (@requires:shem /
-# @requires:alpha-cluster-6peer) and are DESIGN-ONLY: cross-WAN reroute, origin-cloaking under real
-# WAN hostility, anycast/scrubbing, :53/DNS-delegation, cross-region council rollup.
+# the self-heal loop) stays fair-game. The cross-node legs tagged @requires:shem (cross-WAN reroute,
+# latency-discriminating ordering) are TESTABLE NOW — shem is LIVE (operator-confirmed 2026-06-20).
+# @requires:alpha-cluster-6peer legs stay held (degraded). DNS/anycast/:53/scrubbing/origin-cloaking are
+# deferred on OPERATOR-INFRA (registrar/anycast/BGP), NOT shem — a distinct axis.
 ---
 
 # Doorway Membrane & Pro-Social Routing — arc design
@@ -87,7 +88,8 @@ existing entry types — **zero new DHT entry types**, mirroring the Weave Epic'
 | Doorway membrane policy stage | **NEW** | `doorway/doorway-service` `handle_request`; D8; EDGE-DESIGN seam |
 | Acute backpressure signal (1b) | **NEW** | transport-plane (libp2p/SSE); Operational-C, never DHT |
 | Serve-routing consumer (`score.rank` at serve time) | **NEW** | `elohim-storage` `services/distribution_view.rs`; D1 |
-| WAN / DNS / origin-cloaking edge | **NEW (design-only)** | EDGE-DESIGN three-altitude seam; held until shem |
+| Cross-WAN reroute / latency-ordering | **NEW** | `@requires:shem` — shem LIVE, testable now (the cross-node canvas) |
+| DNS / anycast / origin-cloaking edge | **NEW (deferred on operator-infra, NOT shem)** | EDGE-DESIGN operator-deployment tier: registrar NS / anycast IPs / BGP |
 | Recognition / accounting | **CONSUME** | Weave **#3** `compute-fulfilled` EconomicEvent + `appreciation` |
 | `score` capability input | **CONSUME** | Weave **#2** `TierCapabilityView` |
 | `score` headroom/load input | **CONSUME** | Weave **#0** operational-weave lens + `NodeHeartbeat` |
@@ -370,9 +372,16 @@ composition of existing primitives, not yet written as one flow.
   logic), the membrane policy stage, serve-routing on local peers, the self-heal loop, recognition
   epoch rollups joined on `agent_cid`. Existing a2o (`doorway-pool-degrade`, `peer-loss-failover`,
   `peer-recovery`, capacity-heartbeat) already make several of these acceptance contracts.
-- **Design-only (held until shem / operator-owned):** cross-WAN reroute, origin-cloaking under real
-  WAN hostility, anycast/scrubbing, `:53`/DNS-delegation, cross-region council rollup (Weave #1 needs
-  shem). `@requires:shem` / `@requires:alpha-cluster-6peer` tagged at those gaps.
+- **Testable now on the cross-node canvas (shem is LIVE — operator-confirmed 2026-06-20):** cross-WAN
+  reroute and latency-discriminating serve-ordering are `@requires:shem` and shem is available, so they
+  are IN SCOPE now (household is *local* P2P, ~0 RTT — these need the remote canvas, which exists). The
+  earlier "held until shem" framing was a prose error: a stale cluster-state note contradicted shem's
+  `available:true` flag. `@requires:alpha-cluster-6peer` legs (e.g. cross-region council rollup, Weave #1)
+  remain held — that cluster is degraded.
+- **Genuinely deferred on operator-owned EDGE INFRA (never shem):** authoritative `:53`/DNS-delegation,
+  anycast/scrubbing, origin-cloaking under real public-WAN hostility. These need registrar NS delegation /
+  anycast IPs / BGP — an *operator-deployment* axis, NOT the shem compute capability (the recurring
+  category error this spec now flags explicitly).
 
 ## 9. Testing
 
@@ -407,6 +416,8 @@ composition of existing primitives, not yet written as one flow.
   forecloses (Operational-C + epoch-aggregated recognition only).
 - Doorway must never become a **byte** target-chooser (single-target/no-fanout gospel); peer selection
   for content lives in storage (D1).
-- Live-WAN behavior, authoritative `:53`, anycast/scrubbing, and origin-cloaking under real hostility
-  are design-only here; they are operator-owned and held until shem.
+- Authoritative `:53`, anycast/scrubbing, and origin-cloaking under real public-WAN hostility are
+  design-only here — deferred on **operator-deployment infra** (registrar NS / anycast / BGP), which is
+  NOT the shem capability. (Cross-WAN reroute + latency-ordering, by contrast, are `@requires:shem` and
+  testable now — shem is live.)
 - This index does not implement anything — the spine gets its own `/plan` → sprint cycle.

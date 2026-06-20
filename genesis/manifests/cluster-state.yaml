@@ -21,8 +21,10 @@ resources:
     role: multi-tenant live P2P canvas — the cross-node proving ground   # project_shem_is_p2p_live_canvas
     available: true
     provides_node_types: [remote]
-    note: offline / inaccessible (operator-declared 2026-06-01). Cross-node P2P scenarios are OUT OF SCOPE
-          until it returns — held, NOT regressed.
+    note: LIVE — operator-confirmed up 2026-06-20 (the 2026-06-01 offline note was stale; `available:true`
+          was already correct). Cross-node P2P scenarios are IN SCOPE. (Prior drift: this note contradicted
+          `available:true` for weeks and mis-led a whole design arc into a false "held until shem" — see the
+          scope-prose-coherence backlog item.)
 
   alpha-cluster-6peer:
     role: 6-peer alpha soak cluster (adam+matthew bootstrap pair)   # project_alpha_topology_bootstrap_pair

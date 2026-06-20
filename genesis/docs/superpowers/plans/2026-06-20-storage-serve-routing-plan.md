@@ -10,8 +10,9 @@ cites:
   - elohim-peer-fabric-spine-plan | the Wave-1 plan that built the score module this serve-routing consumes | sha256:dd4fe05da91829de | path: genesis/docs/superpowers/plans/2026-06-20-elohim-peer-fabric-spine-plan.md
 refines: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md
 # Mixed-env. Household-now: the selection LOGIC + the agent_cid-native serve fold + DbPool-fixture
-# integration. @requires:shem (inline, T7 only): live cross-WAN RTT-based ORDERING (household RTT ≈ 0
-# ties every peer, so a latency-ordering assertion is vacuous on household). NO doc-level requires_env.
+# integration. @requires:shem (T7): live cross-WAN RTT-based ORDERING — household is local P2P (~0 RTT,
+# every peer ties), so it needs the remote cross-node canvas. shem is LIVE (operator-confirmed 2026-06-20),
+# so T7 is TESTABLE NOW on household+shem (not held). NO doc-level requires_env.
 ---
 
 # Storage Serve-Routing Implementation Plan
@@ -158,7 +159,7 @@ mod tests {
 
 **Files:** Create/extend a scenario in `genesis/a2o/features/federation/` (compose with `epr-cross-peer-resolution.feature` / `peer-loss-failover.feature`).
 
-- [ ] **Step 1:** Author a `@wip @requires:shem` scenario asserting that, cross-WAN, serve-routing prefers the lower-measured-RTT capable peer (the latency signal only discriminates cross-WAN; household RTT ≈ 0 ties every peer, so this assertion is vacuous on household and MUST be env-gated). Mark held; do NOT run household.
+- [ ] **Step 1:** Author a `@requires:shem` scenario asserting that, cross-WAN, serve-routing prefers the lower-measured-RTT capable peer (the latency signal only discriminates cross-WAN; household is local P2P, ~0 RTT, every peer ties — so this assertion needs the remote canvas, not held-forever). **shem is LIVE (2026-06-20), so this is RUNNABLE now on household+shem** — not a held/vacuous-on-household scenario. (Keep `@wip` only until it's implemented + run green.)
 - [ ] **Step 2: Commit** path-limited. (No cargo.)
 
 ### Final gate (batch once after T3–T6 — disk-gated)
@@ -168,7 +169,7 @@ mod tests {
 
 - **Production writer for `peer_transport_manifest.libp2p_peer_id`** — the upstream gap that unblocks the Option-a `peer_blob_inventory`+resolver path. Only needed if inventory coverage exceeds `shard_locations`. Capture as a backlog item, not a sprint task.
 - **`current_load` + `delivery_score` projections** (column-blocked): a JSON-parse projection (load, from `custodian_metrics.health_json`) and a decay projection (delivery, from `peer_blob_inventory` fetch-success). Build-tasks gated only by disk; this wave neutral-defaults them.
-- **Live cross-WAN RTT ordering** (T7) — `@requires:shem`.
+- **Live cross-WAN RTT ordering** (T7) — `@requires:shem`, which is **LIVE** (2026-06-20): runnable now on household+shem, NOT out-of-scope. (Listed here only as the env-gated leg; it is satisfiable today.)
 
 ## Self-Review
 
