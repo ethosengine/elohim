@@ -11,7 +11,7 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["5402d986cb56"]
+fingerprints: ["5402d986cb56", "edf8f0ff36f5"]
 relatedNodeIds: []
 tags: [deprecation, rust, cargo, proc-macro-hack, genawaiter, iroh, iroh-blobs, transitive, p2p-iroh]
 cites:

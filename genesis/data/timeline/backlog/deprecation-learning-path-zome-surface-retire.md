@@ -11,7 +11,7 @@ status: "backlog"
 priority: "low"
 deprecation_status: "blocked"
 severity: "low"
-fingerprints: [4889dfbac5bb, 9bcf23319dde, 7ed1280ab87e, 31e6d68d12f3, ebc68ea93525, 360b6083b7cd]
+fingerprints: [4889dfbac5bb, 9bcf23319dde, 7ed1280ab87e, 31e6d68d12f3, ebc68ea93525, 360b6083b7cd, 13cd6287f972, 8abc1eb04dcb]
 relatedNodeIds: []
 tags: [deprecation, learning-path, content-store, zome, ts-rs, sdk, seeder, dna-migration]
 cites:
