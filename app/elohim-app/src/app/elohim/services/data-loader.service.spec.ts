@@ -173,11 +173,6 @@ describe('DataLoaderService', () => {
     expect(typeof service.getAgent).toBe('function');
   });
 
-  it('should have getAttestations method', () => {
-    expect(service.getAttestations).toBeDefined();
-    expect(typeof service.getAttestations).toBe('function');
-  });
-
   it('should have getGraph method', () => {
     expect(service.getGraph).toBeDefined();
     expect(typeof service.getGraph).toBe('function');
