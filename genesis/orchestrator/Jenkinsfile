@@ -46,10 +46,8 @@ import groovy.transform.Field
 @Field def VERSION_ENDPOINTS = [
     'doorway-alpha': 'https://doorway-alpha.elohim.host/version',
     'doorway-alpha-b': 'https://elohim.host/version',
-    'doorway-staging': 'https://doorway-staging.elohim.host/version',
     'doorway-prod': 'https://doorway.elohim.host/version',
     'app-alpha': 'https://alpha.elohim.host/version.json',
-    'app-staging': 'https://staging.elohim.host/version.json'
 ]
 
 // =============================================================================
@@ -2074,7 +2072,6 @@ spec:
                             def p2pResults = [:]
                             def doorwayEndpoints = [
                                 alpha: 'https://doorway-alpha.elohim.host',
-                                staging: 'https://doorway-staging.elohim.host',
                             ]
                             doorwayEndpoints.each { env, url ->
                                 p2pResults[env] = runP2PValidation(env, url)
@@ -2103,7 +2100,6 @@ spec:
                             sh 'pnpm install --frozen-lockfile'
                             sh '''
                                 E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host \
-                                E2E_DOORWAY_STAGING=https://doorway-staging.elohim.host \
                                 pnpm exec cucumber-js --tags "@e2e and @federation"
                             '''
                         }

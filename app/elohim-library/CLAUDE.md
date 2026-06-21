@@ -3,6 +3,7 @@ id: elohim-library-pattern-gospel
 cites:
   - elohim-elements-ui-substrate-gospel | blank-slate gospel + layer rails that this library's two-library discipline serves | sha256:84cff1a46650cf8f | path: app/elohim-elements/CLAUDE.md
   - genesis/data/timeline/backlog/bundle-styling-token-contract.md
+  - elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the client surface seam (§3.8); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
 ---
 
 # elohim-library — Pattern Library Gospel
@@ -10,6 +11,16 @@ cites:
 This document is the **shared synthesis** for everyone (humans + agents) authoring inside `app/elohim-library/`. It establishes the three sources of truth, the boundary between the "default" and "designed" pattern libraries, and the ownership rules.
 
 **Agents that read this:** `component-architect`, `graphos-designer`, `angular-architect` (when migrating Angular components to Lit primitives), `content-pipeline` (when the manifest vocabulary affects pattern shape).
+
+---
+
+## Seam map — you are here
+
+This surface owns the **client surface** seam (atlas §3.8 — presentation + user-intent capture: render host-provided state accessibly across the lens gradient, emit intent events; thin-client discipline).
+
+Any "where does this go?" concern routes through the concern-routing atlas: `elohim-seam-map-concern-routing`.
+
+Confusion-to-avoid: client vs doorway projection — a "content 404 / blob missing" is a substrate replication problem, not a UI bug; and the Capability-Profile lens gradient (a render concern) ≠ hardware-tier detection (a node concern, §3.1).
 
 ---
 

@@ -4,6 +4,18 @@ This directory holds bridge crates — Rust libraries that translate external
 protocols (web2 federation, VF-GraphQL/hREA, future) to and from elohim's
 canonical EPR-REA substrate.
 
+## Seam map — you are here
+
+This surface owns the **Bridge** seam (atlas §3.6 — translate outward, add a
+CRATE; integrity by routing translated writes through the notary).
+
+Any "where does this go?" concern routes through the concern-routing atlas:
+`genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md`.
+
+Confusion-to-avoid: bridge vs mod/plugin — the discriminator is **direction +
+bind-time** (the bridge is the compile-time form of native extension), not
+"two different things."
+
 ## Pattern
 
 Each bridge is a library crate. Runtimes (`doorway-service`, `elohim-storage`)

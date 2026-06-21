@@ -6,6 +6,7 @@ cites:
   - lamad-bundle-gospel | the bundle-consumer side of the layer rails — B18 token wiring is the worked example | sha256:1bc6eb8e1c112bc4 | path: app/lamad/CLAUDE.md
   - genesis/data/timeline/backlog/bundle-styling-token-contract.md
   - omnibar-consolidation-epr-native-links-design | the design whose theme/serving-context/nav decisions the layer rails enforce; records the B18 styling audit | sha256:92df16eea8d9bcf8 | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md
+  - elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the client surface seam (§3.8); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
 ---
 
 # elohim-elements — UI Substrate Gospel
@@ -15,6 +16,16 @@ This document is the **shared synthesis** for everyone (humans + agents) authori
 **Agents that read this:** `component-architect` (primary), `angular-architect` (when migrating Angular components into Lit primitives), `graphos-designer` (when binding brand tokens — reads from here).
 
 For operational structure (modules, layer model, dependency direction, tag naming), see `README.md` in this directory. This file is gospel about scope.
+
+---
+
+## Seam map — you are here
+
+This surface owns the **client surface** seam (atlas §3.8 — presentation + user-intent capture: stateless Lit primitives render host-provided state accessibly across the lens gradient and emit intent events).
+
+Any "where does this go?" concern routes through the concern-routing atlas: `elohim-seam-map-concern-routing`.
+
+Confusion-to-avoid: client vs doorway projection — a "content 404 / blob missing" is a substrate replication problem, not a UI bug; and the Capability-Profile lens gradient (a render concern) ≠ hardware-tier detection (a node concern, §3.1).
 
 ---
 

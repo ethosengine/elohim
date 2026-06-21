@@ -2,11 +2,20 @@
 id: elohim-sdk-gospel
 cites:
   - elohim-sdk-architecture | the consumption-layer + five-library SDK boundary architecture this surface implements (not a source of truth — symbols reconstructible from substrate) | sha256:7d1a9b09f3c6592d | path: genesis/docs/architecture/elohim-sdk.md
+  - elohim-seam-map-concern-routing | the concern-routing atlas — which seam(s) this surface owns (SDK grammar §3.5 + app-manifest/domain §3.7) and where any where-does-this-go? question routes | sha256:7fd48274fae5e8c5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
 ---
 
 # Elohim Protocol SDK
 
 The TypeScript surface of the Elohim Protocol — types and client libraries that applications use to interact with the protocol's distributed infrastructure.
+
+## Seam map — you are here
+
+This surface owns the **SDK grammar** seam (atlas §3.5 — compose inward, add a MANIFEST; integrity by construction) and the **app-manifest / domain** seam (§3.7 — declarative vocabulary validated against the manifest schema).
+
+Any "where does this go?" concern routes through the concern-routing atlas: `elohim-seam-map-concern-routing`.
+
+Confusion-to-avoid: the SDK boundary is **grammar-vs-capability**, not the *language-vs-language* ts-rs codegen seam (`#[derive(TS)] → export_bindings → storage-client-ts/src/generated/`) it rides on.
 
 ## What Belongs in the SDK
 

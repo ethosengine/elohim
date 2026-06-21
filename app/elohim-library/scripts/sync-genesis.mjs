@@ -82,6 +82,10 @@ export const MAPPINGS = [
   { fromGlob: 'a2o/features/browser/*.feature',
     toDir: 'domains/doorway/stories/',
     titleFn: (name) => `III. Domains / Doorway / Stories / ${name}` },
+  // IV. Reference — single-file architecture docs (committed MDX wrapper under reference/architecture/__docs__/)
+  { from: 'docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md',
+    to: 'reference/architecture/elohim-seam-map.md',
+    title: 'IV. Reference / Architecture / Seam Map — Concern-Routing Atlas' },
   // IV. Reference — globs
   // wrapperDir is explicit to prevent the auto-derive from collapsing all four
   // reference subcategories into the same reference/__docs__/_generated/ dir.

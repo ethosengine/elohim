@@ -53,6 +53,12 @@ The hook has TWO project-detection paths that emit DIFFERENT names: manifest-dri
 
 ## Architecture
 
+### Seam Map — concern routing (read FIRST when "where does this live?")
+
+Before reasoning about *where* a concern belongs — across hardware · OS/packaging · runtime/footprint · mods/plugins · SDK · bridges · clients · app-manifests · the role seams (doorway / peer-hoster / aggregation / hub-cluster) — consult the **concern-routing atlas**: `genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md`. It maps the full device spectrum (**smartwatch → home storage rack**) × the composition stack, with a concern-routing table that makes a problem *self-locate*. The dominant failure mode is **misrouting** (a substrate-identity bug wearing an aggregation costume; a packaging fact read as a dataplane fact; a UI-render gradient confused with hardware tiering).
+
+The disambiguator you'll reach for most — **what do you ADD?** a *manifest* → **SDK seam** (compose inward, integrity by construction); a *crate* → **bridge seam** (translate an external protocol outward); *native code* → **mod/plugin seam** (extend the runtime downward). Orthogonal to those seams are the four **participation tracks** — *how a running node participates*: T1 DHT-notary floor · T2 substrate (libp2p/iroh) · T3 spoke (HTTP/WS) · T4 doorway projection. Seams are where you add capability; tracks are how a thing participates — they meet but never collapse. The atlas also carries a hyperscaler-parity crosswalk and names the **inversion** (the social/governance/trust/recovery plane has no hyperscaler equivalent — human-scale's ceiling, not its catch-up).
+
 ### Domain Pillars (app/elohim-app/src/app/)
 
 The Angular app is organized into Hebrew-named domain pillars, each with its own services, models, and components:

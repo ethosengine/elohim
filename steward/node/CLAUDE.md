@@ -7,6 +7,7 @@ cites:
   - .claude/skills/automerge-sync/SKILL.md
   - steward-device-gospel | device-side Tauri shell gospel — the ephemeral spoke this always-on node serves; device concerns route there | sha256:1d7a9fb8f5da3e01 | path: steward/device/CLAUDE.md
   - steward/node/simulation/P2P-COMPUTE-FOOTPRINT.md
+  - elohim-seam-map-concern-routing | the concern-routing atlas — this crate owns the hub cluster ops / hub-internal swarm seam (§3.12); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
 ---
 
 # steward/node — elohim-node (always-on P2P runtime)
@@ -19,6 +20,21 @@ architecture. Hub-composition decisions — the `Hub` trait, `HouseholdHub` /
 where they migrate. **This gospel covers crate mechanics only.** When a question
 is "should this be a hub method / which hub owns it," route to the epic
 (layered-drift rule: the layer above owns the shape).
+
+## Seam map — you are here
+
+This crate owns the **hub cluster ops** seam (atlas §3.12 — the hub-INTERNAL
+swarm: blade-to-blade mDNS discovery, leader election, pod consensus, replica/PVC
+placement, plus the enablement "hubbiness dial" and identity-preserving tier
+graduation).
+
+Any "where does this go?" concern routes through the concern-routing atlas:
+`elohim-seam-map-concern-routing`.
+
+Confusion-to-avoid: the hub-internal swarm (here) ≠ Track-2 hub-to-hub federation
+(that's `elohim-storage`, §3.10/3.11) — debugging blade consensus in **this**
+crate means you're in the right crate; debugging it in `elohim-storage/src/p2p`
+means the wrong one.
 
 ## Binary identity
 

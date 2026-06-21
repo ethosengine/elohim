@@ -2,11 +2,20 @@
 id: doorway-service-gospel
 cites:
   - resilience-protocol-spec | the resilience protocol + account-recovery canon (Parts V/VI) this gateway implements as the web2 projection — patron-CDN, social-recovery, creator-succession | sha256:2c832b517c7204cc | path: genesis/docs/content/elohim-protocol/resilience/README.md
+  - elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the Doorway projection seam (§3.9, Track 4); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
 ---
 
 # Doorway Service (Rust)
 
 doorway-service is the Rust implementation of the web2 projection of the elohim substrate — it makes the patron-CDN, the storage-stewardship surface, and the social-recovery flows reachable from the traditional internet. This file is the Rust-implementation orientation for the crate; architecture, trust model, routing model, and the no-per-domain-proxy-files discipline live in `../CLAUDE.md`. The deeper "why" — patron-CDN, account-takeover-recovery, creator-succession — lives in `../../genesis/docs/content/elohim-protocol/resilience/README.md` (Parts V and VI).
+
+## Seam map — you are here
+
+This surface owns the **Doorway projection** seam (atlas §3.9, Track 4 — make canonical substrate truth legible to browsers and the web2 world: HTTP, OAuth relying-party, manifest-driven routes, single-target proxy + cache, doorway-to-doorway federation).
+
+Any "where does this go?" concern routes through the concern-routing atlas: `elohim-seam-map-concern-routing`.
+
+Confusion-to-avoid: hub ≠ doorway — the doorway projects **outward** to web2 and is **not a P2P participant**; the hub projects inward to nearby peers (§3.12, `steward/node`).
 
 ## Build
 

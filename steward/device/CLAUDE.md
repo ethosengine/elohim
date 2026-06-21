@@ -2,11 +2,20 @@
 id: steward-device-gospel
 cites:
   - iroh-libp2p-complementarity | the canon defining the steward device as a first-class Track 2 participant and the graduated-stewardship progression this desktop client realizes | sha256:29235aeb35aff128 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
+  - elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the OS/packaging (Tauri §3.2) + client surface (§3.8) seams; routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
 ---
 
 # Elohim Steward - Desktop P2P Client
 
 Tauri 2.x desktop application that runs the full Elohim P2P stack locally: cryptographic identity (Holochain conductor), content storage (elohim-storage sidecar), and the Angular learning platform. The steward makes a user a direct participant in the network's web of mutual accountability - holding their own keys, validating peers, and contributing to the shared infrastructure that the community depends on.
+
+## Seam map — you are here
+
+This surface owns the **OS / packaging** seam (atlas §3.2 — the Tauri `.deb`/AppImage bundle, conductor embedding, deep-link/IPC, identity handoff) and the **client surface** seam (§3.8 — the same Angular UI rendered in the desktop shell).
+
+Any "where does this go?" concern routes through the concern-routing atlas: `elohim-seam-map-concern-routing`.
+
+Confusion-to-avoid: packaging ("which image/bundle runs") vs the network **role** it then plays — bundling the Tauri shell is a packaging act; whether the resulting node is a spoke, hoster, or hub is a separate role question (§3.10–3.12).
 
 ## Role in the Protocol
 

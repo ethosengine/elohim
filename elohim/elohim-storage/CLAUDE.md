@@ -3,12 +3,21 @@ id: elohim-storage-gospel
 cites:
   - tiered-quilt-stewardship-design | the protocol tiered storage substrate design (cold/warm/hot planes, RS sharding, reach enforcement) this crate implements as the operational data plane | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
   - storage-dual-plane-design-arc | the April 2026 design-arc lineage (dual-plane bet, paths not taken, reach-vocabulary ghost) distilled when the P2P-ARCHITECTURE/EDGE-ARCHITECTURE/REACH island retired | sha256:2315c84345a2ef3c | path: genesis/docs/content/elohim-protocol/history/2026-06-11-storage-dual-plane-design-arc.md
+  - elohim-seam-map-concern-routing | the concern-routing atlas — this crate owns a compound stack (runtime §3.3, peer-hoster §3.10, aggregation §3.11, confidentiality/temporal/resource-governance §3.13–3.15); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
 ---
 
 # Elohim Storage - API Boundary Architecture
 
 This crate is the **single source of truth** for the HTTP API that serves TypeScript clients.
 All data transformation happens here - TypeScript receives clean, ready-to-use objects.
+
+## Seam map — you are here
+
+This crate owns a compound stack of seams: **runtime/footprint** (atlas §3.3 — single-node composition, cargo features), **peer-hoster dataplane** (§3.10, Tracks 2+3 — durable record availability, CRDT sync, addressed by peerId), **aggregation / recursive rollup** (§3.11, Track 2 — `CoverageRollup` + REA value-flow), and the **confidentiality / temporal / resource-governance** planes (§3.13–3.15 — encryption-at-rest, scheduling, admission/backpressure).
+
+Any "where does this go?" concern routes through the concern-routing atlas: `elohim-seam-map-concern-routing`.
+
+Confusion-to-avoid: peerId ≠ hostname ("reach my household node" is a peerId→household binding, not DNS/ingress); and the **hub-internal swarm lives in `steward/node`, not here** — debugging blade/pod consensus in `src/p2p/` means you're in the wrong crate (§3.12 is that crate's seam).
 
 ## Core Principle
 

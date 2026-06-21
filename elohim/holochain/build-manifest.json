@@ -102,8 +102,8 @@
   },
   "deployment": {
     "targets": {
-      "alpha": { "healthCheck": "https://alpha-edge.elohim.host/health" },
-      "staging": { "healthCheck": "https://staging-edge.elohim.host/health" }
+      "alpha": { "healthCheck": "https://doorway-alpha.elohim.host/health" },
+      "staging": { "healthCheck": "https://doorway-staging.elohim.host/health" }
     }
   }
 }
