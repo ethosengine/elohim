@@ -2,6 +2,7 @@
 id: "presence-thriving-places-index"
 displayName: "Thriving Places Index"
 presenceType: "organization"
+standing: "inspirational"
 bio: "The Thriving Places Index measures the local conditions for wellbeing, and whether those conditions are being delivered fairly and sustainably. It consists of a broad set of indicators grouped into these three headline domains, from datasets produced by established national data agencies such as the…"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Shared Meaning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

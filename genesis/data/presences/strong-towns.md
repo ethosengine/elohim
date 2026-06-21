@@ -2,6 +2,7 @@
 id: "presence-strong-towns"
 displayName: "Strong Towns"
 presenceType: "organization"
+standing: "inspirational"
 bio: "<p>Our mission is to support a model of growth that allows America’s cities, towns and neighborhoods to become financially strong and resilient. Join the Strong towns movement today.</p>"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Physical Commons","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

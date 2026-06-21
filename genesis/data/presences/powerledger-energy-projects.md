@@ -2,6 +2,7 @@
 id: "presence-powerledger-energy-projects"
 displayName: "Powerledger Energy Projects"
 presenceType: "organization"
+standing: "inspirational"
 bio: "The operating system for new energy markets, Power Ledger is a blockchain enabled software platform for trading renewable energy and environmental commodities."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Built for Purpose","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

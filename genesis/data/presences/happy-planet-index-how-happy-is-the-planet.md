@@ -2,6 +2,7 @@
 id: "presence-happy-planet-index-how-happy-is-the-planet"
 displayName: "Happy Planet Index – How happy Is the planet"
 presenceType: "organization"
+standing: "inspirational"
 bio: "How happy Is the planet"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Shared Meaning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

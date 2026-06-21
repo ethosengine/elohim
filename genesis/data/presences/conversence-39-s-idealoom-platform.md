@@ -2,6 +2,7 @@
 id: "presence-conversence-39-s-idealoom-platform"
 displayName: "Conversence&#39;s IdeaLoom platform"
 presenceType: "organization"
+standing: "inspirational"
 bio: "IdeaLoom is our flagship Collective Intelligence platform, which allows large communities to hold a meaningful conversation at scale, converge to a common understanding, and elaborate solutions beyond what each participant could have envisioned. IdeaLoom allows a structured navigation through conversations on&nbsp;..."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Built for Purpose","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

@@ -2,6 +2,7 @@
 id: "presence-resilience-against-disinformation-tilt"
 displayName: "Resilience against disinformation - Tilt"
 presenceType: "organization"
+standing: "inspirational"
 bio: "In search for solutions against disinformation, radicalisation or online manipulation? This is our field of expertise. Tiltstudio.co"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Safety","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

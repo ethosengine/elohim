@@ -2,6 +2,7 @@
 id: "presence-scaling-trust-on-the-web"
 displayName: "Scaling trust on the web"
 presenceType: "organization"
+standing: "inspirational"
 bio: "The Task Force for a Trustworthy Future Web’s report captures analysis of the systems gaps and critical opportunities that will define how the next generation of online spaces will be constructed."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Safety","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

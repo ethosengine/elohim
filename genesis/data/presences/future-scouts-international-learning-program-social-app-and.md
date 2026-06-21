@@ -2,6 +2,7 @@
 id: "presence-future-scouts-international-learning-program-social-app-and"
 displayName: "Future Scouts International learning program, Social App and Handbook"
 presenceType: "organization"
+standing: "inspirational"
 bio: "The Future Scouts offer an international learning program, the Future Scouts App & the Future Scouts Handbook of 21st Century Survival Skills."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Shared Meaning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

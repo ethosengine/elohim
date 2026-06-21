@@ -2,6 +2,7 @@
 id: "presence-home-2021-edemocracy-network"
 displayName: "Home 2021 - eDemocracy Network"
 presenceType: "organization"
+standing: "inspirational"
 bio: "This is what democracy looks like? We are a non-profit organization that helps community members achieve fair, accessible and engaging public consultation processes that prioritize ensuring all voices are heard. We are focused on climate solutions, […]"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Digital Governance and Democracy","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

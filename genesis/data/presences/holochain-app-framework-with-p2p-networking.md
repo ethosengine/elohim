@@ -2,6 +2,7 @@
 id: "presence-holochain-app-framework-with-p2p-networking"
 displayName: "Holochain | App framework with P2P networking"
 presenceType: "organization"
+standing: "prior-art"
 bio: "Holochain delivers beyond the promises of blockchain by providing a lightweight, secure and versatile framework for everyday distributed apps."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Built for Purpose","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

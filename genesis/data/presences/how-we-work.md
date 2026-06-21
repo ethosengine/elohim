@@ -2,6 +2,7 @@
 id: "presence-how-we-work"
 displayName: "How we work"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Transforming the way humans inhabit the Earth"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Community suggestions","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

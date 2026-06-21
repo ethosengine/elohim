@@ -2,6 +2,7 @@
 id: "presence-open-collective"
 displayName: "Open Collective"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Make your community sustainable. Collect and spend money transparently."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: unnamed","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

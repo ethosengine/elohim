@@ -58,6 +58,7 @@ function frontmatterToBody(fm: PresenceFrontmatter): Record<string, unknown> {
 
   const metadata: Record<string, unknown> = {
     presenceType: fm.presenceType,
+    standing: fm.standing ?? null,
     observations: fm.observations,
     primaryStewardId: fm.primaryStewardId ?? null,
     stewardshipStartedAt: fm.stewardshipStartedAt ?? null,

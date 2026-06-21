@@ -2,6 +2,7 @@
 id: "presence-pubhubs"
 displayName: "PubHubs"
 presenceType: "organization"
+standing: "inspirational"
 bio: "PubHubs - Sociaal platform gebaseerd op publieke waarden."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Built for Purpose","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

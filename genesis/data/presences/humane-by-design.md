@@ -2,6 +2,7 @@
 id: "presence-humane-by-design"
 displayName: "Humane by Design"
 presenceType: "organization"
+standing: "inspirational"
 bio: "A resource that provides guidance for designing ethically humane digital products through patterns focused on user well-being."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Design & Planning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

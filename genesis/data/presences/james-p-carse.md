@@ -2,6 +2,7 @@
 id: "presence-james-p-carse"
 displayName: "James P. Carse"
 presenceType: "person"
+standing: "inspirational"
 bio: "Author of Finite and Infinite Games."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected 'Finite and Infinite Games' in Consilience Garden keen, section: Media and Books","contextContentId":"book-finite-and-infinite-games"}]
 primaryStewardId: "human-matthew-manager"

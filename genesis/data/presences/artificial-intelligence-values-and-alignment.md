@@ -2,6 +2,7 @@
 id: "presence-artificial-intelligence-values-and-alignment"
 displayName: "Artificial Intelligence, Values and Alignment"
 presenceType: "organization"
+standing: "inspirational"
 bio: "This paper looks at philosophical questions that arise in the context of AI alignment. It defends three propositions. First, normative and technical aspects of the AI alignment problem are interrelated, creating space for productive engagement between people working in both domains. Second, it is…"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Digital Governance and Democracy","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

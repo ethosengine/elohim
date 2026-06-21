@@ -2,6 +2,7 @@
 id: "presence-the-permaculture-principles"
 displayName: "The Permaculture Principles"
 presenceType: "organization"
+standing: "inspirational"
 bio: "The Permaculture Principles guide our design decisions and formulate the structure of our Permaculture system. We are using David Holmgren’s 12 principle ver..."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Physical Commons","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

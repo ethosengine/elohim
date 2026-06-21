@@ -2,6 +2,7 @@
 id: "presence-home-initiative-for-digital-public-infrastructure"
 displayName: "Home - Initiative for Digital Public Infrastructure"
 presenceType: "organization"
+standing: "inspirational"
 bio: "We’re imagining, studying, and building public spaces and public goods on the internet. Listen to our podcast,Reimagining the Internet. Read the latest articles written by members of the Initiative team. Learn about the research we’re conducting at iDPI. What is Digital Public Infrastructure? The In…"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Saved","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

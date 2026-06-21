@@ -2,6 +2,7 @@
 id: "presence-future-thinkers-daniel-schmachtenberger-the-existential-game"
 displayName: "Future Thinkers - Daniel Schmachtenberger - The Existential Game"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Daniel Schmachtenberger interview on mitigating natural and human-caused existential risks and designing post-capitalist systems. Show notes: http://futurethinkers.org/46 Listen to previous episodes with Daniel Schmachtenberger: http://futurethinkers.org/daniel…"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Saved","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

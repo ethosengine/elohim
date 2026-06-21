@@ -2,6 +2,7 @@
 id: "presence-commons-transition-commons-transition"
 displayName: "Commons Transition - Commons Transition"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Commons Transition showcases practical experiences and policy proposals for a more humane and environmentally grounded mode of societal organization."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Shared Meaning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

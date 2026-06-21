@@ -2,6 +2,7 @@
 id: "presence-sociocracy-basic-concepts-and-principles"
 displayName: "Sociocracy - basic concepts and principles"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Brief overview of sociocracy: basic concepts and principles, history, its use in organizations, its limits and differences to voting, consensus and hierarchical forms of organizing."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Digital Governance and Democracy","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

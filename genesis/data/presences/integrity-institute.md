@@ -2,6 +2,7 @@
 id: "presence-integrity-institute"
 displayName: "Integrity Institute"
 presenceType: "organization"
+standing: "inspirational"
 bio: "We are a community of integrity professionals, who want a social internet that helps individuals, societies, and democracies thrive. We are here to explore, research, and tech - each other, the platforms, and the world - how to do that best."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Safety","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

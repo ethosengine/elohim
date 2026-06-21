@@ -2,6 +2,7 @@
 id: "presence-2000-watt-society-and-2000-watt-site"
 displayName: "2000-Watt society and 2000-Watt Site"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Das Zertifikat «2000-Watt-Areal» zeichnet Siedlungsgebiete aus, die sich für den Klimaschutz einsetzen und einen nachhaltigen Umgang mit Ressourcen vorweisen."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Shared Meaning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

@@ -2,6 +2,7 @@
 id: "presence-transition-network-transition-towns-the-circular-economy"
 displayName: "Transition Network | Transition Towns | The Circular Economy"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Transition Network encourage communities to come together and rebuild our world. Step up and address the big challenges we face by starting local."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Shared Meaning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

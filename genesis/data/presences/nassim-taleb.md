@@ -2,6 +2,7 @@
 id: "presence-nassim-taleb"
 displayName: "Nassim Taleb"
 presenceType: "person"
+standing: "inspirational"
 bio: "Author referenced in Pastor Pete's FCT curriculum."
 observations: [{"observerId":"human-pete-pastor","observedAt":"2026-01-15T00:00:00Z","context":"Cited in fct-module-02-systems-thinking while building the FCT curriculum","contextContentId":"fct-module-02-systems-thinking"}]
 primaryStewardId: "human-pete-pastor"

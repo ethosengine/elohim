@@ -2,6 +2,7 @@
 id: "presence-joseph-tainter"
 displayName: "Joseph Tainter"
 presenceType: "person"
+standing: "inspirational"
 bio: "Author of The Collapse of Complex Societies."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected 'The Collapse of Complex Societies' in Consilience Garden keen, section: Media and Books","contextContentId":"book-collapse-of-complex-societies"}]
 primaryStewardId: "human-matthew-manager"

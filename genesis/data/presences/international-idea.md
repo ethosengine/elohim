@@ -2,6 +2,7 @@
 id: "presence-international-idea"
 displayName: "International IDEA"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Our objective is to promote and advance sustainable democracy and to ... International Institute for Democracy and Electoral Assistance (International IDEA )"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: unnamed","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

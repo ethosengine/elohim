@@ -2,6 +2,7 @@
 id: "presence-genuine-progress-indicator-gross-national-happiness-usa"
 displayName: "Genuine Progress Indicator - Gross National Happiness USA"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Genuine Progress Indicator takes into account the well-being of a nation by incorporating environmental and social factors which are not measured by GDP."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Shared Meaning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

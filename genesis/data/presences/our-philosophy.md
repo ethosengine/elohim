@@ -2,6 +2,7 @@
 id: "presence-our-philosophy"
 displayName: "Our Philosophy"
 presenceType: "organization"
+standing: "inspirational"
 bio: "We are building the technological tools and social patterns and practices to enable the next economy — one that is distributed, equitable, and regenerative."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Design & Planning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

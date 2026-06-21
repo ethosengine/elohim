@@ -2,6 +2,7 @@
 id: "presence-new-public-for-better-digital-public-spaces"
 displayName: "New_ Public - For Better Digital Public Spaces"
 presenceType: "organization"
+standing: "inspirational"
 bio: "New_ Public aims to inspire and connect designers and technologists to build more flourishing, public friendly digital spaces."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Saved","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

@@ -2,6 +2,7 @@
 id: "presence-tim-challies"
 displayName: "Tim Challies"
 presenceType: "person"
+standing: "inspirational"
 bio: "Author referenced in Pastor Pete's FCT curriculum."
 observations: [{"observerId":"human-pete-pastor","observedAt":"2026-01-15T00:00:00Z","context":"Cited in fct-module-14-ready-to-act while building the FCT curriculum","contextContentId":"fct-module-14-ready-to-act"}]
 primaryStewardId: "human-pete-pastor"

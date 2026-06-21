@@ -2,6 +2,7 @@
 id: "presence-kim-stanley-robinson"
 displayName: "Kim Stanley Robinson"
 presenceType: "person"
+standing: "inspirational"
 bio: "Author of The Ministry for the Future."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected 'The Ministry for the Future' in Consilience Garden keen, section: Media and Books","contextContentId":"book-ministry-for-the-future"}]
 primaryStewardId: "human-matthew-manager"

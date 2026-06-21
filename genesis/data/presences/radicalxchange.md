@@ -2,6 +2,7 @@
 id: "presence-radicalxchange"
 displayName: "RadicalxChange"
 presenceType: "organization"
+standing: "inspirational"
 bio: "We are a community of activists, artists, entrepreneurs, and scholars committed to using mechanism design to inspire radical social change."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Digital Governance and Democracy","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

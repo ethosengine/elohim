@@ -2,6 +2,7 @@
 id: "presence-foundations-of-humane-technology-course"
 displayName: "Foundations of Humane Technology Course"
 presenceType: "organization"
+standing: "inspirational"
 bio: "A free online course for product teams building technology that strengthens human capacity."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Saved","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

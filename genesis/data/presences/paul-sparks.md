@@ -2,6 +2,7 @@
 id: "presence-paul-sparks"
 displayName: "Paul Sparks"
 presenceType: "person"
+standing: "inspirational"
 bio: "Author referenced in Pastor Pete's FCT curriculum."
 observations: [{"observerId":"human-pete-pastor","observedAt":"2026-01-15T00:00:00Z","context":"Cited in fct-module-13-helping-thrive while building the FCT curriculum","contextContentId":"fct-module-13-helping-thrive"}]
 primaryStewardId: "human-pete-pastor"

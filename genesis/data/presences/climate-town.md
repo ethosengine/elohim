@@ -2,6 +2,7 @@
 id: "presence-climate-town"
 displayName: "Climate Town"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Rollie Williams and a ragtag team of climate communicators, creatives and comedians are here to examine climate change in a way that doesn’t make you want to eat a cyanide pill. Get informed about the climate crisis before the weather does it for you.\nPatreon if you’re feeling crazy - https://www.patreon.com/ClimateTown…"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Physical Commons","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

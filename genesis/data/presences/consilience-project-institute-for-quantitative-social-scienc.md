@@ -2,6 +2,7 @@
 id: "presence-consilience-project-institute-for-quantitative-social-scienc"
 displayName: "Consilience Project | Institute for Quantitative Social Science"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Technology Architect and Senior Software Engineer, Consilience, Data Science. 1737 Cambridge St, K328 Cambridge, MA 02138. rtreacy@hmdc.harvard.edu."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Saved","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

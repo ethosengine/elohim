@@ -20,6 +20,11 @@
       "enum": ["person", "organization"],
       "description": "Discriminator. Rides in metadata_json."
     },
+    "standing": {
+      "type": "string",
+      "enum": ["inspirational", "prior-art", "interlocutor", "operator-persona"],
+      "description": "Seed-layer provenance/origin of this presence — the standing gradient (Category C, non-notarized; rides metadata_json). NOT a real/fixture wall: it gates which Layer-2 value-receipt consequences are eligible, while Layer-1 witnessing/recognition accrues unconditionally for every standing. inspirational = cited in the vision; prior-art = code/ideas the protocol composes; interlocutor = engaged-real (a confirmable channel exists); operator-persona = dev/test persona. Optional; absent = unspecified. See genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md."
+    },
     "bio": {
       "type": ["string", "null"]
     },

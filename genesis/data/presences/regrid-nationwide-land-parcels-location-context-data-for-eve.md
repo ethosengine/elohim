@@ -2,6 +2,7 @@
 id: "presence-regrid-nationwide-land-parcels-location-context-data-for-eve"
 displayName: "Regrid | Nationwide Land Parcels & Location Context Data for Everyone"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Regrid is the leading provider of nationwide land parcels and location context data, with over 155 million property boundaries and records."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Physical Commons","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

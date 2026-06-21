@@ -2,6 +2,7 @@
 id: "presence-democracy-earth-foundation"
 displayName: "Democracy Earth Foundation"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Tools for a borderless democracy. For everyone, anywhere."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: unnamed","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

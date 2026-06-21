@@ -2,6 +2,7 @@
 id: "presence-bonfire"
 displayName: "Bonfire"
 presenceType: "organization"
+standing: "inspirational"
 bio: "A federated social network for individuals and communities to design, operate and control their own digital lives."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Built for Purpose","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

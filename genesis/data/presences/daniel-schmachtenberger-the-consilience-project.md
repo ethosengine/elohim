@@ -2,6 +2,7 @@
 id: "presence-daniel-schmachtenberger-the-consilience-project"
 displayName: "Daniel Schmachtenberger - The Consilience Project"
 presenceType: "person"
+standing: "inspirational"
 bio: "The Consilience Project ... The Consilience Project is developing a transmedia body of social theory and philosophy that explains and seeks solutions to the unique ..."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Saved","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

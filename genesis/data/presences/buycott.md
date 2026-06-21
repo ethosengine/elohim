@@ -2,6 +2,7 @@
 id: "presence-buycott"
 displayName: "Buycott"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Buycott is a free app to vote with your wallet. Boycott bad products and find sustainable alternatives."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Saved","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

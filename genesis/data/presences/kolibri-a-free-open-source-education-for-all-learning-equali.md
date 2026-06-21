@@ -2,6 +2,7 @@
 id: "presence-kolibri-a-free-open-source-education-for-all-learning-equali"
 displayName: "Kolibri : A Free, Open Source Education for All | Learning Equality"
 presenceType: "organization"
+standing: "inspirational"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Built for Purpose","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"
 stewardshipStartedAt: "2021-08-07T21:58:56Z"

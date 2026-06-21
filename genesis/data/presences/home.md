@@ -2,6 +2,7 @@
 id: "presence-home"
 displayName: "Home"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Amplifying cooperation in service to regeneration in the Bay Area bioregion through technology, collective action and rebuilding the commons"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Shared Meaning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

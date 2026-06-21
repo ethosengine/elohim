@@ -2,6 +2,7 @@
 id: "presence-eco-efficiency-vs-eco-effectiveness-ecocation"
 displayName: "Eco Efficiency vs Eco Effectiveness - EcoCation"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Eco efficiency vs eco-effectiveness: Eco efficiency means being less bad, whereas eco-effectiveness means being just good."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Design & Planning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

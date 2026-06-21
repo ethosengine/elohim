@@ -2,6 +2,7 @@
 id: "presence-not-just-bikes"
 displayName: "Not Just Bikes"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Stories of great urban planning and urban experiences from the Netherlands and beyond. There are a lot of reasons why Dutch cities are so great; it’s not just bikes. Unfortunately I’ve been overwhelmed with emails and DMs, and I can’t answer most of them anymore. If you really think you need to con…"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Physical Commons","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

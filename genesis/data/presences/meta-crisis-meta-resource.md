@@ -2,6 +2,7 @@
 id: "presence-meta-crisis-meta-resource"
 displayName: "🤯 Meta-Crisis Meta-Resource"
 presenceType: "organization"
+standing: "inspirational"
 bio: "🤯 Meta-Crisis Meta-Resource"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Saved","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

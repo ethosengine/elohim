@@ -2,6 +2,7 @@
 id: "presence-wij-willen-het-internet-terug-publicspaces"
 displayName: "Wij willen het internet terug - PublicSpaces"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Door PublicSpaces zijn in 2026 zijn alle privacy officers en CTO’s van publieke organisaties in Nederland op de hoogte van alternatieve digitale instrumenten gebaseerd op publieke waarden."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Design & Planning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

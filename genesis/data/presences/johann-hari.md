@@ -2,6 +2,7 @@
 id: "presence-johann-hari"
 displayName: "Johann Hari"
 presenceType: "person"
+standing: "inspirational"
 bio: "Author referenced in Pastor Pete's FCT curriculum."
 observations: [{"observerId":"human-pete-pastor","observedAt":"2026-01-15T00:00:00Z","context":"Cited in fct-module-11-collaboration-sensemaking while building the FCT curriculum","contextContentId":"fct-module-11-collaboration-sensemaking"}]
 primaryStewardId: "human-pete-pastor"

@@ -2,6 +2,7 @@
 id: "presence-the-consilience-project"
 displayName: "The Consilience Project"
 presenceType: "organization"
+standing: "inspirational"
 bio: "The Consilience Project is a non-profit media organization that aims to help catalyze a cultural movement toward higher-quality sensemaking."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Saved","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

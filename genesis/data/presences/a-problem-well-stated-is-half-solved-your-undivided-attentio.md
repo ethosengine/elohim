@@ -2,6 +2,7 @@
 id: "presence-a-problem-well-stated-is-half-solved-your-undivided-attentio"
 displayName: "A Problem Well-Stated is Half-Solved | Your Undivided Attention"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Jun 25, 2021 ... We've explored many different problems on Your Undivided Attention — addiction, disinformation, polarization, climate change, and more."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Saved","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

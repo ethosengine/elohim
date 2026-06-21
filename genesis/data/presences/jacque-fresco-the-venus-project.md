@@ -2,6 +2,7 @@
 id: "presence-jacque-fresco-the-venus-project"
 displayName: "Jacque Fresco | The Venus Project"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Jacque Fresco is an industrial designer and social engineer. He’s also active in the field of Human Factors, where he developed an integrated social system."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: unnamed","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

@@ -23,6 +23,13 @@ import { parse as parseYaml } from 'yaml';
 
 export const PRESENCE_TYPES = ['person', 'organization'] as const;
 
+export const STANDING_VALUES = [
+  'inspirational',
+  'prior-art',
+  'interlocutor',
+  'operator-persona',
+] as const;
+
 export const EXTERNAL_ID_TYPES = [
   'orcid',
   'isni',
@@ -88,6 +95,7 @@ export interface PresenceFrontmatter {
   id: string;
   displayName: string;
   presenceType: 'person' | 'organization';
+  standing?: string | null;
   bio?: string | null;
   observations: Observation[];
   primaryStewardId?: string | null;
@@ -278,6 +286,11 @@ export function validatePresenceFrontmatter(
   // here so we only add the "is not valid" error when a value is present.
   if (isNonEmptyString(f.presenceType)) {
     pushEnum(errors, f.presenceType, 'presenceType', PRESENCE_TYPES, label, false);
+  }
+
+  // standing is optional seed-layer vocabulary; validate the enum only when present.
+  if (f.standing != null) {
+    pushEnum(errors, f.standing, 'standing', STANDING_VALUES, label, false);
   }
 
   // --- Observations --------------------------------------------------------

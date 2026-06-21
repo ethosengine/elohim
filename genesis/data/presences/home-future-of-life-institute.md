@@ -2,6 +2,7 @@
 id: "presence-home-future-of-life-institute"
 displayName: "Home - Future of Life Institute"
 presenceType: "organization"
+standing: "inspirational"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Safety","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"
 stewardshipStartedAt: "2021-08-07T21:58:56Z"

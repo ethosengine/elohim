@@ -2,6 +2,7 @@
 id: "presence-homepage"
 displayName: "Homepage"
 presenceType: "organization"
+standing: "inspirational"
 bio: "The blockchain dispute resolution layer. Fast, open and affordable justice for all."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: unnamed","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

@@ -2,6 +2,7 @@
 id: "presence-khan-academy-free-online-courses-lessons-practice"
 displayName: "Khan Academy | Free Online Courses, Lessons & Practice"
 presenceType: "organization"
+standing: "prior-art"
 bio: "Learn for free about math, art, computer programming, economics, physics, chemistry, biology, medicine, finance, history, and more. Khan Academy is a nonprofit with the mission of providing a free, world-class education for anyone, anywhere."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Built for Purpose","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

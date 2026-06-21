@@ -2,6 +2,7 @@
 id: "presence-design-justice-network"
 displayName: "Design Justice Network"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Design justice rethinks design processes, centers people who are normally marginalized by design, and uses collaborative, creative practices to address the deepest challenges our communities face."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: unnamed","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

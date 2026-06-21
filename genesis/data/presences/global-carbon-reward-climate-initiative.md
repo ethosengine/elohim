@@ -2,6 +2,7 @@
 id: "presence-global-carbon-reward-climate-initiative"
 displayName: "Global Carbon Reward - Climate Initiative"
 presenceType: "organization"
+standing: "inspirational"
 bio: "The Global Carbon Reward is a system-changing policy for funding climate mitigation together with healthy ecosystems, vibrant communities, and reliable clean energy."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Design & Planning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

@@ -2,6 +2,7 @@
 id: "presence-about-us"
 displayName: "About us"
 presenceType: "organization"
+standing: "inspirational"
 bio: "&amp;nbsp; About Us The Cities Coalition for Digital Rights, launched by the Cities of Amsterdam, Barcelona and New York in November 2018 and now with a membership of over 50 cities worldwide,"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Design & Planning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

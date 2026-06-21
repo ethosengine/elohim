@@ -2,6 +2,7 @@
 id: "presence-iftf-home"
 displayName: "IFTF: Home"
 presenceType: "organization"
+standing: "inspirational"
 bio: "IFTF Fast Futures: Foresight for Beginners in 90 minutes. August 10 • 10:00am PDT / 17:00 UTC • $99 • An online foresight learning experience for beginners in  ..."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Saved","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

@@ -2,6 +2,7 @@
 id: "presence-civilization-research-institute"
 displayName: "Civilization Research Institute"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Civilization Research Institute is focused on advancing humanity's collective intelligence. · We believe that improving collective sensemaking — our ability to make ..."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Saved","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

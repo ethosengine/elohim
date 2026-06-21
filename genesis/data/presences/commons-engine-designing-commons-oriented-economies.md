@@ -2,6 +2,7 @@
 id: "presence-commons-engine-designing-commons-oriented-economies"
 displayName: "Commons Engine – Designing Commons-Oriented Economies"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Commons Engine solves real-world problems through helping to generate commons-resource sharing organizations"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Design & Planning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

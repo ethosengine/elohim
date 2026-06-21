@@ -2,6 +2,7 @@
 id: "presence-new-public"
 displayName: "New_ Public"
 presenceType: "organization"
+standing: "inspirational"
 bio: "​Email us your stories at hello@newpublic.org with 'Flash Fiction' in the subject line. Deadline: 9/1/21. Theme: Social Media Word Limit: 500 words"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: unnamed","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

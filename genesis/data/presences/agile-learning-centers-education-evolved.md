@@ -2,6 +2,7 @@
 id: "presence-agile-learning-centers-education-evolved"
 displayName: "Agile Learning Centers, Education Evolved"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Agile Learning Centers are a rapidly expanding network of micro-schools leveraging agile tools to support self-directed education."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Built for Purpose","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

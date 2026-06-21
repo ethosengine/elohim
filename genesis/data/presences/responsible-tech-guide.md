@@ -2,6 +2,7 @@
 id: "presence-responsible-tech-guide"
 displayName: "Responsible Tech Guide"
 presenceType: "organization"
+standing: "inspirational"
 bio: "There is a vibrant community focused on reducing the harms of technology, diversifying the tech pipeline, and ensuring that technology is aligned with the public interest."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Design & Planning","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

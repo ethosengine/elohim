@@ -2,6 +2,7 @@
 id: "presence-b-lab-global-site"
 displayName: "B Lab Global Site"
 presenceType: "organization"
+standing: "inspirational"
 bio: "B Lab is a global nonprofit network transforming the global economy to benefit all people, communities, and the planet. We won’t stop until all business is a force for good."
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Saved","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

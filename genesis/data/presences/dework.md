@@ -2,6 +2,7 @@
 id: "presence-dework"
 displayName: "Dework"
 presenceType: "organization"
+standing: "inspirational"
 bio: "The task manager for DAOs and decentralized work"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Built for Purpose","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"

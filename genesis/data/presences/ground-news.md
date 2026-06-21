@@ -2,6 +2,7 @@
 id: "presence-ground-news"
 displayName: "Ground News"
 presenceType: "organization"
+standing: "inspirational"
 bio: "Top Stories from around you and around the world. Compare how different news publishers frame the same news"
 observations: [{"observerId":"human-matthew-manager","observedAt":"2021-08-07T21:58:56Z","context":"Collected in Consilience Garden keen, section: Built for Purpose","contextContentId":null}]
 primaryStewardId: "human-matthew-manager"
