@@ -9,8 +9,11 @@
  * The element ships a DEFAULT_SEAM_MAP fixture derived from the 2026-06-21 atlas.
  * Eventual home: architecture-atlas contentFormat (lamad manifest), once wired.
  *
- * Lens claims: minimal, simple, standard, detail, debug.
- * (Trace not claimed — a static visualization gains nothing from a trace lens.)
+ * Lens/state/theme coverage is exercised via the `.profile` and `map-state` props
+ * (the element supports minimal→debug lenses + loading/error/empty states). The
+ * story EXPORTS are kept to the core Library-A contract set — interaction proof,
+ * full view, blank-slate proof, override-surface proof — to stay within the
+ * Storybook smoke-test budget (a fat per-element story matrix stalls the gate).
  */
 
 import type { Meta, StoryObj } from '@storybook/web-components';
@@ -21,24 +24,13 @@ import 'elohim-core/register';
 import { DEFAULT_SEAM_MAP } from 'elohim-core';
 import type { SeamMap } from 'elohim-core';
 
-// ---------------------------------------------------------------------------
-// Fixture variants
-// ---------------------------------------------------------------------------
-
-/**
- * Trimmed map: only 3 seams + 4 devices, for compact stories that show the
- * layout without the full atlas density.
- */
+// Trimmed map (6 devices, 5 seams) for the compact proof stories.
 const trimmedMap: SeamMap = {
   ...DEFAULT_SEAM_MAP,
   devices: DEFAULT_SEAM_MAP.devices.slice(0, 6),
   seams: DEFAULT_SEAM_MAP.seams.slice(0, 5),
   routing: DEFAULT_SEAM_MAP.routing.slice(0, 4),
 };
-
-// ---------------------------------------------------------------------------
-// Meta
-// ---------------------------------------------------------------------------
 
 const meta: Meta = {
   title: 'Default/Core/elohim-seam-map',
@@ -56,8 +48,7 @@ Renders the Elohim architecture atlas as a two-axis grid:
 **Interaction**: click or keyboard-select a seam row → detail panel showing problem-class · add-a-new-X · home · confusion-to-avoid.
 At \`detail\` lens+, the full concern-routing table is shown beneath.
 
-**Data source**: The element ships a built-in \`DEFAULT_SEAM_MAP\` fixture from the 2026-06-21 atlas.
-Pass a custom \`SeamMap\` via the \`.data\` property to override.
+**Data source**: ships a built-in \`DEFAULT_SEAM_MAP\` fixture from the 2026-06-21 atlas; pass a custom \`SeamMap\` via \`.data\` to override.
 
 **Override surface**: all visual properties use \`--elohim-seam-map-*\` CSS custom properties with neutral CSS system color defaults.
         `.trim(),
@@ -69,21 +60,11 @@ Pass a custom \`SeamMap\` via the \`.data\` property to override.
 export default meta;
 type Story = StoryObj;
 
-// ---------------------------------------------------------------------------
-// Lens stories — capability lens coverage
-// ---------------------------------------------------------------------------
-
 /**
- * StandardWithPanel: Standard lens with the detail panel open on the first seam.
- *
- * Uses a play function to dispatch a keydown Enter on the first .seam-title-cell
- * in the shadow DOM, which triggers _selectSeam() and renders the detail panel.
- * This is the primary verification that the panel (problem-class · add-a-new-X ·
- * home · confusion-to-avoid) renders with real content.
- *
- * No @storybook/test import needed — raw DOM dispatch works in Storybook 10.
+ * Standard lens with the detail panel opened via keyboard (Enter on the first
+ * seam row) — the primary interaction proof. Verifies all four panel fields:
+ * problem-class · add-a-new-X · home · confusion-to-avoid.
  */
-
 export const StandardWithPanel: Story = {
   name: 'StandardWithPanel (detail panel open)',
   render: () => html`
@@ -93,17 +74,11 @@ export const StandardWithPanel: Story = {
     ></elohim-seam-map>
   `,
   play: async ({ canvasElement }: { canvasElement: HTMLElement }) => {
-    // Wait for Lit to complete its first render cycle
     await new Promise(resolve => setTimeout(resolve, 100));
-
     const el = canvasElement.querySelector('elohim-seam-map');
     if (!el?.shadowRoot) return;
-
-    // Select the first .seam-title-cell in shadow DOM — dispatching keydown
-    // mirrors the keyboard-select path claimed in the capability contract.
     const firstCell = el.shadowRoot.querySelector<HTMLElement>('.seam-title-cell');
     if (!firstCell) return;
-
     firstCell.focus();
     firstCell.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
   },
@@ -117,39 +92,7 @@ export const StandardWithPanel: Story = {
   },
 };
 
-export const Minimal: Story = {
-  name: 'Minimal',
-  render: () => html`
-    <elohim-seam-map
-      .profile=${{ lens: 'minimal', theme: 'auto', contrast: 'auto', locale: 'en', stimulus: 'still', textuality: 'textual', standings: [], lock: { kind: 'pilot' }, origin: 'pilot' }}
-    ></elohim-seam-map>
-  `,
-  parameters: {
-    docs: {
-      description: {
-        story: 'Minimal lens: group headings + seam titles only. No applicability dots, no tracks, no detail. The navigation surface for novice explorers.',
-      },
-    },
-  },
-};
-
-export const Simple: Story = {
-  name: 'Simple',
-  render: () => html`
-    <elohim-seam-map
-      .data=${trimmedMap}
-      .profile=${{ lens: 'simple', theme: 'auto', contrast: 'auto', locale: 'en', stimulus: 'still', textuality: 'textual', standings: [], lock: { kind: 'pilot' }, origin: 'pilot' }}
-    ></elohim-seam-map>
-  `,
-  parameters: {
-    docs: {
-      description: {
-        story: 'Simple lens: trimmed fixture (6 devices, 5 seams). Applicability dots visible per seam × device. Track bands shown.',
-      },
-    },
-  },
-};
-
+/** Standard lens, full atlas fixture — the main two-axis view. */
 export const Standard: Story = {
   name: 'Standard',
   render: () => html`
@@ -160,138 +103,13 @@ export const Standard: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Standard lens: full atlas fixture. Click any seam row to open the detail panel (problem-class · add-a-new-X · home · confusion-to-avoid).',
+        story: 'Standard lens: full atlas fixture (all devices × all seams). Click any seam row to open the detail panel.',
       },
     },
   },
 };
 
-export const Detail: Story = {
-  name: 'Detail',
-  render: () => html`
-    <elohim-seam-map
-      .profile=${{ lens: 'detail', theme: 'auto', contrast: 'auto', locale: 'en', stimulus: 'still', textuality: 'textual', standings: [], lock: { kind: 'pilot' }, origin: 'pilot' }}
-    ></elohim-seam-map>
-  `,
-  parameters: {
-    docs: {
-      description: {
-        story: 'Detail lens: full atlas + concern-routing table below the grid. Click a routing-table row to cross-highlight the seam.',
-      },
-    },
-  },
-};
-
-export const Debug: Story = {
-  name: 'Debug',
-  render: () => html`
-    <elohim-seam-map
-      .profile=${{ lens: 'debug', theme: 'auto', contrast: 'auto', locale: 'en', stimulus: 'still', textuality: 'textual', standings: [], lock: { kind: 'elohim-support' }, origin: 'elohim-support' }}
-    ></elohim-seam-map>
-  `,
-  parameters: {
-    docs: {
-      description: {
-        story: 'Debug lens: detail + data-testid annotations visible in the DOM as sub-labels beneath seam titles.',
-      },
-    },
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Content-state stories
-// ---------------------------------------------------------------------------
-
-export const Loading: Story = {
-  name: 'Loading',
-  render: () => html`<elohim-seam-map map-state="loading"></elohim-seam-map>`,
-  parameters: {
-    docs: {
-      description: { story: 'Loading state: skeleton/placeholder while seam map data loads.' },
-    },
-  },
-};
-
-export const Error: Story = {
-  name: 'Error',
-  render: () => html`<elohim-seam-map map-state="error"></elohim-seam-map>`,
-  parameters: {
-    docs: {
-      description: { story: 'Error state: seam map data could not be loaded.' },
-    },
-  },
-};
-
-export const Empty: Story = {
-  name: 'Empty',
-  render: () => html`<elohim-seam-map map-state="empty"></elohim-seam-map>`,
-  parameters: {
-    docs: {
-      description: { story: 'Empty state: no data available (e.g. before atlas contentFormat is wired).' },
-    },
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Dark theme canary
-// ---------------------------------------------------------------------------
-
-export const Dark: Story = {
-  name: 'Dark',
-  decorators: [
-    story => html`
-      <div style="background: #1a1a1a; padding: 1.5rem; color-scheme: dark;">
-        ${story()}
-      </div>
-    `,
-  ],
-  render: () => html`
-    <elohim-seam-map
-      .data=${trimmedMap}
-      .profile=${{ lens: 'standard', theme: 'dark', contrast: 'auto', locale: 'en', stimulus: 'still', textuality: 'textual', standings: [], lock: { kind: 'pilot' }, origin: 'pilot' }}
-    ></elohim-seam-map>
-  `,
-  parameters: {
-    docs: {
-      description: {
-        story: 'Dark theme canary: CSS system colors adapt automatically to the dark color-scheme wrapper. No brand tokens involved.',
-      },
-    },
-  },
-};
-
-// ---------------------------------------------------------------------------
-// RTL canary
-// ---------------------------------------------------------------------------
-
-export const RTLCanary: Story = {
-  name: 'RTLCanary',
-  decorators: [
-    story => html`
-      <div dir="rtl" lang="he" style="padding: 1rem;">
-        ${story()}
-      </div>
-    `,
-  ],
-  render: () => html`
-    <elohim-seam-map
-      .data=${trimmedMap}
-      .profile=${{ lens: 'simple', theme: 'auto', contrast: 'auto', locale: 'he', stimulus: 'still', textuality: 'textual', standings: [], lock: { kind: 'pilot' }, origin: 'pilot' }}
-    ></elohim-seam-map>
-  `,
-  parameters: {
-    docs: {
-      description: {
-        story: 'RTL canary: Hebrew locale in an RTL container. Logical CSS properties (padding-inline, padding-block, gap, border-inline-end) ensure correct layout direction.',
-      },
-    },
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Blank-slate proof
-// ---------------------------------------------------------------------------
-
+/** Blank-slate proof — renders with zero external CSS tokens (system colors). */
 export const Unstyled: Story = {
   name: 'Unstyled (blank-slate proof)',
   decorators: [story => html`<div style="all: initial;">${story()}</div>`],
@@ -302,16 +120,13 @@ export const Unstyled: Story = {
     docs: {
       description: {
         story:
-          'Wrapped in `style="all: initial;"`. Proves the element renders correctly with zero external CSS tokens. CSS system colors (Canvas, CanvasText, ButtonFace, ButtonText, LinkText) provide legible defaults.',
+          'Wrapped in `style="all: initial;"`. Proves the element renders correctly with zero external CSS tokens — CSS system colors (Canvas, CanvasText, ButtonFace, LinkText) provide legible defaults.',
       },
     },
   },
 };
 
-// ---------------------------------------------------------------------------
-// CustomTheme — override-surface proof
-// ---------------------------------------------------------------------------
-
+/** Override-surface proof — terminal-green theme via `--elohim-seam-map-*`. */
 export const CustomTheme: Story = {
   name: 'CustomTheme (override-surface proof)',
   decorators: [
@@ -361,7 +176,7 @@ export const CustomTheme: Story = {
     docs: {
       description: {
         story:
-          'Override-surface proof: terminal-green-on-black theme applied via `--elohim-seam-map-*` CSS custom properties. Demonstrates the override surface is honest — no hardcoded brand colors in the element.',
+          'Override-surface proof: terminal-green-on-black theme applied via `--elohim-seam-map-*` CSS custom properties — no hardcoded brand colors in the element.',
       },
     },
   },

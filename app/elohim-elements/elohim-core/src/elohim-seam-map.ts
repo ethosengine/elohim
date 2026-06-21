@@ -217,7 +217,7 @@ export const DEFAULT_SEAM_MAP: SeamMap = {
     },
     {
       id: 'family-node-extended',
-      label: msg('Family Node (store-anator)'),
+      label: msg('Store-anator rack'),
       capabilityLevel: 5,
       formFactor: 'rack-module',
       tracks: ['T1-dht', 'T2-substrate', 'T3-spoke', 'T4-doorway'],
@@ -592,19 +592,35 @@ export class ElohimSeamMap extends CapabilityAwareElement(LitElement) {
     .col-header {
       background: var(--elohim-seam-map-header-bg, ButtonFace);
       color: var(--elohim-seam-map-header-fg, ButtonText);
-      padding-block: 0.5rem;
-      padding-inline: 0.375rem;
       font-size: 0.6875rem;
       font-weight: 600;
       text-align: center;
-      writing-mode: vertical-lr;
-      transform: rotate(180deg);
-      block-size: 5rem;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
       border-inline-end: 1px solid currentColor;
       border-block-end: 1px solid currentColor;
+      /* Height of the header row: tall enough to accommodate rotated labels.
+         The cell itself lives in horizontal writing-mode so its block-size
+         really is the physical height and the grid track width is unaffected.
+         10rem ≈ 160 px gives headroom for labels up to ~20 characters at 0.6875rem
+         (longest device label is "Family Node (base)" at 18 chars). */
+      block-size: var(--elohim-seam-map-header-height, 10rem);
+      /* visible so the rotated label span can overflow the cell top/bottom cleanly */
+      overflow: visible;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Inner label rotated 90 ° so it reads bottom-to-top inside the cell.
+       By putting writing-mode on the span we decouple rotation from grid sizing:
+       the cell is a normal flex box; the span overflows its cell area visually
+       but the grid track width (minmax(2.75rem, 3.5rem)) is never conflated with
+       block-size in vertical writing-mode. */
+    .col-header-label {
+      writing-mode: vertical-lr;
+      transform: rotate(180deg);
+      white-space: nowrap;
+      overflow: visible;
+      padding-block: 0.375rem;
     }
 
     .col-header-title {
@@ -1100,8 +1116,10 @@ export class ElohimSeamMap extends CapabilityAwareElement(LitElement) {
     return Array.from(groupMap.entries()).map(([group, seams]) => ({ group, seams }));
   }
 
-  /** Compute the CSS grid-template-columns value. 1 title col + N device cols. */
-  private _gridTemplateColumns(): string {
+  /** Compute the CSS grid-template-columns value. 1 title col + N device cols.
+   *  At minimal lens only the title column is shown — device columns are suppressed. */
+  private _gridTemplateColumns(isMinimal: boolean): string {
+    if (isMinimal) return 'minmax(10rem, 14rem)';
     const deviceCols = this.data.devices.map(() => 'minmax(2.75rem, 3.5rem)').join(' ');
     return `minmax(10rem, 14rem) ${deviceCols}`;
   }
@@ -1161,30 +1179,33 @@ export class ElohimSeamMap extends CapabilityAwareElement(LitElement) {
     `;
   }
 
-  private _renderColumnHeaders(devices: SeamDevice[]): TemplateResult {
+  private _renderColumnHeaders(devices: SeamDevice[], isMinimal: boolean): TemplateResult {
     const isDebug = this.profile.lens === 'debug';
     return html`
       <div class="col-header-title" part="header" role="columnheader" aria-label="${msg('Seam')}">
         ${msg('Seam')}
       </div>
-      ${devices.map(device => html`
-        <div class="col-header" role="columnheader"
-             title="${device.label} — L${device.capabilityLevel}"
-             data-testid="${isDebug ? `col-${device.id}` : nothing}">
-          ${device.label}
-        </div>
-      `)}
+      ${isMinimal
+        ? nothing
+        : devices.map(device => html`
+          <div class="col-header" role="columnheader"
+               title="${device.label} — L${device.capabilityLevel}"
+               data-testid="${isDebug ? `col-${device.id}` : nothing}">
+            <span class="col-header-label">${device.label}</span>
+          </div>
+        `)
+      }
     `;
   }
 
-  private _renderGroupHeading(group: SeamGroup): TemplateResult {
+  private _renderGroupHeading(group: SeamGroup, isMinimal: boolean): TemplateResult {
     const label = GROUP_LABELS[group]?.() ?? group;
     return html`
       <div class="group-heading-cell" role="rowheader" part="group-heading"
            aria-label="${label}">
         ${label}
       </div>
-      <div class="group-heading-cell-span" aria-hidden="true"></div>
+      ${isMinimal ? nothing : html`<div class="group-heading-cell-span" aria-hidden="true"></div>`}
     `;
   }
 
@@ -1350,8 +1371,8 @@ export class ElohimSeamMap extends CapabilityAwareElement(LitElement) {
       ? this._getSeamById(this._selectedSeamId)
       : undefined;
 
-    // Build grid-template-columns
-    const gridStyle = `grid-template-columns: ${this._gridTemplateColumns()}`;
+    // Build grid-template-columns — minimal lens collapses to title-only
+    const gridStyle = `grid-template-columns: ${this._gridTemplateColumns(isMinimal)}`;
 
     return html`
       <div class="container" part="container" data-testid="elohim-seam-map" tabindex="-1">
@@ -1367,13 +1388,13 @@ export class ElohimSeamMap extends CapabilityAwareElement(LitElement) {
           >
             <!-- Column headers -->
             <div class="header-row" role="row">
-              ${this._renderColumnHeaders(devices)}
+              ${this._renderColumnHeaders(devices, isMinimal)}
             </div>
 
             <!-- Grouped seam rows -->
             ${grouped.map(({ group, seams }) => html`
               <div class="group-heading" role="row">
-                ${this._renderGroupHeading(group)}
+                ${this._renderGroupHeading(group, isMinimal)}
               </div>
               ${seams.map(seam => html`
                 <div class="seam-row" role="row">

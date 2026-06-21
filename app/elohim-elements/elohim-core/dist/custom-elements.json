@@ -5984,7 +5984,15 @@
                   "text": "string"
                 }
               },
-              "description": "Compute the CSS grid-template-columns value. 1 title col + N device cols."
+              "parameters": [
+                {
+                  "name": "isMinimal",
+                  "type": {
+                    "text": "boolean"
+                  }
+                }
+              ],
+              "description": "Compute the CSS grid-template-columns value. 1 title col + N device cols.\nAt minimal lens only the title column is shown — device columns are suppressed."
             },
             {
               "kind": "method",
@@ -6021,6 +6029,12 @@
                   "type": {
                     "text": "SeamDevice[]"
                   }
+                },
+                {
+                  "name": "isMinimal",
+                  "type": {
+                    "text": "boolean"
+                  }
                 }
               ]
             },
@@ -6038,6 +6052,12 @@
                   "name": "group",
                   "type": {
                     "text": "SeamGroup"
+                  }
+                },
+                {
+                  "name": "isMinimal",
+                  "type": {
+                    "text": "boolean"
                   }
                 }
               ]
@@ -8233,90 +8253,6 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/navigation/epr-link-interceptor.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "recordCrossBundleHandoff",
-          "return": {
-            "type": {
-              "text": "void"
-            }
-          },
-          "parameters": [
-            {
-              "name": "cid",
-              "default": "''"
-            }
-          ],
-          "description": "Append a handoff entry to the shared session-nav-stack — the same\nsessionStorage shape elohim-app's SessionNavStackService reads, so the\nprotocol-omni back affordance survives the bundle boundary."
-        },
-        {
-          "kind": "function",
-          "name": "baseHrefOwnsPath",
-          "return": {
-            "type": {
-              "text": "boolean"
-            }
-          },
-          "parameters": [
-            {
-              "name": "path",
-              "type": {
-                "text": "string"
-              }
-            }
-          ],
-          "description": "Default ownsPath: prefix match against this bundle's <base href>. A \"/\"\nbase owns everything — the shell (base \"/\") installs explicitly with a\nrouter-aware predicate instead of relying on this heuristic."
-        },
-        {
-          "kind": "function",
-          "name": "installEprLinkInterceptor",
-          "return": {
-            "type": {
-              "text": "() => void"
-            }
-          },
-          "parameters": [
-            {
-              "name": "options",
-              "default": "{}",
-              "type": {
-                "text": "EprLinkInterceptorOptions"
-              }
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "recordCrossBundleHandoff",
-          "declaration": {
-            "name": "recordCrossBundleHandoff",
-            "module": "src/navigation/epr-link-interceptor.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "baseHrefOwnsPath",
-          "declaration": {
-            "name": "baseHrefOwnsPath",
-            "module": "src/navigation/epr-link-interceptor.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "installEprLinkInterceptor",
-          "declaration": {
-            "name": "installEprLinkInterceptor",
-            "module": "src/navigation/epr-link-interceptor.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
       "path": "src/session/session.ts",
       "declarations": [
         {
@@ -8436,6 +8372,90 @@
           "declaration": {
             "name": "Session",
             "module": "src/session/session.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/navigation/epr-link-interceptor.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "recordCrossBundleHandoff",
+          "return": {
+            "type": {
+              "text": "void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "cid",
+              "default": "''"
+            }
+          ],
+          "description": "Append a handoff entry to the shared session-nav-stack — the same\nsessionStorage shape elohim-app's SessionNavStackService reads, so the\nprotocol-omni back affordance survives the bundle boundary."
+        },
+        {
+          "kind": "function",
+          "name": "baseHrefOwnsPath",
+          "return": {
+            "type": {
+              "text": "boolean"
+            }
+          },
+          "parameters": [
+            {
+              "name": "path",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Default ownsPath: prefix match against this bundle's <base href>. A \"/\"\nbase owns everything — the shell (base \"/\") installs explicitly with a\nrouter-aware predicate instead of relying on this heuristic."
+        },
+        {
+          "kind": "function",
+          "name": "installEprLinkInterceptor",
+          "return": {
+            "type": {
+              "text": "() => void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "options",
+              "default": "{}",
+              "type": {
+                "text": "EprLinkInterceptorOptions"
+              }
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "recordCrossBundleHandoff",
+          "declaration": {
+            "name": "recordCrossBundleHandoff",
+            "module": "src/navigation/epr-link-interceptor.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "baseHrefOwnsPath",
+          "declaration": {
+            "name": "baseHrefOwnsPath",
+            "module": "src/navigation/epr-link-interceptor.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "installEprLinkInterceptor",
+          "declaration": {
+            "name": "installEprLinkInterceptor",
+            "module": "src/navigation/epr-link-interceptor.ts"
           }
         }
       ]
