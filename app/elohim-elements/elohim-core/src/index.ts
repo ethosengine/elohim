@@ -135,3 +135,17 @@ export {
   LOCALE_CHANGE_EVENT,
 } from './localize/locale-store.js';
 export type { ElohimLocale } from './localize/locale-store.js';
+
+export { ElohimSeamMap, DEFAULT_SEAM_MAP } from './elohim-seam-map.js';
+export type {
+  SeamMap,
+  SeamDevice,
+  SeamEntry,
+  SeamGroup,
+  SeamApplicability,
+  SeamApplicabilityMap,
+  SeamMapState,
+  ParticipationTrack,
+  TrackBand,
+  RoutingRow,
+} from './elohim-seam-map.js';

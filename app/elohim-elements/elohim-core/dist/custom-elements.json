@@ -5647,6 +5647,572 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-seam-map.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "DEFAULT_SEAM_MAP",
+          "type": {
+            "text": "SeamMap"
+          },
+          "default": "{ devices: [ { id: 'biometric-fob', label: msg('Wearable / Fob'), capabilityLevel: 0, formFactor: 'fob', tracks: ['T1-dht', 'T3-spoke'], }, { id: 'observer-camera', label: msg('Civic Camera'), capabilityLevel: 0, formFactor: 'iot-sensor', tracks: ['T1-dht', 'T3-spoke'], }, { id: '2019-android-phone', label: msg('Phone'), capabilityLevel: 2, formFactor: 'phone', tracks: ['T1-dht', 'T3-spoke'], }, { id: 'chromebook-edu', label: msg('Chromebook'), capabilityLevel: 2, formFactor: 'laptop', tracks: ['T1-dht', 'T3-spoke'], }, { id: 'recycled-laptop', label: msg('Laptop'), capabilityLevel: 3, formFactor: 'laptop', tracks: ['T1-dht', 'T2-substrate', 'T3-spoke'], }, { id: 'raspberry-pi-4', label: msg('Raspberry Pi 4'), capabilityLevel: 3, formFactor: 'sbc', tracks: ['T1-dht', 'T2-substrate'], }, { id: 'home-nuc', label: msg('Home NUC'), capabilityLevel: 4, formFactor: 'mini-pc', tracks: ['T1-dht', 'T2-substrate', 'T4-doorway'], }, { id: 'gaming-desktop', label: msg('Gaming Desktop'), capabilityLevel: 4, formFactor: 'desktop', tracks: ['T1-dht', 'T2-substrate'], }, { id: 'family-node-base', label: msg('Family Node (base)'), capabilityLevel: 5, formFactor: 'rack-module', tracks: ['T1-dht', 'T2-substrate', 'T3-spoke', 'T4-doorway'], }, { id: 'family-node-extended', label: msg('Family Node (store-anator)'), capabilityLevel: 5, formFactor: 'rack-module', tracks: ['T1-dht', 'T2-substrate', 'T3-spoke', 'T4-doorway'], }, { id: 'k8s-pod-256mb', label: msg('K8s Pod'), capabilityLevel: 5, formFactor: 'container', tracks: ['T1-dht', 'T2-substrate', 'T4-doorway'], }, ], seams: [ // §3.1 { id: 'hardware', title: msg('Hardware / Capability Gradient'), group: 'hardware', problemClass: msg('What is this peer able/allowed to do, and how do operations adapt?'), addNewX: msg('Add a device-*.md fixture + devices.json entry; wire deviceArchetype in deployments.json'), home: 'genesis/plans/2026-04-13-device-archetypes-design.md; genesis/data/devices/*', confusion: msg('capability_level (L0–5) ≠ stage (1–4, journey) ≠ Tier (1/2/3, product class). nodeTypes is k8s placement, NOT capability.'), applicability: { 0: 'full', 1: 'full', 2: 'full', 3: 'full', 4: 'full', 5: 'full' }, }, // §3.2 { id: 'os-packaging', title: msg('OS / Packaging / Deploy Target'), group: 'os-packaging', problemClass: msg('Will this code physically run on this device, and how does it get there?'), addNewX: msg('Add a Dockerfile / Tauri bundle target / nginx image; edit the edgenode template.yaml'), home: 'CLAUDE.md §Deployment Contexts; steward/device/CLAUDE.md; Dockerfiles; devfile.yaml', confusion: msg('Packaging (\"which image runs\") ≠ the network role it then plays. Editing a manifest is a packaging act; live cluster reconciliation is operator-owned.'), applicability: { 0: 'none', 1: 'none', 2: 'partial', 3: 'partial', 4: 'full', 5: 'full' }, }, // §3.3 { id: 'runtime', title: msg('Runtime / Binary + Footprint'), group: 'runtime', problemClass: msg('Which native binary (or none) runs here, in what compositional shape — thin vs fat, which cargo features?'), addNewX: msg('Flip cargo [features]; embed thin (steward/node/Cargo.toml); a brittle sed strips V8/SSR from the storage image'), home: 'elohim/elohim-storage/CLAUDE.md; steward/node/CLAUDE.md; doorway/doorway-service/CLAUDE.md', confusion: msg('The \"elohim-node\" name overload: steward/node binary ≠ k8s container named elohim-node. Footprint tuning is native-binary-only — never tweak WASM/DNA per device.'), applicability: { 0: 'none', 1: 'none', 2: 'partial', 3: 'partial', 4: 'full', 5: 'full' }, }, // §3.4 { id: 'plugin', title: msg('Mod / Plugin'), group: 'plugin', problemClass: msg('Loading/extending native code into a running node dynamically and integrity-bound.'), addNewX: msg('No canonical path today (loader/host absent). Integrity: bounds_validator + delegates-compute + coordinator hot-swap.'), home: '.claude/data/modular-runtime-plugin-integrity-feasibility-2026-06-21.md', confusion: msg('The bridge is the compile-time form of native extension. @capability* tags are UI render profiles, NOT authorization — that is Mishpat delegates-compute.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'partial', 4: 'partial', 5: 'full' }, }, // §3.5 + §3.6 combined row { id: 'sdk-bridge', title: msg('SDK Grammar + Bridge'), group: 'sdk-bridge', problemClass: msg('SDK: declarative domain composition with integrity-by-construction. Bridge: imperative interop facing the non-elohim world.'), addNewX: msg('SDK: edit manifest → schema:validate → codegen. Bridge: bridges/CLAUDE.md 4-step (crate + dep + arm + recompile).'), home: 'elohim/sdk/CLAUDE.md; bridges/CLAUDE.md; elohim/sdk/domains/lamad/manifest.json', confusion: msg('SDK (compose inward) ≠ Bridge (translate outward) ≠ Plugin (extend downward). Three different artifacts, three different bind-times.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'partial', 4: 'full', 5: 'full' }, }, // §3.7 { id: 'app-manifest', title: msg('App-Manifest / Domain'), group: 'app-manifest', problemClass: msg('Add a new domain app — declarative vocabulary: content types/formats, renderer mappings, relationships, signals, coupling rules.'), addNewX: msg('domains/<app>/manifest.json + domains/<app>/types/ wire-types + codegen (pnpm run lamad:codegen)'), home: 'elohim/sdk/domains/CLAUDE.md; elohim/sdk/domains/{lamad,qahal,shefa}/; root CLAUDE.md §Schema', confusion: msg('Core-vs-extensible formats: a core \"interactive\" has no renderer → raw-JSON fallback. Use sophia-quiz-json, html5-app, not core protocol formats.'), applicability: { 0: 'none', 1: 'none', 2: 'full', 3: 'full', 4: 'full', 5: 'full' }, }, // §3.8 { id: 'client', title: msg('Client Surface'), group: 'client', problemClass: msg('Presentation + user-intent capture only. Render host-provided state; emit intent events. Nothing else.'), addNewX: msg('Add a Lit element to elohim-elements (render + a11y + emit, bind nothing) → bind brand in graphos Library B → compose in the elohim-app shell.'), home: 'app/elohim-elements/CLAUDE.md; app/elohim-library/CLAUDE.md; skill looking-at-frontend', confusion: msg('Client ≠ doorway projection. A \"404 / blob missing\" is substrate replication, not a UI bug. Capability-Profile lens gradient ≠ hardware-tier detection.'), applicability: { 0: 'partial', 1: 'partial', 2: 'full', 3: 'full', 4: 'full', 5: 'full' }, }, // §3.9 { id: 'role-doorway', title: msg('Role: Doorway Projection (T4)'), group: 'role-doorway', problemClass: msg('Make canonical substrate truth legible to browsers and the web2 world — HTTP, OAuth, manifest-driven routes, single-target proxy + cache.'), addNewX: msg('Add the match arm AND is_service_path (else EPR router shadows it). Add an is_service_path unit test.'), home: 'doorway/doorway-service/CLAUDE.md; 2026-05-02-elohim-hub-boundaries-design.md', confusion: msg('Hub ≠ doorway. \"Doorway projects outward to web2; hub projects inward to nearby peers.\" Doorway is NOT a P2P participant.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'none', 4: 'partial', 5: 'host' }, }, // §3.10 { id: 'role-peer-hoster', title: msg('Role: Peer-Hoster Dataplane (T2+T3)'), group: 'role-peer-hoster', problemClass: msg('Durable availability of records across disconnect — async store-and-forward CRDT sync (T2) + spoke HTTP/WS (T3), addressed by peerId.'), addNewX: msg('Add a libp2p request-response behaviour + codec; CRDT engine is Automerge.'), home: 'elohim/elohim-storage/CLAUDE.md; .claude/data/peer-hoster-async-sync-readiness-2026-06-21.md', confusion: msg('peerId ≠ hostname. Peer-hoster (durable availability of records) ≠ aggregation (value rollup), though both ride T2.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'partial', 4: 'full', 5: 'full' }, }, // §3.11 { id: 'role-aggregation', title: msg('Role: Aggregation / Recursive Rollup (T2)'), group: 'role-aggregation', problemClass: msg('Recursive signal aggregation (region ← councils ← households) over CoverageRollup engine; REA value-flow accounting.'), addNewX: msg('Invoke p2p-design-gate FIRST. Rollup engine: recursion.rs; consumer path: graph_views/shefa/coverage.rs.'), home: 'elohim/elohim-storage/CLAUDE.md; .claude/data/commons-compute-aggregation-readiness-2026-06-21.md', confusion: msg('Flat CoverageRollup (single-level fold) ≠ recursive multi-level rollup. Case-A all-zeros is a Track-1 identity-coherence failure, not an aggregation bug.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'none', 4: 'partial', 5: 'full' }, }, // §3.12 { id: 'role-hub-cluster', title: msg('Role: Hub Cluster Ops + Enablement'), group: 'role-hub-cluster', problemClass: msg('k8s-class concerns absorbed inside a hub — blade-to-blade mDNS, leader election, pod consensus, replica/PVC placement. Plus the \"hubbiness dial\".'), addNewX: msg('steward/node/src/{cluster,pod,p2p}/; hub-internal swarm is private to HouseholdHub/CollectiveHub impl, mDNS-first.'), home: 'steward/node/CLAUDE.md; 2026-05-02-elohim-hub-boundaries-design.md; steward/node/src/', confusion: msg('Hub-internal swarm (steward/node, 3.12) ≠ Track-2 hub-to-hub federation (elohim-storage, 3.10/3.11). Also: hub-as-role ≠ Tier-3 hardware.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'partial', 4: 'partial', 5: 'full' }, }, // §3.13 { id: 'plane-confidentiality', title: msg('Plane: Confidentiality / Encryption'), group: 'plane-confidentiality', problemClass: msg('Keeping content readable only by intended readers — encryption-at-rest, private-replica encryption, reader-key envelopes, secret/key custody.'), addNewX: msg('A KeyEnvelope reader-key wrap (X25519 reader set) over the blob/quilt plane.'), home: '.claude/data/commons-compute-aggregation-readiness-2026-06-21.md (R6); BlobStore::store; tiered-quilt-stewardship-design.md', confusion: msg('Confidentiality ≠ integrity ≠ authorization. A notarized entry is world-readable. \"Make this private\" is the encryption plane, not a permission flag.'), applicability: { 0: 'none', 1: 'none', 2: 'partial', 3: 'partial', 4: 'full', 5: 'full' }, }, // §3.14 { id: 'plane-temporal', title: msg('Plane: Temporal / Scheduling'), group: 'plane-temporal', problemClass: msg('When things happen across the fabric — durable timers, recurring ticks, deferred/scheduled work, validity horizons, expiry→obligation.'), addNewX: msg('time is a substrate signal; aggregate-tick services/aggregator.rs::aggregate_and_emit; validity horizons in the feedback/claims model.'), home: 'elohim/sdk/CLAUDE.md §signal list; services/aggregator.rs; the feedback/claims model', confusion: msg('time as a substrate signal (economic, accounted) ≠ a durable scheduler (operational, when-to-fire). \"Re-quilt every N hours\" is this seam, not aggregation.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'partial', 4: 'full', 5: 'full' }, }, // §3.15 { id: 'plane-resource-governance', title: msg('Plane: Resource Governance / Admission'), group: 'plane-resource-governance', problemClass: msg('How the system protects itself and allocates scarce capacity — quotas, rate-limits, circuit-breakers, load-shedding, admission control.'), addNewX: msg('bounds_validator (7-check, rate/ceiling per commitment); doorway 503-shed / admission; self-heal circuit breakers; pantry backpressure; arc_factor.'), home: 'elohim/elohim-storage/src/services/bounds_validator.rs; doorway shed/watchdog /metrics (M1-M5); the self-heal runtime-findings ledger', confusion: msg('The unifying owner of these guards is the elohim-operator (per-hub allocator). \"The phone is getting flooded\" or \"breaker stuck open\" is this seam, not hardware or dataplane.'), applicability: { 0: 'full', 1: 'full', 2: 'full', 3: 'full', 4: 'full', 5: 'full' }, }, ], tracks: [ { id: 'T1-dht', label: msg('T1 DHT'), description: msg('Notary floor: identity · stewardship contracts · REA commitments · reach. All devices. tx5/WebRTC.'), fullFrom: 0, fullTo: 5, }, { id: 'T3-spoke', label: msg('T3 Spoke'), description: msg('HTTP/WS bridge: wearable/IoT/phone route through a dwelling hub. Spoke side: L0–L2; host side: recycled-laptop+.'), fullFrom: 0, fullTo: 2, partialLabel: msg('→ hub host'), }, { id: 'T2-substrate', label: msg('T2 Substrate'), description: msg('Storage-running: laptop+ run elohim-storage. libp2p-primary → iroh-primary (thick).'), fullFrom: 3, fullTo: 5, }, { id: 'T4-doorway', label: msg('T4 Doorway'), description: msg('Browsers CONSUME (default: doorway.elohim.host). Thick nodes may operate a doorway as a separate opt-in deploy.'), fullFrom: 5, fullTo: 5, partialLabel: msg('← browsers consume →'), }, ], routing: [ { concern: msg('A device is too small to run a conductor'), seamId: 'hardware', deviceScale: 'L0–L1 smartwatch/fob', home: 'device-archetypes-design :33-41; Track3Bridge' }, { concern: msg('A phone keeps OOM\\'ing / sync floods it'), seamId: 'runtime', deviceScale: 'L2 phone', home: 'device-archetypes :105; cargo features thin flavor' }, { concern: msg('Render simpler for a child / small screen'), seamId: 'client', deviceScale: 'thin (any)', home: 'elohim-elements/CLAUDE.md:80-98 (lens gradient)' }, { concern: msg('A page 404s / a blob won\\'t load'), seamId: 'role-doorway', deviceScale: 'thin browser', home: 'doorway/CLAUDE.md \"No Blob Fan-Out\"' }, { concern: msg('Add a new domain app (new pillar surface)'), seamId: 'app-manifest', deviceScale: 'device-invariant', home: 'domains/<app>/manifest.json; elohim/sdk/domains/CLAUDE.md' }, { concern: msg('Add a new capability to an existing app'), seamId: 'sdk-bridge', deviceScale: 'device-invariant', home: 'signal_kind / Commitment action / Governor; p2p-design-gate' }, { concern: msg('We need to talk to Mastodon / ActivityPub'), seamId: 'sdk-bridge', deviceScale: 'thick (doorway host)', home: 'bridges/CLAUDE.md; doorway consumes web2 bridges' }, { concern: msg('Extend the runtime with a native capability'), seamId: 'plugin', deviceScale: 'mid–thick', home: 'modular-runtime-plugin-integrity assessment' }, { concern: msg('Tune the binary for a Raspberry Pi (shrink footprint)'), seamId: 'runtime', deviceScale: 'Pi/NUC L3-4', home: 'cargo [features] Cargo.toml:267-273' }, { concern: msg('Package the app for a desktop user'), seamId: 'os-packaging', deviceScale: 'laptop L2-3', home: 'Tauri .deb/AppImage; steward/device/CLAUDE.md' }, { concern: msg('A laptop should host content for others'), seamId: 'role-peer-hoster', deviceScale: 'laptop→hub L3', home: 'peer-hoster-async-sync-readiness; CRDT store' }, { concern: msg('A non-tech steward wants to turn a laptop into a hub'), seamId: 'role-hub-cluster', deviceScale: 'recycled-laptop L3', home: 'hub-enablement-dial-readiness; steward/node daemon' }, { concern: msg('Aggregate signals to commons scale'), seamId: 'role-aggregation', deviceScale: 'always-on→thick', home: 'recursive rollup over recursion.rs' }, { concern: msg('Make this content private / readable only by X'), seamId: 'plane-confidentiality', deviceScale: 'any', home: 'KeyEnvelope over the blob/quilt plane' }, { concern: msg('Schedule recurring work / expire a claim'), seamId: 'plane-temporal', deviceScale: 'always-on', home: 'time signal + durable scheduler home' }, { concern: msg('A peer is being flooded / a breaker is stuck open'), seamId: 'plane-resource-governance', deviceScale: 'any', home: 'bounds_validator + doorway shed + self-heal' }, ], }",
+          "description": "Default SeamMap fixture derived from the 2026-06-21 atlas."
+        },
+        {
+          "kind": "class",
+          "description": "`<elohim-seam-map>` — interactive concern-routing seam map visualization.\n\nRenders the Elohim architecture atlas as an interactive two-axis grid:\n- **Rows**: composition-stack seams (hardware → OS → runtime → plugins → SDK/bridge →\n  app-manifest → client, then role seams, then the confidentiality / temporal /\n  resource-governance planes)\n- **Columns**: device spectrum (smartwatch/fob → k8s-pod), colored by capability level\n- **Bands**: the four participation tracks (T1 DHT / T2 substrate / T3 spoke / T4 doorway)\n\n**Interaction**: click/keyboard-select a seam row → detail panel opens showing\nproblem-class · add-a-new-X path · canonical home · confusion-to-avoid.\nAt `standard` lens+, selecting a concern from the routing table cross-highlights the seam.\n\n**Lens dispatch**:\n| Lens     | What's shown                                    |\n|----------|-------------------------------------------------|\n| minimal  | Group headings + seam titles only; no detail    |\n| simple   | Seam titles + applicability dots per device     |\n| standard | Above + interactive detail panel on select       |\n| detail   | Standard + routing table panel                  |\n| debug    | Detail + data-testid annotations visible in DOM  |\n\n**Data shape note**: SeamMap is operational visualization config — no ts-rs view\nexists. The eventual home is the `architecture-atlas` contentFormat (lamad manifest).\nUntil that contentFormat and its renderer are wired, this element consumes the\nlocally-declared `SeamMap` interface above.",
+          "name": "ElohimSeamMap",
+          "cssProperties": [
+            {
+              "description": "Map background color",
+              "name": "--elohim-seam-map-bg"
+            },
+            {
+              "description": "Map foreground text color",
+              "name": "--elohim-seam-map-fg"
+            },
+            {
+              "description": "Map outer border",
+              "name": "--elohim-seam-map-border"
+            },
+            {
+              "description": "Map border-radius",
+              "name": "--elohim-seam-map-radius"
+            },
+            {
+              "description": "Map padding",
+              "name": "--elohim-seam-map-padding"
+            },
+            {
+              "description": "Column header cell background",
+              "name": "--elohim-seam-map-header-bg"
+            },
+            {
+              "description": "Column header cell foreground",
+              "name": "--elohim-seam-map-header-fg"
+            },
+            {
+              "description": "Group heading background",
+              "name": "--elohim-seam-map-group-bg"
+            },
+            {
+              "description": "Group heading foreground",
+              "name": "--elohim-seam-map-group-fg"
+            },
+            {
+              "description": "Seam row background (idle)",
+              "name": "--elohim-seam-map-row-bg"
+            },
+            {
+              "description": "Seam row background on hover/focus",
+              "name": "--elohim-seam-map-row-bg-hover"
+            },
+            {
+              "description": "Seam row background when selected",
+              "name": "--elohim-seam-map-row-bg-selected"
+            },
+            {
+              "description": "Seam row bottom border",
+              "name": "--elohim-seam-map-row-border"
+            },
+            {
+              "description": "Applicability dot: full",
+              "name": "--elohim-seam-map-cell-full"
+            },
+            {
+              "description": "Applicability dot: partial",
+              "name": "--elohim-seam-map-cell-partial"
+            },
+            {
+              "description": "Applicability dot: host",
+              "name": "--elohim-seam-map-cell-host"
+            },
+            {
+              "description": "Applicability dot: none/N/A",
+              "name": "--elohim-seam-map-cell-none"
+            },
+            {
+              "description": "T1 track band background",
+              "name": "--elohim-seam-map-track-t1-bg"
+            },
+            {
+              "description": "T2 track band background",
+              "name": "--elohim-seam-map-track-t2-bg"
+            },
+            {
+              "description": "T3 track band background",
+              "name": "--elohim-seam-map-track-t3-bg"
+            },
+            {
+              "description": "T4 track band background",
+              "name": "--elohim-seam-map-track-t4-bg"
+            },
+            {
+              "description": "Detail panel background",
+              "name": "--elohim-seam-map-detail-bg"
+            },
+            {
+              "description": "Detail panel border",
+              "name": "--elohim-seam-map-detail-border"
+            },
+            {
+              "description": "Detail panel heading color",
+              "name": "--elohim-seam-map-detail-heading-color"
+            },
+            {
+              "description": "Detail panel body text color",
+              "name": "--elohim-seam-map-detail-body-color"
+            },
+            {
+              "description": "Detail panel field label color",
+              "name": "--elohim-seam-map-detail-label-color"
+            },
+            {
+              "description": "Debug/trace metadata text color",
+              "name": "--elohim-seam-map-meta-color"
+            },
+            {
+              "description": "State banner text color (stale/error/offline)",
+              "name": "--elohim-seam-map-state-color"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The outer element container",
+              "name": "container"
+            },
+            {
+              "description": "Sticky column-header row",
+              "name": "header"
+            },
+            {
+              "description": "The seam-rows × device-columns grid",
+              "name": "grid"
+            },
+            {
+              "description": "A group separator row",
+              "name": "group-heading"
+            },
+            {
+              "description": "One seam's row in the grid",
+              "name": "seam-row"
+            },
+            {
+              "description": "The seam title cell",
+              "name": "seam-title"
+            },
+            {
+              "description": "One applicability cell (seam × device)",
+              "name": "cell"
+            },
+            {
+              "description": "The track-band section beneath the grid",
+              "name": "tracks"
+            },
+            {
+              "description": "One participation track band",
+              "name": "track-band"
+            },
+            {
+              "description": "The selected-seam detail panel",
+              "name": "detail-panel"
+            },
+            {
+              "description": "The concern-routing table (detail+ lens)",
+              "name": "routing-table"
+            },
+            {
+              "description": "Loading / error / empty state banner",
+              "name": "state-banner"
+            }
+          ],
+          "slots": [
+            {
+              "description": "Override the empty state message.",
+              "name": "empty-state"
+            },
+            {
+              "description": "Override the loading state content.",
+              "name": "loading-state"
+            },
+            {
+              "description": "Override the error state message.",
+              "name": "error-state"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "data",
+              "type": {
+                "text": "SeamMap"
+              },
+              "default": "{ devices: [ { id: 'biometric-fob', label: msg('Wearable / Fob'), capabilityLevel: 0, formFactor: 'fob', tracks: ['T1-dht', 'T3-spoke'], }, { id: 'observer-camera', label: msg('Civic Camera'), capabilityLevel: 0, formFactor: 'iot-sensor', tracks: ['T1-dht', 'T3-spoke'], }, { id: '2019-android-phone', label: msg('Phone'), capabilityLevel: 2, formFactor: 'phone', tracks: ['T1-dht', 'T3-spoke'], }, { id: 'chromebook-edu', label: msg('Chromebook'), capabilityLevel: 2, formFactor: 'laptop', tracks: ['T1-dht', 'T3-spoke'], }, { id: 'recycled-laptop', label: msg('Laptop'), capabilityLevel: 3, formFactor: 'laptop', tracks: ['T1-dht', 'T2-substrate', 'T3-spoke'], }, { id: 'raspberry-pi-4', label: msg('Raspberry Pi 4'), capabilityLevel: 3, formFactor: 'sbc', tracks: ['T1-dht', 'T2-substrate'], }, { id: 'home-nuc', label: msg('Home NUC'), capabilityLevel: 4, formFactor: 'mini-pc', tracks: ['T1-dht', 'T2-substrate', 'T4-doorway'], }, { id: 'gaming-desktop', label: msg('Gaming Desktop'), capabilityLevel: 4, formFactor: 'desktop', tracks: ['T1-dht', 'T2-substrate'], }, { id: 'family-node-base', label: msg('Family Node (base)'), capabilityLevel: 5, formFactor: 'rack-module', tracks: ['T1-dht', 'T2-substrate', 'T3-spoke', 'T4-doorway'], }, { id: 'family-node-extended', label: msg('Family Node (store-anator)'), capabilityLevel: 5, formFactor: 'rack-module', tracks: ['T1-dht', 'T2-substrate', 'T3-spoke', 'T4-doorway'], }, { id: 'k8s-pod-256mb', label: msg('K8s Pod'), capabilityLevel: 5, formFactor: 'container', tracks: ['T1-dht', 'T2-substrate', 'T4-doorway'], }, ], seams: [ // §3.1 { id: 'hardware', title: msg('Hardware / Capability Gradient'), group: 'hardware', problemClass: msg('What is this peer able/allowed to do, and how do operations adapt?'), addNewX: msg('Add a device-*.md fixture + devices.json entry; wire deviceArchetype in deployments.json'), home: 'genesis/plans/2026-04-13-device-archetypes-design.md; genesis/data/devices/*', confusion: msg('capability_level (L0–5) ≠ stage (1–4, journey) ≠ Tier (1/2/3, product class). nodeTypes is k8s placement, NOT capability.'), applicability: { 0: 'full', 1: 'full', 2: 'full', 3: 'full', 4: 'full', 5: 'full' }, }, // §3.2 { id: 'os-packaging', title: msg('OS / Packaging / Deploy Target'), group: 'os-packaging', problemClass: msg('Will this code physically run on this device, and how does it get there?'), addNewX: msg('Add a Dockerfile / Tauri bundle target / nginx image; edit the edgenode template.yaml'), home: 'CLAUDE.md §Deployment Contexts; steward/device/CLAUDE.md; Dockerfiles; devfile.yaml', confusion: msg('Packaging (\"which image runs\") ≠ the network role it then plays. Editing a manifest is a packaging act; live cluster reconciliation is operator-owned.'), applicability: { 0: 'none', 1: 'none', 2: 'partial', 3: 'partial', 4: 'full', 5: 'full' }, }, // §3.3 { id: 'runtime', title: msg('Runtime / Binary + Footprint'), group: 'runtime', problemClass: msg('Which native binary (or none) runs here, in what compositional shape — thin vs fat, which cargo features?'), addNewX: msg('Flip cargo [features]; embed thin (steward/node/Cargo.toml); a brittle sed strips V8/SSR from the storage image'), home: 'elohim/elohim-storage/CLAUDE.md; steward/node/CLAUDE.md; doorway/doorway-service/CLAUDE.md', confusion: msg('The \"elohim-node\" name overload: steward/node binary ≠ k8s container named elohim-node. Footprint tuning is native-binary-only — never tweak WASM/DNA per device.'), applicability: { 0: 'none', 1: 'none', 2: 'partial', 3: 'partial', 4: 'full', 5: 'full' }, }, // §3.4 { id: 'plugin', title: msg('Mod / Plugin'), group: 'plugin', problemClass: msg('Loading/extending native code into a running node dynamically and integrity-bound.'), addNewX: msg('No canonical path today (loader/host absent). Integrity: bounds_validator + delegates-compute + coordinator hot-swap.'), home: '.claude/data/modular-runtime-plugin-integrity-feasibility-2026-06-21.md', confusion: msg('The bridge is the compile-time form of native extension. @capability* tags are UI render profiles, NOT authorization — that is Mishpat delegates-compute.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'partial', 4: 'partial', 5: 'full' }, }, // §3.5 + §3.6 combined row { id: 'sdk-bridge', title: msg('SDK Grammar + Bridge'), group: 'sdk-bridge', problemClass: msg('SDK: declarative domain composition with integrity-by-construction. Bridge: imperative interop facing the non-elohim world.'), addNewX: msg('SDK: edit manifest → schema:validate → codegen. Bridge: bridges/CLAUDE.md 4-step (crate + dep + arm + recompile).'), home: 'elohim/sdk/CLAUDE.md; bridges/CLAUDE.md; elohim/sdk/domains/lamad/manifest.json', confusion: msg('SDK (compose inward) ≠ Bridge (translate outward) ≠ Plugin (extend downward). Three different artifacts, three different bind-times.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'partial', 4: 'full', 5: 'full' }, }, // §3.7 { id: 'app-manifest', title: msg('App-Manifest / Domain'), group: 'app-manifest', problemClass: msg('Add a new domain app — declarative vocabulary: content types/formats, renderer mappings, relationships, signals, coupling rules.'), addNewX: msg('domains/<app>/manifest.json + domains/<app>/types/ wire-types + codegen (pnpm run lamad:codegen)'), home: 'elohim/sdk/domains/CLAUDE.md; elohim/sdk/domains/{lamad,qahal,shefa}/; root CLAUDE.md §Schema', confusion: msg('Core-vs-extensible formats: a core \"interactive\" has no renderer → raw-JSON fallback. Use sophia-quiz-json, html5-app, not core protocol formats.'), applicability: { 0: 'none', 1: 'none', 2: 'full', 3: 'full', 4: 'full', 5: 'full' }, }, // §3.8 { id: 'client', title: msg('Client Surface'), group: 'client', problemClass: msg('Presentation + user-intent capture only. Render host-provided state; emit intent events. Nothing else.'), addNewX: msg('Add a Lit element to elohim-elements (render + a11y + emit, bind nothing) → bind brand in graphos Library B → compose in the elohim-app shell.'), home: 'app/elohim-elements/CLAUDE.md; app/elohim-library/CLAUDE.md; skill looking-at-frontend', confusion: msg('Client ≠ doorway projection. A \"404 / blob missing\" is substrate replication, not a UI bug. Capability-Profile lens gradient ≠ hardware-tier detection.'), applicability: { 0: 'partial', 1: 'partial', 2: 'full', 3: 'full', 4: 'full', 5: 'full' }, }, // §3.9 { id: 'role-doorway', title: msg('Role: Doorway Projection (T4)'), group: 'role-doorway', problemClass: msg('Make canonical substrate truth legible to browsers and the web2 world — HTTP, OAuth, manifest-driven routes, single-target proxy + cache.'), addNewX: msg('Add the match arm AND is_service_path (else EPR router shadows it). Add an is_service_path unit test.'), home: 'doorway/doorway-service/CLAUDE.md; 2026-05-02-elohim-hub-boundaries-design.md', confusion: msg('Hub ≠ doorway. \"Doorway projects outward to web2; hub projects inward to nearby peers.\" Doorway is NOT a P2P participant.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'none', 4: 'partial', 5: 'host' }, }, // §3.10 { id: 'role-peer-hoster', title: msg('Role: Peer-Hoster Dataplane (T2+T3)'), group: 'role-peer-hoster', problemClass: msg('Durable availability of records across disconnect — async store-and-forward CRDT sync (T2) + spoke HTTP/WS (T3), addressed by peerId.'), addNewX: msg('Add a libp2p request-response behaviour + codec; CRDT engine is Automerge.'), home: 'elohim/elohim-storage/CLAUDE.md; .claude/data/peer-hoster-async-sync-readiness-2026-06-21.md', confusion: msg('peerId ≠ hostname. Peer-hoster (durable availability of records) ≠ aggregation (value rollup), though both ride T2.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'partial', 4: 'full', 5: 'full' }, }, // §3.11 { id: 'role-aggregation', title: msg('Role: Aggregation / Recursive Rollup (T2)'), group: 'role-aggregation', problemClass: msg('Recursive signal aggregation (region ← councils ← households) over CoverageRollup engine; REA value-flow accounting.'), addNewX: msg('Invoke p2p-design-gate FIRST. Rollup engine: recursion.rs; consumer path: graph_views/shefa/coverage.rs.'), home: 'elohim/elohim-storage/CLAUDE.md; .claude/data/commons-compute-aggregation-readiness-2026-06-21.md', confusion: msg('Flat CoverageRollup (single-level fold) ≠ recursive multi-level rollup. Case-A all-zeros is a Track-1 identity-coherence failure, not an aggregation bug.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'none', 4: 'partial', 5: 'full' }, }, // §3.12 { id: 'role-hub-cluster', title: msg('Role: Hub Cluster Ops + Enablement'), group: 'role-hub-cluster', problemClass: msg('k8s-class concerns absorbed inside a hub — blade-to-blade mDNS, leader election, pod consensus, replica/PVC placement. Plus the \"hubbiness dial\".'), addNewX: msg('steward/node/src/{cluster,pod,p2p}/; hub-internal swarm is private to HouseholdHub/CollectiveHub impl, mDNS-first.'), home: 'steward/node/CLAUDE.md; 2026-05-02-elohim-hub-boundaries-design.md; steward/node/src/', confusion: msg('Hub-internal swarm (steward/node, 3.12) ≠ Track-2 hub-to-hub federation (elohim-storage, 3.10/3.11). Also: hub-as-role ≠ Tier-3 hardware.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'partial', 4: 'partial', 5: 'full' }, }, // §3.13 { id: 'plane-confidentiality', title: msg('Plane: Confidentiality / Encryption'), group: 'plane-confidentiality', problemClass: msg('Keeping content readable only by intended readers — encryption-at-rest, private-replica encryption, reader-key envelopes, secret/key custody.'), addNewX: msg('A KeyEnvelope reader-key wrap (X25519 reader set) over the blob/quilt plane.'), home: '.claude/data/commons-compute-aggregation-readiness-2026-06-21.md (R6); BlobStore::store; tiered-quilt-stewardship-design.md', confusion: msg('Confidentiality ≠ integrity ≠ authorization. A notarized entry is world-readable. \"Make this private\" is the encryption plane, not a permission flag.'), applicability: { 0: 'none', 1: 'none', 2: 'partial', 3: 'partial', 4: 'full', 5: 'full' }, }, // §3.14 { id: 'plane-temporal', title: msg('Plane: Temporal / Scheduling'), group: 'plane-temporal', problemClass: msg('When things happen across the fabric — durable timers, recurring ticks, deferred/scheduled work, validity horizons, expiry→obligation.'), addNewX: msg('time is a substrate signal; aggregate-tick services/aggregator.rs::aggregate_and_emit; validity horizons in the feedback/claims model.'), home: 'elohim/sdk/CLAUDE.md §signal list; services/aggregator.rs; the feedback/claims model', confusion: msg('time as a substrate signal (economic, accounted) ≠ a durable scheduler (operational, when-to-fire). \"Re-quilt every N hours\" is this seam, not aggregation.'), applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'partial', 4: 'full', 5: 'full' }, }, // §3.15 { id: 'plane-resource-governance', title: msg('Plane: Resource Governance / Admission'), group: 'plane-resource-governance', problemClass: msg('How the system protects itself and allocates scarce capacity — quotas, rate-limits, circuit-breakers, load-shedding, admission control.'), addNewX: msg('bounds_validator (7-check, rate/ceiling per commitment); doorway 503-shed / admission; self-heal circuit breakers; pantry backpressure; arc_factor.'), home: 'elohim/elohim-storage/src/services/bounds_validator.rs; doorway shed/watchdog /metrics (M1-M5); the self-heal runtime-findings ledger', confusion: msg('The unifying owner of these guards is the elohim-operator (per-hub allocator). \"The phone is getting flooded\" or \"breaker stuck open\" is this seam, not hardware or dataplane.'), applicability: { 0: 'full', 1: 'full', 2: 'full', 3: 'full', 4: 'full', 5: 'full' }, }, ], tracks: [ { id: 'T1-dht', label: msg('T1 DHT'), description: msg('Notary floor: identity · stewardship contracts · REA commitments · reach. All devices. tx5/WebRTC.'), fullFrom: 0, fullTo: 5, }, { id: 'T3-spoke', label: msg('T3 Spoke'), description: msg('HTTP/WS bridge: wearable/IoT/phone route through a dwelling hub. Spoke side: L0–L2; host side: recycled-laptop+.'), fullFrom: 0, fullTo: 2, partialLabel: msg('→ hub host'), }, { id: 'T2-substrate', label: msg('T2 Substrate'), description: msg('Storage-running: laptop+ run elohim-storage. libp2p-primary → iroh-primary (thick).'), fullFrom: 3, fullTo: 5, }, { id: 'T4-doorway', label: msg('T4 Doorway'), description: msg('Browsers CONSUME (default: doorway.elohim.host). Thick nodes may operate a doorway as a separate opt-in deploy.'), fullFrom: 5, fullTo: 5, partialLabel: msg('← browsers consume →'), }, ], routing: [ { concern: msg('A device is too small to run a conductor'), seamId: 'hardware', deviceScale: 'L0–L1 smartwatch/fob', home: 'device-archetypes-design :33-41; Track3Bridge' }, { concern: msg('A phone keeps OOM\\'ing / sync floods it'), seamId: 'runtime', deviceScale: 'L2 phone', home: 'device-archetypes :105; cargo features thin flavor' }, { concern: msg('Render simpler for a child / small screen'), seamId: 'client', deviceScale: 'thin (any)', home: 'elohim-elements/CLAUDE.md:80-98 (lens gradient)' }, { concern: msg('A page 404s / a blob won\\'t load'), seamId: 'role-doorway', deviceScale: 'thin browser', home: 'doorway/CLAUDE.md \"No Blob Fan-Out\"' }, { concern: msg('Add a new domain app (new pillar surface)'), seamId: 'app-manifest', deviceScale: 'device-invariant', home: 'domains/<app>/manifest.json; elohim/sdk/domains/CLAUDE.md' }, { concern: msg('Add a new capability to an existing app'), seamId: 'sdk-bridge', deviceScale: 'device-invariant', home: 'signal_kind / Commitment action / Governor; p2p-design-gate' }, { concern: msg('We need to talk to Mastodon / ActivityPub'), seamId: 'sdk-bridge', deviceScale: 'thick (doorway host)', home: 'bridges/CLAUDE.md; doorway consumes web2 bridges' }, { concern: msg('Extend the runtime with a native capability'), seamId: 'plugin', deviceScale: 'mid–thick', home: 'modular-runtime-plugin-integrity assessment' }, { concern: msg('Tune the binary for a Raspberry Pi (shrink footprint)'), seamId: 'runtime', deviceScale: 'Pi/NUC L3-4', home: 'cargo [features] Cargo.toml:267-273' }, { concern: msg('Package the app for a desktop user'), seamId: 'os-packaging', deviceScale: 'laptop L2-3', home: 'Tauri .deb/AppImage; steward/device/CLAUDE.md' }, { concern: msg('A laptop should host content for others'), seamId: 'role-peer-hoster', deviceScale: 'laptop→hub L3', home: 'peer-hoster-async-sync-readiness; CRDT store' }, { concern: msg('A non-tech steward wants to turn a laptop into a hub'), seamId: 'role-hub-cluster', deviceScale: 'recycled-laptop L3', home: 'hub-enablement-dial-readiness; steward/node daemon' }, { concern: msg('Aggregate signals to commons scale'), seamId: 'role-aggregation', deviceScale: 'always-on→thick', home: 'recursive rollup over recursion.rs' }, { concern: msg('Make this content private / readable only by X'), seamId: 'plane-confidentiality', deviceScale: 'any', home: 'KeyEnvelope over the blob/quilt plane' }, { concern: msg('Schedule recurring work / expire a claim'), seamId: 'plane-temporal', deviceScale: 'always-on', home: 'time signal + durable scheduler home' }, { concern: msg('A peer is being flooded / a breaker is stuck open'), seamId: 'plane-resource-governance', deviceScale: 'any', home: 'bounds_validator + doorway shed + self-heal' }, ], }",
+              "description": "The seam map data. Defaults to the built-in atlas fixture."
+            },
+            {
+              "kind": "field",
+              "name": "mapState",
+              "type": {
+                "text": "SeamMapState"
+              },
+              "default": "'idle'",
+              "description": "Content state.",
+              "attribute": "map-state"
+            },
+            {
+              "kind": "field",
+              "name": "_selectedSeamId",
+              "type": {
+                "text": "string | null"
+              },
+              "privacy": "private",
+              "default": "null",
+              "description": "The currently-selected seam id."
+            },
+            {
+              "kind": "field",
+              "name": "_selectedRoutingIdx",
+              "type": {
+                "text": "number | null"
+              },
+              "privacy": "private",
+              "default": "null",
+              "description": "The selected routing-row index (debug+ lens)."
+            },
+            {
+              "kind": "method",
+              "name": "_selectSeam",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "id",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_handleSeamKeydown",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "e",
+                  "type": {
+                    "text": "KeyboardEvent"
+                  }
+                },
+                {
+                  "name": "id",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_handleRoutingRowClick",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "idx",
+                  "type": {
+                    "text": "number"
+                  }
+                },
+                {
+                  "name": "seamId",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_getSeamById",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "SeamEntry | undefined"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "id",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_groupedSeams",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Array<{ group: SeamGroup; seams: SeamEntry[] }>"
+                }
+              },
+              "description": "Group seams by their group property, preserving order."
+            },
+            {
+              "kind": "method",
+              "name": "_gridTemplateColumns",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string"
+                }
+              },
+              "description": "Compute the CSS grid-template-columns value. 1 title col + N device cols."
+            },
+            {
+              "kind": "method",
+              "name": "_renderStateBanner",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "TemplateResult"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "_renderLegend",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "TemplateResult"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "_renderColumnHeaders",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "TemplateResult"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "devices",
+                  "type": {
+                    "text": "SeamDevice[]"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_renderGroupHeading",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "TemplateResult"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "group",
+                  "type": {
+                    "text": "SeamGroup"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_renderSeamRow",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "TemplateResult"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "seam",
+                  "type": {
+                    "text": "SeamEntry"
+                  }
+                },
+                {
+                  "name": "devices",
+                  "type": {
+                    "text": "SeamDevice[]"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_renderDetailPanel",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "TemplateResult"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "seam",
+                  "type": {
+                    "text": "SeamEntry"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_renderTrackBands",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "TemplateResult"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "_renderRoutingTable",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "TemplateResult"
+                }
+              }
+            },
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            }
+          ],
+          "attributes": [
+            {
+              "name": "map-state",
+              "type": {
+                "text": "SeamMapState"
+              },
+              "default": "'idle'",
+              "description": "Content state.",
+              "fieldName": "mapState"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "module": "/src/capability/index.js"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-seam-map",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "debug",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "canonical",
+            "states": {
+              "empty": "designed",
+              "loading": "designed",
+              "error": "designed",
+              "stale": "not-applicable",
+              "contested": "not-applicable",
+              "offline": "not-applicable"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "DEFAULT_SEAM_MAP",
+          "declaration": {
+            "name": "DEFAULT_SEAM_MAP",
+            "module": "src/elohim-seam-map.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimSeamMap",
+          "declaration": {
+            "name": "ElohimSeamMap",
+            "module": "src/elohim-seam-map.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-skeleton.ts",
       "declarations": [
         {
@@ -6676,6 +7242,102 @@
             "name": "ElohimLocale",
             "module": "./localize/locale-store.js"
           }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimSeamMap",
+          "declaration": {
+            "name": "ElohimSeamMap",
+            "module": "./elohim-seam-map.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "DEFAULT_SEAM_MAP",
+          "declaration": {
+            "name": "DEFAULT_SEAM_MAP",
+            "module": "./elohim-seam-map.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "SeamMap",
+          "declaration": {
+            "name": "SeamMap",
+            "module": "./elohim-seam-map.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "SeamDevice",
+          "declaration": {
+            "name": "SeamDevice",
+            "module": "./elohim-seam-map.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "SeamEntry",
+          "declaration": {
+            "name": "SeamEntry",
+            "module": "./elohim-seam-map.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "SeamGroup",
+          "declaration": {
+            "name": "SeamGroup",
+            "module": "./elohim-seam-map.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "SeamApplicability",
+          "declaration": {
+            "name": "SeamApplicability",
+            "module": "./elohim-seam-map.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "SeamApplicabilityMap",
+          "declaration": {
+            "name": "SeamApplicabilityMap",
+            "module": "./elohim-seam-map.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "SeamMapState",
+          "declaration": {
+            "name": "SeamMapState",
+            "module": "./elohim-seam-map.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ParticipationTrack",
+          "declaration": {
+            "name": "ParticipationTrack",
+            "module": "./elohim-seam-map.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "TrackBand",
+          "declaration": {
+            "name": "TrackBand",
+            "module": "./elohim-seam-map.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "RoutingRow",
+          "declaration": {
+            "name": "RoutingRow",
+            "module": "./elohim-seam-map.js"
+          }
         }
       ]
     },
@@ -6834,6 +7496,14 @@
           "declaration": {
             "name": "ElohimHypercardPanel",
             "module": "/src/elohim-hypercard-panel.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-seam-map",
+          "declaration": {
+            "name": "ElohimSeamMap",
+            "module": "/src/elohim-seam-map.js"
           }
         }
       ]
@@ -7137,6 +7807,79 @@
           "declaration": {
             "name": "satisfiesRequirement",
             "module": "src/capability/standing.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/loader/loader.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Loader",
+          "members": [
+            {
+              "kind": "field",
+              "name": "verifyCid",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "return": {
+                "type": {
+                  "text": "Promise<LoaderResolution>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "verifyCidMatches",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "bytes",
+                  "type": {
+                    "text": "Uint8Array"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Loader",
+          "declaration": {
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
           }
         }
       ]
@@ -7693,331 +8436,6 @@
           "declaration": {
             "name": "Session",
             "module": "src/session/session.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/loader/loader.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Loader",
-          "members": [
-            {
-              "kind": "field",
-              "name": "verifyCid",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "resolve",
-              "return": {
-                "type": {
-                  "text": "Promise<LoaderResolution>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "verifyCidMatches",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "Promise<void>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                },
-                {
-                  "name": "bytes",
-                  "type": {
-                    "text": "Uint8Array"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "Loader",
-          "declaration": {
-            "name": "Loader",
-            "module": "src/loader/loader.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/theme/theme-store.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "THEME_STORAGE_KEY",
-          "type": {
-            "text": "string"
-          },
-          "default": "'elohim-theme'"
-        },
-        {
-          "kind": "variable",
-          "name": "THEME_CHANGE_EVENT",
-          "type": {
-            "text": "string"
-          },
-          "default": "'elohim-theme-changed'"
-        },
-        {
-          "kind": "class",
-          "description": "",
-          "name": "ThemeStore",
-          "members": [
-            {
-              "kind": "field",
-              "name": "_theme",
-              "type": {
-                "text": "ElohimTheme"
-              },
-              "privacy": "private",
-              "default": "'device'"
-            },
-            {
-              "kind": "field",
-              "name": "_destroyed",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "default": "false"
-            },
-            {
-              "kind": "field",
-              "name": "subscribers",
-              "privacy": "private",
-              "readonly": true,
-              "default": "new Set<Subscriber>()"
-            },
-            {
-              "kind": "field",
-              "name": "_onStorage",
-              "type": {
-                "text": "(e: StorageEvent) => void"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "_onThemeChange",
-              "type": {
-                "text": "(e: Event) => void"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "destroy",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getThemeStore()) is intentionally never destroyed."
-            },
-            {
-              "kind": "field",
-              "name": "theme",
-              "type": {
-                "text": "ElohimTheme"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "effectiveTheme",
-              "type": {
-                "text": "'light' | 'dark'"
-              },
-              "description": "The theme actually in effect ('device' resolved against the UA signal).",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "set",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "theme",
-                  "type": {
-                    "text": "ElohimTheme"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "cycle",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              }
-            },
-            {
-              "kind": "method",
-              "name": "subscribe",
-              "return": {
-                "type": {
-                  "text": "() => void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "fn",
-                  "type": {
-                    "text": "Subscriber"
-                  }
-                }
-              ],
-              "description": "Subscribe to theme changes. Returns an unsubscribe function."
-            },
-            {
-              "kind": "method",
-              "name": "adopt",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "theme",
-                  "type": {
-                    "text": "ElohimTheme"
-                  }
-                }
-              ],
-              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
-            },
-            {
-              "kind": "method",
-              "name": "applyToDocument",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "theme",
-                  "type": {
-                    "text": "ElohimTheme"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "persist",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "theme",
-                  "type": {
-                    "text": "ElohimTheme"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "load",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "ElohimTheme"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "kind": "function",
-          "name": "getThemeStore",
-          "return": {
-            "type": {
-              "text": "ThemeStore"
-            }
-          },
-          "description": "Module-level singleton — all islands in a document share one store."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "THEME_STORAGE_KEY",
-          "declaration": {
-            "name": "THEME_STORAGE_KEY",
-            "module": "src/theme/theme-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "THEME_CHANGE_EVENT",
-          "declaration": {
-            "name": "THEME_CHANGE_EVENT",
-            "module": "src/theme/theme-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "ThemeStore",
-          "declaration": {
-            "name": "ThemeStore",
-            "module": "src/theme/theme-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "getThemeStore",
-          "declaration": {
-            "name": "getThemeStore",
-            "module": "src/theme/theme-store.ts"
           }
         }
       ]
@@ -8592,7 +9010,7 @@
           "name": "VIEWPORT_ARCHETYPES",
           "declaration": {
             "name": "VIEWPORT_ARCHETYPES",
-            "module": "src/testing/viewport.ts"
+            "module": "../viewport-archetypes.js"
           }
         },
         {
@@ -8600,7 +9018,7 @@
           "name": "ViewportArchetype",
           "declaration": {
             "name": "ViewportArchetype",
-            "module": "src/testing/viewport.ts"
+            "module": "../viewport-archetypes.js"
           }
         },
         {
@@ -8608,7 +9026,7 @@
           "name": "ViewportArchetypeName",
           "declaration": {
             "name": "ViewportArchetypeName",
-            "module": "src/testing/viewport.ts"
+            "module": "../viewport-archetypes.js"
           }
         },
         {
@@ -8649,6 +9067,258 @@
           "declaration": {
             "name": "assertWithinViewport",
             "module": "src/testing/viewport.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/theme/theme-store.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "THEME_STORAGE_KEY",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-theme'"
+        },
+        {
+          "kind": "variable",
+          "name": "THEME_CHANGE_EVENT",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-theme-changed'"
+        },
+        {
+          "kind": "class",
+          "description": "",
+          "name": "ThemeStore",
+          "members": [
+            {
+              "kind": "field",
+              "name": "_theme",
+              "type": {
+                "text": "ElohimTheme"
+              },
+              "privacy": "private",
+              "default": "'device'"
+            },
+            {
+              "kind": "field",
+              "name": "_destroyed",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "readonly": true,
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "_onStorage",
+              "type": {
+                "text": "(e: StorageEvent) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "_onThemeChange",
+              "type": {
+                "text": "(e: Event) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "destroy",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getThemeStore()) is intentionally never destroyed."
+            },
+            {
+              "kind": "field",
+              "name": "theme",
+              "type": {
+                "text": "ElohimTheme"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "effectiveTheme",
+              "type": {
+                "text": "'light' | 'dark'"
+              },
+              "description": "The theme actually in effect ('device' resolved against the UA signal).",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "set",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "theme",
+                  "type": {
+                    "text": "ElohimTheme"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "cycle",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to theme changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "adopt",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "theme",
+                  "type": {
+                    "text": "ElohimTheme"
+                  }
+                }
+              ],
+              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
+            },
+            {
+              "kind": "method",
+              "name": "applyToDocument",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "theme",
+                  "type": {
+                    "text": "ElohimTheme"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "persist",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "theme",
+                  "type": {
+                    "text": "ElohimTheme"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "load",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "ElohimTheme"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "getThemeStore",
+          "return": {
+            "type": {
+              "text": "ThemeStore"
+            }
+          },
+          "description": "Module-level singleton — all islands in a document share one store."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "THEME_STORAGE_KEY",
+          "declaration": {
+            "name": "THEME_STORAGE_KEY",
+            "module": "src/theme/theme-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "THEME_CHANGE_EVENT",
+          "declaration": {
+            "name": "THEME_CHANGE_EVENT",
+            "module": "src/theme/theme-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ThemeStore",
+          "declaration": {
+            "name": "ThemeStore",
+            "module": "src/theme/theme-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "getThemeStore",
+          "declaration": {
+            "name": "getThemeStore",
+            "module": "src/theme/theme-store.ts"
           }
         }
       ]
