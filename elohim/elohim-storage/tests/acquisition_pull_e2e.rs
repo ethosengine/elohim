@@ -132,6 +132,7 @@ async fn item_pin_completes_on_byte_arrival() {
             reach: "public".to_string(),
             created_by: None,
             tags: vec![],
+            dht_anchor_hash: None,
             content_body: Some("# Strawberry Guide\nTest content.".to_string()),
         }],
     )

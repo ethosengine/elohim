@@ -79,6 +79,7 @@ fn unpublished_content_is_invisible_to_external_reads() {
             created_by: None,
             content_body: None,
             tags: vec![],
+            dht_anchor_hash: None,
         },
     )
     .unwrap();

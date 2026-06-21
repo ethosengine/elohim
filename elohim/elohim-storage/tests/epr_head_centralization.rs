@@ -51,6 +51,7 @@ fn seed_content(conn: &mut SqliteConnection, id: &str) {
             created_by: Some("did:key:z6Mk".to_string()),
             content_body: None,
             tags: vec!["rust".to_string(), "protocol".to_string()],
+            dht_anchor_hash: None,
         },
     )
     .expect("create_content failed");
