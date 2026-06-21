@@ -48,6 +48,10 @@ COPY elohim/elohim-agent/specialists/defender ./elohim/elohim-agent/specialists/
 # and a workspace member of elohim/Cargo.toml. Without this COPY, cargo aborts at
 # resolve time: "failed to read /elohim/elohim-render/Cargo.toml: No such file".
 COPY elohim/elohim-render ./elohim/elohim-render
+# elohim-peer-fabric: std-only path-dep (doorway membrane policy, edge-defense feature) and a
+# workspace member of elohim/Cargo.toml. Without this COPY cargo aborts at resolve time:
+# "failed to read /elohim/elohim-peer-fabric/Cargo.toml: No such file".
+COPY elohim/elohim-peer-fabric ./elohim/elohim-peer-fabric
 
 # Prune workspace members that aren't copied into the build context.
 # Keeps: constitution, elohim-agent-service, gate-client, gate-types,
@@ -69,7 +73,8 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../../elohim/sdk/domains/infrastructure/types"|path = "elohim/sdk/domains/infrastructure/types"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/elohim-agent/gate-client"|path = "elohim/elohim-agent/gate-client"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/elohim-views"|path = "elohim/elohim-views"|' Cargo.toml && \
-    sed -i 's|path = "../../elohim/elohim-render"|path = "elohim/elohim-render"|' Cargo.toml
+    sed -i 's|path = "../../elohim/elohim-render"|path = "elohim/elohim-render"|' Cargo.toml && \
+    sed -i 's|path = "../../elohim/elohim-peer-fabric"|path = "elohim/elohim-peer-fabric"|' Cargo.toml
 
 # Build dependencies (this layer gets cached)
 RUN cargo build --release
