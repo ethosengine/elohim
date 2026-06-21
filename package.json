@@ -8,6 +8,7 @@
   "devDependencies": {
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
+    "buffer": "^5.2.1",
     "husky": "^9.1.7",
     "json-schema-to-typescript": "^15.0.4",
     "jszip": "^3.10.1",
