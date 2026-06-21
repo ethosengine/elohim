@@ -667,7 +667,7 @@ pub fn top_growing_vmas(
             }),
         })
         .collect();
-    deltas.sort_by(|a, b| b.delta_bytes.cmp(&a.delta_bytes));
+    deltas.sort_by_key(|b| std::cmp::Reverse(b.delta_bytes));
     deltas.truncate(n);
     deltas
 }

@@ -48,7 +48,7 @@ use crate::error::StorageError;
 pub fn classifications_of(raw: Option<&str>) -> Vec<String> {
     match raw {
         None => Vec::new(),
-        Some(s) if s.is_empty() => Vec::new(),
+        Some("") => Vec::new(),
         Some(s) => {
             let parsed = crate::rea_projection::parse_json_strings(Some(s));
             if parsed.is_empty() {
