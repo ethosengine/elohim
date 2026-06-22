@@ -170,8 +170,9 @@ interface ConceptJson {
   thumbnailUrl?: string;
   metadata?: Record<string, unknown>;
   // Blob references for html5-app and large content
-  blobHash?: string;       // Pre-computed hash (camelCase from JSON)
+  blobHash?: string;       // Pre-computed hash (camelCase from JSON) — legacy sha256-<hex> /blob key
   blob_hash?: string;      // Alternative snake_case format
+  blobCid?: string;        // Canonical CIDv1 (bafkrei… raw codec) address for the blob bytes
   entryPoint?: string;    // Entry point for html5-app (e.g., "index.html")
   stewardedBy?: Array<{ humanId: string; affinity: number; role: string }>;
 }
@@ -671,7 +672,7 @@ function transformContent(json: ConceptJson): CreateContentInput {
     contentFormat: normalizeContentFormat(json.contentFormat),
     contentBody: contentBody ?? undefined,
     blobHash: json.blobHash ?? json.blob_hash ?? undefined,
-    blobCid: undefined,
+    blobCid: json.blobCid ?? undefined,
     contentSizeBytes: contentSizeBytes,
     metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     reach: getReachForContent(json.id, json.reach),
