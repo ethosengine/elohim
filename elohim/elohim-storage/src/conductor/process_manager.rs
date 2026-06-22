@@ -191,6 +191,99 @@ impl ConductorManager {
         self.start()?;
         Ok(())
     }
+
+    /// Start the conductor and wait for readiness, with an opt-in genesis-less
+    /// self-heal on a startup crash.
+    ///
+    /// The conductor panics fatally with `CellWithoutGenesis` when its persistent
+    /// data dir holds a cell that was registered but never genesised — e.g. a hApp
+    /// DNA fetched by a floating tag (`elohim-happ:dev-latest`) drifted under the
+    /// installed cell. That panic happens inside the conductor child's own startup,
+    /// BEFORE the admin-WS comes up, so the downstream `ensure_happ_installed`
+    /// reinstall-on-stale heal and `genesis_self_heal_identity` are architecturally
+    /// unreachable: the child is dead before either can run. (Alpha CellWithoutGenesis
+    /// incident, 2026-06-22.)
+    ///
+    /// When `heal_on_boot_fail` is set AND the child has exited (a real startup
+    /// crash, not a slow boot), this clears the conductor data dir once and retries
+    /// the spawn — a clean data dir boots with no cell, so `ensure_happ_installed`
+    /// runs `install_fresh` → genesis. It is **destructive**: clearing the data dir
+    /// wipes the lair keystore too, minting a NEW agent key. Enable it ONLY where a
+    /// re-key is acceptable (ephemeral / re-seeded envs — alpha/dev), never the prod
+    /// upgrade path (which needs DNA migration/lineage). Default OFF: with the flag
+    /// unset this is byte-identical to `start()` + `wait_for_ready()`.
+    pub async fn start_with_genesis_heal(
+        &mut self,
+        max_retries: u32,
+        heal_on_boot_fail: bool,
+    ) -> Result<AdminWebsocket, ConductorError> {
+        self.start()?;
+        match self.wait_for_ready(max_retries).await {
+            Ok(ws) => Ok(ws),
+            Err(e) => {
+                // Heal ONLY a genuine startup crash (child has exited), and ONLY
+                // when explicitly enabled. A still-running-but-slow child is left
+                // alone — clearing its data dir would be a destructive false
+                // positive.
+                if heal_on_boot_fail && !self.is_running() {
+                    warn!(
+                        error = %e,
+                        data_dir = %self.data_dir.display(),
+                        "Conductor crashed at startup and CONDUCTOR_GENESIS_HEAL_ON_BOOT_FAIL \
+                         is set — clearing the conductor data dir (RE-KEYS) and retrying once. \
+                         Recovers a genesis-less cell (CellWithoutGenesis) that the post-ready \
+                         self-heal can never reach."
+                    );
+                    let _ = self.stop().await; // best-effort; child is likely already dead
+                    Self::clear_conductor_state(&self.data_dir)?;
+                    self.start()?;
+                    self.wait_for_ready(max_retries).await
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
+    /// Clear the conductor data dir (chain databases + lair keystore) so the next
+    /// spawn boots clean. **Destructive + RE-KEYS** — only called from
+    /// [`start_with_genesis_heal`] behind an explicit opt-in flag. Guarded against
+    /// unsafe paths (refuses a relative path, the filesystem root, or a path with no
+    /// final component) so a misconfigured `data_dir` can never wipe `/`.
+    fn clear_conductor_state(data_dir: &std::path::Path) -> Result<(), ConductorError> {
+        if !data_dir.is_absolute()
+            || data_dir == std::path::Path::new("/")
+            || data_dir.file_name().is_none()
+        {
+            return Err(ConductorError::HealFailed(format!(
+                "refusing to clear unsafe conductor data_dir: {}",
+                data_dir.display()
+            )));
+        }
+        // Remove the tree, then recreate the empty root for the conductor to write
+        // fresh state into. Already-absent is success (nothing to clear).
+        match std::fs::remove_dir_all(data_dir) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => {
+                return Err(ConductorError::HealFailed(format!(
+                    "failed to clear conductor data_dir {}: {e}",
+                    data_dir.display()
+                )))
+            }
+        }
+        std::fs::create_dir_all(data_dir).map_err(|e| {
+            ConductorError::HealFailed(format!(
+                "failed to recreate conductor data_dir {}: {e}",
+                data_dir.display()
+            ))
+        })?;
+        info!(
+            data_dir = %data_dir.display(),
+            "Conductor data dir cleared for genesis re-heal (new agent key will be minted)"
+        );
+        Ok(())
+    }
 }
 
 impl Drop for ConductorManager {
@@ -219,6 +312,9 @@ pub enum ConductorError {
 
     #[error("Failed to stop conductor: {0}")]
     StopFailed(String),
+
+    #[error("Conductor genesis-heal failed: {0}")]
+    HealFailed(String),
 }
 
 #[cfg(test)]
@@ -236,5 +332,37 @@ mod tests {
             4444,
         );
         assert_eq!(mgr.child_pid(), None, "no child before start()");
+    }
+
+    #[test]
+    fn clear_conductor_state_refuses_unsafe_paths() {
+        // The destructive genesis-heal must NEVER wipe the filesystem root or a
+        // relative/footless path if data_dir is misconfigured.
+        assert!(ConductorManager::clear_conductor_state(std::path::Path::new("/")).is_err());
+        assert!(
+            ConductorManager::clear_conductor_state(std::path::Path::new("relative/dir")).is_err()
+        );
+        assert!(ConductorManager::clear_conductor_state(std::path::Path::new("")).is_err());
+    }
+
+    #[test]
+    fn clear_conductor_state_empties_a_real_dir() {
+        // A genuine data dir is emptied (stale state gone) but the root remains, so
+        // the next conductor spawn boots clean.
+        let root = std::env::temp_dir().join("elohim_clear_state_test");
+        let data = root.join("a/b/holochain");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&data).unwrap();
+        std::fs::write(data.join("stale.sqlite3"), b"x").unwrap();
+        assert!(data.join("stale.sqlite3").exists());
+
+        ConductorManager::clear_conductor_state(&data).unwrap();
+
+        assert!(data.exists(), "data dir root recreated for fresh state");
+        assert!(
+            !data.join("stale.sqlite3").exists(),
+            "genesis-less stale state cleared"
+        );
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

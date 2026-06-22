@@ -143,6 +143,20 @@ struct Args {
     #[arg(long, env = "CONDUCTOR_MAX_RETRIES", default_value_t = 60)]
     conductor_max_retries: u32,
 
+    /// Opt-in genesis-less self-heal: if the embedded conductor crashes at startup
+    /// (e.g. `CellWithoutGenesis` from a hApp DNA drifted by a floating tag), clear
+    /// the conductor data dir once and retry — a clean boot re-installs + genesises.
+    /// DESTRUCTIVE: clearing the data dir wipes the lair keystore (RE-KEYS the node),
+    /// so enable ONLY on ephemeral / re-seeded envs (alpha/dev), never the prod
+    /// upgrade path. Default off → byte-identical to start() + wait_for_ready().
+    /// Only used when --embedded-conductor is set.
+    #[arg(
+        long,
+        env = "CONDUCTOR_GENESIS_HEAL_ON_BOOT_FAIL",
+        default_value_t = false
+    )]
+    conductor_genesis_heal_on_boot_fail: bool,
+
     /// Installed app ID for the imagodei DNA (reconcile controller signal subscription).
     /// Defaults to "imagodei". The controller subscribes to this app's signals to
     /// project key-rotation, revocation, and agent-peer-binding events into SQLite.
@@ -631,11 +645,18 @@ async fn async_main(
             4444, // admin port — must match conductor config
         );
 
-        // Start conductor as child process
-        manager.start()?;
-
-        // Wait for conductor readiness
-        let admin_ws = manager.wait_for_ready(args.conductor_max_retries).await?;
+        // Start conductor as child process + wait for readiness. With
+        // CONDUCTOR_GENESIS_HEAL_ON_BOOT_FAIL set (alpha/dev only — it RE-KEYS), a
+        // startup crash on a genesis-less cell (CellWithoutGenesis) clears the
+        // conductor data dir once and retries, since the post-ready self-heal can
+        // never reach a child that dies during its own startup. Default off =
+        // plain start() + wait_for_ready().
+        let admin_ws = manager
+            .start_with_genesis_heal(
+                args.conductor_max_retries,
+                args.conductor_genesis_heal_on_boot_fail,
+            )
+            .await?;
 
         // Install/validate hApp
         happ_manager::ensure_happ_installed(&admin_ws, &args.happ_path, &args.app_id).await?;
