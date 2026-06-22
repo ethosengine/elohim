@@ -7,7 +7,17 @@
 # Built by che-devworkspaces jenkins/Jenkinsfile-elohim-edgenode (HC_FEATURES includes `jemalloc`)
 # and published as elohim-edgenode:latest. NOTE: only that job pushes :latest; the edge pipeline
 # pushes :dev-latest (Jenkinsfile:1627-1648), so :latest is unambiguously the jemalloc-prod build,
-# never clobbered. To refresh, re-run the che-dw elohim-edgenode job (updates :latest), then rebuild.
+# never clobbered (but still a MOVING tag). To refresh, re-run the che-dw elohim-edgenode job
+# (updates :latest), then bump the pinned digest below.
+#
+# PINNED 2026-06-22 to the jemalloc-prod digest (was the floating `:latest`) so the storage
+# image bakes a REPRODUCIBLE conductor: a later edgenode-job re-run that moves `:latest` can no
+# longer silently change the baked conductor under a normal edge rebuild (the alpha
+# CellWithoutGenesis reproducibility gap). Edgenode builds are rare/on-demand, so a digest pin —
+# not orchestrator auto-rebuild — is the durable fix. The digest is exactly what `:latest`
+# resolved to on 2026-06-22. To bump DELIBERATELY after a new edgenode build:
+#   skopeo inspect docker://harbor.ethosengine.com/ethosengine/elohim-edgenode:latest --format '{{.Digest}}'
+# and update the single ARG line below.
 # ⚠ ROLLBACK: do NOT roll back to a glibc conductor — ghcr.io/holo-host/edgenode (stock) and any
 # pre-jemalloc edgenode build carry the heap leak. The safe rollback is the PREVIOUS jemalloc
 # :latest, pinned by its dated/git tag (printed in the edgenode job's post log) — still the cure.
@@ -15,7 +25,7 @@
 # deployed fleet-wide and the leak persisted. The 2026-06-18 jemalloc-PROF debug build localized
 # it to glibc malloc arenas; the allocator swap is the fix. Details + the superseded-RCA trail:
 # .claude/data/conductor-leak-jemalloc-prod-changeset-2026-06-19.md.)
-ARG CONDUCTOR_SOURCE_IMAGE=harbor.ethosengine.com/ethosengine/elohim-edgenode:latest
+ARG CONDUCTOR_SOURCE_IMAGE=harbor.ethosengine.com/ethosengine/elohim-edgenode@sha256:f7fcf7c0ed36d678519ee17863cad766fbba1050fb4a6727653dfd4725ac5347
 FROM ${CONDUCTOR_SOURCE_IMAGE} AS conductor-source
 
 # Build stage
