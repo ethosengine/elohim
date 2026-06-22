@@ -23,9 +23,14 @@ export interface WeaveView {
    */
   tierOccupancy?: Record<string, unknown>;
   /**
-   * Regional occupancy distribution (deferred — Slice 5 follow-on). Absent in Slice 4 responses.
+   * Viewer-agnostic regional occupancy of distinct stewarding hubs (Slice 4 — shipped by build_weave_view). Absent only when the lens is not selected; an empty holder relation reads Some(all-zero).
    */
-  regionOccupancy?: Record<string, unknown>;
+  regionOccupancy?: {
+    local: number;
+    regional: number;
+    global: number;
+    unknown: number;
+  };
 }
 /**
  * Aggregated storage capacity (free/used/stewarded bytes) summed across all custodian nodes in the cluster weave.
