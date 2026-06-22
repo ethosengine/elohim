@@ -78,6 +78,7 @@ pub mod peer_diversity; // Phase 4 T8 — archetype-mix diversity helper
 pub mod peer_selection;
 pub mod peer_topology_view;
 pub mod presence_service;
+pub mod private_replica; // Wave 5.1 Slice-0 — encrypt-then-erasure-code + DEK envelope PROOF
 pub mod provenance_service;
 pub mod provide_loop_status; // Workstream D — observability for the provide-loop + re-anchor backfill
 pub mod provide_reconcile;
