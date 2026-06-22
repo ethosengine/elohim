@@ -1625,6 +1625,12 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        // Pre-seed readiness RE-gate (genesis #1182 Cluster A): the target
+                        // re-enters `catching-up` after the blob-upload/custody projector
+                        // backlog, so these LATE seeds 503 past the client retry budget.
+                        // Wait for caughtUp + projection.writer first. Soft (never aborts);
+                        // bash in scripts/ci to stay under the Jenkinsfile CPS method limit.
+                        sh "bash '${env.WORKSPACE}/genesis/scripts/ci/wait-storage-ready.sh' '${doorwayHost}'"
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/seeder') {
                                 sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-operator-bindings.sh' '${doorwayHost}'"
