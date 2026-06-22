@@ -192,65 +192,25 @@ impl ConductorManager {
         Ok(())
     }
 
-    /// Start the conductor and wait for readiness, with an opt-in genesis-less
-    /// self-heal on a startup crash.
-    ///
-    /// The conductor panics fatally with `CellWithoutGenesis` when its persistent
-    /// data dir holds a cell that was registered but never genesised — e.g. a hApp
-    /// DNA fetched by a floating tag (`elohim-happ:dev-latest`) drifted under the
-    /// installed cell. That panic happens inside the conductor child's own startup,
-    /// BEFORE the admin-WS comes up, so the downstream `ensure_happ_installed`
-    /// reinstall-on-stale heal and `genesis_self_heal_identity` are architecturally
-    /// unreachable: the child is dead before either can run. (Alpha CellWithoutGenesis
-    /// incident, 2026-06-22.)
-    ///
-    /// When `heal_on_boot_fail` is set AND the child has exited (a real startup
-    /// crash, not a slow boot), this clears the conductor data dir once and retries
-    /// the spawn — a clean data dir boots with no cell, so `ensure_happ_installed`
-    /// runs `install_fresh` → genesis. It is **destructive**: clearing the data dir
-    /// wipes the lair keystore too, minting a NEW agent key. Enable it ONLY where a
-    /// re-key is acceptable (ephemeral / re-seeded envs — alpha/dev), never the prod
-    /// upgrade path (which needs DNA migration/lineage). Default OFF: with the flag
-    /// unset this is byte-identical to `start()` + `wait_for_ready()`.
-    pub async fn start_with_genesis_heal(
-        &mut self,
-        max_retries: u32,
-        heal_on_boot_fail: bool,
-    ) -> Result<AdminWebsocket, ConductorError> {
-        self.start()?;
-        match self.wait_for_ready(max_retries).await {
-            Ok(ws) => Ok(ws),
-            Err(e) => {
-                // Heal ONLY a genuine startup crash (child has exited), and ONLY
-                // when explicitly enabled. A still-running-but-slow child is left
-                // alone — clearing its data dir would be a destructive false
-                // positive.
-                if heal_on_boot_fail && !self.is_running() {
-                    warn!(
-                        error = %e,
-                        data_dir = %self.data_dir.display(),
-                        "Conductor crashed at startup and CONDUCTOR_GENESIS_HEAL_ON_BOOT_FAIL \
-                         is set — clearing the conductor data dir (RE-KEYS) and retrying once. \
-                         Recovers a genesis-less cell (CellWithoutGenesis) that the post-ready \
-                         self-heal can never reach."
-                    );
-                    let _ = self.stop().await; // best-effort; child is likely already dead
-                    Self::clear_conductor_state(&self.data_dir)?;
-                    self.start()?;
-                    self.wait_for_ready(max_retries).await
-                } else {
-                    Err(e)
-                }
-            }
-        }
-    }
-
     /// Clear the conductor data dir (chain databases + lair keystore) so the next
-    /// spawn boots clean. **Destructive + RE-KEYS** — only called from
-    /// [`start_with_genesis_heal`] behind an explicit opt-in flag. Guarded against
-    /// unsafe paths (refuses a relative path, the filesystem root, or a path with no
-    /// final component) so a misconfigured `data_dir` can never wipe `/`.
-    fn clear_conductor_state(data_dir: &std::path::Path) -> Result<(), ConductorError> {
+    /// spawn boots clean — the **node-repair primitive**.
+    ///
+    /// This is the self-repair a node performs to recover from a genesis-less /
+    /// DNA-drifted cell (the alpha CellWithoutGenesis incident, 2026-06-22): a clean
+    /// data dir boots with no cell, so `ensure_happ_installed` runs `install_fresh`
+    /// → genesis against the assigned bundle. **Destructive + RE-KEYS** — the lair
+    /// keystore lives under the data dir, so a new agent key is minted; only invoke
+    /// where a re-key is acceptable (a re-seedable node — its own
+    /// `GENESIS_SELF_HEAL_IDENTITY` policy), never a lineage-bearing node (which must
+    /// migrate, not wipe).
+    ///
+    /// Public so it can be driven by the boot reconcile loop (main.rs) today and by a
+    /// human-facilitated "Update / Repair" trigger on the peer menu later — the node,
+    /// not an operator with kubectl, owns its DNA-lifecycle repair (P1 reconciliation
+    /// controller). Guarded against unsafe paths (refuses a relative path, the
+    /// filesystem root, or a path with no final component) so a misconfigured
+    /// `data_dir` can never wipe `/`.
+    pub fn clear_conductor_state(data_dir: &std::path::Path) -> Result<(), ConductorError> {
         if !data_dir.is_absolute()
             || data_dir == std::path::Path::new("/")
             || data_dir.file_name().is_none()

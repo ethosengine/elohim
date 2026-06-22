@@ -143,20 +143,6 @@ struct Args {
     #[arg(long, env = "CONDUCTOR_MAX_RETRIES", default_value_t = 60)]
     conductor_max_retries: u32,
 
-    /// Opt-in genesis-less self-heal: if the embedded conductor crashes at startup
-    /// (e.g. `CellWithoutGenesis` from a hApp DNA drifted by a floating tag), clear
-    /// the conductor data dir once and retry — a clean boot re-installs + genesises.
-    /// DESTRUCTIVE: clearing the data dir wipes the lair keystore (RE-KEYS the node),
-    /// so enable ONLY on ephemeral / re-seeded envs (alpha/dev), never the prod
-    /// upgrade path. Default off → byte-identical to start() + wait_for_ready().
-    /// Only used when --embedded-conductor is set.
-    #[arg(
-        long,
-        env = "CONDUCTOR_GENESIS_HEAL_ON_BOOT_FAIL",
-        default_value_t = false
-    )]
-    conductor_genesis_heal_on_boot_fail: bool,
-
     /// Installed app ID for the imagodei DNA (reconcile controller signal subscription).
     /// Defaults to "imagodei". The controller subscribes to this app's signals to
     /// project key-rotation, revocation, and agent-peer-binding events into SQLite.
@@ -645,21 +631,64 @@ async fn async_main(
             4444, // admin port — must match conductor config
         );
 
-        // Start conductor as child process + wait for readiness. With
-        // CONDUCTOR_GENESIS_HEAL_ON_BOOT_FAIL set (alpha/dev only — it RE-KEYS), a
-        // startup crash on a genesis-less cell (CellWithoutGenesis) clears the
-        // conductor data dir once and retries, since the post-ready self-heal can
-        // never reach a child that dies during its own startup. Default off =
-        // plain start() + wait_for_ready().
-        let admin_ws = manager
-            .start_with_genesis_heal(
-                args.conductor_max_retries,
-                args.conductor_genesis_heal_on_boot_fail,
-            )
-            .await?;
-
-        // Install/validate hApp
-        happ_manager::ensure_happ_installed(&admin_ws, &args.happ_path, &args.app_id).await?;
+        // Bring the conductor up + reconcile its installed DNA to the assigned
+        // bundle — the node DRIVING ITS OWN genesis repair (P1 reconciliation
+        // controller for the conductor's DNA lifecycle), not an operator kubectl-
+        // wiping the pod.
+        //
+        // Failure this heals (alpha CellWithoutGenesis, 2026-06-22): a hApp DNA
+        // fetched by a floating tag drifted under the installed cell, leaving it
+        // genesis-less. The conductor briefly readies, then dies initialising the
+        // dead cell — either BEFORE wait_for_ready connects, OR mid
+        // ensure_happ_installed (the drift-reinstall's uninstall_app loses the race
+        // to the dying conductor). Wrapping BOTH catches either ordering.
+        //
+        // If the node's OWN policy says it is re-seedable (GENESIS_SELF_HEAL_IDENTITY
+        // — not an operator flag), clear the conductor data dir ONCE and re-run: a
+        // clean boot has no cell → install_fresh → genesis against the assigned
+        // bundle. RE-KEYS (the lair keystore lives under the data dir), hence gated
+        // to the re-seedable policy; a lineage-bearing node must migrate, not wipe.
+        // Same primitive a human steward will drive from a peer-menu "Repair" button.
+        let reseedable = config.genesis_self_heal_identity;
+        let mut genesis_healed = false;
+        let admin_ws = loop {
+            manager.start()?;
+            let outcome: anyhow::Result<holochain_client::AdminWebsocket> =
+                match manager.wait_for_ready(args.conductor_max_retries).await {
+                    Ok(ws) => happ_manager::ensure_happ_installed(
+                        &ws,
+                        &args.happ_path,
+                        &args.app_id,
+                    )
+                    .await
+                    .map(|()| ws),
+                    Err(e) => Err(anyhow::Error::from(e)),
+                };
+            match outcome {
+                Ok(ws) => break ws,
+                Err(e) => {
+                    // Repair ONLY a genuine conductor death (child exited), ONLY when
+                    // the node's policy says it is re-seedable, and ONLY once. A
+                    // still-running conductor that merely failed the install is left
+                    // alone — clearing its data dir would be a destructive false
+                    // positive.
+                    if reseedable && !genesis_healed && !manager.is_running() {
+                        warn!(
+                            error = %e,
+                            data_dir = %args.conductor_data_dir.display(),
+                            "Conductor died during boot/install on a re-seedable node \
+                             (likely a genesis-less / DNA-drifted cell) — clearing the \
+                             conductor data dir and re-genesising once (peer-driven self-repair)."
+                        );
+                        let _ = manager.stop().await; // best-effort; child likely already dead
+                        ConductorManager::clear_conductor_state(&args.conductor_data_dir)?;
+                        genesis_healed = true;
+                        continue;
+                    }
+                    return Err(e);
+                }
+            }
+        };
 
         info!("Embedded conductor ready, hApp installed");
 
