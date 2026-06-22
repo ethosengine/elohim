@@ -79,24 +79,4 @@ export class ContributorsPage extends BasePage {
       .then(() => true)
       .catch(() => false);
   }
-
-  /**
-   * Return the accessible names of all contributor cards currently rendered,
-   * stripped of the "Contributor: " prefix.
-   */
-  async getContributorNames(): Promise<string[]> {
-    const cards = this.testId(CONTRIBUTORS.LIST).locator(
-      `[data-testid^="${CONTRIBUTORS.CARD_PREFIX}"]`
-    );
-    const count = await cards.count();
-    const names: string[] = [];
-    for (let i = 0; i < count; i++) {
-      const label = await cards.nth(i).getAttribute('aria-label');
-      if (label) {
-        // Cards carry aria-label via the shadow article; if the host has it too, strip prefix.
-        names.push(label.replace(/^Contributor:\s*/u, '').trim());
-      }
-    }
-    return names;
-  }
 }

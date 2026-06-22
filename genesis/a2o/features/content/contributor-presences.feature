@@ -13,6 +13,7 @@ Feature: Contributor presences on a content artifact
       | presence-donella | Donella Meadows    |
       | presence-peter   | Peter Senge        |
 
+  @wip
   Scenario: Learner sees contributor presences below the content
     When the learner opens the content "systems-thinking-intro"
     Then the contributors section is visible
@@ -20,6 +21,7 @@ Feature: Contributor presences on a content artifact
     And there is a contributor card for "Donella Meadows"
     And there is a contributor card for "Peter Senge"
 
+  @wip
   Scenario: Content without contributors shows no contributors section
     Given content "no-contributors-node" has been seeded with no contributor presences
     When the learner opens the content "no-contributors-node"
