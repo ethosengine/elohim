@@ -336,6 +336,15 @@ export class ElohimContributorCard extends CapabilityAwareElement(LitElement) {
   @property({ type: Boolean }) compact = false;
 
   /**
+   * **Navigation note:** when `href` is set the element renders a native `<a>` for the
+   * activation target and `contributor-select` is still emitted on click. However, native
+   * anchor navigation is **not suppressed** — the browser will follow the href. Consumers
+   * doing client-side routing should either (a) listen to `contributor-select` with
+   * `href=null` (button path), or (b) call `event.preventDefault()` in their own
+   * `contributor-select` handler before performing a SPA navigation.
+   */
+
+  /**
    * Optional presence type hint — NOT part of the wire type, supplied by
    * the consumer who has domain context. When omitted (null) the type
    * indicator is hidden.
@@ -424,7 +433,7 @@ export class ElohimContributorCard extends CapabilityAwareElement(LitElement) {
     `;
 
     return html`
-      <article part="container" role="article" aria-label="Contributor: ${p.displayName}">
+      <article part="container" aria-label="Contributor: ${p.displayName}">
         ${this.href
           ? html`
               <a

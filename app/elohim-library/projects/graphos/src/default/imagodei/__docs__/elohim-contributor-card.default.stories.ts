@@ -57,13 +57,17 @@ const PERSON_UNCLAIMED: ContributorPresenceView = {
   dhtAnchorHash: null,
 };
 
+// Tiny inline SVG avatar — self-contained, no external network fetch.
+// The SVG uses %23 (URL-encoded #) so the fragment does not terminate the data URI.
+const AVATAR_DATA_URI =
+  'data:image/svg+xml,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 width%3D%2240%22 height%3D%2240%22%3E%3Ccircle cx%3D%2220%22 cy%3D%2220%22 r%3D%2220%22 fill%3D%22%23607080%22%2F%3E%3Ctext x%3D%2250%25%22 y%3D%2255%25%22 dominant-baseline%3D%22middle%22 text-anchor%3D%22middle%22 fill%3D%22%23fff%22 font-size%3D%2216%22%3EGH%3C%2Ftext%3E%3C%2Fsvg%3E';
+
 const PERSON_CLAIMED: ContributorPresenceView = {
   ...PERSON_UNCLAIMED,
   id: 'sha256-0000000000000000000000000000000000000000000000000000000000000002',
   displayName: 'Grace Hopper',
   presenceState: 'claimed',
-  image:
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Commodore_Grace_M._Hopper%2C_USN_%28covered%29.jpg/220px-Commodore_Grace_M._Hopper%2C_USN_%28covered%29.jpg',
+  image: AVATAR_DATA_URI,
   recognitionScore: 128.0,
   citationCount: 22,
   affinityTotal: 63.0,
@@ -209,29 +213,6 @@ export const UnclaimedOpportunity: Story = {
   },
 };
 
-export const ClaimedWithImage: Story = {
-  name: 'Claimed — with avatar image',
-  decorators: [
-    story => html`
-      <div style="max-inline-size: 22rem;">${story()}</div>
-    `,
-  ],
-  render: () => html`
-    <elohim-contributor-card
-      .presence=${PERSON_CLAIMED}
-      presence-type="person"
-    ></elohim-contributor-card>
-  `,
-  parameters: {
-    docs: {
-      description: {
-        story:
-          'Claimed presence with a real avatar image. The `<img>` renders inside the avatar part; the initials placeholder is hidden.',
-      },
-    },
-  },
-};
-
 export const OrganisationStewarded: Story = {
   name: 'Organisation — stewarded',
   decorators: [
@@ -255,30 +236,3 @@ export const OrganisationStewarded: Story = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// Dark theme canary
-// ---------------------------------------------------------------------------
-
-export const Dark: Story = {
-  name: 'Dark',
-  decorators: [
-    story => html`
-      <div
-        style="background: #111; padding: 1.5rem; color-scheme: dark; color: #f0f0f0; max-inline-size: 22rem;"
-      >
-        ${story()}
-      </div>
-    `,
-  ],
-  render: () => html`
-    <elohim-contributor-card .presence=${PERSON_UNCLAIMED}></elohim-contributor-card>
-  `,
-  parameters: {
-    docs: {
-      description: {
-        story:
-          'Dark theme canary: card on dark background. CSS system colors adapt via `color-scheme: dark`.',
-      },
-    },
-  },
-};
