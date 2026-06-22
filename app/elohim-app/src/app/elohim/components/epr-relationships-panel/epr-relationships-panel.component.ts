@@ -15,13 +15,14 @@ interface RelationshipGroup {
 
 // ── Ordering & labels ─────────────────────────────────────────────────────────
 
-const KNOWN_ORDER = ['PREREQUISITE', 'TEACHES', 'CONTAINS', 'REFERENCES'];
+const KNOWN_ORDER = ['PREREQUISITE', 'TEACHES', 'CONTAINS', 'REFERENCES', 'DERIVED_FROM'];
 
 const GROUP_LABELS: Record<string, string> = {
   PREREQUISITE: 'Prerequisites',
   TEACHES: 'This teaches',
   CONTAINS: 'Contains',
   REFERENCES: 'References',
+  DERIVED_FROM: 'Inspired by',
 };
 
 function groupLabel(type: string): string {

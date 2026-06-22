@@ -98,6 +98,32 @@ describe('EprRelationshipsPanelComponent', () => {
     expect(types).toEqual(['PREREQUISITE', 'TEACHES', 'CONTAINS', 'REFERENCES']);
   });
 
+  // ── DERIVED_FROM label ────────────────────────────────────────────────────
+
+  it('renders DERIVED_FROM with "Inspired by" heading', () => {
+    const rels: EprRelationship[] = [{ type: 'DERIVED_FROM', target: 'origin-concept' }];
+    component.relationships = rels;
+    fixture.detectChanges();
+
+    const group = query(fixture, 'epr-rel-group');
+    expect(group).toBeTruthy();
+    const heading = group!.querySelector('h3');
+    expect(heading?.textContent?.trim()).toBe('Inspired by');
+  });
+
+  it('orders DERIVED_FROM after REFERENCES', () => {
+    const rels: EprRelationship[] = [
+      { type: 'DERIVED_FROM', target: 'origin-1' },
+      { type: 'REFERENCES', target: 'ref-1' },
+    ];
+    component.relationships = rels;
+    fixture.detectChanges();
+
+    const groups = queryAll(fixture, 'epr-rel-group');
+    const types = Array.from(groups).map((g) => g.getAttribute('data-type'));
+    expect(types).toEqual(['REFERENCES', 'DERIVED_FROM']);
+  });
+
   // ── Unknown types trail ────────────────────────────────────────────────────
 
   it('renders unknown types trailing after known types', () => {
