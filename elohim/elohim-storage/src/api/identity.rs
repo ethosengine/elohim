@@ -60,6 +60,12 @@ pub async fn handle(
         {
             return get_agent_upgrade_prompts(agent_id, pool, ctx).await;
         }
+        if let Some(subject_id) = resource_path
+            .strip_suffix("/profile")
+            .and_then(|p| p.strip_prefix('/'))
+        {
+            return get_profile_lens(&req, subject_id, pool, ctx).await;
+        }
     }
 
     match (method, resource_path) {
@@ -277,6 +283,49 @@ async fn get_agent_upgrade_prompts(
     let view =
         upgrade_prompt_view::project_upgrade_prompt_view(&mut conn, agent_id, h_app_id, &session)?;
     Ok(response::ok(&view))
+}
+
+/// GET /api/v1/identity/{id}/profile
+///
+/// The viewer-relative disclosure lens: returns the facets of subject `{id}`
+/// that the **authenticated session viewer** may see (spec §3 / §5). The viewer
+/// is resolved from the session identity (`X-Agent-Id` → the viewer's `Human`
+/// row); there is NEVER a `?viewer=` query param (a raw-identity spoof surface).
+/// An anonymous caller (no session) resolves to the commons tier.
+///
+/// Not `auth_required` — anonymous must reach it (→ commons face). The handler
+/// resolves the viewer optionally; `None` means anon.
+///
+/// `{id}` is the subject's human `id`. The viewer is joined to the subject on
+/// the SAME human-`id` namespace inside the consent read (NOT an agent pubkey —
+/// feeding a pubkey into the id-keyed consent read would empty the join and
+/// silently collapse every viewer to the commons floor).
+async fn get_profile_lens(
+    req: &Request<Incoming>,
+    subject_id: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+
+    // Resolve the viewer's session agent key, then to the viewer's human id.
+    // Anonymous (no header, no session) → viewer_id = None → commons floor.
+    let viewer_human_id: Option<String> = match extract_agent_key(req, &mut conn)? {
+        Some(agent_key) => humans::get_human_by_agent_key(&mut conn, &agent_key)?.map(|h| h.id),
+        None => None,
+    };
+
+    let view = crate::services::viewer_lens_facing::build_profile_lens_view(
+        &mut conn,
+        ctx,
+        subject_id,
+        viewer_human_id.as_deref(),
+    )?;
+
+    Ok(response::from_option(
+        Ok(view),
+        &format!("No human record found for subject {}", subject_id),
+    ))
 }
 
 // ---------------------------------------------------------------------------

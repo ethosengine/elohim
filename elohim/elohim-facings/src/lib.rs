@@ -22,6 +22,11 @@
 pub mod fold;
 pub mod folds;
 pub mod relation;
+/// The viewer-relative disclosure lens (`relationship_class × intimacy`). A
+/// top-level module rather than a `folds/<facing>.rs` sibling because it is not
+/// a holder-relation fold — it folds a (viewer, subject) edge + labeled facets,
+/// not the materialized resiliency relation. Pure/DB-free all the same.
+pub mod viewer_lens;
 
 #[cfg(test)]
 mod boundary_tests {

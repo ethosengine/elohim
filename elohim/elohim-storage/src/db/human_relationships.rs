@@ -229,6 +229,63 @@ pub fn get_relationship_between(
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }
 
+/// Get the **consent-complete** relationship(s) between two humans — the C1 fix.
+///
+/// The viewer-lens (`services::viewer_lens_facing`) consumes THIS read, NEVER the
+/// raw consent-blind [`get_relationship_between`]. It generalizes the
+/// [`get_trusted_contacts`] both-consents predicate from custody to the general
+/// disclosure gate: a row is returned **only if `consent_given_by_a == 1 AND
+/// consent_given_by_b == 1`** (mutual consent), and — for `is_bidirectional`
+/// rows — only if `is_bidirectional == 1` as well.
+///
+/// This closes the concrete intimate-facet leak (spec §3 C1 / Adversarial review):
+/// a unilaterally-inserted, half-consented row (`consent_given_by_a=1,
+/// consent_given_by_b=0`) is **invisible** to this read, so it can NEVER route a
+/// viewer into any corridor above the commons/recognition floor. A caller cannot
+/// self-elevate by inserting a half-consented edge naming a victim.
+///
+/// Direction-insensitive on the party pair, exactly like
+/// [`get_relationship_between`] (the lens does not care which party authored the
+/// edge — only that BOTH consented).
+///
+/// On `is_bidirectional`: the load-bearing C1 gate is the **mutual-consent**
+/// pair above. The row's `is_bidirectional` flag is not a *type* discriminator
+/// (there is no separate "this type must be bidirectional" column), so it is NOT
+/// used as a hard filter here — doing so would hide a perfectly both-consented
+/// directional edge (e.g. a one-way mentor edge with both consents), which the
+/// adapter legitimately needs. The discriminating safety property is that a
+/// half-consented row is invisible; that is enforced by the two consent filters.
+pub fn get_consented_relationship_between(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    party_a_id: &str,
+    party_b_id: &str,
+    relationship_type: Option<&str>,
+) -> Result<Vec<HumanRelationship>, StorageError> {
+    let mut base_query = human_relationships::table
+        .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
+        .filter(
+            (human_relationships::party_a_id
+                .eq(party_a_id)
+                .and(human_relationships::party_b_id.eq(party_b_id)))
+            .or(human_relationships::party_a_id
+                .eq(party_b_id)
+                .and(human_relationships::party_b_id.eq(party_a_id))),
+        )
+        // The load-bearing C1 filter: BOTH parties must have consented.
+        .filter(human_relationships::consent_given_by_a.eq(1))
+        .filter(human_relationships::consent_given_by_b.eq(1))
+        .into_boxed();
+
+    if let Some(rel_type) = relationship_type {
+        base_query = base_query.filter(human_relationships::relationship_type.eq(rel_type));
+    }
+
+    base_query
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
 /// Get trusted contacts (custody-enabled relationships)
 pub fn get_trusted_contacts(
     conn: &mut SqliteConnection,
@@ -666,6 +723,107 @@ mod tests {
             },
         )
         .expect("test insert failed");
+    }
+
+    /// Insert a relationship with explicit consent flags + intimacy + type.
+    /// (The plain [`insert_relationship`] hardcodes both-consents-false.)
+    fn insert_relationship_with_consent(
+        conn: &mut SqliteConnection,
+        ctx: &AppContext,
+        party_a: &str,
+        party_b: &str,
+        rel_type: &str,
+        intimacy: &str,
+        consent_a: bool,
+        consent_b: bool,
+    ) {
+        create_human_relationship(
+            conn,
+            ctx,
+            CreateHumanRelationshipInput {
+                id: None,
+                party_a_id: party_a.to_string(),
+                party_b_id: party_b.to_string(),
+                relationship_type: rel_type.to_string(),
+                intimacy_level: intimacy.to_string(),
+                is_bidirectional: true,
+                consent_given_by_a: consent_a,
+                consent_given_by_b: consent_b,
+                initiated_by: party_a.to_string(),
+                governance_layer: None,
+                reach: "private".to_string(),
+                context_json: None,
+                expires_at: None,
+            },
+        )
+        .expect("test insert failed");
+    }
+
+    // -----------------------------------------------------------------------
+    // C1 fix — get_consented_relationship_between
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn consented_read_returns_a_both_consented_edge() {
+        let mut conn = setup_test_db();
+        let ctx = test_ctx();
+        // Both parties consented to an intimate family edge.
+        insert_relationship_with_consent(
+            &mut conn, &ctx, "victim", "kin", "sibling", "intimate", true, true,
+        );
+
+        let rows = get_consented_relationship_between(&mut conn, &ctx, "victim", "kin", None)
+            .expect("query should not error");
+        assert_eq!(
+            rows.len(),
+            1,
+            "a both-consented edge IS visible to the lens"
+        );
+        assert_eq!(rows[0].relationship_type, "sibling");
+        assert_eq!(rows[0].intimacy_level, "intimate");
+    }
+
+    #[test]
+    fn consented_read_hides_a_half_consented_edge() {
+        // The C1 leak shape: Mallory inserts a half-consented family-intimate
+        // edge naming the victim (consent_by_a=1, consent_by_b=0). The
+        // consent-filtered read MUST NOT return it — Mallory cannot self-elevate.
+        let mut conn = setup_test_db();
+        let ctx = test_ctx();
+        insert_relationship_with_consent(
+            &mut conn, &ctx, "mallory", "victim", "sibling", "intimate", true, false,
+        );
+
+        // The raw consent-blind read DOES return it (the bug being fixed)...
+        let raw = get_relationship_between(&mut conn, &ctx, "mallory", "victim", None)
+            .expect("raw query should not error");
+        assert_eq!(raw.len(), 1, "raw read is consent-blind (the leak)");
+
+        // ...but the consent-filtered read the lens consumes does NOT.
+        let consented =
+            get_consented_relationship_between(&mut conn, &ctx, "mallory", "victim", None)
+                .expect("query should not error");
+        assert!(
+            consented.is_empty(),
+            "a half-consented edge is INVISIBLE to the consent-filtered read (C1 fix)"
+        );
+    }
+
+    #[test]
+    fn consented_read_is_direction_insensitive() {
+        let mut conn = setup_test_db();
+        let ctx = test_ctx();
+        insert_relationship_with_consent(
+            &mut conn, &ctx, "adam", "eve", "spouse", "intimate", true, true,
+        );
+
+        // Either ordering of the pair finds the both-consented edge.
+        let forward = get_consented_relationship_between(&mut conn, &ctx, "adam", "eve", None)
+            .expect("query");
+        let reverse = get_consented_relationship_between(&mut conn, &ctx, "eve", "adam", None)
+            .expect("query");
+        assert_eq!(forward.len(), 1);
+        assert_eq!(reverse.len(), 1);
     }
 
     #[test]

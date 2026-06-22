@@ -11199,6 +11199,25 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/identity/{id}/profile — viewer-relative disclosure lens.
+        //
+        // The per-viewer profile lens (spec 2026-06-22 imagodei-profile-page-
+        // viewer-lens-design §3/§5). Viewer = authenticated session (resolved
+        // server-side from X-Agent-Id), NEVER a ?viewer= param. Deliberately NOT
+        // auth_required: an anonymous caller must reach it and resolve to the
+        // commons tier (the public/commons face). Dispatch lives in
+        // api/identity.rs (`/{subjectId}/profile` strip-suffix arm). This entry
+        // is the route-shadow guard (storage has no is_service_path, so the
+        // manifest path-coverage test IS the shadow guard).
+        // cache_ttl(0): viewer-relative — never shared-cached across viewers.
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/identity/{id}/profile")
+                .handler("get_profile_lens")
+                .cache_ttl(0)
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/agreements — REA agreements
         // =====================================================================
         .route(
