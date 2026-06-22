@@ -301,6 +301,44 @@ pub struct ContributorRecognitionView {
     pub events: Vec<EconomicEventView>,
 }
 
+/// One (action, summed-value) entry in a contributor-reflexive recognition rollup.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RecognitionByAction {
+    pub action: String,
+    pub value: f64,
+}
+
+/// The contributor-reflexive facing — "how the network sees a contributor". Assembles the
+/// engagement-accrued scalars (off the presence row) with the network-routed recognition folded
+/// from `economic_events` and the steward-role rollup from active `stewardship_allocations`.
+/// Operational Category C (read projection; no DHT entry). Spec: Wave 2 of
+/// 2026-06-21-contributor-presence-bootstrap-whoswho-design.md.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ContributorReflexiveView {
+    pub presence_id: String,
+    pub display_name: String,
+    pub presence_state: String,
+    // Engagement-accrued scalars — assembled straight off the presence row (NOT re-folded).
+    pub recognition_score: f64,
+    pub citation_count: i32,
+    pub affinity_total: f64,
+    pub unique_engagers: i32,
+    // Network-routed recognition — folded from this presence's economic_events.
+    pub total_recognition_value: f64,
+    pub recognition_by_action: Vec<RecognitionByAction>,
+    pub distinct_content_recognized: i32,
+    /// PARTIAL: only commons flows attributed to this presence's events (settlements carry
+    /// no contributor_presence_id). Full commons accounting is a separate query (deferred).
+    pub commons_flow_value: f64,
+    // Steward role — folded from this presence's active stewardship_allocations.
+    pub steward_allocation_count: i32,
+    pub steward_recognition_accumulated: f64,
+}
+
 /// Input for recording a curation activity
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]

@@ -1,0 +1,73 @@
+{
+  "$id": "contributor-reflexive-view.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContributorReflexiveView",
+  "description": "The contributor-reflexive facing — 'how the network sees a contributor'. Assembles engagement-accrued scalars (off the ContributorPresence row) with network-routed recognition folded from economic_events and the steward-role rollup from active stewardship_allocations. Operational Category C — read projection, no DHT entry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "presenceId",
+    "displayName",
+    "presenceState",
+    "recognitionScore",
+    "citationCount",
+    "affinityTotal",
+    "uniqueEngagers",
+    "totalRecognitionValue",
+    "recognitionByAction",
+    "distinctContentRecognized",
+    "commonsFlowValue",
+    "stewardAllocationCount",
+    "stewardRecognitionAccumulated"
+  ],
+  "properties": {
+    "presenceId": { "type": "string", "description": "The ContributorPresence slug id." },
+    "displayName": { "type": "string" },
+    "presenceState": {
+      "type": "string",
+      "description": "Claim lifecycle: unclaimed / stewarded / claimed (storage also: claiming)."
+    },
+    "recognitionScore": {
+      "type": "number",
+      "description": "Engagement-accrued recognition score — assembled off the presence row, not re-folded."
+    },
+    "citationCount": { "type": "integer", "minimum": 0 },
+    "affinityTotal": { "type": "number" },
+    "uniqueEngagers": { "type": "integer", "minimum": 0 },
+    "totalRecognitionValue": {
+      "type": "number",
+      "description": "Sum of resource_quantity_value across the presence's economic_events (network-routed recognition)."
+    },
+    "recognitionByAction": {
+      "type": "array",
+      "description": "Recognition value bucketed by REA action, summed per action (deterministic order).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "value"],
+        "properties": {
+          "action": { "type": "string" },
+          "value": { "type": "number" }
+        }
+      }
+    },
+    "distinctContentRecognized": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of distinct content nodes that routed recognition to this contributor."
+    },
+    "commonsFlowValue": {
+      "type": "number",
+      "description": "Recognition value visibly routed via the commons (receiver == 'commons-pool'). PARTIAL — settlements carry no contributor_presence_id; full commons accounting is a separate query."
+    },
+    "stewardAllocationCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of active stewardship allocations this presence holds."
+    },
+    "stewardRecognitionAccumulated": {
+      "type": "number",
+      "description": "Sum of recognition_accumulated across this presence's active stewardship allocations."
+    }
+  }
+}

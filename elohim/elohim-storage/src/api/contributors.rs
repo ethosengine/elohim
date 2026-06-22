@@ -42,7 +42,7 @@ pub async fn handle(
     method: Method,
     resource_path: &str,
     pool: &DbPool,
-    _ctx: &AppContext,
+    ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let (path_only, _query) = resource_path.split_once('?').unwrap_or((resource_path, ""));
     let _query_str = req.uri().query().unwrap_or("");
@@ -97,9 +97,43 @@ pub async fn handle(
             Ok(response::ok(&view))
         }
 
+        // GET /api/v1/contributors/{id}/reflexive — reflexive facing ("how the network sees me")
+        (&Method::GET, p) if p.ends_with("/reflexive") => {
+            let id_part = p.strip_suffix("/reflexive").unwrap_or("");
+            let id = extract_id(id_part)
+                .ok_or_else(|| StorageError::InvalidInput("Contributor ID required".to_string()))?;
+            let mut conn = get_conn(pool)?;
+            let view = crate::services::contributor_reflexive_facing::build_contributor_reflexive_view(
+                &mut conn, ctx, id,
+            );
+            Ok(response::from_option(
+                Ok(view),
+                &format!("Reflexive view for {} not found", id),
+            ))
+        }
+
         _ => Ok(response::not_found(&format!(
             "Unknown contributors route: {} {}",
             method, resource_path
         ))),
+    }
+}
+
+#[cfg(test)]
+mod routing_tests {
+    // Route-shadow guard (the /auth/portal incident class): the contributor suffix arms
+    // (/dashboard, /impact, /recognition, /reflexive) are mutually exclusive — /reflexive
+    // must not be caught by a sibling arm. These are `ends_with` arms, so the risk is a
+    // broader sibling suffix swallowing /reflexive; assert none does.
+    #[test]
+    fn reflexive_suffix_not_shadowed_by_siblings() {
+        let p = "/presence-timothy-snyder/reflexive";
+        assert!(p.ends_with("/reflexive"));
+        for sib in ["/dashboard", "/impact", "/recognition"] {
+            assert!(
+                !p.ends_with(sib),
+                "sibling arm {sib} must not shadow the /reflexive arm"
+            );
+        }
     }
 }
