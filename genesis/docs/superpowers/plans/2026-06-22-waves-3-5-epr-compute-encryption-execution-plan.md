@@ -143,6 +143,11 @@ All in-scope implementation committed on `feat/frontend-eyes-sprint` (commit-onl
 
 61 storage/facings tests pass (0 failed), gates independently re-run by the verifiers. `p2p/mod.rs:1492` landmine untouched throughout; no new DHT entry type.
 
+**Post-merge coherence (advisor-prompted final pass):**
+- `6050f76e2` refreshes the 5 distributed `weave-view.ts` to the committed `c6805597d` schema (codegen wasn't run then under disk pressure — left stale). `schema:codegen:ts --verify` green; the committed tree is now self-coherent for a clean CI checkout.
+- The gitignored barrel-source (`generated-ts/views/`) + seeder (`seeder/src/generated/`) `mishpat-commitment-view.ts` are intentionally **not** committed: the barrel `generated-ts/index.ts` is imported nowhere (dangling re-export is inert; codegen regenerates locally), and the current convention does not force-add recent view modules there.
+- Wave 3.3 lights in **production**: `graph-native` is a default feature (`default = ["p2p", "graph-native"]`) and the deployed build passes no `--no-default-features`, so `query_direct_relationships` compiles and the enrich=true path populates `relationships` on the live P2P resolve — not test-only.
+
 ## Held / operator-owned (surfaced, not attempted)
 - **Live encryption substrate** (X25519 reader-key resolver; `KeyEnvelope` entry; `ShardManifest` field-add) — security-owned.
 - **Cross-doorway mutual-compute observation** + **live EPR 302-inversion a2o render** + **`pnpm look` the `/api/v1/.../facing/rea` route** — alpha degraded → operator (prove on next genesis build once alpha healthy).
