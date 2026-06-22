@@ -51,6 +51,10 @@ pub struct ContributorPresenceQuery {
     pub min_affinity: Option<f32>,
     /// Search by display name
     pub search: Option<String>,
+    /// Filter to presences ESTABLISHED VIA this content id (the content→presences reverse
+    /// edge: "who inspired/contributed to this content"). Routes the list query through
+    /// `get_presences_for_content`. URL param: `?establishingContent={contentId}`.
+    pub establishing_content: Option<String>,
     #[serde(default = "default_limit")]
     pub limit: i64,
     #[serde(default)]

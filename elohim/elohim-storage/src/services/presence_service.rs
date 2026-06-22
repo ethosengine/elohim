@@ -25,6 +25,11 @@ impl PresenceService {
         ctx: &AppContext,
         query: &ContributorPresenceQuery,
     ) -> Result<Vec<ContributorPresence>, StorageError> {
+        // Content-scoped read ("who inspired/contributed to this content") routes through the
+        // reverse-edge query rather than the generic list — Sprint 1, presences-on-EPR.
+        if let Some(content_id) = query.establishing_content.as_deref() {
+            return contributor_presences::get_presences_for_content(conn, ctx, content_id);
+        }
         contributor_presences::list_contributor_presences(conn, ctx, query)
     }
 
