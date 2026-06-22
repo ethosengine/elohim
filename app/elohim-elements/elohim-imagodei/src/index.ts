@@ -48,3 +48,6 @@ export type { ClaimRef, RequestingClient } from './elohim-imagodei-consent-card.
 
 export { ElohimImagodeiOauthCallback } from './elohim-imagodei-oauth-callback.js';
 export type { ExchangeOutcome, ExchangeCodeFn } from './elohim-imagodei-oauth-callback.js';
+
+export { ElohimContributorCard, presenceStateBadge } from './elohim-imagodei-contributor-card.js';
+export type { ContributorPresenceState } from './elohim-imagodei-contributor-card.js';

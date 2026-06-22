@@ -70,3 +70,9 @@ import { ElohimImagodeiOauthCallback } from './elohim-imagodei-oauth-callback.js
 if (!customElements.get('elohim-imagodei-oauth-callback')) {
   customElements.define('elohim-imagodei-oauth-callback', ElohimImagodeiOauthCallback);
 }
+
+import { ElohimContributorCard } from './elohim-imagodei-contributor-card.js';
+
+if (!customElements.get('elohim-contributor-card')) {
+  customElements.define('elohim-contributor-card', ElohimContributorCard);
+}
