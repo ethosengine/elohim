@@ -61,7 +61,13 @@ type LoadingState = 'loading' | 'ready' | 'error';
     <div class="landing">
       <!-- Header -->
       <header class="landing-header">
-        <img src="/threshold/images/elohim_logo_light.png" alt="Elohim" class="logo" />
+        <img
+          src="/threshold/images/doorway.jpg"
+          alt="A figure stepping through a doorway into the cosmos — the threshold into the Elohim Protocol"
+          class="hero"
+          width="768"
+          height="515"
+        />
         <div class="header-text">
           <h1>{{ doorwayName() }}</h1>
           @if (status()) {
