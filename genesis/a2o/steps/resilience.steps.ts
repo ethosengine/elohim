@@ -810,22 +810,19 @@ Then(
  * be at least 24x24 CSS px (it was a 7x14px glyph with zero padding). The
  * bounding box includes padding, so the padded button is what's measured.
  */
-Then(
-  'the omni resilience icon meets the minimum tap target size',
-  async function (this: E2EWorld) {
-    const device = findPwDevice(this);
-    if (!device) {
-      assert.fail(NO_PW_DEVICE);
-    }
-    const box = await omniResilienceIcon(device).boundingBox();
-    assert.ok(box, 'Expected the resilience icon to have a bounding box');
-    assert.ok(
-      box.width >= 24 && box.height >= 24,
-      `Resilience icon tap target is ${box.width}x${box.height}px — below the ` +
-        `WCAG 2.5.8 minimum of 24x24. Pad the trigger button's hit area.`
-    );
+Then('the omni resilience icon meets the minimum tap target size', async function (this: E2EWorld) {
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
   }
-);
+  const box = await omniResilienceIcon(device).boundingBox();
+  assert.ok(box, 'Expected the resilience icon to have a bounding box');
+  assert.ok(
+    box.width >= 24 && box.height >= 24,
+    `Resilience icon tap target is ${box.width}x${box.height}px — below the ` +
+      `WCAG 2.5.8 minimum of 24x24. Pad the trigger button's hit area.`
+  );
+});
 
 /**
  * Click the omni resilience icon — folds down the hypercard panel (the L2
@@ -1278,20 +1275,19 @@ Given(
  * Example:
  *   And the operator seed-shard-manifest lever is enabled
  */
-Given(
-  'the operator seed-shard-manifest lever is enabled',
-  async function (this: E2EWorld): Promise<string | undefined> {
-    // Probe the endpoint with an intentionally-empty body: a 400 means the lever
-    // is ON (it got past the gate to validation); a 403 means it's OFF.
-    const { statusCode } = await storagePut('/admin/seed/shard-manifest', {});
-    if (statusCode === 403) {
-      // Lever disabled — skip rather than fail. Set ALLOW_SEED_SHARD_MANIFEST=1
-      // on the storage process to exercise this scenario.
-      return 'pending';
-    }
-    return undefined;
+Given('the operator seed-shard-manifest lever is enabled', async function (this: E2EWorld): Promise<
+  string | undefined
+> {
+  // Probe the endpoint with an intentionally-empty body: a 400 means the lever
+  // is ON (it got past the gate to validation); a 403 means it's OFF.
+  const { statusCode } = await storagePut('/admin/seed/shard-manifest', {});
+  if (statusCode === 403) {
+    // Lever disabled — skip rather than fail. Set ALLOW_SEED_SHARD_MANIFEST=1
+    // on the storage process to exercise this scenario.
+    return 'pending';
   }
-);
+  return undefined;
+});
 
 /**
  * Drive the deterministic lever: discover N real households (from /db/humans),
@@ -1338,11 +1334,7 @@ When(
       statusCode < 300,
       `seed shard-manifest failed: ${statusCode} ${JSON.stringify(json)}`
     );
-    assert.equal(
-      json['seeded'],
-      true,
-      `expected a seeded report; got ${JSON.stringify(json)}`
-    );
+    assert.equal(json['seeded'], true, `expected a seeded report; got ${JSON.stringify(json)}`);
     return undefined;
   }
 );
