@@ -412,6 +412,29 @@ cmd_delivery() {
   echo "═══════════════════════════════════════════════════════════"
   [ -n "$after" ] || { fail "delivery.preflight" "no build-start timestamp (upload stage skipped?)"; finish delivery; return; }
 
+  # Synthetic post-propagation heal (genesis #1182 Cluster F). The build-unique
+  # probe blob is on disk on the source after propagation, but a serve-blob
+  # EconomicEvent is emitted ONLY when a peer actually FETCHES it (blob_fetch's
+  # atomic pair). Propagation can pass via a local-hit GET that emits nothing —
+  # so a 0-event read may be incidental, not a regression (the build-window Loki
+  # trace was inconclusive/aged-out). Force the proof: GET the probe blob from
+  # each peer (a real heal-on-read GET via http_status_only, never HEAD) — a peer
+  # that lacks it fetches cross-pod and the SERVING peer emits the serve-blob
+  # event NOW, inside the after= window. This makes the assertion PROVE the
+  # emission leg instead of depending on incidental traffic.
+  local probe="${PROBE_BLOB_HASH:-}"
+  if [ -n "$probe" ]; then
+    echo "   synthetic heal: GET probe blob $probe from each peer to force a serve-blob emit"
+    for entry in $(peers); do
+      split_peer "$entry"
+      note "$PEER_NAME: heal GET /blob/$probe → $(http_status_only "$PEER_URL/blob/$probe")"
+    done
+    # heal-on-read + the atomic event write need a moment to project.
+    sleep "${DELIVERY_HEAL_SETTLE_SECS:-12}"
+  else
+    warn "delivery.probe" "PROBE_BLOB_HASH unset — cannot force a synthetic heal; counting incidental events only"
+  fi
+
   for entry in $(peers); do
     split_peer "$entry"
     local count body
@@ -429,7 +452,7 @@ cmd_delivery() {
   if [ "$total" -ge "$min_events" ]; then
     pass "delivery.serve-blob-events" "$total serve-blob event(s) across peers — transfers leave an REA delivery trail"
   else
-    fail "delivery.serve-blob-events" "0 serve-blob events since $after — either no transfer happened (see propagation) or the event-emission leg (blob_fetch atomic pair) regressed"
+    fail "delivery.serve-blob-events" "0 serve-blob events since $after${probe:+ despite a forced synthetic heal of $probe} — the event-emission leg (blob_fetch atomic pair) regressed${probe:+ (a real fetch was forced, so 'no transfer happened' is ruled out)}"
   fi
 
   finish delivery "$(jq -cn --argjson p "$per_peer" --arg a "$after" '{perPeer:$p, after:$a}')"
