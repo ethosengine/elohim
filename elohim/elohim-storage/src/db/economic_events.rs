@@ -861,4 +861,82 @@ mod tests {
 
         assert_eq!(got, None);
     }
+
+    /// Robustness guard / DOCUMENTED NEGATIVE RESULT.
+    ///
+    /// Investigation of the live bare-`GET /api/v1/economic-events` HTTP 500
+    /// (filtered queries returned 200 `[]`) hypothesised that one row in the
+    /// `economic_events` projection failed diesel deserialization in the
+    /// unfiltered `.load::<EconomicEvent>()` at line 203. This test probes the
+    /// strongest candidate shapes and proves the `.load()` path is NOT the
+    /// cause: diesel 2.3.5's SQLite decoder coerces every storage class on read,
+    /// so no single-column value can break decode for this table's column types.
+    ///
+    /// Shapes probed (all decode cleanly — `list_economic_events` returns `Ok`):
+    ///   - invalid-UTF-8 BLOB (`x'ff'`) in the TEXT-affinity `note` column.
+    ///     diesel `SqliteValue::parse_string` reads via `sqlite3_value_text`
+    ///     (which coerces) then `str::from_utf8_unchecked` (which does NOT
+    ///     validate) — so a TEXT column NEVER yields a clean decode error.
+    ///   - non-numeric TEXT (`'not-a-number'`) in the REAL-affinity
+    ///     `resource_quantity_value`: SQLite coerces it to `0.0` on read.
+    ///
+    /// Not probed (not constructible): NULL in a NOT NULL column — SQLite
+    /// rejects it at insert; and the model is fully `Option<T>` for every
+    /// nullable column, so NULL-into-non-Option cannot occur. The deployed
+    /// alpha binary's `EconomicEvent` struct is byte-identical to this one
+    /// (commit `72a62343`), so the 500 is NOT a row-decode failure here.
+    #[test]
+    fn list_load_path_decodes_every_constructible_row_shape() {
+        let mut conn = test_conn();
+        let ctx = test_ctx();
+
+        // A clean row that the bare list is expected to surface.
+        let good = CreateEconomicEventInput {
+            id: Some("good-row".to_string()),
+            ..minimal_input()
+        };
+        record_event(&mut conn, &ctx, good).expect("record clean row");
+
+        // Shape 1: invalid-UTF-8 BLOB in a TEXT-affinity column.
+        diesel::sql_query(
+            "INSERT INTO economic_events \
+             (id, h_app_id, action, provider, receiver, \
+              note, has_point_in_time, state, created_at) \
+             VALUES \
+             ('blob-note-row', 'test-app', 'use', 'p', 'r', \
+              x'ff', '2026-06-22T00:00:00Z', 'recorded', '2026-06-22T00:00:00Z')",
+        )
+        .execute(&mut conn)
+        .expect("raw insert of invalid-utf-8 BLOB row");
+
+        // Shape 2: non-numeric TEXT in a REAL-affinity column.
+        diesel::sql_query(
+            "INSERT INTO economic_events \
+             (id, h_app_id, action, provider, receiver, \
+              resource_quantity_value, has_point_in_time, state, created_at) \
+             VALUES \
+             ('text-qty-row', 'test-app', 'use', 'p', 'r', \
+              'not-a-number', '2026-06-22T00:00:00Z', 'recorded', '2026-06-22T00:00:00Z')",
+        )
+        .execute(&mut conn)
+        .expect("raw insert of non-numeric-in-REAL row");
+
+        let query = EconomicEventQuery {
+            limit: 100,
+            ..Default::default()
+        };
+
+        // The db-layer load tolerates both malformed shapes (diesel coerces).
+        let result = list_economic_events(&mut conn, &ctx, &query);
+        assert!(
+            result.is_ok(),
+            "the .load() path must decode every constructible row shape; got {:?}",
+            result.err()
+        );
+        let events = result.unwrap();
+        assert!(
+            events.iter().any(|e| e.id == "good-row"),
+            "clean row must survive alongside the malformed sibling rows"
+        );
+    }
 }

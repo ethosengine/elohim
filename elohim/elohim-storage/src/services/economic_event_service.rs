@@ -654,6 +654,99 @@ fn generate_settlement_id(
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
+mod list_events_conversion_tests {
+    use super::*;
+    use crate::db::economic_events::record_event;
+    use diesel::connection::SimpleConnection;
+    use diesel::prelude::*;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    fn test_conn() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory SQLite");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    /// The route path runs `EconomicEventService::list_events`, which is
+    /// `list_economic_events` (db load) **plus** `.map(EconomicEventView::from)`
+    /// (the wire-shape conversion). The `From` impl parses `metadata_json` and
+    /// `resource_classified_as_json` from String to JSON. This test exercises the
+    /// CONVERSION layer (not just the db load) with a row whose `metadata_json`
+    /// holds malformed JSON, proving the conversion is tolerant — it returns
+    /// `metadata: None` rather than panicking or erroring. Guards against a future
+    /// regression that swaps `parse_json_opt` for a non-tolerant `unwrap`/`expect`,
+    /// which would 500 the whole bare list on a single bad-JSON row.
+    #[test]
+    fn list_events_tolerates_malformed_metadata_json() {
+        let mut conn = test_conn();
+        let ctx = AppContext::new("test-app");
+
+        // Typed insert of a row carrying malformed JSON in metadata_json — a String
+        // column, so this is a perfectly valid persisted value.
+        let input = CreateEconomicEventInput {
+            id: Some("bad-json-row".to_string()),
+            action: "use".to_string(),
+            provider: "p".to_string(),
+            receiver: "r".to_string(),
+            resource_conforms_to: None,
+            resource_inventoried_as: None,
+            resource_classified_as: vec![],
+            resource_quantity_value: None,
+            resource_quantity_unit: None,
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_point_in_time: None,
+            has_duration: None,
+            input_of: None,
+            output_of: None,
+            lamad_event_type: None,
+            content_id: None,
+            contributor_presence_id: None,
+            path_id: None,
+            triggered_by: None,
+            note: None,
+            metadata_json: Some("{not valid json".to_string()),
+            at_location: None,
+            scope_collab_cid: None,
+            substrate_signal: None,
+        };
+        record_event(&mut conn, &ctx, input).expect("record row with malformed metadata_json");
+
+        // Belt-and-suspenders: also force a malformed resource_classified_as_json via
+        // raw SQL on the same kind of column (the typed input wraps it as a list).
+        conn.batch_execute(
+            "UPDATE economic_events SET resource_classified_as_json = '{not json' \
+             WHERE id = 'bad-json-row'",
+        )
+        .expect("force malformed resource_classified_as_json");
+
+        let query = EconomicEventQuery {
+            limit: 100,
+            ..Default::default()
+        };
+
+        // The full route path: load + map(From). Must not panic or 500.
+        let views = EconomicEventService::list_events(&mut conn, &ctx, &query)
+            .expect("list_events must tolerate malformed JSON columns, not error");
+
+        let row = views
+            .iter()
+            .find(|v| v.id == "bad-json-row")
+            .expect("the bad-json row must still be returned");
+        assert!(
+            row.metadata.is_none(),
+            "malformed metadata_json must parse to None, not panic"
+        );
+        assert!(
+            row.resource_classified_as.is_none(),
+            "malformed resource_classified_as_json must parse to None, not panic"
+        );
+    }
+}
+
+#[cfg(test)]
 mod integration_tests {
     use super::*;
     use elohim_views::{
