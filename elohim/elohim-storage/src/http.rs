@@ -5805,6 +5805,10 @@ impl HttpServer {
             Method::POST => {
                 // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
                 // Currently null for direct storage writes. Backfill needed for pre-coherence data.
+                //
+                // C1 write-side gate (spec §3 fix-2): a caller may consent ONLY for the
+                // party they authenticate as. Resolve the caller BEFORE consuming `req`.
+                let caller = crate::api::account::extract_agent_cid(&req, &mut conn)?;
                 let body = req
                     .collect()
                     .await
@@ -5813,7 +5817,34 @@ impl HttpServer {
                 let input_view: CreateHumanRelationshipInputView =
                     serde_json::from_slice(&body.to_bytes())
                         .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
-                let input: human_relationships::CreateHumanRelationshipInput = input_view.into();
+                let mut input: human_relationships::CreateHumanRelationshipInput =
+                    input_view.into();
+
+                // The caller must be authenticated and BE one of the two parties. Set consent
+                // only for the caller's own side; force the counterparty's consent to false
+                // (the counterparty accepts separately via POST /consent). This makes a
+                // unilaterally-forged both-consented edge impossible (the C1 write fix): an
+                // attacker naming a victim can only ever produce a half-consented row, which
+                // is invisible to `get_consented_relationship_between`.
+                let caller = match caller {
+                    Some(c) => c,
+                    None => {
+                        return Ok(response::error_response(StorageError::InvalidInput(
+                            "authentication required to create a relationship".into(),
+                        )))
+                    }
+                };
+                if caller == input.party_a_id {
+                    input.consent_given_by_b = false;
+                    input.initiated_by = caller.clone();
+                } else if caller == input.party_b_id {
+                    input.consent_given_by_a = false;
+                    input.initiated_by = caller.clone();
+                } else {
+                    return Ok(response::error_response(StorageError::InvalidInput(
+                        "caller must be a party to the relationship they create".into(),
+                    )));
+                }
 
                 match human_relationships::create_human_relationship(&mut conn, ctx, input) {
                     Ok(rel) => Ok(response::created(&rel)),
@@ -5870,6 +5901,10 @@ impl HttpServer {
         }
 
         let mut conn = self.get_diesel_conn()?;
+        // C1 write-side gate: you may set consent ONLY for YOUR OWN party — a caller cannot
+        // flip the counterparty's consent flag (which is how a half-consented edge would be
+        // completed into a leaking both-consented one). Resolve the caller before `req` is consumed.
+        let caller = crate::api::account::extract_agent_cid(&req, &mut conn)?;
         let body = req
             .collect()
             .await
@@ -5883,6 +5918,20 @@ impl HttpServer {
 
         let input: ConsentInput = serde_json::from_slice(&body.to_bytes())
             .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+        match caller {
+            Some(c) if c == input.party_id => {}
+            Some(_) => {
+                return Ok(response::error_response(StorageError::InvalidInput(
+                    "you may only set consent for your own party".into(),
+                )))
+            }
+            None => {
+                return Ok(response::error_response(StorageError::InvalidInput(
+                    "authentication required to set consent".into(),
+                )))
+            }
+        }
 
         let consent_update = human_relationships::ConsentUpdate {
             consent_given: input.consent,

@@ -289,9 +289,9 @@ async fn get_agent_upgrade_prompts(
 ///
 /// The viewer-relative disclosure lens: returns the facets of subject `{id}`
 /// that the **authenticated session viewer** may see (spec §3 / §5). The viewer
-/// is resolved from the session identity (`X-Agent-Id` → the viewer's `Human`
-/// row); there is NEVER a `?viewer=` query param (a raw-identity spoof surface).
-/// An anonymous caller (no session) resolves to the commons tier.
+/// is resolved from `X-Agent-Cid` (the general /api/v1 proxy header = `human_id`)
+/// with a Tauri local-session fallback; there is NEVER a `?viewer=` query param (a
+/// raw-identity spoof surface). An anonymous caller (no session) resolves to commons.
 ///
 /// Not `auth_required` — anonymous must reach it (→ commons face). The handler
 /// resolves the viewer optionally; `None` means anon.
@@ -310,10 +310,14 @@ async fn get_profile_lens(
 
     // Resolve the viewer's session agent key, then to the viewer's human id.
     // Anonymous (no header, no session) → viewer_id = None → commons floor.
-    let viewer_human_id: Option<String> = match extract_agent_key(req, &mut conn)? {
-        Some(agent_key) => humans::get_human_by_agent_key(&mut conn, &agent_key)?.map(|h| h.id),
-        None => None,
-    };
+    // Resolve the viewer's human id. The GENERAL /api/v1 doorway proxy injects
+    // X-Agent-Cid (= human_id; see api::account::extract_agent_cid), with a Tauri
+    // local-session fallback. X-Agent-Id / agent-pubkey is the WRONG namespace here —
+    // it is set only by bespoke portal handlers (not this general-proxy route), so
+    // feeding it to the id-keyed consent read would collapse every doorway viewer to
+    // the commons floor. Anonymous (no session) → None → commons floor.
+    let viewer_human_id: Option<String> =
+        crate::api::account::extract_agent_cid(req, &mut conn)?;
 
     let view = crate::services::viewer_lens_facing::build_profile_lens_view(
         &mut conn,
