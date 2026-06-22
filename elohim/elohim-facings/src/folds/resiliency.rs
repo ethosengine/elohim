@@ -248,6 +248,45 @@ mod fold_tests {
         assert_eq!(d.regional, 1, "h2 differs → regional");
         assert_eq!(d.global + d.unknown, 0);
     }
+
+    /// Slice-0 PROOF-GATE (Wave 1.1): a POPULATED holder-relation lights every
+    /// resiliency fold at once — `stewarding_hubs` > 0, `regional_distribution`
+    /// buckets non-zero, and `intra_hub_peers` distinct-agent counts. Proves the
+    /// dark resilience card (`stewardingCollectives: 0`) is caused by an EMPTY
+    /// `shard_locations` relation, NOT a broken fold layer — so the card-lighting
+    /// keystone is "populate the relation" (Wave 1), not "fix the folds".
+    #[test]
+    fn populated_relation_lights_stewarding_regional_and_intra_hub() {
+        // 3 distinct collectives across 2 regions; household-dowell holds the
+        // content on 3 distinct agents (the matthew/jessica/james mesh).
+        let rel = vec![
+            row(Some("household-dowell"), "matthew", Some("us-west")),
+            row(Some("household-dowell"), "jessica", Some("us-west")),
+            row(Some("household-dowell"), "james", Some("us-west")),
+            row(Some("household-eden"), "adam", Some("us-east")),
+            row(Some("household-gertrude"), "gertrude", None),
+        ];
+
+        // stewardingCollectives > 0 — the dark-card metric is reachable.
+        let hubs = stewarding_hubs(&rel);
+        assert_eq!(hubs.len(), 3, "3 distinct stewarding collectives light");
+
+        // intra-hub resiliency: the dowell mesh shows 3 distinct holders.
+        let intra = intra_hub_peers(&rel);
+        assert_eq!(intra.get("household-dowell"), Some(&3), "M/J/J = 3 distinct agents");
+        assert_eq!(intra.get("household-eden"), Some(&1));
+
+        // regional distribution lights (not all-unknown) for a us-west viewer.
+        let dist = regional_distribution(&rel, Some("us-west"));
+        assert_eq!(dist.local, 1, "household-dowell in viewer region → local");
+        assert_eq!(dist.regional, 1, "household-eden differs → regional");
+        assert_eq!(dist.unknown, 1, "household-gertrude null region → unknown");
+        // Internal consistency: every distinct hub lands in exactly one bucket.
+        assert_eq!(
+            dist.local + dist.regional + dist.global + dist.unknown,
+            hubs.len() as i32,
+        );
+    }
 }
 
 #[cfg(test)]
