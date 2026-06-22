@@ -265,6 +265,20 @@ export const CONTENT_VIEWER = {
   FALLBACK_NOTICE: '.fallback-notice', // CSS selector — used via locate(), not testId()
 } as const;
 
+/**
+ * Contributors section (lamad: content-viewer.component.html).
+ * The section renders when `contributorPresences.length > 0`.
+ * Each `<elohim-contributor-card>` host element carries a per-card testid
+ * (`viewer-contributor-card-{id}`) stamped via `[attr.data-testid]` in the *ngFor.
+ * CARD_PREFIX is the attribute prefix for selecting by prefix: `[data-testid^="viewer-contributor-card-"]`.
+ */
+export const CONTRIBUTORS = {
+  SECTION: 'viewer-contributors-section',
+  LIST: 'viewer-contributors-list',
+  /** Prefix for per-card host testids — suffix with presence.id. */
+  CARD_PREFIX: 'viewer-contributor-card-',
+} as const;
+
 /** Raw-node inspector (elohim-app: epr-raw-node.component, shell-rendered at /epr/:id/raw). */
 export const RAW_NODE = {
   ROOT: 'epr-raw-node', // EPR shown AS an atom — the raw subview, never a 302 to a pillar mount

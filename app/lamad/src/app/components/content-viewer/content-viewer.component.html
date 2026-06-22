@@ -426,6 +426,7 @@
             <elohim-contributor-card
               *ngFor="let presence of contributorPresences; trackBy: trackPresenceById"
               [presence]="presence"
+              [attr.data-testid]="'viewer-contributor-card-' + presence.id"
               (contributor-select)="onContributorSelect($event)"
             ></elohim-contributor-card>
           </div>

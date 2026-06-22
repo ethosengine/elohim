@@ -10,6 +10,7 @@ export { UsersTabPage } from './users-tab.page.js';
 export { FederationTabPage } from './federation-tab.page.js';
 export { PipelineTabPage } from './pipeline-tab.page.js';
 export { EprContentPage } from './epr-content.page.js';
+export { ContributorsPage } from './contributors.page.js';
 export {
   THRESHOLD,
   THRESHOLD_REGISTER,
@@ -24,4 +25,5 @@ export {
   LOGIN,
   FOOTER,
   EPR,
+  CONTRIBUTORS,
 } from './selectors.js';
