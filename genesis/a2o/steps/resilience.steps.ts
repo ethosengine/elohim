@@ -76,6 +76,26 @@ async function storagePost(
   return JSON.parse(text) as Record<string, unknown>;
 }
 
+/**
+ * Idempotent content create. Re-running a scenario must not 500 on the
+ * `UNIQUE constraint failed: content.h_app_id, content.id` PK (genesis #1182
+ * Cluster E): storage correctly enforces the primary key, so the TEST FIXTURE
+ * must be idempotent, not the storage. GET `/db/content/{id}` first; if it
+ * already exists (200) treat the create as a no-op and return the existing
+ * record; otherwise POST it.
+ */
+async function storagePostContent(
+  payload: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const id = payload['id'] as string;
+  const { statusCode, body } = await request(`${storageUrl()}/db/content/${id}`);
+  const text = await body.text(); // drain the body even on a miss (undici requirement)
+  if (statusCode === 200) {
+    return JSON.parse(text) as Record<string, unknown>;
+  }
+  return storagePost('/db/content', payload);
+}
+
 /** PUT JSON body to elohim-storage, return {statusCode, json}. Does NOT throw on
  *  non-2xx (the seed-lever scenarios assert on the status themselves). */
 async function storagePut(
@@ -291,7 +311,7 @@ When(
       title: contentId,
       content: `# ${contentId}\n\nA test content item for resilience placement validation.`,
     };
-    await storagePost('/db/content', payload);
+    await storagePostContent(payload);
     this.contentIds.set('lastContentId', contentId);
     this.contentIds.set('lastContentReach', reach);
   }
@@ -1242,7 +1262,7 @@ Given(
       blobHash: `sha256-seed-${contentId}`,
       content: blobPayloadFor(contentId),
     };
-    await storagePost('/db/content', payload);
+    await storagePostContent(payload);
     this.contentIds.set('lastContentId', contentId);
     this.contentIds.set('lastContentReach', reach);
   }
@@ -1347,7 +1367,7 @@ When(
       blobHash: `sha256-seed-${contentId}`,
       content: blobPayloadFor(contentId),
     };
-    await storagePost('/db/content', payload);
+    await storagePostContent(payload);
     this.contentIds.set('lastContentId', contentId);
     this.contentIds.set('lastContentReach', reach);
   }
