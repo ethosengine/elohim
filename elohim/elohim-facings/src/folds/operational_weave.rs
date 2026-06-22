@@ -8,6 +8,10 @@ use std::collections::BTreeMap;
 
 use elohim_views::ComputeTriptych;
 use elohim_views::PlacementGapView;
+use elohim_views::RegionalDistributionView;
+
+use crate::folds::resiliency::regional_distribution;
+use crate::relation::HolderRow;
 
 /// DB-free mirror of a custodian's capacity (custodian_metrics ⨝ system_metrics),
 /// keyed by `agent_cid` (NOT a transport id). The diesel rows are mapped onto this
@@ -62,6 +66,22 @@ pub fn rs_coverage(gaps: &[PlacementGapView]) -> f32 {
         return 1.0;
     }
     gaps.iter().map(|g| g.contract_coverage).sum::<f32>() / gaps.len() as f32
+}
+
+/// Region occupancy (Slice 4): distinct stewarding hubs bucketed by region, but
+/// VIEWER-AGNOSTIC — the cluster/operational weave has no single viewer, so there
+/// is no local/regional split. Reuses the resiliency facing's `regional_distribution`
+/// with `viewer_region = None` (the deduped re-use the charter §44 names): a hub
+/// with a known region buckets `global`, a region-less hub buckets `unknown`.
+/// Charter: 2026-06-19-operational-weave-facing-lens-design.md §44/§48.
+///
+/// NOTE: the sibling `tier_occupancy -> RiskTierDistribution` lens is deliberately
+/// NOT built here — the holder relation carries no risk-tier dimension and
+/// `RiskTierDistribution` is a spatial-vulnerability type; per the not-selected
+/// contract `WeaveView.tier_occupancy` stays absent (never a fabricated tier)
+/// until a risk-tier source/derivation is designed.
+pub fn region_occupancy(holders: &[HolderRow]) -> RegionalDistributionView {
+    regional_distribution(holders, None)
 }
 
 #[cfg(test)]
@@ -136,5 +156,23 @@ mod tests {
     fn aggregate_capacity_all_none_is_none() {
         let t = super::aggregate_capacity(&[cust(None, None, None)]);
         assert!(t.free.is_none() && t.used.is_none() && t.stewarded.is_none());
+    }
+
+    #[test]
+    fn region_occupancy_buckets_distinct_hubs_viewer_agnostic() {
+        let h = |hub: &str, agent: &str, region: Option<&str>| super::HolderRow {
+            hub_id: Some(hub.into()),
+            agent_id: agent.into(),
+            region: region.map(str::to_string),
+        };
+        let holders = vec![
+            h("hub-a", "x", Some("us-east")),
+            h("hub-a", "y", Some("us-east")), // same hub — deduped
+            h("hub-b", "z", None),            // no region → unknown
+        ];
+        let d = super::region_occupancy(&holders);
+        assert_eq!(d.global, 1, "hub-a known region, no viewer → global");
+        assert_eq!(d.unknown, 1, "hub-b no region → unknown");
+        assert_eq!(d.local + d.regional, 0, "no viewer → no local/regional split");
     }
 }
