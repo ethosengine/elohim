@@ -403,6 +403,34 @@
           </div>
         </div>
 
+        <!-- Contributors / Inspired by (reverse-edge contributor presences) -->
+        <!--
+          "Who inspired/contributed to this." Rendered only when there are
+          contributor presences established-via this content. Each presence binds
+          to the <elohim-contributor-card> Lit element via its .presence property
+          (registered at bootstrap through elohim-imagodei/register). Cards render
+          without an href, so contributor-select emits without native navigation;
+          onContributorSelect is a no-op until the Sprint-2 profile route exists.
+        -->
+        <section
+          *ngIf="contributorPresences.length > 0"
+          class="contributors-section"
+          data-testid="viewer-contributors-section"
+          aria-label="Contributors and inspirations"
+        >
+          <h2>🌱 Contributors / Inspired by</h2>
+          <p class="contributors-description">
+            People and works that inspired or contributed to this content:
+          </p>
+          <div class="contributors-list" data-testid="viewer-contributors-list">
+            <elohim-contributor-card
+              *ngFor="let presence of contributorPresences; trackBy: trackPresenceById"
+              [presence]="presence"
+              (contributor-select)="onContributorSelect($event)"
+            ></elohim-contributor-card>
+          </div>
+        </section>
+
         <!-- EPR Relationships (protocol-level content relationships) -->
         <!--
           Real Angular component from the elohim pillar (app-epr-relationships-panel).

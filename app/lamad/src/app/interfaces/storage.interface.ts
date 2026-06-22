@@ -18,6 +18,7 @@ import type {
   ContentMasteryView,
   ContentEngagementStatsView,
   ContentStewardshipView,
+  ContributorPresenceView,
   StewardshipAllocationView,
 } from '@elohim/storage-client/generated';
 
@@ -79,6 +80,11 @@ export interface ILamadStorageApi {
   // ---- Relationships ----
   getRelationships(query?: LamadRelationshipFilters): Observable<RelationshipView[]>;
   createRelationship(input: CreateRelationshipInput): Observable<RelationshipView>;
+
+  // ---- Contributor presences (reverse edge: "who established-via this content") ----
+  // Server-side filtered via GET /api/v1/presence?establishingContent={id} (Sprint 1,
+  // presences-on-EPR). The concrete StorageApiService delegates to that route.
+  getPresenceForContent(contentId: string): Observable<ContributorPresenceView[]>;
 
   // ---- Mastery ----
   getMasteryRecords(query?: LamadMasteryQuery): Observable<ContentMasteryView[]>;

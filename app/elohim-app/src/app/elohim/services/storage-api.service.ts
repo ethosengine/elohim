@@ -416,13 +416,22 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
   }
 
   /**
-   * Get presence for content (by establishing content ID).
+   * Get the contributor presences established-via a piece of content
+   * ("who inspired/contributed to this").
+   *
+   * Server-side filtered via the reverse-edge route
+   * `GET /api/v1/presence?establishingContent={id}` (Sprint 1, presences-on-EPR;
+   * route landed in `cdae451c1`). This replaces the prior fetch-all-and-filter
+   * client-side approach — the server now owns the filtering, keeping this a
+   * thin wrapper. Same-origin absolute path (the `/api/v1` surface is proxied by
+   * doorway and returns clean camelCase views), mirroring `PresenceApiService`.
    */
   getPresenceForContent(contentId: string): Observable<ContributorPresenceView[]> {
-    // Query presences that have this content in their establishing_content_ids
-    // This would need a backend query enhancement, for now get all and filter
-    return this.getContributorPresences().pipe(
-      map(presences => presences.filter(p => p.establishingContentIds?.includes(contentId)))
+    const params = new HttpParams().set('establishingContent', contentId);
+    return this.http.get<ContributorPresenceViewBase[]>('/api/v1/presence', { params }).pipe(
+      timeout(this.defaultTimeoutMs),
+      map(views => withEstablishingContentIdsArray(views)),
+      catchError(error => this.handleError('getPresenceForContent', error))
     );
   }
 

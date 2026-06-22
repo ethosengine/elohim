@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
+import 'elohim-imagodei/register'; // registers <elohim-contributor-card> so the section's cards upgrade + render in-test
 import { ContentViewerComponent } from './content-viewer.component';
 import { ExplorationSidebarComponent } from '../exploration-sidebar/exploration-sidebar.component';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
@@ -25,7 +26,7 @@ import { StewardshipAllocationService } from '../../services/stewardship-allocat
 import { SignalHarnessService } from '../../services/signal-harness.service';
 import { HouseholdResilienceService } from '../../services/household-resilience.service';
 import { ResilienceService as LibResilienceService } from '@elohim/service/public-api';
-import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
+import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
 import { vi, Mock } from 'vitest';
 import { AttentionTrackerService, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
 import { GovernanceApiService } from '@elohim/service';
@@ -68,6 +69,7 @@ describe('ContentViewerComponent', () => {
   let householdResilienceServiceSpy: any;
   let governanceApiSpy: any;
   let eprNavSpy: any;
+  let storageApiSpy: any;
   let affinityChangesSubject: Subject<any>;
   let pathContextSubject: Subject<any>;
 
@@ -232,6 +234,12 @@ describe('ContentViewerComponent', () => {
       listPlacementGaps: vi.fn().mockReturnValue(of({ items: [] })),
     };
 
+    // Default: no contributor presences (the section stays hidden). Individual
+    // tests override getPresenceForContent to return populated views.
+    const storageApiSpyObj = {
+      getPresenceForContent: vi.fn().mockReturnValue(of([])),
+    };
+
     await TestBed.configureTestingModule({
       imports: [ContentViewerComponent],
       providers: [
@@ -244,6 +252,7 @@ describe('ContentViewerComponent', () => {
             getStorageBaseUrl: () => 'https://test',
           },
         },
+        { provide: LAMAD_STORAGE_API, useValue: storageApiSpyObj },
         { provide: LAMAD_AFFINITY_TRACKING, useValue: affinitySpyObj },
         { provide: LAMAD_AGENT, useValue: agentSpyObj },
         { provide: ContentService, useValue: contentSpyObj },
@@ -319,10 +328,120 @@ describe('ContentViewerComponent', () => {
     stewardshipServiceSpy = TestBed.inject(StewardshipAllocationService);
     householdResilienceServiceSpy = TestBed.inject(HouseholdResilienceService);
     governanceApiSpy = TestBed.inject(GovernanceApiService);
+    storageApiSpy = TestBed.inject(LAMAD_STORAGE_API);
     vi.spyOn(routerSpy, 'navigate').mockResolvedValue(true);
 
     fixture = TestBed.createComponent(ContentViewerComponent);
     component = fixture.componentInstance;
+  });
+
+  describe('contributor presences ("Contributors / Inspired by")', () => {
+    // Minimal ContributorPresenceView shape — only the fields the component and
+    // the <elohim-contributor-card> read. Cast through unknown to avoid pinning
+    // the full generated view in the test.
+    const mockPresence = (id: string, displayName: string) =>
+      ({
+        id,
+        hAppId: 'imagodei',
+        displayName,
+        presenceState: 'unclaimed',
+        externalIdentifiers: null,
+        establishingContentIds: ['test-content-1'],
+        affinityTotal: 0,
+        uniqueEngagers: 0,
+        citationCount: 1,
+        recognitionScore: 5,
+        recognitionByContent: null,
+        lastRecognitionAt: null,
+        stewardId: null,
+        stewardshipStartedAt: null,
+        stewardshipCommitmentId: null,
+        stewardshipQualityScore: null,
+        claimInitiatedAt: null,
+        claimVerifiedAt: null,
+        claimVerificationMethod: null,
+        claimEvidence: null,
+        claimedAgentId: null,
+        claimRecognitionTransferredValue: null,
+        claimFacilitatedBy: null,
+        image: null,
+        note: null,
+        metadata: null,
+        createdAt: '2026-06-22T00:00:00Z',
+        updatedAt: '2026-06-22T00:00:00Z',
+        dhtAnchorHash: null,
+      }) as unknown as Parameters<typeof component.trackPresenceById>[1];
+
+    it('fetches presences server-side-filtered by the content id on load', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+
+      expect(storageApiSpy.getPresenceForContent).toHaveBeenCalledWith('test-content-1');
+    }));
+
+    it('keeps the section empty when there are no contributors', fakeAsync(() => {
+      storageApiSpy.getPresenceForContent.mockReturnValue(of([]));
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      expect(component.contributorPresences).toEqual([]);
+      const section = fixture.debugElement.query(
+        el => el.attributes['data-testid'] === 'viewer-contributors-section',
+      );
+      expect(section).toBeNull();
+    }));
+
+    it('renders one contributor card per presence when populated', fakeAsync(() => {
+      storageApiSpy.getPresenceForContent.mockReturnValue(
+        of([mockPresence('p-1', 'Ada'), mockPresence('p-2', 'Grace')]),
+      );
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      expect(component.contributorPresences.length).toBe(2);
+      const section = fixture.debugElement.query(
+        el => el.attributes['data-testid'] === 'viewer-contributors-section',
+      );
+      expect(section).toBeTruthy();
+      const cards = fixture.debugElement.queryAll(el => el.name === 'elohim-contributor-card');
+      expect(cards.length).toBe(2);
+    }));
+
+    it('binds the presence into a registered card so it renders the contributor (shadow DOM)', async () => {
+      storageApiSpy.getPresenceForContent.mockReturnValue(of([mockPresence('p-1', 'Ada Lovelace')]));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const cardEl = fixture.nativeElement.querySelector(
+        'elohim-contributor-card',
+      ) as HTMLElement & { presence: unknown; updateComplete?: Promise<unknown> };
+      expect(cardEl).toBeTruthy();
+      // The .presence property must be set (proves the [presence] binding reached the element).
+      expect(cardEl.presence).toBeTruthy();
+      // Lit async update — wait for the element to render its shadow tree.
+      await cardEl.updateComplete;
+      expect(cardEl.shadowRoot?.textContent).toContain('Ada Lovelace');
+    });
+
+    it('degrades silently to an empty list when the fetch errors', fakeAsync(() => {
+      storageApiSpy.getPresenceForContent.mockReturnValue(throwError(() => new Error('boom')));
+      fixture.detectChanges();
+      tick();
+
+      expect(component.contributorPresences).toEqual([]);
+    }));
+
+    it('onContributorSelect reads the CustomEvent detail id without throwing (Sprint-2 no-op)', () => {
+      const event = new CustomEvent('contributor-select', { detail: { id: 'p-1' } });
+      expect(() => component.onContributorSelect(event)).not.toThrow();
+    });
+
+    it('trackPresenceById returns the presence id', () => {
+      expect(component.trackPresenceById(0, mockPresence('p-9', 'Linus'))).toBe('p-9');
+    });
   });
 
   it('should create', () => {

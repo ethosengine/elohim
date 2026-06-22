@@ -891,6 +891,9 @@ importers:
       elohim-core:
         specifier: workspace:*
         version: link:../elohim-elements/elohim-core
+      elohim-imagodei:
+        specifier: workspace:*
+        version: link:../elohim-elements/elohim-imagodei
       highlight.js:
         specifier: '*'
         version: 11.11.1

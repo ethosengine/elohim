@@ -677,6 +677,34 @@
   gap: 0.75rem;
 }
 
+/* Contributors / Inspired by — section layout (the cards self-style via their
+   own shadow DOM; this only positions the wrapper + lays the cards out). */
+.contributors-section {
+  background: linear-gradient(135deg, rgb(16 185 129 / 5%) 0%, rgb(5 150 105 / 5%) 100%);
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  border: 1px solid rgb(16 185 129 / 20%);
+}
+
+.contributors-section h2 {
+  font-size: 1.3rem;
+  margin: 0 0 0.5rem;
+  color: var(--lamad-text-primary);
+}
+
+.contributors-description {
+  font-size: 0.9rem;
+  color: var(--lamad-text-secondary);
+  margin: 0 0 1rem;
+}
+
+.contributors-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 0.75rem;
+}
+
 .path-card {
   display: flex;
   flex-direction: column;

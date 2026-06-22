@@ -322,6 +322,61 @@ describe('StorageApiService', () => {
     }));
   });
 
+  describe('getPresenceForContent', () => {
+    it('queries the reverse-edge route server-side-filtered by establishingContent', fakeAsync(() => {
+      const mockPresences = [
+        {
+          id: 'presence-1',
+          appId: 'imagodei',
+          displayName: 'Contributor',
+          presenceState: 'unclaimed',
+          externalIdentifiers: null,
+          establishingContentIds: ['content-42'],
+          affinityTotal: 0,
+          uniqueEngagers: 0,
+          citationCount: 1,
+          recognitionScore: 3,
+          recognitionByContent: null,
+          lastRecognitionAt: null,
+          stewardId: null,
+          stewardshipStartedAt: null,
+          stewardshipCommitmentId: null,
+          stewardshipQualityScore: null,
+          claimInitiatedAt: null,
+          claimVerifiedAt: null,
+          claimVerificationMethod: null,
+          claimEvidence: null,
+          claimedAgentId: null,
+          claimRecognitionTransferredValue: null,
+          claimFacilitatedBy: null,
+          image: null,
+          note: null,
+          metadata: null,
+          createdAt: '2026-06-22T00:00:00Z',
+          updatedAt: '2026-06-22T00:00:00Z',
+        },
+      ];
+
+      let received: { establishingContentIds: string[] }[] = [];
+      service.getPresenceForContent('content-42').subscribe(presences => {
+        received = presences;
+      });
+
+      // Server-side filtering: same-origin /api/v1/presence with the
+      // establishingContent query param (NOT the /db/presences list route).
+      const req = httpMock.expectOne(
+        request =>
+          request.url.includes('/api/v1/presence') &&
+          request.params.get('establishingContent') === 'content-42',
+      );
+      req.flush(mockPresences);
+      tick();
+
+      expect(received.length).toBe(1);
+      expect(received[0].establishingContentIds).toEqual(['content-42']);
+    }));
+  });
+
   describe('getContributorPresence', () => {
     it('should fetch single presence by ID', fakeAsync(() => {
       const mockPresence = {

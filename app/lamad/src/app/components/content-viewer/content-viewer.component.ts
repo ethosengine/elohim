@@ -44,7 +44,12 @@ import {
   DiscussionRecord,
   GovernanceStateRecord,
 } from '../../services/data-loader.service';
-import { LAMAD_STORAGE_CLIENT, type ILamadStorageClient } from '../../interfaces/storage.interface';
+import {
+  LAMAD_STORAGE_API,
+  LAMAD_STORAGE_CLIENT,
+  type ILamadStorageApi,
+  type ILamadStorageClient,
+} from '../../interfaces/storage.interface';
 import { TrustBadgeService } from '../../services/trust-badge.service';
 import {
   DEFAULT_FEEDBACK_PROFILES,
@@ -106,7 +111,10 @@ import { EprRelationshipsPanelComponent } from '@app/elohim/components/epr-relat
 import type { HouseholdResilienceView } from '../../../generated/household-resilience-view';
 import type { ResilienceSnapshotView } from '../../../generated/resilience-snapshot-view';
 import type { EprRelationship } from '@elohim/storage-client';
-import type { ContentStewardshipView } from '@elohim/storage-client/generated';
+import type {
+  ContentStewardshipView,
+  ContributorPresenceView,
+} from '@elohim/storage-client/generated';
 
 @Component({
   selector: 'app-content-viewer',
@@ -142,6 +150,11 @@ export class ContentViewerComponent
 
   // Stewardship data
   stewardship: ContentStewardshipView | null = null;
+
+  // Contributor presences established-via this content ("who inspired/contributed to this").
+  // Fetched server-side-filtered (reverse edge); rendered on the Content tab via
+  // <elohim-contributor-card>. The section is hidden when empty.
+  contributorPresences: ContributorPresenceView[] = [];
 
   // Resilience data
   resilience: ResilienceView | null = null;
@@ -234,6 +247,7 @@ export class ContentViewerComponent
   private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
   private readonly eventService = inject(EventService);
   private readonly storageClient: ILamadStorageClient = inject(LAMAD_STORAGE_CLIENT);
+  private readonly storageApi: ILamadStorageApi = inject(LAMAD_STORAGE_API);
   private readonly governanceApi = inject(GovernanceApiService);
   private readonly document = inject(DOCUMENT);
   private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -532,6 +546,9 @@ export class ContentViewerComponent
           this.loadStewardship(nodeId);
           this.loadResilience(nodeId);
 
+          // Load contributor presences for the "Contributors / Inspired by" section
+          this.loadContributorPresences(nodeId);
+
           // Load governance data for Governance tab
           this.loadGovernanceData(nodeId);
 
@@ -612,6 +629,52 @@ export class ContentViewerComponent
           // Stewardship is supplemental — don't block on failure
         },
       });
+  }
+
+  /**
+   * Load the contributor presences established-via this content
+   * ("who inspired/contributed to this").
+   *
+   * Server-side filtered via the reverse-edge route
+   * (GET /api/v1/presence?establishingContent={id}); the section renders only
+   * when there are contributors and degrades silently otherwise.
+   */
+  private loadContributorPresences(nodeId: string): void {
+    this.contributorPresences = [];
+    this.storageApi
+      .getPresenceForContent(nodeId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: presences => {
+          this.contributorPresences = presences;
+        },
+        error: () => {
+          // Contributors are supplemental — don't block on failure.
+          this.contributorPresences = [];
+        },
+      });
+  }
+
+  /**
+   * Handle the `contributor-select` CustomEvent from <elohim-contributor-card>.
+   * The element emits `CustomEvent<{ id: string }>`; under CUSTOM_ELEMENTS_SCHEMA
+   * the template types `$event` as the base `Event`, so we narrow it here (the
+   * codebase pattern for Lit CustomEvent detail access).
+   *
+   * TODO(sprint-2): navigate to the contributor profile route once it exists.
+   * For now this is a no-op — the cards render with no `href`, so they emit the
+   * event without performing native navigation. (Do NOT invent a profile route
+   * here — that's a Sprint-2 surface.)
+   */
+  onContributorSelect(event: Event): void {
+    const _presenceId = (event as CustomEvent<{ id: string }>).detail?.id;
+    // Intentional no-op until the Sprint-2 contributor profile route lands.
+    void _presenceId;
+  }
+
+  /** trackBy for the contributor cards — stable identity is the presence id. */
+  trackPresenceById(_index: number, presence: ContributorPresenceView): string {
+    return presence.id;
   }
 
   /**
