@@ -21,12 +21,18 @@ interface HealthResponse {
   uptime?: number;
 }
 
-/** Status endpoint response */
+/** Status endpoint response.
+ *
+ * `humansServed` / `contentAvailable` are SUBSTRATE (dataplane) figures read via the
+ * conductor (Holochain DHT / libp2p / iroh). They are nullable on purpose: when the
+ * doorway can't see the substrate they are UNKNOWN, not zero (unmeasured ≠ zero). The
+ * landing renders null as "—", never as 0. `federatedPeers` is this doorway's own
+ * (web2-projection) layer and is always measurable. */
 interface StatusResponse {
   name: string;
   region: string | null;
-  humansServed: number;
-  contentAvailable: number;
+  humansServed: number | null;
+  contentAvailable: number | null;
   federatedPeers: number;
 }
 
@@ -88,21 +94,29 @@ type LoadingState = 'loading' | 'ready' | 'error';
 
       <!-- Content -->
       @if (state() === 'ready') {
-        <!-- Community Stats -->
+        <!-- Community Stats — layered: this doorway (web2 projection, measurable) vs
+             the substrate dataplane (via the conductor, unknown when unreachable). -->
         <section class="community-stats">
-          <div class="stat">
-            <span class="stat-value">{{ status()?.humansServed ?? 0 }}</span>
-            <span class="stat-label">Humans Served</span>
-          </div>
-          <div class="stat">
-            <span class="stat-value">{{ status()?.contentAvailable ?? 0 }}</span>
-            <span class="stat-label">Content Available</span>
-          </div>
           <div class="stat">
             <span class="stat-value">{{ peers().length }}</span>
             <span class="stat-label">Federated Doorways</span>
           </div>
+          <div class="stat" [class.unmeasured]="status()?.humansServed == null">
+            <span class="stat-value">{{ status()?.humansServed ?? '—' }}</span>
+            <span class="stat-label">Humans Served</span>
+          </div>
+          <div class="stat" [class.unmeasured]="status()?.contentAvailable == null">
+            <span class="stat-value">{{ status()?.contentAvailable ?? '—' }}</span>
+            <span class="stat-label">Content Available</span>
+          </div>
         </section>
+        @if (status()?.humansServed == null || status()?.contentAvailable == null) {
+          <p class="dataplane-note">
+            Humans served &amp; content available read the substrate (Holochain DHT /
+            libp2p / iroh) through the conductor. They show <strong>—</strong> when this
+            doorway can't reach the substrate — <em>unknown, not zero</em>.
+          </p>
+        }
 
         <!-- Federation Peers -->
         @if (peers().length > 0) {
