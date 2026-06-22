@@ -189,9 +189,13 @@ pub fn get_presences_for_content(
     ctx: &AppContext,
     content_id: &str,
 ) -> Result<Vec<ContributorPresence>, StorageError> {
-    // Search for content_id in JSON array
+    // Search for content_id in JSON array.
+    // Pattern 1: id is NOT last — JSON has a trailing comma after the quoted id.
+    // Pattern 2: id IS last (or only) — JSON has a closing bracket immediately after
+    //   the quoted id. SQLite LIKE has no escape char by default, so ']' is literal —
+    //   do NOT use '\]' (that matches a literal backslash-bracket, never present in JSON).
     let search_pattern = format!("%\"{}\",%", content_id);
-    let search_pattern_last = format!("%\"{}\"\\]%", content_id);
+    let search_pattern_last = format!("%\"{}\"]%", content_id);
 
     contributor_presences::table
         .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
@@ -556,4 +560,157 @@ pub fn bulk_create_presences(
 
         Ok(BulkContributorPresenceResult { created, errors })
     })
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use diesel::sqlite::SqliteConnection;
+    use diesel::Connection;
+
+    /// Set up an in-memory SQLite with the contributor_presences table only.
+    /// Uses the exact column set from the Diesel schema so inserts via
+    /// `create_contributor_presence` work without the full migration suite.
+    fn setup_test_db() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:")
+            .expect("Failed to create in-memory SQLite");
+
+        diesel::sql_query(
+            r#"CREATE TABLE contributor_presences (
+                id TEXT PRIMARY KEY NOT NULL,
+                h_app_id TEXT NOT NULL DEFAULT 'lamad',
+                display_name TEXT NOT NULL,
+                presence_state TEXT NOT NULL DEFAULT 'unclaimed',
+                external_identifiers_json TEXT,
+                establishing_content_ids_json TEXT NOT NULL DEFAULT '[]',
+                affinity_total REAL NOT NULL DEFAULT 0.0,
+                unique_engagers INTEGER NOT NULL DEFAULT 0,
+                citation_count INTEGER NOT NULL DEFAULT 0,
+                recognition_score REAL NOT NULL DEFAULT 0.0,
+                recognition_by_content_json TEXT,
+                last_recognition_at TEXT,
+                steward_id TEXT,
+                stewardship_started_at TEXT,
+                stewardship_commitment_id TEXT,
+                stewardship_quality_score REAL,
+                claim_initiated_at TEXT,
+                claim_verified_at TEXT,
+                claim_verification_method TEXT,
+                claim_evidence_json TEXT,
+                claimed_agent_id TEXT,
+                claim_recognition_transferred_value REAL,
+                claim_facilitated_by TEXT,
+                image TEXT,
+                note TEXT,
+                metadata_json TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                dht_anchor_hash TEXT
+            )"#,
+        )
+        .execute(&mut conn)
+        .expect("Failed to create contributor_presences table");
+
+        conn
+    }
+
+    /// Insert a presence with the given establishing_content_ids list.
+    fn insert_presence(
+        conn: &mut SqliteConnection,
+        ctx: &AppContext,
+        id: &str,
+        display_name: &str,
+        establishing_content_ids: Vec<String>,
+    ) -> ContributorPresence {
+        create_contributor_presence(
+            conn,
+            ctx,
+            CreateContributorPresenceInput {
+                id: Some(id.to_string()),
+                display_name: display_name.to_string(),
+                external_identifiers_json: None,
+                establishing_content_ids,
+                image: None,
+                note: None,
+                metadata_json: None,
+            },
+        )
+        .expect("insert presence")
+    }
+
+    /// `get_presences_for_content` must match:
+    ///   (a) single-element `["content-a"]`                 — id is last AND only
+    ///   (b) multi-element, content-a LAST `["x","content-a"]`  — id is last
+    ///   (c) multi-element, content-a NON-LAST `["content-a","y"]` — id has trailing comma
+    /// and must NOT match:
+    ///   (d) completely different content `["other"]`
+    ///
+    /// The old `\]` escape caused (a) and (b) to be silently missed.
+    #[test]
+    fn get_presences_for_content_covers_all_positions() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        // (a) single-element — establishing_content_ids_json = ["content-a"]
+        let p_a = insert_presence(&mut conn, &ctx, "p-a", "Author A", vec!["content-a".into()]);
+        // (b) multi, content-a LAST — ["x","content-a"]
+        let p_b = insert_presence(
+            &mut conn,
+            &ctx,
+            "p-b",
+            "Author B",
+            vec!["x".into(), "content-a".into()],
+        );
+        // (c) multi, content-a NON-LAST — ["content-a","y"]
+        let p_c = insert_presence(
+            &mut conn,
+            &ctx,
+            "p-c",
+            "Author C",
+            vec!["content-a".into(), "y".into()],
+        );
+        // (d) no-match — ["other"]
+        let _p_d = insert_presence(
+            &mut conn,
+            &ctx,
+            "p-d",
+            "Author D",
+            vec!["other".into()],
+        );
+
+        let results = get_presences_for_content(&mut conn, &ctx, "content-a")
+            .expect("query failed");
+
+        let ids: Vec<&str> = results.iter().map(|p| p.id.as_str()).collect();
+
+        // All three matching rows returned
+        assert!(
+            ids.contains(&p_a.id.as_str()),
+            "single-element case (a) must be returned; got {:?}",
+            ids
+        );
+        assert!(
+            ids.contains(&p_b.id.as_str()),
+            "last-position case (b) must be returned; got {:?}",
+            ids
+        );
+        assert!(
+            ids.contains(&p_c.id.as_str()),
+            "non-last case (c) must be returned; got {:?}",
+            ids
+        );
+
+        // No false positives
+        assert_eq!(
+            results.len(),
+            3,
+            "expected exactly 3 results, got {}; ids = {:?}",
+            results.len(),
+            ids
+        );
+    }
 }
