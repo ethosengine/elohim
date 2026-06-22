@@ -458,6 +458,97 @@ export async function resolveExistingCollectiveCid(baseUrl: string): Promise<str
   }
 }
 
+/**
+ * Pure settle predicate for the household-formation projection (genesis #1182
+ * Cluster B). True iff the collective's `collective_cid` is stamped AND every
+ * expected member id is present in the projected participants — i.e. the
+ * formation projection has run and reflects the affirmed triad. The (network)
+ * `waitForHouseholdProjected` loops on this; kept pure so it is unit-tested
+ * DB-free. Participant rows may be plain id strings (the `Vec<String>` view
+ * shape) or objects carrying `humanId`/`id`.
+ */
+export function householdProjectionSatisfied(
+  collective: Record<string, unknown> | null,
+  participants: unknown[],
+  expectedMemberIds: string[],
+): boolean {
+  if (!collective) {
+    return false;
+  }
+  const cid = collective['collectiveCid'] ?? collective['collective_cid'];
+  if (typeof cid !== 'string' || !cid.startsWith('collective:')) {
+    return false;
+  }
+  const present = new Set(
+    participants.map(p => {
+      if (typeof p === 'string') {
+        return p;
+      }
+      if (p && typeof p === 'object') {
+        const o = p as Record<string, unknown>;
+        return (o['humanId'] ?? o['id'] ?? o['participant'] ?? '') as string;
+      }
+      return '';
+    }),
+  );
+  return expectedMemberIds.every(id => present.has(id));
+}
+
+/**
+ * Wait for the household-formation projection to reflect the affirmed members
+ * (genesis #1182 Cluster B). Polls `/db/collectives/<slug>` (collective_cid
+ * stamp) and `/db/collectives/<slug>/participants` until
+ * `householdProjectionSatisfied`, or a bounded timeout. SOFT — a probe error or
+ * timeout NEVER aborts seeding (the projection may still settle after exit); it
+ * logs and returns false. Mirrors `resolveExistingCollectiveCid`'s soft-fail.
+ */
+export async function waitForHouseholdProjected(
+  baseUrl: string,
+  expectedMemberIds: string[],
+  opts: { slug?: string; timeoutMs?: number; intervalMs?: number } = {},
+): Promise<boolean> {
+  const slug = opts.slug ?? 'family-dowell';
+  const timeoutMs = opts.timeoutMs ?? 60_000;
+  const intervalMs = opts.intervalMs ?? 3_000;
+  const base = baseUrl.replace(/\/$/, '');
+  const headers: Record<string, string> = {};
+  if (process.env.DOORWAY_API_KEY) {
+    headers['Authorization'] = `Bearer ${process.env.DOORWAY_API_KEY}`;
+  }
+  const fetchJson = async (path: string): Promise<Record<string, unknown> | null> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${base}${path}`, { signal: controller.signal, headers });
+      if (!res.ok) {
+        return null;
+      }
+      return (await res.json()) as Record<string, unknown>;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const collective = await fetchJson(`/db/collectives/${slug}`);
+    const partsRaw = await fetchJson(`/db/collectives/${slug}/participants`);
+    const participants = (partsRaw?.['items'] ?? partsRaw?.['participants'] ?? []) as unknown[];
+    if (householdProjectionSatisfied(collective, participants, expectedMemberIds)) {
+      return true;
+    }
+    if (Date.now() >= deadline) {
+      console.warn(
+        `[!] household projection did not settle within ${timeoutMs}ms — collective_cid/` +
+          `participants may lag (non-fatal; projection_reconcile continues after exit)`,
+      );
+      return false;
+    }
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+}
+
 // =============================================================================
 // Main
 // =============================================================================
@@ -613,6 +704,22 @@ async function main(): Promise<void> {
     }
   }
   console.log('');
+
+  // -- 2b. Settle-wait for the formation projection -----------------------
+  // The collective_cid stamp + participant list lag the conductor-side
+  // affirmations via DHT → gossip → projection_reconcile. Wait until the
+  // projection reflects the affirmed members so downstream reads (a2o
+  // qahal-formation) don't observe an unstamped cid or a short participant
+  // list (genesis #1182 Cluster B). Soft — never aborts seeding.
+  if (probeBase) {
+    const settled = await waitForHouseholdProjected(probeBase, [...affirmed]);
+    console.log(
+      settled
+        ? `[+] household projection settled (${affirmed.size} member(s) reflected)`
+        : `[!] household projection not yet settled — continuing (reconcile is async)`,
+    );
+    console.log('');
+  }
 
   // -- 3. Parental StewardshipGrant over the minor (james) ----------------
   const minor = HOUSEHOLD_MEMBERS.find(m => m.minor);
