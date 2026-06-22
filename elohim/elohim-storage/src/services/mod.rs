@@ -71,6 +71,7 @@ pub mod limit_gradient_registry;
 pub mod manifest_registry;
 pub mod mastery_depth;
 pub mod measure;
+pub mod mishpat_commitment_facing;
 pub mod mutuality_audit_service;
 pub mod operational_weave_facing;
 pub mod peer_capacity_service;
@@ -84,6 +85,7 @@ pub mod provide_loop_status; // Workstream D — observability for the provide-l
 pub mod provide_reconcile;
 pub mod rate_history;
 pub mod rea_commitment_service;
+pub mod rea_observed_compute; // Wave 4.3 — OBSERVED-compute reciprocity adapter (consumes the 4.1 mutual_compute fold)
 pub mod reach_earning;
 pub mod reanchor_backfill; // Workstream D — re-author NULL-anchor content a cold-conductor seed left provenance-only
 pub mod reciprocity_view;

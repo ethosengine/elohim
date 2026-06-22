@@ -7,4 +7,5 @@
 pub mod contributor_reflexive;
 pub mod epr_content;
 pub mod operational_weave;
+pub mod rea;
 pub mod resiliency;

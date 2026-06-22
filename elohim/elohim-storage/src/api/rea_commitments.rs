@@ -50,6 +50,14 @@ pub async fn handle(
             handle_get_by_agent(req, agent_id, pool, ctx).await
         }
 
+        // GET /api/v1/commitments/facing/rea — REA economic facing per-commitment
+        // read surface over the mishpat compute/recovery-class ledger (Wave 4.2).
+        // `facing/rea` contains '/', so it can never be shadowed by the
+        // `(GET, id) if !id.contains('/')` arm below — but it is matched
+        // explicitly here for clarity and is the route-shadow guard registered
+        // in the http.rs manifest (asserted by test_manifest_builds).
+        (&Method::GET, "facing/rea") => handle_facing_rea(pool).await,
+
         // GET /api/v1/commitments/{id}
         (&Method::GET, id) if !id.contains('/') => handle_get_by_id(id, pool, ctx).await,
 
@@ -182,6 +190,21 @@ async fn handle_get_by_id(
         ReaCommitmentService::get_by_id(&mut conn, ctx, id),
         &format!("Commitment not found: {}", id),
     ))
+}
+
+/// GET /api/v1/commitments/facing/rea — REA economic facing per-commitment read
+/// surface over the mishpat compute/recovery-class commitment ledger (Wave 4.2).
+///
+/// Viewer-less + node-scoped (no auth, no app-id), mirroring the operational-weave
+/// `build_weave_view` dispatch: the lens reflects the whole node's commitment
+/// ledger, not a single app or agent. Read-only over an already-notarized ledger
+/// (Operational Category C — no new DHT entry type, no POST; the write path lives
+/// on the existing mishpat coordinator). Returns `Vec<MishpatCommitmentView>`.
+async fn handle_facing_rea(pool: &DbPool) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    let views =
+        crate::services::mishpat_commitment_facing::build_mishpat_commitment_view(&mut conn);
+    Ok(response::ok(&views))
 }
 
 async fn handle_update_state(

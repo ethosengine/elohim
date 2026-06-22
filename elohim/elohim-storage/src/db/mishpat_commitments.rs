@@ -106,6 +106,22 @@ pub fn get_by_cid(
         .optional()
 }
 
+/// List ALL mishpat commitment rows, newest-first (`created_at` descending).
+///
+/// The read-side projection the REA economic facing surfaces over
+/// (`GET /api/v1/commitments/facing/rea`). Node-scoped and viewer-less, mirroring
+/// the operational-weave loaders (`load_all_placement_gaps`): there is no single
+/// viewer or app for the compute-commitment ledger, so no scope filter is applied.
+///
+/// Reads EMPTY until the `CommitmentCommitted` post-commit signal projects rows
+/// (the table is write-only/unread-surfaced today — the honest correct-but-dormant
+/// projection; it lights up the moment a notarized commitment lands).
+pub fn list_all(conn: &mut SqliteConnection) -> QueryResult<Vec<MishpatCommitment>> {
+    mc::mishpat_commitments
+        .order(mc::created_at.desc())
+        .load(conn)
+}
+
 /// Update the lifecycle state of a commitment (e.g. `'proposed'` → `'active'`).
 ///
 /// Returns the number of rows affected (0 if the CID does not exist).

@@ -2278,6 +2278,41 @@ pub struct WeaveView {
     pub measured_at: String,
 }
 
+/// Read projection of a single notarized mishpat `Commitment` (the compute /
+/// recovery-class ledger). One row of the `mishpat_commitments` table — the
+/// previously write-only/unread-surfaced ledger the REA economic facing reads
+/// (Wave 4.2). Operational Category C: no new DHT entry type — the Commitment
+/// itself is already notarized (`Mishpat::Commitment`, `cid = entry_hash`); this
+/// is a read-only projection over the existing operational table.
+///
+/// `bounds` is the action-specific policy envelope parsed from the `bounds_json`
+/// column — an opaque object (its shape varies by action). `dht_anchor_hash` is
+/// optional: an un-notarized row (NULL anchor — the local-stack dht-anchor gap)
+/// OMITS the field rather than serializing `null` (the not-selected-field
+/// contract: missing ≡ not-present, never null).
+///
+/// Wire format: `mishpat-commitment-view.schema.json`.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct MishpatCommitmentView {
+    pub cid: String,
+    pub action: String,
+    pub scope: String,
+    pub provider: String,
+    pub recipient: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub bounds: Option<JsonVal>, // PARSED from bounds_json (opaque envelope)
+    pub valid_from: String,
+    pub valid_until: String,
+    pub state: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub dht_anchor_hash: Option<String>, // NULL on an un-notarized row → field omitted
+    pub created_at: String,
+}
+
 /// HTTP view of a row from the `observation_diversity_summary` SQLite view.
 ///
 /// Diversity rollup over `observations` — one row per (subject_cid,

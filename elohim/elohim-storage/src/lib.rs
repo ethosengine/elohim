@@ -259,7 +259,7 @@ pub use views::{
     NodeShapeView, PeerStatusView, RenderCapabilityProfile, RendererKind,
 };
 pub use views::{AttestationView, GovernanceActionTallyView, GovernanceActionView};
-pub use views::{ComputeTriptych, WeaveView};
+pub use views::{ComputeTriptych, MishpatCommitmentView, WeaveView};
 pub use views::{
     EprCouplingView, EprEnvelopeView, EprListView, EprProvidersView, EprPublishInput,
     EprSignatureView, EprVerifyErrorView, EprVerifyView, EprView,

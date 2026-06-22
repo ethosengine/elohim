@@ -119,6 +119,7 @@ export * from './views/key-rotation';
 export * from './views/me-response';
 export * from './views/mechanism-selection';
 export * from './views/membership-view';
+export * from './views/mishpat-commitment-view';
 export * from './views/my-cluster-view';
 export * from './views/navigation-context-view';
 export * from './views/network-posture-view';

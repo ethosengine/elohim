@@ -568,6 +568,141 @@ pub fn record_affinity_transfer(
     )
 }
 
+/// Record a `compute-fulfilled` EconomicEvent bounded by its originating
+/// `delegates-compute` commitment (Wave 4.3 — the realized-compute event).
+///
+/// # Why a focused fn (not `record_event`)
+///
+/// `compute-fulfilled` is an OBSERVED-compute action outside the hREA core
+/// vocabulary (`rea_actions::ALL`), so the generic validated `record_event` path
+/// would reject it, and `upsert_with_anchor` hardcodes `bounded_by: None`. This
+/// is the same focused-insert pattern as
+/// [`crate::db::rea_commitments::record_provide_from_content_commitment`]: build
+/// `NewEconomicEvent` directly so the action need not join `rea_actions::ALL` and
+/// the `bounded_by` COLUMN (not a `metadata_json` annotation) is populated.
+///
+/// # `bounded_by` is the COLUMN, by design
+///
+/// The REA economic facing's observed side (`realized_value_flow`,
+/// observed-`mutual_compute`) reads `economic_events.bounded_by` — the column —
+/// to link an event to its governing commitment (charter §"Materialized
+/// relation(s)"). The conductor-wire `economic_event_emit_service` puts
+/// `bounded_by` in `metadata_json` only because the DHT wire type
+/// `CreateReaEconomicEventInput` carries no such field; THAT is the notarized
+/// intent path. This storage-projection event (Operational Category C — no
+/// conductor, no DHT) writes the column directly so the write and read sides agree.
+///
+/// # Honesty: intent vs observed
+///
+/// This event represents an OBSERVED fulfillment of compute, distinct from the
+/// commitment (the INTENT). `bounded_by = commitment_cid` is the *only* link to
+/// the originating `delegates-compute` commitment; the event itself is never a
+/// substitute for the commitment.
+///
+/// # Producer status (correct-but-dormant)
+///
+/// As of Wave 4.3 NOTHING observes real compute fulfillment, so this emitter has
+/// no production trigger — wiring a runtime/operator observer is downstream work
+/// (operator-owned per the charter §"Non-goals"). The fn is built + tested
+/// correct so the REA facing's observed-`mutual_compute` lights up the moment a
+/// real fulfillment observer lands; it is deliberately NOT wired into any hot
+/// path that would be structurally empty today.
+///
+/// # HELD security boundary — forgeable-without-attestation (red-team 2026-06-22)
+///
+/// This fn takes bare `provider`/`receiver`/`commitment_cid` strings and performs
+/// NO authorization: it never checks that `provider`/`receiver` match the
+/// `bounded_by` commitment's parties, nor that `commitment_cid` is a real
+/// `mishpat_commitments` `entry_hash` that resolves. Today that is safe ONLY
+/// because there is no producer (dormant, above). But it means observed
+/// reciprocity (`services::rea_observed_compute::observed_mutual_compute`) is
+/// **unilaterally forgeable by construction**: one party could write both
+/// `compute-fulfilled` rows (`bounded_by` the A→B cid and the B→A cid) and fake
+/// both-directions-observed with no counterparty action.
+///
+/// DO NOT wire this into any economic-consequence path until the live producer
+/// adds: (1) a trigger gated on a REAL fulfillment observation (not
+/// commitment-landing); (2) counterparty cross-signature/attestation on the event
+/// (mirror the `AgentPeerBinding` unsigned-binding rule — crate CLAUDE.md
+/// "Identity & Transport-Identity Coherence"); (3) validation that the event's
+/// parties match the `bounded_by` commitment's parties; (4) that `commitment_cid`
+/// is the commitment `entry_hash` (NOT `action_hash`) and resolves to a live row.
+///
+/// `dht_anchor_hash` is `None` (this is a local projection, not a notarized DHT
+/// event); `state = "recorded"`.
+#[allow(clippy::too_many_arguments)]
+pub fn record_compute_fulfilled_event(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    provider: &str,
+    receiver: &str,
+    commitment_cid: &str,
+    has_point_in_time: &str,
+) -> Result<EconomicEvent, StorageError> {
+    let new_event = NewEconomicEvent {
+        id,
+        h_app_id: &ctx.h_app_id,
+        action: "compute-fulfilled",
+        provider,
+        receiver,
+        resource_conforms_to: None,
+        resource_inventoried_as: None,
+        resource_classified_as_json: None,
+        resource_quantity_value: None,
+        resource_quantity_unit: None,
+        effort_quantity_value: None,
+        effort_quantity_unit: None,
+        has_point_in_time,
+        has_duration: None,
+        input_of: None,
+        output_of: None,
+        lamad_event_type: None,
+        content_id: None,
+        contributor_presence_id: None,
+        path_id: None,
+        triggered_by: None,
+        state: "recorded",
+        note: None,
+        metadata_json: None,
+        dht_anchor_hash: None,
+        at_location: None,
+        verified_at: None,
+        scope_collab_cid: None,
+        // The bounds reference lives in the COLUMN (read by the REA facing's
+        // observed side), not in a metadata_json annotation.
+        bounded_by: Some(commitment_cid),
+        substrate_signal: None,
+    };
+
+    diesel::insert_into(economic_events::table)
+        .values(&new_event)
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("compute-fulfilled insert failed: {e}")))?;
+
+    get_economic_event(conn, ctx, id)?
+        .ok_or_else(|| StorageError::Internal("Failed to retrieve compute-fulfilled event".into()))
+}
+
+/// All `compute-fulfilled` event rows for this app, used by the REA economic
+/// facing's observed side to determine which `delegates-compute` commitments have
+/// an OBSERVED fulfillment (`bounded_by` carries the commitment cid).
+///
+/// Returns the rows; the caller projects out the set of `bounded_by` cids. A
+/// query error degrades to an empty `Vec` is the caller's choice — this returns a
+/// `Result` so the error is visible.
+pub fn list_compute_fulfilled_events(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+) -> Result<Vec<EconomicEvent>, StorageError> {
+    economic_events::table
+        .filter(economic_events::h_app_id.eq(&ctx.h_app_id))
+        .filter(economic_events::action.eq("compute-fulfilled"))
+        .order(economic_events::has_point_in_time.desc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("compute-fulfilled query failed: {e}")))
+}
+
 /// Bulk record events (for seeding/import) - scoped by app
 pub fn bulk_record_events(
     conn: &mut SqliteConnection,
@@ -860,6 +995,90 @@ mod tests {
             .expect("select substrate_signal");
 
         assert_eq!(got, None);
+    }
+
+    #[test]
+    fn compute_fulfilled_event_is_bounded_by_its_commitment() {
+        let mut conn = test_conn();
+        let ctx = test_ctx();
+
+        let row = record_compute_fulfilled_event(
+            &mut conn,
+            &ctx,
+            "cf-event-001",
+            "uhCAk-provider",
+            "uhCAk-receiver",
+            "uhCEk-commitment-cid",
+            "2026-06-22T12:00:00Z",
+        )
+        .expect("record_compute_fulfilled_event must succeed for an out-of-ALL action");
+
+        assert_eq!(row.action, "compute-fulfilled");
+        assert_eq!(
+            row.bounded_by.as_deref(),
+            Some("uhCEk-commitment-cid"),
+            "bounded_by COLUMN links the event to its originating commitment"
+        );
+        // OBSERVED, not notarized intent: no DHT anchor.
+        assert!(
+            row.dht_anchor_hash.is_none(),
+            "a local-projection compute-fulfilled event carries no DHT anchor"
+        );
+        assert_eq!(row.state, "recorded");
+
+        // The bounds reference is in the column, NOT a metadata_json annotation.
+        assert!(
+            row.metadata_json.is_none(),
+            "bounded_by lives in the column for this projection path, not metadata_json"
+        );
+    }
+
+    #[test]
+    fn list_compute_fulfilled_returns_only_fulfilled_events_with_their_commitments() {
+        let mut conn = test_conn();
+        let ctx = test_ctx();
+
+        // Two compute-fulfilled events bound to two distinct commitments…
+        record_compute_fulfilled_event(
+            &mut conn,
+            &ctx,
+            "cf-1",
+            "agent:A",
+            "agent:B",
+            "cid-1",
+            "2026-06-22T00:00:00Z",
+        )
+        .expect("cf-1");
+        record_compute_fulfilled_event(
+            &mut conn,
+            &ctx,
+            "cf-2",
+            "agent:B",
+            "agent:A",
+            "cid-2",
+            "2026-06-22T00:01:00Z",
+        )
+        .expect("cf-2");
+        // …and an unrelated non-compute event that must NOT be returned.
+        record_event(
+            &mut conn,
+            &ctx,
+            CreateEconomicEventInput {
+                id: Some("noise".to_string()),
+                ..minimal_input()
+            },
+        )
+        .expect("noise event");
+
+        let fulfilled = list_compute_fulfilled_events(&mut conn, &ctx).expect("list must succeed");
+        assert_eq!(fulfilled.len(), 2, "only the two compute-fulfilled rows");
+
+        let mut bounded: Vec<String> = fulfilled
+            .iter()
+            .filter_map(|e| e.bounded_by.clone())
+            .collect();
+        bounded.sort();
+        assert_eq!(bounded, vec!["cid-1".to_string(), "cid-2".to_string()]);
     }
 
     /// Robustness guard / DOCUMENTED NEGATIVE RESULT.

@@ -88,6 +88,9 @@ const INTERFACE_FILES = [
   { src: 'views/placement-gap-view.ts', dest: 'placement-gap-view.ts' },
   // Operational-weave Slice 4 — cluster-scoped WeaveView (GET /api/v1/weave).
   { src: 'views/weave-view.ts', dest: 'weave-view.ts' },
+  // REA economic facing Wave 4.2 — per-commitment MishpatCommitmentView
+  // (GET /api/v1/commitments/facing/rea).
+  { src: 'views/mishpat-commitment-view.ts', dest: 'mishpat-commitment-view.ts' },
   { src: 'views/resilience-snapshot-view.ts', dest: 'resilience-snapshot-view.ts' },
   { src: 'views/recovery-request.ts', dest: 'recovery-request.ts' },
   { src: 'views/key-rotation.ts', dest: 'key-rotation.ts' },

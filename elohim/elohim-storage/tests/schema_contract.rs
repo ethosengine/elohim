@@ -1047,6 +1047,67 @@ fn weave_view_matches_schema() {
     validate_against_schema("views/weave-view.schema.json", &json);
 }
 
+#[test]
+fn mishpat_commitment_view_matches_schema() {
+    use elohim_storage::views::JsonVal;
+    use elohim_storage::MishpatCommitmentView;
+
+    // Minimal required-only variant: bounds + dhtAnchorHash absent (an un-notarized
+    // row that carried no parseable bounds — both optional fields must be OMITTED,
+    // never serialized as null).
+    let minimal = MishpatCommitmentView {
+        cid: "uhCEk-commitment-1".to_string(),
+        action: "delegates-compute".to_string(),
+        scope: "republish-epr".to_string(),
+        provider: "uhCAk-provider".to_string(),
+        recipient: "uhCAk-recipient".to_string(),
+        bounds: None,
+        valid_from: "2026-05-28T00:00:00Z".to_string(),
+        valid_until: "2026-08-26T00:00:00Z".to_string(),
+        state: "proposed".to_string(),
+        dht_anchor_hash: None,
+        created_at: "2026-06-22T00:00:00Z".to_string(),
+    };
+    let json = serde_json::to_value(&minimal).unwrap();
+    assert!(
+        !json.as_object().unwrap().contains_key("bounds"),
+        "bounds must be absent when None (not null)"
+    );
+    assert!(
+        !json.as_object().unwrap().contains_key("dhtAnchorHash"),
+        "dhtAnchorHash must be absent when None (the un-notarized row contract)"
+    );
+    validate_against_schema("views/mishpat-commitment-view.schema.json", &json);
+
+    // Full variant: bounds (opaque action-specific envelope) + dhtAnchorHash present.
+    let full = MishpatCommitmentView {
+        cid: "uhCEk-commitment-2".to_string(),
+        action: "delegates-compute".to_string(),
+        scope: "republish-epr".to_string(),
+        provider: "uhCAk-provider".to_string(),
+        recipient: "uhCAk-recipient".to_string(),
+        bounds: Some(JsonVal(serde_json::json!({
+            "maxCallsPerHour": 100,
+            "reachCeiling": "commons"
+        }))),
+        valid_from: "2026-05-28T00:00:00Z".to_string(),
+        valid_until: "2026-08-26T00:00:00Z".to_string(),
+        state: "active".to_string(),
+        dht_anchor_hash: Some("uhCkk-anchor".to_string()),
+        created_at: "2026-06-22T00:00:00Z".to_string(),
+    };
+    let json = serde_json::to_value(&full).unwrap();
+    assert!(
+        json.as_object().unwrap().contains_key("bounds"),
+        "bounds must be present when Some"
+    );
+    assert!(
+        json.as_object().unwrap().contains_key("dhtAnchorHash"),
+        "dhtAnchorHash must be present when Some (notarized row)"
+    );
+    validate_against_schema("views/mishpat-commitment-view.schema.json", &json);
+}
+
 // ── Placement Gap + Resilience Snapshot ────────────────────────
 
 #[test]

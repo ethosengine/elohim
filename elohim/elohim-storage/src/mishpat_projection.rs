@@ -602,6 +602,78 @@ pub fn provide_projection_for(row: &NewMishpatCommitment) -> Option<ProvideProje
     })
 }
 
+/// The mishpat→REA bridge for a `delegates-compute` commitment (Wave 4.3).
+///
+/// Sibling to [`ProvideProjection`]: where that descriptor bridges a content
+/// provide into the resilience snapshot's `content:<reach>` provide vocabulary,
+/// this descriptor bridges a `delegates-compute` commitment into the REA
+/// economic facing's relation. The REA facing's `mutual_compute` fold
+/// (`elohim_facings::folds::rea`) reads reciprocal `(provider, recipient)`
+/// compute-delegation edges; this descriptor carries exactly the fields that
+/// fold's `CommitmentRow` input needs to populate a `delegates-compute` edge.
+///
+/// Unlike `ProvideProjection`, `scope` is read straight off the row column
+/// (`NewMishpatCommitment.scope`, set by `parse_delegates_compute`), NOT decoded
+/// from `bounds_json` — the delegates-compute parser already promotes `scope` to
+/// a first-class column, so there is no bounds round-trip here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DelegatesComputeProjection {
+    /// The commitment's `entry_hash` (`NewMishpatCommitment.cid`) — the natural
+    /// JOIN KEY the unified `CommitmentRow` relation uses against
+    /// `economic_events.bounded_by` to find the OBSERVED `compute-fulfilled`
+    /// event for this delegation. This is the `entry_hash`, NOT the
+    /// `action_hash`: a `compute-fulfilled` event's `bounded_by` carries the
+    /// commitment `entry_hash`, and `action_hash` lives ONLY in
+    /// `dht_anchor_hash` (the cid=entry_hash / anchor=action_hash invariant). A
+    /// projection that omitted this could not be joined to its fulfillment.
+    pub cid: String,
+    /// Delegating agent (`agent_cid`, `uhCAk…`) — `mutual_compute`'s edge source.
+    pub provider: String,
+    /// Receiving agent (`agent_cid`) — `mutual_compute`'s edge target.
+    pub recipient: String,
+    /// The commitment's compute scope (e.g. `republish-epr`), read through from
+    /// the `scope` column the delegates-compute parser already populated.
+    pub scope: String,
+    /// The commitment's `action_hash` for provenance on the projected edge.
+    pub dht_anchor_hash: Option<String>,
+}
+
+/// Decide whether a just-projected commitment is a `delegates-compute` agreement
+/// that should ALSO surface in the REA economic facing's relation, and with what
+/// `(provider, recipient, scope)`.
+///
+/// Returns `Some` ONLY for `action == "delegates-compute"` (the compute-delegation
+/// agreement the `mutual_compute` fold scopes to). Any other action — `provide`,
+/// `replicates-content`, `replicates-commons`, `replicates-dwelling`,
+/// `custody-blob`, `project-epr`, `acknowledges-reach-change`, … — returns `None`:
+/// those are not compute delegations and must not mint a compute edge.
+///
+/// This is PROJECTION ONLY — no DHT write, no new entry type. The
+/// `delegates-compute` row is already notarized and already landed in
+/// `mishpat_commitments` (via the `parse_delegates_compute` → `Upsert` path); this
+/// bridge does not duplicate that row into a second ledger. It is the pure
+/// translation a future unified `CommitmentRow` loader (the REA facing's relation
+/// materializer) consumes to add the `delegates-compute` edge — exactly as
+/// `signals.rs` consumes [`provide_projection_for`] for the content-provide edge.
+///
+/// Pure — no DB, no conductor.
+pub fn delegates_compute_projection_for(
+    row: &NewMishpatCommitment,
+) -> Option<DelegatesComputeProjection> {
+    if row.action != "delegates-compute" {
+        return None;
+    }
+    Some(DelegatesComputeProjection {
+        // `cid` is the commitment entry_hash (the bounded_by join key), NOT the
+        // action_hash — `parse_delegates_compute` set `cid = entry_hash`.
+        cid: row.cid.clone(),
+        provider: row.provider.clone(),
+        recipient: row.recipient.clone(),
+        scope: row.scope.clone(),
+        dht_anchor_hash: row.dht_anchor_hash.clone(),
+    })
+}
+
 /// Parse a `revokes-commitment` Commitment payload (Slice-2b).
 ///
 /// A revoke does NOT create a new row — it supersedes a previously-notarized
@@ -786,6 +858,87 @@ mod tests {
         assert!(
             result.unwrap_err().contains("provider"),
             "error must mention 'provider'"
+        );
+    }
+
+    // ── delegates_compute_projection_for (Wave 4.3 mishpat→rea bridge) ─────────
+
+    #[test]
+    fn delegates_compute_projection_maps_provider_recipient_scope() {
+        // A delegates-compute commitment projects into the REA relation with
+        // provider/recipient/scope mapped correctly (the mishpat→rea bridge).
+        let row = unwrap_upsert(
+            parse_commitment_payload(
+                "delegates-compute",
+                &delegates_compute_payload(),
+                "uhCEk-entry-abc",
+                "uhCkk-action-xyz",
+            )
+            .expect("well-formed delegates-compute must parse"),
+        );
+
+        let proj = delegates_compute_projection_for(&row)
+            .expect("a delegates-compute row must bridge into the REA relation");
+
+        // `cid` is the entry_hash — the bounded_by join key to the OBSERVED
+        // compute-fulfilled event — NOT the action_hash.
+        assert_eq!(
+            proj.cid, "uhCEk-entry-abc",
+            "cid must be the commitment entry_hash (the bounded_by join key)"
+        );
+        assert_ne!(
+            proj.cid, "uhCkk-action-xyz",
+            "cid must NOT be the action_hash (that lives only in dht_anchor_hash)"
+        );
+        assert_eq!(proj.provider, "agent:matthew-steward");
+        assert_eq!(proj.recipient, "agent:deploy-svc-matthew");
+        assert_eq!(
+            proj.scope, "republish-epr",
+            "scope is read through from the row column, not bounds_json"
+        );
+        assert_eq!(
+            proj.dht_anchor_hash.as_deref(),
+            Some("uhCkk-action-xyz"),
+            "provenance anchor carries through for the projected edge"
+        );
+    }
+
+    #[test]
+    fn non_delegates_compute_row_does_not_bridge() {
+        // A replicates-dwelling row (also provider/recipient-shaped) is NOT a
+        // compute delegation and must return None — only delegates-compute bridges.
+        let dwelling = unwrap_upsert(
+            parse_commitment_payload(
+                "replicates-dwelling",
+                &replicates_dwelling_payload(),
+                "eh-dwell",
+                "ah-dwell",
+            )
+            .expect("well-formed replicates-dwelling must parse"),
+        );
+        assert!(
+            delegates_compute_projection_for(&dwelling).is_none(),
+            "replicates-dwelling is not a compute delegation → None"
+        );
+
+        // A content provide row (acknowledges/replicates-commons) is likewise None.
+        let acknowledge = unwrap_upsert(
+            parse_commitment_payload(
+                "acknowledges-reach-change",
+                &serde_json::json!({
+                    "acknowledger": "agent:a",
+                    "target_epr_cid": "epr:x",
+                    "signed_at": "2026-05-28T00:00:00Z"
+                })
+                .to_string(),
+                "eh-ack",
+                "ah-ack",
+            )
+            .expect("acknowledges-reach-change must parse"),
+        );
+        assert!(
+            delegates_compute_projection_for(&acknowledge).is_none(),
+            "acknowledges-reach-change is not a compute delegation → None"
         );
     }
 

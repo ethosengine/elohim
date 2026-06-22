@@ -11240,6 +11240,21 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .cache_ttl(300)
                 .build(),
         )
+        // =====================================================================
+        // /api/v1/commitments/facing/rea — REA economic facing per-commitment
+        // read surface over the mishpat compute/recovery-class ledger (Wave 4.2).
+        // Viewer-less + node-scoped (no auth). Dispatch lives in
+        // api/rea_commitments.rs (`(GET, "facing/rea")` arm); this registry entry
+        // carries its cache metadata and is the route-shadow guard (asserted by
+        // `test_manifest_builds` — storage has no is_service_path, so the manifest
+        // path-coverage test IS the shadow guard).
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/commitments/facing/rea")
+                .handler("commitments_facing_rea")
+                .cache_ttl(30)
+                .build(),
+        )
         .route(
             Route::get("/api/v1/commitments/{id}")
                 .handler("get_commitment")
@@ -12250,6 +12265,14 @@ mod tests {
         assert!(
             paths.contains(&"/api/v1/weave"),
             "missing /api/v1/weave (operational-weave Slice 4)"
+        );
+        // REA economic facing Wave 4.2 — per-commitment mishpat-ledger read surface.
+        // Same route-shadow guard discipline as /api/v1/weave: a `facing/rea` arm
+        // dispatched through api/rea_commitments.rs but NOT registered here would
+        // carry no cache metadata and be invisible to this coverage assertion.
+        assert!(
+            paths.contains(&"/api/v1/commitments/facing/rea"),
+            "missing /api/v1/commitments/facing/rea (REA economic facing Wave 4.2)"
         );
         // Wave 3 M1 — vf-graphql bridge endpoint
         assert!(
