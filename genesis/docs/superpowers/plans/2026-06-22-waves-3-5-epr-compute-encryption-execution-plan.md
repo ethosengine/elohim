@@ -128,8 +128,26 @@ storage `cargo test` (3.3); a2o `tsc`+`eslint`+testid-sync (3.4). Live a2o rende
 - Per-wave honest-verification line stated; gap-ledger updated; nothing asserted "done" that only an alpha/a2o
   run can confirm.
 
+## Execution result (2026-06-22 — LANDED, adversarially verified)
+
+All in-scope implementation committed on `feat/frontend-eyes-sprint` (commit-only; integrator pushes):
+
+| Wave | Commit | Verify | Honest-verification boundary |
+|---|---|---|---|
+| 5.1 encryption proof | `e5ad3bcc3` | red-team **REAL** (7 tests; load-bearing negatives) | locally-verified-committed. Live encryption HELD. |
+| 4.1 REA folds | `ea31e0bf7` | code-reviewer **REAL/CLEAN** (10 tests) | locally-verified-committed. |
+| 4.2 MishpatCommitmentView+route | `ea31e0bf7` | **REAL/CLEAN** (schema_contract + test_manifest_builds green) | locally-verified-committed. `pnpm look` the route → operator (alpha). |
+| 4.3 bridge + compute-fulfilled | `ea31e0bf7` | red-team: **dormant/unwired**, projection-only Slice-0 OK | impl committed. **Cross-doorway mutual-compute → operator (alpha).** |
+| 3.0/3.1/3.2/3.4 EPR drill-downs | prior sessions (`4e9388c44` + HEAD) | verified green this sprint | live a2o 302-inversion render → operator (alpha). |
+| 3.3 epr_head relationships | `c6b46299f` | **REAL/CLEAN** (enrich-split tests) | locally-verified-committed. |
+
+61 storage/facings tests pass (0 failed), gates independently re-run by the verifiers. `p2p/mod.rs:1492` landmine untouched throughout; no new DHT entry type.
+
 ## Held / operator-owned (surfaced, not attempted)
-- Live encryption substrate (X25519 reader-key resolver; KeyEnvelope; ShardManifest field-add) — security-owned.
-- Cross-doorway mutual-compute observation; live EPR 302-inversion a2o render — alpha degraded → operator.
+- **Live encryption substrate** (X25519 reader-key resolver; `KeyEnvelope` entry; `ShardManifest` field-add) — security-owned.
+- **Cross-doorway mutual-compute observation** + **live EPR 302-inversion a2o render** + **`pnpm look` the `/api/v1/.../facing/rea` route** — alpha degraded → operator (prove on next genesis build once alpha healthy).
+- **⚠ HELD security boundary (red-team-flagged, recorded in `record_compute_fulfilled_event` doc):** the compute-fulfilled bridge is *forgeable-without-attestation* — do NOT wire it into any economic-consequence path until a live producer adds (1) a real-fulfillment trigger, (2) counterparty cross-signature (per the `AgentPeerBinding` unsigned-binding rule), (3) event-party↔commitment-party validation, (4) `entry_hash` cid validation.
+- **Integrator dev-merge:** the generated `mishpat-commitment-view.ts` landed in 5 app packages → the elohim-app gate runs on merge (never defers; `--no-verify` is the only frontend-touching dev-push path). Pre-existing PVC-deferral clippy `--tests` debt in OTHER storage files persists (not introduced here).
+- **Ambient working-tree (left for the other session, NOT committed):** 5 stale `weave-view.ts` regens (pre-existing `c6805597d` drift) + the `contributor-reflexive-view` line in `generated-ts/index.ts` + `build-storage-canary.sh`.
 - Value-leg `provide-content` substrate + ClusterClosure transitive walk — own slices (composed, not forked).
-- Revert `pool-policy.json` watermarks (88/92 → 75/85) after this sprint — temporary "for now" bump.
+- **Revert `pool-policy.json` watermarks (88/92 → 75/85)** after this sprint — temporary "for now" bump.
