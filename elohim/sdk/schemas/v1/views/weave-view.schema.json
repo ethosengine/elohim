@@ -32,8 +32,16 @@
       "type": "object"
     },
     "regionOccupancy": {
-      "description": "Regional occupancy distribution (deferred — Slice 5 follow-on). Absent in Slice 4 responses.",
-      "type": "object"
+      "description": "Viewer-agnostic regional occupancy of distinct stewarding hubs (Slice 4 — shipped by build_weave_view). Absent only when the lens is not selected; an empty holder relation reads Some(all-zero).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["local", "regional", "global", "unknown"],
+      "properties": {
+        "local": { "type": "integer", "minimum": 0 },
+        "regional": { "type": "integer", "minimum": 0 },
+        "global": { "type": "integer", "minimum": 0 },
+        "unknown": { "type": "integer", "minimum": 0 }
+      }
     }
   }
 }

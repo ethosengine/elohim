@@ -11938,6 +11938,21 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/weave — Cluster-scoped operational-weave lens (Slice 4)
+        // Viewer-less + node-scoped (no auth, no app-id): the gauge and the
+        // WeaveView reflect the whole node's placement/coverage/capacity/region
+        // state. Dispatch lives in api/mod.rs (`sub_path == "weave"`); this
+        // registry entry carries its cache metadata and is the route-shadow
+        // guard (asserted by `test_manifest_builds`).
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/weave")
+                .handler("get_weave")
+                .cache_ttl(10)
+                .rate_limit(30)
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/epr/:cid/nav-context — EPR nav-context projection (Category C read-only)
         // Zero new DHT entry types; zero new tables; zero migrations.
         // =====================================================================
@@ -12225,6 +12240,16 @@ mod tests {
         assert!(
             paths.contains(&"/api/v1/reciprocity"),
             "missing /api/v1/reciprocity (T32)"
+        );
+        // Operational-weave Slice 4 — cluster-scoped weave lens.
+        // The registry entry is the route-shadow guard in this crate's
+        // architecture: a viewer-less `/api/v1/weave` not registered here would
+        // dispatch through api/mod.rs but carry no cache/auth metadata and be
+        // invisible to this coverage assertion (the storage analogue of the
+        // doorway is_service_path guard — project_doorway_main_route_needs_is_service_path).
+        assert!(
+            paths.contains(&"/api/v1/weave"),
+            "missing /api/v1/weave (operational-weave Slice 4)"
         );
         // Wave 3 M1 — vf-graphql bridge endpoint
         assert!(

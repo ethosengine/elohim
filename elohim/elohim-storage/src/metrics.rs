@@ -85,6 +85,31 @@ lazy_static! {
     )
     .expect("valid gauge");
 
+    /// Cluster-aggregate FREE custodian capacity in bytes (Σ over reporting nodes;
+    /// 0 when no node reported). The gauge mirror of `WeaveView.cluster_capacity.free`,
+    /// set by the operational-weave facing adapter from the SAME `aggregate_capacity`
+    /// fold (one fold, two projections). Cluster-scalar by design — per-custodian
+    /// breakdown would be an unbounded-cardinality `IntGaugeVec` and is NOT emitted here.
+    pub static ref ELOHIM_CUSTODIAN_FREE_BYTES: IntGauge = IntGauge::new(
+        "elohim_custodian_free_bytes",
+        "Cluster-aggregate free custodian capacity in bytes (0 = none reported)",
+    )
+    .expect("valid gauge");
+
+    /// Cluster-aggregate USED custodian capacity in bytes (Σ over reporting nodes).
+    pub static ref ELOHIM_CUSTODIAN_USED_BYTES: IntGauge = IntGauge::new(
+        "elohim_custodian_used_bytes",
+        "Cluster-aggregate used custodian capacity in bytes (0 = none reported)",
+    )
+    .expect("valid gauge");
+
+    /// Cluster-aggregate STEWARDED bytes (Σ of custody-blob commitment quantities).
+    pub static ref ELOHIM_CUSTODIAN_STEWARDED_BYTES: IntGauge = IntGauge::new(
+        "elohim_custodian_stewarded_bytes",
+        "Cluster-aggregate stewarded bytes from custody-blob commitments (0 = none)",
+    )
+    .expect("valid gauge");
+
     /// Boot-time cgroup CPU quota in millicores (0 = unbounded/unknown).
     pub static ref NODE_CPU_QUOTA_MILLICORES: IntGauge = IntGauge::new(
         "elohim_node_cpu_quota_millicores",
@@ -193,6 +218,9 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_PLACEMENT_GAP_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_RS_COVERAGE_MILLI.clone()));
+        let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_FREE_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_USED_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_STEWARDED_BYTES.clone()));
     });
 }
 

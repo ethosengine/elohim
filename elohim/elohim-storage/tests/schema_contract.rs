@@ -997,7 +997,7 @@ fn household_devices_view_matches_schema() {
 
 #[test]
 fn weave_view_matches_schema() {
-    use elohim_storage::{ComputeTriptych, WeaveView};
+    use elohim_storage::{ComputeTriptych, RegionalDistributionView, WeaveView};
 
     // Minimal required-only variant (cluster_capacity absent → rsCoverage absent).
     let minimal = WeaveView {
@@ -1016,7 +1016,11 @@ fn weave_view_matches_schema() {
     );
     validate_against_schema("views/weave-view.schema.json", &json);
 
-    // Full variant: all optional lenses populated.
+    // Full variant: all SELECTED lenses populated (tier_occupancy stays None — the
+    // deliberate scope deferral, never fabricated). region_occupancy is populated so
+    // this contract actually exercises the field `build_weave_view` now ships on the
+    // wire (it emits `Some(regions)`); validating only its absence would leave a
+    // malformed regionOccupancy sub-schema uncaught.
     // Use all-Some ComputeTriptych fields to avoid null serialization in clusterCapacity.
     let full = WeaveView {
         placement_gap_count: 3,
@@ -1027,10 +1031,19 @@ fn weave_view_matches_schema() {
             stewarded: Some(200_000_000),
         }),
         tier_occupancy: None,
-        region_occupancy: None,
+        region_occupancy: Some(RegionalDistributionView {
+            local: 0,
+            regional: 0,
+            global: 1,
+            unknown: 1,
+        }),
         measured_at: "2026-06-20T12:00:00Z".to_string(),
     };
     let json = serde_json::to_value(&full).unwrap();
+    assert!(
+        json.as_object().unwrap().contains_key("regionOccupancy"),
+        "regionOccupancy must be present when Some (the lens build_weave_view selects)"
+    );
     validate_against_schema("views/weave-view.schema.json", &json);
 }
 

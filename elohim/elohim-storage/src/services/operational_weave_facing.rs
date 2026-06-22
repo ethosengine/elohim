@@ -7,8 +7,9 @@ use diesel::dsl::sql;
 use diesel::prelude::*;
 use diesel::sql_types::{Double, Nullable};
 use elohim_facings::folds::operational_weave::{
-    aggregate_capacity, placement_gap_count, rs_coverage, CustodianRow,
+    aggregate_capacity, placement_gap_count, region_occupancy, rs_coverage, CustodianRow,
 };
+use elohim_facings::relation::HolderRow;
 use elohim_views::{CustodianStorageMetricsView, PlacementGapView, WeaveView};
 
 use crate::db::models::CustodianMetrics;
@@ -100,6 +101,19 @@ pub fn emit_placement_gap_gauge(gaps: &[PlacementGapView]) {
     crate::metrics::ELOHIM_PLACEMENT_GAP_COUNT.set(count as i64);
 }
 
+/// Adapter: publish the already-folded cluster capacity to the /metrics gauges.
+/// Takes the `aggregate_capacity` fold OUTPUT (the caller folds; this only emits)
+/// so the gauge and `WeaveView.cluster_capacity` are the SAME number. An unreported
+/// field (`None`) projects as `0` — the cluster gauge is a scalar floor, not a
+/// nullable; a node that never reported simply contributes nothing.
+/// `u64 → i64`: capacities never approach `i64::MAX`, but saturate defensively.
+pub fn emit_capacity_gauges(cap: &elohim_views::ComputeTriptych) {
+    let as_i64 = |v: Option<u64>| v.unwrap_or(0).min(i64::MAX as u64) as i64;
+    crate::metrics::ELOHIM_CUSTODIAN_FREE_BYTES.set(as_i64(cap.free));
+    crate::metrics::ELOHIM_CUSTODIAN_USED_BYTES.set(as_i64(cap.used));
+    crate::metrics::ELOHIM_CUSTODIAN_STEWARDED_BYTES.set(as_i64(cap.stewarded));
+}
+
 /// Load ALL placement gaps (node-level, not app-scoped) from the database.
 ///
 /// The operational-weave lens is cluster-scoped and viewer-less: the gauge and
@@ -121,27 +135,94 @@ fn load_all_placement_gaps(conn: &mut SqliteConnection) -> Vec<PlacementGapView>
     }
 }
 
+/// Load the WHOLE-NODE holder relation — every `(hub, agent, region)` that holds
+/// ANY shard on this node — for the viewer-less `region_occupancy` fold.
+///
+/// This is the cluster-scoped sibling of `household_resilience::load_holder_relation`,
+/// which is content-scoped (filters by a content's `shard_hashes` + `h_app_id`). The
+/// operational weave has no single content and no single viewer, so we load ALL
+/// `shard_locations` with NO shard/content/app filter (mirroring
+/// `load_all_placement_gaps`).
+///
+/// ## Identity join (the misnamed-column trap)
+/// `shard_locations.peer_id` HOLDS an `agent_cid` (NOT a libp2p transport id — see
+/// `elohim-storage/CLAUDE.md` Identity & Transport Coherence); the canonical join is
+/// `humans.agent_pub_key == shard_locations.peer_id`. `collectives` is LEFT-joined so a
+/// holder without a collective folds to the `unknown` region bucket. A query error
+/// degrades to an empty `Vec` (warn-and-continue), exactly like the placement-gap loader.
+///
+/// ## Dormancy (correct-but-empty)
+/// `humans.agent_pub_key` is a substrate-only-written column (no HTTP create surface
+/// populates it today — `project_resilience_snapshot_humans_junction`), so this join
+/// reads EMPTY on a commitments-only-seeded node. That is the honest correct-but-dormant
+/// projection: the lens is SELECTED (so `region_occupancy` is `Some(empty)`, never absent),
+/// and it lights up the moment a real `agent_cid`-bearing `humans` row + shard placement land.
+fn load_all_holder_relation(conn: &mut SqliteConnection) -> Vec<HolderRow> {
+    use crate::db::diesel_schema::{collectives, humans, shard_locations};
+
+    let rows: Vec<(Option<String>, String, Option<String>)> = match shard_locations::table
+        .inner_join(
+            humans::table.on(humans::agent_pub_key
+                .nullable()
+                .eq(shard_locations::peer_id.nullable())),
+        )
+        .left_join(collectives::table.on(collectives::id.nullable().eq(humans::household_id)))
+        .select((
+            humans::household_id,
+            humans::id,
+            collectives::region.nullable(),
+        ))
+        .load(conn)
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::warn!("load_all_holder_relation: query failed: {e}");
+            return Vec::new();
+        }
+    };
+
+    rows.into_iter()
+        .map(|(hub_id, agent_id, region)| HolderRow {
+            hub_id,
+            agent_id,
+            region,
+        })
+        .collect()
+}
+
 /// Build the full [`WeaveView`] from the current DB state.
 ///
 /// The caller stamps `measured_at` (passed as an ISO-8601 string); this
 /// function NEVER calls a clock.  Both Prometheus gauges are also set here
 /// as a side-effect so the two wire shapes stay in sync with one load.
+///
+/// `tier_occupancy` stays `None` by deliberate scope decision: the holder
+/// relation carries no risk-tier dimension and `RiskTierDistribution` is a
+/// spatial-vulnerability type — fabricating a tier would violate the
+/// not-selected-field contract. Designing a real risk-tier source is a separate
+/// follow-on (see the fold's doc-comment in `operational_weave.rs`).
 pub fn build_weave_view(conn: &mut SqliteConnection, measured_at: String) -> WeaveView {
     let gaps = load_all_placement_gaps(conn);
     let custodians = load_custodian_relation(conn);
+    let holders = load_all_holder_relation(conn);
 
-    // --- gauges (adapter layer — fold is pure) ---------------------------------
+    // --- folds (pure) ----------------------------------------------------------
     let coverage = rs_coverage(&gaps);
+    let cluster_capacity = aggregate_capacity(&custodians);
+    let regions = region_occupancy(&holders);
+
+    // --- gauges (adapter layer — fold is pure; NEVER set() inside a fold) -------
     emit_placement_gap_gauge(&gaps);
     crate::metrics::ELOHIM_RS_COVERAGE_MILLI.set((coverage * 1000.0) as i64);
+    emit_capacity_gauges(&cluster_capacity);
 
     // --- view ------------------------------------------------------------------
     WeaveView {
         placement_gap_count: placement_gap_count(&gaps) as u32,
         rs_coverage: Some(coverage),
-        cluster_capacity: Some(aggregate_capacity(&custodians)),
+        cluster_capacity: Some(cluster_capacity),
         tier_occupancy: None,
-        region_occupancy: None,
+        region_occupancy: Some(regions),
         measured_at,
     }
 }
@@ -171,5 +252,18 @@ mod tests {
         assert_eq!(crate::metrics::ELOHIM_PLACEMENT_GAP_COUNT.get(), 2);
         emit_placement_gap_gauge(&[]);
         assert_eq!(crate::metrics::ELOHIM_PLACEMENT_GAP_COUNT.get(), 0);
+    }
+
+    #[test]
+    fn emit_capacity_gauges_mirror_triptych_none_is_zero() {
+        crate::metrics::register_all(); // idempotent (Once-guarded)
+        emit_capacity_gauges(&elohim_views::ComputeTriptych {
+            free: Some(30),
+            used: Some(5),
+            stewarded: None, // unreported field → 0, never a panic
+        });
+        assert_eq!(crate::metrics::ELOHIM_CUSTODIAN_FREE_BYTES.get(), 30);
+        assert_eq!(crate::metrics::ELOHIM_CUSTODIAN_USED_BYTES.get(), 5);
+        assert_eq!(crate::metrics::ELOHIM_CUSTODIAN_STEWARDED_BYTES.get(), 0);
     }
 }
