@@ -287,6 +287,13 @@ impl EprService {
                         .into_iter()
                         .map(|prereq_id| format!("prerequisite-mastery:{prereq_id}"))
                         .collect();
+                    // Knowledge-leg of the four-leg coupling: populate the
+                    // direct typed relationships from the content graph
+                    // (`epr_edge` outbound edges). The diesel-only enrich=false
+                    // path (`derive_epr_head`) holds no graph engine and leaves
+                    // `relationships` empty — this enrich=true caller fills it,
+                    // exactly mirroring the `attestation_requirements` split.
+                    head.relationships = query_direct_relationships(graph, id);
                 }
                 match rmp_serde::to_vec(&head) {
                     Ok(bytes) => Some(bytes),
@@ -601,6 +608,62 @@ pub fn query_direct_prerequisites(
             .collect(),
         Err(e) => {
             warn!(content_id = %content_id, error = %e, "PREREQUISITE edge query failed");
+            Vec::new()
+        }
+    }
+}
+
+/// Query the **direct (1-hop)** typed relationships of `content_id` from the
+/// content graph — every outbound edge `*epr_edge{from_cid: content_id,
+/// to_cid, rel_type}`, returned as the `EprHead.relationships` wire shape.
+///
+/// This is the general-case counterpart to [`query_direct_prerequisites`]: the
+/// prerequisite query filters to a single `rel_type` because it backs the
+/// access gate, whereas this helper returns *all* relation types
+/// (PREREQUISITE, TEACHES, CONTAINS, REFERENCES, SUPERSEDES, …) so the
+/// knowledge-leg of the four-leg coupling is populated. It is the read-back
+/// inverse of `GraphProjector::project_head`, which writes `head.relationships`
+/// into `epr_edge` rows.
+///
+/// The projector collapses `target` and `target_cid` into a single `to_cid`
+/// column (`rel.target_cid.unwrap_or(rel.target)`), so on read-back the CID is
+/// not separately recoverable: the edge target is placed in `target` and
+/// `target_cid` is left `None`. This is a DIRECT (1-hop) read of existing
+/// edges — NOT a transitive `ClusterClosure` walk (that remains design-only,
+/// HELD). Returns an empty Vec when the content has no edges or on query
+/// failure (fail-open for display).
+#[cfg(feature = "graph-native")]
+pub fn query_direct_relationships(
+    graph: &crate::graph::engine::GraphEngine,
+    content_id: &str,
+) -> Vec<crate::epr_codec::EprRelationship> {
+    let res = graph.run_script(
+        "?[to_cid, rel_type] := *epr_edge{from_cid: $cid, to_cid, rel_type}",
+        &[("cid", cozo::DataValue::from(content_id))],
+    );
+    match res {
+        Ok(qr) => qr
+            .rows
+            .into_iter()
+            .filter_map(|row| {
+                let mut it = row.into_iter();
+                let to_cid = match it.next() {
+                    Some(cozo::DataValue::Str(s)) => s.to_string(),
+                    _ => return None,
+                };
+                let rel_type = match it.next() {
+                    Some(cozo::DataValue::Str(s)) => s.to_string(),
+                    _ => return None,
+                };
+                Some(crate::epr_codec::EprRelationship {
+                    rel_type,
+                    target: to_cid,
+                    target_cid: None,
+                })
+            })
+            .collect(),
+        Err(e) => {
+            warn!(content_id = %content_id, error = %e, "epr_edge relationship query failed");
             Vec::new()
         }
     }
@@ -1029,6 +1092,143 @@ mod tests {
                     .is_ok(),
                 "content with no PREREQUISITE edge must be ALLOWED unconditionally"
             );
+        }
+    }
+
+    // ---- Knowledge-leg: query_direct_relationships + the enrich split ----
+    //
+    // Wave 3.3: the four-leg coupling law wants `EprHead.relationships`
+    // populated. The enrich=true caller (`resolve_epr_head_locally`) fills it
+    // from the content graph; the diesel-only enrich=false path
+    // (`derive_epr_head`) leaves it `vec![]`. These prove both halves.
+    #[cfg(feature = "graph-native")]
+    mod relationships_leg {
+        use super::*;
+        use crate::epr_codec::{
+            EprHead, EprLamadContext, EprQahalContext, EprRelationship, EprShefaContext,
+        };
+        use crate::graph::engine::GraphEngine;
+        use crate::graph::projector::GraphProjector;
+        use crate::graph::schema::apply_core_schema;
+
+        fn graph_with_schema(dir: &std::path::Path) -> GraphEngine {
+            let eng = GraphEngine::open(&dir.join("graph.db")).expect("open graph");
+            apply_core_schema(&eng).expect("apply core schema");
+            eng
+        }
+
+        /// EprHead carrying two distinct typed relations.
+        fn head_with_relations(id: &str, rels: Vec<(&str, &str)>) -> EprHead {
+            EprHead {
+                version: 1,
+                id: id.to_string(),
+                content: String::new(),
+                lamad: EprLamadContext {
+                    title: id.to_string(),
+                    content_type: "concept".to_string(),
+                    description: None,
+                    content_format: Some("markdown".to_string()),
+                    tags: vec![],
+                },
+                shefa: EprShefaContext {
+                    stewards: vec![],
+                    allocations: vec![],
+                },
+                qahal: EprQahalContext {
+                    reach: Some("commons".to_string()),
+                    layer: None,
+                    attestation_requirements: vec![],
+                },
+                relationships: rels
+                    .into_iter()
+                    .map(|(rel_type, target)| EprRelationship {
+                        rel_type: rel_type.to_string(),
+                        target: target.to_string(),
+                        target_cid: None,
+                    })
+                    .collect(),
+                author: None,
+                updated: None,
+            }
+        }
+
+        #[test]
+        fn query_direct_relationships_reads_real_edges() {
+            let tmp = tempfile::tempdir().unwrap();
+            let graph = graph_with_schema(tmp.path());
+            // REAL write path: project content-b with two typed relations.
+            GraphProjector::new(&graph)
+                .project_head(
+                    "content-b",
+                    &head_with_relations(
+                        "content-b",
+                        vec![("TEACHES", "content-c"), ("REFERENCES", "content-d")],
+                    ),
+                )
+                .expect("project head");
+
+            let mut rels = query_direct_relationships(&graph, "content-b");
+            // Cozo returns rows unordered — sort for a stable assertion.
+            rels.sort_by(|a, b| a.rel_type.cmp(&b.rel_type));
+
+            assert_eq!(rels.len(), 2, "both direct relations must read back");
+            assert_eq!(rels[0].rel_type, "REFERENCES");
+            assert_eq!(rels[0].target, "content-d");
+            assert_eq!(rels[0].target_cid, None, "target_cid is not recoverable");
+            assert_eq!(rels[1].rel_type, "TEACHES");
+            assert_eq!(rels[1].target, "content-c");
+
+            // Content with no outbound edge → empty.
+            assert!(
+                query_direct_relationships(&graph, "content-c").is_empty(),
+                "a node with no outbound edges has no direct relations"
+            );
+        }
+
+        #[test]
+        fn enrich_true_populates_relationships_enrich_false_stays_empty() {
+            let pool = crate::test_util::test_pool();
+            let mut conn = pool.get().unwrap();
+            let ctx = AppContext::new("lamad");
+            // Real content row so derive_epr_head finds the focal node.
+            mk_content(&mut conn, &ctx, "content-b", "commons", None);
+            drop(conn);
+
+            let tmp = tempfile::tempdir().unwrap();
+            let graph = graph_with_schema(tmp.path());
+            GraphProjector::new(&graph)
+                .project_head(
+                    "content-b",
+                    &head_with_relations("content-b", vec![("TEACHES", "content-c")]),
+                )
+                .expect("project head");
+
+            // ENRICH=FALSE path (the diesel-only `derive_epr_head`) — even with
+            // pillar enrichment ON it never touches the graph, so relationships
+            // stay empty (no graph dependency on this leg). This same derived
+            // head is the starting point the enrich=true caller overwrites.
+            let mut conn = pool.get().unwrap();
+            let mut head =
+                crate::epr_head::derive_epr_head(&mut conn, &ctx, "content-b", false, true)
+                    .expect("derive ok")
+                    .expect("content exists");
+            assert!(
+                head.relationships.is_empty(),
+                "diesel-only enrich=false path must leave relationships empty"
+            );
+
+            // ENRICH=TRUE overwrite — the exact line the graph-holding caller
+            // (`resolve_epr_head_locally`) runs: fill relationships from the
+            // content graph. Asserting on the helper directly mirrors the
+            // sibling `query_direct_prerequisites` coverage standard.
+            head.relationships = query_direct_relationships(&graph, "content-b");
+            assert_eq!(
+                head.relationships.len(),
+                1,
+                "enrich=true caller must populate the direct relations"
+            );
+            assert_eq!(head.relationships[0].rel_type, "TEACHES");
+            assert_eq!(head.relationships[0].target, "content-c");
         }
     }
 }
