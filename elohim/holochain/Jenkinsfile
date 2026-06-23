@@ -10,9 +10,15 @@
  *   - elohim-edgenode (Holochain conductor)
  *   - elohim-happ-installer (bootstrap sidecar)
  *
- * Environment Architecture:
- *   - dev branch → doorway-alpha.elohim.host (alpha), doorway-staging.elohim.host (staging)
- *   - main branch → doorway.elohim.host (serves production app only)
+ * Environment Architecture (branch → doorways deployed):
+ *   - dev branch     → ALPHA env, deploys BOTH federation peers:
+ *                        · doorway-alpha.elohim.host (doorway-A, on-prem)
+ *                        · elohim.host               (doorway-B / alpha-b federation
+ *                          peer, shem apex — alpha-b.yaml, deploy elohim-doorway-alpha-b)
+ *                      Both peers track dev in lockstep so the federation runs matched
+ *                      code + DNA (mismatched hashes → split DHT → can't federate).
+ *   - staging branch → doorway-staging.elohim.host (+ staging-read)
+ *   - main branch    → doorway.elohim.host (legacy prod doorway — NOT elohim.host)
  *
  * Trigger behavior:
  *   - Only runs when triggered by orchestrator or manual
