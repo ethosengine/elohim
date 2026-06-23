@@ -1,6 +1,6 @@
 {
   "description": "Shared route-claims contract vectors — spec §8.4 of genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md. ONE claims vocabulary, two planes: client minting (claimsFromDeclaration + eprToRoute in @elohim/service) and doorway dispatch (EprRouter claims/alias indexes). Consumed via include_str! by doorway-service and via import by epr-ref.spec.ts + seed-projections tests. Edit here, never fork per-crate copies. reservedPrefixes mirrors doorway is_service_path (asserted by tests in BOTH doorway-service and elohim-storage's validator).",
-  "reservedPrefixes": ["/epr", "/epr-head", "/db", "/api", "/blob", "/apps", "/status", "/health", "/admin", "/identity", "/threshold", "/sitemap.xml"],
+  "reservedPrefixes": ["/epr", "/epr-head", "/db", "/api", "/blob", "/apps", "/status", "/health", "/admin", "/identity/did", "/threshold", "/sitemap.xml"],
   "lamadGrant": {
     "schemaVersion": 1,
     "claimsManifestCid": null,
