@@ -50,12 +50,23 @@ pub async fn handle(
 
         // GET /api/v1/custodians/metrics/{id}/recommendations
         (&Method::GET, p) if p.starts_with("metrics/") && p.ends_with("/recommendations") => {
-            let id = p
+            // Extract {id} without panicking. An id-less request like
+            // "metrics/recommendations" satisfies the guard (starts_with "metrics/"
+            // AND ends_with "/recommendations") but has no id segment, so the old
+            // `.strip_suffix("/recommendations").unwrap()` panicked — dropping the
+            // connection, surfacing as a doorway 503, and polluting the upstream
+            // breaker. Fall through to an honest 404 instead.
+            match p
                 .strip_prefix("metrics/")
-                .unwrap()
-                .strip_suffix("/recommendations")
-                .unwrap();
-            handle_recommendations(id, pool, ctx).await
+                .and_then(|rest| rest.strip_suffix("/recommendations"))
+                .filter(|id| !id.is_empty())
+            {
+                Some(id) => handle_recommendations(id, pool, ctx).await,
+                None => Ok(response::not_found(&format!(
+                    "Custodian id required: /api/v1/custodians/{}",
+                    path
+                ))),
+            }
         }
 
         // GET /api/v1/custodians/metrics/{id}
