@@ -3,7 +3,7 @@ id: "backlog-wan-nat-federation-dataplane-discovery-gap"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "WAN-NAT discovery gap: doorway HTTP federation, storage libp2p/iroh dataplane, and cross-doorway JWKS must register/see each other across NAT — k8s in-cluster DNS is a dev-test fixture, never the architecture"
+title: "WAN-NAT discovery gap across the p2p layer (Holochain DHT conductor + iroh/libp2p blob stores) and the federation/fediverse layer (doorways, over p2p) — k8s in-cluster DNS is a dev-test fixture, never the architecture"
 slug: "wan-nat-federation-dataplane-discovery-gap-2026-06-23"
 written: "2026-06-23"
 author: "oAuth+federation shakeout — 7-agent WAN-NAT gap workflow (wf_0c940c53)"
@@ -21,21 +21,33 @@ cites:
   - genesis/orchestrator/manifests/doorway/alpha.yaml
 ---
 
-# WAN-NAT federation + dataplane discovery gap
+# WAN-NAT discovery gap — p2p substrate + federation/fediverse layer
 
-The operator-visible symptom (`/threshold/doorways` shows only self) is one face of a
-cross-cutting requirement: **federation AND the P2P dataplanes must register/see each
-other over WAN-NAT.** The hazard this doc guards against is "fixing" it on one plane with
-a co-location mechanism (k8s in-cluster DNS) and declaring victory — k8s gaps ≠ protocol
-gaps ([[feedback_k8s_is_not_the_architecture]]).
+**Vocabulary (architect, 2026-06-23):** *p2p* = the **substrate** — the Holochain DHT
+(conductor) + the iroh/libp2p blob stores. *Federation / fediverse* = the **doorways**, a
+layer **over** p2p. Doorway peer-discovery **rides the p2p layer** (DHT-gossiped
+`DoorwayRegistration` entries) — it is NOT a separate direct doorway-to-doorway mechanism.
+([[feedback_p2p_vs_federation_layer_vocabulary]])
 
-## Three-plane WAN-NAT readiness (workflow wf_0c940c53, 2026-06-23)
+The operator-visible symptom (`/threshold/doorways` showed only self) was the
+**federation/fediverse** face of a cross-cutting requirement: **both p2p and federation
+must register/see each other over WAN-NAT.** The hazard this doc guards against is "fixing"
+it with a co-location mechanism (k8s in-cluster DNS) and declaring victory — k8s gaps ≠
+protocol gaps ([[feedback_k8s_is_not_the_architecture]]).
 
-| Plane | Readiness today | Evidence |
+## WAN-NAT readiness by layer (workflow wf_0c940c53, 2026-06-23)
+
+### p2p layer (substrate)
+| Plane | Readiness | Evidence |
 |---|---|---|
-| **Conductor DHT gossip** (kitsune2/tx5) | ✅ **WAN-native, exercised now** — the reference posture | public `bootstrap_url`/`signal_url`, `enable_relaying`, STUN; shared `elohim-bootstrap` table; peerCount ~13 |
-| **Doorway HTTP federation** (the selector) | ⚙️ **being fixed now** — DHT-native `get_all_doorways` (coordinator-only) rides the conductor plane | `services/federation.rs` stub replaced; `infrastructure` zome list-all anchor added |
-| **Storage libp2p+iroh dataplane** | ❌ **pinned to in-cluster / dormant** | below |
+| **Holochain DHT gossip** (conductor, kitsune2/tx5) | ✅ **WAN-native, exercised now** — the reference posture | public `bootstrap_url`/`signal_url`, `enable_relaying`, STUN; shared `elohim-bootstrap` table; peerCount ~13 |
+| **iroh / libp2p blob stores** (byte replication) | ❌ **pinned to in-cluster / dormant** | below |
+
+### federation / fediverse layer (doorways, over p2p)
+| Plane | Readiness | Evidence |
+|---|---|---|
+| **Doorway peer-discovery** (the `/threshold/doorways` selector) | ✅ **LANDED + verified live 2026-06-23** — DHT-native `get_all_doorways` (coordinator-only) **rides the p2p DHT**; selector now lists both doorways (alpha + apex) | `services/federation.rs` stub replaced; `infrastructure` zome `__all__` list-all anchor (b730d3302) |
+| **Cross-doorway JWT/JWKS validation** | ❌ **unimplemented** (HMAC shared secret, not Ed25519/JWKS) | below |
 
 ## What remains (this backlog item)
 
