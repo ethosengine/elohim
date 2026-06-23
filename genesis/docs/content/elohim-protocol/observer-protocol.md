@@ -1,3 +1,7 @@
+---
+id: observer-protocol
+---
+
 # **The Elohim Observer: When Being Seen Becomes Sacred**
 ## **From Surveillance to Witness - The Architecture of Ephemeral Observation**
 

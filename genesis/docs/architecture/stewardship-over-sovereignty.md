@@ -1,3 +1,7 @@
+---
+id: stewardship-over-sovereignty
+---
+
 # Stewardship Over Sovereignty
 
 > **Canon status:** Foundational. This document anchors every other canon, spec, plan, and implementation in the protocol. Read it first.

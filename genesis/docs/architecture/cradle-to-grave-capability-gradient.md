@@ -1,3 +1,7 @@
+---
+id: cradle-to-grave-capability-gradient
+---
+
 # Cradle-to-Grave Capability Gradient
 
 > **Canon status:** Substrate philosophy. Read [stewardship-over-sovereignty](epr:stewardship-over-sovereignty) and [rea-compute-commitment-primitive](epr:rea-compute-commitment-primitive) first.

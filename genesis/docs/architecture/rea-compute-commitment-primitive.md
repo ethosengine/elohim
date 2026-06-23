@@ -1,3 +1,7 @@
+---
+id: rea-compute-commitment-primitive
+---
+
 # The REA Compute-Commitment Primitive
 
 > **Canon status:** Gospel-tier substrate primitive. Read [stewardship-over-sovereignty](epr:stewardship-over-sovereignty) first.

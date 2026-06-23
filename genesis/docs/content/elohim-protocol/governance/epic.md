@@ -1,3 +1,7 @@
+---
+id: governance-epic
+---
+
 # Epic VI: The Elohim Governance Story – When Agents Serve Without Ruling
 
 ## Accountable Autonomy: How We Govern Those Who Cannot Be Controlled

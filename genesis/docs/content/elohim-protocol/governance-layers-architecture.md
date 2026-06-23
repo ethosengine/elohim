@@ -1,3 +1,7 @@
+---
+id: governance-layers-architecture
+---
+
 # Elohim Protocol - Governance Layers
 
 This directory contains the complete governance layer architecture for the Elohim Protocol, spanning from individual to global scales across both geographic/political and functional dimensions.

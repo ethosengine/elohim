@@ -1,3 +1,7 @@
+---
+id: trust-compute-gradient-brainstorm
+---
+
 # Trust as Efficiency Signal — The Compute-Burden Gradient
 
 **Architectural brainstorm — foundation for EPR-native graph enablement, prerequisite to Phase 3**
