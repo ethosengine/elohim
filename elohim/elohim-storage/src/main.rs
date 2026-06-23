@@ -653,17 +653,15 @@ async fn async_main(
         let mut genesis_healed = false;
         let admin_ws = loop {
             manager.start()?;
-            let outcome: anyhow::Result<holochain_client::AdminWebsocket> =
-                match manager.wait_for_ready(args.conductor_max_retries).await {
-                    Ok(ws) => happ_manager::ensure_happ_installed(
-                        &ws,
-                        &args.happ_path,
-                        &args.app_id,
-                    )
+            let outcome: anyhow::Result<holochain_client::AdminWebsocket> = match manager
+                .wait_for_ready(args.conductor_max_retries)
+                .await
+            {
+                Ok(ws) => happ_manager::ensure_happ_installed(&ws, &args.happ_path, &args.app_id)
                     .await
                     .map(|()| ws),
-                    Err(e) => Err(anyhow::Error::from(e)),
-                };
+                Err(e) => Err(anyhow::Error::from(e)),
+            };
             match outcome {
                 Ok(ws) => break ws,
                 Err(e) => {
@@ -685,7 +683,7 @@ async fn async_main(
                         genesis_healed = true;
                         continue;
                     }
-                    return Err(e);
+                    return Err(e.into());
                 }
             }
         };
