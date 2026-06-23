@@ -21,15 +21,16 @@ interface HealthResponse {
   uptime?: number;
 }
 
-/** Status endpoint response.
+/** Status endpoint response (from `/status.json`).
  *
- * `humansServed` / `contentAvailable` are SUBSTRATE (dataplane) figures read via the
- * conductor (Holochain DHT / libp2p / iroh). They are nullable on purpose: when the
- * doorway can't see the substrate they are UNKNOWN, not zero (unmeasured ≠ zero). The
- * landing renders null as "—", never as 0. `federatedPeers` is this doorway's own
- * (web2-projection) layer and is always measurable. */
+ * `contentAvailable` is the count of substrate entries this doorway has projected
+ * through its conductor — a doorway-local projection measure, always available.
+ * `humansServed` is a federation-wide social aggregate (sum of self-reported node
+ * counts); it is null until that figure is surfaced at this layer. Nulls render as
+ * "—" (unknown, never 0 — unmeasured ≠ zero). `federatedPeers` is this doorway's own
+ * web2-projection layer and is always measurable. */
 interface StatusResponse {
-  name: string;
+  name?: string;
   region: string | null;
   humansServed: number | null;
   contentAvailable: number | null;
@@ -107,20 +108,21 @@ type LoadingState = 'loading' | 'ready' | 'error';
             <span class="stat-value">{{ peers().length }}</span>
             <span class="stat-label">Federated Doorways</span>
           </div>
-          <div class="stat" [class.unmeasured]="status()?.humansServed == null">
+          <div class="stat" [class.unmeasured]="humansUnmeasured()">
             <span class="stat-value">{{ status()?.humansServed ?? '—' }}</span>
             <span class="stat-label">Humans Served</span>
           </div>
-          <div class="stat" [class.unmeasured]="status()?.contentAvailable == null">
+          <div class="stat" [class.unmeasured]="contentUnmeasured()">
             <span class="stat-value">{{ status()?.contentAvailable ?? '—' }}</span>
             <span class="stat-label">Content Available</span>
           </div>
         </section>
-        @if (status()?.humansServed == null || status()?.contentAvailable == null) {
+        @if (humansUnmeasured() || contentUnmeasured()) {
           <p class="dataplane-note">
-            Humans served &amp; content available read the substrate (Holochain DHT /
-            libp2p / iroh) through the conductor. They show <strong>—</strong> when this
-            doorway can't reach the substrate — <em>unknown, not zero</em>.
+            <strong>Content available</strong> is the substrate content this doorway has
+            projected through its conductor. <strong>Humans served</strong> aggregates
+            self-reported counts across federated nodes. A <strong>—</strong> means that
+            figure isn't available yet — <em>unknown, not zero</em>.
           </p>
         }
 
@@ -191,6 +193,18 @@ export class DoorwayLandingComponent implements OnInit {
     return this.status()?.name ?? window.location.hostname;
   });
 
+  /** A figure is "unmeasured" when it is null OR undefined (e.g. the /status.json
+   * fetch failed even in the ready state) — rendered as "—", never 0. */
+  readonly humansUnmeasured = computed(() => {
+    const v = this.status()?.humansServed;
+    return v === null || v === undefined;
+  });
+
+  readonly contentUnmeasured = computed(() => {
+    const v = this.status()?.contentAvailable;
+    return v === null || v === undefined;
+  });
+
   readonly version = computed(() => {
     return this.health()?.version ?? null;
   });
@@ -214,7 +228,7 @@ export class DoorwayLandingComponent implements OnInit {
     try {
       const [healthRes, statusRes, federationRes] = await Promise.allSettled([
         firstValueFrom(this.http.get<HealthResponse>(`${this.baseUrl}/health`)),
-        firstValueFrom(this.http.get<StatusResponse>(`${this.baseUrl}/status`)),
+        firstValueFrom(this.http.get<StatusResponse>(`${this.baseUrl}/status.json`)),
         firstValueFrom(this.http.get<FederationResponse>(`${this.baseUrl}/api/v1/federation/doorways`)),
       ]);
 

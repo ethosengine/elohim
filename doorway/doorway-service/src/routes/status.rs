@@ -244,6 +244,23 @@ pub struct StatusResponse {
     pub diagnostics: Diagnostics,
     /// Uniform compute report (shared fleet contract)
     pub compute: elohim_compute::ComputeReport,
+
+    // --- Threshold-landing summary (camelCase for the doorway-app SPA) ---
+    /// Region label, if configured.
+    pub region: Option<String>,
+    /// Humans served — a federation-wide social aggregate (sum of self-reported
+    /// node counts). `None` until that aggregate is surfaced at this layer; the
+    /// landing renders it as "—" (unknown, never 0). Source/semantics is an open
+    /// design decision — see backlog `doorway-landing-humans-served-source`.
+    #[serde(rename = "humansServed")]
+    pub humans_served: Option<u32>,
+    /// Content available — count of substrate entries this doorway has projected
+    /// through its conductor. A doorway-local projection measure, always available.
+    #[serde(rename = "contentAvailable")]
+    pub content_available: Option<u64>,
+    /// Federated peer doorways (web2-projection layer) — always measurable.
+    #[serde(rename = "federatedPeers")]
+    pub federated_peers: usize,
 }
 
 // =============================================================================
@@ -620,6 +637,9 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
         extensions,
     );
 
+    // Capture before `federation` is moved into the struct below.
+    let federated_peers = federation.peer_count;
+
     StatusResponse {
         service: "doorway",
         version: env!("CARGO_PKG_VERSION"),
@@ -636,6 +656,13 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
         federation,
         diagnostics,
         compute,
+        region: state.args.region.clone(),
+        // Honest until surfaced: a federation social aggregate, not a doorway-local
+        // measure — left None rather than reporting a misleading 0. See backlog.
+        humans_served: None,
+        // The doorway's projection of substrate content — always measurable here.
+        content_available: Some(projection_documents),
+        federated_peers,
     }
 }
 
@@ -1193,6 +1220,10 @@ mod tests {
                 status: "healthy".to_string(),
                 recommendations: vec![],
             },
+            region: Some("us-west".to_string()),
+            humans_served: Some(42),
+            content_available: Some(1234),
+            federated_peers: 1,
             compute: elohim_compute::ComputeReport {
                 service_id: "doorway".to_string(),
                 build: elohim_compute::BuildInfo {
@@ -1239,5 +1270,10 @@ mod tests {
         assert!(json.contains("\"compute\""));
         assert!(json.contains("\"serviceId\""));
         assert!(json.contains("\"uptimeSeconds\""));
+        // Threshold-landing contract: the doorway-app SPA reads these exact camelCase
+        // keys from /status.json — lock them so a rename can't silently break the UI.
+        assert!(json.contains("humansServed"));
+        assert!(json.contains("contentAvailable"));
+        assert!(json.contains("federatedPeers"));
     }
 }
