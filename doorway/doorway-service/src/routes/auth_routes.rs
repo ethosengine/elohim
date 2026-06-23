@@ -692,6 +692,39 @@ fn get_auth_header(req: &Request<hyper::body::Incoming>) -> Option<&str> {
 
 /// POST /auth/register
 ///
+/// Derive the doorway's **gateway domain** — the suffix the doorway appends to a bare
+/// identifier so login/register are gateway-scoped: you authenticate at THIS doorway's
+/// account namespace, never an arbitrary domain (cross-doorway lives behind the
+/// "Use a different doorway" link). Sourced from the CONFIGURED `DOORWAY_URL`, never the
+/// inbound `Host` header — behind an ingress the Host can be the internal service name
+/// or client-controlled, so it must not drive credential resolution.
+///
+/// `https://doorway-alpha.elohim.host` -> `alpha.elohim.host`. This mirrors the frontend
+/// `gatewayDomain()` in `threshold-login.component.ts`, which strips the `doorway-`
+/// prefix off `window.location.hostname`. Returns `None` when no URL is configured (e.g.
+/// local dev) — callers then leave the identifier untouched.
+fn gateway_domain(doorway_url: Option<&str>) -> Option<String> {
+    let url = doorway_url?;
+    let host = url
+        .split_once("://")
+        .map_or(url, |(_, rest)| rest)
+        .split(['/', ':'])
+        .next()
+        .unwrap_or("");
+    if host.is_empty() {
+        return None;
+    }
+    Some(host.strip_prefix("doorway-").unwrap_or(host).to_string())
+}
+
+/// Re-qualify an identifier's local-part with the doorway's gateway domain. Idempotent
+/// for an already-own-domain identifier (no double-qualify); converges bare,
+/// full-own-domain, and full-foreign-domain inputs all to `localpart@gateway`.
+fn normalize_identifier(identifier: &str, gateway_domain: &str) -> String {
+    let local = identifier.split('@').next().unwrap_or(identifier);
+    format!("{local}@{gateway_domain}")
+}
+
 /// Create authentication credentials for an existing Holochain identity.
 /// Called after successful register_human zome call.
 ///
@@ -705,7 +738,7 @@ async fn handle_register(
     req: Request<hyper::body::Incoming>,
     state: Arc<AppState>,
 ) -> Response<BoxBody> {
-    let body: RegisterRequest = match parse_json_body(req).await {
+    let mut body: RegisterRequest = match parse_json_body(req).await {
         Ok(b) => b,
         Err(e) => {
             return json_response(
@@ -727,6 +760,13 @@ async fn handle_register(
                 code: None,
             },
         );
+    }
+
+    // Gateway-scope the identifier: re-qualify its local-part with the doorway's OWN
+    // configured domain so a new account is stored canonically (`localpart@gateway`),
+    // matching what `handle_login` resolves against. No-op when no domain is configured.
+    if let Some(domain) = gateway_domain(state.args.doorway_url.as_deref()) {
+        body.identifier = normalize_identifier(&body.identifier, &domain);
     }
 
     // Determine display name for registration
@@ -1489,7 +1529,7 @@ async fn handle_login(
     req: Request<hyper::body::Incoming>,
     state: Arc<AppState>,
 ) -> Response<BoxBody> {
-    let body: LoginRequest = match parse_json_body(req).await {
+    let mut body: LoginRequest = match parse_json_body(req).await {
         Ok(b) => b,
         Err(e) => {
             return json_response(
@@ -1510,6 +1550,18 @@ async fn handle_login(
                 code: None,
             },
         );
+    }
+
+    // Gateway-scoped identifier resolution. The doorway re-qualifies the submitted
+    // identifier's local-part with its OWN configured gateway domain (from DOORWAY_URL,
+    // never the inbound Host header). THIS is where "the suffix is enforced by the
+    // doorway" actually happens — the frontend only strips + displays it. So a bare
+    // `matthew.dowell`, the full `matthew.dowell@alpha.elohim.host`, and a foreign-domain
+    // paste all resolve to this doorway's namespace. See doorway-access-tier-patterns.md
+    // ("No third portal — the doorway auth_routes.rs IS the substrate auth surface").
+    let original_identifier = body.identifier.clone();
+    if let Some(domain) = gateway_domain(state.args.doorway_url.as_deref()) {
+        body.identifier = normalize_identifier(&body.identifier, &domain);
     }
 
     let jwt = match get_jwt_validator(&state) {
@@ -1567,13 +1619,42 @@ async fn handle_login(
         }
     };
 
-    // Look up user by identifier
-    let user = match collection
-        .find_one(doc! { "identifier": &body.identifier, "is_active": true })
-        .await
-    {
-        Ok(Some(u)) => u,
-        Ok(None) => {
+    // Look up user by the normalized identifier first. For backward-compatibility,
+    // fall back to a legacy record stored under the BARE local-part (accounts created
+    // before identifier normalization landed) so this fix never orphans an existing
+    // login. A foreign-domain input is NOT retried verbatim — the doorway is
+    // gateway-scoped, so only the bare local-part is an admissible fallback.
+    let mut lookup_candidates = vec![body.identifier.clone()];
+    if !original_identifier.contains('@') && original_identifier != body.identifier {
+        lookup_candidates.push(original_identifier.clone());
+    }
+
+    let mut found_user: Option<UserDoc> = None;
+    for candidate in &lookup_candidates {
+        match collection
+            .find_one(doc! { "identifier": candidate, "is_active": true })
+            .await
+        {
+            Ok(Some(u)) => {
+                found_user = Some(u);
+                break;
+            }
+            Ok(None) => continue,
+            Err(e) => {
+                return json_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &ErrorResponse {
+                        error: format!("Database error: {e}"),
+                        code: Some("DB_ERROR".into()),
+                    },
+                )
+            }
+        }
+    }
+
+    let user = match found_user {
+        Some(u) => u,
+        None => {
             warn!("Login failed - user not found: {}", body.identifier);
             // Use generic error to prevent user enumeration
             return json_response(
@@ -1583,15 +1664,6 @@ async fn handle_login(
                     code: Some("INVALID_CREDENTIALS".into()),
                 },
             );
-        }
-        Err(e) => {
-            return json_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                &ErrorResponse {
-                    error: format!("Database error: {e}"),
-                    code: Some("DB_ERROR".into()),
-                },
-            )
         }
     };
 
@@ -4505,6 +4577,52 @@ pub fn validate_ws_token(state: &AppState, token: &str) -> Option<Claims> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gateway_domain_strips_scheme_port_path_and_doorway_prefix() {
+        assert_eq!(
+            gateway_domain(Some("https://doorway-alpha.elohim.host")),
+            Some("alpha.elohim.host".to_string())
+        );
+        assert_eq!(
+            gateway_domain(Some("https://doorway-alpha.elohim.host/bootstrap")),
+            Some("alpha.elohim.host".to_string())
+        );
+        assert_eq!(
+            gateway_domain(Some("https://doorway-alpha.elohim.host:8080")),
+            Some("alpha.elohim.host".to_string())
+        );
+        // a host that is not `doorway-`-prefixed is returned unchanged
+        assert_eq!(
+            gateway_domain(Some("https://elohim.host")),
+            Some("elohim.host".to_string())
+        );
+        // no configured URL → no domain → caller leaves the identifier untouched
+        assert_eq!(gateway_domain(None), None);
+    }
+
+    #[test]
+    fn normalize_identifier_is_idempotent_and_gateway_scoped() {
+        let d = "alpha.elohim.host";
+        // bare username gains the gateway suffix (the bug that 401'd matthew)
+        assert_eq!(
+            normalize_identifier("matthew.dowell", d),
+            "matthew.dowell@alpha.elohim.host"
+        );
+        // an already-own-domain identifier is unchanged — no double-qualify
+        assert_eq!(
+            normalize_identifier("matthew.dowell@alpha.elohim.host", d),
+            "matthew.dowell@alpha.elohim.host"
+        );
+        // applying twice is stable (load-bearing: the seeder stores full emails)
+        let once = normalize_identifier("matthew.dowell", d);
+        assert_eq!(normalize_identifier(&once, d), once);
+        // a foreign domain is re-qualified to the gateway (doorway is gateway-scoped)
+        assert_eq!(
+            normalize_identifier("matthew.dowell@gmail.com", d),
+            "matthew.dowell@alpha.elohim.host"
+        );
+    }
 
     /// Regression for genesis #1105 ("Matthew suspends a user"): under
     /// dev_mode, hosted registration skips per-user provisioning, so EVERY
