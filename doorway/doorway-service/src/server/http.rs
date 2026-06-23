@@ -1705,7 +1705,6 @@ fn is_service_path(path: &str) -> bool {
         "/blob/",
         "/pkarr/",
         "/.well-known/",
-        "/identity/",
     ] {
         if path == *prefix || path.starts_with(prefix) {
             return true;
@@ -1731,7 +1730,14 @@ fn is_service_path(path: &str) -> bool {
             | "/api"
             | "/blob"
             | "/apps"
-            | "/identity"
+            // Only the DID service endpoints are doorway-owned under /identity.
+            // The bare "/identity" and "/identity/*" SPA routes (imagodei pillar:
+            // /identity/login, /identity/profile, …) must fall through to the EPR
+            // router / SPA shell like /community and /account do. Claiming the
+            // whole /identity subtree shadowed the entire pillar to the conductor
+            // on cold load (the /auth/portal incident shape).
+            | "/identity/did"
+            | "/identity/did.json"
             | "/sitemap.xml"
     )
 }
@@ -1899,6 +1905,18 @@ mod shakeout_tests {
         // root projection (url_path="/") is registered — the scrape would render
         // the SPA bundle instead of the exposition body.
         assert!(is_service_path("/metrics"));
+    }
+    #[test]
+    fn shakeout_service_path_identity_narrowed_to_did() {
+        // The imagodei SPA pillar must fall through to the EPR router / SPA shell,
+        // exactly like /community and /account. Only the DID service endpoints are
+        // doorway-owned. Regression guard for the cold-load /identity → conductor
+        // 404 shadow (the whole pillar was unreachable by direct URL).
+        assert!(!is_service_path("/identity"));
+        assert!(!is_service_path("/identity/login"));
+        assert!(!is_service_path("/identity/profile"));
+        assert!(is_service_path("/identity/did"));
+        assert!(is_service_path("/identity/did.json"));
     }
 
     // ── derive_app_subpath — projection url_path → storage sub-path ───────────
