@@ -11,6 +11,9 @@
 //! 2. `doorway_self_registers` — register_doorway binds operator_agent to caller.
 //! 3. `doorway_visible_across_agents_and_operator_only_can_update` — DHT
 //!    propagation + operator-only enforcement via coordinator gate.
+//! 4. `get_all_doorways_lists_every_registered_doorway` — federation peer
+//!    discovery: the list-all sentinel anchor surfaces every peer (not just
+//!    self) across conductors, with latest-wins dedup on re-registration.
 
 use anyhow::Result;
 use elohim_sweettest::common::{
@@ -217,6 +220,93 @@ async fn doorway_visible_across_agents_and_operator_only_can_update() -> Result<
     assert!(
         result.is_err(),
         "non-operator (a2) must not be able to update a1's doorway"
+    );
+
+    Ok(())
+}
+
+/// Federation peer discovery. Two operators each self-register a distinct doorway;
+/// `get_all_doorways` must enumerate BOTH from a single conductor once the DHT has
+/// gossipped the list-all anchor links. This is the read side that replaces the
+/// self-only stub in doorway-service — the regression that made every doorway's
+/// `/threshold/doorways` selector list only itself. Also asserts latest-wins dedup:
+/// re-registering the same id collapses to one (newest) record, never duplicates.
+#[tokio::test(flavor = "multi_thread")]
+async fn get_all_doorways_lists_every_registered_doorway() -> Result<()> {
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), None).await?;
+    let app1 = c1
+        .setup_app_for_agent("infrastructure-app", a1.clone(), &[dna.clone()])
+        .await?;
+    let app2 = c2
+        .setup_app_for_agent("infrastructure-app", a2.clone(), &[dna])
+        .await?;
+    let cell1 = app1.cells().first().unwrap().clone();
+    let cell2 = app2.cells().first().unwrap().clone();
+
+    // a1 registers "alpha"
+    let _: DoorwayOutput = c1
+        .call(
+            &cell1.zome("infrastructure"),
+            "register_doorway",
+            alpha_doorway_input(),
+        )
+        .await;
+
+    // a2 registers "beta"
+    let beta = RegisterDoorwayInput {
+        id: "beta".to_string(),
+        url: "https://beta.example".to_string(),
+        capabilities_json: "{}".to_string(),
+        reach: "regional".to_string(),
+        region: Some("us-east".to_string()),
+        bandwidth_mbps: Some(50),
+        version: "0.1.0".to_string(),
+    };
+    let _: DoorwayOutput = c2
+        .call(&cell2.zome("infrastructure"), "register_doorway", beta)
+        .await;
+
+    // From a2's conductor, poll get_all_doorways until BOTH are visible — a2's own
+    // "beta" is local, a1's "alpha" must gossip in. Discovering a peer you did not
+    // already know the id of is the whole point of the list-all anchor.
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let zome2 = cell2.zome("infrastructure");
+    loop {
+        let all: Vec<DoorwayOutput> = c2.call(&zome2, "get_all_doorways", ()).await;
+        let ids: Vec<&str> = all.iter().map(|d| d.doorway.id.as_str()).collect();
+        if ids.contains(&"alpha") && ids.contains(&"beta") {
+            break;
+        }
+        if Instant::now() >= deadline {
+            panic!("get_all_doorways should list both doorways within 30s; saw: {ids:?}");
+        }
+        sleep(Duration::from_millis(100)).await;
+    }
+
+    // Latest-wins dedup: a1 re-registers "alpha" with a new url (re-registration
+    // appends a second link + entry off the sentinel). Read locally from c1 (no
+    // gossip needed) and assert alpha collapses to exactly one record, newest url.
+    let mut alpha_v2 = alpha_doorway_input();
+    alpha_v2.url = "https://alpha-v2.example".to_string();
+    let _: DoorwayOutput = c1
+        .call(&cell1.zome("infrastructure"), "register_doorway", alpha_v2)
+        .await;
+
+    let zome1 = cell1.zome("infrastructure");
+    let all_local: Vec<DoorwayOutput> = c1.call(&zome1, "get_all_doorways", ()).await;
+    let alpha: Vec<&DoorwayOutput> = all_local
+        .iter()
+        .filter(|d| d.doorway.id == "alpha")
+        .collect();
+    assert_eq!(
+        alpha.len(),
+        1,
+        "alpha must appear exactly once after re-registration (latest-wins dedup)"
+    );
+    assert_eq!(
+        alpha[0].doorway.url, "https://alpha-v2.example",
+        "dedup must keep the NEWEST registration"
     );
 
     Ok(())

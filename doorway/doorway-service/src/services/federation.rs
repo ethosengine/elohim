@@ -532,28 +532,27 @@ fn extract_domain_from_url(url: &str) -> Option<String> {
 
 /// Get all registered doorways from the DHT.
 /// Used by the /api/v1/federation/doorways endpoint.
+///
+/// DHT-native federation discovery: enumerates every registered doorway via the
+/// infrastructure zome's `get_all_doorways` list-all anchor. This rides the
+/// conductor DHT gossip plane (WAN-NAT-correct) — a registration written through
+/// any doorway's conductor gossips to every peer's DHT, so each doorway sees the
+/// whole federation, not just itself. The FEDERATION_PEERS HTTP loop is a bootstrap
+/// fallback; this is the canonical path.
 pub async fn get_all_doorways(
     zome_caller: &ZomeCaller,
     config: &FederationConfig,
 ) -> Result<Vec<DoorwayRegistration>, String> {
-    // Use get_doorways_by_region with empty region to get all,
-    // or use find_publishers with wildcard. Since the zome doesn't have
-    // a "get_all_doorways" function, we'll query by the current doorway's operator
-    // and the known regions. For now, return the self doorway as a starting point.
-    // A full implementation would use a "list all" anchor pattern.
-
-    // Try to get our own doorway registration as proof of concept
     match zome_caller
-        .call::<String, Option<DoorwayOutput>>(
+        .call::<(), Vec<DoorwayOutput>>(
             &config.infrastructure_role,
             &config.zome_name,
-            "get_doorway_by_id",
-            &config.doorway_id,
+            "get_all_doorways",
+            &(),
         )
         .await
     {
-        Ok(Some(output)) => Ok(vec![output.doorway]),
-        Ok(None) => Ok(vec![]),
+        Ok(outputs) => Ok(outputs.into_iter().map(|o| o.doorway).collect()),
         Err(e) => {
             warn!("Failed to query doorways from DHT: {}", e);
             Err(e)

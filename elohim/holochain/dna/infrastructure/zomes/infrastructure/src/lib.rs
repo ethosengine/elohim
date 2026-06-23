@@ -283,6 +283,23 @@ pub fn register_doorway(input: RegisterDoorwayInput) -> ExternResult<DoorwayOutp
         (),
     )?;
 
+    // Create "list-all" enumeration link off a fixed sentinel anchor. This is what
+    // lets `get_all_doorways` discover peers DHT-natively — without it, every anchor
+    // is keyed by an attribute the querying doorway must already know (its own id,
+    // operator, region), which is exactly why a self-only doorway sees only itself.
+    // Reuses the existing StringAnchor entry type + IdToDoorway link type, so the DNA
+    // hash does not move (coordinator-only). Single hot anchor — acceptable at
+    // genesis/alpha scale; per the dna/CLAUDE.md Signal Rule, if doorway count grows
+    // this list-all belongs in the SQL projection, not a DHT query-index link.
+    let all_anchor = StringAnchor::new("doorway_id", "__all__");
+    let all_anchor_hash = hash_entry(&EntryTypes::StringAnchor(all_anchor))?;
+    create_link(
+        all_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToDoorway,
+        (),
+    )?;
+
     // Create operator lookup link
     let operator_anchor = StringAnchor::new("doorway_operator", &doorway.operator_agent);
     let operator_anchor_hash = hash_entry(&EntryTypes::StringAnchor(operator_anchor))?;
@@ -414,6 +431,54 @@ pub fn get_doorways_by_operator(operator_agent: String) -> ExternResult<Vec<Door
                         action_hash,
                         doorway: doorway_to_wire(&doorway),
                     });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Get every registered doorway — federation peer discovery.
+///
+/// Reads the fixed "__all__" sentinel anchor that `register_doorway` links every
+/// registration to, so any doorway can enumerate the whole federation without
+/// already knowing peer ids. Rides the conductor DHT gossip plane: a registration
+/// written through any doorway's conductor gossips to every peer, so each doorway
+/// sees them all (WAN-NAT-correct — no direct doorway-to-doorway HTTP needed).
+///
+/// Latest-wins dedup by doorway id: a doorway re-registers at each boot (and a
+/// re-keyed doorway reclaims its id), appending a link + entry per registration,
+/// so collapse to the newest record per id (mirrors `get_doorway_by_id`).
+#[hdk_extern]
+pub fn get_all_doorways(_: ()) -> ExternResult<Vec<DoorwayOutput>> {
+    let all_anchor = StringAnchor::new("doorway_id", "__all__");
+    let all_anchor_hash = hash_entry(&EntryTypes::StringAnchor(all_anchor))?;
+
+    let query = LinkQuery::try_new(all_anchor_hash, LinkTypes::IdToDoorway)?;
+    let mut links = get_links(query, GetStrategy::default())?;
+
+    // Newest-first so the first record seen per id is the live one.
+    links.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+    let mut results: Vec<DoorwayOutput> = Vec::new();
+    let mut seen_ids: Vec<String> = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(doorway) = record
+                    .entry()
+                    .to_app_option::<DoorwayRegistration>()
+                    .ok()
+                    .flatten()
+                {
+                    if !seen_ids.contains(&doorway.id) {
+                        seen_ids.push(doorway.id.clone());
+                        results.push(DoorwayOutput {
+                            action_hash,
+                            doorway: doorway_to_wire(&doorway),
+                        });
+                    }
                 }
             }
         }
