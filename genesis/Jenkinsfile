@@ -1592,6 +1592,12 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
                         def blobHash = env.CONTENT_BLOB_HASH
                         def blobSize = env.CONTENT_BLOB_SIZE_BYTES ?: '0'
+                        // Gate custody seeding on the projector being caught up (not
+                        // just healthy): the Upload-Blob + earlier seed waves backlog
+                        // the projector, so custody PATCH state=active was hitting
+                        // 503 catching-up BEFORE the existing REA-stage gate below
+                        // (genesis #1191 Cluster B). SOFT — warns and proceeds.
+                        sh "bash '${env.WORKSPACE}/genesis/scripts/ci/wait-storage-ready.sh' '${doorwayHost}'"
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/seeder') {
                                 sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-custody-commitments.sh' '${doorwayHost}' '${blobHash}' '${blobSize}'"
