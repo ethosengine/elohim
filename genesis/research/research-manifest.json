@@ -28,6 +28,27 @@
       "path": "genesis/research/repos/logos",
       "relevance": "Archival problem survey — entry point to the Status-incubated sovereign-network stack (Waku messaging, Codex storage, Nomos consensus). Closest peer to Elohim's full-stack civil-society framing; worth cloning the docs hub first before drilling into sub-protocol repos (waku-org, codex-storage, nomos-research).",
       "pillar": "elohim"
+    },
+    {
+      "name": "social-distributed-press",
+      "url": "https://github.com/hyphacoop/social.distributed.press.git",
+      "path": "genesis/research/repos/social-distributed-press",
+      "relevance": "Edge Problem / doorway federation — Hypha Co-op's Social Inbox: a minimal ActivityPub server that splits AP into static-published actor/outbox/posts + a thin dynamic inbox (follows/replies/likes), HTTP-Signature auth over the site keypair, actor+instance allow/block moderation, and draft-FEP-1042 alias-bridging of P2P content into the fediverse. Closest external mirror of the doorway's projection+federation job; ActivityPub-flavor companion to the atproto-lexicon-projection-doorway spec (which defers AP generalization). See doorway/research/activitypub-federation-prior-art.md and genesis/research/hypha-distributed-press-cross-pollination-2026-06-23.md.",
+      "pillar": "doorway"
+    },
+    {
+      "name": "hypercore",
+      "url": "https://github.com/holepunchto/hypercore.git",
+      "path": "genesis/research/repos/hypercore",
+      "relevance": "Networking / Content-Addressing / p2p-dataplane prior art — secure single-writer append-only signed log (BLAKE2b merkle), SPARSE replication ('download only the blocks you need' = 'replication follows relationship'). Structurally a Holochain source chain but integrity-only (no shared validation): a candidate data-plane substrate beside iroh/libp2p, NEVER a truth layer. Autobase (in the holepunchto org) is multi-writer-convergence prior art vs Automerge. See steward/node/research/hypercore-holepunch-prior-art.md.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "hyperdht",
+      "url": "https://github.com/holepunchto/hyperdht.git",
+      "path": "genesis/research/repos/hyperdht",
+      "relevance": "Networking prior art (p2p layer, NOT doorway/federation) — the DHT powering Hyperswarm: peer discovery by topic/discoveryKey (find peers without leaking the core key) with UDP HOLEPUNCHING as a first-class feature into Noise-encrypted streams. One of the most mature holepunching-first JS-ecosystem DHTs (deployed at scale via Holepunch/Keet); relevant to the live WAN-NAT gap and the tx5/go-pion lineage. Discovery-by-topic rhymes with affinity-weighted steward topology.",
+      "pillar": "elohim"
     }
   ]
 }

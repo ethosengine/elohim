@@ -298,7 +298,7 @@ spec:
               # /health task off the runtime. BAND-AID for burst-starvation, NOT the
               # fix — warm_stream has no backpressure/yield (the real "can't pace
               # itself" gap; durable fix = warm_stream pacing + /health isolation,
-              # see doorway-freeze-incident-2026-06-13/WARM-STREAM-RESIDUAL-DIAGNOSIS.md).
+              # see .claude/data/doorway-freeze-incident-2026-06-13/WARM-STREAM-RESIDUAL-DIAGNOSIS.md).
               # Debug logging kept ON deliberately to keep studying the pacing failure.
               cpu: "2000m"
           # V8 + Angular bundle parse takes 10–60s on cold start (varies by

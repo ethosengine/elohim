@@ -6,7 +6,7 @@
     "build": "ng build",
     "start": "ng serve",
     "test": "vitest run --config vite.config.ts",
-    "lint": "node ../../scripts/lint-route-literals.mjs src",
+    "lint": "node ../scripts/lint-route-literals.mjs src",
     "start:alpha": "ng serve --proxy-config proxy.conf.alpha.mjs --disable-host-check"
   },
   "dependencies": {

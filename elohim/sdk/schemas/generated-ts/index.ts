@@ -79,6 +79,7 @@ export * from './views/compute-triptych';
 export * from './views/content-engagement-stats-view';
 export * from './views/content-graph';
 export * from './views/content-view';
+export * from './views/contributor-reflexive-view';
 export * from './views/dashboard-federation-peer';
 export * from './views/dashboard-steward';
 export * from './views/distribution-details';

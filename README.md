@@ -89,84 +89,87 @@ See [The Elohim Medium — When Social Media Becomes Sacred Space](./genesis/doc
 
 ## Repository Structure
 
-Organized by system boundary: core runtime, frontend apps, deployment shells, optional gateway, and meta/ops.
+Organized by system boundary: core runtime, frontend apps, interop bridges, deployment shells, the web2 gateway, and meta/ops. Submodules are noted inline; build artifacts (`target/`, `node_modules/`, the cargo target-pool) are omitted.
 
 ```
-├── elohim/                        # Core Runtime
+├── elohim/                        # Core Runtime (Rust + Holochain)
+│   ├── epr/                       # elohim-epr — canonical EPR codec (CBOR + CIDv1 + Ed25519)
+│   ├── elohim-views/              # ts-rs-anchored HTTP wire View / InputView types
+│   ├── elohim-storage/            # P2P content storage service (chunked blobs, redundancy)
+│   ├── elohim-cache-core/         # Caching primitives (extraction, LRU, blob)
+│   ├── elohim-compute/            # Compute coordination & capacity reporting
+│   ├── elohim-facings/            # Pure lens/fold crate over the holder-relation (DB-free)
+│   ├── elohim-peer-fabric/        # Peer-traffic logic: defense guard + capability-aware ranking
+│   ├── elohim-render/             # Server-side JS render runtime at the peer boundary
+│   ├── elohim-token/              # Economic-rail / settlement-bridge token primitives
+│   ├── elohim-hub/                # Hub-layer composition scaffold (home-node cluster)
+│   ├── elohim-bitswap/            # IPFS Bitswap protocol
+│   ├── rust-ipfs/                 # IPFS implementation (git submodule)
 │   ├── constitution/              # Constitutional AI constraints
 │   ├── eae/                       # Elohim Autonomous Entities
 │   ├── elohim-agent/              # Agent boundary
 │   │   ├── elohim-agent-service/  # Autonomous agent runtime (Rust)
 │   │   ├── elohim-agent-sdk/      # Agent SDK (TypeScript)
+│   │   ├── gate-client/  -zome/  -types/   # Authoring/relay gate client, zome, shared types
+│   │   ├── specialists/  research/  spec/  # Specialist agents, research notes, specs
 │   │   └── mcp-servers/           # Model Context Protocol servers
-│   ├── elohim-storage/            # P2P content storage service (Rust)
-│   ├── elohim-cache-core/         # Caching primitives (extraction, LRU, blob)
-│   ├── elohim-compute/            # Compute coordination & capacity reporting
-│   ├── elohim-bitswap/            # IPFS Bitswap protocol
-│   ├── rust-ipfs/                 # IPFS implementation (git submodule)
 │   ├── sdk/                       # Protocol SDK
 │   │   ├── schemas/               # Protocol JSON Schemas (v1) — source of truth
 │   │   ├── domains/               # App manifests (lamad, etc.)
+│   │   ├── epr-ts/                # EPR codec TypeScript bindings
 │   │   └── storage-client-ts/     # Generated TypeScript types from Rust
-│   └── holochain/                 # Holochain-specific layer
-│       ├── dna/                   # DNA definitions (zomes, hApp packaging)
-│       ├── holochain-cache-core/  # WASM cache module
-│       ├── rna/                   # Schema templates & fixtures
-│       ├── edgenode/              # hApp container runtime
-│       └── elohim-wasm/           # Client-side WASM verification
+│   ├── holochain/                 # Holochain-specific layer
+│   │   ├── dna/                   # DNA definitions — Lamad + Mishpat (zomes, hApp packaging)
+│   │   ├── edgenode/              # hApp container runtime
+│   │   ├── elohim-wasm/           # Client-side WASM verification
+│   │   ├── rna/                   # Schema templates & fixtures
+│   │   └── local-dev/  docs/  tests/   # Local conductor launcher, docs, sweettests
+│   ├── brit/                      # Covenant git — gitoxide fork w/ build-provenance EPRs (submodule)
+│   ├── rakia/                     # Substrate-containment crates: rakia-core, rakia-brit (submodule)
+│   └── holochain-conductor/  kitsune2/  tx5/   # Upstream forks, reference-only (submodule, update=none)
 │
 ├── app/                           # Frontend Applications
 │   ├── elohim-app/                # Angular 19 main platform
-│   │   ├── src/apps-sw.ts         # Service Worker (P2P app delivery)
-│   │   └── src/app/
-│   │       ├── elohim/            # Core infrastructure services
-│   │       ├── imagodei/          # Human identity & stewardship
-│   │       ├── lamad/             # Learning infrastructure
-│   │       ├── avodah/            # Work management & stewardship
-│   │       ├── qahal/             # Community governance
-│   │       ├── shefa/             # Resource flows & economics
-│   │       └── doorway/           # Gateway integration
-│   └── elohim-library/            # Shared Angular libraries
-│       └── projects/
-│           └── elohim-service/    # Import pipeline, content models, peer scoring
+│   │   └── src/app/<pillar>/      # elohim · imagodei · lamad · avodah · qahal · shefa · doorway
+│   ├── lamad/                     # Lamad SPA bundle (split out via pillar-EPR decomposition)
+│   ├── imagodei-portal/           # Imagodei portal Angular surface
+│   ├── elohim-elements/           # Lit web components (elohim-core/avodah/doorway/imagodei/…)
+│   └── elohim-library/            # Shared Angular libraries (projects/elohim-service)
 │
-├── sophia/                        # Assessment engine (git submodule)
-│   └── packages/
-│       ├── sophia-element/        # <sophia-question> web component
-│       ├── sophia-core/           # Core types (Moment, Recognition)
-│       ├── perseus-score/         # Mastery scoring (graded)
-│       ├── psyche-survey/         # Discovery & reflection (psychometric)
-│       ├── psephos/               # Governance ballot rendering (formal voting)
-│       └── psephos-element/       # <psephos-ballot> web component
+├── bridges/                       # Pluggable interop crates (external protocol ↔ EPR-REA)
+│   └── valueflows/                # valueflows-bridge / -types / -tests (hREA / VF-GraphQL)
+│
+├── crates/                        # Shared Rust crates: doorway-client, elohim-sdk, elohim-storage-client
+│
+├── sophia/                        # Assessment engine (git submodule, ~18 packages)
+│   └── packages/                  # sophia-element/-core/-editor/-linter/-score, perseus-core/-score,
+│                                  #   psyche-survey, psephos/-element, + kmath/math-input/markdown utils
 │
 ├── steward/                       # Deployment Shells
-│   ├── device/                    # Tauri desktop app
-│   │   ├── src-tauri/             # Rust backend with Holochain
-│   │   └── ui/                    # Desktop UI
-│   └── node/                      # Headless P2P runtime (libp2p)
-│       ├── src/                   # Always-on family node daemon
-│       └── simulation/            # Network simulation tooling
+│   ├── device/                    # Tauri desktop app (embeds Holochain conductor)
+│   └── node/                      # Headless always-on P2P runtime (libp2p)
 │
-├── doorway/                       # Web2 Gateway (absorption + onboarding)
-│   ├── doorway-service/           # Rust gateway (bootstrap, signal, projection cache)
+├── doorway/                       # Web2 Gateway (bootstrap + signal + projection cache)
+│   ├── doorway-service/           # Rust gateway
 │   └── doorway-app/               # Angular operator dashboard
 │
-├── crates/                        # Shared Rust Crates
-│   ├── doorway-client/            # Gateway client traits
-│   ├── elohim-sdk/                # Core SDK
-│   └── elohim-storage-client/     # Storage HTTP client
-│
 ├── genesis/                       # Meta / Ops / Content
-│   ├── orchestrator/              # CI/CD central controller
-│   │   └── manifests/             # K8s deployment manifests (alpha, staging, prod)
-│   ├── a2o/                       # Alpha-to-omega E2E validation (BDD scenarios)
-│   ├── docs/                      # Source content & manifesto (markdown)
-│   ├── research/                  # Distributed observation protocol research
+│   ├── orchestrator/              # CI/CD central controller (webhook → changeset → downstream)
+│   ├── manifests/                 # K8s deployment manifests + cluster-state.yaml (alpha/staging/prod)
+│   ├── a2o/                       # Alpha-to-omega E2E (BDD scenarios + look/graphos eyes rails)
+│   ├── docs/                      # Source content & manifesto; superpowers specs/plans
+│   ├── data/                      # Timeline backlog, presences, seed inputs
+│   ├── agentic/                   # Agentic-developer harness, pool-policy.json
+│   ├── graphos/                   # Design spec, vocabulary, design assets, fonts
 │   ├── seeder/                    # Content seeding pipeline (TypeScript)
-│   ├── plans/                     # Sprint design docs & implementation plans
-│   └── blobs/                     # Binary assets (ZIP bundles, media)
+│   └── landing/  research/  plans/  blobs/  assets/  scripts/   # Landing page, research, plans, blobs, tooling
 │
-└── scripts/                       # Developer tooling
+├── docs/                          # Repo-level superpowers docs (brit/rakia-era plans & specs)
+├── che-devworkspaces/             # Eclipse Che / Jenkins / container-image infra (submodule)
+├── scripts/                       # Repo-global tooling (ci/ Jenkins bash bodies, local-dev/, sophia release scripts)
+├── tools/                         # Misc tooling (check-cem-fresh.mjs)
+├── patches/                       # pnpm patch files (@angular/build)
+└── rakia/                         # Top-level rakia design docs — distinct from elohim/rakia submodule
 ```
 
 ## Progressive Stewardship

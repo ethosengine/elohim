@@ -1,9 +1,9 @@
 ---
 name: p2p-design-gate
-description: Mandatory gate for any feature design involving data entities (tables, models, routes, sync messages). Forces P2P-native thinking — DHT entry types, content addressing, source-of-truth classification — before proposing design approaches. Use when brainstorming any feature that creates, stores, references, or syncs data entities.
+description: Mandatory gate for any feature design involving data entities (tables, models, routes, sync messages) OR identity/agency/role/capability framing. Forces P2P-native thinking — DHT entry types, content addressing, source-of-truth classification, and identity-ontology framing (imago-dei, not crypto self-sovereignty) — before proposing design approaches. Use when brainstorming any feature that creates, stores, references, or syncs data entities, or that names an identity/agency tier.
 metadata:
   author: elohim-protocol
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # P2P Design Gate
@@ -240,6 +240,7 @@ These are known regressions — design choices that have caused real bugs or arc
 | Creating new entry type when one already exists | Lamad DNA is at ~73/~100, Mishpat at 11/~100. Adding another wastes scarce capacity and fragments the data model. | Check existing entry types first. Use Links (Category A2) for relationships. Only create new types if nothing fits and DNA has headroom. |
 | Putting granular data on the DHT | Every quiz answer, scroll event, or preference on the DHT bloats gossip and exceeds the ~3000 entry budget. | Agent-scoped with attestation (Category B2): raw data stays private, signed proof of outcome is notarized. |
 | Cross-namespace identity string-equality | The same agent has three identities (Holochain `uhCAk…` key, libp2p `12D3Koo…` peer id, iroh NodeId). Joining/matching one against another by raw string silently empties the join (caused the all-zeros resilience card, repeatedly). | Resolve through the canonical agent↔transport resolver (the `AgentPeerBinding` projection / `peer_transport_manifest`). Never string-compare identities across namespaces; pick `agent_cid` as the canonical join key and resolve transport ids TO it. |
+| `self-sovereign` / "true data sovereignty" as the **apex** identity, agency, or capability tier | Imports the silicon-crypto sovereignty ontology the protocol explicitly *subordinates* to community governance. The apex-tier label reads as a neutral capability level ("more keys → more autonomy → higher") and sails past review as a load-bearing ontological claim. Also silently excludes everyone who holds the right *through others* (children, IDD, seniors, wards). | Frame the high-autonomy tier as **community-grounded** (e.g. *node-stewardship standing*), not *self-sovereign*. Key-location is a mechanical fact (`custodial` → on-device → always-on), not an ascent toward sovereignty. Sovereignty is the *adversary frame*, never the protocol's own apex. Confirm the corrected lexicon with the architect. See "Identity Ontology Guard." |
 
 ---
 
@@ -250,6 +251,23 @@ These are known regressions — design choices that have caused real bugs or arc
 The resolution substrate is the notarized `AgentPeerBinding` DHT integrity entry (projected by `ReconcileController::on_agent_peer_binding` into the `peer_identity_bindings` table), materialized locally in `peer_transport_manifest` (`elohim/elohim-storage/src/p2p_iroh/peer_map.rs`).
 
 **Rule**: any new entity that references a peer, provider, or steward identity must declare which namespace it stores, and must resolve through the canonical resolver when joining or matching across namespaces. Never raw-compare `agent_cid` against a transport id.
+
+---
+
+## Identity Ontology Guard (imago-dei floor, not crypto self-sovereignty)
+
+This gate guards the **framing** of identity, not only its addressing. A human's identity in this protocol is *imago dei* — an inviolable right **backstopped by community and institutional expression**, not a self-asserted cryptographic primitive. Individual sovereignty is **subordinated** to community-adjudicated governance; it is never the apex value. **Canonical home:** `genesis/docs/architecture/stewardship-over-sovereignty.md` (Canon status: Foundational, "read it first" — *"We do not consider sovereignty itself to be the right framing"*; §3 reserves *stewardship / agency / authority* with discipline and explicitly excludes "sovereignty") and its life-stage companion `genesis/docs/architecture/cradle-to-grave-capability-gradient.md`. The imagodei domain gospel echoes it: identity grounded in "demonstrated capability and community trust."
+
+**The recurring drift this kills:** naming the top of an identity / agency / capability gradient `self-sovereign`, or celebrating "true data sovereignty" as an achievement. AI agents default to the silicon-crypto sovereignty ontology because it dominates the training data, and it slips past review **at tier-naming** — an apex tier called "self-sovereign" reads as a neutral capability level ("more keys → more autonomy → higher") rather than the load-bearing ontological claim it actually is. This is the identity-vocabulary sibling of the relational-default mistakes above.
+
+**Rules when designing ANY identity, agency, role, capability, or key-location entity** (enum, struct, schema, tier ladder — or the prose that documents one):
+
+- **Never make `sovereignty` / `self-sovereign` the positive apex** of a gradient. Frame the high-autonomy tier as community-grounded — e.g. *node-stewardship standing*, not *self-sovereign*. Key-location is a mechanical fact (`custodial` → on-device → always-on); do not dress it as an ascent toward sovereignty.
+- **Sovereignty as an adversary frame is correct.** Quoting "the crypto sovereignty frame" as the thing being *resisted*, or modeling state/platform sovereignty as a threat, is fine. Asserting it as the protocol's *own* top value is the drift.
+- **Model the whole human life.** The ontology must hold for those who exercise the right *with/through others* — children, IDD, seniors, legal wards. The protocol expresses this as **graduated, mediated agency** (ward = "mediated agency, guardian co-authors"; voice-retention for seniors; supported decision-making) — the canonical §2 life-stage transition map is `genesis/docs/architecture/cradle-to-grave-capability-gradient.md`. An identity model whose apex is "full autonomy, keys on device" silently excludes them. Note: this is canon-written, concrete ward/guardian specs pending — there is no guardian/ward DHT *entity* built yet, and `custodial` key-holding is device-convenience, NOT incapacity-guardianship; do not conflate the two.
+- **Cryptography is an ACCELERATOR of community recovery, never the gate** — Shamir, threshold signatures, hardware-rooted attestation all *speed* the recovery paths but their absence must never prevent recovery (`stewardship-over-sovereignty.md` §4; `project_socially_derived_security`). So "harden a high-risk user" (e.g. a dissident under state duress) means *optional* cryptographic hardening layered onto the social-recovery floor — NOT elevating them to a "more sovereign" tier. The protocol's standing defense against duress is the non-firable elohim-counsel (`project_elohim_as_counsel`), not stronger keys.
+
+If a design names a tier `self-sovereign`, proposes `sovereignty`-as-achievement, or treats individual autonomy as the protocol's ceiling: **stop, reclassify the framing, and confirm the corrected apex lexicon with the architect** before writing the enum/schema. This gate stops *new* design-time bleeding; the existing leaks (the live agency ladder, `hardware-spec.md` "true data sovereignty") are a separate de-drift/rename pass.
 
 ---
 

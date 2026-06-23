@@ -23,7 +23,7 @@ cites:
   - genesis/orchestrator/manifests/doorway/alpha.yaml
   - genesis/orchestrator/manifests/doorway/alpha-b.yaml
   - elohim/holochain/Jenkinsfile
-  - doorway-freeze-incident-2026-06-13/WARM-STREAM-RESIDUAL-DIAGNOSIS.md
+  - .claude/data/doorway-freeze-incident-2026-06-13/WARM-STREAM-RESIDUAL-DIAGNOSIS.md
   - SPRINTER-HANDOFF-2026-06-14.md
   - genesis/data/timeline/backlog/ci-genesis-doorway-503-seed-phase-wedge.md
 ---
@@ -120,7 +120,7 @@ Not done here (the actuation arm, deliberately out of scope for ELEVATE): a true
 (`DOORWAY_HEALTH_PORT` exists but is intentionally unset so a partial wedge still
 trips the kill) and the warm_stream closed-loop backpressure (proven pacing;
 do not re-touch). Those are the durable items in
-`doorway-freeze-incident-2026-06-13/WARM-STREAM-RESIDUAL-DIAGNOSIS.md` §3.
+`.claude/data/doorway-freeze-incident-2026-06-13/WARM-STREAM-RESIDUAL-DIAGNOSIS.md` §3.
 
 ## Current decision
 

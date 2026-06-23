@@ -75,7 +75,13 @@ The pipeline collects signals well beyond what a dollar conveys — contribution
 
 How does a decentralized protocol meet people where they are — in browsers, behind NATs, without installing anything — without becoming the centralized chokepoint it's trying to eliminate? The doorway is the answer we're exploring: a gateway that proxies, caches, and federates, but never owns. Federation with Matrix and ActivityPub, WebRTC signaling for peer-to-peer when possible, graceful fallback when not.
 
-[doorway/research/](../../doorway/research/)
+The closest external mirror of the doorway's job is **Distributed Press** (Hypha Co-op): a publishing platform that seeds one site to HTTP + IPFS + Hypercore, plus a **Social Inbox** that gives static/distributed content a live fediverse presence. Its design validates the doorway's own instincts — split the durable Actor/Outbox/Posts (static *projections*) from a thin dynamic inbox (follows/replies/likes), authenticate with the site keypair rather than an account, and bridge P2P content to the fediverse via the draft **FEP-1042** proposal's HTTPS-alias URLs (an ActivityPub-flavor companion to our committed `atproto-lexicon-projection-doorway` spec, which defers AP generalization until a driver appears). Surveyed June 2026.
+
+[doorway/research/](../../doorway/research/) — `activitypub-federation-prior-art.md` (Distributed Press Social Inbox, FEP-1042, Agregore — pointers for doorway federation brainstorming)
+
+**Key references:**
+
+- [Distributed Press](https://distributed.press) + the [Social Inbox](https://github.com/hyphacoop/social.distributed.press) (Hypha Co-op) — open-source publishing that seeds to HTTP/IPFS/Hypercore and gives static sites a minimal ActivityPub inbox. [FEP-1042 "Peer to Peer Fediverse Identities"](https://codeberg.org/fediverse/fep/src/branch/main/fep/1042/fep-1042.md) (a draft FEP, [announced](https://distributed.press/2024/08/14/our-shiny-new-bridge-between-peer-to-peer-protocols-and-activitypub-implementations/) by Distributed Press as "FEP-1024") bridges P2P content into the fediverse via HTTPS aliases; [Agregore](https://agregore.mauve.moe/) is the distributed-web "loyal client." [Cross-pollination survey →](hypha-distributed-press-cross-pollination-2026-06-23.md)
 
 ---
 
@@ -89,7 +95,7 @@ Why Holochain and not a blockchain? Because agent-centric architecture means you
 
 ## The Content Addressing Problem
 
-EPR content has three tiers — Head (gossipped metadata), Document (peer-cached body), Bytes (steward-delivered shards). IPFS gives us content-addressed delivery and verified fetch, but mapping EPR tiers to IPLD primitives (DAG-CBOR encoding, CID resolution) is non-trivial. The rust-ipfs fork (tracking `dariusc93/rust-ipfs` with connexa) is the vehicle; the research is about making content-addressed delivery feel instant while remaining verifiable.
+EPR content has three tiers — Head (gossipped metadata), Document (peer-cached body), Bytes (steward-delivered shards). IPFS gives us content-addressed delivery and verified fetch, but mapping EPR tiers to IPLD primitives (DAG-CBOR encoding, CID resolution) is non-trivial. The rust-ipfs fork (tracking `dariusc93/rust-ipfs` with connexa) is the vehicle; the research is about making content-addressed delivery feel instant while remaining verifiable. Adjacent prior art: **Distributed Press** seeds content to IPFS and **Hypercore**, and Hypercore's signed-merkle append-only log (sparse, content-addressed delivery) is a comparator for verified fetch — both in the [June 2026 cross-pollination →](hypha-distributed-press-cross-pollination-2026-06-23.md).
 
 [elohim/rust-ipfs/research/](../../elohim/rust-ipfs/research/)
 
@@ -119,7 +125,11 @@ The deliverable from this survey is not a comparison matrix. It is a decision: w
 
 Steward nodes don't form flat peer networks — they form trust-weighted meshes where affinity to content determines topology. libp2p gives us the protocol primitives (request-response, gossipsub, Kademlia), but the research questions are about NAT traversal at scale (tx5, sbd relay), peer discovery that respects affinity, and how the steward topology emerges from individual stewardship decisions rather than being centrally planned.
 
-[steward/node/research/](../../steward/node/research/)
+[steward/node/research/](../../steward/node/research/) — `hypercore-holepunch-prior-art.md` (the Hypercore/Holepunch stack as data-plane + NAT-traversal prior art)
+
+**Key references:**
+
+- [Hypercore / Holepunch](https://github.com/holepunchto/hypercore) — a secure single-writer append-only signed log (BLAKE2b merkle) with **sparse replication** ("download only the blocks you need" = "replication follows relationship"), plus [HyperDHT](https://github.com/holepunchto/hyperdht): peer discovery by topic with **UDP holepunching** as a first-class feature. Structurally a Holochain source chain but *integrity-only* — a candidate data-plane substrate beside iroh/libp2p, never a truth layer. Autobase is multi-writer-convergence prior art (vs. Automerge). Surveyed alongside Distributed Press (which publishes to Hypercore) in the [June 2026 cross-pollination →](hypha-distributed-press-cross-pollination-2026-06-23.md).
 
 ---
 

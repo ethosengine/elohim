@@ -32,7 +32,42 @@ cargo build --release --bin holochain --no-default-features \
 1. **Exact `go-pion-custom` production feature set.** The set above built/resolved, but holo-host's release recipe is authoritative for the *production* binary (wasmer variant, any `unstable-*`/`chc` flags). A wrong set = a subtly-different conductor. Confirm against holo-host's build.
 2. **kitsune2 wire-compat.** Our binary links kitsune2 **0.3.2** (a6d4e805); the live mesh runs **0.3.0-dev.3** (holo-host's downgrade branch). Both 0.3.x → expected wire-compatible, but **canary first** and confirm gossip/DHT before the genesis pair. (DNA-load compat is fine: our binary loads our a6d4e805-built DNA natively.)
 
+## CANARY IMAGE READY (2026-06-17)
+Built from the verified binary (no 40-min rebuild) + pushed:
+**`ghcr.io/ethosengine/elohim-edgenode:zombie-fix-canary-5a73e400d`**
+= holo-host base `v0.0.8-alpha31-hc0.6.0-go-pion-custom` + our `holochain` binary at `/bin/holochain`
+(elohim-0.6: a6d4e805 + #5719 + tx5 [patch] #194/#199, go-pion, glibc). Only the binary differs from
+prod — same base, same config handling. (Dev container can't reach harbor creds / kubectl, so it's on ghcr;
+copy to harbor or point the cluster at ghcr.) ⚠ canary-only — the two checks below still gate fleet roll.
+
+## ⚠ CORRECTED DEPLOY TARGET — it's the STORAGE image, not the edgenode image (2026-06-17)
+The LIVE alpha runs the **consolidated** model (`genesis/orchestrator/manifests/edgenode/_edgenode-consolidated.template.yaml`, NOT the separate-container `alpha.yaml`): one **`elohim-node` container = the `elohim-storage` image**, which runs the conductor as an **embedded child** (`process_manager.rs` `Command::new(conductor_binary)`). The `elohim-storage` Dockerfile **extracts the conductor binary** from a `conductor-source` stage (`COPY --from=conductor-source /usr/bin/holochain …`). So the leaking conductor is carried by the **elohim-storage image**; the edgenode image is only the binary SOURCE.
+
+**Wiring (landed on dev `b33ff524a`):** `elohim/elohim-storage/Dockerfile` now takes `ARG CONDUCTOR_SOURCE_IMAGE` (default = holo-host base → production byte-identical). Override it to embed the patched conductor.
+
+**Canary storage build — run in PROPER infra (NOT the dev container: podman `/dev/null` is read-only → `apt-get` fails in the Rust builder):**
+```
+docker build -f elohim/elohim-storage/Dockerfile \
+  --build-arg CONDUCTOR_SOURCE_IMAGE=harbor.ethosengine.com/ethosengine/elohim-edgenode:<edgenode-job-tag> \
+  -t harbor.ethosengine.com/ethosengine/elohim-storage:zombie-fix-canary <repo-root>
+docker push harbor.ethosengine.com/ethosengine/elohim-storage:zombie-fix-canary
+```
+(`<edgenode-job-tag>` = a tag from the che-devworkspaces `elohim-edgenode` job. Cleanest durable form: a `CONDUCTOR_SOURCE_IMAGE` param on the edge pipeline's storage-build step, default holo-host.)
+Then deploy that **storage** image to one non-genesis leecher's `elohim-node` container; watch `smaps_anon{class=other}` flatten + stay in-mesh; roll, genesis pair last.
+
+(NOTE: the earlier "point a leecher at the elohim-edgenode image" runbook below is superseded by this — the conductor is embedded in the storage image. The `ghcr …elohim-edgenode:zombie-fix-canary` image is still useful as the `CONDUCTOR_SOURCE_IMAGE`.)
+
 ## Deploy (operator / cluster-owned — no kubectl from dev)
+**Canary runbook (alpha = per-human StatefulSets `elohim-{human}-alpha`, ns `elohim-alpha`):**
+1. Get the image where the cluster pulls (harbor): `skopeo copy docker://ghcr.io/ethosengine/elohim-edgenode:zombie-fix-canary-5a73e400d docker://harbor.ethosengine.com/ethosengine/elohim-edgenode:zombie-fix-canary-5a73e400d` (your creds) — or make the ghcr package public and point the canary at ghcr.
+2. Pick ONE non-genesis leecher (`nodeTypes:['remote']`: susan/frank/pete/eve/nancy… — NOT matthew/adam/james/jessica). `kubectl set image statefulset/elohim-<leecher>-alpha <container>=<that-tag> -n elohim-alpha` then `kubectl rollout status`.
+3. Verify over a clean multi-hour window (`now-Xh`):
+   - **CURE signal:** `elohim_node_conductor_smaps_anon_bytes{class="other",pod="elohim-<leecher>-alpha-0"}` **FLATTENS** vs the unpatched leechers still climbing ~0.2 GB/h. (Best witness: a quiet leecher with 0 receipt errors.)
+   - **kitsune2 wire-compat check (the 0.3.2↔0.3.0-dev.3 risk):** the leecher stays in the mesh — peerCount stable, gossip/DHT healthy, no partition. If it islands → roll back (revert image) and investigate.
+   - DNA-load: the conductor starts + serves (loads the a6d4e805-built DNA natively).
+4. Flattens + healthy → roll wider (other leechers → anchors → **genesis pair matthew/adam LAST**). Slope persists → wrong-binary/feature-set; investigate before rolling.
+
+### (original note retained below)
 1. CI/build-host builds `Dockerfile.zombie-fix` → push to the registry.
 2. **Canary ONE non-genesis leecher** (per `HANDOFF-2026-06-17-upstream-tx5-transport-pin.md` §4) — point its edgenode at the patched image; over a clean multi-hour window confirm `elohim_node_conductor_smaps_anon_bytes{class="other"}` **flattens** (the definitive cure signal) and gossip/DHT stays healthy.
 3. Only then roll wider; the genesis pair (matthew/adam) last. A rolling restart on an unchanged DNA hash is safe (no re-key).

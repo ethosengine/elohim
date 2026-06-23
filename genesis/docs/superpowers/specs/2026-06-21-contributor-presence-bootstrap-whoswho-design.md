@@ -147,7 +147,11 @@ grain.
 - [ ] Defer the reach-back-prop-to-inspirers fold (a graph traversal over provenance edges, not a
       flat fold) and the VF-GraphQL projection (the bridge is M1/fixture-only; reports are M5).
 
-### Wave 3 — Opt-out → commons (heavy; net-new) [later]
+### Wave 3 — Opt-out → commons (heavy; net-new) [DEFERRED]
+> **Status: DEFERRED (operator 2026-06-22 — "Wave 3 can wait").** Behavior documented below as the
+> intended design; **not scheduled**. It is DNA-notarized/heavy and gated on a canonical
+> commons-receiver agent. Revisit after the two visual-surface sprints (presences-on-EPR · imagodei
+> profile) that consume Waves 1–2.
 - [ ] Define a canonical **commons receiver agent** (`agent_cid`) — replace the `commons-pool` magic
       string (cross-namespace identity rule).
 - [ ] Model opt-out as a **relinquish action** that emits a commons-redirect `EconomicEvent`

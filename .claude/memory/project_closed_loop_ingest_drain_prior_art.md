@@ -1,0 +1,19 @@
+---
+name: project_closed_loop_ingest_drain_prior_art
+description: "Paced \"drain the seed\" / closed-loop ingest solved TWICE (orphaned by the holochain-as-db→projection pivot, not failed); live reusable kernel = drain_publish_queue + wait-for-drain; warm_stream boot-replay is open-loop pacing dressed as backpressure; diagnose hang location BEFORE building a 3rd scheme."
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: 9d34ac8f-8455-4a08-8ccd-166c8171e257
+---
+
+The "absorb a bulk batch at a safe pace, never blow a hard deadline" primitive has been derived **twice** in this repo; the reusable closed-loop kernel is LIVE today. Don't re-derive it a third (now fourth) time.
+
+- **Era A (pre-pivot, Dec 2025–Jan 2026)** — paced bulk load INTO the conductor/DHT to dodge the 60s zome timeout. `2bf7577fc` (`chunk_size:1`, `chunk_delay_ms:500`), `8c96ab767` (tiered local/remote `BATCH_CREATE_SIZE`/`BATCH_DELAY_MS`/`STEP_BATCH_SIZE`). DELETED with the conductor-ingest path — survives only in commit bodies + deleted docs (`ARCHITECTURAL_REVIEW_MEDIA_SCALE.md` recorded the DHT-as-db wall: "2 concurrent calls = OOM, DHT saturated → timeouts").
+- **Era B (post-pivot, Apr 2026, LIVE — the reusable kernel)** — `drain_publish_queue()` in `elohim/elohim-storage/src/p2p/mod.rs`: adaptive backpressure (batch_delay **halves on success / doubles on failure**, 1ms→500ms cap), peer-gate (skip if 0 connected peers), `SUB_BATCH_SIZE=50` fresh-conn-per-subbatch, idempotent `mark_published` → `p2p_published_at` column (queue is truth, restart-safe), depth on `/p2p/status {total,published,pending}`. Producer-side feedback loop: `genesis/seeder/src/wait-for-drain.ts` (poll depth every 2s, done only at `pending==0 && total>=floor`, fail-fast after 10 errors, never treat `null` as done).
+
+**Why set aside: it wasn't.** The pivot (`6afa9543c`/`0d925b9f4`, "50min→5s, 545×") moved the bulk *target* off the DHT (SQLite absorbs fast; a separate paced loop publishes proofs to libp2p Kademlia — distinct from the Holochain DHT). The pacing discipline was rewritten for the new substrate, not abandoned. Orphaned-by-pivot = reusable. Pivot rationale: `genesis/plans/2026-03-16-p2p-coherence-refactor-design.md`; plan: `genesis/plans/2026-04-08-seeder-dht-drain-and-provenance-gate-plan.md`; ADR `.../history/2026-06-01-dht-is-a-notary-not-a-byte-store.md` (covers "DHT is a notary," NOT the pacing lesson — no history/ record distills the seed-drain pacing recurrence).
+
+**The catch for warm_stream (doorway boot-replay hang, 2026-06-13):** `warm_stream`'s `WARMUP_YIELD_EVERY_N=64` + `WARMUP_TOTAL_BUDGET_SECS=75` is the TIME-based half only — **open-loop pacing dressed as backpressure**. It never senses the downstream projection-store write-queue depth. If `store.set(doc).await` blocks on a saturated write queue the task can't REACH its yield point → the 75s budget KILLS instead of PACES → liveness restart-loop. Fix = instantiate the existing contract (depth-sense → pause → drain → resume), NOT a third bespoke scheme. See [[project_self_healing_control_plane_vision]] (no-overwhelm = every actuator is closed-loop) and [[project_principle_p1_reconciliation_controller]] (same controller pattern).
+
+**OPEN/UNRESOLVED (diagnose before building):** unconfirmed whether the warm_stream hang is even IN the yield loop. Pod hung 3 min at flat ~50MiB with the (correct) yield loop present — could be UPSTREAM of any yield point (SSE `byte_stream.next()`/UTF-8 parse) or the boot-replay path may bypass the loop. Trace the actual boot-replay call path first; adding backpressure in the wrong place fixes nothing. Era-A numeric params (`chunk_delay_ms:500`) are NOT portable (tuned to the 60s zome deadline; today's deadline is the ~150s k8s liveness probe, bottleneck is a projection-store write) — the SHAPE transfers, the NUMBERS re-derive.

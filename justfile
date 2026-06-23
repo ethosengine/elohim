@@ -208,7 +208,7 @@ sophia-build:
 
 # Verify sophia build artifacts exist
 sophia-check:
-    bash {{root}}/scripts/check-sophia.sh
+    bash {{root}}/app/elohim-app/scripts/check-sophia.sh
 
 # ─────────────────────────────────────────────────────────────────────
 # Content

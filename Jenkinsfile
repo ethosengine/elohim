@@ -839,7 +839,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 }
 
                                 echo "Building with configuration: ${buildConfig} (target: ${targetBranch}, source: ${sourceBranch})"
-                                sh 'bash ../../scripts/fetch-fonts.sh'
+                                sh 'bash scripts/fetch-fonts.sh'
                                 // Compile Service Worker (esbuild bundles JSZip into IIFE)
                                 // Must run before ng build so the compiled SW is in src/assets/
                                 sh 'pnpm run build:sw'

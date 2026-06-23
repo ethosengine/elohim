@@ -6,8 +6,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-FONTS_DIR="$PROJECT_ROOT/app/elohim-app/src/assets/fonts"
+APP_DIR="$(dirname "$SCRIPT_DIR")"   # app/elohim-app (script lives in app/elohim-app/scripts/)
+FONTS_DIR="$APP_DIR/src/assets/fonts"
 
 FA_VERSION="6.4.0"
 UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120"

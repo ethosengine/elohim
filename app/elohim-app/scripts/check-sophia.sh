@@ -7,8 +7,9 @@
 #   4. Fetch from GitHub Release via fetch-sophia-release.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-ASSET_DIR="$PROJECT_ROOT/app/elohim-app/src/assets/sophia-plugin"
+APP_DIR="$(dirname "$SCRIPT_DIR")"               # app/elohim-app (script lives in app/elohim-app/scripts/)
+PROJECT_ROOT="$(cd "$APP_DIR/../.." && pwd)"      # repo root (for the sophia submodule + global fetch script)
+ASSET_DIR="$APP_DIR/src/assets/sophia-plugin"
 SOPHIA_DIR="$PROJECT_ROOT/sophia"
 UMD_FILE="sophia-element.umd.js"
 

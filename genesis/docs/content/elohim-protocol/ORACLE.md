@@ -26,7 +26,7 @@ cites:
 | **2 · SDK** | the agency-gradient composition grammar — human-sovereign below, veil-holding above; `limit_owner` in one field; `govern(person)` will not compile | `2026-06-14-elohim-sdk-design.md` |
 | **3 · PLATFORM** | one SDK / many APIs; the capability catalog (the monorepo *is* the nascent surface); the corpus-of-software proof; the grow-without-sprawl rule | `2026-06-14-platform-one-sdk-many-apis-design.md` |
 | **4 · RUNTIME POLICY · DIAGNOSTICS · OBSERVED-BEHAVIOR · SELF-DEVELOPMENT** | the escalation organ — the two doors, the friction memory, the ground→decide→update→hand-back loop | `2026-06-14-design-oracle-design.md` |
-| **5 · DELIVERY** | the buildable layer — dispatch waves, the MVP first move, the plans | `SPRINT-KICKOFF-2026-06-14.md` + `genesis/docs/superpowers/plans/2026-06-14-*` |
+| **5 · DELIVERY** | the buildable layer — dispatch waves, the MVP first move, the plans | `genesis/docs/superpowers/plans/2026-06-14-*` (the dispatch controllers/ledgers dissolved to git after subsume, per ORACLE-stack) |
 
 ## The one machine, in one breath
 

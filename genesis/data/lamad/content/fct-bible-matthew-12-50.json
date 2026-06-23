@@ -1,0 +1,65 @@
+{
+  "id": "fct-bible-matthew-12-50",
+  "contentType": "reference",
+  "title": "Matthew 12:50",
+  "description": "Scripture reference used in FCT Module 14",
+  "content": "## Matthew 12:50\n\n> Matthew 12:50 - Whoever does the will of my Father is my brother and sister and mother (belonging shown by doing)\n\n*NRSVue Translation*\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "matthew",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age",
+    "originalContentType": "bible-verse"
+  },
+  "createdAt": "2026-06-14T16:28:42.060195+00:00",
+  "updatedAt": "2026-06-14T16:28:42.060Z",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Matthew 12:50",
+    "ogDescription": "Scripture reference used in FCT Module 14",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-matthew-12-50",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Matthew 12:50 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-matthew-12-50",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Matthew 12:50",
+    "description": "Scripture reference used in FCT Module 14",
+    "dateCreated": "2026-06-14T16:28:42.060195+00:00",
+    "dateModified": "2026-06-14T16:28:42.060Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

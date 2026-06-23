@@ -59,7 +59,7 @@ harvest each into the named home, then remove the file:
 
 | Doc | Open signal → harvest target |
 |---|---|
-| `HANDOFF-2026-06-17-doorway-metrics.md` | doorway `/metrics` P2 (M1–M5) — **largely landed** (`25bc75b1b`,`e53709967`); confirm no residual P3 items, then remove. |
+| `.claude/handoffs/HANDOFF-2026-06-17-doorway-metrics.md` (relocated from root 2026-06-23) | doorway `/metrics` P2 (M1–M5) — **largely landed** (`25bc75b1b`,`e53709967`); confirm no residual P3 items, then remove. |
 | `2026-06-18-resilience-cards-dual-doorway-sprint-RESULT.md` + `-handoff.md` | THE FORK: `GET /auth/me` 401 from dev is a **known structural item** (session/key-population path; p2p-design-gate + security-owned) — this is the root of the live "steward auth isn't working" symptom; gated on integrator dev-merge + reseed + jemalloc deploy. Also: seeder still stamps `p2pPublishedAt` (`seed-sqlite.ts:903`) instead of the honest ingest `dhtAnchorHash`. → migrate to a backlog item. |
 | `2026-06-21-shakeout-shift-handoff.md` + `2026-06-21-visual-verification-map-for-shakeout-shift.md` | The pre-existing RED floor punch-list (storage `observe_kind` is `#[cfg(test)]` → `observed_kinds()==[]` cross-crate; elohim-app gate pre-existing-red → `--no-verify` is the only frontend dev-push path). Partly in memory (`feedback_pvc_deferral_hides_gate_debt`). Visual-verification-map names which surfaces are deployed-app-verifiable — read it before the next `/shift`. |
 

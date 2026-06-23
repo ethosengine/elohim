@@ -16,6 +16,7 @@ cites:
   - elohim/elohim-storage/src/reconcile/controller.rs
   - elohim/elohim-storage/src/views/reciprocity_view.rs
   - elohim/elohim-storage/src/views/cluster_view.rs
+  - genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md
 relatedNodeIds:
   - backlog-resilience-card-self-cid-provide-loop-gate
 ---
@@ -80,6 +81,12 @@ Everything downstream joins on `agent_cid`:
   explicitly demoted to "speculative until a cross-signed control proof lands" — and
   the resolver is precisely the component that would gate custody/economics on these
   bindings. It cannot be trusted for that until this proof exists.
+- The **imagodei profile/page viewer-lens arc** (`2026-06-22-imagodei-profile-page-viewer-lens-design.md`)
+  is the newest dependent: its reflexive "how the network sees you" feed is the
+  attribution-bearing facet. That arc **severed this as leg 3** (operator decision
+  2026-06-22) and renders the feed honestly-caveated ("observed, not proven") meanwhile —
+  it does NOT join attribution through the binding until this proof lands. This backlog
+  item is that arc's gate for *cryptographically-proven* recognition attribution.
 
 The unsigned binding is the **missing trust root** for all of it. Until it is real,
 the attribution joins either stay off the binding or accept a spoofable input.

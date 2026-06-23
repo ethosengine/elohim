@@ -1,0 +1,66 @@
+{
+  "id": "fct-bible-matthew-7-16",
+  "contentType": "reference",
+  "title": "Matthew 7:16",
+  "description": "Scripture reference used in FCT Module 14",
+  "content": "## Matthew 7:16\n\n> Matthew 7:16 - By their fruit you will recognize them (see Module 2: a system is what it does)\n\n*NIV Translation*\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "matthew",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act",
+    "fct-module-02-systems-thinking"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age",
+    "originalContentType": "bible-verse"
+  },
+  "createdAt": "2026-06-14T16:28:42.060195+00:00",
+  "updatedAt": "2026-06-14T16:28:42.060Z",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Matthew 7:16",
+    "ogDescription": "Scripture reference used in FCT Module 14",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-matthew-7-16",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Matthew 7:16 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-matthew-7-16",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Matthew 7:16",
+    "description": "Scripture reference used in FCT Module 14",
+    "dateCreated": "2026-06-14T16:28:42.060195+00:00",
+    "dateModified": "2026-06-14T16:28:42.060Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}
