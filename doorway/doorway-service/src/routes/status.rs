@@ -352,20 +352,28 @@ async fn fetch_projection_stats(state: &Arc<AppState>) -> (u64, u64) {
 
     let result = if let Some(ref mongo) = state.mongo {
         let db = mongo.inner().database(mongo.db_name());
-        match db
+        // Doc count via count_documents — NOT collStats: collStats is deprecated in
+        // MongoDB 6.2+ and silently returns 0 there (observed live as
+        // managedDocumentCount=0 on alpha), which would render a misleading "0
+        // Content Available". count_documents is reliable across versions.
+        let docs = db
+            .collection::<bson::Document>("projected_entries")
+            .count_documents(bson::doc! {})
+            .await
+            .unwrap_or(0);
+        // Byte size is best-effort via collStats (no count_documents equivalent);
+        // 0 when collStats is unavailable on 6.2+.
+        let bytes = match db
             .run_command(bson::doc! { "collStats": "projected_entries" })
             .await
         {
-            Ok(doc) => {
-                let bytes = doc.get_i64("size").unwrap_or(0).max(0) as u64;
-                let docs = doc.get_i64("count").unwrap_or(0).max(0) as u64;
-                (bytes, docs)
-            }
+            Ok(doc) => doc.get_i64("size").unwrap_or(0).max(0) as u64,
             Err(e) => {
-                tracing::warn!("collStats query failed (deprecated in MongoDB 6.2+): {e}");
-                (0, 0)
+                tracing::warn!("collStats size query failed (deprecated in MongoDB 6.2+): {e}");
+                0
             }
-        }
+        };
+        (bytes, docs)
     } else {
         (0, 0)
     };
