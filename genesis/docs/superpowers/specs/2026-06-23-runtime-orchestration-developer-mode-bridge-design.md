@@ -28,11 +28,36 @@ orchestration control plane**:
 > orchestrates the *runtime lifecycle ITSELF* (repair, update, configure, restart) — the same
 > orchestration paradigm, a different target. Where a2o drives the **app**, this drives the **pod/node**.
 
+## Invariant: the DNA must be consistent across ALL peers (partition-safety)
+Peers on different DNA hashes **cannot communicate** — a DNA hash IS the DHT/network identity (it
+covers the integrity zomes + modifiers), and there is **no live cross-version bridge** (Holochain
+"bridge calls" are local inter-cell calls, not cross-version network comms; DNA migration/lineage is
+a separate, deliberate process). So a hash-moving DNA change is inherently **coordinated, atomic, and
+fleet-wide**: roll it incrementally and the old-DNA / new-DNA peers land on different DHTs and
+silently partition (CLAUDE.md: "different DNA hashes → different DHTs → P2P partition").
+
+**Therefore the DNA MUST be consistent across all peers** — pinned + rolled atomically (incident 1a),
+or baked into the deploy artifact; **never floated per-peer**. The alpha CellWithoutGenesis incident
+is the proof: a floating `elohim-happ:dev-latest` let a restarting peer fetch a *newer* DNA than its
+installed cell → `CellWithoutGenesis` drift, plus the partition risk of peers on mixed hashes. This
+invariant holds **until either**:
+1. Holochain ships native cross-version DNA bridges, OR
+2. we build the **internal DNA upgrade/update/rollback path** — the runtime coordinating its own
+   fleet-wide DNA migration *with lineage* (so it can upgrade/update/rollback itself safely). That
+   path is precisely a plane-1 operation of this control plane (see `update`/`rollback` below) — i.e.
+   **this design is the eventual mechanism that would relax "pin everything."**
+
+The lone exception is a **coordinator-zome-only** change — it does NOT move the hash, so it hot-swaps
+via `update_coordinators` with no partition and no re-genesis (CLAUDE.md). Everything that moves the
+hash: pin/bake, never float.
+
 ## Three planes
 ### 1. Orchestratable runtime operations
 Node-lifecycle/maintenance actions modeled as **declarative, orchestratable operations** on a node's
-own runtime (not imperative kubectl): `repair` (clear genesis-less cell → re-genesis), `update` (bump
-+ reconcile DNA/conductor to the assigned bundle), `restart`, `reconfigure` (the configurable settings
+own runtime (not imperative kubectl): `repair` (clear genesis-less cell → re-genesis), `update`/`rollback`
+(migrate the fleet's DNA to a new pinned bundle — a COORDINATED, atomic, all-peers-together migration
+with lineage per the invariant above, NEVER a per-peer floating fetch; this is the "internal DNA
+upgrade path"), `restart`, `reconfigure` (the configurable settings
 — conductor config, policies, target_arc_factor, the re-seedable policy itself). Each is a P1
 reconciliation-controller op the **node drives on itself**; the operator/steward *triggers* it, the node
 *performs* it. The repair primitive already exists: `ConductorManager::clear_conductor_state` +

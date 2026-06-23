@@ -75,6 +75,16 @@ genesis (re-keys; acceptable on alpha per `GENESIS_SELF_HEAL_IDENTITY=1`). `/dat
    `@sha256:` digests (or dated tags), pass `CONDUCTOR_SOURCE_IMAGE` explicitly as a single declared
    build-arg, and give the edgenode build a `build-manifest.json` so graph-walker chains it. (= "Fix B"
    from the leak-fix-reproducibility RCA; now also a recovery PREREQUISITE.)
+   - **Why the hApp pin is partition-safety, not just drift-prevention:** the hApp (DNA) is a SEPARATE
+     artifact from the conductor — `elohim-edgenode` bakes only the conductor binary; the DNA is fetched
+     at boot by the `happ-fetcher` init via `HAPP_VERSION` (so the conductor pin C does NOT cover it).
+     And peers on different DNA hashes **cannot communicate** (no live cross-version bridge): a floating
+     `HAPP_VERSION` lets restarting peers land on different DNAs → not only `CellWithoutGenesis` drift but
+     a **P2P partition**. So the DNA MUST be consistent across ALL peers — pinned + rolled atomically —
+     until Holochain ships native cross-version bridges OR we build the internal DNA
+     upgrade/update/rollback path (the runtime self-migrating with lineage). Full rationale + the
+     bake-vs-pin trade-off: `genesis/docs/superpowers/specs/2026-06-23-runtime-orchestration-developer-mode-bridge-design.md`
+     §"Invariant: the DNA must be consistent across ALL peers".
 2. **Make the genesis-less self-heal reachable.** The conductor panicking fatally on
    `CellWithoutGenesis` at startup makes the storage service's reinstall-on-stale heal unreachable. Add a
    **pre-conductor-start cell-health sweep** (detect + clear a genesis-less cell on `holochain-data`
