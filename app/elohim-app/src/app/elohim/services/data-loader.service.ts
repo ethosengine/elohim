@@ -48,6 +48,7 @@ import { ContentBackendService } from './content.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
+import { environment } from '../../../environments/environment';
 
 import type { IGovernance } from '@elohim/service';
 import type {
@@ -268,8 +269,12 @@ export class DataLoaderService {
         this.logger.debug('IndexedDB cache initialized', stats);
       }
 
-      // Initialize ContentResolver and register sources
-      await this.contentResolver.initialize();
+      // Initialize ContentResolver and register sources.
+      // Thread the env WASM gate so alpha/prod (preferWasm:false) skip the
+      // /wasm/elohim-cache-core fetch entirely (the asset is Harbor-published
+      // per-happVersion and 404s when unbuilt). undefined → createContentResolver
+      // defaults preferWasm:true, preserving dev's WASM path.
+      await this.contentResolver.initialize({ preferWasm: environment.cache?.preferWasm });
       this.contentResolver.registerStandardSource('indexeddb');
       if (this.projectionApi.enabled) {
         this.contentResolver.registerStandardSource('projection');

@@ -62,6 +62,17 @@ const HAZARD_SEVERITY_COLORS: Record<string, string> = {
     <div class="map-wrapper">
       <div #mapContainer class="map"></div>
 
+      @if (mapError(); as err) {
+        <div
+          class="map-error"
+          data-testid="map-error"
+          role="status"
+          style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:2rem;text-align:center;"
+        >
+          <p>{{ err }}</p>
+        </div>
+      }
+
       @if (selectedPlace()) {
         <div class="place-panel">
           <button
@@ -247,6 +258,8 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
   /** Constitutional layer filter — empty string means all layers */
   selectedLayer = signal<string>('');
   loading = signal(false);
+  /** Non-null when WebGL/map init failed — drives the graceful fallback panel. */
+  mapError = signal<string | null>(null);
 
   /** Places sorted by risk tier (critical first), for dashboard list */
   sortedPlaces = computed(() => {
@@ -260,8 +273,9 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
   });
 
   ngAfterViewInit(): void {
-    this.initMap();
-    this.loadPlaces();
+    if (this.initMap()) {
+      this.loadPlaces();
+    }
   }
 
   ngOnDestroy(): void {
@@ -271,6 +285,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
   }
 
   toggleDashboardMode(): void {
+    if (this.mapError()) return;
     this.dashboardMode.update(v => !v);
     if (this.dashboardMode()) {
       this.loadDashboard();
@@ -292,7 +307,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
   }
 
   geolocate(): void {
-    if (!navigator.geolocation) return;
+    if (this.mapError() || !navigator.geolocation) return;
 
     navigator.geolocation.getCurrentPosition(
       pos => {
@@ -335,33 +350,43 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private initMap(): void {
-    this.map = new maplibregl.Map({
-      container: this.mapContainer.nativeElement,
-      style: {
-        version: 8,
-        sources: {
-          'osm-tiles': {
-            type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            attribution:
-              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  private initMap(): boolean {
+    try {
+      this.map = new maplibregl.Map({
+        container: this.mapContainer.nativeElement,
+        style: {
+          version: 8,
+          sources: {
+            'osm-tiles': {
+              type: 'raster',
+              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              attribution:
+                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            },
           },
+          layers: [
+            {
+              id: 'osm-tiles',
+              type: 'raster',
+              source: 'osm-tiles',
+              minzoom: 0,
+              maxzoom: 19,
+            },
+          ],
         },
-        layers: [
-          {
-            id: 'osm-tiles',
-            type: 'raster',
-            source: 'osm-tiles',
-            minzoom: 0,
-            maxzoom: 19,
-          },
-        ],
-      },
-      center: [0, 20],
-      zoom: 2,
-    });
+        center: [0, 20],
+        zoom: 2,
+      });
+    } catch (err) {
+      // MapLibre throws synchronously from the Map constructor when a WebGL
+      // context cannot be created (GPU-less / sandboxed / headless). Degrade
+      // gracefully here instead of letting the throw escape ngAfterViewInit as
+      // an uncaught error that breaks the whole /map route.
+      this.mapError.set('Map unavailable — this browser or environment does not support WebGL.');
+      console.warn('[SpatialMapComponent] WebGL/map initialization failed:', err);
+      return false;
+    }
 
     this.map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
@@ -383,6 +408,8 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
     this.map.on('mouseleave', 'place-fills', () => {
       this.map.getCanvas().style.cursor = '';
     });
+
+    return true;
   }
 
   private loadPlaces(): void {
