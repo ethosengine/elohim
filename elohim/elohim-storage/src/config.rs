@@ -209,6 +209,27 @@ pub struct Config {
     /// (`services/household_resilience.rs:194-195`).
     #[serde(default)]
     pub self_household_id: Option<String>,
+
+    /// P3 salvage: opt-in consent gate for Good-Samaritan salvage custody.
+    /// Default **false** — a node is NEVER conscripted (the imago-dei floor);
+    /// salvage is an enhancement a node offers, never a participation
+    /// precondition (the hub-optional floor). When true AND the node is an
+    /// always-on archetype (`node`/`steward`), it advertises spare capacity and
+    /// the salvage pass may author custody-blob commitments naming self.
+    /// Loaded from env `SALVAGE_CAPACITY_ENABLED`.
+    #[serde(default)]
+    pub salvage_capacity_enabled: bool,
+
+    /// P3 salvage: desired distinct-holder count per blob. Default = the
+    /// `min_replicas_for_eviction` value (2). The salvage pass treats a blob
+    /// with fewer fresh honored providers than this as under-replicated.
+    #[serde(default = "default_salvage_target_replicas")]
+    pub salvage_target_replicas: usize,
+
+    /// P3 salvage: cadence (seconds) for the salvage-capacity advertisement
+    /// broadcast and the salvage recheck sweep. Default 300s (5 min).
+    #[serde(default = "default_salvage_recheck_seconds")]
+    pub salvage_recheck_seconds: u64,
 }
 
 fn default_peer_policy_path() -> PathBuf {
@@ -279,6 +300,16 @@ fn default_fetch_blob_parallelism() -> usize {
     3
 }
 
+fn default_salvage_target_replicas() -> usize {
+    // Mirrors `min_replicas_for_eviction` (2) — the desired distinct-holder
+    // count per blob the salvage pass restores toward.
+    2
+}
+
+fn default_salvage_recheck_seconds() -> u64 {
+    300
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -314,6 +345,9 @@ impl Default for Config {
             genesis_self_heal_identity: false,
             self_human_id: None,
             self_household_id: None,
+            salvage_capacity_enabled: false,
+            salvage_target_replicas: default_salvage_target_replicas(),
+            salvage_recheck_seconds: default_salvage_recheck_seconds(),
         }
     }
 }

@@ -24,10 +24,10 @@ use super::diesel_schema::{
     peer_blob_inventory, peer_identity_bindings, peer_inventory_cursor, placement_gaps, places,
     portal_hosts, precedents, premium_gates, proposal_options, proposals, ranked_votes,
     rea_commitments, recovery_requests, recovery_witnesses, relationships,
-    responsibility_demand_configs, revocation_votes, risk_alerts, schedules, shard_locations,
-    shard_manifests, spatial_contexts, statements, steward_credentials, stewarded_nodes,
-    stewardship_allocations, token_balances, token_decay_events, token_mint_events,
-    token_transfers, votes,
+    responsibility_demand_configs, revocation_votes, risk_alerts, salvage_capacity, schedules,
+    shard_locations, shard_manifests, spatial_contexts, statements, steward_credentials,
+    stewarded_nodes, stewardship_allocations, token_balances, token_decay_events,
+    token_mint_events, token_transfers, votes,
 };
 
 // ============================================================================
@@ -3218,6 +3218,34 @@ pub struct NewPeerInventoryCursorRow {
     pub peer_id: String,
     pub last_sequence: i64,
     pub last_updated: String,
+}
+
+// ============================================================================
+// salvage_capacity (Phase 3) — Category C operational projection from the
+// salvage-capacity gossip ('elohim/storage/salvage'). agent_cid-keyed; feeds
+// the salvage candidate pool. Manifest counterpart: the salvage `custody-blob`
+// commitment authored when this peer self-selects as a holder.
+// ============================================================================
+
+#[derive(Debug, Clone, Queryable, Selectable)]
+#[diesel(table_name = salvage_capacity)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct SalvageCapacityRow {
+    pub agent_cid: String,
+    pub spare_bytes: i64,
+    pub archetype: String,
+    pub last_seen_at: String,
+    pub seq: i64,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = salvage_capacity)]
+pub struct NewSalvageCapacityRow {
+    pub agent_cid: String,
+    pub spare_bytes: i64,
+    pub archetype: String,
+    pub last_seen_at: String,
+    pub seq: i64,
 }
 
 // ============================================================================

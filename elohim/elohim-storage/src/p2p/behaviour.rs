@@ -523,6 +523,14 @@ impl ElohimStorageBehaviour {
         gossipsub
             .subscribe(&inventory_topic)
             .expect("subscribe to elohim/inventory/blob");
+        // P3-4: subscribe to the salvage-capacity topic. Opt-in peers publish
+        // `SalvageCapacityAd`; the receive arm in p2p/mod.rs projects arrivals
+        // into `salvage_capacity` (SQLite), populating the salvage candidate pool.
+        let salvage_topic =
+            gossipsub::IdentTopic::new(super::salvage_gossip::SALVAGE_CAPACITY_TOPIC);
+        gossipsub
+            .subscribe(&salvage_topic)
+            .expect("subscribe to elohim/storage/salvage");
         // Task 4.4: subscribe to all observation namespaces so peers receive
         // CursorAnnouncements.  Role-based subscription override is a follow-on
         // (see spec §5.3 + open question 4).

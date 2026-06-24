@@ -104,6 +104,7 @@ pub mod response;
 pub mod responsibility_demand_service;
 pub mod risk_alert;
 pub mod routing;
+pub mod salvage_commitment_author; // P3-5 — production CommitmentAuthor (conductor-backed salvage)
 pub mod schemaref_resolver;
 pub mod sealed_against_self;
 pub mod seed_shard_manifest;

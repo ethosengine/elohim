@@ -1,0 +1,382 @@
+[
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/collective_filter_pattern.rs",
+    "struct": "CollectiveFilterPattern",
+    "field": "context_window_seconds"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "AccountingBridge",
+    "field": "asset_name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "AccountingBridge",
+    "field": "property_address"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "AdjustmentReasoning",
+    "field": "interpretation_notes"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Agent",
+    "field": "avatar"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Agent",
+    "field": "bio"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Agent",
+    "field": "display_name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Agent",
+    "field": "location"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "AgentProgress",
+    "field": "step_notes_json"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Agreement",
+    "field": "name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Agreement",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Appreciation",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "AssetSplit",
+    "field": "split_name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Claim",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Commitment",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "ContributorPresence",
+    "field": "display_name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "ContributorPresence",
+    "field": "external_identifiers_json"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "ContributorPresence",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "ContributorRecognition",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "CoveredRisk",
+    "field": "risk_name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "CustodianCommitment",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "EconomicEvent",
+    "field": "at_location"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "EconomicEvent",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "EconomicResource",
+    "field": "name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "EconomicResource",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "FlowBudget",
+    "field": "name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "FlowGoal",
+    "field": "name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "FlowMilestone",
+    "field": "name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "FlowPlan",
+    "field": "name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "FlowScenario",
+    "field": "name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Human",
+    "field": "bio"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Human",
+    "field": "display_name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Human",
+    "field": "location"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "HumanRelationship",
+    "field": "context_json"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Intent",
+    "field": "name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Intent",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "KnowledgeMap",
+    "field": "subject_name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "PointEvent",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "PremiumGate",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Process",
+    "field": "name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Process",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "Settlement",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "StewardCredential",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "StewardRevenue",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "StewardedResource",
+    "field": "allocation_event_ids_json"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "StewardedResource",
+    "field": "allocation_strategy"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "StewardedResource",
+    "field": "allocations_json"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "StewardedResource",
+    "field": "can_modify_allocations"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "StewardedResource",
+    "field": "name"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "TransitionAction",
+    "field": "completion_notes"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "TransitionPhase",
+    "field": "name"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "struct": "Agent",
+    "field": "avatar"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "struct": "Agent",
+    "field": "bio"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "struct": "Agent",
+    "field": "display_name"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "struct": "Agent",
+    "field": "location"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "struct": "AgentProgress",
+    "field": "step_notes_json"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "struct": "ContributorPresence",
+    "field": "display_name"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "struct": "ContributorPresence",
+    "field": "external_identifiers_json"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "struct": "ContributorPresence",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "struct": "Human",
+    "field": "bio"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "struct": "Human",
+    "field": "display_name"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "struct": "Human",
+    "field": "location"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "struct": "HumanRelationship",
+    "field": "context_json"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "struct": "LegacyAttestationView",
+    "field": "display_name"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/qahal.rs",
+    "struct": "CollabAgreement",
+    "field": "share_allocation_json"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/qahal.rs",
+    "struct": "Collective",
+    "field": "display_name"
+  },
+  {
+    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/stewardship.rs",
+    "struct": "StewardshipAppeal",
+    "field": "advocate_notes"
+  },
+  {
+    "path": "elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs",
+    "struct": "GraduatedFeedback",
+    "field": "feedback_context"
+  },
+  {
+    "path": "elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs",
+    "struct": "OpinionStatement",
+    "field": "context_id"
+  },
+  {
+    "path": "elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs",
+    "struct": "Place",
+    "field": "centroid_lat"
+  },
+  {
+    "path": "elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs",
+    "struct": "Place",
+    "field": "centroid_lng"
+  },
+  {
+    "path": "elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs",
+    "struct": "Place",
+    "field": "name"
+  },
+  {
+    "path": "elohim/holochain/dna/node-registry/zomes/node_registry_integrity/src/lib.rs",
+    "struct": "NodeRegistration",
+    "field": "context_epr_id"
+  },
+  {
+    "path": "elohim/holochain/dna/node-registry/zomes/node_registry_integrity/src/lib.rs",
+    "struct": "NodeRegistration",
+    "field": "display_name"
+  },
+  {
+    "path": "elohim/holochain/dna/node-registry/zomes/node_registry_integrity/src/lib.rs",
+    "struct": "NodeRegistration",
+    "field": "latitude"
+  },
+  {
+    "path": "elohim/holochain/dna/node-registry/zomes/node_registry_integrity/src/lib.rs",
+    "struct": "NodeRegistration",
+    "field": "longitude"
+  }
+]

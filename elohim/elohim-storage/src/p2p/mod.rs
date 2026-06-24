@@ -56,6 +56,7 @@ pub mod recovery_revocation;
 pub mod recovery_rotation;
 pub mod replication;
 pub mod revocation_attestation_message;
+pub mod salvage_gossip;
 pub mod shamir_transport;
 pub mod shard_protocol;
 pub mod sync_protocol;
@@ -427,6 +428,19 @@ pub struct P2PConfig {
     /// T23: parallelism bound for the kicked race-fetch.
     /// Threaded from `Config::fetch_blob_parallelism`.
     pub fetch_blob_parallelism: usize,
+    /// P3 salvage: opt-in consent gate. Default false — a node is never
+    /// conscripted (imago-dei floor). When true AND the archetype is always-on
+    /// (`node`/`steward`), this peer advertises spare capacity and the salvage
+    /// pass may author custody-blob commitments naming self.
+    /// Threaded from `Config::salvage_capacity_enabled`.
+    pub salvage_capacity_enabled: bool,
+    /// P3 salvage: desired distinct-holder count per blob (default 2 = the
+    /// `min_replicas_for_eviction` value). Threaded from
+    /// `Config::salvage_target_replicas`.
+    pub salvage_target_replicas: usize,
+    /// P3 salvage: cadence (seconds) for the capacity-ad broadcast and the
+    /// salvage recheck sweep. Threaded from `Config::salvage_recheck_seconds`.
+    pub salvage_recheck_seconds: u64,
 }
 
 impl Default for P2PConfig {
@@ -454,6 +468,9 @@ impl Default for P2PConfig {
             inventory_freshness_seconds: 600,
             fetch_blob_timeout_seconds: 5,
             fetch_blob_parallelism: 3,
+            salvage_capacity_enabled: false,
+            salvage_target_replicas: 2,
+            salvage_recheck_seconds: 300,
         }
     }
 }
@@ -597,6 +614,9 @@ pub struct P2PNode {
     /// run-loop broadcaster tick allocates the next value before each
     /// publish via `inventory_broadcaster::build_snapshot`.
     inventory_seq: inventory_broadcaster::SequenceAllocator,
+    /// P3 salvage: monotonic sequence allocator for outgoing
+    /// `SalvageCapacityAd` messages. Initialized at 0 in `new()`.
+    salvage_seq: inventory_broadcaster::SequenceAllocator,
     /// Plan 4: dual-publish gossip publisher.
     ///
     /// Defaults to a `LibP2PGossipPublisher` using the node's own command channel.
@@ -1819,6 +1839,7 @@ impl P2PNode {
             reconciliation_metrics: std::sync::Arc::new(ReconciliationMetrics::default()),
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
             inventory_seq: inventory_broadcaster::SequenceAllocator::new(0),
+            salvage_seq: inventory_broadcaster::SequenceAllocator::new(0),
             gossip_publisher: default_gossip_publisher,
             sealing_keys: None,
             agent_info_inbound_tx: None,
@@ -2500,6 +2521,11 @@ impl P2PNode {
                 } => {
                     drop(swarm);
                     self.broadcast_inventory_snapshot().await;
+                    // P3-4: piggyback the salvage-capacity advertisement on the
+                    // same broadcast cadence. Self-gates (opt-in + always-on
+                    // archetype + self_cid) inside the method — a no-op for
+                    // non-salvage nodes, so reusing this tick adds no new timer.
+                    self.broadcast_salvage_capacity().await;
                 }
                 _ = async {
                     // T23: custody reconcile sweep tick. When disabled
@@ -2659,6 +2685,89 @@ impl P2PNode {
             count,
             sequence = snapshot_sequence,
             "T22: published inventory snapshot via DualGossipPublisher"
+        );
+    }
+
+    /// P3-4: Build and publish a [`SalvageCapacityAd`] on the salvage-capacity
+    /// gossip topic. Opt-in advertisement of this peer's spare salvage capacity;
+    /// receivers project it into `salvage_capacity`, populating the candidate
+    /// pool the salvage pass ranks over.
+    ///
+    /// **Gated**: only runs when this node is opted in
+    /// (`salvage_capacity_enabled`) AND is an always-on archetype
+    /// (`node` / `steward`) — only always-on peers advertise by default. A node
+    /// is never conscripted (the imago-dei floor); silently no-ops otherwise.
+    ///
+    /// **Identity**: advertises `self_cid` (the agent_cid namespace), NOT the
+    /// libp2p peer id — the candidate pool is agent_cid-keyed so the XOR
+    /// placement metric never crosses namespaces.
+    ///
+    /// **Lock contract**: does NOT acquire the swarm lock; publish routes through
+    /// the gossip publisher (command channel). Callers from `run()` select! arms
+    /// drop their swarm guard first.
+    ///
+    /// Idempotent and safe to call repeatedly.
+    async fn broadcast_salvage_capacity(&self) {
+        use crate::p2p::salvage_gossip::{SalvageCapacityAd, SALVAGE_CAPACITY_TOPIC};
+
+        if !self.config.salvage_capacity_enabled {
+            return; // opt-in consent gate (default off) — never conscripted
+        }
+        // Only always-on archetypes advertise by default.
+        let archetype = self.config.device_archetype.clone().unwrap_or_default();
+        if !matches!(archetype.as_str(), "node" | "steward") {
+            return;
+        }
+        let Some(agent_cid) = self.config.self_cid.clone() else {
+            debug!(
+                target: "elohim_storage::salvage",
+                "P3: self_cid not configured; skipping salvage-capacity advertisement"
+            );
+            return;
+        };
+
+        // P3-4 best-effort spare_bytes: a real capacity probe (fs4 free space −
+        // pantry usage) is a follow-on (the candidate seam already carries
+        // `spare_bytes` for capacity-weighted strategies). The MVP XOR strategy
+        // ignores spare_bytes, so 0 here is harmless for placement; advertise 0
+        // until the probe lands.
+        let spare_bytes: u64 = 0;
+        let seq = self.salvage_seq.next();
+
+        let ad = SalvageCapacityAd {
+            agent_cid: agent_cid.clone(),
+            spare_bytes,
+            archetype: archetype.clone(),
+            seq,
+            signature: vec![0x00], // Stage 1 structural non-empty
+        };
+
+        let bytes = match ad.to_bytes() {
+            Ok(b) => b,
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::salvage",
+                    error = %e,
+                    "P3: failed to serialize salvage-capacity ad"
+                );
+                return;
+            }
+        };
+
+        if let Err(e) = self.gossip_publisher.publish(SALVAGE_CAPACITY_TOPIC, bytes) {
+            warn!(
+                target: "elohim_storage::salvage",
+                error = %e,
+                "P3: salvage-capacity publish failed (often: no subscribed peers yet)"
+            );
+            return;
+        }
+        debug!(
+            target: "elohim_storage::salvage",
+            agent_cid = %agent_cid,
+            archetype = %archetype,
+            seq,
+            "P3: published salvage-capacity advertisement"
         );
     }
 
@@ -6004,6 +6113,71 @@ impl P2PNode {
                                     from = %propagation_source,
                                     "Inventory message decoded as neither snapshot nor delta — dropped"
                                 );
+                            }
+                        } else if message.topic.as_str()
+                            == crate::p2p::salvage_gossip::SALVAGE_CAPACITY_TOPIC
+                        {
+                            // P3-4: receive a salvage-capacity advertisement from an
+                            // opt-in peer. Project it into the `salvage_capacity` reality
+                            // table; the salvage pass reads the fresh, opted-in entries as
+                            // its candidate pool. Mirrors the inventory snapshot arm's
+                            // pool/conn/error handling. agent_cid-keyed by construction.
+                            use crate::p2p::salvage_gossip::SalvageCapacityAd;
+
+                            match SalvageCapacityAd::from_bytes(&message.data) {
+                                Ok(ad) => {
+                                    if let Err(e) = ad.verify_structural() {
+                                        warn!(
+                                            target: "elohim_storage::salvage",
+                                            from = %propagation_source,
+                                            error = ?e,
+                                            "Salvage-capacity ad failed structural verify — dropped"
+                                        );
+                                    } else if let Some(pool) = self.db_pool.as_ref() {
+                                        match pool.get() {
+                                            Ok(mut conn) => {
+                                                let when = chrono::Utc::now()
+                                                    .format("%Y-%m-%dT%H:%M:%SZ")
+                                                    .to_string();
+                                                match crate::db::salvage_capacity::apply_capacity(
+                                                    &mut conn,
+                                                    &ad.agent_cid,
+                                                    ad.spare_bytes as i64,
+                                                    &ad.archetype,
+                                                    &when,
+                                                    ad.seq as i64,
+                                                ) {
+                                                    Ok(()) => debug!(
+                                                        target: "elohim_storage::salvage",
+                                                        from = %propagation_source,
+                                                        agent_cid = %ad.agent_cid,
+                                                        spare_bytes = ad.spare_bytes,
+                                                        archetype = %ad.archetype,
+                                                        seq = ad.seq,
+                                                        "Salvage-capacity ad applied"
+                                                    ),
+                                                    Err(e) => warn!(
+                                                        target: "elohim_storage::salvage",
+                                                        from = %propagation_source,
+                                                        error = %e,
+                                                        "apply_capacity failed"
+                                                    ),
+                                                }
+                                            }
+                                            Err(e) => warn!(
+                                                target: "elohim_storage::salvage",
+                                                error = %e,
+                                                "salvage: db pool exhausted"
+                                            ),
+                                        }
+                                    }
+                                }
+                                Err(e) => debug!(
+                                    target: "elohim_storage::salvage",
+                                    from = %propagation_source,
+                                    error = %e,
+                                    "Salvage-capacity ad failed to decode — dropped"
+                                ),
                             }
                         } else if message.topic.as_str().starts_with("elohim/") {
                             // D.6 wire point B (gossipsub EPR announce): per-pillar

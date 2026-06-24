@@ -121,6 +121,9 @@ pub mod peer_identity_bindings;
 // T12 — peer_blob_inventory projection (libp2p gossipsub inventory, Category C operational)
 pub mod peer_blob_inventory;
 
+// Phase 3 — salvage_capacity projection (salvage-capacity gossip, Category C operational)
+pub mod salvage_capacity;
+
 // Recovery Protocol Phase 2 — M4 revocation projection (key_revocations + revocation_votes)
 // + recovery_flows state-machine projection (T6 schema, T7 CRUD)
 pub mod key_revocations;
