@@ -1,10 +1,5 @@
 [
   {
-    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/attention_tending.rs",
-    "struct": "AttentionTending",
-    "field": "context_json"
-  },
-  {
     "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/collective_filter_pattern.rs",
     "struct": "CollectiveFilterPattern",
     "field": "context_window_seconds"
@@ -81,16 +76,6 @@
   },
   {
     "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
-    "struct": "Content",
-    "field": "related_node_ids"
-  },
-  {
-    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
-    "struct": "ContributorPresence",
-    "field": "accumulating_since"
-  },
-  {
-    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
     "struct": "ContributorPresence",
     "field": "display_name"
   },
@@ -118,11 +103,6 @@
     "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
     "struct": "CustodianCommitment",
     "field": "note"
-  },
-  {
-    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
-    "struct": "CustodianCommitment",
-    "field": "relationship_id"
   },
   {
     "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
@@ -191,11 +171,6 @@
   },
   {
     "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
-    "struct": "HumanRelationship",
-    "field": "relationship_type"
-  },
-  {
-    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
     "struct": "Intent",
     "field": "name"
   },
@@ -216,6 +191,11 @@
   },
   {
     "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "struct": "PremiumGate",
+    "field": "note"
+  },
+  {
+    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
     "struct": "Process",
     "field": "name"
   },
@@ -223,11 +203,6 @@
     "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
     "struct": "Process",
     "field": "note"
-  },
-  {
-    "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
-    "struct": "Relationship",
-    "field": "relationship_type"
   },
   {
     "path": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
@@ -307,11 +282,6 @@
   {
     "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
     "struct": "ContributorPresence",
-    "field": "accumulating_since"
-  },
-  {
-    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
-    "struct": "ContributorPresence",
     "field": "display_name"
   },
   {
@@ -346,23 +316,8 @@
   },
   {
     "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
-    "struct": "HumanRelationship",
-    "field": "relationship_type"
-  },
-  {
-    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
     "struct": "LegacyAttestationView",
     "field": "display_name"
-  },
-  {
-    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
-    "struct": "RelationshipRenewal",
-    "field": "original_relationship_id"
-  },
-  {
-    "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
-    "struct": "RelationshipRenewal",
-    "field": "relationship_type"
   },
   {
     "path": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/qahal.rs",
