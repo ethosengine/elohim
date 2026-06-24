@@ -323,8 +323,11 @@ export const FEEDBACK_GATE = {
   MODAL_PANEL: 'feedback-modal-panel',
   MODAL_TITLE: 'feedback-modal-title',
   MODAL_CLOSE: 'feedback-modal-close',
-  ARTIFACT_TEXTAREA: 'artifact-textarea',
-  ARTIFACT_SUBMIT: 'artifact-submit',
+  // The gate feedback UI migrated from an Angular <dialog> pair to the Lit
+  // <elohim-gate-feedback-trigger> element, whose textarea/submit testids are
+  // feedback-modal-* (the artifact-* names were the retired Angular component's).
+  ARTIFACT_TEXTAREA: 'feedback-modal-textarea',
+  ARTIFACT_SUBMIT: 'feedback-modal-submit',
 } as const;
 
 // Lesson view: the inline exploration panel (lesson-toggle-panel/lesson-panel-close/

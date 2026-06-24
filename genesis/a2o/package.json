@@ -29,7 +29,7 @@
     "generate:skeletons": "tsx scripts/generate-step-skeletons.ts",
     "test:unit": "tsx --test 'src/**/__tests__/*.test.ts' 'scripts/__tests__/*.test.ts'",
     "a2o:setup": "playwright install chromium",
-    "look": "tsx scripts/look.ts",
+    "look": "E2E_DOORWAY_ALPHA=${E2E_DOORWAY_ALPHA:-https://doorway-alpha.elohim.host} tsx scripts/look.ts",
     "graphos": "tsx scripts/graphos.ts",
     "reports:serve": "tsx scripts/serve-reports.ts",
     "typecheck": "tsc --noEmit",
