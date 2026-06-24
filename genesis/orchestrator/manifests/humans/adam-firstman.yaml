@@ -228,6 +228,15 @@ spec:
               value: "/var/local/lib/holochain"
             - name: HAPP_PATH
               value: "/opt/holochain/elohim.happ"
+            # Admin-WS request timeout (seconds) for the embedded conductor. Covers
+            # the cold FIRST hApp install (single-threaded wasm compile + genesis),
+            # which on shem's per-core speed exceeds holochain_client's 60s default
+            # → `install_app ... Websocket error: Timeout` → crash-loop. adam runs
+            # warm today, but a genesis self-heal wipe re-triggers a cold install,
+            # so the apex needs the wider budget too. Tunable here without a
+            # rebuild; keep < the deploy rollout-status timeout (600s). Default 180.
+            - name: HAPP_INSTALL_TIMEOUT_SECS
+              value: "180"
             # Path to the peer-policy mount — enables conductor forwarders.
             - name: ELOHIM_STORAGE_PEER_POLICY_PATH
               value: "/etc/elohim/peer-policy.toml"

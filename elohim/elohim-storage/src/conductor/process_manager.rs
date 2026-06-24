@@ -7,8 +7,9 @@
 //! Instead of running the conductor as a separate container, elohim-storage
 //! spawns and manages it as a child process.
 
-use holochain_client::AdminWebsocket;
+use holochain_client::{AdminWebsocket, WebsocketConfig};
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::process::{Child, Command};
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
@@ -22,6 +23,10 @@ pub struct ConductorManager {
     config_path: PathBuf,
     data_dir: PathBuf,
     admin_port: u16,
+    /// Admin-websocket request timeout. Must cover the cold first hApp install
+    /// (single-threaded wasm compile + genesis), which on slower per-core nodes
+    /// exceeds holochain_client's 60s default. See `HAPP_INSTALL_TIMEOUT_SECS`.
+    admin_request_timeout: Duration,
     child: Option<Child>,
 }
 
@@ -34,12 +39,14 @@ impl ConductorManager {
         config_path: PathBuf,
         data_dir: PathBuf,
         admin_port: u16,
+        admin_request_timeout: Duration,
     ) -> Self {
         Self {
             conductor_binary,
             config_path,
             data_dir,
             admin_port,
+            admin_request_timeout,
             child: None,
         }
     }
@@ -92,8 +99,21 @@ impl ConductorManager {
             "Waiting for conductor to become ready"
         );
 
+        // Widen the admin-WS request timeout from holochain_client's 60s default.
+        // The cold first hApp install compiles wasm single-threaded; on slower
+        // per-core nodes (e.g. the shem apex) that compile exceeds 60s, so
+        // `install_app` returns `Websocket error: Timeout`, the boot fails, and the
+        // node crash-loops re-attempting the same cold compile forever (its wasm
+        // cache never warms). Warm-cache installs are sub-second, so this budget
+        // only ever bounds the first cold install. See `HAPP_INSTALL_TIMEOUT_SECS`.
+        let ws_config = {
+            let mut c = WebsocketConfig::CLIENT_DEFAULT;
+            c.default_request_timeout = self.admin_request_timeout;
+            Arc::new(c)
+        };
+
         for attempt in 1..=max_retries {
-            match AdminWebsocket::connect(&addr, None).await {
+            match AdminWebsocket::connect_with_config(&addr, ws_config.clone(), None).await {
                 Ok(ws) => {
                     info!(
                         attempt = attempt,
@@ -290,6 +310,7 @@ mod tests {
             PathBuf::from("/nonexistent/conductor-config.yaml"),
             PathBuf::from("/tmp"),
             4444,
+            Duration::from_secs(180),
         );
         assert_eq!(mgr.child_pid(), None, "no child before start()");
     }
