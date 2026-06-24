@@ -40,6 +40,9 @@ pub enum RenderError {
 
     #[error("serde error: {0}")]
     Serde(#[from] serde_json::Error),
+
+    #[error("bootstrap error: {0}")]
+    Bootstrap(String),
 }
 
 pub type Result<T> = std::result::Result<T, RenderError>;
