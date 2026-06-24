@@ -657,6 +657,15 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // full-suite fallback (manual / [build:X] tag / force builds).
         buildParams.add(stringParam(name: 'CHANGED_PATHS', value: changedFiles.join('\n')))
 
+        // RESET_STORAGE — only elohim-genesis declares + consumes it (wipe content.db +
+        // fresh reseed). Two activation paths: operator param OR [reseed] commit tag
+        // (webhook-gated above). Scoped to genesis so other pipelines don't get an
+        // undefined-param warning.
+        if (name == 'elohim-genesis') {
+            boolean resetStorage = (params.RESET_STORAGE ?: false) || env.RESET_STORAGE_FROM_TAG == 'true'
+            buildParams.add(booleanParam(name: 'RESET_STORAGE', value: resetStorage))
+        }
+
         def result = build(
             job: "${name}/${branch}",
             wait: shouldWait,
@@ -1351,6 +1360,11 @@ spec:
             defaultValue: false,
             description: 'Skip all build stages and dispatch only elohim-edge (and elohim-genesis if SKIP_GENESIS is false). Use after manifest/RBAC/storageClass-only changes to redeploy from existing Harbor tags. Operator-triggered only; do not combine with auto webhook flow.'
         )
+        booleanParam(
+            name: 'RESET_STORAGE',
+            defaultValue: false,
+            description: 'Wipe genesis storage (content.db) and reseed from scratch before tests. Reliably reconciles authored content that skip-on-exists bulk seeding leaves stale (e.g. a manifesto row stuck at reach=community when the source authors commons — the stampProvenance reach-PATCH trips the conductor re-notarize circuit breaker on bulk-seeded rows). Forwarded only to elohim-genesis. Operator-triggered, or via the [reseed] commit tag on a fresh webhook push.'
+        )
         string(
             name: 'FORCE_COMMIT',
             defaultValue: '',
@@ -1518,6 +1532,16 @@ spec:
                             if (commitMsg =~ /(?i)\[deploy[-_ ]only\]/) {
                                 echo "🚀 [deploy-only] detected in commit message — DEPLOY_ONLY mode (skip builds, redeploy from env-file tags)"
                                 env.DEPLOY_ONLY_FROM_TAG = 'true'
+                            }
+                            // [reseed] — webhook-gated like [deploy-only]. Tells the genesis pipeline
+                            // to wipe content.db and reseed from scratch (RESET_STORAGE), reliably
+                            // reconciling authored content that skip-on-exists bulk seeding leaves
+                            // stale. Destructive-ish (the SQLite projection only — reconstructable
+                            // from the seed source + P2P), so a timer/replay reusing the same HEAD
+                            // must NOT silently re-wipe storage; hence webhook-only.
+                            if (commitMsg =~ /(?i)\[reseed\]/) {
+                                echo "♻️  [reseed] detected in commit message — RESET_STORAGE for genesis (wipe content.db + fresh reseed)"
+                                env.RESET_STORAGE_FROM_TAG = 'true'
                             }
                         }
 
