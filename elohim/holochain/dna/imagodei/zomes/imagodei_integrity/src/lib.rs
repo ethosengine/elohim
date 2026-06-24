@@ -316,7 +316,9 @@ pub struct HumanProgress {
 ///
 /// Holochain mapping:
 /// - id becomes AgentPubKey derivable
-/// - Profile data published to DHT if visibility allows
+/// - Profile data is PUBLIC on the DHT (gossiped, world-readable, append-only).
+///   visibility is a read-time PROJECTION filter only, NOT a gate on gossip.
+///   Do NOT place PII here. See genesis/docs/superpowers/plans/2026-06-23-dht-pii-leak-remediation-plan.md
 ///
 /// W3C DID alignment: The `did` field provides cryptographic identity
 /// while `id` remains human-friendly for routing.
