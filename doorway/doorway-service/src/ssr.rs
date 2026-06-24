@@ -256,6 +256,70 @@ fn strip_to_path(url: &str) -> &str {
 }
 
 // =============================================================================
+// DoorwayBundleSource — blocking BundleSource over the storage HTTP API
+// =============================================================================
+
+/// Implements `elohim_render::BundleSource` by hitting the storage HTTP API
+/// synchronously (blocking reqwest). Safe to call from `init_renderer`, which
+/// is a plain synchronous fn.
+pub struct DoorwayBundleSource {
+    storage_base: String,
+    client: reqwest::blocking::Client,
+}
+
+impl DoorwayBundleSource {
+    pub fn new(storage_base_url: String) -> Self {
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .unwrap_or_default();
+        Self {
+            storage_base: storage_base_url.trim_end_matches('/').to_string(),
+            client,
+        }
+    }
+}
+
+impl elohim_render::BundleSource for DoorwayBundleSource {
+    fn resolve_blob_hash(&self, slug: &str) -> elohim_render::Result<String> {
+        let url = format!("{}/db/content/{}", self.storage_base, slug);
+        let body = self
+            .client
+            .get(&url)
+            .send()
+            .map_err(|e| RenderError::Bootstrap(format!("resolve_blob_hash GET failed: {e}")))?
+            .text()
+            .map_err(|e| RenderError::Bootstrap(format!("resolve_blob_hash read body: {e}")))?;
+        parse_blob_hash(&body)
+    }
+
+    fn fetch_blob(&self, hash: &str) -> elohim_render::Result<Vec<u8>> {
+        let url = format!("{}/blob/{}", self.storage_base, hash);
+        let bytes = self
+            .client
+            .get(&url)
+            .send()
+            .map_err(|e| RenderError::Bootstrap(format!("fetch_blob GET failed: {e}")))?
+            .bytes()
+            .map_err(|e| RenderError::Bootstrap(format!("fetch_blob read bytes: {e}")))?
+            .to_vec();
+        Ok(bytes)
+    }
+}
+
+/// Parse the `blobHash` field from a JSON body returned by `GET /db/content/{slug}`.
+///
+/// The storage boundary is camelCase, so the field is `blobHash`.
+pub fn parse_blob_hash(body: &str) -> elohim_render::Result<String> {
+    let v: serde_json::Value = serde_json::from_str(body)
+        .map_err(|e| RenderError::Bootstrap(format!("parse_blob_hash: invalid JSON: {e}")))?;
+    v.get("blobHash")
+        .and_then(|h| h.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| RenderError::Bootstrap("parse_blob_hash: missing `blobHash` field".into()))
+}
+
+// =============================================================================
 // Tests
 // =============================================================================
 
@@ -395,6 +459,44 @@ mod tests {
         );
         // 32 hex chars for 16 bytes + 4 for "ssr-" prefix = 36 total
         assert_eq!(k.len(), 36, "key must be exactly 36 characters; got: {k}");
+    }
+
+    // ── parse_blob_hash ─────────────────────────────────────────────────────
+
+    #[test]
+    fn parse_blob_hash_valid_returns_hash() {
+        let body = r#"{"blobHash":"sha256-abc"}"#;
+        let result = parse_blob_hash(body);
+        assert_eq!(result.unwrap(), "sha256-abc");
+    }
+
+    #[test]
+    fn parse_blob_hash_missing_field_returns_err() {
+        let body = r#"{"someOtherField":"value"}"#;
+        let result = parse_blob_hash(body);
+        assert!(result.is_err(), "expected Err on missing blobHash field");
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("blobHash"),
+            "error should mention missing field"
+        );
+    }
+
+    #[test]
+    fn parse_blob_hash_invalid_json_returns_err() {
+        let body = "not json at all";
+        let result = parse_blob_hash(body);
+        assert!(result.is_err(), "expected Err on invalid JSON");
+    }
+
+    #[test]
+    fn parse_blob_hash_blob_hash_not_string_returns_err() {
+        let body = r#"{"blobHash":42}"#;
+        let result = parse_blob_hash(body);
+        assert!(
+            result.is_err(),
+            "expected Err when blobHash is not a string"
+        );
     }
 
     #[test]
