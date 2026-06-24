@@ -386,6 +386,24 @@ async fn async_main(
             config.self_household_id = Some(v);
         }
     }
+    // P3 salvage knobs. `salvage_capacity_enabled` is the opt-in consent gate
+    // (default OFF — a node is never conscripted; the imago-dei floor).
+    if let Ok(v) = std::env::var("SALVAGE_CAPACITY_ENABLED") {
+        let v = v.trim();
+        config.salvage_capacity_enabled = matches!(v, "1" | "true" | "TRUE" | "yes" | "on");
+    }
+    if let Ok(v) = std::env::var("SALVAGE_TARGET_REPLICAS") {
+        if let Ok(n) = v.parse::<usize>() {
+            if n > 0 {
+                config.salvage_target_replicas = n;
+            }
+        }
+    }
+    if let Ok(v) = std::env::var("SALVAGE_RECHECK_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.salvage_recheck_seconds = n;
+        }
+    }
 
     // Iroh parallel-stack toggle (see plan
     // genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md).
@@ -1476,6 +1494,98 @@ async fn async_main(
                     }
                 }
 
+                // ── P3-6: salvage pass authoring tick ────────────────────────
+                //
+                // Good-Samaritan salvage: when a custody-blob blob is
+                // under-replicated and this node is opt-in + among the
+                // deterministic closest-N holders (XOR placement seam), author a
+                // NOTARIZED custody-blob commitment naming self. Lives HERE (not in
+                // P2PNode) because the production `SalvageCommitmentAuthor` needs
+                // the lamad HcClient — the same place the provide author is wired.
+                // The P2PNode side broadcasts the capacity ad + projects peers'
+                // ads into `salvage_capacity`; this tick reads that pool and
+                // authors intent. The custody reconcile sweep then moves the bytes
+                // (salvage authors intent; reconcile moves bytes — no new fetch).
+                //
+                // Opt-in default OFF (imago-dei floor): a node is never conscripted.
+                // Safe no-op when disabled, pool empty, or prerequisites absent.
+                match (
+                    config.salvage_capacity_enabled,
+                    registry.lamad.clone(),
+                    db_pool.clone(),
+                    config.self_cid.clone(),
+                ) {
+                    (true, Some(salvage_hc), Some(salvage_pool), Some(salvage_self_cid))
+                        if !salvage_self_cid.is_empty() =>
+                    {
+                        let salvage_author = std::sync::Arc::new(
+                            elohim_storage::services::salvage_commitment_author::SalvageCommitmentAuthor::new(
+                                salvage_hc,
+                            ),
+                        );
+                        let salvage_target_replicas = config.salvage_target_replicas;
+                        let salvage_freshness = config.inventory_freshness_seconds;
+                        let salvage_recheck_seconds = config.salvage_recheck_seconds.max(1);
+                        let mut salvage_shutdown = shutdown_tx.subscribe();
+                        tokio::spawn(async move {
+                            use tokio::time::{interval, Duration, MissedTickBehavior};
+                            let mut ticker = interval(Duration::from_secs(salvage_recheck_seconds));
+                            ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                            loop {
+                                tokio::select! {
+                                    _ = ticker.tick() => {
+                                        let mut conn = match salvage_pool.get() {
+                                            Ok(c) => c,
+                                            Err(e) => {
+                                                tracing::warn!(error = %e, "salvage tick: db conn failed (retry next tick)");
+                                                continue;
+                                            }
+                                        };
+                                        match elohim_storage::services::salvage_commitment_author::run_salvage_pass(
+                                            &mut conn,
+                                            &salvage_self_cid,
+                                            salvage_author.as_ref(),
+                                            true, // enabled (gated by the match arm above)
+                                            salvage_target_replicas,
+                                            salvage_freshness,
+                                            chrono::Utc::now(),
+                                        ) {
+                                            Ok(outcome) => {
+                                                tracing::info!(
+                                                    target: "elohim_storage::salvage",
+                                                    blobs_examined = outcome.blobs_examined,
+                                                    under_replicated = outcome.under_replicated,
+                                                    commitments_authored = outcome.commitments_authored,
+                                                    skipped_not_closest = outcome.skipped_not_closest,
+                                                    skipped_opted_out = outcome.skipped_opted_out,
+                                                    "P3: salvage pass completed"
+                                                );
+                                            }
+                                            Err(e) => {
+                                                tracing::warn!(error = %e, "salvage tick: salvage_pass failed (retry next tick)");
+                                            }
+                                        }
+                                    }
+                                    _ = salvage_shutdown.recv() => {
+                                        tracing::debug!("salvage tick: shutdown signal received, exiting");
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+                        info!(
+                            recheck_seconds = salvage_recheck_seconds,
+                            "P3: salvage authoring tick started (opt-in, shutdown-aware)"
+                        );
+                    }
+                    (false, _, _, _) => {
+                        info!("P3: salvage authoring tick disabled (salvage_capacity_enabled=false; opt-in floor)");
+                    }
+                    _ => {
+                        info!("P3: salvage authoring tick disabled: requires lamad HcClient + db pool + non-empty self_cid");
+                    }
+                }
+
                 // ── Re-anchor backfill (Workstream D — cold-seed recovery) ────
                 //
                 // Heal content rows the cold-conductor seed left provenance-only
@@ -1772,6 +1882,11 @@ async fn async_main(
             inventory_freshness_seconds: config.inventory_freshness_seconds,
             fetch_blob_timeout_seconds: config.fetch_blob_timeout_seconds,
             fetch_blob_parallelism: config.fetch_blob_parallelism,
+            // P3 salvage: thread the salvage knobs (opt-in gate, target replicas,
+            // recheck/advertise cadence) from top-level Config.
+            salvage_capacity_enabled: config.salvage_capacity_enabled,
+            salvage_target_replicas: config.salvage_target_replicas,
+            salvage_recheck_seconds: config.salvage_recheck_seconds,
             ..Default::default()
         };
 

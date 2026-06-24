@@ -1250,6 +1250,18 @@ diesel::table! {
     }
 }
 
+// salvage_capacity (Phase 3) — Category C operational projection from the
+// salvage-capacity gossip ('elohim/storage/salvage'). agent_cid-keyed.
+diesel::table! {
+    salvage_capacity (agent_cid) {
+        agent_cid    -> Text,
+        spare_bytes  -> BigInt,
+        archetype    -> Text,
+        last_seen_at -> Text,
+        seq          -> BigInt,
+    }
+}
+
 // EPR Phase 2B — peer_identity_bindings
 // Source of truth: Holochain DHT (imagodei AgentPeerBinding entry — Task A.2).
 // This table is a Category C operational projection rebuildable from signal replay.
@@ -1843,6 +1855,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     revocation_votes,
     responsibility_demand_configs,
     risk_alerts,
+    salvage_capacity,
     schema_version,
     schedules,
     shard_locations,

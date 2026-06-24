@@ -29,6 +29,8 @@ use crate::error::StorageError;
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 
+use super::placement::{PlacementCandidate, PlacementStrategy};
+
 /// Trait for checking whether a blob exists in this peer's local store.
 /// Production: queries the blob_store. Tests: returns a fixed set.
 pub trait LocalBlobStore: Send + Sync {
@@ -293,6 +295,149 @@ pub fn reconcile_pass(
                 .map_err(|e| StorageError::Database(format!("insert placement-gap event: {e}")))?;
             outcome.placement_gaps_emitted += 1;
         }
+    }
+
+    Ok(outcome)
+}
+
+/// Whether this node offers salvage custody, and the target replication level.
+///
+/// `enabled` is the opt-in consent gate (default false at the config layer; a
+/// node is NEVER conscripted — the imago-dei floor). `target_replicas` is the
+/// desired distinct-holder count per blob; `inventory_freshness_seconds` bounds
+/// what counts as "currently hosting" when computing honored replicas.
+#[derive(Debug, Clone, Copy)]
+pub struct SalvageConfig {
+    pub enabled: bool,
+    pub target_replicas: usize,
+    pub inventory_freshness_seconds: u64,
+}
+
+/// Authors a salvage `custody-blob` commitment naming `provider` as the new
+/// holder of `blob_marker`, owed to content steward `receiver`.
+///
+/// Production (P3-5) mints a NOTARIZED Mishpat commitment via the conductor so
+/// the placement intent stays Class-A and projects back into `rea_commitments`.
+/// Tests record the request. Implementors must be idempotent-friendly — the
+/// caller already skips when self is a provider, but a duplicate author must not
+/// corrupt state.
+pub trait CommitmentAuthor: Send + Sync {
+    fn author_custody_blob(
+        &self,
+        blob_marker: &str,
+        provider: &str,
+        receiver: &str,
+    ) -> Result<(), StorageError>;
+}
+
+/// Outcome of a single salvage pass; useful for tests + metrics.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SalvageOutcome {
+    pub blobs_examined: u32,
+    pub under_replicated: u32,
+    pub commitments_authored: u32,
+    pub skipped_not_closest: u32,
+    pub skipped_opted_out: u32,
+}
+
+/// Run one salvage pass (Phase 3). For each under-replicated `custody-blob`
+/// blob, if this node is opted in, not already a provider, and among the
+/// deterministic closest-N holders for the blob (per `strategy`), author a new
+/// custody-blob commitment naming self as provider. The existing
+/// [`reconcile_pass`] provider branch then fetches the bytes — **salvage authors
+/// intent; reconcile moves bytes** (no new fetch path).
+///
+/// Coordination-free: every peer computes the same closest-N over the same pool,
+/// so exactly the intended holders self-select (no thundering herd). Additive —
+/// does NOT change [`reconcile_pass`]. Idempotent. The XOR vs intentional choice
+/// lives behind `strategy` (the [`PlacementStrategy`] seam) — see
+/// `2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md`.
+pub fn salvage_pass(
+    conn: &mut SqliteConnection,
+    self_cid: &str,
+    strategy: &dyn PlacementStrategy,
+    author: &dyn CommitmentAuthor,
+    salvage_pool: &[PlacementCandidate],
+    cfg: SalvageConfig,
+    now: DateTime<Utc>,
+) -> Result<SalvageOutcome, StorageError> {
+    use std::collections::{BTreeMap, BTreeSet};
+    let mut outcome = SalvageOutcome::default();
+
+    let custody_rows = rea_commitments::table
+        .filter(rea_commitments::action.eq("custody-blob"))
+        .load::<ReaCommitment>(conn)
+        .map_err(|e| StorageError::Database(format!("load custody-blob commitments: {e}")))?;
+
+    let fresh_before = (now - chrono::Duration::seconds(cfg.inventory_freshness_seconds as i64))
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string();
+
+    // Group commitments by blob marker → (distinct providers, a content steward).
+    // BTree* keeps the pass deterministic (stable blob iteration order).
+    struct BlobWant {
+        providers: BTreeSet<String>,
+        receiver: String,
+    }
+    let mut wants: BTreeMap<String, BlobWant> = BTreeMap::new();
+    for c in &custody_rows {
+        let Some(blob) = c.primary_classification() else {
+            continue;
+        };
+        let entry = wants.entry(blob).or_insert_with(|| BlobWant {
+            providers: BTreeSet::new(),
+            receiver: c.receiver.clone(),
+        });
+        entry.providers.insert(c.provider.clone());
+    }
+
+    for (blob, want) in wants {
+        outcome.blobs_examined += 1;
+
+        // honored = distinct committed providers currently hosting (fresh inventory).
+        // Joins provider against `peer_blob_inventory.peer_id` exactly as the
+        // receiver-role check in `reconcile_pass` does; the pool is resolved to
+        // `agent_cid` upstream (P3-6) so the namespaces line up.
+        let mut honored = 0usize;
+        for provider in &want.providers {
+            let fresh: i64 = peer_blob_inventory::table
+                .filter(peer_blob_inventory::peer_id.eq(provider))
+                .filter(peer_blob_inventory::blob_hash.eq(&blob))
+                .filter(peer_blob_inventory::last_seen_at.gt(&fresh_before))
+                .count()
+                .get_result(conn)
+                .map_err(|e| StorageError::Database(format!("count honored providers: {e}")))?;
+            if fresh > 0 {
+                honored += 1;
+            }
+        }
+
+        if honored >= cfg.target_replicas {
+            continue; // already resilient
+        }
+        outcome.under_replicated += 1;
+
+        if !cfg.enabled {
+            outcome.skipped_opted_out += 1;
+            continue; // opt-in consent gate (imago-dei floor; a node is never conscripted)
+        }
+        if want.providers.contains(self_cid) {
+            continue; // already a provider for this blob — idempotent, no duplicate adopt
+        }
+
+        // Deterministic self-selection: adopt iff self is among the closest-N
+        // holders for this blob. Every peer computes the same set over the same
+        // pool, so exactly the intended holders adopt (coordination-free).
+        let closest = strategy.rank(&blob, salvage_pool, cfg.target_replicas);
+        if !closest.iter().any(|cid| cid == self_cid) {
+            outcome.skipped_not_closest += 1;
+            continue;
+        }
+
+        // Adopt: author the notarized placement intent; the next reconcile_pass
+        // provider branch fetches the bytes.
+        author.author_custody_blob(&blob, self_cid, &want.receiver)?;
+        outcome.commitments_authored += 1;
     }
 
     Ok(outcome)
@@ -850,5 +995,216 @@ mod tests {
         );
         assert_eq!(snapshot.len(), 1, "snapshot captured one hash");
         assert!(!snapshot.is_empty(), "snapshot is non-empty after store");
+    }
+
+    // -----------------------------------------------------------------------
+    // P3-2: salvage_pass (salvage self-selection behind the placement seam)
+    // -----------------------------------------------------------------------
+
+    /// Strategy stub returning a fixed closest-set, so salvage tests control
+    /// whether self is "closest" independently of the XOR internals (those are
+    /// covered by `reconcile::placement` tests).
+    struct StaticStrategy(Vec<String>);
+    impl PlacementStrategy for StaticStrategy {
+        fn rank(&self, _blob: &str, _candidates: &[PlacementCandidate], _n: usize) -> Vec<String> {
+            self.0.clone()
+        }
+    }
+
+    struct RecordingAuthor {
+        authored: Mutex<Vec<(String, String, String)>>,
+    }
+    impl RecordingAuthor {
+        fn new() -> Self {
+            Self {
+                authored: Mutex::new(Vec::new()),
+            }
+        }
+    }
+    impl CommitmentAuthor for RecordingAuthor {
+        fn author_custody_blob(
+            &self,
+            blob_marker: &str,
+            provider: &str,
+            receiver: &str,
+        ) -> Result<(), StorageError> {
+            self.authored.lock().unwrap().push((
+                blob_marker.to_string(),
+                provider.to_string(),
+                receiver.to_string(),
+            ));
+            Ok(())
+        }
+    }
+
+    fn salvage_cfg(enabled: bool, target: usize) -> SalvageConfig {
+        SalvageConfig {
+            enabled,
+            target_replicas: target,
+            inventory_freshness_seconds: 600,
+        }
+    }
+
+    fn pool(cids: &[&str]) -> Vec<PlacementCandidate> {
+        cids.iter()
+            .map(|c| PlacementCandidate::from_agent_cid(*c))
+            .collect()
+    }
+
+    /// Mark a provider as currently hosting a blob (fresh inventory row).
+    fn mark_hosting(conn: &mut SqliteConnection, peer: &str, blob: &str, now: DateTime<Utc>) {
+        let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        let b = blob.to_string();
+        apply_snapshot(conn, peer, std::slice::from_ref(&b), 1, &when).unwrap();
+    }
+
+    #[test]
+    fn salvage_under_replicated_self_closest_authors() {
+        let p = test_pool();
+        let mut conn = p.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = "b".repeat(64);
+        // One existing custodian, target 2 → under-replicated.
+        insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
+        mark_hosting(&mut conn, "prov-A", &blob, now);
+
+        let author = RecordingAuthor::new();
+        let strat = StaticStrategy(vec!["prov-A".into(), "self".into()]); // self is closest
+        let outcome = salvage_pass(
+            &mut conn,
+            "self",
+            &strat,
+            &author,
+            &pool(&["self", "prov-A", "prov-B"]),
+            salvage_cfg(true, 2),
+            now,
+        )
+        .unwrap();
+
+        assert_eq!(outcome.commitments_authored, 1);
+        let recorded = author.authored.lock().unwrap();
+        assert_eq!(recorded.len(), 1);
+        assert_eq!(
+            recorded[0],
+            (blob.clone(), "self".to_string(), "steward-Z".to_string()),
+            "salvager authors provider=self, receiver=content steward"
+        );
+    }
+
+    #[test]
+    fn salvage_already_replicated_no_author() {
+        let p = test_pool();
+        let mut conn = p.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = "c".repeat(64);
+        insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
+        insert_custody_commitment(&mut conn, "c2", "prov-B", "steward-Z", &blob);
+        mark_hosting(&mut conn, "prov-A", &blob, now);
+        mark_hosting(&mut conn, "prov-B", &blob, now);
+
+        let author = RecordingAuthor::new();
+        let strat = StaticStrategy(vec!["self".into()]);
+        let outcome = salvage_pass(
+            &mut conn,
+            "self",
+            &strat,
+            &author,
+            &pool(&["self"]),
+            salvage_cfg(true, 2),
+            now,
+        )
+        .unwrap();
+
+        assert_eq!(outcome.commitments_authored, 0);
+        assert_eq!(
+            outcome.under_replicated, 0,
+            "honored==target → not under-replicated"
+        );
+        assert!(author.authored.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn salvage_opted_out_no_author() {
+        let p = test_pool();
+        let mut conn = p.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = "d".repeat(64);
+        insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
+        mark_hosting(&mut conn, "prov-A", &blob, now);
+
+        let author = RecordingAuthor::new();
+        let strat = StaticStrategy(vec!["self".into()]); // would be closest, but opted out
+        let outcome = salvage_pass(
+            &mut conn,
+            "self",
+            &strat,
+            &author,
+            &pool(&["self"]),
+            salvage_cfg(false, 2),
+            now,
+        )
+        .unwrap();
+
+        assert_eq!(outcome.commitments_authored, 0);
+        assert_eq!(outcome.under_replicated, 1);
+        assert_eq!(outcome.skipped_opted_out, 1);
+        assert!(author.authored.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn salvage_not_closest_no_author() {
+        let p = test_pool();
+        let mut conn = p.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = "e".repeat(64);
+        insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
+        mark_hosting(&mut conn, "prov-A", &blob, now);
+
+        let author = RecordingAuthor::new();
+        let strat = StaticStrategy(vec!["prov-A".into(), "prov-B".into()]); // self NOT closest
+        let outcome = salvage_pass(
+            &mut conn,
+            "self",
+            &strat,
+            &author,
+            &pool(&["self", "prov-A", "prov-B"]),
+            salvage_cfg(true, 2),
+            now,
+        )
+        .unwrap();
+
+        assert_eq!(outcome.commitments_authored, 0);
+        assert_eq!(outcome.skipped_not_closest, 1);
+        assert!(author.authored.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn salvage_already_provider_no_author() {
+        let p = test_pool();
+        let mut conn = p.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = "f".repeat(64);
+        // self is already a provider (not yet hosting → honored 0 → under-replicated),
+        // so it must NOT author a duplicate adopt.
+        insert_custody_commitment(&mut conn, "c1", "self", "steward-Z", &blob);
+
+        let author = RecordingAuthor::new();
+        let strat = StaticStrategy(vec!["self".into()]);
+        let outcome = salvage_pass(
+            &mut conn,
+            "self",
+            &strat,
+            &author,
+            &pool(&["self"]),
+            salvage_cfg(true, 2),
+            now,
+        )
+        .unwrap();
+
+        assert_eq!(
+            outcome.commitments_authored, 0,
+            "already a provider — no duplicate adopt"
+        );
+        assert!(author.authored.lock().unwrap().is_empty());
     }
 }
