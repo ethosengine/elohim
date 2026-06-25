@@ -194,6 +194,8 @@ spec:
             # SSR to real content routes once the engine is wired.
             - name: SSR_BUNDLE_PATH
               value: "/opt/elohim-render/main.server.mjs"
+            - name: SSR_BUNDLE_SLUG
+              value: "elohim-host-landing-ssr"
             # Tokio worker threads — set EXPLICITLY, never CPU-derived. The pod has
             # limits.cpu: 1, so the default runtime spun up a SINGLE worker thread;
             # the 2026-06-13 freeze was one synchronously-blocked await on that lone
@@ -349,6 +351,9 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 12  # 12 × 10s = 120s (was 3 = 30s; see RCA note above)
+          volumeMounts:
+            - name: ssr-render-bundle
+              mountPath: /opt/elohim-render
         # Doorway Operator Dashboard - Angular app for node operators
         # Provides: federated OAuth, node metrics, configuration UI
         - name: doorway-app
@@ -430,6 +435,9 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 15
             failureThreshold: 5
+      volumes:
+        - name: ssr-render-bundle
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
