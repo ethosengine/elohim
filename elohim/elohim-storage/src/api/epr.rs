@@ -191,6 +191,12 @@ pub async fn handle(
             get_nav_context(req, cid, pool, ctx).await
         }
 
+        // GET /api/v1/epr/:cid/raw — EPR-content facing inspector (Category C read-only)
+        (&Method::GET, p) if p.ends_with("/raw") && p.split('/').count() == 2 => {
+            let cid = p.trim_end_matches("/raw");
+            get_epr_raw(req, cid, pool, ctx).await
+        }
+
         // GET /api/v1/epr/:cid  (plain CID — must not contain '/')
         (&Method::GET, cid) if !cid.contains('/') => get_epr(req, cid, pool, ctx).await,
 
@@ -993,6 +999,46 @@ async fn get_nav_context(
     }
 
     match crate::services::epr_nav_context_view::project(&mut conn, cid)? {
+        None => Ok(response::not_found(&format!("epr not found: {cid}"))),
+        Some(view) => {
+            let body = serde_json::to_vec(&view)
+                .map_err(|e| StorageError::Database(format!("serialize: {e}")))?;
+            Ok(Response::builder()
+                .status(hyper::StatusCode::OK)
+                .header(hyper::header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(body)))
+                .unwrap())
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/epr/:cid/raw — EPR-content facing inspector (Category C read-only)
+// ---------------------------------------------------------------------------
+
+async fn get_epr_raw(
+    req: Request<Incoming>,
+    cid: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+
+    // Reach check on the focal atom (same gate as the other epr reads): load
+    // directly to check reach before delegating to the projection service.
+    let store = crate::services::epr_store::default_epr_store(
+        None,
+        None,
+        None,
+        ctx.local_libp2p_peer_id.clone(),
+    );
+    if let Some(outcome) = store.fetch(&mut conn, cid)? {
+        if !reach_visible_to(&outcome.fetched.atom.reach, &req) {
+            return Ok(response::not_found(&format!("epr not found: {cid}")));
+        }
+    }
+
+    match crate::services::epr_raw_view::project(&mut conn, cid)? {
         None => Ok(response::not_found(&format!("epr not found: {cid}"))),
         Some(view) => {
             let body = serde_json::to_vec(&view)
