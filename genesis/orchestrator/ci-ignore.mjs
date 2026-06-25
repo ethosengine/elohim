@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 // .ci-ignore — gitignore-style patterns for files that NEVER trigger
-// source pipelines. Single source of truth: the repo-root `.ci-ignore`.
+// source pipelines. Source of truth: the repo-root `.epr-meta` ci-trigger
+// leg; `.ci-ignore` is GENERATED from it by .claude/scripts/ci-ignore-projector.py
+// (never hand-edit it — the pre-push freshness gate enforces this).
 //
-// This module is the shared JS port of that file. Consumers:
+// This module is the shared JS port that reads the generated `.ci-ignore`. Consumers:
 //   - graph-walker.mjs CLI        (.husky/pre-push pipes $CHANGED through it)
 //   - .husky/pre-push             (direct CLI filter before project detection)
 //
 // CI does NOT apply .ci-ignore: build-graph.groovy relies on manifest
 // source-globs (a path matching no source glob triggers nothing). .ci-ignore
-// is a local/pre-push optimization. (A later P6 task makes .ci-ignore a file
-// GENERATED from the repo-root .epr-meta ci-trigger leg.)
+// is a local/pre-push optimization.
 //
 // Library usage:
 //   import { matchesCiIgnore, CI_IGNORE_PATTERNS, filterChanged } from './ci-ignore.mjs';
