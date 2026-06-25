@@ -6,7 +6,8 @@
 # here, the Jenkinsfile keeps a one-line call. See Jenkinsfile
 # "STAGE HELPER METHODS" for the pillar-EPR decomposition rationale.
 #
-# Usage: stage-spa-blob.sh <dist-dir> <slug> <doorway-epr-url>
+# Usage: stage-spa-blob.sh <dist-dir> <slug> <doorway-epr-url> [kind]
+#   kind: "browser" (default) or "server"
 # Env:   STORAGE_API_KEY_ADMIN  admin key for the PATCH+verify step
 #        DO_PATCH               "1" to PATCH+verify, anything else skips (WARN)
 set -euo pipefail
@@ -14,6 +15,7 @@ set -euo pipefail
 DIST_DIR="$1"
 SLUG="$2"
 DOORWAY_EPR_URL="$3"
+KIND="${4:-browser}"
 DO_PATCH="${DO_PATCH:-0}"
 
 cd "${DIST_DIR}"
@@ -22,10 +24,13 @@ cd "${DIST_DIR}"
 # instead of index.html. For static SPA delivery through the protocol's
 # /apps/{slug}/index.html route we need a literal index.html (storage's /apps
 # handler is literal-path, doesn't fall back to index.csr.html). Pure SPAs
-# (app/lamad) pass through unchanged.
-if [ ! -f index.html ] && [ -f index.csr.html ]; then
-    cp index.csr.html index.html
-    echo "  [${SLUG}] materialized index.html from index.csr.html (Angular SSR-mode dist)"
+# (app/lamad) pass through unchanged. Server bundles have no index.html at
+# all — skip this step entirely for KIND=server.
+if [ "$KIND" = "browser" ]; then
+    if [ ! -f index.html ] && [ -f index.csr.html ]; then
+        cp index.csr.html index.html
+        echo "  [${SLUG}] materialized index.html from index.csr.html (Angular SSR-mode dist)"
+    fi
 fi
 
 zip -r spa-bundle.zip .
