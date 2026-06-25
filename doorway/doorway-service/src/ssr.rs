@@ -260,50 +260,89 @@ fn strip_to_path(url: &str) -> &str {
 // =============================================================================
 
 /// Implements `elohim_render::BundleSource` by hitting the storage HTTP API
-/// synchronously (blocking reqwest). Safe to call from `init_renderer`, which
-/// is a plain synchronous fn.
+/// synchronously (blocking reqwest).
+///
+/// ## Async-caller safety
+///
+/// `init_renderer()` is called from FOUR `AppState` constructors. Three are plain
+/// sync fns — fine. The fourth, `AppState::with_projection`, is an **async fn**.
+/// `reqwest::blocking` internally creates a new tokio runtime and calls
+/// `block_on`; doing that while already inside a tokio worker thread panics with
+/// "Cannot start a runtime from within a runtime."
+///
+/// To handle both callers safely each blocking HTTP call is dispatched to a
+/// **dedicated OS thread** via `std::thread::spawn(...).join()`. The spawned
+/// thread has no ambient tokio context, so `reqwest::blocking` can create its
+/// own runtime freely. The brief join is acceptable for a one-shot boot
+/// materialize (this runs at most once per doorway startup, not per request).
 pub struct DoorwayBundleSource {
     storage_base: String,
-    client: reqwest::blocking::Client,
 }
 
 impl DoorwayBundleSource {
     pub fn new(storage_base_url: String) -> Self {
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .unwrap_or_default();
         Self {
             storage_base: storage_base_url.trim_end_matches('/').to_string(),
-            client,
         }
+    }
+
+    /// Build a fresh blocking client. Each call site spawns its own thread, so
+    /// sharing a client across threads is not needed — a fresh per-call client
+    /// keeps the implementation simple and avoids `Arc` across the spawn boundary.
+    fn make_client() -> reqwest::blocking::Client {
+        reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .unwrap_or_default()
     }
 }
 
 impl elohim_render::BundleSource for DoorwayBundleSource {
     fn resolve_blob_hash(&self, slug: &str) -> elohim_render::Result<String> {
         let url = format!("{}/db/content/{}", self.storage_base, slug);
-        let body = self
-            .client
-            .get(&url)
-            .send()
-            .map_err(|e| RenderError::Bootstrap(format!("resolve_blob_hash GET failed: {e}")))?
-            .text()
-            .map_err(|e| RenderError::Bootstrap(format!("resolve_blob_hash read body: {e}")))?;
-        parse_blob_hash(&body)
+        // Run on a dedicated OS thread so `reqwest::blocking` can create its own
+        // tokio runtime without conflicting with an ambient tokio context (the
+        // `with_projection` async constructor calls `init_renderer`).
+        let result = std::thread::spawn(move || {
+            let client = DoorwayBundleSource::make_client();
+            let resp = client.get(&url).send().map_err(|e| {
+                RenderError::Bootstrap(format!("resolve_blob_hash GET failed: {e}"))
+            })?;
+            let status = resp.status();
+            resp.error_for_status()
+                .map_err(|_| {
+                    RenderError::Bootstrap(format!(
+                        "resolve_blob_hash: HTTP {status} for slug `{url}`"
+                    ))
+                })?
+                .text()
+                .map_err(|e| RenderError::Bootstrap(format!("resolve_blob_hash read body: {e}")))
+        })
+        .join()
+        .map_err(|_| RenderError::Bootstrap("resolve_blob_hash: thread panicked".into()))?;
+        parse_blob_hash(&result?)
     }
 
     fn fetch_blob(&self, hash: &str) -> elohim_render::Result<Vec<u8>> {
         let url = format!("{}/blob/{}", self.storage_base, hash);
-        let bytes = self
-            .client
-            .get(&url)
-            .send()
-            .map_err(|e| RenderError::Bootstrap(format!("fetch_blob GET failed: {e}")))?
-            .bytes()
-            .map_err(|e| RenderError::Bootstrap(format!("fetch_blob read bytes: {e}")))?
-            .to_vec();
-        Ok(bytes)
+        // Same thread-isolation rationale as resolve_blob_hash above.
+        std::thread::spawn(move || {
+            let client = DoorwayBundleSource::make_client();
+            let resp = client
+                .get(&url)
+                .send()
+                .map_err(|e| RenderError::Bootstrap(format!("fetch_blob GET failed: {e}")))?;
+            let status = resp.status();
+            resp.error_for_status()
+                .map_err(|_| {
+                    RenderError::Bootstrap(format!("fetch_blob: HTTP {status} for hash `{url}`"))
+                })?
+                .bytes()
+                .map_err(|e| RenderError::Bootstrap(format!("fetch_blob read bytes: {e}")))
+                .map(|b| b.to_vec())
+        })
+        .join()
+        .map_err(|_| RenderError::Bootstrap("fetch_blob: thread panicked".into()))?
     }
 }
 
@@ -326,6 +365,7 @@ pub fn parse_blob_hash(body: &str) -> elohim_render::Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use elohim_render::BundleSource;
 
     #[test]
     fn strip_absolute_url_to_path() {
@@ -508,6 +548,63 @@ mod tests {
         assert_ne!(
             k1, k2,
             "hash ordering must affect the key (list is ordered)"
+        );
+    }
+
+    // ── DoorwayBundleSource async-caller regression ─────────────────────────
+    //
+    // These tests run from WITHIN a tokio runtime (via #[tokio::test]) to prove
+    // that `DoorwayBundleSource::resolve_blob_hash` does NOT panic with "Cannot
+    // start a runtime from within a runtime." Before the thread-isolation fix the
+    // blocking reqwest call would create its own tokio runtime on the tokio
+    // worker thread — a nested-runtime panic.  After the fix the blocking call
+    // runs on a dedicated OS thread with no ambient tokio context.
+
+    #[tokio::test]
+    async fn bundle_source_resolve_blob_hash_ok_from_async_context() {
+        use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+        // Start a wiremock server (runs its own tokio task — fine; we just call
+        // the blocking DoorwayBundleSource from within this async test).
+        let server = MockServer::start().await;
+        Mock::given(matchers::method("GET"))
+            .and(matchers::path("/db/content/my-bundle-slug"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_string(r#"{"blobHash":"sha256-deadbeef"}"#),
+            )
+            .mount(&server)
+            .await;
+
+        let src = DoorwayBundleSource::new(server.uri());
+        // This call PANICS before the thread-isolation fix; it must return Ok after.
+        let result = src.resolve_blob_hash("my-bundle-slug");
+        assert_eq!(
+            result.expect("resolve_blob_hash must succeed from async context"),
+            "sha256-deadbeef"
+        );
+    }
+
+    #[tokio::test]
+    async fn bundle_source_resolve_blob_hash_404_returns_http_status_err() {
+        use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(matchers::method("GET"))
+            .and(matchers::path("/db/content/missing-slug"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("not found"))
+            .mount(&server)
+            .await;
+
+        let src = DoorwayBundleSource::new(server.uri());
+        let err = src
+            .resolve_blob_hash("missing-slug")
+            .expect_err("404 must produce an Err");
+        let msg = err.to_string();
+        // The error must mention the HTTP status so callers get a useful message
+        // instead of a misleading "missing blobHash field".
+        assert!(
+            msg.contains("404"),
+            "error message must mention the HTTP status; got: {msg}"
         );
     }
 }
