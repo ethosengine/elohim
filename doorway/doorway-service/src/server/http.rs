@@ -371,6 +371,32 @@ fn init_renderer() -> Option<Arc<dyn elohim_render::Renderer>> {
     // gets a hard reqwest timeout: a bootstrap fetch must never be the one
     // unbounded await on the SSR thread (cheap defense, matches the per-request
     // client's 10s bound).
+    // TODO(phase-2): lazy-on-miss + background refresh
+    if let Ok(slug) = std::env::var("SSR_BUNDLE_SLUG") {
+        let bundle_dir = std::path::Path::new(&bundle_path)
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."));
+        let src = crate::ssr::DoorwayBundleSource::new(storage_url.clone());
+        match elohim_render::materialize_bundle(&src, &slug, bundle_dir) {
+            Ok(materialized) => {
+                tracing::info!(
+                    target: "doorway::ssr",
+                    slug = %slug,
+                    path = %materialized.display(),
+                    "SSR bundle materialized from substrate"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    target: "doorway::ssr",
+                    slug = %slug,
+                    "SSR bundle materialization failed: {}",
+                    e
+                );
+                return None;
+            }
+        }
+    }
     let bootstrap_client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()

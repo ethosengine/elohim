@@ -66,6 +66,12 @@ COPY elohim/elohim-facings ./elohim-facings
 # elohim-peer-fabric: std-only path-dep (storage serve-routing feature). Flattened /app layout;
 # sed-rewrite below. Without this COPY the build aborts: "failed to read /elohim-peer-fabric/Cargo.toml".
 COPY elohim/elohim-peer-fabric ./elohim-peer-fabric
+# elohim-render: optional path-dep (Cargo.toml: optional = true) gated by the `ssr`
+# feature. Cargo resolves path-deps at metadata time even when the feature is inactive,
+# so the Cargo.toml must point at a real directory or the resolve aborts. The default
+# build does NOT enable ssr (lean, no V8); pass --build-arg STORAGE_FEATURES=ssr to
+# produce the SSR-enabled variant (app-serving nodes). Both share this COPY layer.
+COPY elohim/elohim-render ./elohim-render
 # Wave 3 — valueflows bridge crates (hREA / VF-GraphQL interop) are
 # unconditional path-deps in Cargo.toml; copy them in so the
 # build-context contains their source.
@@ -95,6 +101,7 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../elohim-views"|path = "elohim-views"|' Cargo.toml && \
     sed -i 's|path = "../elohim-facings"|path = "elohim-facings"|' Cargo.toml && \
     sed -i 's|path = "../elohim-peer-fabric"|path = "elohim-peer-fabric"|' Cargo.toml && \
+    sed -i 's|path = "../elohim-render"|path = "elohim-render"|' Cargo.toml && \
     sed -i 's|path = "../epr"|path = "epr"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-bridge"|path = "bridges/valueflows/valueflows-bridge"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-types"|path = "bridges/valueflows/valueflows-types"|' Cargo.toml
@@ -110,18 +117,6 @@ RUN sed -i 's|path = "../../elohim/elohim-views"|path = "../../elohim-views"|' \
         crates/elohim-sdk/Cargo.toml \
         crates/elohim-storage-client/Cargo.toml
 
-# Strip the optional `elohim-render` path-dep + the `ssr` feature that
-# selects it. elohim-render is the V8/deno_core SSR runtime — it lives
-# in the doorway image, not here. The `ssr` feature is opt-in and not
-# enabled in this build, but cargo still resolves the path at metadata
-# time (and `dep:elohim-render` in the feature list would also error if
-# the optional dep is missing). Storage source code uses
-# `#[cfg(feature = "ssr")]` to gate ssr-only paths — those just stay
-# inactive in this image, which is the intended deployment shape.
-RUN sed -i \
-    -e '/^elohim-render = .*optional = true.*$/d' \
-    -e '/^ssr = \["dep:elohim-render"\]$/d' \
-    Cargo.toml
 
 # Constitution crate uses workspace inheritance — inline the values since
 # the workspace root (elohim/Cargo.toml) isn't copied into the build context
@@ -212,16 +207,23 @@ COPY elohim/elohim-storage/benches ./benches
 # bootstrap-{standing,tending}-policy.json: No such file or directory".
 COPY elohim/sdk /sdk
 
-# Build the release binary
+# Build the release binary.
 # CACHE_BUST is interpolated into the command so BuildKit treats it as a new layer
-# when the value changes (ARG alone is insufficient for BuildKit cache invalidation)
+# when the value changes (ARG alone is insufficient for BuildKit cache invalidation).
+#
+# STORAGE_FEATURES controls optional cargo features:
+#   default (empty) — lean build, no V8, suitable for all nodes
+#   ssr             — includes elohim-render + V8; for app-serving nodes that
+#                     materialize and serve the Angular SSR bundle from the substrate
+# Pass --build-arg STORAGE_FEATURES=ssr to CI/operator to produce the SSR variant.
+ARG STORAGE_FEATURES=""
 RUN echo "Building at ${CACHE_BUST}" && \
     RUSTFLAGS='--cfg getrandom_backend="custom"' \
     GIT_COMMIT_SHORT=${GIT_COMMIT_SHORT} \
     GIT_COMMIT_FULL=${GIT_COMMIT_FULL} \
     BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
     RUSTC_VERSION=${RUSTC_VERSION} \
-    cargo build --release
+    cargo build --release ${STORAGE_FEATURES:+--features "$STORAGE_FEATURES"}
 
 # Verify migrations are actually embedded in the binary.
 # If embed_migrations! ran against an empty dir, none of our CREATE TABLE statements appear.

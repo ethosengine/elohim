@@ -61,7 +61,8 @@ runtime boot  (doorway via STORAGE_URL · storage via local blob store)
      elohim-render builds renderer from SSR_BUNDLE_PATH
   else / on any failure:
      renderer = None  →  fall through (doorway: storage-proxied SPA; storage: 503 on SSR-gated handler)
-  lazy-on-miss: if absent at boot, retry the resolve+fetch on the first SSR request
+  v1 = boot-only; absent-at-boot is picked up on the next rollout-restart
+  (phase-2) lazy-on-miss would retry resolve+fetch on the first SSR request
 ```
 
 Versioning is the **content-row head** (`slug → current blobHash`), the same mutable-head→immutable-CID pointer the browser bundle uses ("current landing"). Rollback = re-PATCH the row to a prior blobHash; immutable CIDs remain fetchable indefinitely — reproducible *and* convenient, with no deploy-time resolve and no orchestrator-tracked app↔runtime pairing.
@@ -110,7 +111,7 @@ Versioning is the **content-row head** (`slug → current blobHash`), the same m
 | `SSR_BUNDLE_SLUG` unset | No SSR; lean node. (storage default) |
 | Row/blob missing (e.g. first boot before app deploy) | `warn!`, renderer `None`, fall through to storage-proxied SPA (doorway) / 503 on the SSR-gated handler (storage). No outage. |
 | Blob hash mismatch / corrupt zip | Integrity check fails ⇒ `warn!`, renderer `None`, fall through. Never render from unverified bytes. |
-| Storage unreachable at doorway boot | Same as missing; lazy-on-miss retry on first SSR request. |
+| Storage unreachable at doorway boot | Same as missing (renderer `None`, fall-through); picked up on the next rollout-restart. (phase-2: lazy-on-miss retry on first SSR request.) |
 
 The contract is byte-identical to today's `init_renderer`/`SsrState::from_env` "returns `None` when the file fails to load" — the pod stays healthy and routes fall through. This is what makes the phased rollout safe.
 
@@ -124,14 +125,14 @@ The contract is byte-identical to today's `init_renderer`/`SsrState::from_env` "
 ## 8. Rollout (phased; each step reversible via fall-through)
 
 1. **Publish only** — app pipeline writes the `-ssr` blob + row. Additive, no consumer. Verify the row populates.
-2. **Doorway consumes** — fetch-at-boot + lazy-on-miss; switch `SSR_BUNDLE_PATH` to the writable emptyDir; delete the doorway `ssr-bundle` bake stage. Before the `-ssr` row exists, doorway falls through to the storage-proxied SPA (pre-SSR behavior) — no hard outage window.
+2. **Doorway consumes** — fetch-at-boot (v1; lazy-on-miss is phase-2); switch `SSR_BUNDLE_PATH` to the writable emptyDir; delete the doorway `ssr-bundle` bake stage. Before the `-ssr` row exists, doorway falls through to the storage-proxied SPA (pre-SSR behavior) — no hard outage window.
 3. **Storage consumes** — remove the sed-strip; ship the `--features ssr` variant; SSR-serving storage nodes get the slug + dir. Lean storage nodes unchanged.
 
 **Rollback:** at any step, an unset slug or absent row degrades to fall-through. A bad bundle is rolled back by re-PATCHing the content row to a prior (immutable, still-fetchable) blobHash — no image rebuild.
 
 ## 9. Decisions made / deferred
 
-- **Refresh model = fetch-at-boot + lazy-on-miss (v1).** A new bundle requires a pod rollout-restart (cheap — no image rebuild), not a redeploy. **Phase 2:** background re-resolve + renderer hot-swap (`SSR_BUNDLE_REFRESH_SECS`) so app deploys propagate to *running* runtimes with zero restart — the fullest cure, layered on without redesign. The trickiest piece is the V8 isolate reload under concurrency; out of scope here.
+- **Refresh model = fetch-at-boot (v1).** A new bundle, or a bundle absent at boot, is picked up on a pod rollout-restart (cheap — no image rebuild), not a redeploy. **Phase 2:** lazy-on-miss (retry materialize on the first SSR request — no restart for first-boot pickup) + background re-resolve + renderer hot-swap (`SSR_BUNDLE_REFRESH_SECS`) so app deploys propagate to *running* runtimes with zero restart — the fullest cure, layered on without redesign. The trickiest piece is the V8 isolate reload under concurrency; out of scope here. (Decision 2026-06-25: operator accepted boot-only as v1; lazy-on-miss moved from v1 to phase-2.)
 - **Storage build = clean `--features ssr` variant.** Two images (lean default / ssr-enabled), replacing the sed. Keeps the low end of the device spectrum V8-free.
 
 ## 10. Watch-outs
