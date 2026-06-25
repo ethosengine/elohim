@@ -75,4 +75,29 @@ with tempfile.TemporaryDirectory() as _td:
     check("orphan-tree reason names .epr-meta",
           ".epr-meta" in out["hookSpecificOutput"]["permissionDecisionReason"])
 
+# Strict-but-recoverable: a MALFORMED manifest downgrades the subtree to ASK (not a hard deny),
+# and never blocks an edit of the manifest itself (so the typo is always fixable).
+with tempfile.TemporaryDirectory() as _td:
+    root = Path(_td)
+    (root / ".git").mkdir()
+    _wr(root / ".epr-meta", "---\nepr-meta-version: 2\n---\n")  # malformed (wrong version)
+    r = _hook({"tool_name": "Write", "tool_input": {"file_path": str(root / "anything.py"), "content": "x"}})
+    out = json.loads(r.stdout)
+    check("malformed manifest → subtree downgraded to ASK, not deny (recoverable)",
+          out["hookSpecificOutput"]["permissionDecision"] == "ask"
+          and "malformed" in out["hookSpecificOutput"]["permissionDecisionReason"])
+    r = _hook({"tool_name": "Write", "tool_input":
+               {"file_path": str(root / ".epr-meta"), "content": "---\nepr-meta-version: 1\n---\n"}})
+    check("editing the malformed .epr-meta itself is NEVER blocked (the fix path)",
+          r.returncode == 0 and "permissionDecision" not in r.stdout)
+
+# Parse-bomb manifest (deep flow nesting) must NOT hang or RecursionError → refused pre-parse → ASK.
+with tempfile.TemporaryDirectory() as _td:
+    root = Path(_td)
+    (root / ".git").mkdir()
+    _wr(root / ".epr-meta", "---\nx: " + "[" * 300 + "]" * 300 + "\n---\n")
+    r = _hook({"tool_name": "Write", "tool_input": {"file_path": str(root / "f.py"), "content": "x"}})
+    check("parse-bomb manifest → ASK (refused pre-parse, no hang/RecursionError)",
+          r.returncode == 0 and json.loads(r.stdout)["hookSpecificOutput"]["permissionDecision"] == "ask")
+
 print(f"\n  {_passed} assertions passed ✅")

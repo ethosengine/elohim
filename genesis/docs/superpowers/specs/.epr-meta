@@ -1,7 +1,6 @@
 ---
 epr-meta-version: 1
 id: specs-dir-governance
-extends: ../.epr-meta
 purpose: "Design specs — the 'what/why'. Plans route to plans/."
 rules:
   - id: doc-frontmatter-at-birth
@@ -11,14 +10,14 @@ rules:
     why: "Specs need the full lifecycle frontmatter (overrides the base rule, nearest-wins)."
   - id: route-plans-out
     class: ask
-    when: { write: "*-plan.md" }
+    when: { write: "*-plan.md", new: true }
     route-to: { type: "*-plan.md", dest: genesis/docs/superpowers/plans/ }
-    why: "Plans live in plans/, not specs/."
+    why: "Plans live in plans/, not specs/ — routed at creation, not on every edit."
   - id: p2p-design-gate
     class: ask
-    when: { write: "*.md", contains-any: ["GET /api/v1", "PRIMARY KEY", "uuid"] }
+    when: { write: "*.md", contains-any: ["GET /api/v1", "PRIMARY KEY", "uuid"], new: true }
     validator: epr:validator-p2p-design-gate
-    why: "Data-entity designs pass the p2p-design-gate."
+    why: "New data-entity designs pass the p2p-design-gate (creation-time, not on every edit)."
 validators:
   - ref: epr:validator-p2p-design-gate
     fuel: 200

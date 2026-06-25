@@ -1,6 +1,6 @@
 """Validate + pure-guard evaluator test. Run:
 python3 .claude/scripts/_lib/__tests__/epr_meta_eval_test.py  (exit 0 = pass)"""
-import sys
+import sys, tempfile
 from pathlib import Path
 
 here = Path(__file__).resolve()
@@ -26,7 +26,15 @@ check("validate_meta catches bad class",
       any("class" in e for e in epr_meta.validate_meta(
           {"epr-meta-version": 1, "rules": [{"id": "r", "class": "nope"}]})))
 check("validate_meta passes a good manifest",
-      epr_meta.validate_meta({"epr-meta-version": 1, "rules": [{"id": "r", "class": "deny"}]}) == [])
+      epr_meta.validate_meta({"epr-meta-version": 1,
+          "rules": [{"id": "r", "class": "deny", "no-new-subdirs": True}]}) == [])
+check("validate_meta warns: enforcing rule with no actionable predicate (M2 footgun)",
+      any("fires on nothing" in e for e in epr_meta.validate_meta(
+          {"epr-meta-version": 1, "rules": [{"id": "nuke", "class": "deny"}]})))
+check("validate_meta warns: unknown rule key (typo catch)",
+      any("unknown key" in e for e in epr_meta.validate_meta(
+          {"epr-meta-version": 1, "rules": [{"id": "x", "class": "deny",
+              "no-new-subdirs": True, "reqire-frontmatter": ["id"]}]})))
 
 m = _merged([{"id": "fm", "class": "deny", "when": {"write": "*.md", "new": True},
               "require-frontmatter": ["id", "status"], "why": "need id+status"}])
@@ -60,5 +68,32 @@ check("require-sibling asks for orphan tree", v.cls == "ask" and ".epr-meta" in 
 check("require-sibling exempts the .epr-meta itself",
       epr_meta.combine(epr_meta.evaluate(m,
           {"path": "s/brand/.epr-meta", "content": "x", "is_new": True, "is_new_subdir": True})) is None)
+
+# M1: glob matching is case-insensitive so an uppercase extension can't bypass a rule
+m = _merged([{"id": "md", "class": "deny", "when": {"write": "*.md", "new": True},
+              "require-frontmatter": ["id"], "why": "case"}])
+check("glob is case-insensitive (*.md matches FILE.MD)",
+      epr_meta.combine(epr_meta.evaluate(m,
+          {"path": "specs/FILE.MD", "content": "no fm", "is_new": True})).cls == "deny")
+
+# check_meta: the resolver's health-reporter (size cap / deep-nest / parse-fail / schema)
+with tempfile.TemporaryDirectory() as _td:
+    root = Path(_td)
+    def _mk(name, body):
+        p = root / name
+        p.write_text(body)
+        return p
+    healthy = _mk("h", "---\nepr-meta-version: 1\nrules:\n  - id: r\n    class: deny\n    no-new-subdirs: true\n---\n")
+    check("check_meta: healthy manifest → []", epr_meta.check_meta(healthy) == [])
+    check("check_meta: schema error surfaced",
+          any("epr-meta-version" in e for e in epr_meta.check_meta(_mk("b", "---\nepr-meta-version: 2\n---\n"))))
+    big = _mk("big", "---\nx: " + "a" * (epr_meta.MAX_MANIFEST_BYTES + 10) + "\n---\n")
+    check("check_meta: oversized manifest → size-cap error (parse-DoS guard)",
+          any("size cap" in e for e in epr_meta.check_meta(big)))
+    deep = _mk("deep", "---\nx: " + "[" * (epr_meta.MAX_FLOW_DEPTH + 5) + "]" * (epr_meta.MAX_FLOW_DEPTH + 5) + "\n---\n")
+    check("check_meta: deeply-nested manifest → refused pre-parse (RecursionError guard)",
+          any("too deep" in e for e in epr_meta.check_meta(deep)))
+    check("load_meta: oversized/deep manifest → {} (cascade fast-path stays safe)",
+          epr_meta.load_meta(big) == {} and epr_meta.load_meta(deep) == {})
 
 print(f"\n  {_passed} assertions passed ✅")

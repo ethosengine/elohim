@@ -73,17 +73,28 @@ def main():
         _emit_advise("[.epr-meta] PyYAML unavailable — compose-gate rules NOT enforced for this "
                      "write. Install PyYAML to re-enable the gate. (failing open, not silent.)")
 
-    # schema-validate every .epr-meta in the cascade; a malformed manifest is itself a deny.
-    metas = [(m, epr_meta.load_meta(m)) for m in chain]
-    for meta, cfg in metas:
-        errs = epr_meta.validate_meta(cfg)
-        if errs:
-            _emit_deny(f"malformed `.epr-meta` at {meta}: {'; '.join(errs)}")
+    advisories = []
 
+    # Strict-but-recoverable governance: a MALFORMED .epr-meta in the cascade must NOT hard-deny the
+    # whole subtree (which would brick authoring — including the fix itself). Instead:
+    #   • editing the manifest itself is never blocked, so you can always fix the typo → advise;
+    #   • other writes in the subtree downgrade deny → ASK (overridable) until it's fixed.
+    # This encodes "proposed-but-not-yet-valid governance" as `ask`, not a binding `deny`.
+    target_is_manifest = target.name == epr_meta.MANIFEST_NAME
+    problems = [(m, errs) for m in chain if (errs := epr_meta.check_meta(m))]
+    if problems:
+        detail = "; ".join(f"{m}: {', '.join(e)}" for m, e in problems)
+        if target_is_manifest:
+            advisories.append(f"[.epr-meta] malformed governance manifest(s) — {detail}. "
+                              "(editing an .epr-meta is never blocked, so you can fix it.)")
+        else:
+            _emit_ask(f"governance manifest malformed — {detail}. Fix the manifest to restore full "
+                      "governance here; proceeding now requires confirmation.")
+
+    metas = [(m, epr_meta.load_meta(m)) for m in chain]
     # Recursion-guard surface 6.2: a governed subtree whose cascade reached the repo/depth bound
     # without a `root: true` constitutional base is a misconfiguration. v1 ADVISES (fail-open
     # friendly); the spec's stricter `deny` is a hardening once the root is repo-wide.
-    advisories = []
     if not any(cfg.get("root") is True for _, cfg in metas):
         advisories.append("[.epr-meta] no `root: true` constitutional base in this cascade — "
                           "add one (this subtree's governance has no anchor).")
