@@ -270,7 +270,7 @@ compression = ["lz4_flex"]
 graph-native = ["dep:cozo", "dep:async-graphql"]
 p2p = ["libp2p", "futures"]
 p2p-iroh = ["iroh", "iroh-blobs", "iroh-gossip", "rand", "futures"]
-ssr = ["dep:elohim-render"]
+ssr = ["dep:elohim-render", "reqwest/blocking"]
 
 [dev-dependencies]
 tempfile = "3"
