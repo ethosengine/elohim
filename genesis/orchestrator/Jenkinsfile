@@ -606,7 +606,7 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         ]
     } catch (Exception e) {
         // Distinguish "Jenkins job not provisioned" from a real build failure.
-        // When a pipeline is registered in build-manifest.json (and orchestrator-strategy.mjs)
+        // When a pipeline is registered in build-manifest.json
         // but its multibranch job has not been created in Jenkins yet — a normal
         // interim state during multi-step pipeline landings — the build(job:…) call
         // throws hudson.AbortException with "No item named <X> found". Treat that

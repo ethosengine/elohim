@@ -14,7 +14,7 @@
  *   --branch <name>       orchestrator branch (default 'dev')
  *   --pipelines <list>    comma-separated downstream pipeline jobs to track.
  *                          Defaults to all non-manualOnly pipelines from
- *                          orchestrator-strategy.mjs PIPELINES (single source
+ *                          build-manifest.json via pipeline-registry.mjs (single source
  *                          of truth — keeps this tool from drifting from the
  *                          orchestrator's actual dispatch set).
  *   --json                emit structured JSON instead of a table

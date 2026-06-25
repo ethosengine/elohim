@@ -3,13 +3,13 @@
 // source pipelines. Single source of truth: the repo-root `.ci-ignore`.
 //
 // This module is the shared JS port of that file. Consumers:
-//   - orchestrator-strategy.mjs  (analyzePipelineRequirements)
 //   - graph-walker.mjs CLI        (.husky/pre-push pipes $CHANGED through it)
-//   - .husky/pre-push             (direct CLI filter for the fallback path)
+//   - .husky/pre-push             (direct CLI filter before project detection)
 //
-// The Jenkinsfile mirrors this logic in Groovy (loadCiIgnore / isCiIgnored)
-// because Groovy can't import .mjs; drift between the two is caught by
-// orchestrator-strategy.test.mjs which loads BOTH and compares parses.
+// CI does NOT apply .ci-ignore: build-graph.groovy relies on manifest
+// source-globs (a path matching no source glob triggers nothing). .ci-ignore
+// is a local/pre-push optimization. (A later P6 task makes .ci-ignore a file
+// GENERATED from the repo-root .epr-meta ci-trigger leg.)
 //
 // Library usage:
 //   import { matchesCiIgnore, CI_IGNORE_PATTERNS, filterChanged } from './ci-ignore.mjs';

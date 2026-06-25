@@ -146,6 +146,18 @@ test('pre-push references no deleted orchestrator-strategy module', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════
+// guard: no dangling orchestrator-strategy references in runtime files
+// ══════════════════════════════════════════════════════════════════
+
+test('runtime orchestrator files carry no dangling orchestrator-strategy references', () => {
+  const files = ['ci-ignore.mjs', 'justfile', 'scripts/count-pipeline-failures.sh', 'scripts/pipeline-trajectory.mjs'];
+  for (const f of files) {
+    const txt = readFileSync(new URL(`./${f}`, import.meta.url), 'utf8');
+    assert.equal(/orchestrator-strategy/.test(txt), false, `${f} must not reference the deleted orchestrator-strategy module`);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
 // pipeline-list.json drift
 // ══════════════════════════════════════════════════════════════════
 
