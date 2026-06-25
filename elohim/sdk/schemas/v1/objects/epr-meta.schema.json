@@ -49,6 +49,22 @@
         }
       }
     },
-    "cites": { "type": "array", "items": { "type": "string" } }
+    "cites": { "type": "array", "items": { "type": "string" } },
+    "ci-trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Build-time signal (orthogonal to the author-time rule classes): how external CI pipelines treat changes here. Read by the projector, ignored by the resolver.",
+      "properties": {
+        "ignore": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "gitignore-flavored patterns whose changes never trigger source pipelines (projected into the flat .ci-ignore)."
+        },
+        "defines": {
+          "type": "string",
+          "description": "Forward hook (P1b): an epr: reference to the content-addressed ci-ignore EPR that defines the ignore behavior."
+        }
+      }
+    }
   }
 }
