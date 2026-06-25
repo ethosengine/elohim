@@ -1,36 +1,21 @@
-# CI-only patterns — files/paths that NEVER trigger source pipelines.
+# GENERATED — DO NOT EDIT.
+# Projected from the `ci-trigger:` leg of the repo-root .epr-meta by
+# .claude/scripts/ci-ignore-projector.py. To change what CI ignores, edit the
+# root .epr-meta's ci-trigger.ignore and regenerate (the pre-push freshness gate enforces this).
 #
-# Shape is gitignore-style:
-#   - one pattern per line; blank lines and # comments are ignored
-#   - `foo/`               subtree prefix match  (matches foo/<anything>)
-#   - `path/to/file`       exact path match      (anchored)
-#   - `CLAUDE.md`          basename match anywhere in the tree
+# Pattern grammar (gitignore-flavored, parsed by genesis/orchestrator/ci-ignore.mjs):
+#   foo/             subtree prefix match
+#   path/to/file     exact path match (anchored)
+#   CLAUDE.md        basename match anywhere
 #
-# This is the single source of truth. Consumed by:
-#   - genesis/orchestrator/Jenkinsfile         (auto-mode change detection)
-#   - genesis/orchestrator/ci-ignore.mjs       (shared JS parser/matcher + CLI filter)
-#   - genesis/orchestrator/orchestrator-strategy.mjs  (preview + tests, via ci-ignore.mjs)
-#   - genesis/orchestrator/graph-walker.mjs    (CLI pre-filter, via ci-ignore.mjs)
-#   - .husky/pre-push                          (pipes $CHANGED through ci-ignore.mjs)
-# All load this file at runtime — no mirroring, no drift. (Jenkinsfile
-# is Groovy and reimplements the parser; drift is caught by tests.)
-#
-# Before adding a basename: verify NO project's build/storybook/test
-# pipeline reads the file by name as a real source input.
+# .ci-ignore is a LOCAL/pre-push optimization — CI relies on manifest source-globs, not this file.
 
-# Orchestrator + IDE/agent glue (entire subtrees):
 .claude/
 .github/
 .husky/
-
-# Specific CI-only files (orchestrator self-hosting + meta-doc):
 ROADMAP.md
 genesis/orchestrator/Jenkinsfile
 genesis/orchestrator/build-graph.groovy
-
-# Agent-instruction files anywhere in the tree.
-# These live INSIDE product trees as developer guidance for AI coding
-# agents, but are never consumed by any build/test/storybook step.
 CLAUDE.md
 AGENTS.md
 GEMINI.md
