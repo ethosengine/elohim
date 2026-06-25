@@ -134,6 +134,18 @@ test('dead change-detection helpers are retired from the Jenkinsfile', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════
+// pre-push guard: no references to deleted orchestrator-strategy module
+// ══════════════════════════════════════════════════════════════════
+
+test('pre-push references no deleted orchestrator-strategy module', () => {
+  const hook = readFileSync(new URL('../../.husky/pre-push', import.meta.url), 'utf8');
+  assert.equal(hook.includes('orchestrator-strategy'), false,
+    'pre-push must not reference the deleted orchestrator-strategy.mjs/.test.mjs');
+  assert.ok(/build-manifest\.json/.test(hook) && hook.includes('pipeline-list-fresh'),
+    'pipeline-list-fresh must trigger on build-manifest.json / pipeline-registry.mjs changes');
+});
+
+// ══════════════════════════════════════════════════════════════════
 // pipeline-list.json drift
 // ══════════════════════════════════════════════════════════════════
 
