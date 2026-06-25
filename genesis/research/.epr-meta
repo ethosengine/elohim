@@ -1,0 +1,17 @@
+---
+epr-meta-version: 1
+id: research-governance
+purpose: "Cross-pollination surveys and prior-art notes. README.md is the catalog; new surveys fold there rather than proliferating as near-duplicates."
+rules:
+  - id: cross-pollination-dedupe
+    class: ask
+    when: { write: "*cross-pollination*.md", new: true }
+    dedupe-of: genesis/research/README.md
+    why: "Check the Research Index (README.md) first — this topic may be catalogued (e.g. the hypha* name-collision triple). Extend the entry rather than starting a parallel note."
+---
+# research — surveys + prior-art
+
+The Research Index (`README.md`) is the canonical catalog of what has been surveyed, including the
+name-collision scar tissue (`hypha-dao` ≠ `hyphacoop` ≠ `hypha-network`). A new `*cross-pollination*.md`
+is checked against the index at birth so authors fold existing coverage rather than starting a parallel
+note. Edits to existing surveys and all other research files are unaffected.
