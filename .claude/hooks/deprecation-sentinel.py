@@ -107,24 +107,33 @@ ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 #   line that contains "deprecations.jsonl" as a source path prefix.
 ECHO_LEDGER_PATH = re.compile(r"deprecations\.jsonl", re.IGNORECASE)
 
-# Guard B — managed decision-record / museum prose:
+# Guard B — managed decision-record / museum / planning prose:
 #   Lines sourced from the project's deprecation-narrating managed surfaces:
 #     - genesis/docs/content/elohim-protocol/history/**  (museum / arc records)
 #     - genesis/data/timeline/backlog/**                 (the canonical backlog
 #       decision records THIS sentinel itself writes — every deprecation-*.md
 #       carries "deprecated" in its title/tags/author frontmatter by design)
 #     - genesis/data/timeline/chronicle/**               (graduated-lesson records)
+#     - genesis/docs/superpowers/**                      (plan / spec / brief
+#       docs whose task headers narrate work — "### Task 1: Retire the dead
+#       Groovy helpers + fix the inverted DEPRECATED label")
+#     - .superpowers/**                                  (the SDD working tree:
+#       progress.md task-checkbox ledgers, per-task reports, review diffs —
+#       "- [x] Task 1: complete … DEPRECATED comment removed …")
 #   These narrate (or canonicalize) deprecations; reading them back is never a
 #   NEW in-flight finding.  fp-dedupe cannot suppress the class: each new
-#   backlog/chronicle file mints a fresh fingerprint on the next cat/grep, so
-#   only a structural guard collapses it (cf. the 2026-06-17 + 2026-06-20
-#   backlog-frontmatter captures).
+#   backlog/chronicle/plan/progress edit mints a fresh fingerprint on the next
+#   cat/grep/tail, so only a structural guard collapses it (cf. the 2026-06-17
+#   + 2026-06-20 backlog-frontmatter captures, and the 2026-06-25 SDD-ledger
+#   c4c3eccc7e05 + plan-header d09bbe4004a6 captures during the P6 sprint).
 #   They appear in grep-with-filename output as a leading file path, or the
-#   command itself directly reads such a file (cat/head/sed output has no path
-#   prefix — the command gate below covers that case).
+#   command itself directly reads such a file (cat/head/tail/sed output has no
+#   path prefix — the command gate below covers that case).
 ECHO_HISTORY_PATH_RE = re.compile(
     r"genesis/docs/content/elohim-protocol/history/"
-    r"|genesis/data/timeline/(?:backlog|chronicle)/",
+    r"|genesis/data/timeline/(?:backlog|chronicle)/"
+    r"|genesis/docs/superpowers/"
+    r"|\.superpowers/",
     re.IGNORECASE,
 )
 
@@ -164,15 +173,19 @@ ECHO_EPHEMERAL_SOURCE_RE = re.compile(r"<(?:string|stdin)>:\d+:")
 
 # Command-level gates for echo classes B and C: if the command itself is a pure
 # git history read (git log / git show without a -p / --patch flag) or reads
-# directly from the history prose tree, ALL lines from that output are echo
-# candidates — the command gate is a cheap early exit before per-line work.
+# directly from the history / planning / SDD prose trees, ALL lines from that
+# output are echo candidates — the command gate is a cheap early exit before
+# per-line work (cat/tail/grep of a single doc carries no path prefix per line,
+# so the command string is the only signal of source).
 _CMD_GIT_HISTORY_RE = re.compile(
     r"\bgit\s+(?:log|show)\b(?!.*(?:\s-p\b|\s--patch\b|\s--diff\b))",
     re.IGNORECASE,
 )
 _CMD_HISTORY_TREE_RE = re.compile(
     r"genesis/docs/content/elohim-protocol/history/"
-    r"|genesis/data/timeline/(?:backlog|chronicle)/",
+    r"|genesis/data/timeline/(?:backlog|chronicle)/"
+    r"|genesis/docs/superpowers/"
+    r"|\.superpowers/",
     re.IGNORECASE,
 )
 
