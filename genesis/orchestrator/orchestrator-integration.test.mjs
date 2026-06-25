@@ -120,6 +120,20 @@ describe('CI_IGNORE_PATTERNS (loaded from repo-root .ci-ignore)', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════
+// Jenkinsfile dead-helper guard
+// ══════════════════════════════════════════════════════════════════
+
+test('dead change-detection helpers are retired from the Jenkinsfile', () => {
+  const jf = readFileSync(new URL('./Jenkinsfile', import.meta.url), 'utf8');
+  for (const dead of ['loadCiIgnore', 'matchesCiIgnore', 'propagateDependencies']) {
+    assert.equal(jf.includes(dead), false, `${dead} must be fully removed from the Jenkinsfile`);
+  }
+  assert.ok(jf.includes('def analyzeChangeset'), 'analyzeChangeset must remain (it is live)');
+  assert.equal(/DEPRECATED: advisory only, will be removed/.test(jf), false,
+    'the inverted DEPRECATED tag on analyzeChangeset must be removed');
+});
+
+// ══════════════════════════════════════════════════════════════════
 // pipeline-list.json drift
 // ══════════════════════════════════════════════════════════════════
 

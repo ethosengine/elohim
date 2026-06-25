@@ -250,64 +250,6 @@ def getGitCommitHashFull() {
 }
 
 /**
- * Load and parse repo-root .ci-ignore into a list of {kind, value} maps.
- * Single source of truth shared with orchestrator-strategy.mjs.
- *
- * Pattern shapes (gitignore-flavored):
- *   trailing '/'     → kind: 'prefix'   (subtree)
- *   contains '/'     → kind: 'exact'    (anchored path)
- *   no '/'           → kind: 'basename' (anywhere in tree)
- *
- * Comment-from-#-to-EOL and blank lines are stripped. If .ci-ignore is
- * missing or unreadable, returns [] (orchestrator falls back to
- * triggering everything that matches changePatterns — safer than
- * silently ignoring real source).
- */
-def loadCiIgnore() {
-    def text
-    try {
-        text = readFile('.ci-ignore')
-    } catch (Exception e) {
-        echo "WARNING: could not read .ci-ignore: ${e.message}; no CI-only skips applied"
-        return []
-    }
-    def patterns = []
-    text.split('\n').each { rawLine ->
-        def line = rawLine.replaceFirst(/\s*#.*$/, '').trim()
-        if (!line) return
-        def kind
-        if (line.endsWith('/')) {
-            kind = 'prefix'
-        } else if (line.contains('/')) {
-            kind = 'exact'
-        } else {
-            kind = 'basename'
-        }
-        patterns.add([kind: kind, value: line])
-    }
-    return patterns
-}
-
-/**
- * Test a file path against parsed .ci-ignore patterns. Mirrors the
- * matchesCiIgnore export in orchestrator-strategy.mjs.
- */
-def matchesCiIgnore(String file, List patterns) {
-    for (p in patterns) {
-        if (p.kind == 'prefix') {
-            if (file.startsWith(p.value)) return true
-        } else if (p.kind == 'exact') {
-            if (file == p.value) return true
-        } else {
-            def slash = file.lastIndexOf('/')
-            def basename = slash >= 0 ? file.substring(slash + 1) : file
-            if (basename == p.value) return true
-        }
-    }
-    return false
-}
-
-/**
  * Analyze the changeset to determine which files changed.
  *
  * Priority order:
@@ -323,7 +265,6 @@ def matchesCiIgnore(String file, List patterns) {
  * means the diff window is bounded to "since the last orchestrator dispatched",
  * which is what change-detection actually needs.
  */
-// DEPRECATED: advisory only, will be removed
 def analyzeChangeset(storedGlobalBaseline = null) {
     // 1. Manual override via FORCE_COMMIT parameter
     def baseCommit = params.FORCE_COMMIT?.trim() ?: null
@@ -460,41 +401,6 @@ def groupByDependencyLevel(pipelineList) {
     }
 
     return levels
-}
-
-/**
- * If a pipeline is building, auto-include all pipelines that depend on it.
- * Uses fixed-point iteration for transitive propagation.
- * Example: DNA builds → edge auto-includes (dependsOn DNA) → genesis auto-includes (dependsOn edge)
- * Reads dependency metadata from build-manifest.json via getPipelineMetadata().
- */
-def propagateDependencies(pipelines) {
-    def added = true
-    while (added) {
-        added = false
-        def allNames = []
-        if (env.PIPELINE_REGISTRY_JSON) {
-            def registry = readJSON(text: env.PIPELINE_REGISTRY_JSON)
-            allNames = registry.keySet().toList()
-        }
-        allNames.each { name ->
-            if (pipelines.contains(name)) return
-            def meta = getPipelineMetadata(name)
-            if (meta.manualOnly) return
-
-            def deps = meta.dependsOn ?: []
-            def buildingDep = deps.find { dep ->
-                if (!pipelines.contains(dep)) return false
-                def depMeta = getPipelineMetadata(dep)
-                return depMeta.cascades == null ? true : depMeta.cascades
-            }
-            if (buildingDep) {
-                pipelines.add(name)
-                added = true
-            }
-        }
-    }
-    return pipelines
 }
 
 /**
@@ -656,6 +562,15 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // 2026-05-24 stage efficiency design) read this. Empty value →
         // full-suite fallback (manual / [build:X] tag / force builds).
         buildParams.add(stringParam(name: 'CHANGED_PATHS', value: changedFiles.join('\n')))
+
+        // RESET_STORAGE — only elohim-genesis declares + consumes it (wipe content.db +
+        // fresh reseed). Two activation paths: operator param OR [reseed] commit tag
+        // (webhook-gated above). Scoped to genesis so other pipelines don't get an
+        // undefined-param warning.
+        if (name == 'elohim-genesis') {
+            boolean resetStorage = (params.RESET_STORAGE ?: false) || env.RESET_STORAGE_FROM_TAG == 'true'
+            buildParams.add(booleanParam(name: 'RESET_STORAGE', value: resetStorage))
+        }
 
         def result = build(
             job: "${name}/${branch}",
@@ -1351,6 +1266,11 @@ spec:
             defaultValue: false,
             description: 'Skip all build stages and dispatch only elohim-edge (and elohim-genesis if SKIP_GENESIS is false). Use after manifest/RBAC/storageClass-only changes to redeploy from existing Harbor tags. Operator-triggered only; do not combine with auto webhook flow.'
         )
+        booleanParam(
+            name: 'RESET_STORAGE',
+            defaultValue: false,
+            description: 'Wipe genesis storage (content.db) and reseed from scratch before tests. Reliably reconciles authored content that skip-on-exists bulk seeding leaves stale (e.g. a manifesto row stuck at reach=community when the source authors commons — the stampProvenance reach-PATCH trips the conductor re-notarize circuit breaker on bulk-seeded rows). Forwarded only to elohim-genesis. Operator-triggered, or via the [reseed] commit tag on a fresh webhook push.'
+        )
         string(
             name: 'FORCE_COMMIT',
             defaultValue: '',
@@ -1518,6 +1438,16 @@ spec:
                             if (commitMsg =~ /(?i)\[deploy[-_ ]only\]/) {
                                 echo "🚀 [deploy-only] detected in commit message — DEPLOY_ONLY mode (skip builds, redeploy from env-file tags)"
                                 env.DEPLOY_ONLY_FROM_TAG = 'true'
+                            }
+                            // [reseed] — webhook-gated like [deploy-only]. Tells the genesis pipeline
+                            // to wipe content.db and reseed from scratch (RESET_STORAGE), reliably
+                            // reconciling authored content that skip-on-exists bulk seeding leaves
+                            // stale. Destructive-ish (the SQLite projection only — reconstructable
+                            // from the seed source + P2P), so a timer/replay reusing the same HEAD
+                            // must NOT silently re-wipe storage; hence webhook-only.
+                            if (commitMsg =~ /(?i)\[reseed\]/) {
+                                echo "♻️  [reseed] detected in commit message — RESET_STORAGE for genesis (wipe content.db + fresh reseed)"
+                                env.RESET_STORAGE_FROM_TAG = 'true'
                             }
                         }
 
