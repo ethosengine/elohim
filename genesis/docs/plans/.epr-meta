@@ -1,0 +1,16 @@
+---
+epr-meta-version: 1
+id: docs-plans-legacy-routing
+purpose: "Legacy/parallel plans dir (stalled since May). New plans belong in genesis/docs/superpowers/plans/ where the gate lives."
+rules:
+  - id: route-plans-to-governed-home
+    class: ask
+    when: { write: "*.md", new: true }
+    route-to: { dest: genesis/docs/superpowers/plans/ }
+    why: "New plans go to genesis/docs/superpowers/plans/ (governed) — not this stalled legacy dir."
+---
+# docs/plans (legacy)
+
+The active plans home is `genesis/docs/superpowers/plans/` (governed by the lifecycle gate). This legacy
+dir stalled in May; new plans are routed there at birth so they land under governance. Existing files
+are left in place.
