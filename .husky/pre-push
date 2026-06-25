@@ -236,6 +236,23 @@ if echo "$CHANGED" | grep -qE "genesis/data/account-packages/|genesis/data/human
   echo "[pre-push] account-packages validation ✓"
 fi
 
+# ── .ci-ignore freshness (projected from the .epr-meta ci-trigger cascade) ──
+#
+# When any .epr-meta or the generated .ci-ignore changes, ensure .ci-ignore is
+# fresh relative to the root .epr-meta ci-trigger leg. Fail-open if python3 is
+# absent (degraded shell) — same posture as the node-guarded blocks above.
+if echo "$CHANGED" | grep -qE "(^|/)\.epr-meta$|^\.ci-ignore$"; then
+  if command -v python3 >/dev/null 2>&1; then
+    echo "[pre-push] Verifying .ci-ignore is fresh relative to the .epr-meta ci-trigger leg..."
+    if ! python3 .claude/scripts/ci-ignore-projector.py --verify; then
+      echo "[pre-push] ERROR: .ci-ignore is stale relative to the root .epr-meta."
+      echo "  Run: python3 .claude/scripts/ci-ignore-projector.py && git add .ci-ignore"
+      exit 1
+    fi
+    echo "[pre-push] .ci-ignore freshness ✓"
+  fi
+fi
+
 # ── Project Detection (manifest-driven) ──────────────────────────
 #
 # Try graph walker first — reads build-manifest.json files and matches
