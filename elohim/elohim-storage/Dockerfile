@@ -161,6 +161,27 @@ RUN sed -i \
     -e 's|chrono = { workspace = true }|chrono = { version = "0.4", features = ["serde"] }|' \
     elohim-compute/Cargo.toml
 
+# elohim-render crate uses workspace inheritance too — inline the values.
+# Added when storage gained the optional `ssr` feature (elohim-render path-dep):
+# the workspace root (elohim/Cargo.toml) isn't in the build context, so cargo
+# fails "error inheriting `edition` from workspace root ... failed to find a
+# workspace root" at metadata time — even for the lean (no-ssr) build, since
+# cargo resolves the optional dep's manifest regardless. Same fix as constitution/epr.
+RUN sed -i \
+    -e 's|version.workspace = true|version = "0.1.0"|' \
+    -e 's|edition.workspace = true|edition = "2021"|' \
+    -e 's|license.workspace = true|license = "Apache-2.0"|' \
+    -e 's|serde.workspace = true|serde = { version = "1.0", features = ["derive"] }|' \
+    -e 's|serde_json.workspace = true|serde_json = "1.0"|' \
+    -e 's|sha2.workspace = true|sha2 = "0.10"|' \
+    -e 's|thiserror.workspace = true|thiserror = "2.0"|' \
+    -e 's|tracing.workspace = true|tracing = "0.1"|' \
+    -e 's|async-trait.workspace = true|async-trait = "0.1"|' \
+    -e 's|tokio = { workspace = true }|tokio = { version = "1.43", features = ["full", "sync"] }|' \
+    -e 's|deno_core.workspace = true|deno_core = "0.339.0"|' \
+    -e 's|deno_error.workspace = true|deno_error = "0.5.7"|' \
+    elohim-render/Cargo.toml
+
 # Create dummy src + bench placeholders to build dependencies.
 # Any `[[bin]]`, `[[bench]]`, or `[[example]]` entry declared in Cargo.toml
 # requires a matching file at manifest-parse time; the dep-cache stage builds
