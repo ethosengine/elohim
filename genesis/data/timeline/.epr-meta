@@ -1,0 +1,16 @@
+---
+epr-meta-version: 1
+id: timeline-data-governance
+purpose: "Timeline data (backlog, chronicle, roadmap). Every new entry carries id + kind so it is citable and schema-typed (see CONVENTIONS.md)."
+rules:
+  - id: timeline-entry-frontmatter
+    class: ask
+    when: { write: "*.md", new: true }
+    require-frontmatter: [id, kind]
+    why: "New timeline entries need `id` (citation slug) and `kind` (schema type). See genesis/data/timeline/CONVENTIONS.md."
+---
+# timeline data — backlog / chronicle / roadmap
+
+Every new entry under this tree (backlog, chronicle, roadmap) is born with `id` (citation slug) and
+`kind` (schema type) per `CONVENTIONS.md`. The rule fires at birth on a schema-less entry and stays
+silent on edits to the already-grandfathered entries. `roadmap/`, already conformant, sees no friction.
