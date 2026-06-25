@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:objects:epr-meta",
+  "title": "EprMeta",
+  "description": "Source of truth: the directory-local compose-gate manifest (.epr-meta). A self-contained leaf config read by the epr-meta-resolver PreToolUse hook; not an HTTP wire shape. P2P design-gate classification: Category C (operational/config; not notarized).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["epr-meta-version"],
+  "properties": {
+    "epr-meta-version": { "type": "integer", "const": 1 },
+    "id": { "type": "string" },
+    "root": { "type": "boolean" },
+    "extends": { "type": "string" },
+    "max-cascade-depth": { "type": "integer", "minimum": 1, "maximum": 32 },
+    "purpose": { "type": "string" },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "class"],
+        "properties": {
+          "id": { "type": "string" },
+          "class": { "type": "string", "enum": ["deny", "ask", "inject", "measure", "dispatch"] },
+          "why": { "type": "string" },
+          "when": { "type": "object" },
+          "require-frontmatter": { "type": "array", "items": { "type": "string" } },
+          "allowed-types": { "type": "array", "items": { "type": "string" } },
+          "route-to": { "type": "object" },
+          "no-new-subdirs": { "type": "boolean" },
+          "require-sibling": { "type": "string" },
+          "dedupe-of": { "type": "string" },
+          "max-files": { "type": "object" },
+          "measure": { "type": "object" },
+          "validator": { "type": "string" }
+        }
+      }
+    },
+    "validators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref"],
+        "properties": {
+          "ref": { "type": "string" },
+          "cid": { "type": "string" },
+          "fuel": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "cites": { "type": "array", "items": { "type": "string" } }
+  }
+}
