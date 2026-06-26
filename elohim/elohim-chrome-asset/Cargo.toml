@@ -1,0 +1,9 @@
+[package]
+name = "elohim-chrome-asset"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Content-addressed runtime-served EPR omnibar client element (no V8/deno_core) — served by both the doorway and the storage sidecar"
+
+[dependencies]
+sha2.workspace = true

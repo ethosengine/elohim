@@ -11,7 +11,11 @@
 //! - [`theme`] — the theme inputs (the `--omni-*` token shape + base palette).
 //! - [`omnibar`] — the Rust markup/style renderer (the design source-of-truth
 //!   the element JS faithfully ports).
-//! - [`element`] — the content-addressed served element bytes/hash/path.
+//! - [`element`] — re-export shim over the light `elohim-chrome-asset` crate
+//!   (the content-addressed served element bytes/hash/path + the `inject_element`
+//!   SSR-HTML helper). Lives in a separate crate so serving the static element
+//!   does NOT pull `deno_core`/V8 — `elohim-storage`'s default build and the
+//!   doorway both serve `/chrome/*` without compiling V8.
 //! - [`enhance`] — SUPERSEDED; delegates to [`element`] so the runtime serves a
 //!   single content-addressed asset that is the full element.
 //!
@@ -23,7 +27,10 @@ pub mod enhance;
 pub mod omnibar;
 pub mod theme;
 
-pub use element::{element_js_bytes, element_js_hash, element_script_path, ELEMENT_JS};
+pub use element::{
+    element_js_bytes, element_js_hash, element_script_path, escape_json_for_script, inject_element,
+    CONTEXT_SCRIPT_ID, ELEMENT_JS, STABLE_ELEMENT_PATH,
+};
 pub use enhance::{enhance_js_bytes, enhance_js_hash, enhance_script_path, ENHANCE_JS};
 pub use omnibar::{html_escape, render_omnibar_markup, render_omnibar_style, ChromeInput};
 pub use theme::{base_palette, BasePalette, ColorScheme, Theme, ThemeTokens};

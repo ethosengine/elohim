@@ -21,8 +21,8 @@ pub use angular::AngularRenderer;
 pub use bootstrap::{materialize_server_bundle, BundleSource};
 pub use chrome::{
     base_palette, element_js_bytes, element_js_hash, element_script_path, enhance_js_bytes,
-    enhance_js_hash, enhance_script_path, BasePalette, ColorScheme, Theme, ThemeTokens, ELEMENT_JS,
-    ENHANCE_JS,
+    enhance_js_hash, enhance_script_path, escape_json_for_script, inject_element, BasePalette,
+    ColorScheme, Theme, ThemeTokens, CONTEXT_SCRIPT_ID, ELEMENT_JS, ENHANCE_JS, STABLE_ELEMENT_PATH,
 };
 pub use data_fetcher::{DataFetcher, FetchRequest, FetchResponse};
 pub use error::{RenderError, Result};

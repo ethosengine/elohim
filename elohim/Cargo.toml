@@ -8,6 +8,7 @@ members = [
     "elohim-agent/gate-client-zome",
     "elohim-agent/specialists/defender",
     "eae",
+    "elohim-chrome-asset",
     "elohim-compute",
     "elohim-peer-fabric",
     "elohim-render",
