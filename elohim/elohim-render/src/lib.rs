@@ -17,7 +17,7 @@ pub mod traced_fetcher;
 pub mod types;
 
 pub use angular::AngularRenderer;
-pub use bootstrap::{materialize_bundle, BundleSource};
+pub use bootstrap::{materialize_server_bundle, BundleSource};
 pub use data_fetcher::{DataFetcher, FetchRequest, FetchResponse};
 pub use error::{RenderError, Result};
 pub use renderer::{EchoRenderer, Renderer};
