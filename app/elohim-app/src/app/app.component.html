@@ -1,10 +1,8 @@
 <!-- Skip navigation link for keyboard accessibility -->
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
-<!-- Protocol omni — top-of-viewport chrome, gated by route protocolContent flag -->
-@if (protocolRouteCtx.isProtocol() && protocolRouteCtx.cid(); as cid) {
-  <app-protocol-omni [contentId]="cid" [showEnvContext]="true"></app-protocol-omni>
-}
+<!-- Protocol chrome (omnibar) is now native runtime chrome rendered server-side by
+     the doorway and spliced around the V8 Angular body — no longer in this bundle. -->
 
 <!-- Floating theme toggle button (only on root landing page) -->
 <app-theme-toggle *ngIf="showFloatingToggle"></app-theme-toggle>

@@ -115,7 +115,9 @@ describe('AppComponent', () => {
     expect(compiled.querySelector('router-outlet')).toBeTruthy();
   });
 
-  it('should not render protocol omni when isProtocol() is false', () => {
+  it('does not render the omnibar in the Angular bundle (now native runtime chrome)', () => {
+    // The protocol omnibar moved out of the Angular bundle to native runtime chrome
+    // rendered server-side by the doorway. The Angular app must render no omnibar.
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;

@@ -11,10 +11,8 @@ import { BlobBootstrapService } from '@app/lamad/services/blob-bootstrap.service
 import { environment } from '../environments/environment';
 
 import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
-import { ProtocolOmniComponent } from './elohim/components/protocol-omni/protocol-omni.component';
 import { EprNavService } from './elohim/services/epr-nav.service';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
-import { ProtocolRouteContextService } from './elohim/services/protocol-route-context.service';
 import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 
@@ -30,17 +28,14 @@ interface RetryConfig {
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, ThemeToggleComponent, CommonModule, ProtocolOmniComponent],
+  imports: [RouterOutlet, ThemeToggleComponent, CommonModule],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css',
-  host: { '[class.with-omni]': 'protocolRouteCtx.isProtocol()' },
 })
 export class AppComponent implements OnInit, OnDestroy {
   title = 'elohim-app';
   /** Show floating theme toggle only on root landing page */
   showFloatingToggle = false;
-
-  protected readonly protocolRouteCtx = inject(ProtocolRouteContextService);
 
   private readonly eprNav = inject(EprNavService);
   private readonly holochainService = inject(HolochainClientService);

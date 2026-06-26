@@ -1,10 +1,9 @@
 /* App root styles */
 
+/* Top spacing for the protocol omnibar is now owned by the native runtime chrome
+   (spliced server-side by the doorway), so the Angular body reserves no omnibar
+   space here. */
+
 :host {
   display: block;
-}
-
-:host.with-omni {
-  padding-top: 2.5rem;
-  transition: padding-top 150ms ease-out;
 }
