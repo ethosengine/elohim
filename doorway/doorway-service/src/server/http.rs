@@ -1719,6 +1719,9 @@ fn is_service_path(path: &str) -> bool {
         // !is_service_path) would shadow it whenever a root projection is
         // registered — the /auth/portal incident shape.
         "/metrics",
+        // /chrome/* has an explicit arm (runtime chrome static assets); same
+        // shadow-guard as /metrics — keep it out of the EPR router's reach.
+        "/chrome/",
         "/status",
         "/debug",
         "/admin",
@@ -1936,6 +1939,13 @@ mod shakeout_tests {
         // root projection (url_path="/") is registered — the scrape would render
         // the SPA bundle instead of the exposition body.
         assert!(is_service_path("/metrics"));
+    }
+    #[test]
+    fn shakeout_service_path_guards_chrome() {
+        // /chrome/* (runtime chrome static assets — omni-enhance.js) MUST be a
+        // service path so the EPR router doesn't shadow it with the SPA bundle
+        // when a root projection is registered — same guard as /metrics.
+        assert!(is_service_path("/chrome/omni-enhance.abc123.js"));
     }
     #[test]
     fn shakeout_service_path_identity_narrowed_to_did() {
@@ -2655,6 +2665,21 @@ async fn handle_request(
         // Needs doorway-specific logic (renders the in-process registry, not a
         // storage proxy) → an explicit arm above the registry fallback is correct.
         (Method::GET, "/metrics") => to_boxed(routes::handle_metrics()),
+
+        // Runtime chrome static assets — the content-addressed `omni-enhance.js`
+        // that progressively enhances the natively-spliced EPR omnibar.
+        // Doorway-specific runtime chrome (same legitimate class as
+        // bootstrap/signal/metrics — a surface the doorway OWNS and paints, NOT
+        // a per-domain proxy of substrate truth). There is no storage endpoint
+        // behind it and every doorway serves identical content-addressed bytes
+        // from the linked elohim-render crate, so it must NOT flow through the
+        // manifest registry. Explicit, documented exception ABOVE the wildcard
+        // registry arm (see doorway/CLAUDE.md "No Per-Domain Proxy Files" and
+        // server/CLAUDE.md). Content-addressed ⇒ immutable cache; unknown
+        // /chrome/* path ⇒ 404.
+        (Method::GET, p) if p.starts_with("/chrome/") => {
+            to_boxed(routes::handle_chrome_asset(p))
+        }
 
         // Comprehensive status (runtime stats, cluster health, storage diagnostics)
         (Method::GET, "/status") => to_boxed(routes::status_page(req, Arc::clone(&state)).await),

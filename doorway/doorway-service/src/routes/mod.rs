@@ -10,6 +10,7 @@ pub mod apps;
 pub mod auth_routes;
 pub mod blob;
 pub mod bootstrap_coherence;
+pub mod chrome;
 pub mod coherence;
 pub mod collectives;
 pub mod dashboard_ws;
@@ -67,6 +68,7 @@ pub use blob::{
     error_response as blob_error_response, handle_blob_request, handle_blob_request_with_fallback,
     handle_blob_request_with_storage_proxy, BlobContext, BlobError,
 };
+pub use chrome::handle_chrome_asset;
 pub use dashboard_ws::handle_dashboard_ws;
 // `handle_db_request` re-export retired with the db module — see comment above.
 pub use debug_stream::{handle_debug_stream, DebugEvent, DebugHub};
