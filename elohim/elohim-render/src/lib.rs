@@ -7,6 +7,7 @@
 
 pub mod angular;
 pub mod bootstrap;
+pub mod chrome;
 pub mod data_fetcher;
 pub mod error;
 pub mod renderer;
@@ -18,6 +19,7 @@ pub mod types;
 
 pub use angular::AngularRenderer;
 pub use bootstrap::{materialize_server_bundle, BundleSource};
+pub use chrome::{base_palette, BasePalette, ColorScheme, Theme, ThemeTokens};
 pub use data_fetcher::{DataFetcher, FetchRequest, FetchResponse};
 pub use error::{RenderError, Result};
 pub use renderer::{EchoRenderer, Renderer};
