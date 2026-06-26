@@ -59,10 +59,17 @@ When(
 When('I start the assessment', async function (this: E2EWorld) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
+  // The pre-assessment start gate (`assessment-start`) only renders in the
+  // PreAssessment results phase when there are skippable sections; the discovery
+  // flow renders the Sophia question directly with no start gate. Click the gate
+  // only if present (matching navigateToQuizStep in completion-feedback.steps.ts),
+  // then confirm the assessment actually mounted via the sophia-question element.
   const startBtn = device.page.locator(`[data-testid="${ASSESSMENT.START}"]`);
-  await startBtn.waitFor({ state: 'visible', timeout: 10_000 });
-  await startBtn.click();
-  await device.page.waitForLoadState('networkidle');
+  if (await startBtn.isVisible().catch(() => false)) {
+    await startBtn.click();
+    await device.page.waitForLoadState('networkidle');
+  }
+  await device.page.locator('sophia-question').waitFor({ state: 'attached', timeout: 15_000 });
 });
 
 /** Click a likert-scale tick mark for the given value. */

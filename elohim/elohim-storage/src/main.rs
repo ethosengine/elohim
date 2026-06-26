@@ -143,6 +143,17 @@ struct Args {
     #[arg(long, env = "CONDUCTOR_MAX_RETRIES", default_value_t = 60)]
     conductor_max_retries: u32,
 
+    /// Admin-websocket request timeout (seconds) for the embedded conductor.
+    /// Must cover the cold FIRST hApp install — a single-threaded wasm compile +
+    /// genesis — which on slower per-core nodes (e.g. the shem apex) exceeds
+    /// holochain_client's 60s default and yields `install_app failed: Websocket
+    /// error: Timeout`, crash-looping the node forever (its wasm cache never
+    /// warms). Warm-cache installs are sub-second, so this only bounds the first
+    /// cold install; keep it well under the deploy rollout-status timeout (600s).
+    /// Only used when --embedded-conductor is set.
+    #[arg(long, env = "HAPP_INSTALL_TIMEOUT_SECS", default_value_t = 180)]
+    happ_install_timeout_secs: u64,
+
     /// Installed app ID for the imagodei DNA (reconcile controller signal subscription).
     /// Defaults to "imagodei". The controller subscribes to this app's signals to
     /// project key-rotation, revocation, and agent-peer-binding events into SQLite.
@@ -647,6 +658,7 @@ async fn async_main(
             args.conductor_config_path.clone(),
             args.conductor_data_dir.clone(),
             4444, // admin port — must match conductor config
+            std::time::Duration::from_secs(args.happ_install_timeout_secs),
         );
 
         // Bring the conductor up + reconcile its installed DNA to the assigned

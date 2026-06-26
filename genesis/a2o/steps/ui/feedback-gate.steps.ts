@@ -175,63 +175,16 @@ Then(
     if (!device) return 'pending';
 
     const panel = device.page.locator(`[data-testid="${FEEDBACK_GATE.MODAL_PANEL}"]`);
-    await panel.waitFor({ state: 'visible' });
+    await panel.waitFor({ state: 'visible', timeout: 5_000 });
 
-    const backdropSel = `[data-testid="${FEEDBACK_GATE.MODAL_BACKDROP}"]`;
-    const panelSel = `[data-testid="${FEEDBACK_GATE.MODAL_PANEL}"]`;
-
-    // Native <dialog>.showModal() places the dialog in the browser top layer —
-    // above every stacking context regardless of ancestor transforms,
-    // overflow, or z-index. Top-layer membership is asserted via the
-    // standardized :modal pseudo-class (CSSWG; supported in Chromium/
-    // Firefox/Safari). Reading getComputedStyle().zIndex returns "auto"
-    // for top-layer elements, which parses to NaN — z-index isn't the
-    // mechanism here.
-    const topLayerCheck = (await device.page.evaluate((sel: string) => {
-      const el = document.querySelector(sel);
-      if (!el) return { found: false, isTopLayer: false, isDialog: false, isOpen: false };
-      const isDialog = el.tagName === 'DIALOG';
-      const isOpen = el.hasAttribute('open');
-      let isTopLayer = false;
-      try {
-        isTopLayer = el.matches(':modal');
-      } catch {
-        // jsdom or older browsers without :modal pseudo-class — fall back
-        // to dialog-with-open-attribute as a structural proxy.
-        isTopLayer = isDialog && isOpen;
-      }
-      return { found: true, isTopLayer, isDialog, isOpen };
-    }, backdropSel)) as {
-      found: boolean;
-      isTopLayer: boolean;
-      isDialog: boolean;
-      isOpen: boolean;
-    };
-
-    assert.ok(topLayerCheck.found, 'feedback dialog backdrop element not found');
-    assert.ok(
-      topLayerCheck.isDialog,
-      `feedback backdrop must be a <dialog> element (got tagName via showModal-based stacking)`
-    );
-    assert.ok(topLayerCheck.isOpen, 'feedback dialog must have [open] attribute when shown');
-    assert.ok(
-      topLayerCheck.isTopLayer,
-      'feedback dialog must be in browser top layer (showModal()) — above any TOC sidebar'
-    );
-
-    // Hit-testing: the click target at the panel center should be the panel
-    // (or one of its descendants), not a chrome element above it.
-    const panelOnTop = (await device.page.evaluate((sel: string) => {
-      const el = document.querySelector(sel);
-      if (!el) return false;
-      const rect = el.getBoundingClientRect();
-      const x = rect.left + rect.width / 2;
-      const y = rect.top + rect.height / 2;
-      const hit = document.elementFromPoint(x, y);
-      return hit ? el === hit || el.contains(hit) : false;
-    }, panelSel)) as boolean;
-
-    assert.ok(panelOnTop, 'feedback dialogue panel center must be hit-testable (nothing above it)');
+    // The gate feedback UI is now the Lit <elohim-gate-feedback-trigger> element,
+    // which renders a fixed `.modal-overlay` (z-index 1000) in shadow DOM — NOT a
+    // native <dialog>/top-layer (the old Angular component). "Stacks above the ToC
+    // sidebar" therefore means the panel is genuinely on top and hit-testable: a
+    // Playwright trial click resolves actionability (visible + stable + receives
+    // pointer events + NOT obscured) and pierces shadow DOM. If a sidebar overlaid
+    // the panel, the trial click would throw.
+    await panel.click({ trial: true, timeout: 5_000 });
   }
 );
 
@@ -242,10 +195,12 @@ Then('the artifact textarea should be selectable and focusable', async function 
   const textarea = device.page.locator(`[data-testid="${FEEDBACK_GATE.ARTIFACT_TEXTAREA}"]`);
   await textarea.waitFor({ state: 'visible', timeout: 5_000 });
   await textarea.click();
-  const isFocused = (await device.page.evaluate((sel: string) => {
-    const el = document.querySelector(sel);
-    return el === document.activeElement;
-  }, `[data-testid="${FEEDBACK_GATE.ARTIFACT_TEXTAREA}"]`)) as boolean;
+  // The textarea lives in the Lit element's shadow root, so document.activeElement
+  // is the host; check focus within the textarea's own root node (Playwright's
+  // element-scoped evaluate resolves the shadow element directly).
+  const isFocused = await textarea.evaluate(
+    (el: HTMLElement) => el === (el.getRootNode() as Document | ShadowRoot).activeElement
+  );
   assert.ok(isFocused, 'artifact textarea did not receive focus on click');
 });
 
@@ -308,33 +263,26 @@ When('{word} clicks the dialogue backdrop', async function (this: E2EWorld, huma
   const device = requirePlaywright(this, humanName);
   if (!device) return 'pending';
 
-  // Native <dialog>::backdrop covers the viewport outside the dialog box;
-  // clicks on the backdrop dispatch on the <dialog> element itself with
-  // event.target === <dialog>. The iter-4 component handler uses that
-  // exact predicate to distinguish backdrop from panel-content clicks.
-  // PWPage stub omits page.mouse, so we synthesize the click with the
-  // correct target by dispatching directly on the dialog element.
-  await device.page.evaluate((sel: string) => {
-    const dialog = document.querySelector(sel);
-    if (!dialog) return;
-    dialog.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-  }, `[data-testid="${FEEDBACK_GATE.MODAL_BACKDROP}"]`);
+  // The Lit modal overlay (`.modal-overlay`) dismisses on a click whose target
+  // is the overlay itself; the centered panel calls stopPropagation, so a click
+  // ON the panel does NOT close it. Click the overlay near a corner — outside the
+  // centered panel — so the overlay (not the panel) receives the click. Playwright
+  // pierces shadow DOM and resolves the position against the overlay's box.
+  await device.page
+    .locator(`[data-testid="${FEEDBACK_GATE.MODAL_BACKDROP}"]`)
+    .click({ position: { x: 8, y: 8 } });
 });
 
 When('{word} presses the Escape key', async function (this: E2EWorld, humanName: string) {
   const device = requirePlaywright(this, humanName);
   if (!device) return 'pending';
 
-  // Native <dialog>.showModal() handles Escape via user-agent default —
-  // dispatching a synthetic KeyboardEvent does not invoke the close path.
-  // The iter-4 component listens for the (close) event on <dialog>, which
-  // fires whether close was triggered by Escape, the close button, or
-  // dialog.close(). Calling close() here exercises the same dismissal
-  // contract a real Escape press would.
-  await device.page.evaluate((sel: string) => {
-    const dialog = document.querySelector<HTMLDialogElement>(sel);
-    if (dialog && typeof dialog.close === 'function') {
-      dialog.close();
-    }
-  }, `[data-testid="${FEEDBACK_GATE.MODAL_BACKDROP}"]`);
+  // The Lit modal closes on Escape via the overlay's keydown handler (the panel
+  // lets Escape bubble up to it). Focus an element inside the modal so the
+  // keypress originates within the overlay subtree, then press Escape for real.
+  const textarea = device.page.locator(`[data-testid="${FEEDBACK_GATE.ARTIFACT_TEXTAREA}"]`);
+  if (await textarea.isVisible().catch(() => false)) {
+    await textarea.click();
+  }
+  await device.page.keyboard.press('Escape');
 });
