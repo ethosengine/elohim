@@ -1,47 +1,50 @@
 //! Content-addressed progressive-enhancement script for the native runtime
-//! chrome.
+//! chrome — SUPERSEDED by the self-contained element ([`super::element`]).
 //!
-//! The hand-written `omni-enhance.js` is baked into the binary via `include_str!`
-//! and content-addressed by its `sha256`. The doorway serves it at
-//! `/chrome/omni-enhance.{hash}.js` with immutable cache headers; the
-//! `ComposingRenderer` (Task 3) references the SAME hash via
-//! [`enhance_script_path`] so the spliced `<script src>` always matches the
-//! served route — no staleness window.
+//! Historically this module baked a small `omni-enhance.js` that progressively
+//! enhanced server-rendered omnibar markup. The Phase-2 (revised) pivot replaced
+//! the SSR-splice with a runtime-served, self-contained CLIENT ELEMENT
+//! (`omni-element.js`) that self-mounts, renders, themes, AND wires the same
+//! behavior — so there is no separate server-rendered markup left to "enhance."
 //!
-//! Hashing convention mirrors `bootstrap.rs` (`format!("{:x}", Sha256::digest)`).
-//! The filename hash is bare lowercase hex (a clean content address); the
-//! `enhance_js_hash()` accessor exposes that same hex.
+//! The element FULLY ABSORBS the enhance behavior (the `data-omni-*` action
+//! hooks, the `elohim-theme` persistence, the `elohim-theme-changed` event, the
+//! lazy `/api/v1/resilience/{slug}` fetch). To keep the runtime coherent — ONE
+//! served script that is the full element — these accessors now DELEGATE to
+//! [`super::element`]: `enhance_js_bytes()`/`enhance_js_hash()` return the
+//! element's bytes/hash, and `enhance_script_path()` returns the element's
+//! content-addressed path. Any existing caller that referenced the "enhance"
+//! script therefore transparently serves and references the element.
+//!
+//! Prefer the `element_*` accessors in new code; the `enhance_*` names are kept
+//! only so in-flight references keep resolving to the (now superseding) element.
 
-use sha2::{Digest, Sha256};
-use std::sync::OnceLock;
+use super::element;
 
-/// The hand-written vanilla enhancement script, baked at compile time.
-pub const ENHANCE_JS: &str = include_str!("omni-enhance.js");
+/// The served enhancement script — now the self-contained element bytes.
+///
+/// Kept as a `const` alias of [`element::ELEMENT_JS`] for any caller that
+/// referenced the baked source directly.
+pub const ENHANCE_JS: &str = element::ELEMENT_JS;
 
-/// The script's bare lowercase-hex `sha256`, computed once on first use.
-fn enhance_js_hash_cell() -> &'static str {
-    static HASH: OnceLock<String> = OnceLock::new();
-    HASH.get_or_init(|| format!("{:x}", Sha256::digest(ENHANCE_JS.as_bytes())))
-}
-
-/// The script bytes the doorway `/chrome/` route serves.
+/// The served script bytes — the element bytes (supersession).
 #[must_use]
 pub fn enhance_js_bytes() -> &'static [u8] {
-    ENHANCE_JS.as_bytes()
+    element::element_js_bytes()
 }
 
-/// The script's content address — bare lowercase-hex `sha256` of [`ENHANCE_JS`].
+/// The served script's content address — the element's `sha256` (supersession).
 #[must_use]
 pub fn enhance_js_hash() -> &'static str {
-    enhance_js_hash_cell()
+    element::element_js_hash()
 }
 
-/// The content-addressed URL path the doorway serves the script at, e.g.
-/// `/chrome/omni-enhance.<sha256hex>.js`. Task 3 splices a `<script src>`
-/// pointing here; Task 5's route serves the bytes at exactly this path.
+/// The content-addressed URL path the doorway serves — the element's path
+/// (`/chrome/omni-element.<sha256hex>.js`). The enhance path is no longer a
+/// distinct asset; it resolves to the element so there is a single served file.
 #[must_use]
 pub fn enhance_script_path() -> String {
-    format!("/chrome/omni-enhance.{}.js", enhance_js_hash())
+    element::element_script_path()
 }
 
 #[cfg(test)]
@@ -49,41 +52,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hash_matches_script_bytes() {
-        let expected = format!("{:x}", Sha256::digest(ENHANCE_JS.as_bytes()));
-        assert_eq!(enhance_js_hash(), expected);
+    fn enhance_now_delegates_to_the_element() {
+        // Supersession invariant: the enhance accessors return the element's
+        // bytes/hash/path verbatim — one served script that is the full element.
+        assert_eq!(ENHANCE_JS, element::ELEMENT_JS);
+        assert_eq!(enhance_js_bytes(), element::element_js_bytes());
+        assert_eq!(enhance_js_hash(), element::element_js_hash());
+        assert_eq!(enhance_script_path(), element::element_script_path());
     }
 
     #[test]
-    fn script_path_carries_the_hash() {
+    fn served_path_is_the_element_path() {
+        // The path now carries the element filename (supersession), not the old
+        // omni-enhance filename — so the served asset is unambiguously the element.
         let path = enhance_script_path();
-        assert!(path.starts_with("/chrome/omni-enhance."), "{path}");
+        assert!(path.starts_with("/chrome/omni-element."), "{path}");
         assert!(path.ends_with(".js"), "{path}");
-        assert!(path.contains(enhance_js_hash()), "{path}");
-    }
-
-    #[test]
-    fn hash_is_lowercase_hex_64_chars() {
-        let h = enhance_js_hash();
-        assert_eq!(h.len(), 64, "sha256 hex is 64 chars: {h}");
-        assert!(
-            h.chars()
-                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
-            "hash must be lowercase hex: {h}"
-        );
-    }
-
-    #[test]
-    fn bytes_match_const() {
-        assert_eq!(enhance_js_bytes(), ENHANCE_JS.as_bytes());
-    }
-
-    #[test]
-    fn script_is_nonempty_and_bounded() {
-        // Sanity: the baked script is present and within the ~3-5KB design budget
-        // (generous upper bound to catch accidental bloat, not a hard limit).
-        let len = ENHANCE_JS.len();
-        assert!(len > 1000, "script unexpectedly small: {len} bytes");
-        assert!(len < 12_000, "script unexpectedly large: {len} bytes");
     }
 }

@@ -20,8 +20,9 @@ pub mod types;
 pub use angular::AngularRenderer;
 pub use bootstrap::{materialize_server_bundle, BundleSource};
 pub use chrome::{
-    base_palette, enhance_js_bytes, enhance_js_hash, enhance_script_path, BasePalette, ColorScheme,
-    Theme, ThemeTokens, ENHANCE_JS,
+    base_palette, element_js_bytes, element_js_hash, element_script_path, enhance_js_bytes,
+    enhance_js_hash, enhance_script_path, BasePalette, ColorScheme, Theme, ThemeTokens, ELEMENT_JS,
+    ENHANCE_JS,
 };
 pub use data_fetcher::{DataFetcher, FetchRequest, FetchResponse};
 pub use error::{RenderError, Result};

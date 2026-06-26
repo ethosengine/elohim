@@ -1942,10 +1942,10 @@ mod shakeout_tests {
     }
     #[test]
     fn shakeout_service_path_guards_chrome() {
-        // /chrome/* (runtime chrome static assets — omni-enhance.js) MUST be a
+        // /chrome/* (runtime chrome static assets — omni-element.js) MUST be a
         // service path so the EPR router doesn't shadow it with the SPA bundle
         // when a root projection is registered — same guard as /metrics.
-        assert!(is_service_path("/chrome/omni-enhance.abc123.js"));
+        assert!(is_service_path("/chrome/omni-element.abc123.js"));
     }
     #[test]
     fn shakeout_service_path_identity_narrowed_to_did() {
@@ -2666,8 +2666,8 @@ async fn handle_request(
         // storage proxy) → an explicit arm above the registry fallback is correct.
         (Method::GET, "/metrics") => to_boxed(routes::handle_metrics()),
 
-        // Runtime chrome static assets — the content-addressed `omni-enhance.js`
-        // that progressively enhances the natively-spliced EPR omnibar.
+        // Runtime chrome static assets — the content-addressed `omni-element.js`
+        // (the self-contained, runtime-served EPR omnibar client element).
         // Doorway-specific runtime chrome (same legitimate class as
         // bootstrap/signal/metrics — a surface the doorway OWNS and paints, NOT
         // a per-domain proxy of substrate truth). There is no storage endpoint
