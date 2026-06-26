@@ -143,3 +143,15 @@ requires_env: [household-nodes]
 - Interpolated values are HTML-escaped (no XSS via title/marker/theme).
 - elohim-render + doorway + elohim-app gates green.
 - **Post-merge / post-deploy** (not a local gate): the a2o visual regression — the omnibar themed correctly across light/dark on **both** alpha and elohim.host (the originating defect) — verified via `pnpm look` + the theme probe once `dev` deploys.
+
+## DELIVERY REVISED (2026-06-26): runtime-served client element (supersedes the SSR-splice tasks)
+
+Tauri is CSR, so the omnibar is delivered as a runtime-served self-contained vanilla web-component ELEMENT (client-rendered in browser, /deliver, and Tauri identically). Supersedes old T2-render / T3-splice / T4-dispatch.
+
+- **B-T1 (the element)** — self-mounts; acquires EPR context (inline `<script id=elohim-omni-context>` or fetch); renders the rich omnibar (ported from `omnibar.rs` design); themes from `metadata.theme` (base-palette fallback); folds in `omni-enhance.js` behavior; served content-addressed `/chrome/omni-element.{hash}.js`. [DISPATCHED]
+- **B-T2 (sidecar serving)** — add the `/chrome` route to the elohim-storage sidecar (the device peer runtime serves the element to its local Tauri webview + connecting peers); mirror doorway `routes/chrome.rs` + the `is_service_path` guard; gate with the peer render-capability (runtime-layer enable/disable).
+- **B-T3 (references)** — doorway injects the inline EPR context + the element `<script>` into SSR'd HTML (replaces the splice); the Tauri SPA `app/elohim-app/src/index.html` references the local sidecar's `/chrome` element.
+- **B-T7 (review)** — whole-branch review (JS XSS escaping, context-acquisition, the `/chrome` exception, dual-serving); a2o visual regression post-deploy.
+
+REUSE: T1 (theme), T5 (/chrome route + content-addressing + behavior JS), T6 (both omnibars deleted; /deliver resolved by B).
+DEFER: old T2 Rust render = the element's reference design + the future SSR-first-paint runtime toggle.

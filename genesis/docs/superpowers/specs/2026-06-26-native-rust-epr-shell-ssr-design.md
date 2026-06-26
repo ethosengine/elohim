@@ -178,3 +178,11 @@ No `GET /api/v1/thing` is added: the engine consumes the existing content-row fe
 ## 11. Relationship to the predecessor spec
 
 `2026-06-24-ssr-bundle-substrate-content-decouple-design.md` made both bundles content-addressed substrate artifacts materialized at boot. **V8 materialize-at-boot is retained.** This spec (a) adds the native, EPR-agnostic composition layer, (b) lifts the omnibar out of the app bundle into runtime chrome, (c) introduces the EPR theme declaration, and (d) **corrects the predecessor's two-row model** — the server bundle collapses from a sibling `-ssr` content row into a field on the one EPR node, which dissolves the per-host `-ssr` 404 that this incident exposed. The remaining per-host blob publish is named MVP scaffold toward `2026-05-11-tiered-quilt-stewardship-design.md`.
+
+## Delivery revision (2026-06-26): omnibar as a runtime-served CLIENT ELEMENT
+
+§4.1's SSR-splice composition is **superseded for the omnibar** (the Phase-1 row collapse + the EPR-nature×peer-capability framing stand). **Rationale:** Tauri is CSR — it loads the static SPA and uses the local sidecar for data only — so a server-spliced omnibar cannot bridge native↔web. **Delivery:** the omnibar is a runtime-served, self-contained **vanilla web-component element**, served content-addressed at `/chrome/` by BOTH the doorway AND the device's own elohim-storage sidecar (the device IS a peer; its runtime serves the wrapper to its local Tauri webview AND to connecting peers — **enabled/disabled at the runtime layer** via the `RenderCapabilityProfile` seam). Referenced by one `<script>` in any HTML (the doorway injects it + an inline EPR context into SSR'd pages; the Tauri SPA `index.html` references the local sidecar's `/chrome`). It renders **client-side**, themed from the wrapped EPR's `metadata.theme`. Covers browser + `/deliver` (CSR) + Tauri identically.
+
+**Future (runtime-layer toggle):** SSR-first-paint — server-emit the omnibar's initial markup (the Rust `omnibar.rs` render) where the peer is capable, the element hydrates; client-render everywhere else.
+
+**Long-term TODO:** offload the web2.0 wrapper to a fully on-device **native counterpart** (Tauri-native trust/EPR-nav UI) via a runtime flag — `genesis/data/timeline/backlog/omnibar-native-on-device-counterpart.md`.
