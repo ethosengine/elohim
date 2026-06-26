@@ -21,7 +21,7 @@
 #![cfg(feature = "ssr")]
 
 use async_trait::async_trait;
-use elohim_render::{materialize_bundle, AngularRenderer, BundleSource, DataFetcher};
+use elohim_render::{materialize_server_bundle, AngularRenderer, BundleSource, DataFetcher};
 use elohim_render::{FetchRequest, FetchResponse, RenderContext};
 use elohim_render::{RenderError, RenderSpec, Renderer};
 use std::path::PathBuf;
@@ -50,13 +50,17 @@ impl SsrState {
     /// ## Materialize-first (substrate self-serve)
     ///
     /// When `SSR_BUNDLE_SLUG` is also set, the bundle is fetched from this peer's
-    /// OWN content + blob surface (resolve slug → `blobHash`, fetch the blob,
-    /// verify integrity, unzip) into the parent directory of `SSR_BUNDLE_PATH`
-    /// BEFORE the renderer is built. This lets a peer render its own SPA directly
-    /// without a pre-baked bundle on disk — the p2p-native analogue of doorway's
-    /// `init_renderer` materialize step. On any materialization error we `warn!`
-    /// and return `None` (SSR degraded, never a crash) — same graceful-degrade
-    /// contract as a missing/corrupt bundle.
+    /// OWN content + blob surface (resolve slug → `serverBlobHash`, fetch the
+    /// blob, verify integrity, unzip) into the parent directory of
+    /// `SSR_BUNDLE_PATH` BEFORE the renderer is built. The resolved pointer is the
+    /// **server** bundle (`serverBlobHash` on the one EPR node), not the browser
+    /// bundle (`blobHash`) — the SSR runtime renders the Angular *server* output.
+    /// This lets a peer render its own SPA directly without a pre-baked bundle on
+    /// disk — the p2p-native analogue of doorway's `init_renderer` materialize
+    /// step. On any materialization error (including an absent `serverBlobHash`,
+    /// the mid-transition migration-safe case) we `warn!` and return `None` (SSR
+    /// degraded, never a crash) — same graceful-degrade contract as a
+    /// missing/corrupt bundle.
     pub fn from_env() -> Option<Self> {
         let path = std::env::var("SSR_BUNDLE_PATH").ok()?;
 
@@ -71,7 +75,7 @@ impl SsrState {
                 .or_else(|_| std::env::var("STORAGE_URL"))
                 .unwrap_or_else(|_| "http://localhost:8090".to_string());
             let src = LocalBundleSource::new(storage_base);
-            match materialize_bundle(&src, &slug, target_dir) {
+            match materialize_server_bundle(&src, &slug, target_dir) {
                 Ok(materialized) => {
                     tracing::info!(
                         target: "elohim_storage::ssr",
@@ -143,7 +147,8 @@ impl DataFetcher for LocalFetcher {
 
 /// Implements `elohim_render::BundleSource` by hitting this peer's OWN storage
 /// HTTP surface synchronously (blocking reqwest): resolve a deployment slug to a
-/// content-addressed `blobHash` via `GET /db/content/{slug}`, then fetch the raw
+/// content-addressed hash via `GET /db/content/{slug}` — `blobHash` for the
+/// browser bundle, `serverBlobHash` for the server bundle — then fetch the raw
 /// bytes via `GET /blob/{hash}`.
 ///
 /// ## v1 limitation — loopback HTTP, not in-process
@@ -156,7 +161,8 @@ impl DataFetcher for LocalFetcher {
 /// localhost round-trip at boot (at most once per process startup, never per
 /// render), and it requires the HTTP server to be accepting on the base URL when
 /// `from_env()` runs. When an ergonomic in-process accessor is exposed, switch
-/// `resolve_blob_hash`/`fetch_blob` to call it and drop the HTTP hop.
+/// `resolve_blob_hash`/`resolve_server_blob_hash`/`fetch_blob` to call it and
+/// drop the HTTP hop.
 ///
 /// ## Async-caller safety
 ///
@@ -211,6 +217,34 @@ impl BundleSource for LocalBundleSource {
         parse_blob_hash(&result?)
     }
 
+    fn resolve_server_blob_hash(&self, slug: &str) -> elohim_render::Result<String> {
+        // Mirrors `resolve_blob_hash` exactly (same loopback GET, same dedicated-
+        // OS-thread isolation so `reqwest::blocking` can spin its own runtime) and
+        // differs only in parsing the **server** bundle pointer (`serverBlobHash`)
+        // instead of the browser pointer (`blobHash`) from the same response.
+        let url = format!("{}/db/content/{}", self.storage_base, slug);
+        let result = std::thread::spawn(move || {
+            let client = LocalBundleSource::make_client();
+            let resp = client.get(&url).send().map_err(|e| {
+                RenderError::Bootstrap(format!("resolve_server_blob_hash GET failed: {e}"))
+            })?;
+            let status = resp.status();
+            resp.error_for_status()
+                .map_err(|_| {
+                    RenderError::Bootstrap(format!(
+                        "resolve_server_blob_hash: HTTP {status} for slug `{url}`"
+                    ))
+                })?
+                .text()
+                .map_err(|e| {
+                    RenderError::Bootstrap(format!("resolve_server_blob_hash read body: {e}"))
+                })
+        })
+        .join()
+        .map_err(|_| RenderError::Bootstrap("resolve_server_blob_hash: thread panicked".into()))?;
+        parse_server_blob_hash(&result?)
+    }
+
     fn fetch_blob(&self, hash: &str) -> elohim_render::Result<Vec<u8>> {
         let url = format!("{}/blob/{}", self.storage_base, hash);
         std::thread::spawn(move || {
@@ -243,6 +277,24 @@ pub fn parse_blob_hash(body: &str) -> elohim_render::Result<String> {
         .and_then(|h| h.as_str())
         .map(|s| s.to_string())
         .ok_or_else(|| RenderError::Bootstrap("parse_blob_hash: missing `blobHash` field".into()))
+}
+
+/// Parse the `serverBlobHash` field from the JSON body of `GET /db/content/{slug}`.
+///
+/// The storage boundary is camelCase (see `views.rs`), so the field is
+/// `serverBlobHash`. This is the **server** bundle pointer on the one EPR node
+/// (alongside the browser `blobHash`). Absence is the migration-safe condition —
+/// it returns a clean `Err` so the caller degrades to CSR fallback, never panics.
+pub fn parse_server_blob_hash(body: &str) -> elohim_render::Result<String> {
+    let v: serde_json::Value = serde_json::from_str(body).map_err(|e| {
+        RenderError::Bootstrap(format!("parse_server_blob_hash: invalid JSON: {e}"))
+    })?;
+    v.get("serverBlobHash")
+        .and_then(|h| h.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| {
+            RenderError::Bootstrap("parse_server_blob_hash: missing `serverBlobHash` field".into())
+        })
 }
 
 // =============================================================================
@@ -315,6 +367,48 @@ mod tests {
     fn parse_blob_hash_invalid_json_returns_err() {
         let body = "not json at all";
         let result = parse_blob_hash(body);
+        assert!(result.is_err(), "invalid JSON should be Err, not panic");
+    }
+
+    // ── parse_server_blob_hash ───────────────────────────────────────────────
+    // Mirrors the parse_blob_hash tests for the SERVER bundle pointer. The
+    // discriminating case is `prefers_server_field_over_browser_field`: with both
+    // present the server parser MUST return `serverBlobHash`, never `blobHash`.
+
+    #[test]
+    fn parse_server_blob_hash_valid_returns_hash() {
+        let body =
+            r#"{"id":"my-spa","serverBlobHash":"sha256-server1","contentType":"epr-composite"}"#;
+        let result = parse_server_blob_hash(body);
+        assert_eq!(result.unwrap(), "sha256-server1");
+    }
+
+    #[test]
+    fn parse_server_blob_hash_prefers_server_field_over_browser_field() {
+        // The one EPR node carries both pointers; the server resolve must pick
+        // serverBlobHash, not the browser blobHash.
+        let body =
+            r#"{"id":"my-spa","blobHash":"sha256-browser","serverBlobHash":"sha256-server"}"#;
+        let result = parse_server_blob_hash(body);
+        assert_eq!(result.unwrap(), "sha256-server");
+    }
+
+    #[test]
+    fn parse_server_blob_hash_missing_field_returns_err() {
+        // Migration safety: absent serverBlobHash (e.g. only blobHash present) is a
+        // clean Err → CSR fallback, never a panic.
+        let body = r#"{"id":"my-spa","blobHash":"sha256-browser"}"#;
+        let result = parse_server_blob_hash(body);
+        assert!(
+            result.is_err(),
+            "missing serverBlobHash should be Err (CSR fallback)"
+        );
+    }
+
+    #[test]
+    fn parse_server_blob_hash_invalid_json_returns_err() {
+        let body = "not json at all";
+        let result = parse_server_blob_hash(body);
         assert!(result.is_err(), "invalid JSON should be Err, not panic");
     }
 
