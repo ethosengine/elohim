@@ -179,6 +179,27 @@ pub fn html_escape(raw: &str) -> String {
     out
 }
 
+/// Validate an `href` against a scheme allowlist, returning `Some(href)` when
+/// safe and `None` when it must be dropped.
+///
+/// Allows only same-origin-relative paths (`/…`, but not a scheme-relative
+/// `//host`) and `http:` / `https:` absolute URLs. Anything else —
+/// `javascript:`, `data:`, `vbscript:`, … — is rejected. The active paths feed
+/// hardcoded hrefs, but a future composition layer that derives an href from EPR
+/// data must not be able to slip a `javascript:` URL past [`html_escape`]
+/// (escaping the quotes does not neutralize the scheme).
+#[must_use]
+fn safe_href(raw: &str) -> Option<&str> {
+    if raw.starts_with('/') && !raw.starts_with("//") {
+        return Some(raw);
+    }
+    let lower = raw.to_ascii_lowercase();
+    if lower.starts_with("http:") || lower.starts_with("https:") {
+        return Some(raw);
+    }
+    None
+}
+
 /// Truncate a content address the way `protocol-omni`'s `shortCid` getter does:
 /// `<=20` chars passes through; longer becomes `head6…tail6` (joined by the
 /// ASCII `...` so the markup stays pure-ASCII; the original used `…`).
@@ -193,21 +214,76 @@ fn truncate_address(address: &str) -> String {
     format!("{head}...{tail}")
 }
 
-/// Bind a single `--omni-*` declaration line from a token value.
-fn var_line(name: &str, value: &str) -> String {
-    format!("  --omni-{name}: {value};\n")
+/// Whether a theme token value is safe to splice into a `--omni-*: <value>;`
+/// CSS declaration.
+///
+/// A token is read raw from the EPR content node's `metadata.theme` and emitted
+/// into a `<style>` (in the SSR path it is serialized straight into served
+/// HTML, so the stakes are higher than the client element's). Reject any value
+/// that could break out of the declaration or smuggle external/active content:
+/// a `;`, `}`, `{`, `<`, or `@` ends/escapes the declaration or rule, and
+/// `url(` / `expression(` pull in external/active content. Legitimate tokens
+/// (`rgba(...)`, `#hex`, named colors, the `0 1px 6px rgba(0,0,0,0.08)`
+/// box-shadow) contain none of these, so the deny-list passes them untouched.
+#[must_use]
+pub fn is_safe_token_value(value: &str) -> bool {
+    if value
+        .chars()
+        .any(|c| matches!(c, ';' | '{' | '}' | '<' | '@'))
+    {
+        return false;
+    }
+    let lower = value.to_ascii_lowercase();
+    // Match `url(` / `expression(` tolerating whitespace before the paren.
+    !contains_call(&lower, "url") && !contains_call(&lower, "expression")
+}
+
+/// True if `haystack` (already lowercased) contains `name` followed (after
+/// optional ASCII whitespace) by `(`.
+fn contains_call(haystack: &str, name: &str) -> bool {
+    let bytes = haystack.as_bytes();
+    let name = name.as_bytes();
+    let mut i = 0;
+    while let Some(pos) = haystack[i..].find(std::str::from_utf8(name).unwrap()) {
+        let mut j = i + pos + name.len();
+        while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+            j += 1;
+        }
+        if j < bytes.len() && bytes[j] == b'(' {
+            return true;
+        }
+        i += pos + name.len();
+    }
+    false
+}
+
+/// Bind a single `--omni-*` declaration line from a token value, falling back
+/// to `base_default` when the value fails the CSS-injection allowlist.
+fn var_line(name: &str, value: &str, base_default: &str) -> String {
+    let safe = if is_safe_token_value(value) {
+        value
+    } else {
+        base_default
+    };
+    format!("  --omni-{name}: {safe};\n")
 }
 
 /// Emit the seven `--omni-*` custom-property declarations for one token set.
+///
+/// Each value is validated against the CSS-value allowlist; a rejected value is
+/// replaced by the corresponding [`base_palette`] light default so an attacker
+/// token can never reach the served `<style>`.
 fn token_block(tokens: &ThemeTokens) -> String {
+    let base = base_palette();
+    let d = &base.light;
     let mut block = String::new();
-    block.push_str(&var_line("bg", &tokens.bg));
-    block.push_str(&var_line("fg", &tokens.fg));
-    block.push_str(&var_line("muted", &tokens.muted));
-    block.push_str(&var_line("border", &tokens.border));
-    block.push_str(&var_line("accent", &tokens.accent));
-    block.push_str(&var_line("shadow", &tokens.shadow));
-    block.push_str(&var_line("env-ring", &tokens.env_ring));
+    block.push_str(&var_line("bg", &tokens.bg, &d.bg));
+    block.push_str(&var_line("fg", &tokens.fg, &d.fg));
+    block.push_str(&var_line("muted", &tokens.muted, &d.muted));
+    block.push_str(&var_line("border", &tokens.border, &d.border));
+    block.push_str(&var_line("accent", &tokens.accent, &d.accent));
+    block.push_str(&var_line("shadow", &tokens.shadow, &d.shadow));
+    block.push_str(&var_line("env-ring", &tokens.env_ring, &d.env_ring));
     block
 }
 
@@ -400,14 +476,17 @@ aria-label=\"Elohim Protocol \u{2014} click for details\">\n"
         "  <div class=\"omni-toolbar\" role=\"region\" aria-label=\"Protocol context\">\n",
     );
 
-    // Back nav (server-known target only; plain link, no client router).
+    // Back nav (server-known target only; plain link, no client router). The
+    // href is scheme-validated — an unsafe scheme drops the affordance.
     if let Some(back) = &input.nav_back {
-        let href = html_escape(back.href);
-        let label = html_escape(back.label);
-        html.push_str(&format!(
-            "    <a href=\"{href}\" class=\"omni-nav omni-nav-back\" \
+        if let Some(safe) = safe_href(back.href) {
+            let href = html_escape(safe);
+            let label = html_escape(back.label);
+            html.push_str(&format!(
+                "    <a href=\"{href}\" class=\"omni-nav omni-nav-back\" \
 title=\"{label}\" aria-label=\"{label}\">\u{2190} {label}</a>\n"
-        ));
+            ));
+        }
     }
 
     // EPR group: copy-CID button + (optional) env-context badge.
@@ -453,20 +532,23 @@ title=\"Resilience snapshot unavailable\">\u{25C9}</span>\n",
     );
     html.push_str("    </span>\n");
 
-    // Forward nav (server-known target only).
+    // Forward nav (server-known target only; href scheme-validated).
     if let Some(forward) = &input.nav_forward {
-        let href = html_escape(forward.href);
-        let label = html_escape(forward.label);
-        html.push_str(&format!(
-            "    <a href=\"{href}\" class=\"omni-nav omni-nav-forward\" \
+        if let Some(safe) = safe_href(forward.href) {
+            let href = html_escape(safe);
+            let label = html_escape(forward.label);
+            html.push_str(&format!(
+                "    <a href=\"{href}\" class=\"omni-nav omni-nav-forward\" \
 title=\"{label}\" aria-label=\"{label}\">{label} \u{2192}</a>\n"
-        ));
+            ));
+        }
     }
 
     // Account link — always server-rendered; hidden (with the data-omni-account
     // hook) when the server doesn't know the session is authenticated, so JS may
     // reveal it. Mirrors protocol-omni's *ngIf="authenticated()".
-    let account_href = html_escape(input.account_href);
+    // Account link is always rendered; an unsafe href falls back to `/account`.
+    let account_href = html_escape(safe_href(input.account_href).unwrap_or("/account"));
     let hidden_attr = if input.authenticated { "" } else { " hidden" };
     html.push_str(&format!(
         "    <a href=\"{account_href}\" class=\"omni-account\" data-omni-account \
@@ -625,6 +707,132 @@ mod tests {
         assert!(
             css.contains("--omni-bg: rgba(22, 23, 28, 0.92);"),
             "css: {css}"
+        );
+    }
+
+    // ---- CSS-injection guard (is_safe_token_value / token_block fallback) ----
+
+    #[test]
+    fn safe_token_value_passes_legitimate_css() {
+        // Every legitimate token shape used by the base palette / EPR themes.
+        for v in [
+            "rgba(255, 255, 255, 0.92)",
+            "rgba(20, 22, 30, 0.96)",
+            "#d97706",
+            "#abcdef",
+            "rebeccapurple",
+            "0 1px 6px rgba(0, 0, 0, 0.08)",
+            "0 1px 6px rgba(0, 0, 0, 0.35)",
+        ] {
+            assert!(is_safe_token_value(v), "must pass: {v}");
+        }
+    }
+
+    #[test]
+    fn safe_token_value_rejects_injection_payloads() {
+        for v in [
+            "x; } body{display:none} .y{", // the review's canonical payload
+            "red}",
+            "red; color: blue",
+            "red<script>",
+            "@import 'evil'",
+            "url(http://evil)",
+            "URL ( javascript:alert(1) )", // case-insensitive + whitespace
+            "expression(alert(1))",
+            "EXPRESSION (alert(1))",
+        ] {
+            assert!(!is_safe_token_value(v), "must reject: {v}");
+        }
+    }
+
+    #[test]
+    fn style_rejects_malicious_token_falls_back_to_base_default() {
+        // An EPR theme whose `bg` token carries a CSS break-out payload.
+        let mut theme = sample_theme(ColorScheme::Light);
+        let payload = "x; } body{display:none} .y{".to_string();
+        theme.tokens.bg = payload.clone();
+        let input = input_with(Some(theme), None);
+        let css = render_omnibar_style(&input);
+
+        // The attacker value never reaches the served <style>.
+        assert!(
+            !css.contains(&payload),
+            "malicious token must not be emitted: {css}"
+        );
+        assert!(
+            !css.contains("body{display:none}"),
+            "break-out payload must not be emitted: {css}"
+        );
+        // bg falls back to the base-palette light default; the other (safe)
+        // theme tokens still bind normally.
+        assert!(
+            css.contains("--omni-bg: rgba(255, 255, 255, 0.92);"),
+            "rejected bg must fall back to base default: {css}"
+        );
+        assert!(
+            css.contains("--omni-env-ring: #abcdef;"),
+            "legitimate tokens still bind: {css}"
+        );
+    }
+
+    // ---- href scheme guard (safe_href) ----
+
+    #[test]
+    fn safe_href_allows_relative_and_http() {
+        assert_eq!(safe_href("/account"), Some("/account"));
+        assert_eq!(safe_href("/resource/abc"), Some("/resource/abc"));
+        assert_eq!(
+            safe_href("http://example.test/x"),
+            Some("http://example.test/x")
+        );
+        assert_eq!(
+            safe_href("https://example.test/x"),
+            Some("https://example.test/x")
+        );
+    }
+
+    #[test]
+    fn safe_href_rejects_dangerous_schemes() {
+        assert_eq!(safe_href("javascript:alert(1)"), None);
+        assert_eq!(safe_href("JavaScript:alert(1)"), None);
+        assert_eq!(safe_href("data:text/html,<script>x</script>"), None);
+        assert_eq!(safe_href("vbscript:msgbox"), None);
+        // scheme-relative `//host` is NOT a same-origin path.
+        assert_eq!(safe_href("//evil.example"), None);
+    }
+
+    #[test]
+    fn markup_drops_nav_with_javascript_href() {
+        let mut input = input_with(None, None);
+        input.nav_back = Some(NavTarget {
+            href: "javascript:alert(1)",
+            label: "Back",
+        });
+        let html = render_omnibar_markup(&input);
+        // The unsafe nav affordance is dropped entirely.
+        assert!(
+            !html.contains("javascript:alert(1)"),
+            "javascript: href must not be rendered: {html}"
+        );
+        assert!(
+            !html.contains("omni-nav-back"),
+            "unsafe nav-back affordance must be dropped: {html}"
+        );
+    }
+
+    #[test]
+    fn markup_account_href_falls_back_on_unsafe_scheme() {
+        let mut input = input_with(None, None);
+        input.account_href = "javascript:alert(1)";
+        let html = render_omnibar_markup(&input);
+        assert!(
+            !html.contains("javascript:alert(1)"),
+            "javascript: account href must not be rendered: {html}"
+        );
+        // The always-rendered account link falls back to the safe default.
+        assert!(
+            html.contains("href=\"/account\" class=\"omni-account\""),
+            "account href must fall back to /account: {html}"
         );
     }
 

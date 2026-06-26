@@ -544,13 +544,14 @@ pub fn run() {
                                 // The doorway already injects omni-element.js into SSR'd HTML for the
                                 // browser path — this block covers the Tauri webview only.
                                 //
-                                // Guard: skip if the element is already registered (idempotent) or if
-                                // a loader script is already present (e.g. dev hot-reload double-fire).
+                                // Guard: skip if a loader script is already present (e.g. dev
+                                // hot-reload double-fire). The element self-mounts a
+                                // <div id="elohim-omni"> — it is NOT a registered custom element
+                                // (it never customElements.define()s a tag), so the loader-script
+                                // marker (plus the element's own getElementById mount-check) is the
+                                // real idempotency guard.
                                 (function() {{
-                                    if (
-                                        (typeof customElements !== 'undefined' && customElements.get('elohim-omni-bar')) ||
-                                        document.querySelector('script[data-elohim-omni]')
-                                    ) {{
+                                    if (document.querySelector('script[data-elohim-omni]')) {{
                                         console.log('[STEWARD] omni-element already present, skipping loader');
                                         return;
                                     }}

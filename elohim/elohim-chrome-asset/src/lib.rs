@@ -236,6 +236,32 @@ mod tests {
         );
     }
 
+    #[test]
+    fn element_carries_the_css_injection_and_href_guards() {
+        // The token-value CSS-injection guard and the href scheme allowlist are
+        // load-bearing XSS guards baked into the served JS. These string anchors
+        // ensure a refactor cannot silently drop them (the JS has no in-tree
+        // engine test; the behavioral proof lives in elohim-render's Rust twin).
+        assert!(
+            ELEMENT_JS.contains("isSafeTokenValue"),
+            "missing CSS-value allowlist guard"
+        );
+        assert!(
+            ELEMENT_JS.contains("safeHref"),
+            "missing href scheme allowlist guard"
+        );
+        // The token guard must reject the structural break-out / active-content
+        // chars and fall back to the base palette.
+        assert!(
+            ELEMENT_JS.contains("[;{}<@]"),
+            "token guard must deny the structural break-out chars"
+        );
+        assert!(
+            ELEMENT_JS.contains("expression"),
+            "token guard must deny expression("
+        );
+    }
+
     // ── inject_element ──────────────────────────────────────────────────────
 
     #[test]

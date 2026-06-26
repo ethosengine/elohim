@@ -47,6 +47,22 @@
       .replace(/'/g, '&#x27;');
   }
 
+  // ── safeHref (port of omnibar.rs::safe_href — scheme allowlist) ─────────────
+  // Allow only same-origin-relative (`/…`) or http(s) absolute hrefs. Anything
+  // else — `javascript:`, `data:`, `vbscript:`, a scheme-relative `//host` — is
+  // dropped to the supplied safe default (or `null` to omit the link). Defensive:
+  // the active paths hardcode these, but a future composition layer that feeds an
+  // EPR-derived href must not be able to smuggle `javascript:` past htmlEscape.
+  function safeHref(raw, fallback) {
+    var fb = fallback === undefined ? '/' : fallback;
+    if (raw == null) return fb;
+    var s = String(raw);
+    // Same-origin-relative path (but not a scheme-relative `//host`).
+    if (s.charAt(0) === '/' && s.charAt(1) !== '/') return s;
+    if (/^https?:/i.test(s)) return s;
+    return fb;
+  }
+
   // ── truncate_address (port of omnibar.rs: <=20 passthrough; head6...tail6) ──
   function truncateAddress(address) {
     var s = String(address == null ? '' : address);
@@ -142,6 +158,22 @@
     '#elohim-omni .omni-resilience-neutral { font-size: 12px; line-height: 1; }\n' +
     '#elohim-omni .omni-collapse { margin-left: auto; }\n';
 
+  // ── CSS-value allowlist (port of omnibar.rs::is_safe_token_value) ───────────
+  // A theme token is read raw from the EPR content node's metadata.theme and
+  // spliced into a client-side <style>. Reject any value that could break out of
+  // the `--omni-*: <value>;` declaration or smuggle a fetch/expression: a `;`,
+  // `}`, `{`, `<`, or `@` ends/escapes the declaration or rule, and `url(` /
+  // `expression(` pull in external/active content. Legitimate tokens
+  // (`rgba(...)`, `#hex`, named colors, the `0 1px 6px rgba(0,0,0,0.08)`
+  // box-shadow) contain none of these, so the deny-list passes them untouched.
+  function isSafeTokenValue(value) {
+    if (typeof value !== 'string') return false;
+    if (/[;{}<@]/.test(value)) return false;
+    if (/url\s*\(/i.test(value)) return false;
+    if (/expression\s*\(/i.test(value)) return false;
+    return true;
+  }
+
   // ── Token-block / style synthesis (port of render_omnibar_style) ────────────
   function tokenBlock(tokens, indent) {
     var pad = indent || '  ';
@@ -150,6 +182,8 @@
       var suffix = TOKEN_VARS[i][0];
       var field = TOKEN_VARS[i][1];
       var value = tokens && tokens[field] != null ? tokens[field] : BASE_PALETTE.light[field];
+      // Reject an unsafe token value (CSS-injection guard) → base-palette default.
+      if (!isSafeTokenValue(value)) value = BASE_PALETTE.light[field];
       out += pad + '--omni-' + suffix + ': ' + value + ';\n';
     }
     return out;
@@ -250,8 +284,9 @@
 
     // Back nav (server-known target only; plain link, no client router).
     var navBack = ctx.navBack;
-    if (navBack && navBack.href) {
-      var bh = htmlEscape(navBack.href);
+    var navBackHref = navBack ? safeHref(navBack.href, null) : null;
+    if (navBackHref) {
+      var bh = htmlEscape(navBackHref);
       var bl = htmlEscape(navBack.label || '');
       html +=
         '<a href="' +
@@ -303,8 +338,9 @@
 
     // Forward nav (server-known target only).
     var navFwd = ctx.navForward;
-    if (navFwd && navFwd.href) {
-      var fh = htmlEscape(navFwd.href);
+    var navFwdHref = navFwd ? safeHref(navFwd.href, null) : null;
+    if (navFwdHref) {
+      var fh = htmlEscape(navFwdHref);
       var fl = htmlEscape(navFwd.label || '');
       html +=
         '<a href="' +
@@ -319,7 +355,7 @@
     }
 
     // Account link — hidden + data-omni-account hook when unauthenticated.
-    var accountHref = htmlEscape(ctx.accountHref || '/account');
+    var accountHref = htmlEscape(safeHref(ctx.accountHref || '/account', '/account'));
     var hiddenAttr = ctx.authenticated ? '' : ' hidden';
     html +=
       '<a href="' +

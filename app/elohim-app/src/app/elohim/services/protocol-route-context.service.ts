@@ -9,7 +9,7 @@ import { filter } from 'rxjs/operators';
  * (params.resourceId, or data.fallbackCid when the route has no param —
  * e.g. the root landing route).
  *
- * The ProtocolOmniComponent mounts in the app shell gated by these
+ * The runtime omnibar element mounts in the app shell gated by these
  * signals so non-protocol routes (admin, settings, auth flows) don't
  * carry the chrome.
  */

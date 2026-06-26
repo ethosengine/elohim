@@ -11,7 +11,7 @@ import { SessionNavStackService } from './session-nav-stack.service';
 
 /**
  * Composes SessionNavStack (visitor history) and EprNavContext (substrate
- * adjacency) into unified back/forward affordances for ProtocolOmniComponent.
+ * adjacency) into unified back/forward affordances for the runtime omnibar element.
  *
  * Composition rule:
  *   - back():   session-previous if present, else EPR prev, else null.

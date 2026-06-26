@@ -12,7 +12,7 @@ export interface NavStackEntry {
 
 /**
  * Visitor's in-protocol route history. sessionStorage-backed.
- * Powers the back affordance on ProtocolOmniComponent when the visitor
+ * Powers the back affordance on the runtime omnibar element when the visitor
  * walked through the protocol to get here; empty on cold anonymous hit.
  */
 @Injectable({ providedIn: 'root' })
