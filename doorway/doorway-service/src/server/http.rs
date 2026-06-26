@@ -3710,7 +3710,12 @@ async fn handle_request(
                     // safe ONLY because a gated write (`POST /db/content*`) never
                     // classifies as SsrRoute: those routes carry no server-controlled
                     // render_spec. A gated write must NEVER be allowed to reach here.
-                    // Enforced by `gated_writes_classify_as_storage_proxy_not_ssr`.
+                    // `gated_writes_classify_as_storage_proxy_not_ssr` pins the
+                    // classify BRANCH-contract (a storage route with no render_spec
+                    // → StorageProxy) against a synthetic registry; the LIVE guarantee
+                    // rests on the manifest never attaching a render_spec to
+                    // /db/content* — if it ever does, hoist the gate into
+                    // forward_to_storage rather than relying on this arm.
                     // Do NOT duplicate the gate logic here; keep gated writes out.
                     //
                     // Auth-mode enforcement: if the doorway publishes a
