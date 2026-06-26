@@ -60,7 +60,7 @@
     "seed:household": "npx tsx src/seed-household-formation.ts",
     "seed:household:dev": "CONDUCTOR_URLS='ws://localhost:4445' npx tsx src/seed-household-formation.ts",
     "seed:delegates": "npx tsx src/seed-delegates-compute.ts",
-    "seed:delegates:dev": "STORAGE_URL='https://doorway-alpha.elohim.host' npx tsx src/seed-delegates-compute.ts",
+    "seed:delegates:dev": "STORAGE_URL='https://storage-alpha.elohim.host' npx tsx src/seed-delegates-compute.ts",
     "seed:test-admin": "npx tsx src/seed-test-admin.ts",
     "seed:test-admin:dev": "ADMIN_PROXY_URL='https://doorway-alpha.elohim.host' npx tsx src/seed-test-admin.ts",
     "generate:devices": "tsx src/generate-devices-json.ts",
