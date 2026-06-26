@@ -82,9 +82,11 @@ struct AuthorizeOperationResponse {
 /// `POST /api/v1/authorize-operation`
 ///
 /// Delegates to [`authorize_operation`] with the wall-clock `now` as `signed_at`.
-/// Returns 200 + verdict for both allowed and denied outcomes; 503 only on
-/// pool/infra failure (which the service maps to `allowed:false` internally —
-/// so 503 here means the service layer itself panicked or pool was None).
+/// Always returns **200 + verdict** for both allowed and denied outcomes:
+/// `authorize_operation` never returns `Err` — every infra failure (pool
+/// unavailable, fetch breakdown) maps to `allowed:false` with a diagnostic
+/// `reason`, so the gate is fail-closed and the handler still answers 200. The
+/// only non-200 path is a malformed request body, surfaced by `parse_body`.
 ///
 /// Deliberately **NOT** registered in `build_manifest()` (Review C6).
 pub async fn handle(

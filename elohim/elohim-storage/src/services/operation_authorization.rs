@@ -28,6 +28,7 @@ use crate::db::DbPool;
 use crate::services::bounds_validator::{validate, EventForValidation};
 use crate::services::commitment_fetcher::ProjectionCommitmentFetcher;
 use crate::services::rate_history::DieselRateHistory;
+use elohim_views::bounds::ViolationKind;
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -138,13 +139,34 @@ pub async fn authorize_operation(
             commitment_cid: Some(commitment.cid),
             reason: "ok".into(),
         },
-        Err(v) => deny(Some(commitment.cid), format!("{v:?}")),
+        // Map to a short stable code — never `{v:?}`-dump the full BoundsViolation
+        // (commitment CIDs + the entire check trail) into the storage 200-body
+        // and the doorway log (Review C5: commitment internals stay server-side).
+        Err(v) => deny(Some(commitment.cid), violation_code(&v.kind).to_string()),
     }
 }
 
 // ---------------------------------------------------------------------------
 // Internal helper
 // ---------------------------------------------------------------------------
+
+/// Stable, internals-free diagnostic vocabulary for a bounds violation.
+///
+/// One short code per [`ViolationKind`] — enough to know *why* a deny happened
+/// without leaking the commitment CID or the partial check trail that
+/// `format!("{v:?}")` would dump.
+fn violation_code(kind: &ViolationKind) -> &'static str {
+    match kind {
+        ViolationKind::CommitmentNotFound => "commitment-not-found",
+        ViolationKind::CommitmentRevoked => "commitment-revoked",
+        ViolationKind::CommitmentInactive => "commitment-inactive",
+        ViolationKind::ScopeNotIncluded => "scope-not-included",
+        ViolationKind::ReachCeilingExceeded => "reach-ceiling-exceeded",
+        ViolationKind::RateLimitExceeded => "rate-limit-exceeded",
+        ViolationKind::KeyRotationStale => "key-rotation-stale",
+        ViolationKind::ConstitutionalRatioBreach => "constitutional-ratio-breach",
+    }
+}
 
 fn deny(cid: Option<String>, reason: String) -> AuthorizeOperationResult {
     AuthorizeOperationResult {

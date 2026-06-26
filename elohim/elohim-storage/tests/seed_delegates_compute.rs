@@ -175,6 +175,64 @@ fn seed_delegates_compute_revoke_sets_revoked_at() {
 }
 
 // ---------------------------------------------------------------------------
+// Test 2b: re-seed AFTER revoke must be refused (revoke is terminal for dev-seed)
+// ---------------------------------------------------------------------------
+
+/// Idempotency footgun guard: the dev seeder is advertised idempotent and its CID
+/// is deterministic, so a re-run of `seed:delegates` AFTER `{revoke:true}` would
+/// silently un-revoke the grant via the shared `upsert_with_anchor`. `perform_seed`
+/// must refuse: re-seeding a revoked row returns `Err` and the row stays revoked.
+#[test]
+fn seed_delegates_compute_reseed_after_revoke_refused() {
+    let _g = SEED_FLAG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::env::set_var("ALLOW_SEED_DELEGATES_COMPUTE", "1");
+
+    let pool = test_pool();
+    let mut conn = pool.get().expect("pool connection");
+
+    let cid = "commitment:che-opgate-reseed-after-revoke-001";
+    let input = SeedDelegatesInput {
+        cid,
+        scope: SCOPE,
+        provider: PROVIDER,
+        recipient: RECIPIENT,
+        bounds_json: BOUNDS_JSON,
+        valid_from: VALID_FROM,
+        valid_until: VALID_UNTIL,
+    };
+
+    // 1. Seed (active).
+    perform_seed(&mut conn, &input).expect("initial seed must succeed");
+
+    // 2. Revoke via the real revoke path.
+    let ts = "2026-07-01T12:00:00Z";
+    mishpat_commitments::set_revoked_at(&mut conn, cid, ts).expect("set_revoked_at must succeed");
+
+    // 3. Re-seed: must be REFUSED (revoke is terminal for dev-seed).
+    let err = perform_seed(&mut conn, &input)
+        .expect_err("re-seeding a revoked row must return Err, not silently reactivate");
+    let msg = format!("{err:?}");
+    assert!(
+        msg.contains("revoked"),
+        "error must explain the revocation refusal; got: {msg}"
+    );
+
+    // 4. The row stays revoked and is NOT reactivated.
+    let post = mishpat_commitments::get_by_cid(&mut conn, cid)
+        .expect("get_by_cid post-reseed")
+        .expect("row must still exist");
+    assert!(
+        post.revoked_at.is_some(),
+        "revoked_at must remain non-NULL after the refused re-seed"
+    );
+    assert_eq!(
+        post.revoked_at.as_deref(),
+        Some(ts),
+        "revoked_at must equal the original revoke timestamp (not reset by re-seed)"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Test 3: flag UNSET → is_seed_allowed() returns false, no row written
 // ---------------------------------------------------------------------------
 

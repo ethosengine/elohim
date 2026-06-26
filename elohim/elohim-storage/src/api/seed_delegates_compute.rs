@@ -90,6 +90,26 @@ pub fn perform_seed(
     conn: &mut diesel::SqliteConnection,
     input: &SeedDelegatesInput<'_>,
 ) -> Result<crate::db::models::MishpatCommitment, StorageError> {
+    // Revoke is TERMINAL for dev-seed.  `upsert_with_anchor` is the SHARED
+    // DHT-projection upsert and correctly mirrors a re-activation when real DHT
+    // truth says so — but the dev seeder is advertised idempotent and its CID is
+    // deterministic, so a re-run of `seed:delegates` AFTER `{revoke:true}` would
+    // silently un-revoke the grant (do_update resets revoked_at=None,
+    // state="active").  For a gate whose revocation story is "deny the next
+    // request," that is a footgun.  Refuse to reactivate a revoked row here, at
+    // the dev-seed layer, without touching the shared projection upsert.
+    if let Some(existing) = db::mishpat_commitments::get_by_cid(conn, input.cid)
+        .map_err(|e| StorageError::Internal(format!("get_by_cid: {e}")))?
+    {
+        if existing.revoked_at.is_some() {
+            return Err(StorageError::InvalidInput(format!(
+                "delegates-compute {} is revoked; refusing to reactivate via re-seed \
+                 (revoke is terminal for dev-seed)",
+                input.cid
+            )));
+        }
+    }
+
     let anchor =
         crate::p2p::identity_handshake::synthesise_dht_anchor_hash(input.recipient, input.cid);
 
