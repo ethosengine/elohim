@@ -10,25 +10,25 @@ import {
   type ShapeEntry,
 } from '../build-resource-shape-report.js';
 
-describe('classifyResource', () => {
-  it('classifies an OOM/memory incident', () => {
+void describe('classifyResource', () => {
+  void it('classifies an OOM/memory incident', () => {
     const classes = classifyResource('jessica edgenode OOMKilled at the memcg limit', ['oom']);
     assert.ok(classes.includes('memory'));
   });
 
-  it('classifies a reconnect-storm as sessions', () => {
+  void it('classifies a reconnect-storm as sessions', () => {
     const classes = classifyResource('conductor closing app-ws sessions ~40/min', ['reconnect']);
     assert.ok(classes.includes('sessions'));
   });
 
-  it('classifies an arc/dht working-set incident', () => {
+  void it('classifies an arc/dht working-set incident', () => {
     const classes = classifyResource('per-node RAM tracks the full authority arc DHT working set', [
       'gossip',
     ]);
     assert.ok(classes.includes('arc-dht'));
   });
 
-  it('classifies a crash-loop/liveness incident as runtime-sched', () => {
+  void it('classifies a crash-loop/liveness incident as runtime-sched', () => {
     const classes = classifyResource(
       'doorway crash-loop: liveness watchdog SIGKILL on a wedged runtime',
       ['crash-loop']
@@ -36,7 +36,7 @@ describe('classifyResource', () => {
     assert.ok(classes.includes('runtime-sched'));
   });
 
-  it('returns empty for an unrelated entry', () => {
+  void it('returns empty for an unrelated entry', () => {
     assert.deepEqual(
       classifyResource('add a new content type to the lamad manifest', ['lamad']),
       []
@@ -44,18 +44,18 @@ describe('classifyResource', () => {
   });
 });
 
-describe('documentedTunablesFor', () => {
-  it('maps db-pool to STORAGE_DB_POOL_SIZE', () => {
+void describe('documentedTunablesFor', () => {
+  void it('maps db-pool to STORAGE_DB_POOL_SIZE', () => {
     assert.deepEqual(documentedTunablesFor(['db-pool']), ['STORAGE_DB_POOL_SIZE']);
   });
-  it('dedupes across multiple classes', () => {
+  void it('dedupes across multiple classes', () => {
     const t = documentedTunablesFor(['cpu', 'memory']);
     assert.ok(t.includes('deployments.json edgenodeCpuLimit'));
     assert.ok(t.includes('deployments.json edgenodeMemoryLimit'));
   });
 });
 
-describe('parseFrontmatter', () => {
+void describe('parseFrontmatter', () => {
   const md = [
     '---',
     'slug: "matthew-edge-storm"',
@@ -75,7 +75,7 @@ describe('parseFrontmatter', () => {
     'tune the pool.',
   ].join('\n');
 
-  it('parses scalars and inline arrays', () => {
+  void it('parses scalars and inline arrays', () => {
     const fm = parseFrontmatter(md)!;
     assert.equal(fm.slug, 'matthew-edge-storm');
     assert.equal(fm.severity, 'high');
@@ -85,18 +85,18 @@ describe('parseFrontmatter', () => {
     assert.deepEqual(fm.fingerprints, []);
   });
 
-  it('extracts the "What is exhausted" paragraph', () => {
+  void it('extracts the "What is exhausted" paragraph', () => {
     const t = exhaustedText(md)!;
     assert.ok(t.includes('app-ws sessions'));
     assert.ok(!t.includes('Fix path'));
   });
 
-  it('returns null without frontmatter', () => {
+  void it('returns null without frontmatter', () => {
     assert.equal(parseFrontmatter('# no frontmatter here'), null);
   });
 });
 
-describe('buildShape', () => {
+void describe('buildShape', () => {
   const entries: ShapeEntry[] = [
     {
       slug: 'a',
@@ -124,7 +124,7 @@ describe('buildShape', () => {
     },
   ];
 
-  it('builds a node×class matrix and lifecycle tallies', () => {
+  void it('builds a node×class matrix and lifecycle tallies', () => {
     const shape = buildShape(entries);
     assert.equal(shape.matrix.cells['matthew']['sessions'], 1);
     assert.equal(shape.matrix.cells['matthew']['db-pool'], 1);

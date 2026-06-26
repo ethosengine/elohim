@@ -183,7 +183,7 @@ void describe('sheetHtml', () => {
 // sibling of the default/designed family sections)
 // ---------------------------------------------------------------------------
 
-describe('sheetHtml viewport bands', () => {
+void describe('sheetHtml viewport bands', () => {
   const entries: StoryEntry[] = [
     {
       id: 'default-core-elohim-hypercard-panel--standard',
@@ -200,7 +200,7 @@ describe('sheetHtml viewport bands', () => {
     cols: 3,
   };
 
-  it('renders one band per viewport with iframes at the TRUE archetype size', () => {
+  void it('renders one band per viewport with iframes at the TRUE archetype size', () => {
     const html = sheetHtml({
       ...baseOpts,
       viewports: [
@@ -219,7 +219,7 @@ describe('sheetHtml viewport bands', () => {
     assert.ok(/scale\(0\.3\d+\)/.test(html), 'desktop iframe scaled to cell width');
   });
 
-  it('keeps the single-grid shape when viewports are absent', () => {
+  void it('keeps the single-grid shape when viewports are absent', () => {
     const html = sheetHtml(baseOpts);
     assert.ok(!html.includes('class="band"'), 'no viewport bands');
     assert.ok(html.includes(`width="420"`), 'iframe at cell width');

@@ -32,7 +32,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
-const base = (process.argv[2] ?? 'https://doorway-alpha.elohim.host').replace(/\/+$/, '');
+let base = process.argv[2] ?? 'https://doorway-alpha.elohim.host';
+while (base.endsWith('/')) base = base.slice(0, -1);
 const outDir = resolve('reports/look/doorway-membrane');
 const TIMEOUT_MS = 15_000;
 
@@ -72,7 +73,7 @@ function readCounter(metricsBody: string, series: string, verdictLabel?: string)
     if (line.startsWith('#') || !line.startsWith(series)) continue;
     // The line is either `series value` (unlabelled gauge) or `series{...} value`.
     const after = line.slice(series.length);
-    if (after.length > 0 && after[0] !== ' ' && after[0] !== '{') continue; // a longer metric name sharing the prefix
+    if (after.length > 0 && !after.startsWith(' ') && !after.startsWith('{')) continue; // a longer metric name sharing the prefix
     if (verdictLabel !== undefined && !after.includes(`verdict="${verdictLabel}"`)) continue;
     const value = Number(line.trim().split(/\s+/).pop());
     if (!Number.isNaN(value)) total = (total ?? 0) + value;
@@ -92,7 +93,8 @@ async function main(): Promise<void> {
 
   const record = (name: string, ok: boolean | null, detail: string): void => {
     result.checks.push({ name, ok, detail });
-    result.notes.push(`${ok === null ? 'SKIP' : ok ? 'PASS' : 'FAIL'} ${name}: ${detail}`);
+    const okLabel = ok ? 'PASS' : 'FAIL';
+    result.notes.push(`${ok === null ? 'SKIP' : okLabel} ${name}: ${detail}`);
     if (ok === false) result.pass = false;
   };
 

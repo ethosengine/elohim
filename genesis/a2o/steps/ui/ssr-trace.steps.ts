@@ -80,7 +80,12 @@ async function captureRaw(world: E2EWorld, path: string): Promise<void> {
     headerMap[k] = Array.isArray(v) ? v.join(', ') : (v ?? '');
   }
 
-  const capture: SsrCapture = { status: statusCode, headers: headerMap, body: bodyText, durationMs };
+  const capture: SsrCapture = {
+    status: statusCode,
+    headers: headerMap,
+    body: bodyText,
+    durationMs,
+  };
   world.contentIds.set(SSR_CAPTURE_KEY, JSON.stringify(capture));
 }
 
@@ -105,8 +110,7 @@ function headerValue(capture: SsrCapture, headerName: string): string | undefine
 When(
   'the raw HTTP response for an SSR route whose upstream returns no content is captured',
   async function (this: E2EWorld) {
-    const path =
-      process.env['E2E_SSR_EMPTY_ROUTE'] ?? '/lamad/concept/__a2o_nonexistent_concept__';
+    const path = process.env['E2E_SSR_EMPTY_ROUTE'] ?? '/lamad/concept/__a2o_nonexistent_concept__';
     await captureRaw(this, path);
   }
 );
@@ -176,7 +180,8 @@ Then(
 Then('the raw HTTP response body contains the CSR shell fallback', function (this: E2EWorld) {
   const capture = storedCapture(this);
   const hasEmptyAppRoot =
-    capture.body.includes('<app-root></app-root>') || /<app-root>\s*<\/app-root>/.test(capture.body);
+    capture.body.includes('<app-root></app-root>') ||
+    /<app-root>\s*<\/app-root>/.test(capture.body);
   assert.ok(
     hasEmptyAppRoot,
     'Expected the CSR shell fallback (empty <app-root>) in the response body.\n' +

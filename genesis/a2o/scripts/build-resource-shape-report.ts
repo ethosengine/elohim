@@ -158,7 +158,7 @@ function stripQuotes(s: string): string {
 
 /** Parse an inline `[a, b, "c"]` array; returns [] for `[]` or absent. */
 function parseInlineArray(v: string): string[] {
-  const m = v.match(/^\[(.*)\]$/s);
+  const m = /^\[(.*)\]$/s.exec(v);
   if (!m) return [];
   return m[1]
     .split(',')
@@ -167,11 +167,11 @@ function parseInlineArray(v: string): string[] {
 }
 
 export function parseFrontmatter(md: string): BacklogFrontmatter | null {
-  const m = md.match(/^---\n([\s\S]*?)\n---/);
+  const m = /^---\n([\s\S]*?)\n---/.exec(md);
   if (!m) return null;
   const fm: BacklogFrontmatter = { nodes: [], tags: [], fingerprints: [] };
   for (const line of m[1].split('\n')) {
-    const kv = line.match(/^([a-zA-Z_]+):\s*(.*)$/);
+    const kv = /^([a-zA-Z_]+):[ \t]*(.*)/.exec(line);
     if (!kv) continue;
     const [, key, rawVal] = kv;
     const val = rawVal.trim();
@@ -206,7 +206,7 @@ export function parseFrontmatter(md: string): BacklogFrontmatter | null {
 
 /** Extract the body text under a "## What is exhausted" heading (first paragraph), if present. */
 export function exhaustedText(md: string): string | null {
-  const m = md.match(/^##\s+What is exhausted\s*\n([\s\S]*?)(?:\n##\s|\n*$)/im);
+  const m = /^##\s+What is exhausted\s*\n([\s\S]*?)(?:\n##\s|\n*$)/im.exec(md);
   return m ? m[1].trim() : null;
 }
 
@@ -225,6 +225,29 @@ export interface ShapeEntry {
   ciOccurrences: number;
   hasExhaustedSection: boolean;
   documentedTunables: string[];
+}
+
+/** Accumulate one node's contribution for a single backlog entry into the running shape maps. */
+function accumulateNodeEntry(
+  node: string,
+  life: string,
+  classes: ResourceClass[],
+  byNode: Record<
+    string,
+    { total: number; classes: Record<string, number>; lifecycle: Record<string, number> }
+  >,
+  cells: Record<string, Record<string, number>>,
+  nodeSet: Set<string>
+): void {
+  nodeSet.add(node);
+  byNode[node] ??= { total: 0, classes: {}, lifecycle: {} };
+  byNode[node].total += 1;
+  byNode[node].lifecycle[life] = (byNode[node].lifecycle[life] ?? 0) + 1;
+  cells[node] ??= {};
+  for (const c of classes) {
+    byNode[node].classes[c] = (byNode[node].classes[c] ?? 0) + 1;
+    cells[node][c] = (cells[node][c] ?? 0) + 1;
+  }
 }
 
 export function buildShape(entries: ShapeEntry[]) {
@@ -253,22 +276,14 @@ export function buildShape(entries: ShapeEntry[]) {
 
     const nodes = e.nodes.length > 0 ? e.nodes : ['(unattributed)'];
     for (const node of nodes) {
-      nodeSet.add(node);
-      byNode[node] ??= { total: 0, classes: {}, lifecycle: {} };
-      byNode[node].total += 1;
-      byNode[node].lifecycle[life] = (byNode[node].lifecycle[life] ?? 0) + 1;
-      cells[node] ??= {};
-      for (const c of e.classes) {
-        byNode[node].classes[c] = (byNode[node].classes[c] ?? 0) + 1;
-        cells[node][c] = (cells[node][c] ?? 0) + 1;
-      }
+      accumulateNodeEntry(node, life, e.classes, byNode, cells, nodeSet);
     }
     for (const c of e.classes) {
       classSet.add(c);
       byClass[c] ??= {
         total: 0,
         nodes: [],
-        documentedTunables: DOCUMENTED_TUNABLES[c as ResourceClass] ?? [],
+        documentedTunables: DOCUMENTED_TUNABLES[c] ?? [],
         lifecycle: {},
       };
       byClass[c].total += 1;
@@ -282,7 +297,7 @@ export function buildShape(entries: ShapeEntry[]) {
     byClass,
     byLifecycle,
     matrix: {
-      nodes: [...nodeSet].sort(),
+      nodes: [...nodeSet].sort((a, b) => a.localeCompare(b)),
       classes: RESOURCE_CLASSES.filter(c => classSet.has(c)),
       cells,
     },
@@ -312,7 +327,7 @@ function loadCiFindings(path: string): CiFinding[] {
         return null;
       }
     })
-    .filter((x): x is CiFinding => x != null);
+    .filter((x): x is CiFinding => x !== null);
 }
 
 // ---------------------------------------------------------------------------
@@ -328,7 +343,7 @@ export function collectEntries(backlogDir: string, ci: CiFinding[]): ShapeEntry[
     if (!fm) continue;
     const slug = fm.slug ?? file.replace(/\.md$/, '');
     const exhausted = exhaustedText(md);
-    const hasExhaustedSection = exhausted != null;
+    const hasExhaustedSection = exhausted !== null;
     const classes = classifyResource(`${fm.title ?? ''} ${exhausted ?? ''}`, fm.tags);
 
     // Only resource/resilience/self-heal entries belong in the shape report.

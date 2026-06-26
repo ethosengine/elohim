@@ -65,7 +65,10 @@ Then('the raw inspector echoes a content-addressed cid', function (this: E2EWorl
 
 Then('the raw inspector reports a governance coupling leg', function (this: E2EWorld) {
   const coupling = capturedBody(this).coupling as Record<string, unknown> | undefined;
-  assert.ok(coupling && typeof coupling === 'object', 'Expected a coupling object on the inspector');
+  assert.ok(
+    coupling && typeof coupling === 'object',
+    'Expected a coupling object on the inspector'
+  );
   const governance = coupling.governance;
   assert.ok(
     typeof governance === 'string' && governance.length > 0,

@@ -38,6 +38,7 @@ import { request } from 'undici';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { Human } from '../../src/framework/human.js';
+import { EprContentPage } from '../../src/framework/pages/epr-content.page.js';
 import {
   CONTENT_VIEWER,
   LENS_VIEWER,
@@ -46,7 +47,6 @@ import {
   PATH_OVERVIEW,
   RAW_NODE,
 } from '../../src/framework/pages/selectors.js';
-import { EprContentPage } from '../../src/framework/pages/epr-content.page.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
 import { AppResponse, fetchApp, responseStore } from '../delivery.steps.js';

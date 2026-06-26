@@ -51,11 +51,7 @@ async function main(): Promise<void> {
     // 2. Click the resilience icon (or report the neutral glyph).
     const icon = page.locator('[data-testid="resilience-icon"]');
     const iconVisible = await icon.isVisible().catch(() => false);
-    if (!iconVisible) {
-      notes.push(
-        'resilience-icon NOT present — snapshot likely unresolved (neutral glyph fallback)'
-      );
-    } else {
+    if (iconVisible) {
       const iconBox = await icon.boundingBox();
       notes.push(`icon boundingBox: ${JSON.stringify(iconBox)}`);
       await icon.click();
@@ -63,7 +59,9 @@ async function main(): Promise<void> {
 
       const panel = page.locator('[data-testid="resilience-hypercard"]');
       const panelBox = await panel.boundingBox();
-      notes.push(`panel boundingBox: ${JSON.stringify(panelBox)} (viewport ${viewport.width}x${viewport.height})`);
+      notes.push(
+        `panel boundingBox: ${JSON.stringify(panelBox)} (viewport ${viewport.width}x${viewport.height})`
+      );
       if (panelBox) {
         const offRight = panelBox.x + panelBox.width - viewport.width;
         const offLeft = -panelBox.x;
@@ -72,6 +70,10 @@ async function main(): Promise<void> {
             `(positive = pixels off-screen)`
         );
       }
+    } else {
+      notes.push(
+        'resilience-icon NOT present — snapshot likely unresolved (neutral glyph fallback)'
+      );
     }
     await page.screenshot({ path: join(outDir, '2-panel-open.png'), fullPage: false });
 
