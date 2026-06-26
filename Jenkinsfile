@@ -268,8 +268,20 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey) {
     def doPatch = (adminKey != null && adminKey.trim() != '') ? '1' : '0'
     for (bundle in bundles) {
         echo "stageSpaBlobs: distDir='${bundle.distDir}' slug='${bundle.slug}'"
-        withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=${doPatch}"]) {
-            sh "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '${bundle.distDir}' '${bundle.slug}' '${doorwayEprUrl}' '${bundle.kind ?: 'browser'}'"
+        // Per-bundle isolation (App #1560 regression). One bundle's blob/PATCH
+        // failure must NOT skip the remaining bundles on this host OR the
+        // remaining hosts. In #1560 the new elohim-host-landing-ssr PATCH 404'd
+        // on alpha (its content row was never seeded) and — under a single
+        // loop-wide catchError around the whole host list — aborted before the
+        // elohim.host iteration ran, stranding elohim.host on the stale 8a2c65e
+        // bundle for days while alpha advanced to 580b88d. Catching per (host,
+        // slug) keeps every still-publishable bundle landing; the failed slug
+        // alone goes UNSTABLE (orchestrator treats UNSTABLE as success). This is
+        // the PRIMARY isolation point — the caller's catchError is now a backstop.
+        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+            withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=${doPatch}"]) {
+                sh "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '${bundle.distDir}' '${bundle.slug}' '${doorwayEprUrl}' '${bundle.kind ?: 'browser'}'"
+            }
         }
     }
 }
@@ -374,6 +386,12 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey) {
     // FAILURE here would abort the whole dependency graph. catchError ->
     // UNSTABLE keeps the chain alive (the orchestrator treats UNSTABLE as
     // success). The credential-missing guard stays a hard error upstream.
+    //
+    // BACKSTOP ONLY. Per-(host,slug) isolation now lives INSIDE stageSpaBlobs
+    // (App #1560 fix). Do NOT rely on this outer catchError for isolation: it
+    // wraps the entire host loop, so on its own a single slug's failure aborts
+    // the loop before later hosts run (that was the #1560 bug). Keep the inner
+    // per-bundle catchError; this one only guards non-sh throws.
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
         for (int i = 0; i < doorwayEprUrls.size(); i++) {
             stageSpaBlobs(doorwayEprUrls[i], [
