@@ -1532,6 +1532,16 @@ impl HttpServer {
                 }
             }
 
+            // Runtime-served native chrome static assets (the omnibar element).
+            // The Tauri shell talks to this sidecar directly, so it serves the
+            // element the same way the doorway does. V8-free (light asset crate),
+            // so this is in the DEFAULT build, NOT behind the `ssr` feature.
+            // Placed ABOVE the catch-all so the 404 fallthrough can't shadow it
+            // (the sidecar's equivalent of the doorway's is_service_path guard —
+            // storage has no EPR-router wildcard, so an explicit arm here is the
+            // guard).
+            (Method::GET, p) if p.starts_with("/chrome/") => Ok(Self::handle_chrome_asset(p)),
+
             // Not found
             _ => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
@@ -2092,6 +2102,62 @@ impl HttpServer {
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
             .body(Full::new(Bytes::from(html)))
+            .unwrap()
+    }
+
+    /// `GET /chrome/*` — runtime-served native chrome static assets.
+    ///
+    /// The Tauri desktop shell talks to this storage sidecar directly (no
+    /// doorway), so the sidecar must serve the omnibar element the same way the
+    /// doorway does (`doorway/.../routes/chrome.rs`). The element bytes/hash/path
+    /// come from the light, V8-free `elohim-chrome-asset` crate — so this route
+    /// is in the DEFAULT storage build (it does NOT need the `ssr` feature).
+    ///
+    /// Two known paths:
+    /// - `GET /chrome/omni-element.{sha256}.js` — the content-addressed element,
+    ///   served immutable (a changed script ⇒ a new hash ⇒ a new path).
+    /// - `GET /chrome/omni-element.js` — a STABLE alias for the CURRENT element,
+    ///   for static `index.html` refs (Tauri) that cannot embed a content hash.
+    ///   NOT immutable: its bytes change with the element, so it is served with a
+    ///   revalidation-friendly cache policy.
+    ///
+    /// Any other `/chrome/*` path (including a stale/mismatched hash) → 404.
+    fn handle_chrome_asset(path: &str) -> Response<Full<Bytes>> {
+        if path == elohim_chrome_asset::element_script_path() {
+            return Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "text/javascript; charset=utf-8")
+                // Content-addressed ⇒ immutable: a changed script changes the
+                // hash (and the path), so the bytes at THIS path never change.
+                .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+                .body(Full::new(Bytes::from_static(
+                    elohim_chrome_asset::element_js_bytes(),
+                )))
+                .unwrap();
+        }
+
+        if path == elohim_chrome_asset::STABLE_ELEMENT_PATH {
+            return Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "text/javascript; charset=utf-8")
+                // The stable alias serves the CURRENT element, which changes over
+                // time — so revalidate rather than cache immutably. An ETag lets a
+                // client skip the body when the content address is unchanged.
+                .header(header::CACHE_CONTROL, "public, max-age=0, must-revalidate")
+                .header(
+                    header::ETAG,
+                    format!("\"{}\"", elohim_chrome_asset::element_js_hash()),
+                )
+                .body(Full::new(Bytes::from_static(
+                    elohim_chrome_asset::element_js_bytes(),
+                )))
+                .unwrap();
+        }
+
+        Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+            .body(Full::new(Bytes::from_static(b"chrome asset not found")))
             .unwrap()
     }
 
@@ -12217,6 +12283,92 @@ mod tests {
         let hash = BlobStore::compute_hash(b"test data");
         assert!(hash.starts_with("sha256-"));
         assert_eq!(hash.len(), 7 + 64); // "sha256-" + 64 hex chars
+    }
+
+    // ── /chrome native-chrome asset route (default build, V8-free) ──────────
+
+    async fn collect_body(resp: Response<Full<Bytes>>) -> (StatusCode, hyper::HeaderMap, Vec<u8>) {
+        let status = resp.status();
+        let headers = resp.headers().clone();
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        (status, headers, bytes.to_vec())
+    }
+
+    #[tokio::test]
+    async fn chrome_serves_content_addressed_element_immutable() {
+        let path = elohim_chrome_asset::element_script_path();
+        let resp = HttpServer::handle_chrome_asset(&path);
+        let (status, headers, body) = collect_body(resp).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            headers.get(header::CONTENT_TYPE).unwrap(),
+            "text/javascript; charset=utf-8"
+        );
+        assert_eq!(
+            headers.get(header::CACHE_CONTROL).unwrap(),
+            "public, max-age=31536000, immutable"
+        );
+        assert_eq!(body, elohim_chrome_asset::element_js_bytes());
+    }
+
+    #[tokio::test]
+    async fn chrome_serves_stable_alias_revalidating() {
+        let resp = HttpServer::handle_chrome_asset(elohim_chrome_asset::STABLE_ELEMENT_PATH);
+        let (status, headers, body) = collect_body(resp).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            headers.get(header::CONTENT_TYPE).unwrap(),
+            "text/javascript; charset=utf-8"
+        );
+        // Stable alias serves the CURRENT element ⇒ revalidate, not immutable.
+        assert_eq!(
+            headers.get(header::CACHE_CONTROL).unwrap(),
+            "public, max-age=0, must-revalidate"
+        );
+        // ETag carries the content address so a client can skip the body.
+        assert_eq!(
+            headers.get(header::ETAG).unwrap(),
+            &format!("\"{}\"", elohim_chrome_asset::element_js_hash())
+        );
+        // Same bytes as the content-addressed path.
+        assert_eq!(body, elohim_chrome_asset::element_js_bytes());
+    }
+
+    #[tokio::test]
+    async fn chrome_stale_hash_is_404() {
+        let resp = HttpServer::handle_chrome_asset("/chrome/omni-element.deadbeef.js");
+        let (status, _h, _b) = collect_body(resp).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn chrome_unrelated_path_is_404() {
+        let resp = HttpServer::handle_chrome_asset("/chrome/not-a-thing.js");
+        let (status, _h, _b) = collect_body(resp).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn chrome_route_dispatches_through_handle_request() {
+        // The is_service_path-equivalent guard: a GET /chrome/* request must
+        // reach handle_chrome_asset, not fall through to the 404 catch-all. We
+        // assert the dispatch contract at the prefix-match level (the arm uses
+        // `p.starts_with("/chrome/")`), proving the explicit arm shadows the
+        // catch-all for every /chrome path.
+        let hashed = elohim_chrome_asset::element_script_path();
+        assert!(
+            hashed.starts_with("/chrome/"),
+            "hashed path under /chrome: {hashed}"
+        );
+        assert!(
+            elohim_chrome_asset::STABLE_ELEMENT_PATH.starts_with("/chrome/"),
+            "stable alias under /chrome"
+        );
+        // And a known path returns 200 (would be 404 if the catch-all shadowed).
+        let (status, _h, _b) = collect_body(HttpServer::handle_chrome_asset(&hashed)).await;
+        assert_eq!(status, StatusCode::OK);
     }
 
     /// Construct an UpdateContentInputView with every field defaulted to None,

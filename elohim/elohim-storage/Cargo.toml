@@ -40,6 +40,10 @@ lamad-types = { path = "../sdk/domains/lamad/types" }
 # Server-side rendering via V8 / deno_core (opt-in; most peer hardware can't sustain V8)
 elohim-render = { path = "../elohim-render", optional = true }
 
+# Light, V8-free omnibar element asset (bytes/hash/path) for the /chrome route.
+# In the DEFAULT feature set — serving the static element must not pull deno_core.
+elohim-chrome-asset = { path = "../elohim-chrome-asset" }
+
 # Constitutional layer — principles, boundaries, agent reasoning
 constitution = { path = "../constitution" }
 
