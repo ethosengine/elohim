@@ -24,10 +24,21 @@ import { RendererInitializerService } from '@app/lamad/renderers/renderer-initia
 import { ContentService } from '@app/lamad/services/content.service';
 
 import { SeoService } from '../../../services/seo.service';
-import {
-  ProtocolOmnibarComponent,
-  OmnibarSteward,
-} from '../protocol-omnibar/protocol-omnibar.component';
+
+/**
+ * Steward attribution row for the delivery view's provenance data.
+ *
+ * NOTE: The omnibar that consumed this is now runtime chrome (server-rendered
+ * by the doorway), not a per-route Angular component — see
+ * genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md.
+ * These fields stay populated as the provenance source the runtime chrome reads
+ * once /deliver is brought under SSR (currently a CSR route — coverage gap).
+ */
+interface OmnibarSteward {
+  humanId: string;
+  displayName: string;
+  ratio: number;
+}
 
 /**
  * ContentDeliveryComponent — Full-page content delivery with protocol omnibar.
@@ -39,7 +50,7 @@ import {
 @Component({
   selector: 'app-content-delivery',
   standalone: true,
-  imports: [CommonModule, RouterModule, ProtocolOmnibarComponent],
+  imports: [CommonModule, RouterModule],
   templateUrl: './content-delivery.component.html',
   styleUrls: ['./content-delivery.component.css'],
 })

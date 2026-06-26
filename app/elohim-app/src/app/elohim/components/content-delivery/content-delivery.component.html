@@ -1,12 +1,11 @@
 <div class="delivery-shell" data-testid="content-delivery">
-  <!-- Protocol Omnibar (EPR provenance — like browser SSL padlock) -->
-  <app-protocol-omnibar
-    [contentId]="node?.id || ''"
-    [contentAddress]="contentAddress"
-    [stewards]="omnibarStewards"
-    [reach]="reach"
-    [deliverySource]="deliverySource"
-  ></app-protocol-omnibar>
+  <!--
+    Protocol omnibar (EPR provenance) is now runtime chrome — server-rendered by
+    the doorway, not a per-route Angular component. See
+    genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md.
+    NOTE: /deliver/:slug is a CSR-only SPA route (not in storage's angular-ssr
+    manifest set), so the runtime chrome does not yet cover it — coverage gap.
+  -->
 
   <!-- Loading -->
   <div *ngIf="isLoading" class="loading-state" data-testid="delivery-loading">
