@@ -9,6 +9,8 @@
 //! Spec: `genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md` §4.3
 //! Plan: `genesis/docs/superpowers/plans/2026-06-26-native-chrome-omnibar-plan.md`
 
+pub mod omnibar;
 pub mod theme;
 
+pub use omnibar::{html_escape, render_omnibar_markup, render_omnibar_style, ChromeInput};
 pub use theme::{base_palette, BasePalette, ColorScheme, Theme, ThemeTokens};
