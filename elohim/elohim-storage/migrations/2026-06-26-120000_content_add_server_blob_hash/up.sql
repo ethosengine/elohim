@@ -1,0 +1,13 @@
+-- Add server_blob_hash column to content for the SSR row-collapse (SSR row collapse T1).
+-- Carries the content-addressed hash of the Angular SSR *server* bundle so it can live as a
+-- field on the one elohim-host-landing EPR node, alongside the browser bundle's blob_hash,
+-- instead of on a separate elohim-host-landing-ssr content row.
+--
+-- Nullable: absent is the normal pre-deploy state (SSR simply isn't materialized → CSR
+-- fallback, never a crash). This is the migration safety — the field can be absent on any
+-- host mid-transition without breaking serving.
+--
+-- Mirrors the blob_hash column exactly (a deploy-time projection field, not a new entity).
+-- Source of truth for the SSR server bundle is the deploy pipeline's PATCH; this column is the
+-- operational projection the doorway/storage SSR runtime reads.
+ALTER TABLE content ADD COLUMN server_blob_hash TEXT;

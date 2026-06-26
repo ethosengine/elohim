@@ -96,6 +96,13 @@ pub struct Content {
     /// Timestamp when this content was successfully published to the libp2p Kademlia DHT by the seeder drain loop.
     /// NULL = not yet published. Classification: C (Operational).
     pub p2p_published_at: Option<String>,
+    /// Content-addressed hash of the Angular SSR *server* bundle this row projects.
+    /// Mirrors `blob_hash` (which carries the *browser* bundle) so the one
+    /// `elohim-host-landing` EPR node can carry its full SSR nature instead of a
+    /// sibling `-ssr` content row. Written at deploy-time by the Jenkins SSR PATCH.
+    /// NULL = SSR not materialized (CSR fallback). Classification: C (Operational
+    /// projection of the deploy artifact — not a DNA-notarized content-entry field).
+    pub server_blob_hash: Option<String>,
 }
 
 /// Content with tags attached (API response)
@@ -125,6 +132,9 @@ pub struct NewContent<'a> {
     pub created_by: Option<&'a str>,
     pub content_body: Option<&'a str>,
     pub dht_anchor_hash: Option<&'a str>,
+    /// SSR *server* bundle hash — see `Content::server_blob_hash`. Deploy-PATCH
+    /// populated; `None` at create/seed time (mirrors the `blob_hash` insert wiring).
+    pub server_blob_hash: Option<&'a str>,
 }
 
 /// Content tag row

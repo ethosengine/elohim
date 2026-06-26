@@ -309,6 +309,7 @@ mod tests {
                 created_by: None,
                 content_body: None,
                 dht_anchor_hash: None,
+                server_blob_hash: None,
             })
             .execute(conn)
             .expect("insert content");

@@ -13,6 +13,7 @@
     "contentType": { "$ref": "../enums/content-type.schema.json" },
     "contentFormat": { "$ref": "../enums/content-format.schema.json" },
     "blobHash": { "type": ["string", "null"] },
+    "serverBlobHash": { "type": ["string", "null"] },
     "blobCid": { "type": ["string", "null"] },
     "contentSizeBytes": { "type": ["integer", "null"] },
     "metadata": {},

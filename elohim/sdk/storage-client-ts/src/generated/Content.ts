@@ -12,4 +12,13 @@ dht_anchor_hash: string | null,
  * Timestamp when this content was successfully published to the libp2p Kademlia DHT by the seeder drain loop.
  * NULL = not yet published. Classification: C (Operational).
  */
-p2p_published_at: string | null, };
+p2p_published_at: string | null, 
+/**
+ * Content-addressed hash of the Angular SSR *server* bundle this row projects.
+ * Mirrors `blob_hash` (which carries the *browser* bundle) so the one
+ * `elohim-host-landing` EPR node can carry its full SSR nature instead of a
+ * sibling `-ssr` content row. Written at deploy-time by the Jenkins SSR PATCH.
+ * NULL = SSR not materialized (CSR fallback). Classification: C (Operational
+ * projection of the deploy artifact — not a DNA-notarized content-entry field).
+ */
+server_blob_hash: string | null, };

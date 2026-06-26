@@ -44,6 +44,7 @@ impl From<Content> for ContentView {
             content_type: c.content_type,
             content_format: c.content_format,
             blob_hash: c.blob_hash,
+            server_blob_hash: c.server_blob_hash,
             blob_cid: c.blob_cid,
             content_size_bytes: c.content_size_bytes,
             metadata: parse_json_opt(&c.metadata_json),
@@ -81,6 +82,8 @@ pub fn content_view_from_epr_head(head: &crate::epr_codec::EprHead) -> ContentVi
             .clone()
             .unwrap_or_else(|| "markdown".to_string()),
         blob_hash: None,
+        // EPR-head projection carries no SSR server bundle; CSR fallback applies.
+        server_blob_hash: None,
         blob_cid: if head.content.is_empty() {
             None
         } else {

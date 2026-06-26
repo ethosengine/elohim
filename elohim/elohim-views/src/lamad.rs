@@ -21,6 +21,11 @@ pub struct ContentView {
     pub content_type: String,
     pub content_format: String,
     pub blob_hash: Option<String>,
+    /// Content-addressed hash of the Angular SSR *server* bundle (wire:
+    /// `serverBlobHash`). Mirrors `blob_hash` (the *browser* bundle) so the one
+    /// EPR node carries its full SSR nature. `None` ⇒ SSR not materialized (CSR
+    /// fallback). Deploy-PATCH populated; absent is the normal pre-deploy state.
+    pub server_blob_hash: Option<String>,
     pub blob_cid: Option<String>,
     pub content_size_bytes: Option<i32>,
     /// Parsed metadata object (was metadata_json string in storage)
@@ -212,6 +217,16 @@ pub struct UpdateContentInputView {
     /// any other field.
     #[serde(default)]
     pub blob_hash: Option<String>,
+    /// Content-addressed SHA256 of the Angular SSR *server* bundle this row
+    /// projects (wire: `serverBlobHash`). Set at deploy-time by the Jenkins SSR
+    /// PATCH (mirrors `blob_hash`, the browser bundle). Deliberately optional:
+    /// PATCH callers MAY set this without touching any other field — and a
+    /// `serverBlobHash`-only PATCH must NOT clobber `blob_hash` or other fields.
+    /// Unlike `blob_hash`/`reach`, this is a deploy-projection artifact, not a
+    /// DNA-notarized content-entry field, so it takes the diesel-direct PATCH
+    /// path (see `patch_needs_conductor`), like `p2p_published_at`.
+    #[serde(default)]
+    pub server_blob_hash: Option<String>,
     /// RFC-3339 timestamp marking when this row was published to the libp2p
     /// Kad DHT. Stamping this satisfies the `require_provenance` read gate
     /// (content_diesel: `dht_anchor_hash IS NOT NULL OR p2p_published_at IS
