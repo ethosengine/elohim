@@ -1163,6 +1163,33 @@ fn compute_op_gate_decision(
     }
 }
 
+/// Outcome of the no-verified-credential branch of the op-gate.
+///
+/// `compute_op_gate_decision` never sees the credential — the credential check
+/// is a control-flow decision in the dispatch path. This tiny enum makes that
+/// branch unit-testable in isolation.
+#[derive(Debug, PartialEq, Eq)]
+enum NoCredentialDecision {
+    /// Forward to storage without authorizing (no performer to authorize).
+    Forward,
+    /// Deny with a generic 403 (fail-closed).
+    Deny,
+}
+
+/// Decide the no-credential case from the mode alone.
+///
+/// A `POST /db/content*` with no doorway-verified performer has nothing to
+/// authorize. The mode still governs the outcome: `Observe` is a non-blocking
+/// shadow stage (plan D2 — log the would-deny, never block) so it forwards;
+/// `Enforce` fails closed with a 403. `Off` never reaches the gate (filtered by
+/// the outer guard) but maps to `Forward` for totality.
+fn no_credential_decision(mode: &OpGateMode) -> NoCredentialDecision {
+    match mode {
+        OpGateMode::Enforce => NoCredentialDecision::Deny,
+        OpGateMode::Observe | OpGateMode::Off => NoCredentialDecision::Forward,
+    }
+}
+
 /// Call storage's `POST /api/v1/authorize-operation` and return the verdict.
 ///
 /// Uses the doorway's pooled `storage_proxy_client`. The `storage_endpoint` is the
@@ -1188,6 +1215,9 @@ async fn call_authorize_operation(
     let body = serde_json::json!({
         "performer": performer,
         "capability": capability,
+        // Synthetic/conservative reach for Slice 1: the content's actual reach
+        // isn't plumbed through the gate yet, so we claim `commons` — the highest
+        // rank, hence the strictest ceiling check (deny-safe until real reach lands).
         "reach": "commons",
         "targetEprId": null,
     });
@@ -3674,6 +3704,15 @@ async fn handle_request(
                 Disposition::SsrRoute { spec, endpoint } => {
                     // Manifest-driven SSR dispatch (Task 13).
                     //
+                    // OP-GATE INVARIANT: this arm's forward_to_storage fallbacks
+                    // (below) carry NO delegates-compute op-gate and NO write-method
+                    // guard — the gate lives only in the StorageProxy arm. This is
+                    // safe ONLY because a gated write (`POST /db/content*`) never
+                    // classifies as SsrRoute: those routes carry no server-controlled
+                    // render_spec. A gated write must NEVER be allowed to reach here.
+                    // Enforced by `gated_writes_classify_as_storage_proxy_not_ssr`.
+                    // Do NOT duplicate the gate logic here; keep gated writes out.
+                    //
                     // Auth-mode enforcement: if the doorway publishes a
                     // render_capability claim and the request's posture isn't
                     // in the claim's auth_modes, fall back to the CSR shell
@@ -3960,68 +3999,89 @@ async fn handle_request(
                         if gate_mode != OpGateMode::Off && is_gated_write {
                             // performer = doorway-verified human_id (never the client
                             // X-Agent-Cid header, which is trivially spoofable — C8).
-                            let performer = match agent_cid_owned.as_ref() {
-                                Some(cid) => cid.clone(),
-                                None => {
-                                    warn!(
-                                        path = %p,
-                                        "op-gate: no verified credential; denying (fail-closed)"
-                                    );
-                                    return Ok(to_boxed(make_op_gate_forbidden()));
-                                }
-                            };
-                            // Forward the user's own Bearer (D6: storage logs requester identity).
-                            let bearer = extract_bearer_from_req(&req);
-                            let verdict = call_authorize_operation(
-                                &state.storage_proxy_client,
-                                bearer.as_deref(),
-                                &performer,
-                                "orchestrate-node",
-                                &endpoint,
-                            )
-                            .await;
-                            let allowed_result: Result<bool, String> = match &verdict {
-                                Ok(v) => Ok(v.allowed),
-                                Err(e) => Err(e.clone()),
-                            };
-                            match compute_op_gate_decision(
-                                &gate_mode,
-                                req.method(),
-                                p,
-                                &allowed_result,
-                            ) {
-                                OpGateDecision::Allow => { /* fall through to forward */ }
-                                OpGateDecision::AllowWithWarn => {
-                                    let summary = match &verdict {
-                                        Ok(v) if v.allowed => {
-                                            format!("would-allow: {}", v.reason)
-                                        }
-                                        Ok(v) => format!("would-deny: {}", v.reason),
-                                        Err(e) => format!("would-deny (error): {e}"),
+                            // The authorize call runs ONLY when a performer exists; the
+                            // no-credential case branches by mode (D2: observe is a
+                            // non-blocking shadow stage — log the would-deny but never
+                            // block; only enforce fails closed).
+                            match agent_cid_owned.as_ref() {
+                                Some(performer) => {
+                                    let performer = performer.clone();
+                                    // Forward the user's own Bearer (D6: storage logs requester identity).
+                                    let bearer = extract_bearer_from_req(&req);
+                                    let verdict = call_authorize_operation(
+                                        &state.storage_proxy_client,
+                                        bearer.as_deref(),
+                                        &performer,
+                                        "orchestrate-node",
+                                        &endpoint,
+                                    )
+                                    .await;
+                                    let allowed_result: Result<bool, String> = match &verdict {
+                                        Ok(v) => Ok(v.allowed),
+                                        Err(e) => Err(e.clone()),
                                     };
-                                    warn!(
-                                        path = %p,
-                                        %performer,
-                                        %summary,
-                                        "op-gate OBSERVE"
-                                    );
-                                }
-                                OpGateDecision::Deny403 => {
-                                    match &verdict {
-                                        Ok(v) => warn!(
-                                            path = %p,
-                                            %performer,
-                                            reason = %v.reason,
-                                            "op-gate ENFORCE deny"
-                                        ),
-                                        Err(e) => warn!(
-                                            path = %p,
-                                            %performer,
-                                            error = %e,
-                                            "op-gate ENFORCE deny (infra error)"
-                                        ),
+                                    match compute_op_gate_decision(
+                                        &gate_mode,
+                                        req.method(),
+                                        p,
+                                        &allowed_result,
+                                    ) {
+                                        OpGateDecision::Allow => { /* fall through to forward */ }
+                                        OpGateDecision::AllowWithWarn => {
+                                            let summary = match &verdict {
+                                                Ok(v) if v.allowed => {
+                                                    format!("would-allow: {}", v.reason)
+                                                }
+                                                Ok(v) => format!("would-deny: {}", v.reason),
+                                                Err(e) => format!("would-deny (error): {e}"),
+                                            };
+                                            warn!(
+                                                path = %p,
+                                                %performer,
+                                                %summary,
+                                                "op-gate OBSERVE"
+                                            );
+                                        }
+                                        OpGateDecision::Deny403 => {
+                                            match &verdict {
+                                                Ok(v) => warn!(
+                                                    path = %p,
+                                                    %performer,
+                                                    reason = %v.reason,
+                                                    "op-gate ENFORCE deny"
+                                                ),
+                                                Err(e) => warn!(
+                                                    path = %p,
+                                                    %performer,
+                                                    error = %e,
+                                                    "op-gate ENFORCE deny (infra error)"
+                                                ),
+                                            }
+                                            return Ok(to_boxed(make_op_gate_forbidden()));
+                                        }
                                     }
-                                    return Ok(to_boxed(make_op_gate_forbidden()));
+                                }
+                                None => {
+                                    // No verified credential ⇒ no performer to authorize.
+                                    // Observe must NOT block (D2: log the would-deny and
+                                    // forward); only Enforce fails closed with a 403.
+                                    match no_credential_decision(&gate_mode) {
+                                        NoCredentialDecision::Forward => {
+                                            warn!(
+                                                path = %p,
+                                                "op-gate OBSERVE: no verified credential; \
+                                                 would-deny (forwarding)"
+                                            );
+                                            // fall through to forward
+                                        }
+                                        NoCredentialDecision::Deny => {
+                                            warn!(
+                                                path = %p,
+                                                "op-gate: no verified credential; denying (fail-closed)"
+                                            );
+                                            return Ok(to_boxed(make_op_gate_forbidden()));
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -5237,6 +5297,25 @@ mod dispatch_classification_tests {
             other => panic!("expected SsrRoute, got {other:?}"),
         }
     }
+
+    #[tokio::test]
+    async fn gated_writes_classify_as_storage_proxy_not_ssr() {
+        // Op-gate placement contract: the delegates-compute op-gate lives ONLY in
+        // the StorageProxy disposition arm. The SsrRoute arm has its own
+        // forward_to_storage fallbacks with NO gate and NO method guard, so a
+        // gated write must NEVER classify as SsrRoute. Today `POST /db/content*`
+        // carries no server-controlled render_spec, so it classifies as
+        // StorageProxy — this test fails the day a manifest change adds a render
+        // field to a content-write route (the latent un-gating regression).
+        for path in ["/db/content", "/db/content/bulk"] {
+            let registry = registry_with_storage_route(HttpMethod::Post, path).await;
+            let dispo = classify_dispatch(&registry, &Method::POST, path).await;
+            assert!(
+                matches!(dispo, Disposition::StorageProxy { .. }),
+                "POST {path} must classify as StorageProxy (gated arm), never SsrRoute; got {dispo:?}"
+            );
+        }
+    }
 }
 
 #[cfg(test)]
@@ -5550,7 +5629,9 @@ mod op_gate_tests {
     //! Self-review invariant: the gated path set MUST match the routes that call
     //! `distribute_shards` in elohim-storage (`/db/content` and `/db/content/bulk`).
 
-    use super::{compute_op_gate_decision, OpGateDecision};
+    use super::{
+        compute_op_gate_decision, no_credential_decision, NoCredentialDecision, OpGateDecision,
+    };
     use crate::config::OpGateMode;
     use hyper::Method;
 
@@ -5761,6 +5842,39 @@ mod op_gate_tests {
         assert!(
             args.validate().is_ok(),
             "CHE_FACING with enforce+jwt_secret(32+) must pass"
+        );
+    }
+
+    // ── no-credential branch (mode-dependent) ─────────────────────────────────
+
+    #[test]
+    fn no_credential_observe_forwards_not_blocks() {
+        // D2: observe is a non-blocking shadow stage. A no-credential write must
+        // forward (log the would-deny), never 403 — that's enforce's job.
+        assert_eq!(
+            no_credential_decision(&OpGateMode::Observe),
+            NoCredentialDecision::Forward,
+            "observe + no credential must forward (never block)"
+        );
+    }
+
+    #[test]
+    fn no_credential_enforce_denies() {
+        // Enforce fails closed: no verified performer ⇒ 403.
+        assert_eq!(
+            no_credential_decision(&OpGateMode::Enforce),
+            NoCredentialDecision::Deny,
+            "enforce + no credential must deny (fail-closed)"
+        );
+    }
+
+    #[test]
+    fn no_credential_off_forwards() {
+        // Off never reaches the gate, but the helper must be total: treat as Forward.
+        assert_eq!(
+            no_credential_decision(&OpGateMode::Off),
+            NoCredentialDecision::Forward,
+            "off maps to forward for totality (gate never fires in Off)"
         );
     }
 }
