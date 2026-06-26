@@ -1082,6 +1082,19 @@ impl HttpServer {
                 self.handle_seed_shard_manifest(req).await
             }
 
+            // Dev-seed endpoint for `delegates-compute` mishpat commitments
+            // (Che op-gate Slice 1, §14). Flag-gated (ALLOW_SEED_DELEGATES_COMPUTE=1);
+            // writes directly into mishpat_commitments with a synthesized dev anchor.
+            // Deliberately NOT in build_manifest() — never doorway-proxied.
+            // Revoke variant: body { cid, revoke: true }.
+            (Method::POST, "/admin/seed/delegates-compute") => {
+                if let Some(pool) = self.db_pool.as_ref() {
+                    crate::api::seed_delegates_compute::handle(req, pool).await
+                } else {
+                    Ok(response::service_unavailable("db pool not available"))
+                }
+            }
+
             // Operator setter for per-object blob transport affinity
             // (iroh-toggle sprint). POST /admin/blob-transport-affinity/{hash}
             // body {"affinity":"iroh-only"|"libp2p-only"|"prefer-iroh"|
