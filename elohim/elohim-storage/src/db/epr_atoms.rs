@@ -175,3 +175,21 @@ pub fn fetch_reverse_coupling(
         .filter(epr_coupling::target_cid.eq(target_cid))
         .load::<EprCouplingRow>(conn)
 }
+
+/// Fetch the most-recently issued atom whose `schema_key` matches `key`.
+///
+/// Used by the nav-context handler to resolve human-readable slug keys
+/// (e.g. `"elohim-host-landing"`) to their stored EPR atom when the caller
+/// passes a slug rather than a CIDv1 string. The most-recently issued atom
+/// for the key is returned (latest issued_at DESC), matching normal supersedence
+/// conventions where the latest atom is the live one.
+pub fn fetch_atom_by_schema_key(
+    conn: &mut SqliteConnection,
+    key: &str,
+) -> QueryResult<Option<EprAtom>> {
+    epr_atoms::table
+        .filter(epr_atoms::schema_key.eq(key))
+        .order(epr_atoms::issued_at.desc())
+        .first::<EprAtom>(conn)
+        .optional()
+}

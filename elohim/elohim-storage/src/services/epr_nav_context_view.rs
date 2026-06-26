@@ -76,12 +76,42 @@ pub fn project(
     cid: &str,
 ) -> Result<Option<EprNavContextView>, StorageError> {
     // 1. Load focal atom — 404 if absent.
+    //
+    // Try CID primary-key lookup first. If the atom is not found AND the
+    // identifier is not a CIDv1 multibase string (i.e. it looks like a
+    // human-readable slug), fall back to schema_key lookup. This allows the
+    // Angular app and test clients to address well-known atoms by their
+    // schema_key (e.g. "elohim-host-landing") while the seeder writes atoms
+    // with their canonical CIDv1 primary key.
     let focal = match epr_atoms::fetch_atom_by_cid(conn, cid)
         .map_err(|e| StorageError::Database(e.to_string()))?
     {
         Some(a) => a,
-        None => return Ok(None),
+        None => {
+            // CID parse attempt: CIDv1 multibase strings always start with 'b'
+            // (base32lower) or 'B' (base32upper). A slug like "elohim-host-landing"
+            // starts with neither, so we know it's safe to try schema_key.
+            let looks_like_slug = !cid.starts_with('b')
+                && !cid.starts_with('B')
+                && !cid.starts_with('z')
+                && !cid.starts_with('Z')
+                && !cid.starts_with('u')
+                && !cid.starts_with('U');
+            if looks_like_slug {
+                match epr_atoms::fetch_atom_by_schema_key(conn, cid)
+                    .map_err(|e| StorageError::Database(e.to_string()))?
+                {
+                    Some(a) => a,
+                    None => return Ok(None),
+                }
+            } else {
+                return Ok(None);
+            }
+        }
     };
+
+    // Canonical key for all subsequent queries is the stored cid field.
+    let cid = &focal.cid;
 
     let mut derived_from: Vec<String> = Vec::new();
 

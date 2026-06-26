@@ -50,6 +50,7 @@ import {
   createOperatorBindingClient,
 } from './seed-operator-bindings.js';
 import { seedProjections, defaultProjectionSeeds, createProjectionClient } from './seed-projections.js';
+import { seedLandingEprAtom } from './seed-epr-atom.js';
 // ========================================
 // PERFORMANCE TIMING UTILITIES
 // ========================================
@@ -2149,6 +2150,25 @@ async function seed() {
     createOperatorBindingClient(DOORWAY_URL!, DOORWAY_API_KEY),
     defaultHostingAgreements(),
   );
+
+  // ========================================
+  // EPR ATOMS
+  // Must run before projections — each projection commitment references an EPR
+  // atom by schema_key. Without the atom, GET /api/v1/epr/<slug>/nav-context
+  // 404s for every caller that addresses the atom by its schema_key slug.
+  //
+  // Routing: doorway proxies PUT /api/v1/epr/:cid to elohim-storage via the
+  // manifest-driven RouteRegistry — no explicit STORAGE_URL override required.
+  // ========================================
+  console.log('\n=== Seeding EPR Atoms ===');
+  {
+    const atomResult = await seedLandingEprAtom(DOORWAY_URL!);
+    if (atomResult.skipped) {
+      console.log(`  [=] ${atomResult.schemaKey} (idempotent — ${atomResult.reason ?? 'already exists'})`);
+    } else {
+      console.log(`  [+] ${atomResult.schemaKey}  cid=${atomResult.cid}`);
+    }
+  }
 
   // ========================================
   // EPR PROJECTIONS
