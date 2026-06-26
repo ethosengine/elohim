@@ -1020,6 +1020,41 @@ fn build_ssr_user_credential<B>(req: &Request<B>) -> Option<crate::ssr::UserCred
     None
 }
 
+/// Build the inline JSON context the native omnibar element reads (the doorway
+/// inject path). The doorway supplies what the element cannot infer or wants
+/// authoritatively client-side:
+/// - `slug` — the EPR address, derived from the request path (root → the landing
+///   slug `elohim-host-landing`, else the last non-empty path segment), so the
+///   element doesn't have to re-derive it from `window.location`.
+/// - `authenticated` — whether this request carried a session/credential; the
+///   element cannot determine this client-side, and it gates the account link.
+///
+/// `theme`/`envTier`/`buildMarker`/`nav` are intentionally LEFT to the element's
+/// own client-side resolution (it fetches `/db/content/{slug}` for the theme and
+/// treats an absent env tier as non-visible) — the doorway SSR path does not yet
+/// plumb env-tier/build-marker, and inventing it here would be speculative. The
+/// element's defaults are sensible for the unspecified fields, so a minimal,
+/// honest island is correct.
+fn build_chrome_context_json<B>(path: &str, req: &Request<B>) -> String {
+    const LANDING_SLUG: &str = "elohim-host-landing";
+    let trimmed = path.trim_end_matches('/');
+    let slug = if trimmed.is_empty() {
+        LANDING_SLUG.to_string()
+    } else {
+        trimmed
+            .rsplit('/')
+            .find(|s| !s.is_empty())
+            .unwrap_or(LANDING_SLUG)
+            .to_string()
+    };
+    let authenticated = build_ssr_user_credential(req).is_some();
+    serde_json::json!({
+        "slug": slug,
+        "authenticated": authenticated,
+    })
+    .to_string()
+}
+
 fn resolve_agent_cid_from_request<B>(state: &AppState, req: &Request<B>) -> Option<String> {
     let auth_header = req
         .headers()
@@ -3593,6 +3628,12 @@ async fn handle_request(
                                 .unwrap_or_default()
                         );
 
+                        // Native runtime chrome: build the omnibar element's inline
+                        // context island ONCE (authoritative slug + authenticated
+                        // flag from this request) so both the cache-HIT and the
+                        // fresh-render responses inject the identical island.
+                        let chrome_context_json = build_chrome_context_json(p, &req);
+
                         // MVP cache key: (url, spec_version). Invalidation is TTL-based
                         // (5-minute default). `fetched_inputs` is captured in the audit
                         // trail (RenderOutput) but not in the lookup key. Hash-aware
@@ -3610,6 +3651,7 @@ async fn handle_request(
                                 "HIT",
                                 state.render_capability.as_ref(),
                                 None,
+                                Some(&chrome_context_json),
                             )));
                         }
 
@@ -3675,6 +3717,9 @@ async fn handle_request(
                                 state.render_trace_stats.record(&out.trace);
                                 let trace = out.trace;
                                 let html = out.html;
+                                // Cache the UN-injected render; the chrome island
+                                // is request-specific (slug/auth), so it is spliced
+                                // at serve time on both MISS and a later HIT.
                                 state.cache.put_rendered(
                                     &cache_key,
                                     html.clone(),
@@ -3685,6 +3730,7 @@ async fn handle_request(
                                     "MISS",
                                     state.render_capability.as_ref(),
                                     Some(&trace),
+                                    Some(&chrome_context_json),
                                 )
                             }
                             Err(e) => {
@@ -4348,7 +4394,16 @@ fn ssr_html_response_with_observability(
     cache_status: &str,
     capability: Option<&crate::render::types::RenderCapabilityProfile>,
     trace: Option<&elohim_render::RenderTrace>,
+    chrome_context_json: Option<&str>,
 ) -> Response<Full<Bytes>> {
+    // Native runtime chrome: splice the omnibar element loader + an inline JSON
+    // context island into the finalized SSR HTML, immediately before </body>.
+    // The element self-mounts client-side, identically to the Tauri/CSR paths.
+    // `inject_element` escapes the JSON so it cannot break out of the island.
+    let html = match chrome_context_json {
+        Some(ctx) => elohim_render::inject_element(&html, ctx),
+        None => html,
+    };
     let mut builder = Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "text/html; charset=utf-8")
@@ -4521,6 +4576,99 @@ mod ssr_session_tests {
         req.headers_mut()
             .insert(COOKIE, HeaderValue::from_bytes(&[0xFF, 0xFE]).unwrap());
         assert!(build_ssr_user_credential(&req).is_none());
+    }
+
+    // ── native chrome context island (the doorway inject path) ──────────────
+
+    fn req_for(path: &str, headers: &[(&str, &str)]) -> Request<Bytes> {
+        let mut builder = Request::builder().uri(path);
+        for (k, v) in headers {
+            builder = builder.header(*k, *v);
+        }
+        builder.body(Bytes::new()).unwrap()
+    }
+
+    #[test]
+    fn chrome_context_slug_is_last_path_segment() {
+        let req = req_for("/lamad/concept/abc", &[]);
+        let ctx = build_chrome_context_json("/lamad/concept/abc", &req);
+        let v: serde_json::Value = serde_json::from_str(&ctx).unwrap();
+        assert_eq!(v["slug"], "abc");
+        // Anonymous request → not authenticated.
+        assert_eq!(v["authenticated"], false);
+    }
+
+    #[test]
+    fn chrome_context_root_resolves_to_landing_slug() {
+        let req = req_for("/", &[]);
+        let ctx = build_chrome_context_json("/", &req);
+        let v: serde_json::Value = serde_json::from_str(&ctx).unwrap();
+        assert_eq!(v["slug"], "elohim-host-landing");
+    }
+
+    #[test]
+    fn chrome_context_authenticated_when_credential_present() {
+        let req = req_for("/lamad/concept/x", &[("authorization", "Bearer t")]);
+        let ctx = build_chrome_context_json("/lamad/concept/x", &req);
+        let v: serde_json::Value = serde_json::from_str(&ctx).unwrap();
+        assert_eq!(v["authenticated"], true);
+    }
+
+    #[test]
+    fn chrome_context_trailing_slash_ignored() {
+        let req = req_for("/resource/cid123/", &[]);
+        let ctx = build_chrome_context_json("/resource/cid123/", &req);
+        let v: serde_json::Value = serde_json::from_str(&ctx).unwrap();
+        assert_eq!(v["slug"], "cid123");
+    }
+
+    #[test]
+    fn ssr_response_injects_the_omnibar_element() {
+        // The finalized SSR response splices the element loader + context island
+        // before </body>. We exercise the real response builder with a context.
+        let ctx = r#"{"slug":"abc","authenticated":false}"#;
+        let resp = ssr_html_response_with_observability(
+            "<html><body><app-root></app-root></body></html>".to_string(),
+            "HIT",
+            None,
+            None,
+            Some(ctx),
+        );
+        let body = futures::executor::block_on(async {
+            resp.into_body().collect().await.unwrap().to_bytes()
+        });
+        let html = String::from_utf8(body.to_vec()).unwrap();
+        assert!(
+            html.contains("id=\"elohim-omni-context\""),
+            "island present: {html}"
+        );
+        assert!(html.contains("omni-element."), "loader present: {html}");
+        // Injected before </body>, document intact.
+        let island_at = html.find("elohim-omni-context").unwrap();
+        let body_close = html.rfind("</body>").unwrap();
+        assert!(island_at < body_close);
+        assert!(html.contains("<app-root></app-root>"));
+    }
+
+    #[test]
+    fn ssr_response_without_context_is_unchanged() {
+        // No chrome context → no inject (the non-SSR-chrome path stays clean).
+        let resp = ssr_html_response_with_observability(
+            "<html><body>plain</body></html>".to_string(),
+            "MISS",
+            None,
+            None,
+            None,
+        );
+        let body = futures::executor::block_on(async {
+            resp.into_body().collect().await.unwrap().to_bytes()
+        });
+        let html = String::from_utf8(body.to_vec()).unwrap();
+        assert!(
+            !html.contains("elohim-omni-context"),
+            "no island injected: {html}"
+        );
+        assert_eq!(html, "<html><body>plain</body></html>");
     }
 }
 
