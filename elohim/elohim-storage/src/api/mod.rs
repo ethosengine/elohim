@@ -18,6 +18,7 @@ pub mod account;
 pub mod agreements;
 pub mod attention;
 pub mod attestations;
+pub mod authorize_operation; // Che op-gate Slice 1 §14 — POST /api/v1/authorize-operation (off-manifest)
 pub mod blob;
 pub mod cluster;
 pub mod comments;
@@ -357,6 +358,14 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("gate") {
         let resource_path = sub_path.strip_prefix("gate").unwrap_or("");
         gate::handle(req, method, resource_path, &pool, &app_ctx, services).await
+    } else if sub_path == "authorize-operation" {
+        // Che op-gate Slice 1 §14 — core operation-authorization gate.
+        // Deliberately NOT in build_manifest() (Review C6 — never doorway-proxied).
+        // performer comes from the request body (the doorway sets it from its JWT).
+        if method != Method::POST {
+            return Ok(response::method_not_allowed());
+        }
+        authorize_operation::handle(req, &pool).await
     } else if sub_path.starts_with("lamad") {
         // M-REA-1: intent-driven EconomicEvent composition — POST /api/v1/lamad/events
         let resource_path = sub_path.strip_prefix("lamad").unwrap_or("");

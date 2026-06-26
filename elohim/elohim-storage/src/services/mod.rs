@@ -74,6 +74,7 @@ pub mod mastery_depth;
 pub mod measure;
 pub mod mishpat_commitment_facing;
 pub mod mutuality_audit_service;
+pub mod operation_authorization; // Che op-gate Slice 1 §14 — core op-gate gate over mishpat_commitments
 pub mod operational_weave_facing;
 pub mod peer_capacity_service;
 pub mod peer_diversity; // Phase 4 T8 — archetype-mix diversity helper

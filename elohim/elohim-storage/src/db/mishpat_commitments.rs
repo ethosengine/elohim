@@ -161,6 +161,31 @@ pub fn graduate_to_active(conn: &mut SqliteConnection, cid: &str) -> QueryResult
     .execute(conn)
 }
 
+/// Find the active, notarized `delegates-compute` grant for a (recipient, capability) pair.
+///
+/// Filters scope in SQL so a newer differently-scoped grant cannot shadow a valid
+/// one for the requested capability.  `provider` is NOT filtered in Slice 1
+/// (the self-contract has provider==recipient); a provider filter is a Slice-3
+/// multi-party concern — documented here, not enforced.
+///
+/// Returns `Ok(None)` when no matching row exists (fail-closed: deny).
+pub fn find_active_delegates_compute(
+    conn: &mut SqliteConnection,
+    recipient_cid: &str,
+    capability: &str,
+) -> Result<Option<MishpatCommitment>, diesel::result::Error> {
+    mc::mishpat_commitments
+        .filter(mc::action.eq("delegates-compute"))
+        .filter(mc::recipient.eq(recipient_cid))
+        .filter(mc::scope.eq(capability))
+        .filter(mc::state.eq("active"))
+        .filter(mc::revoked_at.is_null())
+        .filter(mc::dht_anchor_hash.is_not_null())
+        .order(mc::created_at.desc())
+        .first::<MishpatCommitment>(conn)
+        .optional()
+}
+
 /// Load this provider's live (non-revoked) `replicates-commons` commitments.
 ///
 /// "Live" = `action == "replicates-commons"` AND `provider == self` AND
