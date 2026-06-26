@@ -7,6 +7,49 @@ use clap::Parser;
 use std::net::SocketAddr;
 use uuid::Uuid;
 
+/// Enforcement mode for the delegates-compute op-gate (`DELEGATES_COMPUTE_OP_GATE`).
+///
+/// Controls whether `POST /db/content` and `POST /db/content/bulk` are gated by a
+/// pre-dispatch call to storage's `POST /api/v1/authorize-operation` before forwarding.
+///
+/// - `off` (default): no call, no latency — today's passthrough behavior.
+/// - `observe`: gate fires; verdict is logged but request always forwards.
+/// - `enforce`: gate fires; denied verdict or infra error returns 403 (fail-closed).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum OpGateMode {
+    /// Passthrough — no storage call, no latency.
+    #[default]
+    Off,
+    /// Gate fires; verdicts are logged but request always forwards.
+    Observe,
+    /// Gate fires; denied verdict or infra error → 403 (fail-closed).
+    Enforce,
+}
+
+impl std::str::FromStr for OpGateMode {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "off" | "" => Ok(Self::Off),
+            "observe" => Ok(Self::Observe),
+            "enforce" => Ok(Self::Enforce),
+            other => Err(format!(
+                "unknown op-gate mode {other:?}; expected off|observe|enforce"
+            )),
+        }
+    }
+}
+
+impl std::fmt::Display for OpGateMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Off => write!(f, "off"),
+            Self::Observe => write!(f, "observe"),
+            Self::Enforce => write!(f, "enforce"),
+        }
+    }
+}
+
 /// Doorway - WebSocket gateway for Elohim Holochain
 ///
 /// "Knock and it shall be opened" - Matthew 7:7-8
@@ -225,6 +268,30 @@ pub struct Args {
     /// Number of StatefulSet replicas for P2P peer enumeration
     #[arg(long, env = "STATEFULSET_REPLICAS")]
     pub statefulset_replicas: Option<u32>,
+
+    /// Delegates-compute op-gate enforcement mode.
+    ///
+    /// Controls whether `POST /db/content` and `POST /db/content/bulk` are gated by a
+    /// pre-dispatch call to storage's `POST /api/v1/authorize-operation`.
+    ///
+    /// - `off` (default): no call, no latency — existing passthrough behavior.
+    /// - `observe`: gate fires; result is logged but request always forwards.
+    /// - `enforce`: gate fires; denied verdict or infra error returns 403 (fail-closed).
+    #[arg(
+        long = "delegates-compute-op-gate",
+        env = "DELEGATES_COMPUTE_OP_GATE",
+        default_value = "off"
+    )]
+    pub op_gate_mode: OpGateMode,
+
+    /// Run in CHE-facing (keyless peer-client) mode.
+    ///
+    /// When `true`, the doorway refuses to start unless:
+    /// - `DELEGATES_COMPUTE_OP_GATE=enforce`
+    /// - `DEV_MODE` is off
+    /// - `JWT_SECRET` is set and at least 32 characters
+    #[arg(long, env = "CHE_FACING", default_value = "false")]
+    pub che_facing: bool,
 }
 
 /// NATS connection configuration
@@ -290,6 +357,29 @@ impl Args {
 
         if self.app_port_min > self.app_port_max {
             return Err("APP_PORT_MIN must be less than or equal to APP_PORT_MAX".to_string());
+        }
+
+        // CHE_FACING: enforce a minimal security baseline for keyless peer-client deployments.
+        // I4: mode must be enforce; I5: dev_mode off + jwt_secret present and ≥32 chars.
+        if self.che_facing {
+            if self.op_gate_mode != OpGateMode::Enforce {
+                return Err("CHE_FACING=1 requires DELEGATES_COMPUTE_OP_GATE=enforce".to_string());
+            }
+            if self.dev_mode {
+                return Err("CHE_FACING=1 is incompatible with DEV_MODE=true".to_string());
+            }
+            match &self.jwt_secret {
+                None => {
+                    return Err("CHE_FACING=1 requires JWT_SECRET to be set".to_string());
+                }
+                Some(s) if s.len() < 32 => {
+                    return Err(format!(
+                        "CHE_FACING=1 requires JWT_SECRET to be at least 32 characters (got {})",
+                        s.len()
+                    ));
+                }
+                _ => {}
+            }
         }
 
         Ok(())

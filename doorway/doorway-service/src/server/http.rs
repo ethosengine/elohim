@@ -22,7 +22,7 @@ use crate::cache::{
     ContentCache, DeliveryRelay, DoorwayResolver, TieredBlobCache, TieredCacheConfig,
 };
 use crate::conductor::{ConductorRegistry, ConductorRouter};
-use crate::config::Args;
+use crate::config::{Args, OpGateMode};
 use crate::db::MongoClient;
 use crate::nats::{HostRouter, NatsClient};
 use crate::orchestrator::OrchestratorState;
@@ -1075,6 +1075,156 @@ fn resolve_agent_cid_from_request<B>(state: &AppState, req: &Request<B>) -> Opti
     }
     result.claims.map(|c| c.human_id)
 }
+
+/// Extract the raw Bearer token string from an `Authorization: Bearer <token>` header.
+///
+/// Returns `None` when the header is absent or not a Bearer scheme.
+/// Used by the op-gate to forward the user's own credential to storage.
+fn extract_bearer_from_req<B>(req: &Request<B>) -> Option<String> {
+    let header = req
+        .headers()
+        .get(hyper::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())?;
+    header
+        .strip_prefix("Bearer ")
+        .or_else(|| header.strip_prefix("bearer "))
+        .map(|t| t.trim().to_string())
+}
+
+// ── delegates-compute op-gate ─────────────────────────────────────────────────
+//
+// Pre-dispatch gate for `POST /db/content` and `POST /db/content/bulk`
+// (both routes invoke `distribute_shards` — the compute-commitment surface).
+//
+// Gate performs a direct call to storage's internal `POST /api/v1/authorize-operation`
+// (NOT proxied through doorway's public surface — that would create a verdict-oracle
+// DoS vector per Review C6). The endpoint is reached on the same `endpoint` URL the
+// StorageProxy disposition carries (the internal sidecar address).
+//
+// Decision matrix:
+//   Off     → forward without calling storage (no latency, no I/O)
+//   Observe → call storage, log result, always forward
+//   Enforce → call storage; allowed → forward; denied|error → 403 (fail-closed)
+
+/// Response body from storage's `POST /api/v1/authorize-operation`.
+///
+/// camelCase per the Rust-to-TS boundary (storage uses `#[serde(rename_all = "camelCase")]`).
+/// We only need `allowed` and `reason`; `commitmentCid` is intentionally ignored here.
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthorizeVerdict {
+    allowed: bool,
+    reason: String,
+}
+
+/// Outcome of the pre-dispatch op-gate decision for one request.
+///
+/// Pure over `(mode, method, path, verdict)` — extracted so the full matrix is
+/// unit-testable without any I/O or running services.
+#[derive(Debug, PartialEq, Eq)]
+enum OpGateDecision {
+    /// Allow the request to proceed to storage.
+    Allow,
+    /// Allow, but emit a tracing warning (Observe mode: would-have-denied).
+    AllowWithWarn,
+    /// Deny with generic 403 (Enforce mode: denied verdict or infra failure).
+    Deny403,
+}
+
+/// Compute the op-gate decision from `(mode, method, path, verdict)`.
+///
+/// This is the pure decision kernel — no I/O, no state.
+///
+/// `verdict`: `Ok(true)` = allowed, `Ok(false)` = denied, `Err(_)` = infra failure.
+/// In `Enforce` mode, both `Ok(false)` and `Err(_)` produce `Deny403` (fail-closed).
+/// The gate only fires for `POST /db/content` and `POST /db/content/bulk`.
+fn compute_op_gate_decision(
+    mode: &OpGateMode,
+    method: &Method,
+    path: &str,
+    verdict: &Result<bool, String>,
+) -> OpGateDecision {
+    // Only POST to the two content-write routes triggers the gate.
+    let is_gated_write =
+        method == Method::POST && (path == "/db/content" || path == "/db/content/bulk");
+    if !is_gated_write || matches!(mode, OpGateMode::Off) {
+        return OpGateDecision::Allow;
+    }
+    match mode {
+        OpGateMode::Off => OpGateDecision::Allow, // unreachable — filtered above
+        OpGateMode::Observe => OpGateDecision::AllowWithWarn,
+        OpGateMode::Enforce => {
+            if matches!(verdict, Ok(true)) {
+                OpGateDecision::Allow
+            } else {
+                OpGateDecision::Deny403
+            }
+        }
+    }
+}
+
+/// Call storage's `POST /api/v1/authorize-operation` and return the verdict.
+///
+/// Uses the doorway's pooled `storage_proxy_client`. The `storage_endpoint` is the
+/// internal base URL (e.g. `http://elohim-storage:8090`) — NOT the public doorway
+/// proxy path (that would expose a verdict-oracle, Review C6).
+///
+/// The user's own Bearer token is forwarded (Review D6: storage can log the requester
+/// identity on its side without the doorway re-issuing a service credential).
+///
+/// Any transport or parse failure is returned as `Err(String)`. The caller treats
+/// this as a denial in Enforce mode (fail-closed) and a logged warning in Observe.
+async fn call_authorize_operation(
+    client: &reqwest::Client,
+    bearer: Option<&str>,
+    performer: &str,
+    capability: &str,
+    storage_endpoint: &str,
+) -> Result<AuthorizeVerdict, String> {
+    let url = format!(
+        "{}/api/v1/authorize-operation",
+        storage_endpoint.trim_end_matches('/')
+    );
+    let body = serde_json::json!({
+        "performer": performer,
+        "capability": capability,
+        "reach": "commons",
+        "targetEprId": null,
+    });
+    let mut req_builder = client.post(&url).json(&body);
+    if let Some(token) = bearer {
+        req_builder = req_builder.header("Authorization", format!("Bearer {token}"));
+    }
+    let resp = req_builder
+        .send()
+        .await
+        .map_err(|e| format!("transport error: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!(
+            "authorize-operation returned HTTP {}",
+            resp.status()
+        ));
+    }
+    resp.json::<AuthorizeVerdict>()
+        .await
+        .map_err(|e| format!("parse error: {e}"))
+}
+
+/// Generic 403 response for op-gate denials.
+///
+/// The body is intentionally vague — the denial reason is logged server-side only
+/// (Review C5/security: commitment internals must not be echoed to the client).
+fn make_op_gate_forbidden() -> Response<Full<Bytes>> {
+    Response::builder()
+        .status(StatusCode::FORBIDDEN)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(
+            r#"{"error":"operation not authorized"}"#,
+        )))
+        .unwrap()
+}
+
+// ── end op-gate helpers ───────────────────────────────────────────────────────
 
 /// Heartbeat interval (ms): how often the MAIN runtime stamps the liveness
 /// heartbeat. Must be well below `HEALTH_STALE_MS_DEFAULT` so a healthy runtime
@@ -3797,6 +3947,87 @@ async fn handle_request(
                             .await,
                         ));
                     }
+
+                    // ── delegates-compute op-gate ─────────────────────────────
+                    // Gate POST /db/content and POST /db/content/bulk before
+                    // forwarding.  Off → no storage call (exact passthrough).
+                    // Observe → log verdict, always forward.
+                    // Enforce → allowed → forward; denied|error → 403 fail-closed.
+                    {
+                        let gate_mode = state.args.op_gate_mode.clone();
+                        let is_gated_write = *req.method() == Method::POST
+                            && (p == "/db/content" || p == "/db/content/bulk");
+                        if gate_mode != OpGateMode::Off && is_gated_write {
+                            // performer = doorway-verified human_id (never the client
+                            // X-Agent-Cid header, which is trivially spoofable — C8).
+                            let performer = match agent_cid_owned.as_ref() {
+                                Some(cid) => cid.clone(),
+                                None => {
+                                    warn!(
+                                        path = %p,
+                                        "op-gate: no verified credential; denying (fail-closed)"
+                                    );
+                                    return Ok(to_boxed(make_op_gate_forbidden()));
+                                }
+                            };
+                            // Forward the user's own Bearer (D6: storage logs requester identity).
+                            let bearer = extract_bearer_from_req(&req);
+                            let verdict = call_authorize_operation(
+                                &state.storage_proxy_client,
+                                bearer.as_deref(),
+                                &performer,
+                                "orchestrate-node",
+                                &endpoint,
+                            )
+                            .await;
+                            let allowed_result: Result<bool, String> = match &verdict {
+                                Ok(v) => Ok(v.allowed),
+                                Err(e) => Err(e.clone()),
+                            };
+                            match compute_op_gate_decision(
+                                &gate_mode,
+                                req.method(),
+                                p,
+                                &allowed_result,
+                            ) {
+                                OpGateDecision::Allow => { /* fall through to forward */ }
+                                OpGateDecision::AllowWithWarn => {
+                                    let summary = match &verdict {
+                                        Ok(v) if v.allowed => {
+                                            format!("would-allow: {}", v.reason)
+                                        }
+                                        Ok(v) => format!("would-deny: {}", v.reason),
+                                        Err(e) => format!("would-deny (error): {e}"),
+                                    };
+                                    warn!(
+                                        path = %p,
+                                        %performer,
+                                        %summary,
+                                        "op-gate OBSERVE"
+                                    );
+                                }
+                                OpGateDecision::Deny403 => {
+                                    match &verdict {
+                                        Ok(v) => warn!(
+                                            path = %p,
+                                            %performer,
+                                            reason = %v.reason,
+                                            "op-gate ENFORCE deny"
+                                        ),
+                                        Err(e) => warn!(
+                                            path = %p,
+                                            %performer,
+                                            error = %e,
+                                            "op-gate ENFORCE deny (infra error)"
+                                        ),
+                                    }
+                                    return Ok(to_boxed(make_op_gate_forbidden()));
+                                }
+                            }
+                        }
+                    }
+                    // ── end op-gate ───────────────────────────────────────────
+
                     return Ok(to_boxed(
                         routes::forward_to_storage(
                         req,
@@ -5306,5 +5537,230 @@ mod admission_tests {
         let would_shed = !admission_exempt(gated, false)
             && std::sync::Arc::clone(&sem).try_acquire_owned().is_err();
         assert!(would_shed, "gated path must shed at 0 permits");
+    }
+}
+
+#[cfg(test)]
+mod op_gate_tests {
+    //! Unit tests for the delegates-compute op-gate decision matrix.
+    //!
+    //! `compute_op_gate_decision` is a pure function over (mode, method, path, verdict);
+    //! these tests pin the full mode × path × verdict matrix without any I/O.
+    //!
+    //! Self-review invariant: the gated path set MUST match the routes that call
+    //! `distribute_shards` in elohim-storage (`/db/content` and `/db/content/bulk`).
+
+    use super::{compute_op_gate_decision, OpGateDecision};
+    use crate::config::OpGateMode;
+    use hyper::Method;
+
+    // ── enforce mode ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn enforce_allowed_yields_allow() {
+        let verdict = Ok(true);
+        assert_eq!(
+            compute_op_gate_decision(&OpGateMode::Enforce, &Method::POST, "/db/content", &verdict),
+            OpGateDecision::Allow,
+            "enforce + allowed:true must forward"
+        );
+    }
+
+    #[test]
+    fn enforce_denied_yields_deny403() {
+        let verdict = Ok(false);
+        assert_eq!(
+            compute_op_gate_decision(&OpGateMode::Enforce, &Method::POST, "/db/content", &verdict),
+            OpGateDecision::Deny403,
+            "enforce + allowed:false must 403"
+        );
+    }
+
+    #[test]
+    fn enforce_error_yields_deny403_fail_closed() {
+        // Infra/transport error in enforce mode → fail-closed (deny).
+        let verdict: Result<bool, String> = Err("storage unreachable".into());
+        assert_eq!(
+            compute_op_gate_decision(&OpGateMode::Enforce, &Method::POST, "/db/content", &verdict),
+            OpGateDecision::Deny403,
+            "enforce + infra error must deny (fail-closed)"
+        );
+    }
+
+    // ── observe mode ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn observe_denied_yields_allow_with_warn() {
+        let verdict = Ok(false);
+        assert_eq!(
+            compute_op_gate_decision(&OpGateMode::Observe, &Method::POST, "/db/content", &verdict),
+            OpGateDecision::AllowWithWarn,
+            "observe + denied must log and forward"
+        );
+    }
+
+    #[test]
+    fn observe_error_yields_allow_with_warn() {
+        let verdict: Result<bool, String> = Err("storage unreachable".into());
+        assert_eq!(
+            compute_op_gate_decision(&OpGateMode::Observe, &Method::POST, "/db/content", &verdict),
+            OpGateDecision::AllowWithWarn,
+            "observe mode always forwards (even on infra error)"
+        );
+    }
+
+    // ── off mode ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn off_yields_allow_for_any_verdict() {
+        // off must short-circuit before any storage call; these tests assert the
+        // decision is Allow regardless of what the verdict would be. The outer
+        // dispatch code is structured so the verdict is never computed when Off.
+        for verdict in [Ok(true), Ok(false), Err("irrelevant".to_string())] {
+            assert_eq!(
+                compute_op_gate_decision(&OpGateMode::Off, &Method::POST, "/db/content", &verdict),
+                OpGateDecision::Allow,
+                "off mode must always allow (no storage call)"
+            );
+        }
+    }
+
+    // ── path gating ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn content_path_is_gated_in_enforce_denied() {
+        let verdict = Ok(false);
+        assert_eq!(
+            compute_op_gate_decision(&OpGateMode::Enforce, &Method::POST, "/db/content", &verdict),
+            OpGateDecision::Deny403,
+            "/db/content must be gated"
+        );
+    }
+
+    #[test]
+    fn bulk_path_is_gated_identically_to_content() {
+        // C5: /db/content/bulk spawns distribute_shards — gate must match /db/content.
+        let verdict = Ok(false);
+        assert_eq!(
+            compute_op_gate_decision(
+                &OpGateMode::Enforce,
+                &Method::POST,
+                "/db/content/bulk",
+                &verdict
+            ),
+            OpGateDecision::Deny403,
+            "/db/content/bulk must be gated identically to /db/content"
+        );
+    }
+
+    #[test]
+    fn non_matching_path_not_gated() {
+        // Paths outside the gated set must never be gated, regardless of mode.
+        let verdict = Ok(false);
+        assert_eq!(
+            compute_op_gate_decision(&OpGateMode::Enforce, &Method::POST, "/db/other", &verdict),
+            OpGateDecision::Allow,
+            "/db/other must never be gated"
+        );
+    }
+
+    #[test]
+    fn get_method_not_gated_even_on_content_path() {
+        // GET requests are read-only — never gated, even on the content paths.
+        let verdict = Ok(false);
+        assert_eq!(
+            compute_op_gate_decision(&OpGateMode::Enforce, &Method::GET, "/db/content", &verdict),
+            OpGateDecision::Allow,
+            "GET /db/content must never be gated"
+        );
+    }
+
+    // ── config: CHE_FACING boot-refusals ─────────────────────────────────────
+
+    #[test]
+    fn che_facing_requires_enforce_mode() {
+        use crate::config::Args;
+        use clap::Parser;
+        // Simulate CHE_FACING=1 with the wrong mode — validate() must reject.
+        let args = Args::try_parse_from([
+            "doorway",
+            "--che-facing",
+            "--delegates-compute-op-gate",
+            "off",
+            "--jwt-secret",
+            "a-secret-that-is-at-least-32-chars-long",
+        ])
+        .expect("parse must succeed");
+        let err = args
+            .validate()
+            .expect_err("che_facing+off must be rejected");
+        assert!(
+            err.contains("enforce"),
+            "error must mention enforce; got: {err}"
+        );
+    }
+
+    #[test]
+    fn che_facing_requires_jwt_secret_32_chars() {
+        use crate::config::Args;
+        use clap::Parser;
+        let args = Args::try_parse_from([
+            "doorway",
+            "--che-facing",
+            "--delegates-compute-op-gate",
+            "enforce",
+            "--jwt-secret",
+            "short",
+        ])
+        .expect("parse must succeed");
+        let err = args
+            .validate()
+            .expect_err("short jwt_secret must be rejected");
+        assert!(
+            err.contains("32"),
+            "error must mention 32 chars; got: {err}"
+        );
+    }
+
+    #[test]
+    fn che_facing_rejects_dev_mode() {
+        use crate::config::Args;
+        use clap::Parser;
+        let args = Args::try_parse_from([
+            "doorway",
+            "--che-facing",
+            "--dev-mode",
+            "--delegates-compute-op-gate",
+            "enforce",
+            "--jwt-secret",
+            "a-secret-that-is-at-least-32-chars-long",
+        ])
+        .expect("parse must succeed");
+        let err = args
+            .validate()
+            .expect_err("che_facing+dev_mode must be rejected");
+        assert!(
+            err.contains("DEV_MODE"),
+            "error must mention DEV_MODE; got: {err}"
+        );
+    }
+
+    #[test]
+    fn che_facing_passes_with_correct_config() {
+        use crate::config::Args;
+        use clap::Parser;
+        let args = Args::try_parse_from([
+            "doorway",
+            "--che-facing",
+            "--delegates-compute-op-gate",
+            "enforce",
+            "--jwt-secret",
+            "a-secret-that-is-at-least-32-chars-long",
+        ])
+        .expect("parse must succeed");
+        assert!(
+            args.validate().is_ok(),
+            "CHE_FACING with enforce+jwt_secret(32+) must pass"
+        );
     }
 }
