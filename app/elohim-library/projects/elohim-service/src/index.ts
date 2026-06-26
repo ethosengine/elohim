@@ -118,7 +118,6 @@ export {
   isAboveGate,
   compareMasteryLevels,
   MASTERY_LEVEL_VALUES,
-  BLOOM_LEVEL_VALUES,
   ATTESTATION_GATE_LEVEL,
 } from './angular/models/agent.model';
 

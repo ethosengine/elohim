@@ -39,7 +39,6 @@ export {
   isAboveGate,
   compareMasteryLevels,
   MASTERY_LEVEL_VALUES,
-  BLOOM_LEVEL_VALUES,
   ATTESTATION_GATE_LEVEL,
 } from '@elohim/service/angular/models/agent.model';
 export * from './elohim-agent.model';

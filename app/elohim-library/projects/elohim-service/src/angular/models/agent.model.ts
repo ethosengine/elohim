@@ -241,11 +241,6 @@ export const MASTERY_LEVEL_VALUES: Record<MasteryLevel, number> = {
 };
 
 /**
- * @deprecated Use MASTERY_LEVEL_VALUES instead.
- */
-export const BLOOM_LEVEL_VALUES = MASTERY_LEVEL_VALUES;
-
-/**
  * The level at which participation privileges unlock.
  * Below this: passive learning (practice anything, no contribution privileges)
  * At/above this: active participation (comment, review, create)
