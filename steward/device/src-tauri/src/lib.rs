@@ -536,6 +536,37 @@ pub fn run() {
                                 })();
                                 "#,
                             )
+                            .initialization_script(
+                                &format!(
+                                    r#"
+                                // Load the omnibar runtime element from the local elohim-storage sidecar.
+                                //
+                                // The doorway already injects omni-element.js into SSR'd HTML for the
+                                // browser path — this block covers the Tauri webview only.
+                                //
+                                // Guard: skip if the element is already registered (idempotent) or if
+                                // a loader script is already present (e.g. dev hot-reload double-fire).
+                                (function() {{
+                                    if (
+                                        (typeof customElements !== 'undefined' && customElements.get('elohim-omni-bar')) ||
+                                        document.querySelector('script[data-elohim-omni]')
+                                    ) {{
+                                        console.log('[STEWARD] omni-element already present, skipping loader');
+                                        return;
+                                    }}
+                                    var script = document.createElement('script');
+                                    script.setAttribute('data-elohim-omni', '');
+                                    // Absolute URL to the local sidecar — the webview origin is NOT :8090,
+                                    // so a relative /chrome/... reference would resolve to the wrong host.
+                                    script.src = 'http://localhost:{port}/chrome/omni-element.js';
+                                    script.defer = true;
+                                    document.head.appendChild(script);
+                                    console.log('[STEWARD] omni-element loader injected from local sidecar :{port}');
+                                }})();
+                                "#,
+                                    port = STORAGE_PORT
+                                ),
+                            )
                             .build()
                             .expect("Failed to open main window");
                     });
