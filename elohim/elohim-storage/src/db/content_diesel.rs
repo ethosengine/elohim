@@ -71,6 +71,11 @@ pub struct UpdateContentInput {
     /// projects. Written by Jenkinsfile:stageSpaBlob at deploy time. None
     /// means "no change" — preserves existing blob_hash on the row.
     pub blob_hash: Option<String>,
+    /// Content-addressed hash of the Angular SSR *server* bundle this row
+    /// projects (the browser bundle is `blob_hash`). Written by the Jenkins SSR
+    /// PATCH at deploy time. None means "no change" — preserves the existing
+    /// `server_blob_hash` on the row (no-clobber, mirrors `blob_hash`).
+    pub server_blob_hash: Option<String>,
     /// RFC-3339 timestamp marking DHT publication. The drain loop is the
     /// canonical writer (see `mark_published`); this PATCH-path field lets the
     /// genesis seeder stamp it directly so household/local stacks with no DHT
@@ -358,6 +363,8 @@ pub fn create_content(
             created_by: input.created_by.as_deref(),
             content_body: input.content_body.as_deref(),
             dht_anchor_hash: input.dht_anchor_hash.as_deref(),
+            // SSR server bundle hash is deploy-PATCH populated, never at create time.
+            server_blob_hash: None,
         };
 
         diesel::insert_into(content::table)
@@ -434,6 +441,8 @@ pub fn bulk_create_content(
                 created_by: input.created_by.as_deref(),
                 content_body: input.content_body.as_deref(),
                 dht_anchor_hash: input.dht_anchor_hash.as_deref(),
+                // SSR server bundle hash is deploy-PATCH populated, never at seed time.
+                server_blob_hash: None,
             };
 
             match diesel::insert_into(content::table)
@@ -509,6 +518,12 @@ pub fn update_content(
         .blob_hash
         .as_deref()
         .or(existing.content.blob_hash.as_deref());
+    // No-clobber: a serverBlobHash-only PATCH falls back to the existing
+    // server_blob_hash; a blob_hash-only PATCH leaves server_blob_hash untouched.
+    let new_server_blob_hash = input
+        .server_blob_hash
+        .as_deref()
+        .or(existing.content.server_blob_hash.as_deref());
     let new_p2p_published_at = input
         .p2p_published_at
         .as_deref()
@@ -530,6 +545,7 @@ pub fn update_content(
             content::metadata_json.eq(new_metadata_json),
             content::reach.eq(new_reach),
             content::blob_hash.eq(new_blob_hash),
+            content::server_blob_hash.eq(new_server_blob_hash),
             content::p2p_published_at.eq(new_p2p_published_at),
             content::updated_at.eq(&now),
         ))
@@ -767,6 +783,9 @@ pub fn upsert_with_anchor(
             created_by: None,
             content_body: None,
             dht_anchor_hash: None,
+            // SSR server bundle hash is deploy-PATCH populated, not set on this
+            // defensive DHT-projection insert path.
+            server_blob_hash: None,
         };
 
         diesel::insert_into(content::table)
@@ -1099,6 +1118,7 @@ mod tests {
                 content_format TEXT NOT NULL DEFAULT 'markdown',
                 content_body TEXT,
                 blob_hash TEXT,
+                server_blob_hash TEXT,
                 blob_cid TEXT,
                 content_size_bytes INTEGER,
                 metadata_json TEXT,
@@ -1833,6 +1853,7 @@ mod tests {
             tags: None,
             reach: None,
             blob_hash: None,
+            server_blob_hash: None,
             p2p_published_at: None,
         };
         assert_eq!(input.id, "test-id");
@@ -1936,6 +1957,88 @@ mod tests {
         assert_eq!(
             result.content.description.as_deref(),
             Some("Original Description")
+        );
+    }
+
+    /// PATCH semantics (SSR row collapse T2): setting only `server_blob_hash`
+    /// persists it, returns it on the subsequent read, and does NOT clobber
+    /// `blob_hash` or other fields — and vice-versa, a later `blob_hash`-only
+    /// PATCH retains the previously-set `server_blob_hash`. This is the deploy-time
+    /// SSR PATCH path (browser bundle → blob_hash, server bundle → server_blob_hash,
+    /// patched independently per host).
+    #[test]
+    fn test_update_content_server_blob_hash_only_preserves_and_no_clobber() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        // Seed the one landing row with a browser blob_hash already set; no SSR yet.
+        let create = CreateContentInput {
+            id: "elohim-host-landing".to_string(),
+            title: "Landing".to_string(),
+            description: Some("Landing desc".to_string()),
+            content_type: "concept".to_string(),
+            content_format: "spa-bundle".to_string(),
+            blob_hash: Some("sha256-browser".to_string()),
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "commons".to_string(),
+            created_by: None,
+            content_body: None,
+            dht_anchor_hash: None,
+            tags: vec![],
+        };
+        bulk_create_content(&mut conn, &ctx, vec![create]).unwrap();
+        // Pre-state: server_blob_hash absent (the normal pre-deploy state).
+        let pre = get_content_with_tags(&mut conn, &ctx, "elohim-host-landing", false)
+            .unwrap()
+            .unwrap();
+        assert_eq!(pre.content.server_blob_hash, None);
+
+        // PATCH only server_blob_hash — must persist it and leave blob_hash/title alone.
+        let update = UpdateContentInput {
+            id: "elohim-host-landing".to_string(),
+            server_blob_hash: Some("sha256-ssrserver".to_string()),
+            ..Default::default()
+        };
+        let result = update_content(&mut conn, &ctx, update).unwrap();
+        assert_eq!(
+            result.content.server_blob_hash.as_deref(),
+            Some("sha256-ssrserver"),
+            "serverBlobHash-only PATCH persists serverBlobHash"
+        );
+        assert_eq!(
+            result.content.blob_hash.as_deref(),
+            Some("sha256-browser"),
+            "serverBlobHash-only PATCH must NOT clobber blob_hash"
+        );
+        assert_eq!(result.content.title, "Landing");
+
+        // GET-equivalent re-read returns serverBlobHash (round-trip).
+        let got = get_content_with_tags(&mut conn, &ctx, "elohim-host-landing", false)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            got.content.server_blob_hash.as_deref(),
+            Some("sha256-ssrserver")
+        );
+
+        // Now PATCH only blob_hash — must update blob_hash AND retain serverBlobHash.
+        let update2 = UpdateContentInput {
+            id: "elohim-host-landing".to_string(),
+            blob_hash: Some("sha256-browser-v2".to_string()),
+            ..Default::default()
+        };
+        let result2 = update_content(&mut conn, &ctx, update2).unwrap();
+        assert_eq!(
+            result2.content.blob_hash.as_deref(),
+            Some("sha256-browser-v2"),
+            "blob_hash-only PATCH updates blob_hash"
+        );
+        assert_eq!(
+            result2.content.server_blob_hash.as_deref(),
+            Some("sha256-ssrserver"),
+            "blob_hash-only PATCH must retain the previously-set serverBlobHash (no clobber)"
         );
     }
 }

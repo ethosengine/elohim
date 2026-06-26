@@ -1422,6 +1422,66 @@ fn epr_providers_view_conforms() {
     validate_against_schema("views/epr-providers-view.schema.json", &json);
 }
 
+/// Build a `ContentView` with every required field populated. `server_blob_hash`
+/// is the field under test (SSR row-collapse T1) — varied by the caller.
+fn sample_content_view(server_blob_hash: Option<String>) -> elohim_views::ContentView {
+    elohim_views::ContentView {
+        id: "elohim-host-landing".into(),
+        h_app_id: "lamad".into(),
+        title: "Elohim Host Landing".into(),
+        description: None,
+        content_type: "concept".into(),
+        content_format: "spa-bundle".into(),
+        blob_hash: Some(format!("sha256-{}", "ab".repeat(32))),
+        server_blob_hash,
+        blob_cid: None,
+        content_size_bytes: None,
+        metadata: None,
+        reach: "commons".into(),
+        validation_status: "valid".into(),
+        created_by: None,
+        created_at: "2026-06-26T00:00:00Z".into(),
+        updated_at: "2026-06-26T00:00:00Z".into(),
+        content_body: None,
+        dht_anchor_hash: None,
+    }
+}
+
+/// Round-trip: a `ContentView` carrying `serverBlobHash` conforms to the schema,
+/// and the wire key is exactly `serverBlobHash` (camelCase), mirroring `blobHash`.
+/// `content-view.schema.json` is `additionalProperties: false`, so this also
+/// proves the schema declares the new optional field.
+#[test]
+fn content_view_with_server_blob_hash_conforms() {
+    let v = sample_content_view(Some(format!("sha256-{}", "cd".repeat(32))));
+    let json = serde_json::to_value(&v).unwrap();
+    assert!(
+        json.get("serverBlobHash")
+            .and_then(|x| x.as_str())
+            .is_some(),
+        "serverBlobHash must surface on the wire as a camelCase string"
+    );
+    assert!(
+        json.get("server_blob_hash").is_none(),
+        "snake_case server_blob_hash must NOT leak to the wire"
+    );
+    validate_against_schema("views/content-view.schema.json", &json);
+}
+
+/// Absent `serverBlobHash` is the normal pre-deploy state — it serializes to
+/// `null` and must still conform (the field is optional/nullable, not required).
+#[test]
+fn content_view_without_server_blob_hash_conforms() {
+    let v = sample_content_view(None);
+    let json = serde_json::to_value(&v).unwrap();
+    assert_eq!(
+        json.get("serverBlobHash"),
+        Some(&serde_json::Value::Null),
+        "absent serverBlobHash serializes to null"
+    );
+    validate_against_schema("views/content-view.schema.json", &json);
+}
+
 #[test]
 fn epr_providers_view_schema_parses() {
     // Ensures the schema file is present and valid JSON Schema — will panic if not.

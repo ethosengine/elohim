@@ -125,6 +125,7 @@ pub async fn run_once(
             tags: None,
             reach: None,
             blob_hash: None,
+            server_blob_hash: None,
             p2p_published_at: None,
         };
         match content_service

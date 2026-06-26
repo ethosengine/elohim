@@ -9947,6 +9947,11 @@ impl HttpServer {
 /// tags) stay on the legacy diesel path.
 /// Note: `p2p_published_at` is deliberately excluded — it is a provenance stamp,
 /// not a DHT entry field, so its diesel write is not subject to reconciliation-controller reversion.
+/// `server_blob_hash` is likewise excluded — it is the SSR *server* bundle hash, a deploy-time
+/// projection artifact (not part of the notarized content entry, whose content address is
+/// `blob_cid`). Routing a serverBlobHash-only PATCH through the conductor would 503 on
+/// household/local stacks with no conductor bridge; the diesel-direct write is correct and is
+/// not reverted by the reconciliation controller.
 fn patch_needs_conductor(view: &UpdateContentInputView) -> bool {
     view.blob_hash.is_some() || view.reach.is_some()
 }
@@ -12228,6 +12233,7 @@ mod tests {
             tags: None,
             reach: reach.map(str::to_string),
             blob_hash: blob_hash.map(str::to_string),
+            server_blob_hash: None,
             p2p_published_at: None,
         }
     }
@@ -12261,6 +12267,19 @@ mod tests {
         assert!(
             !patch_needs_conductor(&titled),
             "title-only PATCH can use diesel"
+        );
+
+        // A serverBlobHash-only PATCH (the SSR deploy path) must NOT route to the
+        // conductor — server_blob_hash is a deploy-projection artifact, not a
+        // DNA-notarized content-entry field. Routing it through the conductor
+        // would 503 on household/local stacks with no conductor bridge.
+        let ssr = UpdateContentInputView {
+            server_blob_hash: Some("sha256-ssrserver".into()),
+            ..patch_view(None, None)
+        };
+        assert!(
+            !patch_needs_conductor(&ssr),
+            "serverBlobHash-only PATCH must stay on the diesel-direct path"
         );
     }
 

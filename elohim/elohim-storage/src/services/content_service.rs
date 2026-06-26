@@ -199,6 +199,7 @@ impl ContentService {
             tags: view.tags,
             reach: view.reach,
             blob_hash: view.blob_hash,
+            server_blob_hash: view.server_blob_hash,
             p2p_published_at: view.p2p_published_at,
         };
 
@@ -415,6 +416,23 @@ impl ContentService {
         {
             let mut conn = self.conn()?;
             content_diesel::upsert_with_anchor(&mut conn, &self.ctx, id, patch, &action_hash_str)?;
+        }
+
+        // `server_blob_hash` is a deploy-projection field, not part of the
+        // notarized content entry — the conductor round-trip + ContentProjectionPatch
+        // above do not carry it. If this PATCH also set serverBlobHash (e.g. a
+        // combined {blobHash, serverBlobHash} body that routed here via
+        // patch_needs_conductor), persist it diesel-direct so it isn't dropped.
+        // No-clobber: only server_blob_hash is set; update_content preserves all
+        // other fields (the just-projected anchor/blob_cid included).
+        if view.server_blob_hash.is_some() {
+            let mut conn = self.conn()?;
+            let server_patch = content_diesel::UpdateContentInput {
+                id: id.to_string(),
+                server_blob_hash: view.server_blob_hash.clone(),
+                ..Default::default()
+            };
+            content_diesel::update_content(&mut conn, &self.ctx, server_patch)?;
         }
 
         let updated = {
