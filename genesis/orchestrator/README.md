@@ -108,28 +108,27 @@ Read it before debugging a "regression" or proposing a measure/baseline change �
 
 ## Before Editing Orchestrator Dispatch Logic
 
-Read all four substrate pieces before touching Execute Builds, dispatch ordering, or trigger logic:
-- `orchestrator-strategy.mjs` — pure-JS algorithm mirror of the Groovy decision logic (`simulate`, `groupByDependencyLevel`, `propagateDependencies`)
-- `preview.mjs` — `just ci-preview`, runs `simulate()` locally pre-push to print predicted dispatch
-- `Jenkinsfile` `groupByDependencyLevel` and `triggerPipeline` (Groovy that mirrors strategy.mjs)
-- `orchestrator-strategy.test.mjs` — drift detector between Groovy and JS; keep it green
+Read the substrate pieces before touching Execute Builds, dispatch ordering, or trigger logic:
+- `graph-walker.mjs` (`walkGraph`) — JS change-detection for local pre-push; reads `build-manifest.json` source-globs to compute which pipelines are affected
+- `build-graph.groovy` (`walkBuildGraph`) — the server-side Groovy mirror of the same manifest-walk; runs in Jenkins
+- `preview.mjs` — `just ci-preview`, imports `pipeline-registry.mjs` + `graph-walker.mjs` to print predicted dispatch locally pre-push
+- `Jenkinsfile` `groupByDependencyLevel` and `triggerPipeline` (Groovy dispatch loop)
 
-Key invariants that naive edits break: `levelFailed` guard must abort downstream; baselines advance only after confirmed success; `cascades: false` pipelines (sophia, epr) opt out of downstream auto-include; Genesis is intentionally outside the levels loop. Any edit to `orderByDependencies`, `groupByDependencyLevel`, `propagateDependencies`, or the PIPELINES map **must** be mirrored in `orchestrator-strategy.mjs` — the test catches missed mirroring.
+Key invariants that naive edits break: `levelFailed` guard must abort downstream; baselines advance only after confirmed success; `cascades: false` pipelines (sophia, epr) opt out of downstream auto-include; Genesis is intentionally outside the levels loop. Any edit to `orderByDependencies`, `groupByDependencyLevel`, `propagateDependencies`, or pipeline metadata in `build-manifest.json` files must be reflected in `build-graph.groovy`.
 
-Note: `graph-walker.mjs` is per-pipeline manifest-step gating (lint/test); `groupByDependencyLevel` is orchestrator-level dispatch ordering. Different layers, different concerns.
+Note: `graph-walker.mjs` is per-pipeline manifest-step gating (change detection + lint/test); `groupByDependencyLevel` is orchestrator-level dispatch ordering. Different layers, different concerns.
 
 ## Predictive Build-Graph Vision
 
 The long-term target: predict what will run before you push, reconcile against what actually ran, and treat every disconnect as an investigation. Three-hour build runs hide cascading failures inside a single opaque "Execute Builds" stage; visible structure surfaces drift before it becomes a mystery.
 
 The substrate already exists — don't rebuild it:
-- `orchestrator-strategy.mjs` (`simulate()`) computes the predicted dispatch graph locally
-- `preview.mjs` runs it pre-push
-- `orchestrator-strategy.test.mjs` keeps Groovy/JS in sync
+- `preview.mjs` (`walkGraph` via `graph-walker.mjs`) computes the predicted dispatch graph locally pre-push
+- `pipeline-registry.mjs` is the single source of pipeline metadata (loaded from `build-manifest.json` files)
 
 Planned iterations (each safe to land independently):
 1. **Visibility** — nest stages inside Execute Builds so Blue Ocean shows level structure with per-pipeline timing. Presentation only, no behavior change.
-2. **Reconciliation artifact** — emit `predicted-build-graph.json` (from `simulate()`) and `actual-build-graph.json` (from Execute Builds results), then diff in a Reconcile stage.
+2. **Reconciliation artifact** — emit `predicted-build-graph.json` (from `walkGraph`) and `actual-build-graph.json` (from Execute Builds results), then diff in a Reconcile stage.
 3. **Drift escalation** — any predicted-vs-actual disconnect marks UNSTABLE with an investigation pointer.
 
 ## Seed Stage — Per-Peer, Not All-or-Nothing

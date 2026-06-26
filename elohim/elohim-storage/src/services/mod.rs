@@ -48,6 +48,7 @@ pub mod elohim_gate;
 pub mod epr_compose;
 pub mod epr_kind;
 pub mod epr_nav_context_view; // Category C read-only projection for nav-context endpoint
+pub mod epr_raw_view; // Category C read-only projection for the /raw inspector (EPR-content facing Slice 2)
 pub mod epr_service;
 pub mod epr_store;
 pub mod events;

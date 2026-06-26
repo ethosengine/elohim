@@ -12047,6 +12047,18 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/epr/:cid/raw — EPR-content facing inspector (Category C read-only)
+        // Folds epr_coupling into legs + neighborhood degree + reverse part-of.
+        // Zero new DHT entry types; zero new tables; zero migrations.
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/epr/{cid}/raw")
+                .handler("get_epr_raw")
+                .cache_ttl(30)
+                .public_if_reach("commons")
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/collective + /api/v1/collab — Multi-collective collaboration EPR M1
         // See genesis/docs/content/elohim-protocol/architecture/2026-05-23-multi-collective-collaboration-epr-design.md
         // Writes require auth (imagodei conductor bridge); reads are public.

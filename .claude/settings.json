@@ -129,6 +129,16 @@
             "timeout": 3000
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/epr-meta-resolver.py\"",
+            "timeout": 3000
+          }
+        ]
       }
     ],
     "PostToolUse": [

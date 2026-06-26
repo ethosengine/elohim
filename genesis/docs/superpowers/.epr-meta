@@ -1,0 +1,22 @@
+---
+epr-meta-version: 1
+id: superpowers-docs-governance
+root: true
+purpose: >
+  Specs and plans — the authored design surface. Born-linked, decomposes to gaps,
+  graduates to history; never parked. See the framing spec for the full law.
+rules:
+  - id: doc-frontmatter-at-birth
+    class: deny
+    when: { write: "*.md", new: true }
+    require-frontmatter: [id, status, cites]
+    why: "No doc born without id + status + cites (the .epr-meta law)."
+validators: []
+max-cascade-depth: 8
+cites:
+  - 2026-06-25-doc-lifecycle-as-epr-development-substrate-design
+---
+
+# superpowers/ — authored design surface
+
+The base governance for specs and plans. Child `.epr-meta` files tighten this per-directory.

@@ -141,6 +141,8 @@ const INTERFACE_FILES = [
   { src: 'views/topology-overview-view.ts', dest: 'topology-overview-view.ts' },
   // EPR nav-context projection -- Category C read-only, no new DHT types
   { src: 'views/epr-nav-context-view.ts', dest: 'epr-nav-context-view.ts' },
+  // EPR-content facing /raw inspector -- Category C read-only, no new DHT types
+  { src: 'views/epr-raw-view.ts', dest: 'epr-raw-view.ts' },
   // M1 multi-collective collaboration substrate — Category C wire projections of Phase A DHT entries
   { src: 'objects/share-allocation.ts', dest: 'share-allocation.ts' },
   { src: 'inputs/create-collective-input.ts', dest: 'create-collective-input.ts' },

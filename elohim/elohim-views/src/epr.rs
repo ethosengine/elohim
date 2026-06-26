@@ -208,3 +208,36 @@ pub struct EprNavContextView {
     #[serde(default)]
     pub derived_from: Vec<String>,
 }
+
+/// Raw inspector projection for GET /api/v1/epr/{cid}/raw — the EPR-content
+/// facing's first-person fold over its materialized leg-neighborhood. Where
+/// `/nav-context` is the navigational projection (labelled refs, prev/next),
+/// `/raw` is the inspector: the bare folds with no enrichment.
+///
+/// Source of truth: existing `epr_coupling` table (read-only projection of
+/// notarized EPR atoms). Zero new DHT entry types, zero new tables, zero
+/// migrations — Category C per p2p-design-gate.
+///
+/// Folds (pure, DB-free): `elohim_facings::folds::epr_content::{fold_coupling_legs,
+/// neighborhood_degree, reverse_part_of}`. Charter:
+/// `genesis/docs/superpowers/specs/2026-06-19-epr-content-perspective-facing-lens-design.md` §6 Slice 2.
+///
+/// Honesty note: `coupling` carries the three modelled legs (knowledge / value /
+/// governance). The unmodelled `process` leg is dropped by the fold — `/raw` v1
+/// does NOT advertise 4-of-4 leg coverage (charter Slice 1 owns `process`).
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct EprRawView {
+    /// CIDv1 base32 of the focal atom.
+    pub cid: String,
+    /// Forward coupling legs (knowledge / value / governance) pivoted from
+    /// the focal atom's `epr_coupling` rows.
+    pub coupling: EprCouplingView,
+    /// Count of DISTINCT forward coupling targets across all legs (the content's
+    /// immediate dataplane reach — a multi-leg coupling to one target counts once).
+    pub neighborhood_degree: i32,
+    /// DISTINCT source atoms that couple TO this atom (inbound "part-of" set),
+    /// sorted for deterministic wire order. Each entry is a CIDv1 base32 string.
+    pub reverse_part_of: Vec<String>,
+}

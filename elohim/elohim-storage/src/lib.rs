@@ -261,7 +261,7 @@ pub use views::{
 pub use views::{AttestationView, GovernanceActionTallyView, GovernanceActionView};
 pub use views::{ComputeTriptych, MishpatCommitmentView, WeaveView};
 pub use views::{
-    EprCouplingView, EprEnvelopeView, EprListView, EprProvidersView, EprPublishInput,
+    EprCouplingView, EprEnvelopeView, EprListView, EprProvidersView, EprPublishInput, EprRawView,
     EprSignatureView, EprVerifyErrorView, EprVerifyView, EprView,
 };
 pub use views::{

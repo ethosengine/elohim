@@ -1,0 +1,28 @@
+---
+epr-meta-version: 1
+id: repo-root-governance
+root: true
+purpose: >
+  The repo-root constitutional base. Carries ONLY the build-time ci-trigger: leg (the cross-cutting
+  CI-ignore set, projected into the flat .ci-ignore) and no author-time rules — so it changes nothing
+  about authoring repo-wide; it only anchors the cascade and hosts the ignores that cannot decentralize
+  (basename-anywhere + repo-root exact paths).
+ci-trigger:
+  ignore:
+    - .claude/
+    - .github/
+    - .husky/
+    - ROADMAP.md
+    - genesis/orchestrator/Jenkinsfile
+    - genesis/orchestrator/build-graph.groovy
+    - CLAUDE.md
+    - AGENTS.md
+    - GEMINI.md
+    - .no-claude.md
+---
+
+# repo root — constitutional base
+
+Carries the cross-cutting `ci-trigger:` ignore set (projected into `.ci-ignore` by
+`.claude/scripts/ci-ignore-projector.py`) and no author-time rules. **`.ci-ignore` is GENERATED from
+this leg — never hand-edit it.**

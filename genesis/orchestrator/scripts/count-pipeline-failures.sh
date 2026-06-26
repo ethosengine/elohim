@@ -15,7 +15,7 @@ set -u
 JENKINS_URL="${JENKINS_URL:-https://jenkins.ethosengine.com}"
 
 # Read pipeline names from pipeline-list.json (generated from
-# orchestrator-strategy.mjs by scripts/generate-pipeline-list.mjs).
+# build-manifest.json via pipeline-registry.mjs by scripts/generate-pipeline-list.mjs).
 # Include elohim-orchestrator explicitly because it's the orchestrator
 # itself and not in the dispatchable downstream set.
 REPO_ROOT="$(git rev-parse --show-toplevel)"

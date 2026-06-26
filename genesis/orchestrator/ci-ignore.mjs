@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 // .ci-ignore — gitignore-style patterns for files that NEVER trigger
-// source pipelines. Single source of truth: the repo-root `.ci-ignore`.
+// source pipelines. Source of truth: the repo-root `.epr-meta` ci-trigger
+// leg; `.ci-ignore` is GENERATED from it by .claude/scripts/ci-ignore-projector.py
+// (never hand-edit it — the pre-push freshness gate enforces this).
 //
-// This module is the shared JS port of that file. Consumers:
-//   - orchestrator-strategy.mjs  (analyzePipelineRequirements)
+// This module is the shared JS port that reads the generated `.ci-ignore`. Consumers:
 //   - graph-walker.mjs CLI        (.husky/pre-push pipes $CHANGED through it)
-//   - .husky/pre-push             (direct CLI filter for the fallback path)
+//   - .husky/pre-push             (direct CLI filter before project detection)
 //
-// The Jenkinsfile mirrors this logic in Groovy (loadCiIgnore / isCiIgnored)
-// because Groovy can't import .mjs; drift between the two is caught by
-// orchestrator-strategy.test.mjs which loads BOTH and compares parses.
+// CI does NOT apply .ci-ignore: build-graph.groovy relies on manifest
+// source-globs (a path matching no source glob triggers nothing). .ci-ignore
+// is a local/pre-push optimization.
 //
 // Library usage:
 //   import { matchesCiIgnore, CI_IGNORE_PATTERNS, filterChanged } from './ci-ignore.mjs';

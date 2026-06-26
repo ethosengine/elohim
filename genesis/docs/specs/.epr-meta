@@ -1,0 +1,16 @@
+---
+epr-meta-version: 1
+id: docs-specs-legacy-routing
+purpose: "Legacy/parallel specs dir. New design specs belong in the governed home genesis/docs/superpowers/specs/ (full lifecycle gate)."
+rules:
+  - id: route-specs-to-governed-home
+    class: ask
+    when: { write: "*.md", new: true }
+    route-to: { dest: genesis/docs/superpowers/specs/ }
+    why: "New specs go to genesis/docs/superpowers/specs/ where the lifecycle frontmatter gate lives — not this ungoverned legacy dir."
+---
+# docs/specs (legacy)
+
+This directory predates the superpowers governance and bypasses the spec lifecycle gate. New specs are
+routed (at birth) to `genesis/docs/superpowers/specs/`, where the full frontmatter gate awaits. Existing
+files are left in place.

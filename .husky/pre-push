@@ -236,6 +236,23 @@ if echo "$CHANGED" | grep -qE "genesis/data/account-packages/|genesis/data/human
   echo "[pre-push] account-packages validation ✓"
 fi
 
+# ── .ci-ignore freshness (projected from the .epr-meta ci-trigger cascade) ──
+#
+# When any .epr-meta or the generated .ci-ignore changes, ensure .ci-ignore is
+# fresh relative to the root .epr-meta ci-trigger leg. Fail-open if python3 is
+# absent (degraded shell) — same posture as the node-guarded blocks above.
+if echo "$CHANGED" | grep -qE "(^|/)\.epr-meta$|^\.ci-ignore$"; then
+  if command -v python3 >/dev/null 2>&1; then
+    echo "[pre-push] Verifying .ci-ignore is fresh relative to the .epr-meta ci-trigger leg..."
+    if ! python3 .claude/scripts/ci-ignore-projector.py --verify; then
+      echo "[pre-push] ERROR: .ci-ignore is stale relative to the root .epr-meta."
+      echo "  Run: python3 .claude/scripts/ci-ignore-projector.py && git add .ci-ignore"
+      exit 1
+    fi
+    echo "[pre-push] .ci-ignore freshness ✓"
+  fi
+fi
+
 # ── Project Detection (manifest-driven) ──────────────────────────
 #
 # Try graph walker first — reads build-manifest.json files and matches
@@ -259,9 +276,9 @@ if command -v node >/dev/null 2>&1; then
   fi
 fi
 
-# Pipeline-list freshness: if orchestrator-strategy.mjs changed, the
-# generated pipeline-list.json must be regenerated and committed.
-if echo "$CHANGED" | grep -q "^genesis/orchestrator/orchestrator-strategy.mjs$"; then
+# Pipeline-list freshness: if any build-manifest.json or pipeline-registry.mjs
+# changed, the generated pipeline-list.json must be regenerated and committed.
+if echo "$CHANGED" | grep -qE "(^|/)build-manifest\.json$|^genesis/orchestrator/pipeline-registry\.mjs$"; then
   PROJECTS="$PROJECTS pipeline-list-fresh"
 fi
 
@@ -304,7 +321,7 @@ if [ "$USE_MANIFEST" = false ]; then
   fi
   # elohim-storybook: registry-defined paths include graphos source content
   # (genesis/docs/content/elohim-protocol/**, genesis/graphos/**, genesis/a2o/features/**)
-  # — keep this grep aligned with orchestrator-strategy.mjs PIPELINES['elohim-storybook'].changePatterns.
+  # — keep this grep aligned with pipeline-registry.mjs changePatterns for elohim-storybook.
   if echo "$CHANGED" | grep -qE "^app/elohim-library/|^genesis/docs/content/elohim-protocol/|^genesis/graphos/|^genesis/a2o/features/"; then
     PROJECTS="$PROJECTS elohim-storybook"
   fi
@@ -641,7 +658,7 @@ run_gate() {
         echo "[$PROJECT_NAME] Verifying pipeline-list.json is fresh..."
         node genesis/orchestrator/scripts/generate-pipeline-list.mjs >/dev/null
         if ! git diff --quiet -- genesis/orchestrator/pipeline-list.json; then
-          echo "ERROR: pipeline-list.json is stale relative to orchestrator-strategy.mjs"
+          echo "ERROR: pipeline-list.json is stale relative to build-manifest.json / pipeline-registry.mjs"
           echo "  Run: just -d genesis/orchestrator ci-pipeline-list && git add genesis/orchestrator/pipeline-list.json"
           rc=1
         else
@@ -755,7 +772,7 @@ run_gate() {
         # genesis/orchestrator justfile gate (gate: lint) omits.
         # Delete only after genesis/orchestrator/justfile gate: adds node tests.
         bash scripts/lint-jenkinsfiles-fast.sh 2>&1 && \
-        node --test orchestrator-strategy.test.mjs graph-walker.test.mjs 2>&1
+        node --test graph-walker.test.mjs orchestrator-integration.test.mjs jenkinsfile-cps-scope.test.mjs 2>&1
         rc=$?
         ;;
       schema-validate)

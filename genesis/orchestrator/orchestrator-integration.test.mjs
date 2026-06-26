@@ -120,6 +120,44 @@ describe('CI_IGNORE_PATTERNS (loaded from repo-root .ci-ignore)', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════
+// Jenkinsfile dead-helper guard
+// ══════════════════════════════════════════════════════════════════
+
+test('dead change-detection helpers are retired from the Jenkinsfile', () => {
+  const jf = readFileSync(new URL('./Jenkinsfile', import.meta.url), 'utf8');
+  for (const dead of ['loadCiIgnore', 'matchesCiIgnore', 'propagateDependencies']) {
+    assert.equal(jf.includes(dead), false, `${dead} must be fully removed from the Jenkinsfile`);
+  }
+  assert.ok(jf.includes('def analyzeChangeset'), 'analyzeChangeset must remain (it is live)');
+  assert.equal(/DEPRECATED: advisory only, will be removed/.test(jf), false,
+    'the inverted DEPRECATED tag on analyzeChangeset must be removed');
+});
+
+// ══════════════════════════════════════════════════════════════════
+// pre-push guard: no references to deleted orchestrator-strategy module
+// ══════════════════════════════════════════════════════════════════
+
+test('pre-push references no deleted orchestrator-strategy module', () => {
+  const hook = readFileSync(new URL('../../.husky/pre-push', import.meta.url), 'utf8');
+  assert.equal(hook.includes('orchestrator-strategy'), false,
+    'pre-push must not reference the deleted orchestrator-strategy.mjs/.test.mjs');
+  assert.ok(/build-manifest\.json/.test(hook) && hook.includes('pipeline-list-fresh'),
+    'pipeline-list-fresh must trigger on build-manifest.json / pipeline-registry.mjs changes');
+});
+
+// ══════════════════════════════════════════════════════════════════
+// guard: no dangling orchestrator-strategy references in runtime files
+// ══════════════════════════════════════════════════════════════════
+
+test('runtime orchestrator files carry no dangling orchestrator-strategy references', () => {
+  const files = ['ci-ignore.mjs', 'justfile', 'scripts/count-pipeline-failures.sh', 'scripts/pipeline-trajectory.mjs'];
+  for (const f of files) {
+    const txt = readFileSync(new URL(`./${f}`, import.meta.url), 'utf8');
+    assert.equal(/orchestrator-strategy/.test(txt), false, `${f} must not reference the deleted orchestrator-strategy module`);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
 // pipeline-list.json drift
 // ══════════════════════════════════════════════════════════════════
 

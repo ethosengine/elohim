@@ -28,9 +28,7 @@ lint-fix:
 # Static Jenkinsfile lints that catch runtime-only failure classes
 # (env-bridge anti-pattern → orchestrator/dev #1024 MissingPropertyException).
 # Fast — no Jenkins required. SCOPED to jenkinsfile-cps-scope.test.mjs only
-# because the broader orchestrator-strategy.test.mjs has a pre-existing drift
-# failure (tsconfig.storybook.json glob coverage) that's out of scope here.
-# Expand to `*.test.mjs` when that gets fixed.
+# (CPS method-size and env-bridge checks specific to the Jenkinsfile).
 test-jenkinsfile-lints:
     node --test jenkinsfile-cps-scope.test.mjs
 
@@ -39,7 +37,7 @@ test-jenkinsfile-lints:
 # orchestrator change.
 gate: lint test-jenkinsfile-lints
 
-# Regenerate pipeline-list.json from orchestrator-strategy.mjs.
+# Regenerate pipeline-list.json from build-manifest.json / pipeline-registry.mjs.
 # Run after editing PIPELINES.
 ci-pipeline-list:
   @node scripts/generate-pipeline-list.mjs

@@ -1348,6 +1348,29 @@ fn epr_view_conforms() {
 }
 
 #[test]
+fn epr_raw_view_conforms() {
+    use elohim_storage::{EprCouplingView, EprRawView};
+    let v = EprRawView {
+        cid: "bafyreib2vq7fztfnmgzrmo7q5jnfkdvxkfxpvsjmesxrqjzqxkzqzqzqa".into(),
+        coupling: EprCouplingView {
+            knowledge: Some(
+                "bafyreib2vq7knowledge01234567890123456789012345678901234567890".into(),
+            ),
+            value: None,
+            governance: Some(
+                "bafyreib2vq7governance01234567890123456789012345678901234567890".into(),
+            ),
+        },
+        neighborhood_degree: 2,
+        reverse_part_of: vec![
+            "bafyreib2vq7citingatom01234567890123456789012345678901234567890".into(),
+        ],
+    };
+    let json = serde_json::to_value(&v).unwrap();
+    validate_against_schema("views/epr-raw-view.schema.json", &json);
+}
+
+#[test]
 fn epr_verify_view_conforms() {
     use elohim_storage::EprVerifyView;
     let v = EprVerifyView {
