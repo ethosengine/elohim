@@ -24,6 +24,7 @@
     "author": "Matthew Dowell",
     "blobPopulatedAt": "deploy-time",
     "blobPopulatedBy": "Jenkinsfile:stageSpaBlob (root pipeline). The elohim-app browser bundle is zipped + uploaded as a blob; the hash is written into db/content/elohim-host-landing.blobHash and db/content/lamad-spa.blobHash. Intentionally absent from this source JSON so seed-sqlite does not clobber the deploy-time value on re-seed.",
+    "serverBlobPopulatedBy": "Jenkinsfile:stageSpaBlobs (root pipeline, kind: server). The elohim-app SSR *server* bundle is zipped + uploaded as a blob; the hash is written into db/content/elohim-host-landing.serverBlobHash via PATCH. Collapsed onto this one EPR node (SSR row collapse) — there is no separate elohim-host-landing-ssr row. Intentionally absent from this source JSON so seed-sqlite does not clobber the deploy-time value on re-seed; absent serverBlobHash ⇒ SSR not materialized (CSR fallback, never a crash).",
     "embedStrategy": "iframe",
     "requiredCapabilities": ["javascript"],
     "securityPolicy": {

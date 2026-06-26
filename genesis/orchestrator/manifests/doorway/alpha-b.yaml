@@ -219,7 +219,7 @@ spec:
             - name: SSR_BUNDLE_PATH
               value: "/opt/elohim-render/main.server.mjs"
             - name: SSR_BUNDLE_SLUG
-              value: "elohim-host-landing-ssr"
+              value: "elohim-host-landing"
             # Tokio worker threads — set EXPLICITLY, never CPU-derived. The pod has
             # limits.cpu: 1, so the default runtime spun up a SINGLE worker thread;
             # the 2026-06-13 freeze was one synchronously-blocked await on that lone

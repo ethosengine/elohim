@@ -59,30 +59,40 @@ echo "  ✓ [${SLUG}] blob uploaded (via /admin/seed/blob)"
 
 # 2. Link blob to the content row (PATCH+verify) — only when admin key present.
 # Regression seatbelt (PATCH path only): after each PATCH, GET the row and
-# assert blobHash matches the SHA just written. set -euo pipefail + curl -fSs
-# (no || echo swallow) means any 4xx/5xx FAILS the build — surfacing silent
-# CI/storage drift as a red build instead of a stuck production surface.
+# assert the hash field matches the SHA just written. set -euo pipefail +
+# curl -fSs (no || echo swallow) means any 4xx/5xx FAILS the build — surfacing
+# silent CI/storage drift as a red build instead of a stuck production surface.
+#
+# Field-by-kind (SSR row collapse): KIND=server PATCHes/reads serverBlobHash on
+# the ONE elohim-host-landing EPR node (not a separate -ssr row); KIND=browser
+# stays blobHash. Both ride db/content/{slug} with identical partial-update
+# semantics — PATCHing one field never clobbers the other.
+if [ "$KIND" = "server" ]; then
+    HASH_FIELD="serverBlobHash"
+else
+    HASH_FIELD="blobHash"
+fi
 if [ "${DO_PATCH}" = "1" ]; then
     curl -fSs -X PATCH \
         -H 'Content-Type: application/json' \
         -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
-        -d "{\"blobHash\":\"${SPA_HASH}\"}" \
+        -d "{\"${HASH_FIELD}\":\"${SPA_HASH}\"}" \
         "${DOORWAY_EPR_URL}/db/content/${SLUG}" \
         >/dev/null
-    echo "  ✓ patched ${SLUG}"
+    echo "  ✓ patched ${SLUG} (${HASH_FIELD})"
 
     ACTUAL=$(curl -fSs "${DOORWAY_EPR_URL}/db/content/${SLUG}" \
-        | python3 -c "import sys, json; print(json.load(sys.stdin).get('blobHash',''))")
+        | HASH_FIELD="${HASH_FIELD}" python3 -c "import os, sys, json; print(json.load(sys.stdin).get(os.environ['HASH_FIELD'],''))")
     if [ "${ACTUAL}" != "${SPA_HASH}" ]; then
-        echo "ERROR: ${SLUG} blobHash drifted after PATCH" >&2
+        echo "ERROR: ${SLUG} ${HASH_FIELD} drifted after PATCH" >&2
         echo "  expected: ${SPA_HASH}" >&2
         echo "  actual:   ${ACTUAL}" >&2
         exit 1
     fi
-    echo "  ✓ verified ${SLUG} blobHash = ${SPA_HASH}"
+    echo "  ✓ verified ${SLUG} ${HASH_FIELD} = ${SPA_HASH}"
 else
     echo "  ⊘ WARN: skipping PATCH+verify for ${SLUG} — no admin credential available"
-    echo "    content row retains seed-time blobHash"
+    echo "    content row retains seed-time ${HASH_FIELD}"
     echo "    blob bytes uploaded and content-addressable via PUT /blob/${SPA_HASH}"
 fi
 

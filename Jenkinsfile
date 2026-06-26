@@ -396,7 +396,7 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey) {
         for (int i = 0; i < doorwayEprUrls.size(); i++) {
             stageSpaBlobs(doorwayEprUrls[i], [
                 [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
-                [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/server", slug: "elohim-host-landing-ssr", kind: "server"],
+                [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/server",  slug: "elohim-host-landing", kind: "server"],
                 [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
             ], adminKey)
         }
