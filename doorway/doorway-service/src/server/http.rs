@@ -377,20 +377,25 @@ fn init_renderer() -> Option<Arc<dyn elohim_render::Renderer>> {
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."));
         let src = crate::ssr::DoorwayBundleSource::new(storage_url.clone());
-        match elohim_render::materialize_bundle(&src, &slug, bundle_dir) {
+        // The SSR runtime materializes the Angular *server* bundle, resolved from
+        // the EPR node's `serverBlobHash` field (not the browser `blobHash`).
+        // `SSR_BUNDLE_SLUG` now names the one EPR node (`elohim-host-landing`),
+        // not a sibling `-ssr` row. On resolve failure (e.g. `serverBlobHash`
+        // absent mid-migration), return None → CSR fallback, never a crash.
+        match elohim_render::materialize_server_bundle(&src, &slug, bundle_dir) {
             Ok(materialized) => {
                 tracing::info!(
                     target: "doorway::ssr",
                     slug = %slug,
                     path = %materialized.display(),
-                    "SSR bundle materialized from substrate"
+                    "SSR server bundle materialized from substrate"
                 );
             }
             Err(e) => {
                 tracing::warn!(
                     target: "doorway::ssr",
                     slug = %slug,
-                    "SSR bundle materialization failed: {}",
+                    "SSR server bundle materialization failed: {}",
                     e
                 );
                 return None;
@@ -2854,7 +2859,7 @@ async fn handle_request(
         }
 
         // Unified self-healing read model — Cat C node-local Operational state
-        // (SELF-HEALING-CONTROL-PLANE-DESIGN-2026-06-13.md §6). Composed fresh
+        // (genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md §6). Composed fresh
         // per request from in-process snapshots + on-demand projector fetch.
         // Legitimate doorway-local aggregate (NOT a per-domain proxy): fails the
         // swap test by design — a node serves its OWN runtime state, same class

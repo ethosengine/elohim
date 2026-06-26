@@ -297,30 +297,45 @@ impl DoorwayBundleSource {
     }
 }
 
-impl elohim_render::BundleSource for DoorwayBundleSource {
-    fn resolve_blob_hash(&self, slug: &str) -> elohim_render::Result<String> {
+impl DoorwayBundleSource {
+    /// Shared thread-isolated `GET /db/content/{slug}` returning the raw body.
+    ///
+    /// Both `resolve_blob_hash` and `resolve_server_blob_hash` hit the same
+    /// endpoint and differ only in which JSON field they parse, so the blocking
+    /// HTTP call (and its dedicated-OS-thread isolation) lives here once.
+    fn fetch_content_body(&self, slug: &str) -> elohim_render::Result<String> {
         let url = format!("{}/db/content/{}", self.storage_base, slug);
         // Run on a dedicated OS thread so `reqwest::blocking` can create its own
         // tokio runtime without conflicting with an ambient tokio context (the
         // `with_projection` async constructor calls `init_renderer`).
-        let result = std::thread::spawn(move || {
+        std::thread::spawn(move || {
             let client = DoorwayBundleSource::make_client();
-            let resp = client.get(&url).send().map_err(|e| {
-                RenderError::Bootstrap(format!("resolve_blob_hash GET failed: {e}"))
-            })?;
+            let resp = client
+                .get(&url)
+                .send()
+                .map_err(|e| RenderError::Bootstrap(format!("content GET failed: {e}")))?;
             let status = resp.status();
             resp.error_for_status()
                 .map_err(|_| {
-                    RenderError::Bootstrap(format!(
-                        "resolve_blob_hash: HTTP {status} for slug `{url}`"
-                    ))
+                    RenderError::Bootstrap(format!("content GET: HTTP {status} for slug `{url}`"))
                 })?
                 .text()
-                .map_err(|e| RenderError::Bootstrap(format!("resolve_blob_hash read body: {e}")))
+                .map_err(|e| RenderError::Bootstrap(format!("content GET read body: {e}")))
         })
         .join()
-        .map_err(|_| RenderError::Bootstrap("resolve_blob_hash: thread panicked".into()))?;
-        parse_blob_hash(&result?)
+        .map_err(|_| RenderError::Bootstrap("content GET: thread panicked".into()))?
+    }
+}
+
+impl elohim_render::BundleSource for DoorwayBundleSource {
+    fn resolve_blob_hash(&self, slug: &str) -> elohim_render::Result<String> {
+        let body = self.fetch_content_body(slug)?;
+        parse_blob_hash(&body)
+    }
+
+    fn resolve_server_blob_hash(&self, slug: &str) -> elohim_render::Result<String> {
+        let body = self.fetch_content_body(slug)?;
+        parse_server_blob_hash(&body)
     }
 
     fn fetch_blob(&self, hash: &str) -> elohim_render::Result<Vec<u8>> {
@@ -348,7 +363,8 @@ impl elohim_render::BundleSource for DoorwayBundleSource {
 
 /// Parse the `blobHash` field from a JSON body returned by `GET /db/content/{slug}`.
 ///
-/// The storage boundary is camelCase, so the field is `blobHash`.
+/// The storage boundary is camelCase, so the field is `blobHash`. This is the
+/// **browser** bundle pointer.
 pub fn parse_blob_hash(body: &str) -> elohim_render::Result<String> {
     let v: serde_json::Value = serde_json::from_str(body)
         .map_err(|e| RenderError::Bootstrap(format!("parse_blob_hash: invalid JSON: {e}")))?;
@@ -356,6 +372,27 @@ pub fn parse_blob_hash(body: &str) -> elohim_render::Result<String> {
         .and_then(|h| h.as_str())
         .map(|s| s.to_string())
         .ok_or_else(|| RenderError::Bootstrap("parse_blob_hash: missing `blobHash` field".into()))
+}
+
+/// Parse the `serverBlobHash` field from a JSON body returned by
+/// `GET /db/content/{slug}`.
+///
+/// The storage boundary is camelCase, so the field is `serverBlobHash`. This is
+/// the **server** bundle pointer — the deploy-time hash of the Angular SSR
+/// *server* bundle on the one EPR node. The SSR runtime materializes this, not
+/// `blobHash`. Absence is an honest, non-fatal condition (the caller treats it
+/// as "SSR not materializable → CSR fallback"), so a missing field is a clean
+/// `Err`, never a panic.
+pub fn parse_server_blob_hash(body: &str) -> elohim_render::Result<String> {
+    let v: serde_json::Value = serde_json::from_str(body).map_err(|e| {
+        RenderError::Bootstrap(format!("parse_server_blob_hash: invalid JSON: {e}"))
+    })?;
+    v.get("serverBlobHash")
+        .and_then(|h| h.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| {
+            RenderError::Bootstrap("parse_server_blob_hash: missing `serverBlobHash` field".into())
+        })
 }
 
 // =============================================================================
@@ -536,6 +573,77 @@ mod tests {
         assert!(
             result.is_err(),
             "expected Err when blobHash is not a string"
+        );
+    }
+
+    // ── parse_server_blob_hash ──────────────────────────────────────────────
+
+    #[test]
+    fn parse_server_blob_hash_returns_server_not_browser() {
+        // A body carrying BOTH pointers — must select the SERVER one. This is
+        // the exact shape `GET /db/content/elohim-host-landing` returns after
+        // the row collapse (one EPR node, both hashes).
+        let body = r#"{"blobHash":"sha256-browser","serverBlobHash":"sha256-server"}"#;
+        let result = parse_server_blob_hash(body);
+        assert_eq!(
+            result.unwrap(),
+            "sha256-server",
+            "must return serverBlobHash, not blobHash"
+        );
+    }
+
+    #[test]
+    fn parse_server_blob_hash_missing_field_returns_err() {
+        // `blobHash` present but `serverBlobHash` absent (the migration-safety
+        // shape: SSR simply isn't materializable yet → caller does CSR fallback).
+        let body = r#"{"blobHash":"sha256-browser"}"#;
+        let result = parse_server_blob_hash(body);
+        assert!(
+            result.is_err(),
+            "expected Err when serverBlobHash field is absent"
+        );
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("serverBlobHash"),
+            "error should mention the missing field; got: {msg}"
+        );
+    }
+
+    #[test]
+    fn parse_server_blob_hash_invalid_json_returns_err() {
+        let result = parse_server_blob_hash("not json at all");
+        assert!(result.is_err(), "expected Err on invalid JSON");
+    }
+
+    #[test]
+    fn parse_server_blob_hash_not_string_returns_err() {
+        let body = r#"{"serverBlobHash":42}"#;
+        let result = parse_server_blob_hash(body);
+        assert!(
+            result.is_err(),
+            "expected Err when serverBlobHash is not a string"
+        );
+    }
+
+    #[tokio::test]
+    async fn bundle_source_resolve_server_blob_hash_ok_from_async_context() {
+        use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(matchers::method("GET"))
+            .and(matchers::path("/db/content/elohim-host-landing"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                r#"{"blobHash":"sha256-browser","serverBlobHash":"sha256-server"}"#,
+            ))
+            .mount(&server)
+            .await;
+
+        let src = DoorwayBundleSource::new(server.uri());
+        // Thread-isolation regression: must not panic from within a tokio runtime.
+        let result = src.resolve_server_blob_hash("elohim-host-landing");
+        assert_eq!(
+            result.expect("resolve_server_blob_hash must succeed from async context"),
+            "sha256-server"
         );
     }
 
