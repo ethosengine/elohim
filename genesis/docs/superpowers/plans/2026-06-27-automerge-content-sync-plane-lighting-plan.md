@@ -452,6 +452,18 @@ Give the (tree-shaken) `ContentDocSyncService` a real consumer that (a) surfaces
 - **G7f `[test, after G7d/G7e + local stack]`** — browser-leg proof via the look rail: a non-bulk `POST /db/content` so `ContentCreated` projects `node:{id}`, then `pnpm look 'http://localhost:4200/dev/doc-sync?id=<id>' --wait-testid docsync-title`. Success: `shot.png` shows the converged fields; `capture.json` shows `GET …/sync/v1/elohim/docs/node%3A<id>/changes` → 200 non-empty, no `/sync` httpError, no pageerror.
 - **G7g `[test, STRETCH/post-deploy]`** — shem cross-tenant: author on a non-Matthew peer, prove the libp2p round (~60s, libp2p-only) carries `node:{id}` into the browser's node. Runs once the producer is deployed.
 
+### G7 Outcome (2026-06-27) — LANDED + VERIFIED (recovered after a mid-flight session crash)
+
+The frontend agent crashed before committing; its work was recovered from the worktree, build-verified, and committed `1b70c0532`. G7a–G7e: ContentDocSyncService promoted to `@elohim/service`, "Doc sync" sibling row on `<elohim-resilience-snapshot>`, lamad consumer, `/sync` proxy, `/dev/doc-sync` harness. Verified: elohim-app + lamad dev builds green (automerge base64 alias resolves in all 3 contexts); harness 2/2, service 5/5, card 26/26.
+
+**G7f browser-leg proof — PASSED (the deployed form):**
+- Production `ng build` runtime via look rail (`reports/look/docsync-prod`): harness renders, **zero httpErrors, no `automerge_wasm_bg` fetch** — automerge base64 loads cleanly inline in a real browser.
+- Full fetch→apply→render seam (`reports/look/docsync-converged`): served the production `dist` + a **wire-faithful fake `/sync`** (a REAL automerge change, same lib version) → the real `AutomergeSync` client fetched it over real `/sync` HTTP, applied it, and rendered the converged doc (`Status: synced`, all fields). Only the change ORIGIN was authored in node; cross-peer origin is proven by G3.
+
+**NEW FINDING (backlogged `dev-serve-automerge-wasm-bundler-entry-gap.md`):** the automerge base64 alias works in the production build but NOT under `ng serve` (dev pre-bundles the wasm-bindgen bundler entry → `automerge_wasm_bg.wasm` 500). Doc-sync is broken under `pnpm start` local dev; production unaffected. The look rail caught it.
+
+**G7g (shem cross-tenant) remains deployment-gated** — the producer + `/sync` carriage are committed but not deployed; the live cross-peer→browser proof runs once the integrator merges+deploys.
+
 ---
 
 ## Self-Review
