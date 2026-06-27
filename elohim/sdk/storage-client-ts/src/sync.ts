@@ -15,18 +15,13 @@ let automergePromise: Promise<AutomergeModule> | undefined;
 
 /**
  * Lazily load @automerge/automerge (ESM-only, wasm-backed) so that merely
- * importing this package never evaluates the module. This package compiles
- * to CommonJS; a top-level import becomes `require("@automerge/automerge")`,
- * which browser bundlers reject at app bootstrap with
- * "Dynamic require of \"@automerge/automerge\" is not supported".
- * The indirection through `new Function` keeps tsc from down-leveling the
- * dynamic import back into a require. Browser consumers that need sync
- * should migrate this package to ESM output (tracked; no browser caller today).
+ * importing this package never evaluates the heavy wasm module. This package
+ * now emits ESM (tsconfig `module: ESNext` + package `"type": "module"`), so a
+ * native dynamic `import()` is preserved by tsc rather than down-leveled to a
+ * `require()` that browser bundlers reject.
  */
 function loadAutomerge(): Promise<AutomergeModule> {
-  automergePromise ??= new Function(
-    'return import("@automerge/automerge")',
-  )() as Promise<AutomergeModule>;
+  automergePromise ??= import('@automerge/automerge');
   return automergePromise;
 }
 
