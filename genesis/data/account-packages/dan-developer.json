@@ -517,25 +517,25 @@
     },
     {
       "contentId": "elohim-global-orchestra",
-      "reach": "local",
+      "reach": "community",
       "reason": "steward",
       "stewardRatio": 0.4
     },
     {
       "contentId": "elohim-lamad",
-      "reach": "local",
+      "reach": "community",
       "reason": "steward",
       "stewardRatio": 0.5
     },
     {
       "contentId": "elohim-observer-protocol",
-      "reach": "local",
+      "reach": "community",
       "reason": "steward",
       "stewardRatio": 0.4
     },
     {
       "contentId": "elohim-public-observer-epic",
-      "reach": "local",
+      "reach": "community",
       "reason": "steward",
       "stewardRatio": 0.4
     },
@@ -3223,7 +3223,7 @@
     },
     {
       "contentId": "global-orchestra",
-      "reach": "local",
+      "reach": "community",
       "reason": "steward",
       "stewardRatio": 0.4
     },
@@ -3301,7 +3301,7 @@
     },
     {
       "contentId": "hardware-spec",
-      "reach": "local",
+      "reach": "community",
       "reason": "steward",
       "stewardRatio": 0.4
     },
@@ -3337,25 +3337,25 @@
     },
     {
       "contentId": "lamad-reference-implementation",
-      "reach": "local",
+      "reach": "community",
       "reason": "steward",
       "stewardRatio": 0.5
     },
     {
       "contentId": "manifesto",
-      "reach": "local",
+      "reach": "community",
       "reason": "steward",
       "stewardRatio": 0.4
     },
     {
       "contentId": "observer-protocol",
-      "reach": "local",
+      "reach": "community",
       "reason": "steward",
       "stewardRatio": 0.4
     },
     {
       "contentId": "organizations-decomposition",
-      "reach": "local",
+      "reach": "community",
       "reason": "steward",
       "stewardRatio": 0.4
     },

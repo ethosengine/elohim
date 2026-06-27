@@ -999,21 +999,24 @@ pub fn list_unpublished_content_ids(
 /// `created_at` ascending so the oldest un-anchored rows heal first and the
 /// ordering is stable across sweeps (restart-safe, idempotent: an id that
 /// gained an anchor on a prior sweep is no longer a candidate).
+/// Returns `(id, reach)` for each NULL-anchor row so the re-anchor sweep can
+/// skip rows whose stored reach is non-canonical (the conductor would reject
+/// them on every sweep). Only the reanchor_backfill service calls this.
 pub fn list_unanchored_content_ids(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     limit: i64,
-) -> Result<Vec<String>, StorageError> {
+) -> Result<Vec<(String, String)>, StorageError> {
     if limit <= 0 {
         return Ok(Vec::new());
     }
     content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::dht_anchor_hash.is_null())
-        .select(content::id)
+        .select((content::id, content::reach))
         .order((content::created_at.asc(), content::id.asc()))
         .limit(limit)
-        .load::<String>(conn)
+        .load::<(String, String)>(conn)
         .map_err(|e| StorageError::Internal(format!("list_unanchored_content_ids failed: {}", e)))
 }
 

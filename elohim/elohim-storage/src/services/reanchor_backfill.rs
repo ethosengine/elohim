@@ -37,6 +37,7 @@ use crate::db::DbPool;
 use crate::services::provide_loop_status::ProvideLoopState;
 use crate::services::ContentService;
 use crate::StorageError;
+use crate::generated_enums::CORE_REACH_LEVELS;
 
 /// Tuning for a single re-anchor sweep.
 #[derive(Debug, Clone)]
@@ -67,6 +68,10 @@ pub struct ReanchorReport {
     pub reanchored: usize,
     /// Rows that errored re-authoring (non-fatal, retried next boot).
     pub failed: usize,
+    /// Rows skipped because their stored reach is non-canonical — not
+    /// re-authorable (the DNA rejects it), so re-attempting would fail
+    /// every sweep and saturate the conductor. Fix via the seed data.
+    pub skipped: usize,
     /// NULL-anchor rows remaining AFTER the sweep (for `/p2p/status` pending).
     pub remaining: usize,
 }
@@ -85,7 +90,7 @@ pub async fn run_once(
 ) -> Result<ReanchorReport, StorageError> {
     let app_ctx = crate::db::AppContext::default_lamad();
 
-    let candidates: Vec<String> = {
+    let candidates: Vec<(String, String)> = {
         let mut conn = pool
             .get()
             .map_err(|e| StorageError::Internal(format!("reanchor: db conn: {e}")))?;
@@ -112,7 +117,21 @@ pub async fn run_once(
         "reanchor_backfill: re-authoring NULL-anchor content via conductor (cold-seed recovery)"
     );
 
-    for id in &candidates {
+    for (id, reach) in &candidates {
+        // Guard: a stored reach outside the DNA-notarized vocabulary can
+        // never be re-authored (the content_store zome rejects it), so it
+        // would fail every sweep forever and saturate the conductor. Skip
+        // it loudly — one bad row must not wedge the heal loop. The fix is a
+        // seed-data correction, caught by check-reach-drift.mjs.
+        if !CORE_REACH_LEVELS.contains(&reach.as_str()) {
+            report.skipped += 1;
+            tracing::warn!(
+                content_id = %id,
+                reach = %reach,
+                "reanchor_backfill: skipping row with non-canonical reach (not re-authorable)"
+            );
+            continue;
+        }
         // Empty patch → for a NULL-anchor row, update_via_conductor takes the
         // bootstrap branch: re-publishes the full entry from the existing SQL
         // row via create_content and projects dht_anchor_hash. Idempotent.
@@ -173,6 +192,15 @@ pub async fn run_once(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn core_reach_excludes_local_includes_community() {
+        // Locks the guard contract to the canonical DNA vocabulary: 'local'
+        // is NOT a content-visibility reach (it wedged reanchor_backfill),
+        // and the remap target 'community' IS.
+        assert!(!CORE_REACH_LEVELS.contains(&"local"));
+        assert!(CORE_REACH_LEVELS.contains(&"community"));
+    }
 
     #[test]
     fn default_config_is_bounded_and_paced() {
