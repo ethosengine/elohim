@@ -538,7 +538,11 @@ impl ContentService {
         }
 
         // Validate reach level — from protocol schema (generated_enums) + legacy for backward compat
-        const LEGACY_REACH_LEVELS: &[&str] = &["regional", "local", "invited", "federated"];
+        // 'local' removed 2026-06-27: it is not a content-visibility reach
+        // (it belongs to the relationship/distance vocabulary) and the DNA
+        // rejects it; accepting it here only let invalid rows reach the
+        // conductor. See genesis check-reach-drift + reanchor_backfill guard.
+        const LEGACY_REACH_LEVELS: &[&str] = &["regional", "invited", "federated"];
         if !ALL_REACH_LEVELS.contains(&input.reach.as_str())
             && !LEGACY_REACH_LEVELS.contains(&input.reach.as_str())
         {
