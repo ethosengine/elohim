@@ -238,7 +238,7 @@ fn build_salvage_candidates(
 /// humans-replayer) AND (b) `self_cid` / `salvage_capacity.agent_cid` are in the
 /// `agent_cid` namespace (`SELF_CID` / the blocked transport-identity resolver).
 /// Until both clear, the strategy degrades to XOR. Shared with the ingest selector
-/// + resilience card; tracked in
+/// and the resilience card; tracked in
 /// `resilience-card-membership-humans-projection-gap-2026-06-19.md`.
 ///
 /// Lives here (not in `P2PNode`) because the production [`SalvageCommitmentAuthor`]
@@ -378,8 +378,7 @@ mod tests {
         seed_human(&mut conn, "h-a", Some("uhCAk-a"), Some("hh-1"), APP);
         seed_human(&mut conn, "h-b", Some("uhCAk-b"), Some("hh-2"), APP);
 
-        let cands =
-            build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
+        let cands = build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
 
         assert_eq!(hh_of(&cands, "uhCAk-a"), Some("hh-1"));
         assert_eq!(hh_of(&cands, "uhCAk-b"), Some("hh-2"));
@@ -398,8 +397,7 @@ mod tests {
         // a candidate (candidates come from salvage_capacity) and must not bind.
         seed_human(&mut conn, "h-dormant", None, Some("hh-X"), APP);
 
-        let cands =
-            build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
+        let cands = build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
 
         assert!(
             hh_of(&cands, "uhCAk-c").is_none(),
@@ -430,8 +428,7 @@ mod tests {
             APP,
         );
 
-        let cands =
-            build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
+        let cands = build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
 
         assert_eq!(
             hh_of(&cands, "uhCAk-self"),
@@ -451,7 +448,13 @@ mod tests {
         let mut conn = pool.get().unwrap();
         seed_capacity(&mut conn, "uhCAk-a");
         // A human under the WRONG (operating/content) scope must NOT be seen.
-        seed_human(&mut conn, "h-lamad", Some("uhCAk-a"), Some("hh-wrong"), "lamad");
+        seed_human(
+            &mut conn,
+            "h-lamad",
+            Some("uhCAk-a"),
+            Some("hh-wrong"),
+            "lamad",
+        );
         let cands = build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
         assert!(
             hh_of(&cands, "uhCAk-a").is_none(),
@@ -680,17 +683,9 @@ mod tests {
         };
 
         // enabled=false → the gate short-circuits; nothing authored.
-        let gated = super::run_salvage_pass(
-            &mut conn,
-            "uhCAk-self",
-            &author,
-            false,
-            2,
-            600,
-            true,
-            now,
-        )
-        .unwrap();
+        let gated =
+            super::run_salvage_pass(&mut conn, "uhCAk-self", &author, false, 2, 600, true, now)
+                .unwrap();
         assert_eq!(
             gated.commitments_authored, 0,
             "disabled pass authors nothing"
@@ -698,17 +693,9 @@ mod tests {
         assert!(author.authored.lock().unwrap().is_empty());
 
         // enabled=true → self is among the closest-2 → authors exactly once.
-        let outcome = super::run_salvage_pass(
-            &mut conn,
-            "uhCAk-self",
-            &author,
-            true,
-            2,
-            600,
-            true,
-            now,
-        )
-        .unwrap();
+        let outcome =
+            super::run_salvage_pass(&mut conn, "uhCAk-self", &author, true, 2, 600, true, now)
+                .unwrap();
         assert_eq!(
             outcome.commitments_authored, 1,
             "self self-selects and authors"
