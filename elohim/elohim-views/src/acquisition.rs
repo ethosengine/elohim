@@ -28,6 +28,8 @@ pub struct PinView {
 ///
 /// `kind` defaults to `"item"` when omitted.
 /// `priority` defaults to `1` when omitted.
+/// `provide` makes the pin a serveable peer provider (spec slice 2b); it is
+/// honored only on a peer-capable node — a `browser` context provide is refused.
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
@@ -36,6 +38,8 @@ pub struct CreatePinInputView {
     pub kind: Option<String>,
     pub closure_rule: Option<JsonVal>,
     pub priority: Option<i32>,
+    pub provide: Option<bool>,
+    pub context: Option<String>,
 }
 
 /// Per-EPR pull progress (spec §4.3 / Slice 2b T13), served on

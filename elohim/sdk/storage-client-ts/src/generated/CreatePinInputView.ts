@@ -6,5 +6,7 @@ import type { JsonValue } from "./JsonValue";
  *
  * `kind` defaults to `"item"` when omitted.
  * `priority` defaults to `1` when omitted.
+ * `provide` makes the pin a serveable peer provider (spec slice 2b); it is
+ * honored only on a peer-capable node — a `browser` context provide is refused.
  */
-export type CreatePinInputView = { headRef: string, kind: string | null, closureRule: JsonValue | null, priority: number | null, };
+export type CreatePinInputView = { headRef: string, kind: string | null, closureRule: JsonValue | null, priority: number | null, provide: boolean | null, context: string | null, };

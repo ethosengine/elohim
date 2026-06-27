@@ -9994,6 +9994,18 @@ impl HttpServer {
             ));
         }
 
+        // A provide pin makes the node a serveable peer provider; that is only
+        // meaningful on a peer-capable node. A browser-only context cannot serve
+        // bytes to peers, so refuse the provide flag there (spec slice 2b).
+        if input.provide.unwrap_or(false) && input.context.as_deref() == Some("browser") {
+            return Ok(response::json_response(
+                StatusCode::BAD_REQUEST,
+                &serde_json::json!({
+                    "error": "provide pins require a peer-capable node; a browser-only context cannot serve bytes to peers"
+                }),
+            ));
+        }
+
         let mut conn = self.get_diesel_conn()?;
         let pin = db::acquisition_pins::upsert_pin(
             &mut conn,
@@ -10074,10 +10086,19 @@ fn patch_needs_conductor(view: &UpdateContentInputView) -> bool {
 /// `closure_rule_json` is parsed from a JSON string to `serde_json::Value`
 /// so TypeScript receives a real object, not a JSON-string-inside-JSON.
 fn pin_to_view(p: db::models::AcquisitionPin) -> elohim_views::acquisition::PinView {
+    // The DB stores the bare content id (handle_create_pin strips `epr:` so the
+    // reconcile loop joins against the unprefixed content projection). The wire
+    // shape is the EPR link surface, which carries the `epr:` prefix — re-add it
+    // here so the read path matches what callers POST and filter on.
+    let head_ref = if p.head_ref.starts_with("epr:") {
+        p.head_ref
+    } else {
+        format!("epr:{}", p.head_ref)
+    };
     elohim_views::acquisition::PinView {
         id: p.id,
         agent_pub_key: p.agent_pub_key,
-        head_ref: p.head_ref,
+        head_ref,
         kind: p.kind,
         closure_rule: p
             .closure_rule_json
@@ -13587,6 +13608,68 @@ mod session_exchange_tests {
         let server = test_server().await;
         let removed = server.test_handle_remove_pin("99999").await;
         assert_eq!(removed.status, 404, "removing an unknown pin must 404");
+    }
+
+    // The write path strips `epr:` (the reconcile loop joins on the bare content
+    // id); the read path must re-surface it so a pin POSTed for
+    // "epr:strawberry-guide" is listed under the same headRef.
+    #[tokio::test]
+    async fn pin_epr_prefix_round_trips_through_list() {
+        let server = test_server().await;
+        let created = server
+            .test_handle_create_pin_raw(r#"{"headRef":"epr:strawberry-guide","kind":"item"}"#)
+            .await;
+        assert_eq!(created.status, 201, "pin create must succeed");
+
+        let listed = server.test_handle_list_pins().await;
+        assert_eq!(listed.status, 200);
+        let body: serde_json::Value = serde_json::from_slice(&listed.body).expect("json");
+        let pins = body["pins"].as_array().expect("pins array");
+        let active: Vec<_> = pins
+            .iter()
+            .filter(|p| p["status"] == "active" && p["headRef"] == "epr:strawberry-guide")
+            .collect();
+        assert_eq!(
+            active.len(),
+            1,
+            "exactly one active pin must list under the prefixed headRef; got {body}"
+        );
+    }
+
+    // A provide pin from a browser-only context cannot serve bytes to peers and
+    // must be refused with 400 mentioning "peer".
+    #[tokio::test]
+    async fn provide_pin_on_browser_context_is_refused() {
+        let server = test_server().await;
+        let resp = server
+            .test_handle_create_pin_raw(
+                r#"{"headRef":"strawberry-guide","kind":"item","provide":true,"context":"browser"}"#,
+            )
+            .await;
+        assert_eq!(
+            resp.status, 400,
+            "browser-context provide pin must be refused"
+        );
+        let body = String::from_utf8_lossy(&resp.body);
+        assert!(
+            body.contains("peer"),
+            "rejection body must mention 'peer'; got: {body}"
+        );
+    }
+
+    // A provide pin without a browser context is accepted (peer-capable node).
+    #[tokio::test]
+    async fn provide_pin_without_browser_context_is_accepted() {
+        let server = test_server().await;
+        let resp = server
+            .test_handle_create_pin_raw(
+                r#"{"headRef":"strawberry-guide","kind":"item","provide":true}"#,
+            )
+            .await;
+        assert_eq!(
+            resp.status, 201,
+            "provide pin on a peer-capable node must succeed"
+        );
     }
 }
 
