@@ -118,7 +118,7 @@ impl CommitmentAuthor for SalvageCommitmentAuthor {
 ///
 /// **Household enrichment (option B — joined, not self-reported).** Mirrors the
 /// ingest selector (`services/peer_selection.rs:184-203`): join
-/// `salvage_capacity.agent_cid == humans.agent_pub_key` scoped to `h_app_id`, and
+/// `salvage_capacity.agent_cid == humans.agent_pub_key` scoped to the canonical humans scope, and
 /// set each candidate's `household_id` from the result. Failure domain comes from
 /// the notarized projection, never peer self-report (option A, rejected on trust
 /// grounds). A candidate with no matching human (or a human whose `household_id`
@@ -132,19 +132,22 @@ impl CommitmentAuthor for SalvageCommitmentAuthor {
 /// unless `SELF_CID` pins the agent key — one of the reasons this join is latent
 /// in production today (see the dormancy note on [`run_salvage_pass`]).
 ///
-/// **Dormancy.** Two reasons a candidate can stay `None` in production: (1) NULL
-/// `agent_pub_key` humans (the dormant-human gate); (2) a writer/reader `h_app_id`
-/// SCOPE SPLIT — household-bearing humans rows are WRITTEN under
-/// `h_app_id="imagodei"` (`api/identity.rs`, `services/genesis_self_heal.rs`)
-/// while this join (like the ingest selector) READS under `"lamad"`, so it returns
-/// no household rows until a shared substrate scope reconciliation lands. Both are
-/// shared with ingest + the resilience card, tracked in
-/// `genesis/data/timeline/backlog/resilience-card-membership-humans-projection-gap-2026-06-19.md`
-/// — NOT fixed here.
+/// **Scope (RESOLVED).** The join filters humans by the canonical
+/// [`crate::db::context::HUMANS_HAPP_ID`] (`"imagodei"`, the identity pillar) — the
+/// same scope production writers use (`api/identity.rs`, `services/genesis_self_heal.rs`).
+/// The earlier `imagodei`-write / `lamad`-read scope split that emptied this join is
+/// reconciled (humans-projection scope reconciliation; see the const doc).
+///
+/// **Remaining dormancy (NOT fixed here).** A candidate can still stay `None` for two
+/// reasons: (1) NULL `agent_pub_key` humans (the dormant-human gate — per-pod
+/// registration / the humans-replayer arc); (2) a transport-id vs `agent_cid`
+/// namespace mismatch on `self_cid` / `salvage_capacity.agent_cid` unless `SELF_CID`
+/// pins the agent key (the blocked transport-identity resolver). Both shared with
+/// ingest + the resilience card, tracked in
+/// `genesis/data/timeline/backlog/resilience-card-membership-humans-projection-gap-2026-06-19.md`.
 fn build_salvage_candidates(
     conn: &mut diesel::SqliteConnection,
     self_cid: &str,
-    h_app_id: &str,
     fresh_after: &str,
 ) -> Result<Vec<crate::reconcile::placement::PlacementCandidate>, StorageError> {
     use crate::db::diesel_schema::humans;
@@ -177,7 +180,7 @@ fn build_salvage_candidates(
         household_id: Option<String>,
     }
     let human_rows: Vec<HumanRow> = humans::table
-        .filter(humans::h_app_id.eq(h_app_id))
+        .filter(humans::h_app_id.eq(crate::db::context::HUMANS_HAPP_ID))
         .filter(humans::agent_pub_key.eq_any(&cids))
         // `agent_pub_key` is only non-uniquely indexed, so two rows could share a
         // key with different households. Order by the PK `id` so the collect below
@@ -227,18 +230,16 @@ fn build_salvage_candidates(
 /// pass moves the bytes — **salvage authors intent; reconcile moves bytes** (no
 /// new fetch path).
 ///
-/// `h_app_id` is the projection scope for the humans join. Pass the canonical
-/// `"lamad"` to MIRROR the ingest selector (`distribute_shards(.., "lamad")`) —
-/// NOT the installed Holochain app id (`args.app_id="elohim"`), which would empty
-/// the join harder. **Honest caveat:** `"lamad"` does not light the feature in
-/// production *today* either — household-bearing humans rows are WRITTEN under
-/// `h_app_id="imagodei"`, so the `"lamad"` read returns no household rows and the
-/// strategy degrades to XOR. This dormancy is deliberate and SHARED with the
-/// ingest selector + resilience card; making the join populate is a substrate-wide
-/// scope-reconciliation step left to the backlog
-/// (`resilience-card-membership-humans-projection-gap-2026-06-19.md`), not this
-/// slice. 1b ships the decision logic + plumbing (fixture-verified); the
-/// production efficacy waits on that shared fix.
+/// The humans join is scoped to the canonical [`crate::db::context::HUMANS_HAPP_ID`]
+/// (`"imagodei"`); the writer/reader scope split that previously emptied it is
+/// reconciled (it is no longer a parameter). **Honest ceiling:** that resolves only
+/// ONE of the dormancy gates. The join can still return no households until (a)
+/// humans rows have a populated `agent_pub_key` (per-pod registration / the
+/// humans-replayer) AND (b) `self_cid` / `salvage_capacity.agent_cid` are in the
+/// `agent_cid` namespace (`SELF_CID` / the blocked transport-identity resolver).
+/// Until both clear, the strategy degrades to XOR. Shared with the ingest selector
+/// + resilience card; tracked in
+/// `resilience-card-membership-humans-projection-gap-2026-06-19.md`.
 ///
 /// Lives here (not in `P2PNode`) because the production [`SalvageCommitmentAuthor`]
 /// needs the conductor handle, which is threaded in the reconcile task — the same
@@ -249,7 +250,6 @@ fn build_salvage_candidates(
 pub fn run_salvage_pass(
     conn: &mut diesel::SqliteConnection,
     self_cid: &str,
-    h_app_id: &str,
     author: &dyn CommitmentAuthor,
     enabled: bool,
     target_replicas: usize,
@@ -263,7 +263,7 @@ pub fn run_salvage_pass(
         .format("%Y-%m-%dT%H:%M:%SZ")
         .to_string();
 
-    let candidates = build_salvage_candidates(conn, self_cid, h_app_id, &fresh_after)?;
+    let candidates = build_salvage_candidates(conn, self_cid, &fresh_after)?;
 
     let strategy = select_placement_strategy(diversity_placement);
     let cfg = SalvageConfig {
@@ -313,7 +313,10 @@ mod tests {
     use diesel::prelude::*;
     use diesel::SqliteConnection;
 
-    const APP: &str = "lamad";
+    // The canonical humans-projection scope (imagodei). `seed_human(.., APP)` seeds
+    // rows the join (now hardcoded to this scope) will match. Content commitments
+    // stay operating-scoped ("lamad"); only humans live under imagodei.
+    const APP: &str = crate::db::context::HUMANS_HAPP_ID;
 
     fn iso_now() -> String {
         chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
@@ -376,7 +379,7 @@ mod tests {
         seed_human(&mut conn, "h-b", Some("uhCAk-b"), Some("hh-2"), APP);
 
         let cands =
-            build_salvage_candidates(&mut conn, "uhCAk-self", APP, &fresh_cutoff()).unwrap();
+            build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
 
         assert_eq!(hh_of(&cands, "uhCAk-a"), Some("hh-1"));
         assert_eq!(hh_of(&cands, "uhCAk-b"), Some("hh-2"));
@@ -396,7 +399,7 @@ mod tests {
         seed_human(&mut conn, "h-dormant", None, Some("hh-X"), APP);
 
         let cands =
-            build_salvage_candidates(&mut conn, "uhCAk-self", APP, &fresh_cutoff()).unwrap();
+            build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
 
         assert!(
             hh_of(&cands, "uhCAk-c").is_none(),
@@ -428,7 +431,7 @@ mod tests {
         );
 
         let cands =
-            build_salvage_candidates(&mut conn, "uhCAk-self", APP, &fresh_cutoff()).unwrap();
+            build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
 
         assert_eq!(
             hh_of(&cands, "uhCAk-self"),
@@ -437,39 +440,38 @@ mod tests {
         );
     }
 
-    /// The `h_app_id` scope filter is LOAD-BEARING: a humans row under one scope is
-    /// invisible to a join under another. This is exactly why the slice ships
-    /// inert in production — household-bearing rows are written under `"imagodei"`
-    /// while this join (mirroring the ingest selector) reads `"lamad"`, so the
-    /// production read sees zero household rows (a shared, backlogged dormancy; see
-    /// `build_salvage_candidates` rustdoc). The test pins the mechanism so the
-    /// scope can't silently drift to `args.app_id` ("elohim") OR be assumed to
-    /// match writers without evidence: a row written under scope X is found under X
-    /// and NOT under a different scope Y.
+    /// The humans-join scope is the canonical [`crate::db::context::HUMANS_HAPP_ID`]
+    /// (`"imagodei"`), NOT the operating content scope, and is no longer a parameter.
+    /// A humans row under the wrong (content) scope is invisible to the join; only a
+    /// row under the canonical scope matches. This pins the reconciliation so the
+    /// scope cannot silently drift (replaces the old param-driven scope test).
     #[test]
-    fn h_app_id_scope_filter_is_load_bearing() {
+    fn humans_join_uses_canonical_imagodei_scope_only() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         seed_capacity(&mut conn, "uhCAk-a");
-        // Seed under one scope; only a join under THAT scope sees the household.
-        seed_human(&mut conn, "h-a", Some("uhCAk-a"), Some("hh-1"), "scope-X");
+        // A human under the WRONG (operating/content) scope must NOT be seen.
+        seed_human(&mut conn, "h-lamad", Some("uhCAk-a"), Some("hh-wrong"), "lamad");
+        let cands = build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
+        assert!(
+            hh_of(&cands, "uhCAk-a").is_none(),
+            "lamad-scoped human must not match the canonical imagodei join"
+        );
 
-        // Same scope → match.
-        let same =
-            build_salvage_candidates(&mut conn, "uhCAk-self", "scope-X", &fresh_cutoff()).unwrap();
-        assert_eq!(hh_of(&same, "uhCAk-a"), Some("hh-1"));
-
-        // Different scope (the writer/reader split that makes the join dormant in
-        // prod, and the "elohim" mistake) → no household.
-        for wrong_scope in ["scope-Y", "elohim", "imagodei"] {
-            let wrong =
-                build_salvage_candidates(&mut conn, "uhCAk-self", wrong_scope, &fresh_cutoff())
-                    .unwrap();
-            assert!(
-                hh_of(&wrong, "uhCAk-a").is_none(),
-                "a humans row under scope-X must be invisible to a join under {wrong_scope}"
-            );
-        }
+        // Only the imagodei (canonical) row is matched.
+        seed_human(
+            &mut conn,
+            "h-imagodei",
+            Some("uhCAk-a"),
+            Some("hh-1"),
+            crate::db::context::HUMANS_HAPP_ID,
+        );
+        let cands = build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
+        assert_eq!(
+            hh_of(&cands, "uhCAk-a"),
+            Some("hh-1"),
+            "imagodei-scoped human matches"
+        );
     }
 
     // ---- step 6: the knob selects the strategy; safety property holds --------
@@ -508,7 +510,7 @@ mod tests {
             seed_capacity(&mut conn, cid);
             seed_human(&mut conn, &format!("h-{cid}"), Some(cid), Some(hh), APP);
         }
-        let cands = build_salvage_candidates(&mut conn, "uhCAk-a", APP, &fresh_cutoff()).unwrap();
+        let cands = build_salvage_candidates(&mut conn, "uhCAk-a", &fresh_cutoff()).unwrap();
 
         let blob = "uhblob-X";
         let xor = select_placement_strategy(false).rank(blob, &cands, 2);
@@ -552,7 +554,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         seed_two_households(&mut conn);
-        let cands = build_salvage_candidates(&mut conn, "uhCAk-a", APP, &fresh_cutoff()).unwrap();
+        let cands = build_salvage_candidates(&mut conn, "uhCAk-a", &fresh_cutoff()).unwrap();
 
         let off = select_placement_strategy(false).rank("uhblob-X", &cands, 3);
         let xor = XorDistanceStrategy.rank("uhblob-X", &cands, 3);
@@ -568,7 +570,7 @@ mod tests {
         for cid in ["uhCAk-a", "uhCAk-b", "uhCAk-c", "uhCAk-d", "uhCAk-e"] {
             seed_capacity(&mut conn, cid);
         }
-        let cands = build_salvage_candidates(&mut conn, "uhCAk-a", APP, &fresh_cutoff()).unwrap();
+        let cands = build_salvage_candidates(&mut conn, "uhCAk-a", &fresh_cutoff()).unwrap();
         assert!(
             cands.iter().all(|c| c.household_id.is_none()),
             "no humans → no household enrichment"
@@ -681,7 +683,6 @@ mod tests {
         let gated = super::run_salvage_pass(
             &mut conn,
             "uhCAk-self",
-            APP,
             &author,
             false,
             2,
@@ -700,7 +701,6 @@ mod tests {
         let outcome = super::run_salvage_pass(
             &mut conn,
             "uhCAk-self",
-            APP,
             &author,
             true,
             2,

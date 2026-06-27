@@ -1565,18 +1565,6 @@ async fn async_main(
                                         match elohim_storage::services::salvage_commitment_author::run_salvage_pass(
                                             &mut conn,
                                             &salvage_self_cid,
-                                            // Humans-join scope. "lamad" MIRRORS the ingest
-                                            // selector (distribute_shards(.., "lamad")), NOT
-                                            // `args.app_id` ("elohim", which would empty the join
-                                            // harder). Honest caveat: household-bearing humans rows
-                                            // are written under h_app_id="imagodei", so "lamad"
-                                            // reads no household rows in prod today and salvage
-                                            // degrades to XOR — a dormancy SHARED with ingest +
-                                            // the resilience card, fixed by substrate-wide scope
-                                            // reconciliation (backlog: resilience-card-membership-
-                                            // humans-projection-gap-2026-06-19), not here. See the
-                                            // run_salvage_pass rustdoc.
-                                            "lamad",
                                             salvage_author.as_ref(),
                                             true, // enabled (gated by the match arm above)
                                             salvage_target_replicas,
