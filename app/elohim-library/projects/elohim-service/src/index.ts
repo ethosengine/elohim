@@ -164,6 +164,26 @@ export { LocalSourceChainService } from './angular/services/local-source-chain.s
 // localStorage simulation once write-path consumers migrate in M-REA-1 + M-AGGR-1.
 export { HolochainSourceChainService } from './angular/services/holochain-source-chain.service';
 
+// Content doc-sync — thin reactive wrapper over the Automerge content-sync plane
+// (one doc per content id, `node:{id}` under the "elohim" sync partition). The
+// resilience card consumes it as a CLIENT-COMPOSED sibling signal (NOT a server
+// fold — see resilience-facings spec §12). Promoted here from elohim-app so the
+// lamad-bundled card and the elohim-app harness can both consume it.
+export {
+  ContentDocSyncService,
+  AUTOMERGE_SYNC_FACTORY,
+  CONTENT_SYNC_NAMESPACE,
+  CONTENT_SYNC_STORAGE_BASE_URL,
+  DEFAULT_SYNC_POLL_MS,
+  contentDocId,
+} from './angular/services/content-doc-sync.service';
+export type {
+  ContentDocFields,
+  WatchContentOptions,
+  AutomergeSyncFactory,
+  StorageBaseUrlResolver,
+} from './angular/services/content-doc-sync.service';
+
 // Utils
 export * from './angular/utils/access-control.helper';
 export * from './angular/utils/epr-ref';

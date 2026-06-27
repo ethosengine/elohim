@@ -28,7 +28,10 @@
     "paths": {
       "@elohim/service/*": ["src/*"],
       "@elohim/storage-client": ["../../../../node_modules/@elohim/storage-client/dist/index.d.ts"],
-      "@elohim/storage-client/generated": ["../../../../node_modules/@elohim/storage-client/dist/generated/index.d.ts"]
+      "@elohim/storage-client/generated": ["../../../../node_modules/@elohim/storage-client/dist/generated/index.d.ts"],
+      "@automerge/automerge": [
+        "../../../../node_modules/@automerge/automerge/dist/mjs/entrypoints/fullfat_base64.js"
+      ]
     }
   },
   "include": ["src/**/*"],

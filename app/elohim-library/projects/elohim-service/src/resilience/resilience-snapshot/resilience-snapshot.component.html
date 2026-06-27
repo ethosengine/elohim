@@ -84,6 +84,13 @@
       <dt>Placement gaps</dt>
       <dd data-testid="resilience-gap-count">{{ snapshot.placementGaps.length }}</dd>
     </dl>
+    <!-- Doc-sync sibling signal — SEPARATE from the custody verdict <dl> above
+         (spec §12): a converged doc is not custody-resilience, so it never
+         folds into that verdict. Honest pending state, never a fake "synced". -->
+    <dl class="resilience-doc-sync" data-testid="resilience-doc-sync">
+      <dt>Doc sync</dt>
+      <dd data-testid="resilience-doc-sync-value">{{ docSyncSummary }}</dd>
+    </dl>
   </div>
 </ng-template>
 
@@ -109,6 +116,13 @@
       <dd>{{ snapshot.diversityScore | percent }}</dd>
       <dt>Geographic distribution</dt>
       <dd>{{ regionSummary || 'no region data' }}</dd>
+    </dl>
+
+    <!-- Doc-sync sibling signal — SEPARATE labeled row, never inside the
+         custody verdict <dl> above (spec §12). -->
+    <dl class="resilience-doc-sync summary-grid" data-testid="resilience-doc-sync-full">
+      <dt>Doc sync</dt>
+      <dd data-testid="resilience-doc-sync-full-value">{{ docSyncSummary }}</dd>
     </dl>
 
     <ng-container *ngIf="snapshot.details as details">

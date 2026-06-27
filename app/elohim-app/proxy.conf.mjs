@@ -18,6 +18,7 @@ export default [
       '/health',
       '/p2p',
       '/admin',
+      '/sync',
     ],
     target: 'http://localhost:8888',
     secure: false,

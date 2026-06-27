@@ -346,4 +346,55 @@ describe('ResilienceSnapshotComponent', () => {
       expect(wrap?.classList.contains('align-end')).toBe(true);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Doc-sync sibling signal (spec §12) — a CLIENT-COMPOSED reading kept
+  // separate from the custody-resilience verdict. Honest-by-construction:
+  // pending/unwired reads "not yet synced", never a fake "synced".
+  // -------------------------------------------------------------------------
+
+  describe('docSyncSummary (Automerge content-sync sibling signal)', () => {
+    it('reads "synced" with the document version when a converged doc is present', () => {
+      component.docSync = { id: 'c1', title: 'Edited v2', updatedAt: '2026-06-27T00:00:00Z' };
+      expect(component.docSyncSummary).toBe('synced · 2026-06-27T00:00:00Z');
+    });
+
+    it('reads "synced" (no version) when the doc is present but carries no updatedAt yet', () => {
+      // Mid-convergence: doc present, updatedAt not yet arrived field-by-field.
+      component.docSync = { id: 'c1', title: 'Edited v2' };
+      expect(component.docSyncSummary).toBe('synced');
+    });
+
+    it('reads "not yet synced" for a pending (null) doc — never a fake "synced"', () => {
+      component.docSync = null;
+      expect(component.docSyncSummary).toBe('not yet synced');
+    });
+
+    it('reads "not yet synced" when the host never wired the input (undefined)', () => {
+      // Default state — additive optional input, honest when absent.
+      expect(component.docSyncSummary).toBe('not yet synced');
+    });
+
+    it('renders the labeled Doc-sync row OUTSIDE the custody verdict <dl> (context density)', () => {
+      // OnPush: drive inputs via setInput so the second render (the null flip)
+      // marks the view dirty — direct field assignment would leave it stale.
+      fixture.componentRef.setInput('snapshot', sampleProtected);
+      fixture.componentRef.setInput('density', 'context');
+      fixture.componentRef.setInput('docSync', { title: 'x', updatedAt: '2026-06-27T00:00:00Z' });
+      fixture.detectChanges();
+      const row = fixture.nativeElement.querySelector('[data-testid="resilience-doc-sync"]');
+      expect(row).toBeTruthy();
+      const value = fixture.nativeElement.querySelector(
+        '[data-testid="resilience-doc-sync-value"]'
+      )?.textContent;
+      expect(value).toContain('synced');
+      // Honest: pending state shows "not yet synced" in the same row.
+      fixture.componentRef.setInput('docSync', null);
+      fixture.detectChanges();
+      const pending = fixture.nativeElement.querySelector(
+        '[data-testid="resilience-doc-sync-value"]'
+      )?.textContent;
+      expect(pending).toContain('not yet synced');
+    });
+  });
 });

@@ -14,6 +14,7 @@ import { ResilienceSnapshotView } from '../../generated/resilience-snapshot-view
 
 import { ResilienceSnapshotDensity } from './resilience-snapshot.types';
 
+import type { ContentDocFields } from '../../angular/services/content-doc-sync.service';
 import type { ContextMenuItem } from 'elohim-core';
 
 /** The built-in "drill into the full card" action — flips the panel body in place. */
@@ -50,6 +51,22 @@ export class ResilienceSnapshotComponent {
    * viewport). Forwarded to the panel's align attribute (spec §11.2).
    */
   @Input() panelAlign: 'start' | 'end' = 'start';
+
+  /**
+   * Doc-sync sibling signal (Automerge content-sync plane). DELIBERATELY a
+   * separate signal from the custody-resilience verdict above — they fold
+   * different planes and genuinely diverge (a doc converged on ONE peer is not
+   * custody-resilient; a doc behind on heads can still be RS-distributed to many
+   * households). See resilience-facings spec §12: doc-sync is a CLIENT-COMPOSED
+   * sibling, never folded into the resilience `<dl>` verdict. The host supplies
+   * the per-content `node:{id}` doc fields (or null while pending) — this
+   * component never reaches the sync plane itself.
+   *
+   * Tri-state: `undefined` = host did not wire it; `null` = watching, no doc
+   * yet (pending); a fields object = doc present (synced). The first two render
+   * honestly as "not yet synced" — never a fake "synced" (mirrors `isUnmeasured`).
+   */
+  @Input() docSync?: ContentDocFields | null;
 
   /**
    * Re-emits every action selection id, the built-in `view-full` included —
@@ -98,6 +115,19 @@ export class ResilienceSnapshotComponent {
     const peers = this.snapshot?.details?.onlinePeers;
     if (!peers) return '';
     return `${peers.live}/${peers.known} peers live`;
+  }
+
+  /**
+   * Doc-sync sibling reading. Honest-by-construction (spec §12): a present doc
+   * reads "synced" (+ its `updatedAt` document version when known); a pending
+   * (null) or unwired (undefined) doc reads "not yet synced" — never a fake
+   * "synced". This is per-content presence, NOT a cross-peer converged count
+   * (that lives only in the unexposed StreamTracker).
+   */
+  get docSyncSummary(): string {
+    const doc = this.docSync;
+    if (!doc) return 'not yet synced';
+    return doc.updatedAt ? `synced · ${doc.updatedAt}` : 'synced';
   }
 
   get regionSummary(): string {

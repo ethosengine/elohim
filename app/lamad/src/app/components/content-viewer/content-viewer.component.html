@@ -91,6 +91,7 @@
           <elohim-resilience-snapshot
             *ngIf="resilienceSnapshot$ | async as snap"
             [snapshot]="snap"
+            [docSync]="docSync$ | async"
             density="icon"
             panelAlign="end"
             data-testid="viewer-resilience-info"

@@ -1,14 +1,15 @@
+// @vitest-environment jsdom
 import { TestBed } from '@angular/core/testing';
 
 import { vi } from 'vitest';
 
 import {
   AUTOMERGE_SYNC_FACTORY,
-  ContentDocSyncService,
   CONTENT_SYNC_NAMESPACE,
+  CONTENT_SYNC_STORAGE_BASE_URL,
+  ContentDocSyncService,
   contentDocId,
 } from './content-doc-sync.service';
-import { StorageClientService } from './storage-client.service';
 
 /**
  * Minimal AutomergeSync stand-in: `load` seeds an empty doc, `sync` returns a
@@ -25,19 +26,17 @@ function fakeSyncReturning(doc: Record<string, unknown>) {
 describe('ContentDocSyncService', () => {
   function setup(doc: Record<string, unknown>) {
     const fake = fakeSyncReturning(doc);
-    const storageStub = {
-      getStorageBaseUrl: vi.fn().mockReturnValue('http://localhost:8090'),
-    } as unknown as StorageClientService;
+    const baseUrl = vi.fn().mockReturnValue('http://localhost:8090');
 
     TestBed.configureTestingModule({
       providers: [
         ContentDocSyncService,
-        { provide: StorageClientService, useValue: storageStub },
+        { provide: CONTENT_SYNC_STORAGE_BASE_URL, useValue: baseUrl },
         { provide: AUTOMERGE_SYNC_FACTORY, useValue: () => fake },
       ],
     });
 
-    return { service: TestBed.inject(ContentDocSyncService), fake, storageStub };
+    return { service: TestBed.inject(ContentDocSyncService), fake, baseUrl };
   }
 
   it('derives the backend doc id as node:{contentId}', () => {
@@ -56,15 +55,15 @@ describe('ContentDocSyncService', () => {
     expect(service.contentDoc('edit-prop-1')()?.contentFormat).toBe('markdown');
   });
 
-  it('queries the sync helper under the load-bearing "elohim" namespace', async () => {
-    const { storageStub } = setup({ title: 'x' });
+  it('queries the sync helper under the load-bearing "elohim" namespace via the seam base URL', async () => {
+    const { baseUrl } = setup({ title: 'x' });
     const service = TestBed.inject(ContentDocSyncService);
 
     await service.refreshContent('c1');
 
     // The doc-id the helper is asked for is node:{id}, and the helper is built
     // against the storage base URL the connection seam provides.
-    expect(storageStub.getStorageBaseUrl).toHaveBeenCalled();
+    expect(baseUrl).toHaveBeenCalled();
     expect(CONTENT_SYNC_NAMESPACE).toBe('elohim');
   });
 

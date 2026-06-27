@@ -100,6 +100,17 @@ export const routes: Routes = [
       import('./debug/debug-shell.component').then(m => m.DebugShellComponent),
     title: 'Protocol Debug',
   },
+  // Dev-only doc-sync harness — un-tree-shakes ContentDocSyncService and is the
+  // look-rail render target for the Automerge content-sync browser leg.
+  // /dev/doc-sync?id=<contentId>. Reads only the already-public /sync surface.
+  {
+    path: 'dev/doc-sync',
+    loadComponent: async () =>
+      import('./elohim/components/dev/doc-sync-harness.component').then(
+        m => m.DocSyncHarnessComponent
+      ),
+    title: 'Doc-sync harness',
+  },
   // Spatial map — cross-pillar geospatial view (Places, resources, governance)
   {
     path: 'map',

@@ -7,12 +7,14 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   ElementRef,
   HostListener,
+  Injector,
   OnDestroy,
   OnInit,
   ViewChild,
   ViewContainerRef,
   inject,
 } from '@angular/core';
+import { toObservable } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 // @coverage: 90.5% (2026-03-03)
@@ -75,9 +77,11 @@ import type {
 } from 'elohim-core';
 
 import {
+  ContentDocSyncService,
   DistributionBadgeComponent,
   ResilienceService as LibResilienceService,
   ResilienceSnapshotComponent,
+  type ContentDocFields,
 } from '@elohim/service/public-api';
 
 import { SeoService } from '../../shared/services/seo.service';
@@ -218,6 +222,20 @@ export class ContentViewerComponent
     switchMap(id => (id ? this.libResilience.getSnapshot(id) : of(null)))
   );
 
+  // Doc-sync sibling signal (Automerge content-sync plane) — a CLIENT-COMPOSED
+  // reading bound BESIDE the resilience verdict, never folded into it (facings
+  // spec §12). watchContent(id) returns a self-managing signal per content id;
+  // we bridge it to the viewer's nodeId$-driven async-pipe world. The switchMap
+  // body defers service/injector access to subscription time, so field-init
+  // order with the inject()s below is safe (same pattern as resilienceSnapshot$).
+  readonly docSync$: Observable<ContentDocFields | null> = this.nodeId$.pipe(
+    switchMap(id =>
+      id
+        ? toObservable(this.docSyncSvc.watchContent(id), { injector: this.injector })
+        : of(null)
+    )
+  );
+
   private readonly seoService = inject(SeoService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -241,6 +259,8 @@ export class ContentViewerComponent
   private readonly stewardshipService = inject(StewardshipAllocationService);
   private readonly resilienceService = inject(ResilienceService);
   private readonly libResilience = inject(LibResilienceService);
+  private readonly docSyncSvc = inject(ContentDocSyncService);
+  private readonly injector = inject(Injector);
   private readonly householdResilienceService = inject(HouseholdResilienceService);
   private readonly attentionTracker = inject(AttentionTrackerService);
   private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);

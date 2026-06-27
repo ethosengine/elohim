@@ -16,6 +16,14 @@
  * DATA IDENTITY: the sync-plane doc id is the backend's deterministic mapping
  * `node:{contentId}` (mirrors the Rust producer's `content_doc_id`). We do not
  * mint identity here — we derive the same operational key the backend writes.
+ *
+ * LIBRARY HOME: this service lives in `@elohim/service` (not elohim-app) so the
+ * resilience snapshot card — which renders inside the lamad bundle — and the
+ * elohim-app harness can both consume it. The connection seam is honoured via
+ * the injectable {@link CONTENT_SYNC_STORAGE_BASE_URL} resolver: the library
+ * never hardcodes an endpoint or branches on doorway-vs-Tauri; the host app
+ * provides the base URL (elohim-app wires it to its connection strategy; the
+ * default is origin-relative, which the dev proxy / doorway carry for `/sync`).
  */
 
 import {
@@ -30,8 +38,6 @@ import {
 
 import { AutomergeSync, StorageClient } from '@elohim/storage-client';
 
-import { StorageClientService } from './storage-client.service';
-
 /**
  * The sync-partition namespace. MUST equal the `h_app_id` the elohim-storage
  * producer writes under and the sync timer lists (`initiate_sync_round`,
@@ -41,6 +47,25 @@ export const CONTENT_SYNC_NAMESPACE = 'elohim';
 
 /** Default poll cadence for a watched doc. */
 export const DEFAULT_SYNC_POLL_MS = 5000;
+
+/**
+ * Resolves the storage base URL the SDK client targets. Injectable so the host
+ * app owns the connection seam (doorway-vs-Tauri-vs-direct) while the library
+ * stays endpoint-agnostic. The default is origin-relative (`''`): in
+ * browser/doorway/dev-proxy contexts that resolves `/sync/v1/...` against the
+ * current origin, which the doorway carries. Hosts with a non-origin storage
+ * endpoint (e.g. Tauri's local sidecar) override this from their connection
+ * strategy.
+ */
+export type StorageBaseUrlResolver = () => string;
+
+export const CONTENT_SYNC_STORAGE_BASE_URL = new InjectionToken<StorageBaseUrlResolver>(
+  'ContentSyncStorageBaseUrl',
+  {
+    providedIn: 'root',
+    factory: () => () => '',
+  }
+);
 
 /**
  * Flat content-doc fields as projected by the elohim-storage producer
@@ -123,7 +148,7 @@ function readDocFields(doc: SyncDocHandle): ContentDocFields {
 
 @Injectable({ providedIn: 'root' })
 export class ContentDocSyncService {
-  private readonly storage = inject(StorageClientService);
+  private readonly resolveBaseUrl = inject(CONTENT_SYNC_STORAGE_BASE_URL);
   private readonly makeSync = inject(AUTOMERGE_SYNC_FACTORY);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -220,7 +245,7 @@ export class ContentDocSyncService {
   private getHelper(): DocSyncHelper {
     if (this.helper === undefined) {
       const client = new StorageClient({
-        baseUrl: this.storage.getStorageBaseUrl(),
+        baseUrl: this.resolveBaseUrl(),
         hAppId: CONTENT_SYNC_NAMESPACE,
       });
       // Single cast boundary: re-type the SDK helper to the local slice so the

@@ -22,6 +22,21 @@ export type { ContextMenuItem } from 'elohim-core';
 export { DistributionService } from './distribution/distribution.service';
 export { DistributionBadgeComponent } from './distribution/distribution-badge/distribution-badge.component';
 
+// Content doc-sync sibling signal for the resilience card (spec §12: a
+// client-composed sibling, NOT a server-fold facing). Re-exported here so hosts
+// that import the resilience widget from this surface get the matching service.
+export {
+  ContentDocSyncService,
+  AUTOMERGE_SYNC_FACTORY,
+  CONTENT_SYNC_NAMESPACE,
+  CONTENT_SYNC_STORAGE_BASE_URL,
+  contentDocId,
+} from './angular/services/content-doc-sync.service';
+export type {
+  ContentDocFields,
+  WatchContentOptions,
+} from './angular/services/content-doc-sync.service';
+
 export { ObservationService } from './services/observation.service';
 
 export type { ElohimEnv } from './env/elohim-env';

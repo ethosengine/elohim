@@ -22,6 +22,7 @@ export default [
       '/health',
       '/p2p',
       '/admin',
+      '/sync',
     ],
     target,
     secure: true,

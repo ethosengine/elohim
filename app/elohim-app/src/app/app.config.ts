@@ -40,6 +40,7 @@ import { LEARNER_BACKEND } from '@app/lamad/interfaces/learner-backend.interface
 import { LearnerBackendApiService } from '@app/lamad/services/learner-backend-api.service';
 import { ECONOMIC_EVENT_FACTORY, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
 import { BUNDLE_ROUTE_CONTEXT, type BundleRouteContext } from '@elohim/service';
+import { CONTENT_SYNC_STORAGE_BASE_URL } from '@elohim/service';
 import { EconomicEventsApiService } from './shefa/services/economic-events-api.service';
 import { StorageApiService } from './elohim/services/storage-api.service';
 import { StorageClientService } from './elohim/services/storage-client.service';
@@ -164,6 +165,16 @@ export const appConfig: ApplicationConfig = {
     // LAMAD_STORAGE_CLIENT — content-viewer (direct) + resilience / household-
     // resilience / projection-api / content-backend services in the viewer chain.
     { provide: LAMAD_STORAGE_CLIENT, useExisting: StorageClientService },
+    // CONTENT_SYNC_STORAGE_BASE_URL — the connection seam for @elohim/service's
+    // ContentDocSyncService (Automerge content-sync plane). The library defaults
+    // to origin-relative; the shell wires it to the live connection strategy so
+    // the doc-sync `/sync/v1/...` calls honour doorway-vs-Tauri-vs-direct (Tauri's
+    // local sidecar is non-origin) exactly as the rest of the storage surface does.
+    {
+      provide: CONTENT_SYNC_STORAGE_BASE_URL,
+      useFactory: (storage: StorageClientService) => () => storage.getStorageBaseUrl(),
+      deps: [StorageClientService],
+    },
     // LAMAD_STORAGE_API — StewardshipAllocationService (injected by content-viewer).
     { provide: LAMAD_STORAGE_API, useExisting: StorageApiService },
     // LAMAD_CONTEXT_ASSEMBLY — ContentEditorService (injected by content-viewer for
