@@ -21,6 +21,7 @@
 //! - **Content metadata**: Node stubs for fog-of-war visibility
 
 pub mod doc_store;
+pub mod projector;
 pub mod stream;
 
 pub use doc_store::{DocStore, DocStoreConfig, StoredDocument};
@@ -28,6 +29,7 @@ pub use stream::{StreamPosition, StreamTracker};
 
 use crate::error::StorageError;
 use automerge::Automerge;
+use automerge::ReadDoc;
 use std::sync::Arc;
 use tracing::debug;
 
@@ -154,6 +156,37 @@ impl SyncManager {
             }
             None => Ok(vec![]),
         }
+    }
+
+    /// Read a single top-level string field from a document.
+    ///
+    /// Read-only accessor used by `sync::projector` and the convergence tests
+    /// to assert a doc's projected scalar fields. Returns an error if the
+    /// document does not exist, the field is absent, or the field is not a
+    /// string scalar.
+    pub async fn get_doc_field(
+        &self,
+        h_app_id: &str,
+        doc_id: &str,
+        field: &str,
+    ) -> Result<String, StorageError> {
+        let stored = self
+            .doc_store
+            .get(h_app_id, doc_id)
+            .await?
+            .ok_or_else(|| StorageError::Sync(format!("doc not found: {h_app_id}/{doc_id}")))?;
+        let doc = Automerge::load(&stored.data)
+            .map_err(|e| StorageError::Sync(format!("Failed to load doc: {e}")))?;
+        doc.get(automerge::ROOT, field)
+            .map_err(|e| StorageError::Sync(format!("Failed to read field {field}: {e}")))?
+            .and_then(|(v, _)| match v {
+                automerge::Value::Scalar(s) => match s.as_ref() {
+                    automerge::ScalarValue::Str(smol) => Some(smol.to_string()),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .ok_or_else(|| StorageError::Sync(format!("field not found or not a string: {field}")))
     }
 
     /// List documents for an app

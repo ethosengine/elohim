@@ -2572,7 +2572,25 @@ async fn async_main(
         if args.enable_content_db {
             // Create services with the shared pool
             let services = Arc::new(Services::new(pool.clone()));
-            http_server = http_server.with_services(services);
+            http_server = http_server.with_services(services.clone());
+
+            // Light the Automerge content-sync plane: subscribe the
+            // content-projection producer to the SAME EventBus the content
+            // service emits on, so each content write becomes an Automerge doc
+            // in the DocStore under the "elohim" sync namespace (the only
+            // namespace `initiate_sync_round` lists). Without this organ the
+            // sync engine is fully wired but inert. libp2p path only — the iroh
+            // branch's SyncManager is moved into SyncManagerBackend (its
+            // producer wiring is a separate, p2p-iroh-gated follow-up).
+            #[cfg(feature = "p2p")]
+            if let Some(ref node) = p2p_node {
+                elohim_storage::sync::projector::spawn_content_projection_listener(
+                    services.events.clone(),
+                    node.sync_manager().clone(),
+                    pool.clone(),
+                );
+                info!("Content-projection producer spawned — Automerge content-sync plane lit");
+            }
             // Wire policy enforcement for content filtering
             let policy_cache = elohim_storage::db::policy_cache::PolicyCache::new(pool.clone());
             let enforcement = Arc::new(elohim_storage::db::policy_cache::PolicyEnforcement::new(
