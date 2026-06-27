@@ -287,6 +287,38 @@ mod tests {
         assert_eq!(healed.household_id.as_deref(), Some("household-dowell"));
     }
 
+    /// `list_humans` under the canonical scope returns the imagodei rows the
+    /// production writers create. The `/db/humans` handler delegates to this with
+    /// `HUMANS_HAPP_ID` (NOT the operating ctx) — pinning the contract that the
+    /// 2026-06-19 dark-card probe's empty `/db/humans` was a read-scope artifact.
+    #[test]
+    fn list_humans_under_canonical_scope_finds_imagodei_rows() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        create_human(
+            &mut conn,
+            CreateHumanInput {
+                id: "h-1".to_string(),
+                agent_pub_key: Some("uhCAk-a".to_string()),
+                display_name: "A".to_string(),
+                bio: None,
+                affinities: "[]".to_string(),
+                profile_reach: "commons".to_string(),
+                location: None,
+                profile_photo_url: None,
+                h_app_id: crate::db::context::HUMANS_HAPP_ID.to_string(),
+                household_id: Some("hh-1".to_string()),
+            },
+        )
+        .unwrap();
+        let rows = list_humans(&mut conn, crate::db::context::HUMANS_HAPP_ID).unwrap();
+        assert_eq!(
+            rows.len(),
+            1,
+            "list_humans under the canonical scope returns the imagodei row"
+        );
+    }
+
     /// STOPGAP invariant (resolver spec §3.4, §3.5): heal NEVER overwrites a
     /// value that is already set. A second heal with a *different* key is a
     /// no-op on the set column — this is load-bearing so a later key

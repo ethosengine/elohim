@@ -8405,11 +8405,14 @@ impl HttpServer {
     async fn handle_list_humans(
         &self,
         _req: Request<Incoming>,
-        ctx: &AppContext,
+        _ctx: &AppContext,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         let mut conn = self.get_diesel_conn()?;
 
-        match humans::list_humans(&mut conn, &ctx.h_app_id) {
+        // /db/humans lists the imagodei identity projection, NOT the operating
+        // content scope — else a populated table reads empty (the 2026-06-19
+        // dark-card probe artifact). See db::context::HUMANS_HAPP_ID.
+        match humans::list_humans(&mut conn, crate::db::context::HUMANS_HAPP_ID) {
             Ok(items) => {
                 let views: Vec<HumanView> = items.into_iter().map(HumanView::from).collect();
                 let body = serde_json::json!({
