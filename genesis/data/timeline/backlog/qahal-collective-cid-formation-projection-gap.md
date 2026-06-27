@@ -90,6 +90,15 @@ branch) while account-import participations use `qahal`. The FK is on bare
 materialization deliberately uses "lamad" today so the projection
 controller's upsert converges instead of PK-colliding — flip both together.
 
+**Sibling (2026-06-27):** this is the SAME CLASS as the humans-projection scope split
+(`resilience-card-membership-humans-projection-gap-2026-06-19.md`), reconciled by the `HUMANS_HAPP_ID`
+const in `genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md`.
+The humans fix was **reader-side only** — production writers were already uniformly `imagodei`, so it
+did NOT need writer convergence. Collectives are DIFFERENT: they ARE written under BOTH `lamad`
+(seed/legacy-prefix) and `qahal` (account-import), so reconciling them needs the "decide ONE scope,
+flip BOTH writers together" step above. It is the **next instance** of this pattern, NOT folded into
+the humans fix.
+
 ## UPDATE genesis #1145 (2026-06-14): root cause is ONE RUNG DEEPER — formation never reaches a full collective; jessica's affirm is rejected at the STEWARD GATE
 
 The 2026-06-08 framing ("the `CollectiveProjected` signal/stamp path never

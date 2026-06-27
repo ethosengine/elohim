@@ -56,3 +56,39 @@ per-pod work for adam). The `/db/humans` read-scope artifact + the steward-gate 
 circularity are captured as complementary items (home: `qahal-collective-cid-formation-projection-
 gap.md`). **status stays `open`** (work not landed) but the diagnosis is settled — do not re-chase a
 "projection isn't populating humans" cause; matthew's row is healed.
+
+---
+
+## UPDATE 2026-06-27 — the imagodei-write / lamad-read SCOPE leg is RESOLVED (plan: humans-projection-scope-reconciliation)
+
+The **scope split** named in U2 (production writes `humans` under `h_app_id="imagodei"`; the
+household-join readers filtered under the operating content scope `"lamad"`, so every join silently
+emptied) is **reconciled** by
+`genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md` (landed on
+`feat/frontend-eyes-sprint`):
+
+- **Single source of truth:** `elohim-storage` now has `pub const HUMANS_HAPP_ID: &str = "imagodei"`
+  (`db/context.rs`), re-exported as `crate::db::HUMANS_HAPP_ID`. Every humans-projection reader filters
+  by it; the two production writers (`api/identity.rs::register_human`,
+  `services/genesis_self_heal.rs`) reference it (flip-both-together drift guard).
+- **Readers fixed (4):** the ingest peer-selector (`services/peer_selection.rs`), salvage placement
+  (`services/salvage_commitment_author.rs` — also retired the threaded `h_app_id` param from
+  `run_salvage_pass`/`build_salvage_candidates`), the doorway public-humans cache
+  (`db/cache_queries.rs::list_cacheable_humans`), and `GET /db/humans`
+  (`http.rs::handle_list_humans` — the exact read-scope artifact U2 flagged as misleading this card).
+- **Monotonic-safe:** every affected read returned empty before (humans are imagodei, the filter was
+  lamad); flipping to imagodei is empty→correct only — no production data is mis-selected (writers
+  already write imagodei).
+
+**Two gates remain OPEN — `status` stays `open`; nobody may re-assert "diversity works in production"
+until both clear:**
+
+1. **NULL `agent_pub_key` population** (U3) — the DHT humans-replayer is a stub; only
+   `genesis_self_heal` fills the self pod. Other pods (adam, …) need per-pod registration.
+   Owner: `2026-06-19-resilience-card-lighting-plan` Sprint 2 / the humans-replayer arc.
+2. **Transport-id vs `agent_cid` namespace** — `self_cid` / `salvage_capacity.agent_cid` may be a
+   libp2p/iroh transport id unless `SELF_CID` pins the agent key. Owner: the **blocked**
+   `2026-06-15-coherent-transport-identity-resolver-design`, or `SELF_CID` per deployment.
+
+The U1 JSON-list serialization bug is unrelated to this plan (owned by
+`2026-06-13-non-commons-provide-commitments-design` §11).
