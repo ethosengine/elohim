@@ -2080,9 +2080,11 @@ async fn async_main(
     // branch constructs its own SyncManager pointing at the same on-disk
     // sled DB the libp2p path would use; only one branch ever opens it.
     #[cfg(feature = "p2p-iroh")]
-    let (_iroh_node, iroh_blob_store_for_http): (
+    #[allow(clippy::type_complexity)]
+    let (_iroh_node, iroh_blob_store_for_http, iroh_sync_manager): (
         Option<elohim_storage::p2p_iroh::IrohNode>,
         Option<Arc<elohim_storage::p2p_iroh::IrohBlobStore>>,
+        Option<Arc<elohim_storage::sync::SyncManager>>,
     ) = if args.enable_p2p
         && config.transport_backend == elohim_storage::config::TransportBackend::Iroh
     {
@@ -2119,6 +2121,11 @@ async fn async_main(
         };
         let stream_tracker = Arc::new(StreamTracker::new());
         let sync_manager = Arc::new(SyncManager::new(doc_store, stream_tracker));
+        // Clone a handle for the content-projection producer (wired below at the
+        // services co-scope) BEFORE the Arc is moved into the SyncBackend. This
+        // is the iroh-mode equivalent of the libp2p `node.sync_manager()` handle;
+        // the producer is transport-neutral and lights whichever DocStore is live.
+        let sync_manager_for_projector = sync_manager.clone();
         let sync_backend: Arc<dyn elohim_storage::p2p_iroh::SyncBackend> =
             Arc::new(SyncManagerBackend::new(sync_manager));
         let sync_handler = IrohSyncProtocol::new(sync_backend);
@@ -2294,7 +2301,11 @@ async fn async_main(
                 );
                 // Cutover gate #2 (Plan 2): clone blob store for HTTP server wiring.
                 let iroh_blob_store_for_http = Arc::new(node.store().clone());
-                (Some(node), Some(iroh_blob_store_for_http))
+                (
+                    Some(node),
+                    Some(iroh_blob_store_for_http),
+                    Some(sync_manager_for_projector),
+                )
             }
             Err(e) => {
                 error!(error = %e, "Failed to start iroh node");
@@ -2302,7 +2313,7 @@ async fn async_main(
             }
         }
     } else {
-        (None, None)
+        (None, None, None)
     };
 
     #[cfg(not(feature = "p2p-iroh"))]
@@ -2590,6 +2601,32 @@ async fn async_main(
                     pool.clone(),
                 );
                 info!("Content-projection producer spawned — Automerge content-sync plane lit");
+            }
+            // iroh transport path: the iroh SyncManager (built at the iroh
+            // co-scope above and moved into SyncManagerBackend) exposes a
+            // clonable handle here. The producer is transport-neutral, so the
+            // same listener fills the iroh DocStore. Only ONE transport is active
+            // at runtime (transport_backend selects), so the libp2p block above
+            // and this block never both fire: in iroh mode `p2p_node` is None and
+            // `iroh_sync_manager` is Some.
+            //
+            // NOTE: this fills the iroh DocStore on each content write, but iroh
+            // currently has no periodic sync-round DRIVER — the 60s
+            // `initiate_sync_round` scheduler is libp2p-only (p2p/mod.rs:2401);
+            // `IrohSyncClient` exists but is invoked only from tests/benches.
+            // iroh content sync will not FLOW peer-to-peer until an iroh-side
+            // round driver listing h_app_id="elohim" is added (bounded follow-up).
+            #[cfg(feature = "p2p-iroh")]
+            if let Some(ref iroh_sync) = iroh_sync_manager {
+                elohim_storage::sync::projector::spawn_content_projection_listener(
+                    services.events.clone(),
+                    iroh_sync.clone(),
+                    pool.clone(),
+                );
+                info!(
+                    "Content-projection producer spawned on iroh transport — \
+                     Automerge content-sync DocStore now filled (iroh)"
+                );
             }
             // Wire policy enforcement for content filtering
             let policy_cache = elohim_storage::db::policy_cache::PolicyCache::new(pool.clone());
