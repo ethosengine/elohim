@@ -1137,6 +1137,9 @@ pub fn validate_project_epr_commitment(
         "/admin",
         "/identity",
         "/threshold",
+        // /sync exposed through doorway (2026-06-27, build_manifest + doorway
+        // is_service_path); an EPR projection alias must not collide with it.
+        "/sync",
         "/sitemap.xml",
     ];
     let alias_paths = input

@@ -10307,9 +10307,18 @@ fn correlate_issues(entries: &[crate::db::models::ObservationEntry]) -> Vec<Obse
 /// Used by `GET /manifest` and consumed by doorway's dynamic route registry.
 ///
 /// Design rule: list only routes that doorway should proxy to clients.
-/// Infrastructure routes (/health, /shard/*, /blob/*, /sync/*, /import/*,
+/// Infrastructure routes (/health, /shard/*, /blob/*, /import/*,
 /// /p2p/*, /epr-head/*, /ipfs/*, /dag/*, /session, /account/*) are
 /// intentionally omitted — doorway handles them independently or not at all.
+///
+/// EXCEPTION (2026-06-27): the `/sync/v1/*` Automerge doc-sync routes ARE
+/// declared here so doorway's route registry proxies browser doc-sync to
+/// storage (StorageProxy entries → forward_to_storage). This DELIBERATELY
+/// reverses the prior "/sync intentionally omitted" rule — paired with the
+/// flipped guard in the `build_manifest_*` test and `is_service_path("/sync")`
+/// in doorway. Security-adjacent: this exposes the CRDT doc-sync plane through
+/// doorway. The sync API does not itself enforce reach (it shares the known
+/// http-reach-enforcement-gap); GET reads mirror /db content-read posture.
 pub fn build_manifest() -> doorway_client::DoorwayRoutes {
     DoorwayRoutesBuilder::new()
         // =====================================================================
@@ -10347,6 +10356,41 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
             Route::get("/api/v1/status/projector")
                 .handler("projector_status")
                 .cache_ttl(5)
+                .build(),
+        )
+        // =====================================================================
+        // /sync/v1 — Automerge CRDT doc-sync (browser doc-sync carriage)
+        // =====================================================================
+        // FLIPPED 2026-06-27: previously omitted as infrastructure. Declared so
+        // doorway's route registry proxies these to storage's handle_sync_request
+        // (http.rs ~:3380). Handlers already exist; these are proxy declarations.
+        // GET reads are NOT cached (live CRDT state must not go stale). POST
+        // /changes is a write → auth_required, mirroring /db POST posture.
+        // Doc-id path segments are URL-encoded single segments (e.g. node%3Aid).
+        .route(
+            Route::get("/sync/v1/{hAppId}/docs")
+                .handler("sync_list_documents")
+                .build(),
+        )
+        .route(
+            Route::get("/sync/v1/{hAppId}/docs/{docId}")
+                .handler("sync_get_document")
+                .build(),
+        )
+        .route(
+            Route::get("/sync/v1/{hAppId}/docs/{docId}/heads")
+                .handler("sync_get_heads")
+                .build(),
+        )
+        .route(
+            Route::get("/sync/v1/{hAppId}/docs/{docId}/changes")
+                .handler("sync_get_changes")
+                .build(),
+        )
+        .route(
+            Route::post("/sync/v1/{hAppId}/docs/{docId}/changes")
+                .handler("sync_apply_changes")
+                .auth_required()
                 .build(),
         )
         // =====================================================================
@@ -12693,9 +12737,14 @@ mod tests {
             !paths.iter().any(|p| p.starts_with("/shard")),
             "shard routes should not be in manifest"
         );
+        // FLIPPED 2026-06-27: /sync/v1 doc-sync routes ARE now declared so
+        // doorway's route registry proxies browser doc-sync to storage. This
+        // deliberately reverses the prior "sync routes should not be in manifest"
+        // guard (security-adjacent — exposes the CRDT doc-sync plane through
+        // doorway). See the build_manifest design-rule note + is_service_path("/sync").
         assert!(
-            !paths.iter().any(|p| p.starts_with("/sync")),
-            "sync routes should not be in manifest"
+            paths.iter().any(|p| p.starts_with("/sync/v1/")),
+            "sync routes must be declared in manifest (doorway doc-sync carriage)"
         );
         // Verify blob proxy points to /blob
         assert_eq!(manifest.blob_proxy.unwrap().base_path, "/blob");

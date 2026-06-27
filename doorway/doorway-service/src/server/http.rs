@@ -1948,6 +1948,11 @@ fn is_service_path(path: &str) -> bool {
         "/api/",
         "/import/",
         "/db/",
+        // /sync/* — Automerge doc-sync proxied to storage via the route
+        // registry (storage build_manifest declares /sync/v1/*). Without this
+        // the EPR router (GET + !is_service_path) would shadow GET /sync to the
+        // SPA bundle — the /auth/portal incident shape. FLIPPED 2026-06-27.
+        "/sync/",
         "/apps/",
         "/epr-head/",
         "/epr/",
@@ -1979,6 +1984,10 @@ fn is_service_path(path: &str) -> bool {
             | "/api"
             | "/blob"
             | "/apps"
+            // Bare /sync root — pinned reserved (mirrors the "/sync/" prefix
+            // above and the route-claims fixture). Keeps a bare reserved root
+            // from being a legal projection mount or alias target. FLIPPED 2026-06-27.
+            | "/sync"
             // Only the DID service endpoints are doorway-owned under /identity.
             // The bare "/identity" and "/identity/*" SPA routes (imagodei pillar:
             // /identity/login, /identity/profile, …) must fall through to the EPR
@@ -2173,6 +2182,20 @@ mod shakeout_tests {
         assert!(!is_service_path("/identity/profile"));
         assert!(is_service_path("/identity/did"));
         assert!(is_service_path("/identity/did.json"));
+    }
+    #[test]
+    fn shakeout_service_path_guards_sync() {
+        // /sync/* (Automerge doc-sync, proxied to storage via the route registry)
+        // MUST be a service path or the EPR router (GET + !is_service_path)
+        // shadows GET /sync to the SPA bundle when a root projection is
+        // registered — the /auth/portal incident shape. FLIPPED 2026-06-27.
+        assert!(is_service_path("/sync/v1/elohim/docs"));
+        assert!(is_service_path(
+            "/sync/v1/elohim/docs/node%3Aedit-prop-1/changes"
+        ));
+        // Bare root is reserved too (pins it against projection-mount collision).
+        assert!(is_service_path("/sync"));
+        assert!(is_reserved_url_path("/sync"));
     }
 
     // ── derive_app_subpath — projection url_path → storage sub-path ───────────
