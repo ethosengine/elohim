@@ -42,6 +42,7 @@ pub use epr::*;
 pub use imagodei::*;
 pub use infrastructure::*;
 pub use lamad::*;
+pub use lens::*;
 pub use qahal::*;
 pub use shared::*;
 pub use shefa::*;

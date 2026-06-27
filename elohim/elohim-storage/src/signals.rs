@@ -908,6 +908,17 @@ pub fn handle_mishpat_signal(
                         "handle_mishpat_signal: CommitmentCommitted projected → mishpat_commitments"
                     );
                 }
+                Ok(crate::mishpat_projection::CommitmentProjection::UpsertLens(new_lens)) => {
+                    // author-lens projects into the A-class `lenses` table (NOT
+                    // mishpat_commitments). Anchor-preserving upsert; cid = entry_hash.
+                    crate::db::lenses::upsert_with_anchor(conn, new_lens)
+                        .map_err(|e| StorageError::Database(e.to_string()))?;
+                    tracing::info!(
+                        cid = %entry_hash,
+                        action_hash = %action_hash,
+                        "handle_mishpat_signal: CommitmentCommitted projected → lenses"
+                    );
+                }
                 Ok(crate::mishpat_projection::CommitmentProjection::Revoke {
                     target_cid,
                     signed_at,
@@ -2591,6 +2602,129 @@ mod mishpat_signal_tests {
         assert_eq!(
             row.cid, "uhCEkCOM2",
             "Re-delivered CommitmentCommitted must not duplicate the row"
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // author-lens projection (lens-market S3) — CommitmentCommitted{author-lens}
+    // projects a `lenses` A-class row (NOT a mishpat_commitments row).
+    // -------------------------------------------------------------------------
+
+    fn make_author_lens_signal(
+        action_hash: &str,
+        entry_hash: &str,
+        governs_epr: &str,
+        school: &str,
+    ) -> MishpatSignal {
+        let payload_json = serde_json::json!({
+            "action": "author-lens",
+            "governs_epr": governs_epr,
+            "school": school,
+            "role": "lens",
+            "rule": { "predicate": "land_value_uplift > rent_capture" },
+            "telos": { "summary": "tax unimproved land value, not labor" },
+            "version_parent": serde_json::Value::Null
+        })
+        .to_string();
+
+        MishpatSignal::CommitmentCommitted {
+            action_hash: action_hash.into(),
+            entry_hash: entry_hash.into(),
+            author: "uhCAkAUTHOR".into(),
+            commitment: crate::mishpat_projection::CommitmentPayload {
+                action: "author-lens".to_string(),
+                payload_json,
+                signed_at: "2026-06-27T00:00:00Z".to_string(),
+            },
+        }
+    }
+
+    /// S3a — CommitmentCommitted{author-lens} projects ONE `lenses` row (A-class),
+    /// keyed cid = entry_hash, dht_anchor_hash = action_hash. It must NOT land in
+    /// mishpat_commitments (author-lens is a lens, not a compute-bounds commitment).
+    #[test]
+    fn author_lens_signal_projects_lens_row() {
+        let mut conn = setup_commitments_conn();
+        let signal =
+            make_author_lens_signal("uhCkkLENS1", "uhCEkLENS1", "epr:lamad-spa", "georgist");
+
+        handle_mishpat_signal(&mut conn, "app", signal).unwrap();
+
+        let row = crate::db::lenses::get_by_cid(&mut conn, "uhCEkLENS1")
+            .unwrap()
+            .expect("lenses row must be present after author-lens CommitmentCommitted");
+        assert_eq!(row.cid, "uhCEkLENS1", "cid = entry_hash");
+        assert_eq!(row.governs_epr, "epr:lamad-spa");
+        assert_eq!(row.school, "georgist");
+        assert_eq!(row.role, "lens");
+        assert_eq!(
+            row.dht_anchor_hash.as_deref(),
+            Some("uhCkkLENS1"),
+            "dht_anchor_hash must equal action_hash (A-class provenance)"
+        );
+        // rule/telos round-trip as JSON.
+        let telos: serde_json::Value =
+            serde_json::from_str(&row.telos_json).expect("telos_json must be valid JSON");
+        assert_eq!(telos["summary"], "tax unimproved land value, not labor");
+
+        // It must NOT have leaked into mishpat_commitments.
+        assert!(
+            crate::db::mishpat_commitments::get_by_cid(&mut conn, "uhCEkLENS1")
+                .unwrap()
+                .is_none(),
+            "author-lens must NOT project into mishpat_commitments"
+        );
+    }
+
+    /// S3b — re-delivery is idempotent + anchor-preserving (one lens row).
+    #[test]
+    fn author_lens_signal_idempotent() {
+        let mut conn = setup_commitments_conn();
+        let signal =
+            make_author_lens_signal("uhCkkLENS2", "uhCEkLENS2", "epr:lamad-spa", "beerian");
+
+        handle_mishpat_signal(&mut conn, "app", signal.clone()).unwrap();
+        handle_mishpat_signal(&mut conn, "app", signal).unwrap();
+
+        let row = crate::db::lenses::get_by_cid(&mut conn, "uhCEkLENS2")
+            .unwrap()
+            .expect("lens row must exist after two deliveries");
+        assert_eq!(row.school, "beerian");
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkkLENS2"));
+    }
+
+    /// S3c — a malformed author-lens payload (missing governs_epr) is warn-skipped:
+    /// no lens row, no error bubbles (per-row fail-closed degrade, the EprRouter lesson).
+    #[test]
+    fn author_lens_malformed_payload_skipped() {
+        let mut conn = setup_commitments_conn();
+        let payload_json = serde_json::json!({
+            "action": "author-lens",
+            // governs_epr deliberately absent
+            "school": "georgist",
+            "role": "lens",
+            "rule": { "predicate": "x" },
+            "telos": { "summary": "y" }
+        })
+        .to_string();
+        let signal = MishpatSignal::CommitmentCommitted {
+            action_hash: "uhCkkBAD".into(),
+            entry_hash: "uhCEkBAD".into(),
+            author: "uhCAkAUTHOR".into(),
+            commitment: crate::mishpat_projection::CommitmentPayload {
+                action: "author-lens".to_string(),
+                payload_json,
+                signed_at: "2026-06-27T00:00:00Z".to_string(),
+            },
+        };
+
+        // Must NOT error — the handler degrades the row, never the whole signal.
+        handle_mishpat_signal(&mut conn, "app", signal).expect("handler must not error on bad row");
+        assert!(
+            crate::db::lenses::get_by_cid(&mut conn, "uhCEkBAD")
+                .unwrap()
+                .is_none(),
+            "malformed author-lens must not project a lens row"
         );
     }
 

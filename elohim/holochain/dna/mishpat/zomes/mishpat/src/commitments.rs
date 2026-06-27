@@ -198,6 +198,7 @@ pub fn validate_commitment_payload(input: &CreateCommitmentInput) -> Result<(), 
         "revokes-commitment" => validate_revokes_commitment(&payload),
         "ratifies-limit-gradient" => validate_ratifies_limit_gradient(&payload),
         "sets-authority-arc" => validate_sets_authority_arc(&payload),
+        "author-lens" => validate_author_lens(&payload),
         other => Err(format!(
             "commitments::validate_commitment_payload unhandled action: {other}"
         )),
@@ -533,6 +534,59 @@ fn validate_sets_authority_arc(payload: &serde_json::Value) -> Result<(), String
     // a zero floor would permit a coverage-destroying leecher.
     if bounds["coverage_floor"].as_u64().unwrap_or(0) == 0 {
         return Err("sets-authority-arc bounds.coverage_floor must be > 0".into());
+    }
+    Ok(())
+}
+
+/// Validator for the `author-lens` action — the lens-market "teeth" (plan S1 of
+/// `genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md`,
+/// payload contract I1; charter §8).
+///
+/// A **Lens** is a `Mishpat::Commitment` with `action="author-lens"`; the whole
+/// concept lives in `payload_json` — zero integrity-struct change. This is the
+/// closed-coordinator gate (a malformed lens is rejected at create-time), so
+/// adding it is **DNA-hash-NEUTRAL**: the `mishpat_integrity` zome is untouched
+/// and this validator hot-swaps via `update_coordinators`. The storage projection
+/// (plan S3) keys the `lenses` table on `cid == entry_hash`; `governs_epr` is the
+/// EPR **slug-id** scope key (plan A3), NOT the dag-cbor CID — a forward index
+/// reuses the existing SQL scope projection, so no new DHT entry/link type.
+///
+/// `role` ∈ {lens, floor, ceiling}: a plain lens is one school's reading; floor
+/// and ceiling are constitutional bounds (the wisdom-layer floor/ceiling seam).
+/// `rule` is the deterministic predicate (the teeth) and `telos` is what the lens
+/// steers toward (viability and/or justice) — both required objects.
+fn validate_author_lens(payload: &serde_json::Value) -> Result<(), String> {
+    let required = ["action", "governs_epr", "school", "role", "rule", "telos"];
+    for field in required {
+        if payload.get(field).is_none() {
+            return Err(format!("author-lens missing required field: {field}"));
+        }
+    }
+    if payload["action"] != "author-lens" {
+        return Err("action field must equal 'author-lens'".into());
+    }
+    // governs_epr is the scope key (slug-id, plan A3) — must be a non-empty
+    // string, else the lens binds to no scope row.
+    if payload["governs_epr"].as_str().unwrap_or("").is_empty() {
+        return Err("author-lens governs_epr must be a non-empty slug-id".into());
+    }
+    if payload["school"].as_str().unwrap_or("").is_empty() {
+        return Err("author-lens school must be a non-empty string".into());
+    }
+    // role enum: a plain lens, or a constitutional floor/ceiling bound.
+    let role = payload["role"].as_str().unwrap_or("");
+    if !matches!(role, "lens" | "floor" | "ceiling") {
+        return Err(format!(
+            "author-lens role '{role}' not in enum (lens|floor|ceiling)"
+        ));
+    }
+    // rule (the deterministic predicate — the teeth) and telos (what it steers
+    // toward) must both be objects.
+    if !payload["rule"].is_object() {
+        return Err("author-lens rule must be an object (the deterministic predicate)".into());
+    }
+    if !payload["telos"].is_object() {
+        return Err("author-lens telos must be an object".into());
     }
     Ok(())
 }
@@ -1271,5 +1325,140 @@ mod tests {
         assert_eq!(decoded.state, original.state);
         assert_eq!(decoded.event_hash, original.event_hash);
         assert_eq!(decoded.signed_at, original.signed_at);
+    }
+
+    // =========================================================================
+    // author-lens tests (S1 — the lens-market "teeth"; plan I1)
+    //
+    // A Lens IS a Mishpat::Commitment with action="author-lens"; the whole lens
+    // concept lives in payload_json (zero struct change, coordinator-only →
+    // DNA-hash-neutral). The validator is the closed-coordinator gate: a malformed
+    // lens payload must be rejected at create-time. `governs_epr` is the EPR
+    // SLUG-ID scope key (plan A3), NOT the dag-cbor CID.
+    // =========================================================================
+
+    fn well_formed_author_lens_payload() -> serde_json::Value {
+        serde_json::json!({
+            "action": "author-lens",
+            "governs_epr": "epr:lamad-spa",
+            "school": "georgist",
+            "role": "lens",
+            "rule": { "predicate": "land_value_uplift > rent_capture", "emits": "contention-vote" },
+            "telos": { "steers_toward": "justice", "summary": "tax unimproved land value, not labor" },
+            "version_parent": serde_json::Value::Null
+        })
+    }
+
+    #[test]
+    fn author_lens_well_formed_validates() {
+        let input = CreateCommitmentInput {
+            action: "author-lens".to_string(),
+            payload_json: well_formed_author_lens_payload().to_string(),
+            signed_at: "2026-06-27T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_ok(),
+            "well-formed author-lens payload must validate"
+        );
+    }
+
+    #[test]
+    fn author_lens_missing_field_rejected() {
+        // Each required field is load-bearing: drop one at a time, expect reject.
+        for drop_field in ["governs_epr", "school", "role", "rule", "telos"] {
+            let mut payload = well_formed_author_lens_payload();
+            payload.as_object_mut().unwrap().remove(drop_field);
+            let input = CreateCommitmentInput {
+                action: "author-lens".to_string(),
+                payload_json: payload.to_string(),
+                signed_at: "2026-06-27T00:00:00Z".to_string(),
+            };
+            assert!(
+                validate_commitment_payload(&input).is_err(),
+                "author-lens missing '{drop_field}' must fail validation"
+            );
+        }
+    }
+
+    #[test]
+    fn author_lens_wrong_action_discriminator_rejected() {
+        let mut payload = well_formed_author_lens_payload();
+        payload["action"] = serde_json::json!("not-author-lens");
+        let input = CreateCommitmentInput {
+            action: "author-lens".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-27T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_err(),
+            "author-lens action field must equal the discriminator"
+        );
+    }
+
+    #[test]
+    fn author_lens_empty_governs_epr_rejected() {
+        // governs_epr is the scope key (slug-id); an empty key would bind to no
+        // scope row (plan A3) — reject at write.
+        let mut payload = well_formed_author_lens_payload();
+        payload["governs_epr"] = serde_json::json!("");
+        let input = CreateCommitmentInput {
+            action: "author-lens".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-27T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_err(),
+            "author-lens empty governs_epr must fail validation"
+        );
+    }
+
+    #[test]
+    fn author_lens_unknown_role_rejected() {
+        // role enum: lens | floor | ceiling.
+        let mut payload = well_formed_author_lens_payload();
+        payload["role"] = serde_json::json!("dictator");
+        let input = CreateCommitmentInput {
+            action: "author-lens".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-27T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_err(),
+            "author-lens role outside {{lens,floor,ceiling}} must fail validation"
+        );
+    }
+
+    #[test]
+    fn author_lens_floor_and_ceiling_roles_validate() {
+        // floor and ceiling are valid governance roles (constitutional bounds).
+        for role in ["floor", "ceiling"] {
+            let mut payload = well_formed_author_lens_payload();
+            payload["role"] = serde_json::json!(role);
+            let input = CreateCommitmentInput {
+                action: "author-lens".to_string(),
+                payload_json: payload.to_string(),
+                signed_at: "2026-06-27T00:00:00Z".to_string(),
+            };
+            assert!(
+                validate_commitment_payload(&input).is_ok(),
+                "author-lens role '{role}' must validate"
+            );
+        }
+    }
+
+    #[test]
+    fn author_lens_non_object_rule_rejected() {
+        // rule is the deterministic predicate (the teeth) — must be an object.
+        let mut payload = well_formed_author_lens_payload();
+        payload["rule"] = serde_json::json!("just a string");
+        let input = CreateCommitmentInput {
+            action: "author-lens".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-27T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_err(),
+            "author-lens rule must be an object"
+        );
     }
 }

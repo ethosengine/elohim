@@ -19,15 +19,15 @@ use super::diesel_schema::{
     custodian_metrics, custodian_shares, device_policies, discussions, economic_events,
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
-    local_sessions, mishpat_commitments, mutuality_audit_log, node_stewardship,
-    observation_diversity_summary, observation_entries, observation_sessions, observations,
-    peer_blob_inventory, peer_identity_bindings, peer_inventory_cursor, placement_gaps, places,
-    portal_hosts, precedents, premium_gates, proposal_options, proposals, ranked_votes,
-    rea_commitments, recovery_requests, recovery_witnesses, relationships,
-    responsibility_demand_configs, revocation_votes, risk_alerts, salvage_capacity, schedules,
-    shard_locations, shard_manifests, spatial_contexts, statements, steward_credentials,
-    stewarded_nodes, stewardship_allocations, token_balances, token_decay_events,
-    token_mint_events, token_transfers, votes,
+    lens_selections, lens_verdicts, lenses, local_sessions, mishpat_commitments,
+    mutuality_audit_log, node_stewardship, observation_diversity_summary, observation_entries,
+    observation_sessions, observations, peer_blob_inventory, peer_identity_bindings,
+    peer_inventory_cursor, placement_gaps, places, portal_hosts, precedents, premium_gates,
+    proposal_options, proposals, ranked_votes, rea_commitments, recovery_requests,
+    recovery_witnesses, relationships, responsibility_demand_configs, revocation_votes,
+    risk_alerts, salvage_capacity, schedules, shard_locations, shard_manifests, spatial_contexts,
+    statements, steward_credentials, stewarded_nodes, stewardship_allocations, token_balances,
+    token_decay_events, token_mint_events, token_transfers, votes,
 };
 
 // ============================================================================
@@ -3605,6 +3605,116 @@ pub struct NewMishpatCommitment {
     pub revoked_at: Option<String>,
     pub state: String,
     pub dht_anchor_hash: Option<String>,
+}
+
+// ============================================================================
+// Lens — lenses (lens-market S2)
+// Category A DHT projection. Source of truth: Holochain DHT (mishpat DNA
+// Commitment entry, action='author-lens'). Populated from the create_commitment
+// post-commit signal (plan S3). A NULL dht_anchor_hash means un-notarized — the
+// forward index (find_lenses_governing_epr, plan S4) fail-closes on it.
+// `cid` = Commitment entry_hash (read/scope key); `governs_epr` = EPR slug-id.
+// Spec: 2026-06-27-plural-mishpat-lenses-over-epr-design.md §8.
+// ============================================================================
+
+/// Queryable row from the `lenses` table.
+///
+/// `rule_json`/`telos_json` are the raw JSON predicate/steering objects; callers
+/// convert to `serde_json::Value` (or read `telos.summary`) before surfacing in
+/// the `LensBindingView`.
+#[derive(Debug, Clone, Queryable, Identifiable, Selectable, Serialize)]
+#[diesel(table_name = lenses)]
+#[diesel(primary_key(cid))]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct Lens {
+    pub cid: String,
+    pub governs_epr: String,
+    pub school: String,
+    pub role: String,
+    pub rule_json: String,
+    pub telos_json: String,
+    pub version_parent: Option<String>,
+    pub revoked_at: Option<String>,
+    /// Source of truth: DHT (Commitment entry in mishpat DNA). Classification: A (Notarized).
+    /// NULL means un-notarized; the forward index refuses to surface NULL rows.
+    pub dht_anchor_hash: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Insertable row for `lenses`.
+///
+/// `created_at`/`updated_at` are set explicitly in `upsert_with_anchor` via
+/// `current_timestamp()` to ensure ISO-8601 format (mirrors mishpat_commitments).
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = lenses)]
+pub struct NewLens {
+    pub cid: String,
+    pub governs_epr: String,
+    pub school: String,
+    pub role: String,
+    pub rule_json: String,
+    pub telos_json: String,
+    pub version_parent: Option<String>,
+    pub revoked_at: Option<String>,
+    pub dht_anchor_hash: Option<String>,
+}
+
+// ============================================================================
+// Lens-market C-class fold-input rows (lens-market S4)
+// Classification C (operational): NO dht_anchor_hash — affinity/contention are
+// computed on read (spec §4.4). These hold the fold INPUTS. They map 1:1 to the
+// elohim_facings fold-input structs (LensSelectionRow / LensVerdictRow).
+// ============================================================================
+
+/// Queryable row from `lens_selections` — an agent exercised (selected) a lens
+/// within an EPR scope. The affinity fold counts distinct `selector_agent` per lens.
+#[derive(Debug, Clone, Queryable, Identifiable, Selectable, Serialize)]
+#[diesel(table_name = lens_selections)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct LensSelection {
+    pub id: String,
+    pub lens_cid: String,
+    pub selector_agent: String,
+    pub epr_scope: String,
+    pub selected_at: String,
+}
+
+/// Insertable row for `lens_selections`.
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = lens_selections)]
+pub struct NewLensSelection {
+    pub id: String,
+    pub lens_cid: String,
+    pub selector_agent: String,
+    pub epr_scope: String,
+    pub selected_at: String,
+}
+
+/// Queryable row from `lens_verdicts` — an agent rendered a verdict on a lens
+/// within an EPR scope. The contention fold measures the agree/disagree spread.
+#[derive(Debug, Clone, Queryable, Identifiable, Selectable, Serialize)]
+#[diesel(table_name = lens_verdicts)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct LensVerdict {
+    pub id: String,
+    pub epr_scope: String,
+    pub lens_cid: String,
+    pub verdict: String,
+    pub agent: String,
+    pub created_at: String,
+}
+
+/// Insertable row for `lens_verdicts`.
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = lens_verdicts)]
+pub struct NewLensVerdict {
+    pub id: String,
+    pub epr_scope: String,
+    pub lens_cid: String,
+    pub verdict: String,
+    pub agent: String,
+    pub created_at: String,
 }
 
 // ============================================================================

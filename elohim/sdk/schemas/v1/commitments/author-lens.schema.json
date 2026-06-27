@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:author-lens",
+  "title": "AuthorLensCommitment",
+  "description": "Payload shape for a Mishpat::Commitment entry with action='author-lens'. A Lens is the plural-Mishpat governance primitive: one collective's deterministic reading over an EPR, co-valid alongside peer lenses (no collapse). The whole concept lives in payload_json — NO new DHT entry type (the action discriminator distinguishes it), so authoring it is DNA-hash-neutral (coordinator hot-swap). Source of truth: Holochain DHT (Mishpat zome, existing Commitment entry type). Storage projection keys the `lenses` table on cid == entry_hash. Canon: genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md (§8). Service-layer slice: genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md (S1, I1).",
+  "type": "object",
+  "required": ["action", "governs_epr", "school", "role", "rule", "telos"],
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "type": "string",
+      "const": "author-lens",
+      "description": "Action discriminator. Fixed at 'author-lens' for this commitment kind."
+    },
+    "governs_epr": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The EPR SLUG-ID this lens governs (the scope key, e.g. 'epr:lamad-spa') — NOT the dag-cbor EprHead CID. The forward index (lens ← EPR) reuses the existing SQL scope projection (find_active_delegates_compute style) which keys on slug-id everywhere; binding on the CID would line up with no existing scope row. See plan A3."
+    },
+    "school": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The collective / school-of-thought label that authored this reading (e.g. 'georgist', 'beerian', 'limitarian'). Feeds the contributor-card and the affinity attribution. Plural schools over one EPR is the point — they do not collapse."
+    },
+    "role": {
+      "type": "string",
+      "enum": ["lens", "floor", "ceiling"],
+      "description": "Governance role. 'lens' = one school's co-valid reading (affinity-ranked, never authoritative-by-fiat); 'floor'/'ceiling' = constitutional bounds (the wisdom-layer floor/ceiling seam) that bracket what any lens may steer toward."
+    },
+    "rule": {
+      "type": "object",
+      "description": "The deterministic predicate over the EPR signal — the 'teeth'. A smart-contract-like rule that fires deterministically when the lens is exercised (e.g. a predicate + the verdict/signal it emits). Shape is school-defined; the substrate only requires it be a structured object so it is machine-evaluable, not prose.",
+      "additionalProperties": true
+    },
+    "telos": {
+      "type": "object",
+      "description": "What this lens steers toward — its viability and/or justice target (George/Beer: the justice surface and the viability surface). The substrate requires a structured object; the 'summary' is surfaced in the LensBindingView.telosSummary.",
+      "additionalProperties": true,
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "Short human summary of the steering target (rendered as telosSummary in the lens-market view)."
+        }
+      }
+    },
+    "version_parent": {
+      "type": ["string", "null"],
+      "description": "CID (entry_hash) of the superseded lens this one replaces, or null for a first-version lens. Commitments are immutable, so lens versioning is a new create + this back-pointer (never an update). Forms the immutable version chain."
+    }
+  }
+}

@@ -48,7 +48,7 @@
 
 use tracing::warn;
 
-use crate::db::models::NewMishpatCommitment;
+use crate::db::models::{NewLens, NewMishpatCommitment};
 use elohim_epr::Reach;
 
 /// Parse a reach string into the DNA-notarized schema-8 [`Reach`] enum, or
@@ -86,6 +86,10 @@ fn parse_reach(reach: &str) -> Option<Reach> {
 pub enum CommitmentProjection {
     /// Project a new commitment row into `mishpat_commitments`.
     Upsert(NewMishpatCommitment),
+    /// Project a new lens row into `lenses` (the `author-lens` action — a Lens is
+    /// a Commitment, but its projection target is the A-class `lenses` table, not
+    /// `mishpat_commitments`). Lens-market S3.
+    UpsertLens(NewLens),
     /// Revoke an existing commitment by CID (sets `revoked_at` on that row).
     Revoke {
         /// CID of the original commitment being superseded.
@@ -177,6 +181,8 @@ pub fn parse_commitment_payload(
                 .map(CommitmentProjection::Upsert)
         }
         "revokes-commitment" => parse_revokes_commitment(&payload),
+        "author-lens" => parse_author_lens(&payload, entry_hash, action_hash)
+            .map(CommitmentProjection::UpsertLens),
         other => {
             warn!(
                 action = %other,
@@ -269,6 +275,70 @@ fn parse_delegates_compute(
         valid_until,
         revoked_at: None,
         state: "proposed".to_string(),
+        dht_anchor_hash: Some(action_hash.to_string()),
+    })
+}
+
+/// Parse an `author-lens` payload into a `NewLens` row (lens-market S3).
+///
+/// A Lens is a Commitment, but it projects into the A-class `lenses` table, not
+/// `mishpat_commitments`. `cid = entry_hash` (the read/scope key), `dht_anchor_hash
+/// = action_hash` (notarised provenance). `governs_epr` is the EPR slug-id scope
+/// key (plan A3). `rule`/`telos` round-trip to compact JSON.
+///
+/// Fail-closed: required fields error (the signal handler warn-skips that row only,
+/// never the whole signal). The S1 coordinator validator already rejects malformed
+/// lenses at create-time; this is the defense-in-depth projection-side guard.
+fn parse_author_lens(
+    payload: &serde_json::Value,
+    entry_hash: &str,
+    action_hash: &str,
+) -> Result<NewLens, String> {
+    let governs_epr = payload
+        .get("governs_epr")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "author-lens payload missing non-empty 'governs_epr'".to_string())?
+        .to_string();
+    let school = payload
+        .get("school")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "author-lens payload missing non-empty 'school'".to_string())?
+        .to_string();
+    let role = payload
+        .get("role")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "author-lens payload missing non-empty 'role'".to_string())?
+        .to_string();
+    // rule (the deterministic predicate) and telos (steering target) are required
+    // objects; round-trip to compact JSON for storage.
+    let rule_json = payload
+        .get("rule")
+        .filter(|v| v.is_object())
+        .map(|v| v.to_string())
+        .ok_or_else(|| "author-lens payload missing object 'rule'".to_string())?;
+    let telos_json = payload
+        .get("telos")
+        .filter(|v| v.is_object())
+        .map(|v| v.to_string())
+        .ok_or_else(|| "author-lens payload missing object 'telos'".to_string())?;
+    // version_parent is optional (None for a first-version lens).
+    let version_parent = payload
+        .get("version_parent")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+
+    Ok(NewLens {
+        cid: entry_hash.to_string(),
+        governs_epr,
+        school,
+        role,
+        rule_json,
+        telos_json,
+        version_parent,
+        revoked_at: None,
         dht_anchor_hash: Some(action_hash.to_string()),
     })
 }

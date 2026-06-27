@@ -176,6 +176,18 @@ pub mod acquisition_pins;
 // Spec: 2026-06-07-epr-acquisition-pull-queue-design.md §6.5.
 pub mod mishpat_commitments;
 
+// Lens projection — `author-lens` Mishpat::Commitment cache (Category A DHT projection).
+// Source of truth: Holochain DHT (mishpat DNA Commitment entry, action='author-lens').
+// Populated from create_commitment post-commit signal (plan S3). NULL dht_anchor_hash
+// = un-notarized (forward index fail-closes). cid = entry_hash; governs_epr = slug-id.
+// Plan: 2026-06-27-plural-mishpat-lenses-service-layer-plan.md (S2).
+pub mod lenses;
+
+// Lens-market C-class fold-input tables (lens_selections + lens_verdicts).
+// Operational (Category C): no dht_anchor_hash; affinity/contention computed on read.
+// Plan: 2026-06-27-plural-mishpat-lenses-service-layer-plan.md (S4).
+pub mod lens_market;
+
 // Limitarian-governor concentration snapshots (Category C operational aggregate — spec §11 land 3a)
 // Source of truth: NONE — rebuildable by replay; no dht_anchor_hash by design (spec §4.4).
 // k>=5 firewall enforced by concentration_service (writer side).

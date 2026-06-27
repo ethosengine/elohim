@@ -1736,6 +1736,53 @@ diesel::table! {
     }
 }
 
+// Lens projection — `author-lens` Mishpat::Commitment cache (Category A, DHT projection).
+// Source of truth: Holochain DHT (mishpat DNA Commitment entry, action='author-lens').
+// Populated from the create_commitment post-commit signal (plan S3). A NULL
+// dht_anchor_hash means un-notarized (forward index fail-closes on it). `cid` =
+// Commitment entry_hash; `governs_epr` = EPR slug-id scope key (plan A3).
+// Migration: 2026-06-27-120000_lenses
+diesel::table! {
+    lenses (cid) {
+        cid -> Text,
+        governs_epr -> Text,
+        school -> Text,
+        role -> Text,
+        rule_json -> Text,
+        telos_json -> Text,
+        version_parent -> Nullable<Text>,
+        revoked_at -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+// Lens-market C-class fold-input tables (Category C operational; no dht_anchor_hash
+// by design — affinity/contention are computed on read, spec §4.4). Hold the fold
+// INPUTS (selections, verdicts); outputs are recomputed per request.
+// Migration: 2026-06-27-130000_lens_market
+diesel::table! {
+    lens_selections (id) {
+        id -> Text,
+        lens_cid -> Text,
+        selector_agent -> Text,
+        epr_scope -> Text,
+        selected_at -> Text,
+    }
+}
+
+diesel::table! {
+    lens_verdicts (id) {
+        id -> Text,
+        epr_scope -> Text,
+        lens_cid -> Text,
+        verdict -> Text,
+        agent -> Text,
+        created_at -> Text,
+    }
+}
+
 // Migration: 2026-06-10-020000_concentration_snapshot
 // Source of truth: NONE (Category C operational aggregate — see migration header;
 // deliberately no dht_anchor_hash, spec §4.4).
@@ -1818,6 +1865,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     humans,
     imagodei_observations,
     knowledge_maps,
+    lens_selections,
+    lens_verdicts,
+    lenses,
     local_sessions,
     manifests,
     mechanism_selection,

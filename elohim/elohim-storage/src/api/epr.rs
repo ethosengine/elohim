@@ -197,6 +197,15 @@ pub async fn handle(
             get_epr_raw(req, cid, pool, ctx).await
         }
 
+        // GET /api/v1/epr/:scope/lens-market — plural-Mishpat lens market (S7).
+        // NOTE: the `:scope` segment here is the EPR SLUG-ID (e.g. `epr:lamad-spa`,
+        // plan A3), NOT a dag-cbor CID like the other epr sub-resources. The market
+        // is a read-projection of the A-class `lenses` table keyed on `governs_epr`.
+        (&Method::GET, p) if is_lens_market_path(p) => {
+            let scope = p.trim_end_matches("/lens-market");
+            get_lens_market(scope, pool).await
+        }
+
         // GET /api/v1/epr/:cid  (plain CID — must not contain '/')
         (&Method::GET, cid) if !cid.contains('/') => get_epr(req, cid, pool, ctx).await,
 
@@ -1016,6 +1025,32 @@ async fn get_nav_context(
 // GET /api/v1/epr/:cid/raw — EPR-content facing inspector (Category C read-only)
 // ---------------------------------------------------------------------------
 
+/// Pure route-classifier for the lens-market sub-resource (route-shadow guard).
+///
+/// True iff `path` is exactly `{scope}/lens-market` (two segments). The `{scope}`
+/// is the EPR slug-id; a bare CID, a `{cid}/envelope`, or a deeper path do NOT
+/// match — so the lens-market arm cannot shadow (or be shadowed by) the other epr
+/// routes. Tested directly (dispatch-as-pure-fn convention).
+fn is_lens_market_path(path: &str) -> bool {
+    path.ends_with("/lens-market") && path.split('/').count() == 2 && !path.starts_with('/')
+}
+
+/// GET /api/v1/epr/:scope/lens-market — assemble + serve the plural lens market.
+///
+/// A read-projection (Operational Category C) over the A-class `lenses` table for
+/// the given EPR scope slug-id. An unknown scope returns `200` with an empty-but-
+/// valid market (never `404`) — the market simply has no lenses yet. `computed_at`
+/// is stamped here (the handler edge), keeping the service/fold layer deterministic.
+async fn get_lens_market(
+    scope: &str,
+    pool: &DbPool,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    let computed_at = crate::db::models::current_timestamp();
+    let view = crate::services::lens_facing::build_lens_market_view(&mut conn, scope, computed_at);
+    Ok(response::ok(&view))
+}
+
 async fn get_epr_raw(
     req: Request<Incoming>,
     cid: &str,
@@ -1083,6 +1118,38 @@ mod dedup_tests {
         assert!(
             !is_local_origin("12D3KooWXyz", ""),
             "non-empty signed_by vs empty local_peer_id should NOT be local origin"
+        );
+    }
+
+    // ---------------------------------------------------------------------------
+    // S7 — lens-market route-shadow guard (dispatch-as-pure-fn convention).
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn lens_market_path_classifier_matches_only_the_market_route() {
+        // The market route: `{scope}/lens-market` (scope = EPR slug-id, A3).
+        assert!(is_lens_market_path("epr:lamad-spa/lens-market"));
+        assert_eq!(
+            "epr:lamad-spa/lens-market".trim_end_matches("/lens-market"),
+            "epr:lamad-spa",
+            "scope is extracted intact (colon-bearing slug-id survives)"
+        );
+
+        // Must NOT match — these belong to OTHER epr arms (no shadowing).
+        assert!(!is_lens_market_path("bafyreiabc"), "bare CID → get_epr");
+        assert!(
+            !is_lens_market_path("bafyreiabc/envelope"),
+            "envelope sub-resource"
+        );
+        assert!(!is_lens_market_path("bafyreiabc/raw"), "raw sub-resource");
+        assert!(!is_lens_market_path(""), "list route");
+        assert!(
+            !is_lens_market_path("a/b/lens-market"),
+            "deeper path is not the 2-segment market route"
+        );
+        assert!(
+            !is_lens_market_path("lens-market"),
+            "single segment without a scope is not the market route"
         );
     }
 }
