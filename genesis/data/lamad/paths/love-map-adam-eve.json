@@ -8,7 +8,7 @@
   "contributors": [],
   "createdAt": "2026-02-25T00:00:00.000Z",
   "updatedAt": "2026-02-25T00:00:00.000Z",
-  "visibility": "commons",
+  "visibility": "intimate",
   "participantIds": ["human-adam-firstman", "human-eve-firstwoman"],
   "isEmergent": true,
   "negotiationId": "negotiation-adam-eve-001",
@@ -328,7 +328,7 @@
   "difficulty": "intermediate",
   "estimatedDuration": "3-4 hours",
   "pathType": "journey",
-  "reach": "commons",
+  "reach": "intimate",
   "prerequisitePaths": [],
   "attestationsGranted": [
     "love-map-adam-eve-completed"
