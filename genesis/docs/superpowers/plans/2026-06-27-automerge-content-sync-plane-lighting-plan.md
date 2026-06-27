@@ -1,7 +1,7 @@
 ---
 id: plan-automerge-content-sync-plane-lighting
 title: Light the Automerge content-sync plane — pure-Rust two-node convergence spine
-status: Spine landed + verified (2026-06-27); stretch G5/G6 pending operator
+status: Spine + stretch (G5 doorway, G6 frontend) + iroh-mode landed & verified (2026-06-27); follow-up = iroh sync-round driver
 domain: D5
 sprint: dataplane-automerge-spine (D5 forward slice; not in roadmap 1-6 — operator-requested 2026-06-27)
 requires_env: [household-nodes]
@@ -43,6 +43,16 @@ The spine (G2, G1, G4, G3) is implemented, committed (commit-only, branch `feat/
 **Deferred follow-ups (captured, not dropped):**
 - **iroh-mode producer wiring** — the iroh `SyncManager` (`main.rs:2121`) lives only under the non-default `p2p-iroh` feature, outside the `--features p2p` gate, so it can't be compile-verified here. iroh-mode content sync was already inert (not regressed). The producer is transport-neutral → small follow-up.
 - **Pre-existing `--all-targets` clippy debt (11 errors, NONE in spine files)** — the documented `feedback_pvc_deferral_hides_gate_debt` pattern; for the integrator/shift to triage. The plan's literal clippy gate (lib+bins) is green.
+
+## Stretch + iroh Outcome (2026-06-27) — ALL THREE LANDED & INDEPENDENTLY VERIFIED
+
+After the spine, the two stretch legs AND iroh-mode were carried on (operator "carry on"). Commits on `feat/frontend-eyes-sprint`, commit-only:
+
+- **iroh-mode producer** (`e4fb14727`) — `spawn_content_projection_listener` wired on the iroh path (clonable `Arc<SyncManager>` taken before the move into `SyncManagerBackend`, spawned under `#[cfg(feature="p2p-iroh")]`). Builds under `--features p2p-iroh` (2m41s) and `--features p2p`. **NEW FINDING (bounded follow-up, backlogged):** iroh now *fills* the DocStore but content won't *flow* P2P — the 60s `initiate_sync_round` driver is libp2p-only; iroh has no periodic round driver (its `IrohSyncClient` is invoked only from tests/benches). See backlog `iroh-sync-round-driver-gap.md`.
+- **G5 doorway `/sync` carriage** (`f37b28509`) — grounding found the storage `/sync/v1` HANDLERS ALREADY EXIST (`http.rs:981` → `handle_sync_request`), so this was the smaller manifest+gating path. Declared the 5 `/sync/v1` routes in `build_manifest()` + **FLIPPED** the `test_manifest_builds` guard that forbade `/sync`; added `/sync` to doorway `is_service_path` + route-claims fixture + `shakeout_service_path_guards_sync` unit test; added `/sync` to the storage EPR-alias `RESERVED_URL_PREFIXES`. Doorway 762/0; storage manifest+validator tests green. **SECURITY-ADJACENT (operator review at merge):** `/sync` is now exposed through doorway — GET reads unauthenticated/uncached (inherit the known `http-reach-enforcement-gap`), POST `/changes` `auth_required`. No browser caller consumes it yet.
+- **G6 frontend ESM** (`9357b10df`) — the smoke-test GATE caught that the plan's "wasm base64-inlined" premise was FALSE (automerge 3.2.4 `browser` export → wasm-bindgen bundler entry → breaks Zone.js Angular builds). Working fix: a tsconfig path-alias to automerge's `fullfat_base64.js` (base64 entry), proven on real dev+prod `ng build` (automerge lands in a lazy chunk, no initial-budget hit). SDK ESM flip (`module: ESNext`, `"type":"module"`, dropped the `new Function` import hack) breaks no consumer (40/40 SDK tests; consumers are type-only). Added `ContentDocSyncService` (thin reactive, signals, `node:{id}` under `"elohim"`, no-leak teardown) + 5 tests. **CAVEAT (operator's call):** the alias hardcodes an internal automerge dist path (bypasses package `exports`, degrades automerge types to `any` in app source) — brittle across upgrades; cleaner long-term fix is bundler-only resolution or making elohim-app zoneless.
+
+Independently re-verified by the orchestrator: storage `--features p2p` build + spine 7/7 + `test_manifest_builds`; doorway `shakeout_service_path_guards_sync` + `reserved_prefixes_fixture_agrees_with_is_service_path` + 762/0; `ng build --configuration development` green.
 
 ## Global Constraints
 
