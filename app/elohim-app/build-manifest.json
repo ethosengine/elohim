@@ -20,7 +20,8 @@
           "app/elohim-elements/**",
           "app/lamad/**",
           "elohim/sdk/**",
-          "VERSION"
+          "VERSION",
+          "scripts/ci/stage-spa-blob.sh"
         ],
         "buildProcess": ["Jenkinsfile"]
       },
