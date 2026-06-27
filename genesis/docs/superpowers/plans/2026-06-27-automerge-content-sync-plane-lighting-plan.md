@@ -438,6 +438,22 @@ Two-surface change, no websocket, no new handler:
 
 ---
 
+## Task G7: Resilience-card surfacing + browser-leg proof (operator-requested 2026-06-27)
+
+Give the (tree-shaken) `ContentDocSyncService` a real consumer that (a) surfaces live per-content doc-sync on the resilience card and (b) genuinely exercises the browser leg. **Design decision** recorded in `specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md` §12: doc-sync is a **client-composed sibling signal**, NOT a server-fold facing (plane separation + determinism contract). Per-content meaning: `synced` (doc present) / `pending` (null) + `updatedAt`. **P2P-design-gate: PASS** — pure read-projection over the existing `node:{contentId}` doc; no new entity/route/identity. Cross-references the weave sprint `plans/2026-06-21-resiliency-card-p2p-weave-sprint-plan.md` (which surfaces only blob-shard sync, never CRDT convergence).
+
+**Deployment gate (honest):** the live shem cross-peer→browser proof is BLOCKED until the producer (spine, this branch) is merged+deployed — feature branches don't deploy. The runnable-now proof is the **local stack** (my producer) + the look-rail harness; shem cross-tenant is documented for post-deploy.
+
+- **G7a `[frontend, sequential-blocker]`** — promote `ContentDocSyncService` from `app/elohim-app/src/app/elohim/services/content-doc-sync.service.ts` into `app/elohim-library/projects/elohim-service/src/` (carry the `AUTOMERGE_SYNC_FACTORY` token + the automerge base64 tsconfig alias); the card renders in the lamad bundle, so only the shared library can feed both surfaces.
+- **G7b `[frontend, after G7a]`** — `<elohim-resilience-snapshot>` (`app/elohim-library/projects/elohim-service/src/resilience/resilience-snapshot/`): additive optional `@Input() docSync` + `get docSyncSummary()` (beside `peersLiveSummary`/`regionSummary`, `.component.ts:96-112`) + a "Doc sync" `<dt>/<dd>` row in BOTH `#contextBody` (after `.html:83`) and `#fullCardBody` (after `.html:111`), inheriting the existing `isUnmeasured` honesty (null → "not yet synced", never a fake "synced"). Unit test the summary + the null/honesty case.
+- **G7c `[frontend, after G7a/G7b]`** — consume in lamad `content-viewer.component.ts:217-218` (`docSync$ = svc.watchContent(contentId)`) → `[docSync]` at `content-viewer.component.html:91-97`. **Verify lamad's build resolves the automerge alias** (the one new build-integration risk from promotion).
+- **G7d `[frontend, parallel]`** — add `'/sync'` to the proxy context array in BOTH `app/elohim-app/proxy.conf.mjs` and `proxy.conf.alpha.mjs` (dev-proxy gap — `/sync/*` currently falls through to the SPA).
+- **G7e `[frontend, parallel]`** — lazy `dev/doc-sync` harness route (`app/elohim-app/src/app/app.routes.ts:6`) + standalone component: inject `ContentDocSyncService`, read `id` query param, `watchContent(id)`, render fields with `data-testid` (`docsync-title`, `docsync-reach`, `docsync-body`). This un-tree-shakes the service and is the look-rail render target.
+- **G7f `[test, after G7d/G7e + local stack]`** — browser-leg proof via the look rail: a non-bulk `POST /db/content` so `ContentCreated` projects `node:{id}`, then `pnpm look 'http://localhost:4200/dev/doc-sync?id=<id>' --wait-testid docsync-title`. Success: `shot.png` shows the converged fields; `capture.json` shows `GET …/sync/v1/elohim/docs/node%3A<id>/changes` → 200 non-empty, no `/sync` httpError, no pageerror.
+- **G7g `[test, STRETCH/post-deploy]`** — shem cross-tenant: author on a non-Matthew peer, prove the libp2p round (~60s, libp2p-only) carries `node:{id}` into the browser's node. Runs once the producer is deployed.
+
+---
+
 ## Self-Review
 
 **Spec coverage:** the user's spec = "next deliverable verifiable slice to get data syncing, workflow for parallel gap-closing." Covered: the slice = light the inert Automerge plane (G1-G4 spine); verifiable = G3 + two-tier live check; parallel = G5/G6 stretch on independent surfaces. The already-working DHT content plane and the 503 `signal/emit` carrier are deliberately out of scope (named in Architecture).
