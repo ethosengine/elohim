@@ -194,4 +194,15 @@ mod tests {
         // The doc_id helper is the canonical content-node address.
         assert_eq!(super::content_doc_id("edit-prop-1"), "node:edit-prop-1");
     }
+
+    /// Guard the load-bearing namespace coupling. `initiate_sync_round`
+    /// (p2p/mod.rs:6996) lists ONLY `"elohim"`. If that constant and the
+    /// producer ever diverge, content sync silently dies — this test fails loudly
+    /// if `PROJECTION_NAMESPACE` drifts from the sync-timer's `h_app_id`.
+    #[test]
+    fn projection_namespace_matches_sync_timer() {
+        // Mirror of the literal hardcoded at p2p/mod.rs:6996 (initiate_sync_round).
+        const PROJECTION_NS: &str = "elohim";
+        assert_eq!(PROJECTION_NS, super::PROJECTION_NAMESPACE);
+    }
 }
