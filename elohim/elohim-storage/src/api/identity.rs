@@ -109,7 +109,7 @@ async fn register_human(
         profile_reach: body.profile_reach,
         location: body.location,
         profile_photo_url: body.profile_photo_url,
-        h_app_id: "imagodei".to_string(),
+        h_app_id: crate::db::context::HUMANS_HAPP_ID.to_string(),
         // Short-term explicit bridge (while the DHT humans-replayer is a stub):
         // the create surface may seed household membership directly so the
         // load-bearing resilience-snapshot junction is populated. When absent,

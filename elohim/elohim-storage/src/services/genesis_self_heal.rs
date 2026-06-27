@@ -106,7 +106,7 @@ pub fn genesis_self_heal_identity(
                     profile_reach: "commons".to_string(),
                     location: None,
                     profile_photo_url: None,
-                    h_app_id: "imagodei".to_string(),
+                    h_app_id: crate::db::context::HUMANS_HAPP_ID.to_string(),
                     household_id: household_id.map(|h| h.to_string()),
                 },
             )?;
