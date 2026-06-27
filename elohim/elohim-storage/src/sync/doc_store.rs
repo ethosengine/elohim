@@ -304,6 +304,11 @@ impl DocStore {
             "personal".to_string()
         } else if doc_id.starts_with("community:") {
             "community".to_string()
+        } else if doc_id.starts_with("node:") || doc_id.starts_with("content:") {
+            // Content-node docs written by sync::projector (the producer that
+            // lights the content-sync plane). "node:" is canonical; "content:"
+            // is accepted as an alias.
+            "content".to_string()
         } else {
             "unknown".to_string()
         }
@@ -404,5 +409,25 @@ mod tests {
         assert_eq!(store.count("app1").await.unwrap(), 1);
         assert_eq!(store.count("app2").await.unwrap(), 1);
         assert_eq!(store.count_all().await.unwrap(), 2);
+    }
+
+    /// `node:` (and the `content:` alias) is the content-node doc namespace the
+    /// sync::projector writes. `infer_doc_type` must classify it so document
+    /// listings carry an accurate `doc_type` for content docs.
+    ///
+    /// NOTE: `infer_doc_type` is a private `&self` method returning `String`
+    /// (there is no `DocType` enum in this codebase — the plan's `DocType::Content`
+    /// is realized as the `"content"` string, mirroring "graph"/"path"/etc.).
+    #[tokio::test]
+    async fn infer_doc_type_recognizes_node_prefix() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = DocStore::at_path(temp_dir.path().join("test.sled"))
+            .await
+            .unwrap();
+        assert_eq!(store.infer_doc_type("node:abc-123"), "content");
+        assert_eq!(store.infer_doc_type("content:xyz"), "content");
+        // existing classifications still hold
+        assert_eq!(store.infer_doc_type("graph:g1"), "graph");
+        assert_eq!(store.infer_doc_type("whatever"), "unknown");
     }
 }
