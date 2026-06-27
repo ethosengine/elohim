@@ -172,7 +172,7 @@ fn hc_client_registry_has_imagodei_field() {
     let registry = HcClientRegistry {
         infrastructure: None,
         imagodei: None,
-        lamad: None,
+        lamad: std::sync::RwLock::new(None),
     };
     assert!(
         registry.imagodei.is_none(),
@@ -191,7 +191,7 @@ fn hc_client_registry_both_slots_absent_is_valid_state() {
     let registry = std::sync::Arc::new(HcClientRegistry {
         infrastructure: None,
         imagodei: None,
-        lamad: None,
+        lamad: std::sync::RwLock::new(None),
     });
     assert!(registry.infrastructure.is_none());
     assert!(registry.imagodei.is_none());

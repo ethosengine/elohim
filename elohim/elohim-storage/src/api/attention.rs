@@ -226,7 +226,7 @@ async fn handle_post_tending(
     }
 
     // --- Conductor-first path: call create_attention_tending coordinator ---
-    if let Some(hc) = hc_registry.and_then(|r| r.lamad.clone()) {
+    if let Some(hc) = hc_registry.and_then(|r| r.lamad_client()) {
         let zome_input = ZomeCreateAttentionTendingInput::from(&intent);
         let payload = rmp_serde::to_vec_named(&zome_input)
             .map_err(|e| StorageError::Conductor(format!("encode attention tending: {e}")))?;

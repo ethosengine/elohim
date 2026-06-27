@@ -1398,7 +1398,7 @@ async fn async_main(
                 // for the scope. The two sets were previously conflated (commons
                 // presence doubled as both proxy and gate); they are now distinct.
                 match (
-                    registry.lamad.clone(),
+                    registry.lamad_client(),
                     db_pool.clone(),
                     config.self_cid.clone(),
                 ) {
@@ -1531,7 +1531,7 @@ async fn async_main(
                 // Safe no-op when disabled, pool empty, or prerequisites absent.
                 match (
                     config.salvage_capacity_enabled,
-                    registry.lamad.clone(),
+                    registry.lamad_client(),
                     db_pool.clone(),
                     config.self_cid.clone(),
                 ) {
@@ -1621,7 +1621,7 @@ async fn async_main(
                 {
                     let reanchor_pool = db_pool.clone();
                     let reanchor_state = provide_loop_state.clone();
-                    let reanchor_lamad_boot = registry.lamad.clone();
+                    let reanchor_lamad_boot = registry.lamad_client();
                     let reanchor_late_inputs =
                         elohim_storage::hc_client_registry::HcRegistryInputs {
                             admin_url: admin_url.clone(),
@@ -1697,6 +1697,37 @@ async fn async_main(
                             Err(e) => {
                                 warn!(error = %e, "reanchor_backfill failed (non-fatal)");
                             }
+                        }
+                    });
+                }
+
+                // genesis #1122 (HTTP re-notarize leg): the bounded boot ramp
+                // `None`-stamps `lamad` when the conductor's cells take minutes
+                // to enable, permanently 503ing the PATCH /db/content re-notarize
+                // path. Spawn a forever-retry that STORES the late connection into
+                // the shared registry the HTTP server reads -- wiring the notarize
+                // path identically to the boot-success path.
+                if registry.lamad_client().is_none() {
+                    let lamad_reg = registry.clone();
+                    let lamad_late_inputs = elohim_storage::hc_client_registry::HcRegistryInputs {
+                        admin_url: admin_url.clone(),
+                        app_url: args.app_url.clone(),
+                        app_id: args.app_id.clone(),
+                    };
+                    let lamad_late_shutdown = shutdown_tx.subscribe();
+                    tokio::spawn(async move {
+                        if let Some(hc) =
+                            elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
+                                &lamad_late_inputs,
+                                "lamad",
+                                lamad_late_shutdown,
+                            )
+                            .await
+                        {
+                            lamad_reg.set_lamad(Some(hc));
+                            info!(
+                                "registry.lamad populated via late connect -- HTTP re-notarize path now live"
+                            );
                         }
                     });
                 }
@@ -3211,7 +3242,7 @@ async fn async_main(
         // pod — would never spawn. Instead we acquire the lamad bridge INSIDE
         // the task via `connect_role_forever`, so the heal sweep starts the
         // moment lamad lands, late or early.
-        let lamad_hc_boot = hc_registry_for_http.as_ref().and_then(|r| r.lamad.clone());
+        let lamad_hc_boot = hc_registry_for_http.as_ref().and_then(|r| r.lamad_client());
         let late_inputs = saved_admin_url.clone().map(|admin_url| {
             elohim_storage::hc_client_registry::HcRegistryInputs {
                 admin_url,

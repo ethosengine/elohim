@@ -9,7 +9,7 @@
 //! serving HTTP. Downstream code checks `Option<Arc<HcClient>>` and
 //! returns a 503 if the role is unconnected.
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tracing::{info, warn};
 
@@ -55,7 +55,7 @@ pub struct HcClientRegistry {
     /// content rows, attestations). Required for the conductor-first HTTP
     /// write path landing per 2026-05-26-substrate-rea-replication-fix.md
     /// (closes Gap C/D — REA + content row replication on alpha).
-    pub lamad: Option<Arc<HcClient>>,
+    pub lamad: RwLock<Option<Arc<HcClient>>>,
 }
 
 /// Connection inputs. Mirrors the relevant CLI args without depending on
@@ -78,8 +78,24 @@ impl HcClientRegistry {
         Self {
             infrastructure,
             imagodei,
-            lamad,
+            lamad: RwLock::new(lamad),
         }
+    }
+
+    /// Snapshot the current `lamad` handle. Interior-mutable: the boot-time
+    /// late-connect updater (main.rs) stores a connection that lands after the
+    /// bounded boot ramp gave up, so the HTTP re-notarize path picks it up
+    /// instead of reading a frozen boot-time `None`.
+    pub fn lamad_client(&self) -> Option<Arc<HcClient>> {
+        self.lamad
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
+    /// Store a (re)connected `lamad` handle (called by the late-connect updater).
+    pub fn set_lamad(&self, hc: Option<Arc<HcClient>>) {
+        *self.lamad.write().unwrap_or_else(|e| e.into_inner()) = hc;
     }
 
     async fn connect_role(inputs: &HcRegistryInputs, role: &str) -> Option<Arc<HcClient>> {

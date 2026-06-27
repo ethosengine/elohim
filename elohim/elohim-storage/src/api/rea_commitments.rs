@@ -35,14 +35,14 @@ pub async fn handle(
     hc_registry: Option<&Arc<HcClientRegistry>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let path = resource_path.trim_start_matches('/');
-    let hc_lamad = hc_registry.and_then(|r| r.lamad.as_ref());
+    let hc_lamad = hc_registry.and_then(|r| r.lamad_client());
 
     match (&method, path) {
         // GET /api/v1/commitments
         (&Method::GET, "") => handle_list(req, pool, ctx).await,
 
         // POST /api/v1/commitments
-        (&Method::POST, "") => handle_create(req, pool, ctx, services, hc_lamad).await,
+        (&Method::POST, "") => handle_create(req, pool, ctx, services, hc_lamad.as_ref()).await,
 
         // GET /api/v1/commitments/agent/{agent_id}
         (&Method::GET, agent_path) if agent_path.starts_with("agent/") => {
@@ -63,7 +63,7 @@ pub async fn handle(
 
         // PATCH /api/v1/commitments/{id}
         (&Method::PATCH, id) if !id.contains('/') => {
-            handle_update_state(req, id, pool, ctx, services, hc_lamad).await
+            handle_update_state(req, id, pool, ctx, services, hc_lamad.as_ref()).await
         }
 
         _ => Ok(response::not_found(&format!(

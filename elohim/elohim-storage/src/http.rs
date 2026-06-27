@@ -1146,7 +1146,7 @@ impl HttpServer {
             // BoundsValidationResultView per the schema. Matched before the /api/v1/ catch-all.
             (Method::POST, "/api/v1/diagnostics/validate-bounds") => {
                 if let Some(ref pool) = self.db_pool {
-                    let hc_lamad = self.hc_registry.as_ref().and_then(|r| r.lamad.clone());
+                    let hc_lamad = self.hc_registry.as_ref().and_then(|r| r.lamad_client());
                     crate::api::diagnostics_bounds::handle(
                         req,
                         Method::POST,
@@ -2989,7 +2989,7 @@ impl HttpServer {
         });
 
         // observed_N (conductor DHT peer count) — the coverage gate needs it.
-        let observed_n = match self.hc_registry.as_ref().and_then(|r| r.lamad.clone()) {
+        let observed_n = match self.hc_registry.as_ref().and_then(|r| r.lamad_client()) {
             Some(hc) => hc
                 .get_health()
                 .await
@@ -3172,7 +3172,7 @@ impl HttpServer {
         // (storage.bytes_used) from one health call. Best-effort: a missing
         // conductor client / health failure leaves these None → safe full-arc.
         let (observed_n, corpus_bytes, entry_count) =
-            if let Some(hc) = self.hc_registry.as_ref().and_then(|r| r.lamad.clone()) {
+            if let Some(hc) = self.hc_registry.as_ref().and_then(|r| r.lamad_client()) {
                 let h = hc.get_health().await;
                 let n = h
                     .network
@@ -4953,7 +4953,7 @@ impl HttpServer {
                 //
                 // See 2026-05-26-substrate-rea-replication-fix.md Task 8d.
                 let needs_conductor = patch_needs_conductor(&view);
-                let lamad_hc = self.hc_registry.as_ref().and_then(|r| r.lamad.clone());
+                let lamad_hc = self.hc_registry.as_ref().and_then(|r| r.lamad_client());
 
                 let update_result = match (needs_conductor, lamad_hc) {
                     (true, Some(hc)) => {
@@ -9885,7 +9885,7 @@ impl HttpServer {
         // row revoke arm is the backstop if the conductor is unavailable here.
         if let (Some(target_cid), Some(hc)) = (
             offer_cid,
-            self.hc_registry.as_ref().and_then(|r| r.lamad.clone()),
+            self.hc_registry.as_ref().and_then(|r| r.lamad_client()),
         ) {
             let signed_at = crate::db::models::current_timestamp();
             let payload_json = crate::services::conductor_commitment_author::build_revoke_payload(

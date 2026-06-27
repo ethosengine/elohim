@@ -153,7 +153,7 @@ async fn handle_emit_event(
     let intent: LamadEventIntentView = parse_body(req).await?;
 
     // --- Path 1: conductor-first via content_store zome ---
-    if let Some(hc) = hc_registry.and_then(|r| r.lamad.clone()) {
+    if let Some(hc) = hc_registry.and_then(|r| r.lamad_client()) {
         let zome_input = ZomeLamadEventIntentInput::from(&intent);
         let payload = rmp_serde::to_vec_named(&zome_input)
             .map_err(|e| StorageError::Conductor(format!("encode intent: {e}")))?;
