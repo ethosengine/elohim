@@ -184,8 +184,12 @@ pub struct AuthResponse {
     /// in the JWT; surfaced explicitly so the client doesn't have to decode
     /// the JWT just to choose between the hosted-visitor and hosted-steward
     /// surfaces.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    #[serde(default)]
+    ///
+    /// Always serialized (both `true` and `false`). A hosted visitor's client
+    /// must be able to read `isSteward: false` to select the visitor surface;
+    /// an omitted field reads as `undefined`, indistinguishable from an old
+    /// doorway that never emitted the claim. The steward-login portal-handoff
+    /// a2o (`isSteward: false` for a hosted visitor) pins this.
     pub is_steward: bool,
     /// First reachable portal host URL for this human, when `is_steward` is
     /// true and at least one registered host responds to a health probe.
