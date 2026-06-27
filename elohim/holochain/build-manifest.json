@@ -14,6 +14,7 @@
           "doorway/doorway-service/src/**",
           "doorway/doorway-service/Cargo.toml",
           "doorway/doorway-service/Cargo.lock",
+          "doorway/doorway-service/Dockerfile",
           "doorway/doorway-client/**"
         ],
         "buildProcess": ["elohim/holochain/Jenkinsfile"]
