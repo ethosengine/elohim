@@ -53,6 +53,14 @@
       "debit_weight": 10,
       "decay_days": 60
     },
+    "contention-breach": {
+      "description": "Cross-surface regime-drift breach over an EPR's lens market — an incumbent lens's affinity decayed AND contention (controversy spread) rose together (folds::lens_selector::classify_regime). NOT a punishment signal: it opens a fresh-lens R&D bounty (contention→renewal), so standing-impact is advisory. See plural-mishpat-lenses-over-epr-design §8.",
+      "target_kinds": ["content", "agent"],
+      "evidence_required": true,
+      "standing_impact_allowed": ["advisory"],
+      "debit_weight": 2,
+      "decay_days": 30
+    },
     "reciprocity-imbalance": {
       "description": "Provider-dwelling-hub authored a replicates-dwelling commitment in steward_mutual mode; counter-commitment never arrived within grace_period_days, or was unilaterally revoked. Substrate emits this signal naming the breaching party. Standing-debit moderate.",
       "target_kinds": ["dwelling-hub", "agent"],

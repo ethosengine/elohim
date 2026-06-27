@@ -27,6 +27,7 @@ pub mod imagodei;
 pub mod infrastructure;
 pub mod inputs;
 pub mod lamad;
+pub mod lens;
 pub mod peer_capacity;
 pub mod projection;
 pub mod qahal;

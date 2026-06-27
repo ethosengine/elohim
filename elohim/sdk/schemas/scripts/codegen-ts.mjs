@@ -54,6 +54,8 @@ const INTERFACE_FILES = [
   { src: 'inputs/create-economic-event-input.ts', dest: 'create-economic-event-input.ts' },
   { src: 'inputs/create-attestation-input.ts', dest: 'create-attestation-input.ts' },
   { src: 'views/content-view.ts', dest: 'content-view.ts' },
+  // Plural Mishpat Lenses — the lens-market over one EPR (Wave-1 front↔back contract).
+  { src: 'views/lens-market-view.ts', dest: 'lens-market-view.ts' },
   // Native content-graph seam §4.6 — graph wire shape (rootId/related/totalNodes,
   // inferenceSource-discriminated edges) from GET /db/relationships/graph/{id}.
   { src: 'views/content-graph.ts', dest: 'content-graph-view.ts' },

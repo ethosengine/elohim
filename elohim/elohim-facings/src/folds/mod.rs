@@ -6,6 +6,9 @@
 
 pub mod contributor_reflexive;
 pub mod epr_content;
+pub mod lens_affinity;
+pub mod lens_contention;
+pub mod lens_selector;
 pub mod operational_weave;
 pub mod rea;
 pub mod resiliency;

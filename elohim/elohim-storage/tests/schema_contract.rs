@@ -24,8 +24,8 @@ use elohim_storage::services::provide_loop_status::ProvideLoopStatus;
 use elohim_storage::P2PStatusInfo;
 use elohim_views::{
     CollabAgreementStatus, CollabAgreementView, CollabCollectiveView, CollabMembershipRole,
-    CollabMembershipView, CollabQahalView, DeclaredShare, ElohimTier, GovernanceTerms, MemberKind,
-    ShareAllocation, ShareAllocationForm,
+    CollabMembershipView, CollabQahalView, DeclaredShare, ElohimTier, GovernanceTerms,
+    LensBindingView, LensMarketView, MemberKind, ShareAllocation, ShareAllocationForm,
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -178,6 +178,41 @@ fn assert_source_of_truth_declared(schema_value: &Value, schema_name: &str) {
         schema_name,
         desc
     );
+}
+
+// ── Lens Market (plural Mishpat lenses over an EPR) ──────────────
+
+#[test]
+fn lens_market_view_matches_schema() {
+    let view = LensMarketView {
+        epr_scope: "epr:lamad-spa".to_string(),
+        lenses: vec![
+            LensBindingView {
+                lens_cid: "uhCEkGeorgist".to_string(),
+                school: "georgist".to_string(),
+                role: "lens".to_string(),
+                telos_summary: "tax unearned land rent".to_string(),
+                affinity_in_context: 3,
+                current_verdict: Some("rent-bearing".to_string()),
+                valid: true,
+            },
+            LensBindingView {
+                lens_cid: "uhCEkBeerian".to_string(),
+                school: "beerian".to_string(),
+                role: "lens".to_string(),
+                telos_summary: "keep the loop regulable".to_string(),
+                affinity_in_context: 0,
+                current_verdict: None, // warm, not yet fired in this context
+                valid: true,
+            },
+        ],
+        contention_index: 1.0,
+        regime_status: "breached".to_string(),
+        open_bounty_cid: Some("uhCEkBounty".to_string()),
+        computed_at: "2026-06-27T00:00:00Z".to_string(),
+    };
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/lens-market-view.schema.json", &json);
 }
 
 // ── P2P Status ──────────────────────────────────────────────────
