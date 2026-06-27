@@ -12242,6 +12242,21 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/epr/:scope/lens-market — plural-Mishpat lens market (lens-market S7).
+        // `:scope` is the EPR SLUG-ID (e.g. epr:lamad-spa), NOT a dag-cbor CID.
+        // Read-projection of the A-class `lenses` table keyed on `governs_epr`.
+        // Dispatch lives in api/epr.rs (`is_lens_market_path`); THIS registry entry
+        // is the route-shadow guard — unregistered, doorway's manifest matcher would
+        // miss it and the hosted path would fall through to the SPA bootstrap (HTML).
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/epr/{scope}/lens-market")
+                .handler("get_epr_lens_market")
+                .cache_ttl(30)
+                .public_if_reach("commons")
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/collective + /api/v1/collab — Multi-collective collaboration EPR M1
         // See genesis/docs/content/elohim-protocol/architecture/2026-05-23-multi-collective-collaboration-epr-design.md
         // Writes require auth (imagodei conductor bridge); reads are public.
@@ -12636,6 +12651,16 @@ mod tests {
         assert!(
             paths.contains(&"/api/v1/commitments/facing/rea"),
             "missing /api/v1/commitments/facing/rea (REA economic facing Wave 4.2)"
+        );
+        // Plural-Mishpat lens market (lens-market S7). Same route-shadow guard
+        // discipline as /api/v1/weave: the GET arm is dispatched through
+        // api/epr.rs (`is_lens_market_path`) but, unregistered here, would be
+        // invisible to doorway's manifest matcher and fall through to the SPA
+        // bootstrap (HTML, not JSON) on every hosted path — unreachable except
+        // storage-direct (project_doorway_main_route_needs_is_service_path).
+        assert!(
+            paths.contains(&"/api/v1/epr/{scope}/lens-market"),
+            "missing /api/v1/epr/{{scope}}/lens-market (lens-market S7 — doorway reachability)"
         );
         // Wave 3 M1 — vf-graphql bridge endpoint
         assert!(

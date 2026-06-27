@@ -1,7 +1,7 @@
 ---
 title: "Plural Mishpat Lenses over an EPR — service-layer vertical slice (DNA teeth → DAO → service → route)"
 id: plural-mishpat-lenses-service-layer-plan
-status: Draft
+status: claimed-not-verified   # S1–S8 code landed + gate-green locally (7ff99ebcd); S9 live render is the open verification gap — see "Decomposition status" below
 class: protocol-canonical
 domain: D7
 sprint: vision-deferred   # D7 collective-governance ranks below the household seed; this is the read+write vertical proof, not a scheduled sprint
@@ -255,13 +255,62 @@ render (S9).
 5. Deferred legs (ballots/elections/bounty/breach-emit, selection write-path) remain captured (§A6), so
    `regime_status` read-only + `open_bounty_cid: None` are *intended*, not gaps.
 
-## Task checklist (decomposition surface — one line-item per task)
-- [ ] S1 — `author-lens` validator arm + payload schema (teeth); sweettest; `cid==entry_hash`; no integrity arm @requires:household-nodes
-- [ ] S2 — `lenses` A-class DAO (**source of truth: Holochain DHT**, projected from the S1 `author-lens` entry; A3): migration + `db/models.rs` structs + `db/lenses.rs` anchor-preserving upsert @requires:household-nodes
-- [ ] S3 — projection write-arm: `parse_author_lens` + `CommitmentCommitted` signal-arm → upsert; per-row warn-skip @requires:household-nodes
-- [ ] S4 — forward index `find_lenses_governing_epr` (slug-id SQL projection) + `lens_affinity`/`epr_contention` C-class tables (**source of truth: operational/reconstructable, NOT notarized**; A3) @requires:household-nodes
-- [ ] S5 — service layer `services/lens_facing.rs`: DB→fold→`LensBindingView`, affinity-ranked, fail-closed per row @requires:household-nodes
-- [ ] S6 — composite assembler `build_lens_market_view` → `LensMarketView` (contention + classify_regime + empty-valid); schema_contract green @requires:household-nodes
-- [ ] S7 — HTTP route `GET /api/v1/epr/{scope}/lens-market` (**route FOLLOWS the S1 `author-lens` DHT entry type**, not vice-versa; read-projection of the A-class `lenses` table): `api/lens.rs` handler + `api/mod.rs` dispatch arm; unknown scope → empty-valid @requires:household-nodes
-- [ ] S8 — ts-rs `export_bindings` + codegen drift-free (sha256-stable); pre-push freshness gate @requires:household-nodes
-- [ ] S9 — a2o qahal plural-observation scenario + live `household-nodes` render of the loop @requires:household-nodes
+## Decomposition status (2026-06-27 — landed on `feat/frontend-eyes-sprint` @ `7ff99ebcd`, codegen `f43e7f89b`)
+
+**`[x]` here means CLAIMED, not verified** (decompose convention: a checked box is a *claim* — `checked ≠
+done`). S1–S8 are **code-complete and gate-green locally** (fmt + clippy `-D warnings`, schema_contract, 379
+`export_bindings` tests, hash-neutral: coordinator hot-swap + storage + manifest, no integrity bytecode → no
+DNA reinstall). They remain **CLAIMED-to-VERIFY** until the dev-merge soak + the S9 live render close them.
+
+**Implementation deltas vs the PART A file map** (consolidations; verified against the `7ff99ebcd` diff —
+update A1 mentally when navigating):
+- **S7 route landed in `src/api/epr.rs` (+67), NOT a new `api/lens.rs`** — the `epr/{scope}/lens-market`
+  suffix dispatches from the existing EPR handler. (`api/lens.rs` does not exist; don't grep for it.)
+- **S4 C-class tables folded into one `db/lens_market.rs` (+150) + the `2026-06-27-130000_lens_market`
+  migration** — not the planned separate `db/lens_bindings.rs` / `lens_affinity` / `epr_contention` files.
+- **S6 assembler lives with the service** (`services/lens_facing.rs` +377 + `db/lens_market.rs`), not a
+  separate `views_convert/lens.rs`.
+- S1 teeth: `dna/mishpat/zomes/mishpat/src/commitments.rs` (+189) + `schemas/v1/commitments/author-lens.schema.json` (+51).
+- S9 scenario authored: `genesis/a2o/features/qahal/plural-mishpat-lenses.feature` (+63); the **live render is the open gap**.
+
+**Remaining to reach terminal `landed` (then this plan decomposes to zero residue):**
+1. **S9 live render** on a `household-nodes` stack (operator-gated — needs the stack run): author 2 lenses
+   through the real `author-lens` path → `GET …/lens-market` returns both, plural, no collapse.
+2. **Mishpat sweettest** — the conductor-level `author-lens` proof (rides the ~75min DNA CI gate; validator
+   logic already unit+integration covered).
+3. **dev-merge** — integrator owns the push/merge (`[[feedback_commit_only_integrator_pushes]]`).
+4. Wave-1 remainder (ballots/elections/bounty/breach-emit) stays **captured in §A6, not a gap of this slice**
+   — `regime_status` read-only + `open_bounty_cid: None` are *intended*, per DoD #5.
+
+## Post-review gaps (2026-06-27 — `/code-review high`, workflow `wf_15274bda-9d1`; 10 findings, all verified)
+
+The review cross-checks against §A6/DoD#5. **Tier-3 below CONFIRMS the documented deferrals** (not defects).
+**Tier-1/2 are real gaps the slice introduced, NOT covered by the deferrals** — tracked here as OPEN so the
+ledger stays honest. (Verdicts: 8 CONFIRMED, 2 PLAUSIBLE.)
+
+**Tier 1 — real gaps (close before S1–S8 can move CLAIMED→verified):**
+- [x] PR1 — **doorway-reachability** — ✅ FIXED (CLAIMED): `epr/{scope}/lens-market` was missing from the `http.rs` route manifest (`build_manifest()`), so on doorway/hosted it fell through to the SPA bootstrap (HTML not JSON) → unreachable except storage-direct/Tauri, S9's hosted render would fail. Registered the route alongside the epr siblings + `test_manifest_builds` now asserts it (RED→GREEN verified). (`[[project_doorway_main_route_needs_is_service_path]]`) @requires:household-nodes
+- [x] PR2 — **projection guard fail-open on role** — ✅ FIXED (CLAIMED): `parse_author_lens` accepted any non-empty role; since the S1 validator is a coordinator hot-swap, a stale-coordinator peer/replay could store an out-of-enum `role` (e.g. `dictator`) into `lenses.role` (floor/ceiling governance seam). Now re-validates `role ∈ {lens,floor,ceiling}` at the projection layer, fail-closed (2 tests, RED→GREEN; `action` is already routed by the dispatcher so the enum is the real gap). @requires:household-nodes
+- [x] PR3 — **lens revocation unwired + resurrection** — ✅ FIXED (CLAIMED): the `revokes-commitment` arm only revoked `mishpat_commitments` (0 rows on a lens CID → silent no-op), and `upsert_with_anchor` clobbered `revoked_at = None` on replay (fail-open resurrection). Added `db::lenses::set_revoked_at`, wired it into the revoke arm alongside the commitments call (each no-ops on the other table's CIDs), and made `revoked_at` sticky-on-set in the upsert (mirrors the `dht_anchor_hash` preservation). 2 tests, RED→GREEN. This is the substrate primitive a future "revert/yank" builds on (`[[project_versioned_entity_head_is_declared_dependency]]`). @requires:household-nodes
+- ~~PR4 — version supersession~~ **DEFERRED to design (2026-06-27 architect call), NOT a recency bug.** Which HEAD applies to an EPR is a *declared* dependency (package.json/lockfile; cid-pin = lockfile), not a `find_lenses` recency inference; versions are a DAG (fork/revert/merge), the binding picks the head. Surfacing all heads is the honest default until the binding-declaration layer lands. Seed: `genesis/data/timeline/backlog/lens-version-dag-policy-dependency.md` (needs `p2p-design-gate`). `find_lenses` left unfiltered on purpose; `[[project_versioned_entity_head_is_declared_dependency]]`.
+
+**Tier 2 — latent (correct-looking now; wrong when a deferred leg lands):**
+- [ ] PR5 — **contention conflates distinct lenses**: `contention_index(&verdict_rows, epr_scope)` (lens_facing.rs:171) tallies ALL verdicts in scope regardless of `lens_cid` — two internally-unanimous lenses (one agreed, one disagreed) read as a perfectly-split 1.0 "high contention." Inert in prod today (no verdict producer) but fires false controversy the moment the verdict/ballot write-path (Wave-1 T7) lands. Make contention per-lens. @requires:household-nodes
+
+**Tier 3 — CONFIRMS the documented deferrals (intended per §A6/DoD#5 — NOT defects, captured for closure):**
+- `regime_status` permanently `"stable"` — `classify_regime(now==prev)` can't drift without a prior temporal snapshot (finding #5). Matches DoD#5 "regime_status read-only"; lands non-trivial with the T-series temporal snapshot.
+- `affinity` inert in prod — `lens_selections` has no producer (migration 130000 DORMANT), so ranking collapses to CID-order outside seeded tests (finding #6). Matches §A6 backlog one-liner `lens-selection-write-path-slice`.
+
+**Tier 4 — quality cleanups (non-blocking):**
+- `upsert_with_anchor` is the **5th** hand-rolled copy of the anchor-preserving two-step idiom (mishpat_commitments / rea_commitments / economic_events / content_diesel / lenses) — extract a shared helper before the copies drift further (finding #9). · `load_selection_rows`/`load_verdict_rows` are structural twins with duplicated error policy (finding #10).
+
+## Task checklist (decomposition surface — one line-item per task; `[x]` = CLAIMED, awaiting verification)
+- [x] S1 — `author-lens` validator arm + payload schema (teeth); sweettest; `cid==entry_hash`; no integrity arm @requires:household-nodes
+- [x] S2 — `lenses` A-class DAO (**source of truth: Holochain DHT**, projected from the S1 `author-lens` entry; A3): migration + `db/models.rs` structs + `db/lenses.rs` anchor-preserving upsert @requires:household-nodes
+- [x] S3 — projection write-arm: `parse_author_lens` + `CommitmentCommitted` signal-arm → upsert; per-row warn-skip @requires:household-nodes
+- [x] S4 — forward index `find_lenses_governing_epr` (slug-id SQL projection) + C-class tables (**source of truth: operational/reconstructable, NOT notarized**; A3) — landed folded into `db/lens_market.rs` @requires:household-nodes
+- [x] S5 — service layer `services/lens_facing.rs`: DB→fold→`LensBindingView`, affinity-ranked, fail-closed per row @requires:household-nodes
+- [x] S6 — composite assembler `build_lens_market_view` → `LensMarketView` (contention + classify_regime + empty-valid); schema_contract green @requires:household-nodes
+- [x] S7 — HTTP route `GET /api/v1/epr/{scope}/lens-market` (**route FOLLOWS the S1 `author-lens` DHT entry type**, not vice-versa; read-projection of the A-class `lenses` table) — landed in `api/epr.rs`; unknown scope → empty-valid @requires:household-nodes
+- [x] S8 — ts-rs `export_bindings` + codegen drift-free (sha256-stable); pre-push freshness gate @requires:household-nodes
+- [ ] S9 — a2o qahal plural-observation scenario + live `household-nodes` render of the loop (scenario authored; **live render OPEN — operator-gated**) @requires:household-nodes

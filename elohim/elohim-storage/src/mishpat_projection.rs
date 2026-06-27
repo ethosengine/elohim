@@ -310,8 +310,19 @@ fn parse_author_lens(
         .get("role")
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| "author-lens payload missing non-empty 'role'".to_string())?
-        .to_string();
+        .ok_or_else(|| "author-lens payload missing non-empty 'role'".to_string())?;
+    // Re-establish the closed role enum at the projection layer (defense-in-depth).
+    // The S1 coordinator validator enforces this, but it is a HOT-SWAPPED coordinator
+    // gate — a stale-coordinator peer or a replay predating the validator can deliver
+    // an unvalidated payload. A bogus constitutional role (e.g. 'dictator') must never
+    // reach `lenses.role`, which feeds the floor/ceiling governance seam. Enum mirrors
+    // sdk/schemas/v1/commitments/author-lens.schema.json.
+    if !matches!(role, "lens" | "floor" | "ceiling") {
+        return Err(format!(
+            "author-lens payload has out-of-enum 'role' (must be lens|floor|ceiling): {role}"
+        ));
+    }
+    let role = role.to_string();
     // rule (the deterministic predicate) and telos (steering target) are required
     // objects; round-trip to compact JSON for storage.
     let rule_json = payload
@@ -1679,6 +1690,52 @@ mod tests {
             result.unwrap_err().contains("signed_at"),
             "error must mention 'signed_at'"
         );
+    }
+
+    // ── author-lens role enum (projection-side defense-in-depth) ───────────────
+
+    fn author_lens_payload(role: &str) -> String {
+        serde_json::json!({
+            "action": "author-lens",
+            "governs_epr": "epr:lamad-spa",
+            "school": "georgist",
+            "role": role,
+            "rule": { "predicate": "land_value_uplift > rent_capture" },
+            "telos": { "summary": "tax unimproved land value" }
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn parse_author_lens_rejects_out_of_enum_role() {
+        // The S1 coordinator validator enforces role ∈ {lens, floor, ceiling}, but
+        // it is a HOT-SWAPPED coordinator gate — a stale-coordinator peer or a replay
+        // predating the validator can deliver an unvalidated payload. The projection
+        // must re-establish the closed enum so a bogus constitutional role
+        // (e.g. role='dictator', feeding the floor/ceiling governance seam) never
+        // reaches the `lenses` table.
+        let payload = author_lens_payload("dictator");
+        let result = parse_commitment_payload("author-lens", &payload, "eh1", "ah1");
+        assert!(
+            result.is_err(),
+            "an out-of-enum role must be rejected at the projection layer"
+        );
+        assert!(
+            result.unwrap_err().contains("role"),
+            "the error must name the offending 'role' field"
+        );
+    }
+
+    #[test]
+    fn parse_author_lens_accepts_constitutional_roles() {
+        for role in ["lens", "floor", "ceiling"] {
+            let payload = author_lens_payload(role);
+            let result = parse_commitment_payload("author-lens", &payload, "eh1", "ah1");
+            assert!(
+                matches!(result, Ok(CommitmentProjection::UpsertLens(_))),
+                "role '{role}' is a valid constitutional role and must project a lens"
+            );
+        }
     }
 
     // ── unknown action ────────────────────────────────────────────────────────

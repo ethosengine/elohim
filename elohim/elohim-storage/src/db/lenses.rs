@@ -24,11 +24,14 @@ use super::models::{current_timestamp, Lens, NewLens};
 /// On conflict the row is refreshed — all projected fields are updated and
 /// `updated_at` is bumped via `current_timestamp()`.
 ///
-/// **Anchor-preservation rule** (mirrors `mishpat_commitments::upsert_with_anchor`):
-/// `dht_anchor_hash` is only overwritten when the incoming `new.dht_anchor_hash` is
-/// `Some(_)`. A later un-anchored re-projection (signal replay with `None`) must
-/// never clobber a previously written anchor — doing so would silently strip the
-/// notarised provenance the forward index requires before surfacing a lens.
+/// **Sticky-on-set preservation rule** (mirrors `mishpat_commitments::upsert_with_anchor`):
+/// `dht_anchor_hash` AND `revoked_at` are only overwritten when the incoming value
+/// is `Some(_)`. A later re-projection from the `author-lens` signal always carries
+/// `dht_anchor_hash = Some` but `revoked_at = None` — so an un-anchored or post-revoke
+/// replay (Holochain re-emits on conductor restart/gossip) must never (a) strip the
+/// notarised anchor the forward index requires, nor (b) resurrect a revoked lens by
+/// clobbering `revoked_at` back to NULL (a fail-open governance bug). Revocation is
+/// owned by `set_revoked_at`, not by the create-projection upsert.
 pub fn upsert_with_anchor(conn: &mut SqliteConnection, new: NewLens) -> QueryResult<Lens> {
     let now = current_timestamp();
 
@@ -57,10 +60,9 @@ pub fn upsert_with_anchor(conn: &mut SqliteConnection, new: NewLens) -> QueryRes
             ln::rule_json.eq(new.rule_json.clone()),
             ln::telos_json.eq(new.telos_json.clone()),
             ln::version_parent.eq(new.version_parent.clone()),
-            ln::revoked_at.eq(new.revoked_at.clone()),
-            // Anchor-preservation: dht_anchor_hash is updated conditionally below,
-            // never in this set() — so an incoming None cannot clobber an existing
-            // anchor (mirror mishpat_commitments::upsert_with_anchor).
+            // Preservation: dht_anchor_hash AND revoked_at are updated conditionally
+            // below, never in this set() — so an incoming None cannot clobber an
+            // existing anchor or resurrect a revoked lens.
             ln::updated_at.eq(&now),
         ))
         .execute(conn)?;
@@ -74,12 +76,35 @@ pub fn upsert_with_anchor(conn: &mut SqliteConnection, new: NewLens) -> QueryRes
             .execute(conn)?;
     }
 
+    // Same sticky rule for revoked_at: a replay carrying None never un-revokes a
+    // lens. Revocation flows through `set_revoked_at`, not the create-projection.
+    if let Some(ref ts) = new.revoked_at {
+        diesel::update(ln::lenses.filter(ln::cid.eq(&new.cid)))
+            .set(ln::revoked_at.eq(ts))
+            .execute(conn)?;
+    }
+
     ln::lenses.filter(ln::cid.eq(&new.cid)).first(conn)
 }
 
 /// Fetch a single lens by its CID. Returns `Ok(None)` when no row exists.
 pub fn get_by_cid(conn: &mut SqliteConnection, cid: &str) -> QueryResult<Option<Lens>> {
     ln::lenses.filter(ln::cid.eq(cid)).first(conn).optional()
+}
+
+/// Mark a lens revoked by its CID (= Commitment entry_hash). Mirrors
+/// `mishpat_commitments::set_revoked_at` for the A-class `lenses` table.
+///
+/// A `revokes-commitment` may target EITHER a `mishpat_commitments` row OR a
+/// `lenses` row — distinct tables over the same CID space — so the revoke
+/// projection calls BOTH (each no-ops, returning 0, when the CID is absent from
+/// that table). Without this, a revoke targeting a lens silently matched 0 rows
+/// and the lens stayed live in the market. Returns rows affected.
+pub fn set_revoked_at(conn: &mut SqliteConnection, cid: &str, ts: &str) -> QueryResult<usize> {
+    let now = current_timestamp();
+    diesel::update(ln::lenses.filter(ln::cid.eq(cid)))
+        .set((ln::revoked_at.eq(ts), ln::updated_at.eq(&now)))
+        .execute(conn)
 }
 
 /// The forward index: all live lenses governing an EPR (keyed by slug-id, plan A3).
@@ -254,5 +279,74 @@ mod tests {
         assert!(find_lenses_governing_epr(&mut conn, "epr:nope")
             .expect("query")
             .is_empty());
+    }
+
+    // NOTE: version supersession / head-selection is DEFERRED to the lens-version-DAG
+    // + EPR→policy dependency-declaration design (package.json/lockfile model — which
+    // HEAD applies is a DECLARED binding, not a recency inference). `find_lenses`
+    // surfaces all heads until that binding lands; do NOT add a linear auto-supersede
+    // filter here. Seed: genesis/data/timeline/backlog/lens-version-dag-policy-dependency.md
+
+    #[test]
+    fn upsert_preserves_revoked_at_when_new_is_null() {
+        let mut conn = test_conn();
+        let cid = "lens:rev-preserve";
+
+        // First projection establishes the lens already revoked.
+        let mut revoked = sample_lens(cid, Some("h1"));
+        revoked.revoked_at = Some("2026-06-27T01:00:00Z".to_string());
+        upsert_with_anchor(&mut conn, revoked).expect("first upsert (revoked)");
+
+        // A re-delivered author-lens signal carries revoked_at = None (the projection
+        // always sends None). Holochain re-emits on conductor restart/gossip — this
+        // replay must NOT resurrect a revoked lens.
+        upsert_with_anchor(&mut conn, sample_lens(cid, Some("h1"))).expect("replay upsert");
+
+        let row = get_by_cid(&mut conn, cid)
+            .expect("get_by_cid")
+            .expect("row must exist");
+        assert_eq!(
+            row.revoked_at.as_deref(),
+            Some("2026-06-27T01:00:00Z"),
+            "revoked_at must be preserved when an incoming replay carries None (no fail-open resurrection)"
+        );
+    }
+
+    #[test]
+    fn set_revoked_at_marks_lens_revoked() {
+        let mut conn = test_conn();
+        upsert_with_anchor(&mut conn, sample_lens("lens:sr", Some("a1"))).expect("seed");
+
+        let affected =
+            set_revoked_at(&mut conn, "lens:sr", "2026-06-27T02:00:00Z").expect("revoke");
+        assert_eq!(
+            affected, 1,
+            "revoking an existing lens affects exactly its row"
+        );
+
+        let row = get_by_cid(&mut conn, "lens:sr")
+            .expect("get_by_cid")
+            .expect("row exists");
+        assert_eq!(
+            row.revoked_at.as_deref(),
+            Some("2026-06-27T02:00:00Z"),
+            "the lens row carries the revocation timestamp"
+        );
+
+        // The lens drops out of the live market.
+        assert!(
+            find_lenses_governing_epr(&mut conn, "epr:lamad-spa")
+                .expect("query")
+                .is_empty(),
+            "a revoked lens is fail-closed excluded from the market"
+        );
+
+        // Revoking an absent CID is a no-op (the revoke may target a commitment,
+        // not a lens — each table call no-ops when the CID is elsewhere).
+        assert_eq!(
+            set_revoked_at(&mut conn, "lens:absent", "2026-06-27T02:00:00Z").expect("noop"),
+            0,
+            "revoking a CID absent from lenses affects 0 rows"
+        );
     }
 }
