@@ -48,6 +48,14 @@ COPY elohim/elohim-agent/specialists/defender ./elohim/elohim-agent/specialists/
 # and a workspace member of elohim/Cargo.toml. Without this COPY, cargo aborts at
 # resolve time: "failed to read /elohim/elohim-render/Cargo.toml: No such file".
 COPY elohim/elohim-render ./elohim/elohim-render
+# elohim-chrome-asset: TRANSITIVE path-dep — elohim-render depends on it
+# (elohim-render/Cargo.toml: path = "../elohim-chrome-asset"), and it's a
+# workspace member of elohim/Cargo.toml. doorway-service doesn't name it directly,
+# but cargo must read /app/elohim/elohim-chrome-asset/Cargo.toml when resolving
+# render. Without this COPY the build aborts at resolve time: "failed to read
+# /app/elohim/elohim-chrome-asset/Cargo.toml: No such file". Inherits the
+# workspace root (elohim/Cargo.toml, COPYd above) like render — no sed/inline.
+COPY elohim/elohim-chrome-asset ./elohim/elohim-chrome-asset
 # elohim-peer-fabric: std-only path-dep (doorway membrane policy, edge-defense feature) and a
 # workspace member of elohim/Cargo.toml. Without this COPY cargo aborts at resolve time:
 # "failed to read /elohim/elohim-peer-fabric/Cargo.toml: No such file".
