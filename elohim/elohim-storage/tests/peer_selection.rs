@@ -31,7 +31,7 @@ fn seed_human(conn: &mut diesel::SqliteConnection, id: &str, agent_key: &str, hh
             profile_reach: "commons".into(),
             location: None,
             profile_photo_url: None,
-            h_app_id: "lamad".into(),
+            h_app_id: elohim_storage::db::HUMANS_HAPP_ID.into(),
             household_id: hh.map(str::to_string),
         })
         .execute(conn)
@@ -278,5 +278,59 @@ fn places_what_we_can_and_flags_under_committed_when_desired_exceeds_households(
             assert_eq!(requested, 3);
         }
         other => panic!("expected Short(under-committed), got {other:?}"),
+    }
+}
+
+/// Household enrichment must read humans under the canonical imagodei scope, NOT
+/// the operating/content scope. Production writes humans under `h_app_id="imagodei"`
+/// while the content commitments the selector filters live under `"lamad"`. This
+/// seeds the human under imagodei (the production write scope) and asserts the
+/// selected peer carries its household. RED before the fix: the join filtered by
+/// `input.h_app_id` ("lamad") missed the imagodei row → household enrichment None.
+#[test]
+fn selected_peer_carries_imagodei_household() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+
+    // Human written under the imagodei (identity) scope — the production write scope.
+    diesel::insert_into(db::diesel_schema::humans::table)
+        .values(&NewHuman {
+            id: "h-a".into(),
+            agent_pub_key: Some("uhCAk-a".into()),
+            display_name: "A".into(),
+            bio: None,
+            affinities: "[]".into(),
+            profile_reach: "commons".into(),
+            location: None,
+            profile_photo_url: None,
+            h_app_id: elohim_storage::db::HUMANS_HAPP_ID.into(),
+            household_id: Some("hh-1".into()),
+        })
+        .execute(&mut conn)
+        .unwrap();
+    // Peer status + the content commitment stay on the operating ("lamad") scope.
+    seed_peer_status(&mut conn, "uhCAk-a", "accepting");
+    seed_rea_commitment(&mut conn, "uhCAk-a", "commons");
+
+    let sel = PeerSelection::new(pool.clone());
+    let outcome = sel
+        .select(&SelectionInput {
+            h_app_id: "lamad",
+            content_id: "content-hh",
+            content_reach: "commons",
+            desired_count: 1,
+        })
+        .unwrap();
+
+    match outcome {
+        SelectionOutcome::Ok(peers) => {
+            assert_eq!(peers.len(), 1);
+            assert_eq!(
+                peers[0].household_id.as_deref(),
+                Some("hh-1"),
+                "selected peer must carry the imagodei-scoped household_id"
+            );
+        }
+        other => panic!("expected Ok with household enrichment, got {other:?}"),
     }
 }

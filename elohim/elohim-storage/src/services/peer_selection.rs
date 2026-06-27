@@ -27,6 +27,7 @@ use crate::db::diesel_schema::{
     humans, node_stewardship, peer_statuses, rea_commitments, stewarded_nodes,
 };
 use crate::db::DbPool;
+use crate::db::HUMANS_HAPP_ID;
 use crate::StorageError;
 
 // ---------------------------------------------------------------------------
@@ -190,7 +191,7 @@ impl PeerSelection {
         }
 
         let human_rows: Vec<HumanRow> = humans::table
-            .filter(humans::h_app_id.eq(input.h_app_id))
+            .filter(humans::h_app_id.eq(HUMANS_HAPP_ID)) // imagodei scope (was input.h_app_id)
             .filter(humans::agent_pub_key.eq_any(&accepting))
             .select((humans::agent_pub_key, humans::household_id))
             .load::<HumanRow>(&mut conn)
@@ -219,7 +220,7 @@ impl PeerSelection {
         }
 
         let human_id_rows: Vec<HumanIdRow> = humans::table
-            .filter(humans::h_app_id.eq(input.h_app_id))
+            .filter(humans::h_app_id.eq(HUMANS_HAPP_ID)) // imagodei scope (was input.h_app_id)
             .filter(humans::agent_pub_key.eq_any(&accepting))
             .select((humans::id, humans::agent_pub_key))
             .load::<HumanIdRow>(&mut conn)
