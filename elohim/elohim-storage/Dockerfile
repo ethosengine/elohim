@@ -72,6 +72,11 @@ COPY elohim/elohim-peer-fabric ./elohim-peer-fabric
 # build does NOT enable ssr (lean, no V8); pass --build-arg STORAGE_FEATURES=ssr to
 # produce the SSR-enabled variant (app-serving nodes). Both share this COPY layer.
 COPY elohim/elohim-render ./elohim-render
+# elohim-chrome-asset: non-optional path-dep — storage serves the runtime-served
+# EPR omnibar client element from the sidecar (/chrome route). Cargo resolves
+# path-deps at metadata time regardless of features, so the directory must exist
+# or the build aborts at resolve: "failed to read /elohim-chrome-asset/Cargo.toml".
+COPY elohim/elohim-chrome-asset ./elohim-chrome-asset
 # Wave 3 — valueflows bridge crates (hREA / VF-GraphQL interop) are
 # unconditional path-deps in Cargo.toml; copy them in so the
 # build-context contains their source.
@@ -102,6 +107,7 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../elohim-facings"|path = "elohim-facings"|' Cargo.toml && \
     sed -i 's|path = "../elohim-peer-fabric"|path = "elohim-peer-fabric"|' Cargo.toml && \
     sed -i 's|path = "../elohim-render"|path = "elohim-render"|' Cargo.toml && \
+    sed -i 's|path = "../elohim-chrome-asset"|path = "elohim-chrome-asset"|' Cargo.toml && \
     sed -i 's|path = "../epr"|path = "epr"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-bridge"|path = "bridges/valueflows/valueflows-bridge"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-types"|path = "bridges/valueflows/valueflows-types"|' Cargo.toml
@@ -181,6 +187,16 @@ RUN sed -i \
     -e 's|deno_core.workspace = true|deno_core = "0.339.0"|' \
     -e 's|deno_error.workspace = true|deno_error = "0.5.7"|' \
     elohim-render/Cargo.toml
+
+# elohim-chrome-asset uses workspace inheritance too — inline the values since
+# the workspace root (elohim/Cargo.toml) isn't in the build context. Only the
+# fields its manifest actually inherits: version/edition/license + sha2.
+RUN sed -i \
+    -e 's|version.workspace = true|version = "0.1.0"|' \
+    -e 's|edition.workspace = true|edition = "2021"|' \
+    -e 's|license.workspace = true|license = "Apache-2.0"|' \
+    -e 's|sha2.workspace = true|sha2 = "0.10"|' \
+    elohim-chrome-asset/Cargo.toml
 
 # Create dummy src + bench placeholders to build dependencies.
 # Any `[[bin]]`, `[[bench]]`, or `[[example]]` entry declared in Cargo.toml
