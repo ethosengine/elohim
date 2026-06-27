@@ -35,7 +35,6 @@ import {
   inject,
   signal,
 } from '@angular/core';
-
 import { AutomergeSync, StorageClient } from '@elohim/storage-client';
 
 /**
