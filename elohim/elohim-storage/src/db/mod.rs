@@ -191,6 +191,7 @@ use tracing::info;
 
 use crate::error::StorageError;
 pub use context::AppContext;
+pub use context::HUMANS_HAPP_ID;
 // Re-export so api/* modules can use `crate::db::SqliteConnection` directly.
 pub use diesel::sqlite::SqliteConnection;
 

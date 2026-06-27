@@ -3,6 +3,22 @@
 //! All database operations are scoped by h_app_id to enable multiple apps
 //! to store content in the same database without interference.
 
+/// Canonical `h_app_id` scope for the `humans` projection.
+///
+/// Humans are the **imagodei** (identity) pillar's projection — production
+/// writers (`api/identity.rs::register_human`, `services/genesis_self_heal.rs`)
+/// write them under this scope, and the membership projection
+/// (`reconcile/controller.rs`) UPDATEs `household_id` onto those rows in place.
+///
+/// A reader that joins/filters `humans` for IDENTITY or HOUSEHOLD data MUST scope
+/// by this constant — NOT by the operating app scope (`"lamad"` for content
+/// distribution). Filtering humans by `"lamad"` silently empties the join (the
+/// 2026-06-19 dark-card probe artifact; see
+/// `backlog/resilience-card-membership-humans-projection-gap-2026-06-19.md`).
+/// This is the single source of truth so writers and readers cannot drift
+/// ("decide ONE scope, flip both together").
+pub const HUMANS_HAPP_ID: &str = "imagodei";
+
 /// App context passed to all database operations for multi-tenant isolation
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AppContext {
@@ -66,5 +82,14 @@ mod tests {
     fn test_custom_context() {
         let ctx = AppContext::new("calendar");
         assert_eq!(ctx.h_app_id, "calendar");
+    }
+
+    #[test]
+    fn humans_happ_id_is_imagodei() {
+        // Humans are the imagodei pillar's projection. Production writers
+        // (api/identity.rs register_human; services/genesis_self_heal.rs) write this
+        // scope; every household-join reader MUST filter humans by it (not the
+        // operating content scope "lamad"), or the join silently empties.
+        assert_eq!(super::HUMANS_HAPP_ID, "imagodei");
     }
 }
