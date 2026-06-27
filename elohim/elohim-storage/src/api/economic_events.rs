@@ -79,7 +79,9 @@ pub async fn handle(
         (&Method::POST, "from-staged") => handle_from_staged(req, pool, ctx).await,
 
         // GET /api/v1/economic-events/{id}  (must not match known sub-paths)
-        (&Method::GET, id) if !id.contains('/') => handle_get_by_id(id, pool, ctx).await,
+        (&Method::GET, id) if !id.contains('/') && id != "appreciations" => {
+            handle_get_by_id(id, pool, ctx).await
+        }
 
         // GET /api/v1/economic-events/agent/{agent_id}
         (&Method::GET, agent_path) if agent_path.starts_with("agent/") => {
