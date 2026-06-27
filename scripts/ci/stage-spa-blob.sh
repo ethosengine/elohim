@@ -65,6 +65,18 @@ fi
 #    requests get silently downgraded to GET, storage returns 404 on the
 #    not-yet-uploaded hash, the build fails with curl exit 22. /admin/seed/blob
 #    is the seeder's write-through path (preserves dev fix f853fb665).
+#
+#    AUTH (2026-06-27): doorway's require_seed_authority gate (commit 396779747,
+#    2026-06-11) 401s an UNAUTHENTICATED PUT on any non-DEV_MODE doorway. alpha
+#    (doorway-A) sets DEV_MODE=true and bypassed the gate, masking the omission;
+#    elohim.host (doorway-B / alpha-b) does NOT set DEV_MODE, so its PUT 401'd
+#    EVERY build → blob never uploaded → host silently stranded on a stale bundle
+#    for ~2 weeks (the per-host deploy-lag class). The PATCH already sent the
+#    admin key; the PUT was simply never updated when the gate landed. Send the
+#    SAME admin X-API-Key here — seed.rs: "Admin API key (X-API-Key) also passes
+#    — the operator credential CI uses." DEV_MODE hosts ignore it; gated hosts
+#    require it. ${VAR:-} keeps it set -u-safe when no admin key is in scope (the
+#    no-credential PUT then correctly stays unauthorized on a gated host).
 # 2. Link blob to the content row (PATCH+verify) — only when admin key present.
 #    Seatbelt: after each PATCH, GET the row and assert the hash field matches
 #    the SHA just written; a drift returns non-zero (→ retried, then NAMED).
@@ -72,6 +84,7 @@ stage_once() {
     curl -fSs -X PUT \
         -H 'Content-Type: application/zip' \
         -H "X-Blob-Hash: ${SPA_HASH}" \
+        -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
         --data-binary @spa-bundle.zip \
         "${DOORWAY_EPR_URL}/admin/seed/blob" || return 1
     echo "  ✓ [${SLUG}] blob uploaded (via /admin/seed/blob)"
