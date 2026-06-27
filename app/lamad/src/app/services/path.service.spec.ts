@@ -290,6 +290,50 @@ describe('PathService', () => {
       }));
   });
 
+  describe('findContentInPaths', () => {
+    it('finds the cross-path match for content in another path', () =>
+      new Promise<void>(done => {
+        dataLoaderSpy.getPathIndex.mockReturnValue(
+          of({
+            ...mockPathIndex,
+            paths: [{ ...mockPathIndex.paths[0], id: 'other-path' }],
+          }),
+        );
+        dataLoaderSpy.getPath.mockReturnValue(of({ ...mockPath, id: 'other-path' }));
+
+        service.findContentInPaths('content-2', 'current-path').subscribe(matches => {
+          expect(matches).toEqual([{ pathId: 'other-path', stepIndex: 1 }]);
+          done();
+        });
+      }));
+
+    it('degrades per-path: one unloadable path does not sink the whole lookup', () =>
+      new Promise<void>(done => {
+        // Two candidate paths; the first fails to load (stale reference), the
+        // second holds the target. A non-resilient forkJoin would reject here,
+        // stranding the learner on their current path instead of cross-linking.
+        dataLoaderSpy.getPathIndex.mockReturnValue(
+          of({
+            ...mockPathIndex,
+            paths: [
+              { ...mockPathIndex.paths[0], id: 'stale-path' },
+              { ...mockPathIndex.paths[0], id: 'good-path' },
+            ],
+          }),
+        );
+        dataLoaderSpy.getPath.mockImplementation((id: string) =>
+          id === 'stale-path'
+            ? throwError(() => new Error('Path not found: stale-path'))
+            : of({ ...mockPath, id: 'good-path' }),
+        );
+
+        service.findContentInPaths('content-2', 'current-path').subscribe(matches => {
+          expect(matches).toEqual([{ pathId: 'good-path', stepIndex: 1 }]);
+          done();
+        });
+      }));
+  });
+
   describe('isStepAccessible', () => {
     it('should allow access to step 0 with no progress', () => {
       const result = service.isStepAccessible(mockPath, 0, null, []);

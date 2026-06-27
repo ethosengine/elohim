@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 
 // @coverage: 20.0% (2026-02-24)
 
-import { map, switchMap } from 'rxjs/operators';
+import { catchError, map, switchMap } from 'rxjs/operators';
 
 import { Observable, forkJoin, of } from 'rxjs';
 
@@ -1133,12 +1133,19 @@ export class PathService {
 
         if (pathIds.length === 0) return of([]);
 
-        // Load each path and search its steps
-        const pathLoads = pathIds.map(id => this.getPath(id));
+        // Load each path and search its steps. A single stale/missing path
+        // reference must NOT sink the whole lookup — otherwise an unresolvable
+        // path in the index aborts forkJoin, rejects the resolver, and strands
+        // the learner on their current path (the cross-path link goes nowhere).
+        // Degrade per-path: skip any that fail to load.
+        const pathLoads = pathIds.map(id =>
+          this.getPath(id).pipe(catchError(() => of(null)))
+        );
         return forkJoin(pathLoads).pipe(
           map(paths => {
             const matches: CrossPathMatch[] = [];
             for (const path of paths) {
+              if (!path) continue;
               const stepIndex = path.steps.findIndex(s => s.resourceId === contentId);
               if (stepIndex >= 0) {
                 matches.push({ pathId: path.id, stepIndex });
