@@ -34,16 +34,33 @@ pub fn content_doc_id(id: &str) -> String {
 /// tests/sync_integration.rs) is `apply_changes(ns, doc_id, vec![doc.save()])` —
 /// the same path a peer's changes take, so a local projection and a remote merge
 /// converge identically.
-pub async fn project_content_doc(sync: &SyncManager, content: &Content) -> Result<(), StorageError> {
+pub async fn project_content_doc(
+    sync: &SyncManager,
+    content: &Content,
+) -> Result<(), StorageError> {
     let doc_id = content_doc_id(&content.id);
-    let mut doc = sync.get_or_create_doc(PROJECTION_NAMESPACE, &doc_id).await?;
+    let mut doc = sync
+        .get_or_create_doc(PROJECTION_NAMESPACE, &doc_id)
+        .await?;
     doc.transact::<_, _, automerge::AutomergeError>(|tx| {
         tx.put(automerge::ROOT, "id", content.id.as_str())?;
         tx.put(automerge::ROOT, "title", content.title.as_str())?;
-        tx.put(automerge::ROOT, "contentType", content.content_type.as_str())?;
-        tx.put(automerge::ROOT, "contentFormat", content.content_format.as_str())?;
+        tx.put(
+            automerge::ROOT,
+            "contentType",
+            content.content_type.as_str(),
+        )?;
+        tx.put(
+            automerge::ROOT,
+            "contentFormat",
+            content.content_format.as_str(),
+        )?;
         tx.put(automerge::ROOT, "reach", content.reach.as_str())?;
-        tx.put(automerge::ROOT, "body", content.content_body.as_deref().unwrap_or(""))?;
+        tx.put(
+            automerge::ROOT,
+            "body",
+            content.content_body.as_deref().unwrap_or(""),
+        )?;
         tx.put(
             automerge::ROOT,
             "metadata",

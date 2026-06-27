@@ -287,7 +287,10 @@ async fn handle_request(sync: &SyncManager, request: SyncRequest) -> SyncRespons
             doc_id,
             have_heads,
             ..
-        } => match sync.get_changes_since(&h_app_id, &doc_id, &have_heads).await {
+        } => match sync
+            .get_changes_since(&h_app_id, &doc_id, &have_heads)
+            .await
+        {
             Ok((changes, new_heads)) => SyncResponse::Changes {
                 h_app_id,
                 doc_id,
@@ -379,10 +382,7 @@ async fn doc_authored_on_a_converges_to_b() {
     let node_a = TestSyncNode::spawn("a").await;
     let node_b = TestSyncNode::spawn("b").await;
 
-    node_b
-        .dial(node_a.listen_addr())
-        .await
-        .expect("B dials A");
+    node_b.dial(node_a.listen_addr()).await.expect("B dials A");
     assert!(
         node_b
             .wait_for_connection(&node_a.peer_id(), Duration::from_secs(10))
@@ -398,11 +398,21 @@ async fn doc_authored_on_a_converges_to_b() {
 
     // Precondition: A has the doc, B does not yet.
     assert!(
-        !node_a.sync.get_heads(SYNC_NS, DOC_ID).await.unwrap().is_empty(),
+        !node_a
+            .sync
+            .get_heads(SYNC_NS, DOC_ID)
+            .await
+            .unwrap()
+            .is_empty(),
         "node A must hold the authored doc"
     );
     assert!(
-        node_b.sync.get_heads(SYNC_NS, DOC_ID).await.unwrap().is_empty(),
+        node_b
+            .sync
+            .get_heads(SYNC_NS, DOC_ID)
+            .await
+            .unwrap()
+            .is_empty(),
         "node B must NOT hold the doc before sync"
     );
 
