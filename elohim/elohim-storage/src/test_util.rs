@@ -85,7 +85,7 @@ pub async fn spawn_p2p_with_peers(pool: DbPool, peers: &[(&str, &str, &str)]) ->
                 profile_reach: "commons".to_string(),
                 location: None,
                 profile_photo_url: None,
-                h_app_id: "lamad".to_string(),
+                h_app_id: crate::db::HUMANS_HAPP_ID.to_string(),
                 household_id: Some((*household_id).to_string()),
             })
             .execute(&mut conn)

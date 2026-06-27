@@ -8405,13 +8405,22 @@ impl HttpServer {
     async fn handle_list_humans(
         &self,
         _req: Request<Incoming>,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        self.handle_list_humans_inner(ctx).await
+    }
+
+    /// Inner body of `GET /db/humans`. Receives the operating `ctx` but IGNORES it:
+    /// humans are the imagodei identity projection, scoped to the canonical
+    /// `HUMANS_HAPP_ID`, NOT the operating content scope — else a populated table
+    /// reads empty (the 2026-06-19 dark-card probe artifact). Extracted so
+    /// `test_list_db_humans` can prove the handler ignores the operating ctx (the
+    /// test goes RED if this is ever reverted to `&ctx.h_app_id`).
+    async fn handle_list_humans_inner(
+        &self,
         _ctx: &AppContext,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         let mut conn = self.get_diesel_conn()?;
-
-        // /db/humans lists the imagodei identity projection, NOT the operating
-        // content scope — else a populated table reads empty (the 2026-06-19
-        // dark-card probe artifact). See db::context::HUMANS_HAPP_ID.
         match humans::list_humans(&mut conn, crate::db::context::HUMANS_HAPP_ID) {
             Ok(items) => {
                 let views: Vec<HumanView> = items.into_iter().map(HumanView::from).collect();
@@ -9669,6 +9678,28 @@ impl HttpServer {
             .handle_db_rea_commitments_inner(action, doorway_id, &app_ctx)
             .await
         {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let body = http_body_util::BodyExt::collect(resp.into_body())
+                    .await
+                    .unwrap()
+                    .to_bytes();
+                HttpTestResponse { status, body }
+            }
+            Err(e) => HttpTestResponse {
+                status: 500,
+                body: bytes::Bytes::from(format!("error: {e}")),
+            },
+        }
+    }
+
+    /// Drive `GET /db/humans` for integration tests. `operating_scope` is the
+    /// content scope the router would pass (e.g. "lamad"); the handler must IGNORE
+    /// it and list the imagodei humans projection. RED if the handler is reverted to
+    /// read the operating ctx. Not guarded by `#[cfg(test)]` — see note above.
+    pub async fn test_list_db_humans(&self, operating_scope: &str) -> HttpTestResponse {
+        let ctx = db::AppContext::new(operating_scope);
+        match self.handle_list_humans_inner(&ctx).await {
             Ok(resp) => {
                 let status = resp.status().as_u16();
                 let body = http_body_util::BodyExt::collect(resp.into_body())
