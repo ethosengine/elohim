@@ -220,7 +220,7 @@ def publishE2EReports(String environment) {
     }
 }
 
-def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey) {
+def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map outcomes) {
     // Uploads one OR MORE pillar-EPR browser bundles. Each bundle is a
     // {distDir, slug} pair: the dist contents get zipped + uploaded as a
     // content-addressed blob, then (when an admin key is present) PATCHed
@@ -266,8 +266,14 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey) {
     // MethodTooLargeException limit — builds #1519/#1520 died at Jenkinsfile
     // compile, zero stages ran). Keep helpers heredoc-free.
     def doPatch = (adminKey != null && adminKey.trim() != '') ? '1' : '0'
+    def host = doorwayEprUrl.replaceFirst(/^https?:\/\//, '')
     for (bundle in bundles) {
-        echo "stageSpaBlobs: distDir='${bundle.distDir}' slug='${bundle.slug}'"
+        def kind = bundle.kind ?: 'browser'
+        // String key (NOT a GString) so the cross-method map lookup in
+        // emitAppDeployJunit is reliable — a GString and an equal String are
+        // not interchangeable map keys in Groovy.
+        def outcomeKey = "${host}|${bundle.slug}|${kind}".toString()
+        echo "stageSpaBlobs: host='${host}' distDir='${bundle.distDir}' slug='${bundle.slug}'"
         // Per-bundle isolation (App #1560 regression). One bundle's blob/PATCH
         // failure must NOT skip the remaining bundles on this host OR the
         // remaining hosts. In #1560 the new elohim-host-landing-ssr PATCH 404'd
@@ -278,10 +284,21 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey) {
         // slug) keeps every still-publishable bundle landing; the failed slug
         // alone goes UNSTABLE (orchestrator treats UNSTABLE as success). This is
         // the PRIMARY isolation point — the caller's catchError is now a backstop.
-        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        //
+        // Visibility (Part B, 2026-06-27): a swallowed-UNSTABLE leg was
+        // INVISIBLE — a transient adam (elohim.host backend) 503 stranded the
+        // host silently for days. stage-spa-blob.sh now retries (Part A); only a
+        // PERSISTENT failure exits 1 here. We record per-(host,slug) outcomes so
+        // emitAppDeployJunit names the stale host as a junit failure instead of
+        // a buried UNSTABLE. Mirrors the edge emitDeployJunit outcome gate.
+        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE',
+                   message: "deploy ${host} ${bundle.slug} (${kind}): SPA-blob stage failed after retries — host left STALE; see junit testcase") {
             withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=${doPatch}"]) {
-                sh "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '${bundle.distDir}' '${bundle.slug}' '${doorwayEprUrl}' '${bundle.kind ?: 'browser'}'"
+                sh "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '${bundle.distDir}' '${bundle.slug}' '${doorwayEprUrl}' '${kind}'"
             }
+            // Reached only on a clean return — catchError swallows exceptions
+            // before this line on any failure path.
+            outcomes[outcomeKey] = true
         }
     }
 }
@@ -392,15 +409,24 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey) {
     // wraps the entire host loop, so on its own a single slug's failure aborts
     // the loop before later hosts run (that was the #1560 bug). Keep the inner
     // per-bundle catchError; this one only guards non-sh throws.
+    def bundles = [
+        [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
+        [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/server",  slug: "elohim-host-landing", kind: "server"],
+        [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
+    ]
+    // Per-(host,slug) deploy outcomes → junit (Part B, 2026-06-27). UNSTABLE on
+    // a swallowed leg was invisible (the orchestrator treats UNSTABLE as
+    // success), so a stale host went unnoticed for days. emitAppDeployJunit
+    // turns a persistently-failed leg into a NAMED test failure (host + stale
+    // state) that surfaces in the test-report tab and getTestResults, while the
+    // build stays UNSTABLE (graph survives). Mirrors edge emitDeployJunit.
+    def outcomes = [:]
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
         for (int i = 0; i < doorwayEprUrls.size(); i++) {
-            stageSpaBlobs(doorwayEprUrls[i], [
-                [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
-                [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/server",  slug: "elohim-host-landing", kind: "server"],
-                [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
-            ], adminKey)
+            stageSpaBlobs(doorwayEprUrls[i], bundles, adminKey, outcomes)
         }
     }
+    emitAppDeployJunit((env.BRANCH_NAME ?: 'dev'), doorwayEprUrls, bundles, outcomes)
     // End-to-end serving seatbelt: probe the EPR-routed mounts a human
     // actually visits (verifyEprMounts). Skipped on STORAGE_URL override
     // runs — a raw storage backend has no EPR router to probe. UNSTABLE per
@@ -411,6 +437,55 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey) {
                 verifyEprMounts(doorwayEprUrls[i], ['/', '/lamad'])
             }
         }
+    }
+}
+
+// Emit a junit-style report for the per-(host,slug) SPA-blob deploy (Part B,
+// 2026-06-27). One testcase per (host, bundle) cell, classname
+// `elohim-app.deploy.<env>`. Registered via junit() so a STALE host surfaces in
+// the test-report tab + getTestResults even though the build stays UNSTABLE —
+// the orchestrator treats UNSTABLE as success, so a swallowed leg was
+// previously invisible (the per-host deploy-lag class: elohim.host stuck on an
+// old bundle while alpha advanced). A passing leg => outcomes["host|slug|kind"]
+// == true (set inside stageSpaBlobs only on clean return). Mirrors the edge
+// emitDeployJunit. Own top-level def = own CPS method; no heredoc (CPS 64KB).
+def emitAppDeployJunit(String envName, List<String> doorwayEprUrls, List<Map> bundles, Map outcomes) {
+    def safeEnv = (envName ?: 'dev').replaceAll('[^A-Za-z0-9._-]', '-')
+    def cases = []
+    doorwayEprUrls.each { url ->
+        def host = url.replaceFirst(/^https?:\/\//, '')
+        bundles.each { b ->
+            def kind = b.kind ?: 'browser'
+            cases << [name: "${host} ${b.slug} (${kind})".toString(),
+                      passed: outcomes["${host}|${b.slug}|${kind}".toString()] == true]
+        }
+    }
+    def failed = cases.count { !it.passed }
+    def lines = cases.collect { c ->
+        def attrs = "classname=\"elohim-app.deploy.${safeEnv}\" name=\"${c.name}\" time=\"0\""
+        if (c.passed) {
+            "  <testcase ${attrs}/>"
+        } else {
+            def msg = "SPA-blob deploy leg '${c.name}' failed after retries (PUT /admin/seed/blob or PATCH+verify db/content): this host is serving a STALE bundle. elohim.host's backend is the adam storage peer — a transient 503 during cluster churn is the usual cause (now retried in stage-spa-blob.sh); a persistent failure means the host backend is down. Re-run the App pipeline, or check the host storage /health."
+            msg = msg.replace('&', '&amp;').replace('<', '&lt;').replace('"', '&quot;')
+            "  <testcase ${attrs}><failure message=\"${msg}\" type=\"spa-blob-stale\"/></testcase>"
+        }
+    }
+    def xml = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        "<testsuite name=\"elohim-app.deploy.${safeEnv}\" tests=\"${cases.size()}\" failures=\"${failed}\">",
+        lines.join('\n'),
+        '</testsuite>',
+    ].join('\n')
+    def reportFile = "deploy-app-${safeEnv}-junit.xml"
+    writeFile(file: reportFile, text: xml)
+    archiveArtifacts(artifacts: reportFile, allowEmptyArchive: true)
+    junit(testResults: reportFile, allowEmptyResults: true)
+    def passed = cases.size() - failed
+    echo "App SPA-blob deploy for ${safeEnv}: ${passed}/${cases.size()} (host,bundle) legs landed"
+    if (failed > 0) {
+        def stale = cases.findAll { !it.passed }.collect { it.name }.join('; ')
+        echo "App deploy partial failure: ${failed}/${cases.size()} legs STALE — ${stale}. Build UNSTABLE (test shape); orchestrator proceeds. Named host(s) are serving stale bundles."
     }
 }
 

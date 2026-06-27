@@ -10,6 +10,7 @@
 #   kind: "browser" (default) or "server"
 # Env:   STORAGE_API_KEY_ADMIN  admin key for the PATCH+verify step
 #        DO_PATCH               "1" to PATCH+verify, anything else skips (WARN)
+#        STAGE_BLOB_ATTEMPTS    max attempts per leg (default 3)
 set -euo pipefail
 
 DIST_DIR="$1"
@@ -17,6 +18,7 @@ SLUG="$2"
 DOORWAY_EPR_URL="$3"
 KIND="${4:-browser}"
 DO_PATCH="${DO_PATCH:-0}"
+ATTEMPTS="${STAGE_BLOB_ATTEMPTS:-3}"
 
 cd "${DIST_DIR}"
 
@@ -33,36 +35,15 @@ if [ "$KIND" = "browser" ]; then
     fi
 fi
 
+# Local + deterministic — done ONCE, not retried (a zip/sha failure is not a
+# transient network blip and re-zipping yields the identical content-addressed
+# hash anyway).
 zip -r spa-bundle.zip .
 SPA_HASH="sha256-$(sha256sum spa-bundle.zip | awk '{print $1}')"
 SPA_SIZE="$(du -h spa-bundle.zip | cut -f1)"
 echo "[${SLUG}] blob hash: ${SPA_HASH}"
 echo "[${SLUG}] blob size: ${SPA_SIZE}"
 
-# 1. Upload ZIP as blob via doorway's seed-blob route.
-#
-# Why /admin/seed/blob and not /blob/{hash}: doorway's forward_blob_to_storage
-# (storage_proxy.rs) is a read-through cache that hardcodes client.get() — PUT
-# requests get silently downgraded to GET, storage returns 404 on the
-# not-yet-uploaded hash, the build fails with curl exit 22.
-#
-# /admin/seed/blob is the seeder's write-through path: doorway validates the
-# X-Blob-Hash header, caches locally, then server-side forwards PUT
-# /blob/{hash} to elohim-storage. (Preserves dev fix f853fb665 across the B21
-# multi-bundle rewrite.)
-curl -fSs -X PUT \
-    -H 'Content-Type: application/zip' \
-    -H "X-Blob-Hash: ${SPA_HASH}" \
-    --data-binary @spa-bundle.zip \
-    "${DOORWAY_EPR_URL}/admin/seed/blob"
-echo "  ✓ [${SLUG}] blob uploaded (via /admin/seed/blob)"
-
-# 2. Link blob to the content row (PATCH+verify) — only when admin key present.
-# Regression seatbelt (PATCH path only): after each PATCH, GET the row and
-# assert the hash field matches the SHA just written. set -euo pipefail +
-# curl -fSs (no || echo swallow) means any 4xx/5xx FAILS the build — surfacing
-# silent CI/storage drift as a red build instead of a stuck production surface.
-#
 # Field-by-kind (SSR row collapse): KIND=server PATCHes/reads serverBlobHash on
 # the ONE elohim-host-landing EPR node (not a separate -ssr row); KIND=browser
 # stays blobHash. Both ride db/content/{slug} with identical partial-update
@@ -72,28 +53,74 @@ if [ "$KIND" = "server" ]; then
 else
     HASH_FIELD="blobHash"
 fi
-if [ "${DO_PATCH}" = "1" ]; then
-    curl -fSs -X PATCH \
-        -H 'Content-Type: application/json' \
-        -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
-        -d "{\"${HASH_FIELD}\":\"${SPA_HASH}\"}" \
-        "${DOORWAY_EPR_URL}/db/content/${SLUG}" \
-        >/dev/null
-    echo "  ✓ patched ${SLUG} (${HASH_FIELD})"
 
-    ACTUAL=$(curl -fSs "${DOORWAY_EPR_URL}/db/content/${SLUG}" \
-        | HASH_FIELD="${HASH_FIELD}" python3 -c "import os, sys, json; print(json.load(sys.stdin).get(os.environ['HASH_FIELD'],''))")
-    if [ "${ACTUAL}" != "${SPA_HASH}" ]; then
-        echo "ERROR: ${SLUG} ${HASH_FIELD} drifted after PATCH" >&2
-        echo "  expected: ${SPA_HASH}" >&2
-        echo "  actual:   ${ACTUAL}" >&2
+# One PUT + (optional) PATCH+verify attempt. Returns non-zero on ANY failure
+# WITHOUT exiting the script: stage_once is invoked in an `if` condition, so
+# bash suspends `set -e` inside its body — each network op carries an explicit
+# `|| return 1`, letting the retry loop below catch transient failures.
+#
+# 1. Upload ZIP as blob via doorway's seed-blob route.
+#    Why /admin/seed/blob and not /blob/{hash}: doorway's forward_blob_to_storage
+#    (storage_proxy.rs) is a read-through cache that hardcodes client.get() — PUT
+#    requests get silently downgraded to GET, storage returns 404 on the
+#    not-yet-uploaded hash, the build fails with curl exit 22. /admin/seed/blob
+#    is the seeder's write-through path (preserves dev fix f853fb665).
+# 2. Link blob to the content row (PATCH+verify) — only when admin key present.
+#    Seatbelt: after each PATCH, GET the row and assert the hash field matches
+#    the SHA just written; a drift returns non-zero (→ retried, then NAMED).
+stage_once() {
+    curl -fSs -X PUT \
+        -H 'Content-Type: application/zip' \
+        -H "X-Blob-Hash: ${SPA_HASH}" \
+        --data-binary @spa-bundle.zip \
+        "${DOORWAY_EPR_URL}/admin/seed/blob" || return 1
+    echo "  ✓ [${SLUG}] blob uploaded (via /admin/seed/blob)"
+
+    if [ "${DO_PATCH}" = "1" ]; then
+        curl -fSs -X PATCH \
+            -H 'Content-Type: application/json' \
+            -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
+            -d "{\"${HASH_FIELD}\":\"${SPA_HASH}\"}" \
+            "${DOORWAY_EPR_URL}/db/content/${SLUG}" \
+            >/dev/null || return 1
+        echo "  ✓ patched ${SLUG} (${HASH_FIELD})"
+
+        local actual
+        actual=$(curl -fSs "${DOORWAY_EPR_URL}/db/content/${SLUG}" \
+            | HASH_FIELD="${HASH_FIELD}" python3 -c "import os, sys, json; print(json.load(sys.stdin).get(os.environ['HASH_FIELD'],''))") || return 1
+        if [ "${actual}" != "${SPA_HASH}" ]; then
+            echo "  ✗ [${SLUG}] ${HASH_FIELD} drift after PATCH: expected ${SPA_HASH}, got ${actual:-<empty>}" >&2
+            return 1
+        fi
+        echo "  ✓ verified ${SLUG} ${HASH_FIELD} = ${SPA_HASH}"
+    else
+        echo "  ⊘ WARN: skipping PATCH+verify for ${SLUG} — no admin credential available"
+        echo "    content row retains seed-time ${HASH_FIELD}"
+        echo "    blob bytes uploaded and content-addressable via PUT /blob/${SPA_HASH}"
+    fi
+    return 0
+}
+
+# Bounded retry (Part A, 2026-06-27). elohim.host's storage backend is the adam
+# peer, which 503s transiently during cluster churn; a single attempt turned
+# every transient blip into a swallowed-UNSTABLE STALE host (the per-host
+# deploy-lag class). Retry with linear backoff. Only a PERSISTENT failure exits
+# non-zero — which the Jenkinsfile's per-(host,slug) catchError converts into a
+# NAMED junit failure (Part B) instead of a buried UNSTABLE.
+attempt=1
+while true; do
+    if stage_once; then
+        break
+    fi
+    if [ "${attempt}" -ge "${ATTEMPTS}" ]; then
+        echo "ERROR: [${SLUG}] stage failed after ${ATTEMPTS} attempt(s) against ${DOORWAY_EPR_URL} — host left STALE" >&2
+        rm -f spa-bundle.zip
         exit 1
     fi
-    echo "  ✓ verified ${SLUG} ${HASH_FIELD} = ${SPA_HASH}"
-else
-    echo "  ⊘ WARN: skipping PATCH+verify for ${SLUG} — no admin credential available"
-    echo "    content row retains seed-time ${HASH_FIELD}"
-    echo "    blob bytes uploaded and content-addressable via PUT /blob/${SPA_HASH}"
-fi
+    backoff=$(( attempt * 5 ))
+    echo "  ⚠ [${SLUG}] attempt ${attempt}/${ATTEMPTS} against ${DOORWAY_EPR_URL} failed — retrying in ${backoff}s" >&2
+    attempt=$(( attempt + 1 ))
+    sleep "${backoff}"
+done
 
 rm -f spa-bundle.zip
