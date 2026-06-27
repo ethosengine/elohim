@@ -230,6 +230,16 @@ pub struct Config {
     /// broadcast and the salvage recheck sweep. Default 300s (5 min).
     #[serde(default = "default_salvage_recheck_seconds")]
     pub salvage_recheck_seconds: u64,
+
+    /// P3-8 salvage: select the diversity-aware placement strategy
+    /// (`DiversityAwarePlacementStrategy`) over the MVP `XorDistanceStrategy`
+    /// when picking salvage re-placement holders. Default **true** — the
+    /// strategy degrades EXACTLY to XOR when household data is absent (slice 1a),
+    /// so it is never worse than XOR and strictly better once households are
+    /// known; the knob lets ops roll back to plain XOR deliberately.
+    /// Loaded from env `SALVAGE_DIVERSITY_PLACEMENT`.
+    #[serde(default = "default_true")]
+    pub salvage_diversity_placement: bool,
 }
 
 fn default_peer_policy_path() -> PathBuf {
@@ -348,6 +358,7 @@ impl Default for Config {
             salvage_capacity_enabled: false,
             salvage_target_replicas: default_salvage_target_replicas(),
             salvage_recheck_seconds: default_salvage_recheck_seconds(),
+            salvage_diversity_placement: default_true(),
         }
     }
 }
@@ -427,6 +438,13 @@ mod transport_backend_tests {
     fn defaults_to_libp2p() {
         let cfg = super::Config::default();
         assert_eq!(cfg.transport_backend, TransportBackend::Libp2p);
+    }
+
+    #[test]
+    fn salvage_diversity_placement_defaults_on() {
+        // P3-8: the diversity strategy degrades exactly to XOR without household
+        // data, so the knob ships ON; a flipped default must not pass silently.
+        assert!(super::Config::default().salvage_diversity_placement);
     }
 
     #[test]

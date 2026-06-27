@@ -415,6 +415,14 @@ async fn async_main(
             config.salvage_recheck_seconds = n;
         }
     }
+    // P3-8: diversity-aware salvage placement (default ON; never worse than XOR).
+    // Case-insensitive so `True`/`On`/`Yes` aren't silently read as OFF.
+    if let Ok(v) = std::env::var("SALVAGE_DIVERSITY_PLACEMENT") {
+        config.salvage_diversity_placement = matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        );
+    }
 
     // Iroh parallel-stack toggle (see plan
     // genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md).
@@ -1538,6 +1546,7 @@ async fn async_main(
                         let salvage_target_replicas = config.salvage_target_replicas;
                         let salvage_freshness = config.inventory_freshness_seconds;
                         let salvage_recheck_seconds = config.salvage_recheck_seconds.max(1);
+                        let salvage_diversity = config.salvage_diversity_placement;
                         let mut salvage_shutdown = shutdown_tx.subscribe();
                         tokio::spawn(async move {
                             use tokio::time::{interval, Duration, MissedTickBehavior};
@@ -1556,10 +1565,23 @@ async fn async_main(
                                         match elohim_storage::services::salvage_commitment_author::run_salvage_pass(
                                             &mut conn,
                                             &salvage_self_cid,
+                                            // Humans-join scope. "lamad" MIRRORS the ingest
+                                            // selector (distribute_shards(.., "lamad")), NOT
+                                            // `args.app_id` ("elohim", which would empty the join
+                                            // harder). Honest caveat: household-bearing humans rows
+                                            // are written under h_app_id="imagodei", so "lamad"
+                                            // reads no household rows in prod today and salvage
+                                            // degrades to XOR — a dormancy SHARED with ingest +
+                                            // the resilience card, fixed by substrate-wide scope
+                                            // reconciliation (backlog: resilience-card-membership-
+                                            // humans-projection-gap-2026-06-19), not here. See the
+                                            // run_salvage_pass rustdoc.
+                                            "lamad",
                                             salvage_author.as_ref(),
                                             true, // enabled (gated by the match arm above)
                                             salvage_target_replicas,
                                             salvage_freshness,
+                                            salvage_diversity,
                                             chrono::Utc::now(),
                                         ) {
                                             Ok(outcome) => {
