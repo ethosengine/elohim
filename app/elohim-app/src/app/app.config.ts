@@ -36,6 +36,8 @@ import {
 } from '@app/lamad/interfaces/cross-pillar.interface';
 import { LAMAD_AGENT } from '@app/lamad/interfaces/agent.interface';
 import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '@app/lamad/interfaces/storage.interface';
+import { LEARNER_BACKEND } from '@app/lamad/interfaces/learner-backend.interface';
+import { LearnerBackendApiService } from '@app/lamad/services/learner-backend-api.service';
 import { ECONOMIC_EVENT_FACTORY, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
 import { BUNDLE_ROUTE_CONTEXT, type BundleRouteContext } from '@elohim/service';
 import { EconomicEventsApiService } from './shefa/services/economic-events-api.service';
@@ -168,6 +170,14 @@ export const appConfig: ApplicationConfig = {
     // edit/reach-negotiation surfaces) injects this token. ContextAssemblyService is
     // providedIn:'root' in @app/elohim and pulls only concrete root services.
     { provide: LAMAD_CONTEXT_ASSEMBLY, useExisting: ContextAssemblyService },
+    // LEARNER_BACKEND — the markdown-renderer (and sophia-renderer) injects PathService,
+    // which reaches ContentMasteryService/PointsService/PracticeService; all three inject the
+    // lamad-local LEARNER_BACKEND token. That token carries NO providedIn factory (lamad's
+    // app.config supplies the concrete class), so the shell injector must provide it too or the
+    // viewer chain throws NullInjectorError and content never renders. LearnerBackendApiService
+    // is providedIn:'root' and injects only HttpClient; useExisting bridges to that root instance
+    // (mirrors app/lamad/src/app/app.config.ts).
+    { provide: LEARNER_BACKEND, useExisting: LearnerBackendApiService },
     // AGENT_CONTEXT (rea-runtime) — AttentionTrackerService injects this token and is
     // injected directly by content-viewer.component. AgentService satisfies
     // IAgentContext via getCurrentAgentId() (mirrors lamad app.config.ts).
