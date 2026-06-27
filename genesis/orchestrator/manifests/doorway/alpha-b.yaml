@@ -146,6 +146,13 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
+            # DEV_MODE: A-to-B federation comms are in active dev scope
+            # (operator decision 2026-06-27). Opens the seed/admin gate
+            # like doorway-A (alpha-elohim-host) so the CI admin key
+            # lands the SPA blob without a per-host credential. Remove
+            # when doorway-B federation auth hardens. Sibling: alpha.yaml.
+            - name: DEV_MODE
+              value: "true"
             - name: RUST_LOG
               value: "info,doorway=debug"
             - name: PROJECTION_WRITER
