@@ -138,6 +138,9 @@ def validate_meta(cfg: dict) -> list[str]:
         return ["`.epr-meta` is not a mapping"]
     if cfg.get("epr-meta-version") != 1:
         errs.append("missing/invalid `epr-meta-version` (must be 1)")
+    if "covers" in cfg and cfg["covers"] not in ("subtree", "dir-only"):
+        errs.append(f"`covers` value `{cfg['covers']}` not in ('subtree', 'dir-only') "
+                    f"— a typo here would silently leave the subtree unclaimed")
     for i, rule in enumerate(cfg.get("rules", []) or []):
         if not isinstance(rule, dict):
             errs.append(f"rules[{i}] is not a mapping"); continue
@@ -284,3 +287,187 @@ def combine(verdicts: list[Verdict]) -> Verdict | None:
     if not blocking:
         return None
     return max(blocking, key=lambda v: _SEVERITY[v.cls])
+
+
+# ── Subtree-coverage walk: the `.epr-meta` self-responsibility claim + the deterministic coverage
+# signal that placement-audit.py reads as a stasis dimension (the downward dual of claude-md-audit's
+# missing-CLAUDE.md census). An `.epr-meta` that declares `covers: subtree` is FULLY RESPONSIBLE for
+# everything beneath it — the walk terminates there (integrity by construction; a claimed subtree's
+# internals are never re-audited, exactly as the core never re-validates an app-manifest's vocabulary).
+# A structurally-substantial directory reached with no such covering ancestor is an unclaimed GAP. ──
+DEFAULT_COMPLEXITY_EXTS = {
+    ".ts", ".tsx", ".js", ".jsx", ".mjs", ".py", ".rs", ".go", ".java", ".rb",
+    ".html", ".scss", ".css", ".vue", ".svelte", ".feature", ".sql", ".graphql", ".proto",
+}
+# Directories the walk never descends into (build output, vendored, VCS, agent worktrees). The
+# `.claude/worktrees/wf_*` trees carry shadow `.epr-meta` files that must NOT count as governance.
+DEFAULT_SKIP_DIRS = {
+    ".git", "node_modules", "target", "dist", "build", ".angular", ".pnpm-store", "__pycache__",
+    ".cargo", ".venv", "venv", ".next", "coverage", "worktrees", ".worktrees", ".pytest_cache",
+}
+
+
+def claims_subtree(cfg: dict) -> bool:
+    """True iff this manifest declares full responsibility for its subtree (`covers: subtree`).
+    The self-contained coverage-walk terminator — the downward dual of `root: true` (which stops the
+    upward cascade). Opt-in by design: an incidental manifest (a `ci-trigger` config, one local rule)
+    does NOT claim its subtree, so the repo-root manifest never trivially 'covers' the whole tree."""
+    return isinstance(cfg, dict) and cfg.get("covers") == "subtree"
+
+
+def _is_substantial(n_files: int, n_subdirs: int, n_exts: int,
+                    min_files: int, min_subdirs: int, min_exts: int) -> bool:
+    """A directory worth a governance decision: enough direct files OR subdirs to be architecturally
+    real, AND enough distinct complexity-extensions that it isn't pure data/assets. Mirrors
+    claude-md-audit's MISSING_TUNABLES substantiality predicate."""
+    return (n_files >= min_files or n_subdirs >= min_subdirs) and n_exts >= min_exts
+
+
+def subtree_coverage(root: Path, *, min_files: int = 15, min_subdirs: int = 4, min_exts: int = 1,
+                     complexity_exts=DEFAULT_COMPLEXITY_EXTS, skip_dirs=DEFAULT_SKIP_DIRS,
+                     exclude_globs=()) -> dict:
+    """Walk the file graph under `root`; classify each region as COVERED (claimed by a *valid*
+    `covers: subtree` manifest) or a GAP (structurally-substantial, no covering ancestor). Both
+    claim-points and gap-roots TERMINATE descent — one manifest at the right altitude resolves a whole
+    subtree, so nested substantial dirs are never double-counted. Deliberate v1 simplification: a
+    `covers` claim placed *below* a gap-root is NOT reached, so the gap-root counts AGAINST the ratio
+    until a claim is declared at/above it (ownership is altitude-first, not leaf-first). The repo root is
+    never itself a gap (mirrors claude-md-audit). `min_exts` defaults to 1 (NOT claude-md's 2): a
+    single-language code dir is a prime governance target here. Returns {covered, gaps, covered_count,
+    gap_count, ratio}; ratio = covered / (covered + gaps), and 1.0 when there is nothing governable."""
+    root = root.resolve()
+    covered: list[str] = []
+    gaps: list[dict] = []
+
+    def rel(d: Path) -> str:
+        return d.relative_to(root).as_posix()
+
+    def excluded(d: Path) -> bool:
+        r = rel(d)
+        return any(fnmatch.fnmatch(r, g) or fnmatch.fnmatch(r + "/", g) for g in exclude_globs)
+
+    def visit(d: Path, is_root: bool):
+        meta = d / MANIFEST_NAME
+        if meta.is_file():
+            cfg = load_meta(meta)
+            # only a VALID claim owns the subtree — a schema-invalid manifest the resolver would reject
+            # must NOT be credited as coverage (else the census and the enforcing resolver disagree, and a
+            # broken/unenforced manifest inflates the ratio + hides a real gap).
+            if claims_subtree(cfg) and not validate_meta(cfg):
+                covered.append(rel(d))
+                return  # fully responsible — terminate
+        try:
+            entries = list(d.iterdir())
+        except OSError:
+            return
+        # not c.is_symlink(): never follow a symlinked dir — it would double-count a target reached two
+        # ways and could pull a dir OUTSIDE root into the census under an in-root relpath.
+        subdirs = [c for c in entries if c.is_dir() and not c.is_symlink()
+                   and c.name not in skip_dirs and not excluded(c)]
+        if not is_root:  # the repo root is never itself a gap
+            files = [c for c in entries if c.is_file() and c.name != MANIFEST_NAME]
+            exts = {c.suffix for c in files if c.suffix in complexity_exts}
+            if _is_substantial(len(files), len(subdirs), len(exts), min_files, min_subdirs, min_exts):
+                gaps.append({"path": rel(d), "files": len(files),
+                             "subdirs": len(subdirs), "exts": sorted(exts)})
+                return  # gap-root — a claim at/above here resolves it; don't descend
+        for c in sorted(subdirs):
+            visit(c, False)
+
+    visit(root, True)
+    denom = len(covered) + len(gaps)
+    return {"covered": covered, "gaps": gaps, "covered_count": len(covered),
+            "gap_count": len(gaps), "ratio": 1.0 if denom == 0 else len(covered) / denom}
+
+
+def _dir_is_substantial(d: Path, min_files: int, min_subdirs: int, min_exts: int,
+                        complexity_exts, skip_dirs) -> bool:
+    """Substantiality of ONE directory (the per-edit ascending check's unit; same predicate the
+    descending walk applies to a candidate region)."""
+    try:
+        entries = list(d.iterdir())
+    except OSError:
+        return False
+    subdirs = [c for c in entries if c.is_dir() and not c.is_symlink() and c.name not in skip_dirs]
+    files = [c for c in entries if c.is_file() and c.name != MANIFEST_NAME]
+    exts = {c.suffix for c in files if c.suffix in complexity_exts}
+    return _is_substantial(len(files), len(subdirs), len(exts), min_files, min_subdirs, min_exts)
+
+
+def coverage_advice(target: Path, *, repo_root: Path = None, min_files: int = 15, min_subdirs: int = 4,
+                    min_exts: int = 1, complexity_exts=DEFAULT_COMPLEXITY_EXTS,
+                    skip_dirs=DEFAULT_SKIP_DIRS, exclude_globs=()) -> dict | None:
+    """The ASCENDING dual of `subtree_coverage`, for the in-flight signal: given a single edited
+    `target`, is it inside an UNCLAIMED substantial region? Walks ancestors from the target's dir up
+    to the repo root (bounded). Returns None if any valid `covers: subtree` ancestor already owns it
+    (claimed) OR if no substantial ancestor exists (nothing to govern — no nag). Otherwise returns
+    {gap_root, covered: False} where gap_root is the SHALLOWEST substantial ancestor — the same
+    altitude the `--epr-meta` census reports, so the in-flight nudge and the queue agree on WHERE to
+    author the manifest. The repo root itself is never a gap-root."""
+    target = target.resolve()
+    start = target.parent if (target.is_file() or not target.exists()) else target
+    root = (repo_root or find_repo_root(start)).resolve()
+
+    def excluded(d: Path) -> bool:
+        try:
+            r = d.relative_to(root).as_posix()
+        except ValueError:
+            return True
+        return any(fnmatch.fnmatch(r, g) or fnmatch.fnmatch(r + "/", g) for g in exclude_globs)
+
+    chain: list[Path] = []
+    here, depth = start, 0
+    while depth < MAX_CASCADE_DEPTH:
+        chain.append(here)
+        meta = here / MANIFEST_NAME
+        if meta.is_file():
+            cfg = load_meta(meta)
+            if claims_subtree(cfg) and not validate_meta(cfg):
+                return None  # already inside a valid claimed subtree
+        if here == root or here.parent == here:
+            break
+        here = here.parent
+        depth += 1
+
+    for d in reversed(chain):  # root-first → first substantial is the shallowest (the gap-root)
+        if d == root or d.name in skip_dirs or excluded(d):
+            continue
+        if _dir_is_substantial(d, min_files, min_subdirs, min_exts, complexity_exts, skip_dirs):
+            return {"gap_root": d.relative_to(root).as_posix(), "covered": False}
+    return None
+
+
+def governance_cfg(repo_root: Path) -> dict:
+    """The SINGLE config source for epr-meta coverage — coverage tunables + the exclusion globs
+    (git submodules, auto-discovered, PLUS the yaml `epr_meta_governance.exclude` list). Shared by the
+    descending census (`placement-audit.py --epr-meta`) and the ascending in-flight nudge (the resolver
+    hook) so the two can never disagree about which dirs are governable. Fail-open to code defaults if
+    `.gitmodules` / PyYAML / the yaml block is absent. Returns {min_files, min_subdirs, min_exts,
+    exclude_globs}."""
+    repo_root = Path(repo_root)
+    cfg = {"min_files": 15, "min_subdirs": 4, "min_exts": 1, "exclude_globs": []}
+    ex: list[str] = []
+    gm = repo_root / ".gitmodules"
+    if gm.is_file():
+        try:
+            for ln in gm.read_text().splitlines():
+                ln = ln.strip()
+                if ln.startswith("path") and "=" in ln:
+                    p = ln.split("=", 1)[1].strip()
+                    if p:
+                        ex += [p, p + "/**"]
+        except OSError:
+            pass
+    if yaml is not None:
+        try:
+            data = yaml.safe_load((repo_root / ".claude/memory-kit/context-coverage.yaml").read_text()) or {}
+            blk = data.get("epr_meta_governance", {}) or {}
+            for k in ("min_files", "min_subdirs", "min_exts"):
+                if isinstance(blk.get(k), int):
+                    cfg[k] = blk[k]
+            if isinstance(blk.get("exclude"), list):
+                ex += [str(x) for x in blk["exclude"]]
+        except Exception:  # noqa: BLE001
+            pass
+    cfg["exclude_globs"] = ex
+    return cfg

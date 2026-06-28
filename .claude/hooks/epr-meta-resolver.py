@@ -4,6 +4,7 @@
 Fail-open: a guard bug never blocks dev."""
 import json
 import sys
+import time
 from pathlib import Path
 
 # --- _lib bootstrap (clone of managed-surface-context.py:26-32) ---
@@ -15,6 +16,12 @@ for _ in range(8):
     _here = _here.parent
 
 from _lib import epr_meta  # noqa: E402
+from _lib import store  # noqa: E402
+
+# Re-nudge a given gap-root at most once per ~working session, so the in-flight coverage signal
+# INFORMS the agent-with-context without nagging every edit (the minimalism principle, applied to
+# the nudge itself). Tunable; the gap self-closes the moment a `covers: subtree` manifest is authored.
+_ADVICE_WINDOW = 4 * 3600
 
 
 def _emit_deny(reason: str):
@@ -35,6 +42,40 @@ def _emit_advise(text: str):
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse", "additionalContext": text}}))
     sys.exit(0)
+
+
+def _coverage_nudge(target: Path):
+    """The IN-FLIGHT coverage signal: if `target` sits inside an UNCLAIMED substantial region, return a
+    debounced advisory pointing the agent — who has the live context RIGHT NOW — at the gap-root to
+    govern. This is the prevention-shaped, context-rich remediation path (vs a blind external sweep):
+    the best `.epr-meta` is written by whoever is already intimately in the directory. None if the
+    region is already owned, not substantial, or recently advised. Fail-open: any error → no nudge."""
+    try:
+        root = epr_meta.find_repo_root(target)
+        cfg = epr_meta.governance_cfg(root)
+        adv = epr_meta.coverage_advice(
+            target, repo_root=root, min_files=cfg["min_files"], min_subdirs=cfg["min_subdirs"],
+            min_exts=cfg["min_exts"], exclude_globs=cfg["exclude_globs"])
+        if not adv:
+            return None
+        gap = adv["gap_root"]
+        state_p = root / ".claude/data/epr-meta-advice.json"
+        seen = store.load_json(state_p, {}) or {}
+        now = time.time()
+        last = seen.get(gap, 0)
+        if isinstance(last, (int, float)) and (now - last) < _ADVICE_WINDOW:
+            return None  # debounced — already nudged for this region this session
+        seen[gap] = now
+        store.save_json(state_p, seen)
+        return (f"[.epr-meta coverage] You're working in `{gap}` — a substantial directory with no "
+                f"governance ownership (no `covers: subtree` .epr-meta above it). You have the live "
+                f"context NOW: consider authoring `{gap}/.epr-meta` declaring `covers: subtree` — a real "
+                f"rule if there's a recurring, mechanizable drift here, else rules-free with a `why:` "
+                f"recording the considered 'no edit-time gate needed' decision. See the "
+                f"`elohim-epr-metafile` skill. (In-flight remediation; full queue: "
+                f"`placement-audit.py --epr-meta`.)")
+    except Exception:  # noqa: BLE001 — the nudge is advisory; never let it block or crash the hook
+        return None
 
 
 def main():
@@ -65,15 +106,24 @@ def main():
         except Exception:
             content = None
 
+    # IN-FLIGHT COVERAGE SIGNAL — independent of the rule cascade. Authoring an .epr-meta is itself
+    # never nudged (you're already governing). Computed up-front so it can fire even when there is no
+    # cascade at all (the most common gap: a wholly-ungoverned substantial region).
+    cov_nudge = None if target.name == epr_meta.MANIFEST_NAME else _coverage_nudge(target)
+
     chain = epr_meta.collect_cascade(target)
     if not chain:
-        sys.exit(0)  # no governance here
+        if cov_nudge:
+            _emit_advise(cov_nudge)  # the empty-chair: "no governance here" → deliver the signal
+        sys.exit(0)
 
     if not epr_meta.yaml_available():
         _emit_advise("[.epr-meta] PyYAML unavailable — compose-gate rules NOT enforced for this "
                      "write. Install PyYAML to re-enable the gate. (failing open, not silent.)")
 
     advisories = []
+    if cov_nudge:  # a governed-but-unclaimed region: the nudge rides along with any rule advisories
+        advisories.append(cov_nudge)
 
     # Strict-but-recoverable governance: a MALFORMED .epr-meta in the cascade must NOT hard-deny the
     # whole subtree (which would brick authoring — including the fix itself). Instead:
