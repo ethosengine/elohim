@@ -1,14 +1,18 @@
 ---
 title: Lens version DAG + EPR→policy dependency-declaration (which HEAD applies is declared, not inferred)
 created: 2026-06-27
-status: OPEN
+status: SPECCED
 domain: D7-collective-governance
 source: code-review of the plural-Mishpat lens-market slice (PR4 disposition) + architect design direction
 severity: medium
-needs: p2p-design-gate
+spec: genesis/docs/superpowers/specs/2026-06-27-lens-version-dag-epr-policy-dependency-design.md
 ---
 
-**Design seed — NOT yet specced. The proper next step is a `p2p-design-gate`'d brainstorm → spec.**
+**SPECCED 2026-06-27** — design sealed (p2p-design-gate passed) in
+`genesis/docs/superpowers/specs/2026-06-27-lens-version-dag-epr-policy-dependency-design.md`. This file now
+tracks the *implementation* (the spec's §5 V1–V4 phases); the spec is the design of record. Below is the
+captured rationale that seeded it.
+
 Captured 2026-06-27 from the lens-market code review (finding #3: `version_parent` stored but never
 consumed → v1 and v2 of one school both surface, splitting its standing) and the architect's reframing of
 how supersession *should* work.
