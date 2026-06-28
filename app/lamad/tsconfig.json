@@ -41,7 +41,18 @@
       "@elohim/storage-client/wire-types/*": ["../elohim-app/node_modules/@elohim/storage-client/dist/wire-types/*/index"],
       "@elohim/storage-client/graphql": ["../elohim-app/node_modules/@elohim/storage-client/dist/graphql/index"],
       "@holochain/client": ["../elohim-app/node_modules/@holochain/client"],
-      "@holochain/client/*": ["../elohim-app/node_modules/@holochain/client/*"]
+      "@holochain/client/*": ["../elohim-app/node_modules/@holochain/client/*"],
+      // Force automerge's base64 browser entry (mirrors elohim-app/tsconfig.json).
+      // Its default `browser` export is the wasm-bindgen "bundler" entry which
+      // Angular's esbuild builder rejects in Zone.js apps; the base64 entry
+      // inlines the wasm via atob so it bundles cleanly. Required here because
+      // the lamad bundle now pulls in @elohim/service's ContentDocSyncService
+      // (which references @elohim/storage-client's AutomergeSync). NOTE: bypasses
+      // automerge's package `exports` (hardcodes a dist path) — revisit on
+      // automerge upgrades. See the content-sync-plane plan (Task G7a/G7c).
+      "@automerge/automerge": [
+        "../../node_modules/@automerge/automerge/dist/mjs/entrypoints/fullfat_base64.js"
+      ]
     },
     "outDir": "./dist/out-tsc",
     "strict": true,
