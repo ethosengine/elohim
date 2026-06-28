@@ -134,10 +134,15 @@ pub fn spawn_content_projection_listener(
     })
 }
 
-/// The sync-partition namespace. MUST equal the `h_app_id` listed by
-/// `initiate_sync_round` (p2p/mod.rs:6996). Changing one without the other
-/// silently disables content sync. (Promoted to a named const in Task G4;
-/// guarded by `projection_namespace_matches_sync_timer`.)
+/// The sync-partition namespace — the single source of truth for the `h_app_id`
+/// that partitions content sync. BOTH sides reference this const: the producer
+/// (`project_content_doc`, below) writes docs under it, and the consumer
+/// (`initiate_sync_round` in p2p/mod.rs) lists documents under it. Because both
+/// reference the const directly, producer/consumer drift is now compile-impossible
+/// (each used to carry a bare `"elohim"` literal — a silent content-sync killer if
+/// either drifted). The remaining invariant — the wire value stays `"elohim"`
+/// unless every peer + the DNA migrate in lockstep — is pinned by
+/// `projection_namespace_is_wire_contract`.
 pub const PROJECTION_NAMESPACE: &str = "elohim";
 
 #[cfg(test)]
@@ -212,14 +217,22 @@ mod tests {
         assert_eq!(super::content_doc_id("edit-prop-1"), "node:edit-prop-1");
     }
 
-    /// Guard the load-bearing namespace coupling. `initiate_sync_round`
-    /// (p2p/mod.rs:6996) lists ONLY `"elohim"`. If that constant and the
-    /// producer ever diverge, content sync silently dies — this test fails loudly
-    /// if `PROJECTION_NAMESPACE` drifts from the sync-timer's `h_app_id`.
+    /// Pin the on-the-wire sync namespace. Producer/consumer drift is now
+    /// compile-enforced — `initiate_sync_round` (p2p/mod.rs) and
+    /// `project_content_doc` both reference `PROJECTION_NAMESPACE` directly, so
+    /// neither can silently diverge. (The previous version of this test compared
+    /// a LOCAL COPY of the `"elohim"` literal to the const and so guarded nothing:
+    /// renaming the sync-timer's `h_app_id` would have passed while killing content
+    /// sync fleet-wide.) What remains to guard is the WIRE VALUE: remote peers and
+    /// the DNA expect `"elohim"`. Changing the const moves both sides coherently
+    /// but alters the wire protocol — this fails loudly so that change is deliberate
+    /// and coordinated, never an incidental rename.
     #[test]
-    fn projection_namespace_matches_sync_timer() {
-        // Mirror of the literal hardcoded at p2p/mod.rs:6996 (initiate_sync_round).
-        const PROJECTION_NS: &str = "elohim";
-        assert_eq!(PROJECTION_NS, super::PROJECTION_NAMESPACE);
+    fn projection_namespace_is_wire_contract() {
+        assert_eq!(
+            super::PROJECTION_NAMESPACE,
+            "elohim",
+            "sync-partition namespace is a wire contract with every peer + the DNA"
+        );
     }
 }

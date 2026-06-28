@@ -6993,7 +6993,12 @@ impl P2PNode {
 
         for peer_id in peers {
             let request = SyncRequest::ListDocuments {
-                h_app_id: "elohim".to_string(),
+                // Single source of truth for the sync-partition namespace: the
+                // producer (`sync::projector::project_content_doc`) writes docs
+                // under this same const. Referencing it here (not a bare literal)
+                // makes producer/consumer drift compile-impossible — a silent
+                // content-sync killer otherwise (see PROJECTION_NAMESPACE docs).
+                h_app_id: crate::sync::projector::PROJECTION_NAMESPACE.to_string(),
                 prefix: None,
                 offset: 0,
                 limit: 1000,
