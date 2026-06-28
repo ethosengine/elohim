@@ -754,6 +754,9 @@ importers:
       '@angular/core':
         specifier: ^19.2.0
         version: 19.2.19(rxjs@7.8.2)(zone.js@0.15.1)
+      '@elohim/storage-client':
+        specifier: workspace:*
+        version: link:../../../../elohim/sdk/storage-client-ts
       '@holochain/client':
         specifier: ^0.20.0
         version: 0.20.2
