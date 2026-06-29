@@ -1,0 +1,63 @@
+---
+epr-meta-version: 1
+id: elohim-storage-src-resolution-gate
+purpose: >
+  Rust implementation of elohim-storage — HTTP handlers, EPR/blob resolution,
+  P2P dataplane, views, and service modules. One invariant is gate-enforced here:
+  any code on the EPR/blob resolution path that returns a hard "App not found" /
+  "App ZIP not available" for a known-EPR-head / missing-blob case MUST pair that
+  arm with a peer-fallback (blob_fetch::race_fetch) branch or an EPR-head-aware
+  syncing-status response — the exact shortcut that caused alpha-B to 404 on /
+  while blob bytes were present locally (2026-06-29).
+rules:
+  - id: peer-fallback-invariant
+    class: inject
+    when: { write: "*.rs", contains-any: ["App not found", "App ZIP not available"] }
+    validator: epr:validator-epr-peer-fallback
+    why: >
+      INVARIANT — peers are the store; doorways project with peer-fallback (race_fetch).
+      Code writing "App not found" or "App ZIP not available" is on the EPR/blob
+      resolution path. Any NotFound arm MUST include: (a) a peer-fallback call
+      (blob_fetch::race_fetch — already in custody_sweep, NOT yet wired at http.rs:5589/5601),
+      OR (b) an EPR-head-aware syncing-status body instead of a bare 404.
+      Root cause and fix plan (read before adding a new resolution-path NotFound arm):
+      genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md
+cites:
+  - backlog-dataplane-peer-fallback-and-blob-replication
+---
+
+# elohim/elohim-storage/src — Rust storage implementation
+
+HTTP handlers, EPR/blob resolution, P2P dataplane, views, and service modules for the
+elohim-storage Rust crate. Editing conventions are in `elohim/elohim-storage/CLAUDE.md`.
+
+## EPR/blob resolution invariant (gate-enforced)
+
+**Peers are the store; doorways are projections with peer-fallback.** The EPR/blob
+resolution path (`http.rs` app-resolution handlers, `sharding.rs`, `shard_service.rs`,
+`epr_head.rs`, `epr_service.rs`, `epr_atom_service.rs`) MUST never return a hard
+"App not found" 404 for a known-EPR-head / missing-blob case without a peer-fallback
+branch or an EPR-head-aware syncing-status response.
+
+**The shortcut lives at `http.rs:5589` and `:5601`.** The live failure it caused
+(alpha-B, 2026-06-29): the `blobHash` pointer was null while the blob bytes were
+present locally — the resolver hard-failed instead of healing from a peer.
+
+The `peer-fallback-invariant` inject rule fires as an advisory (class stays `inject`
+because `epr:validator-epr-peer-fallback` is not yet registered in v1) when any `.rs`
+write in this directory contains "App not found" or "App ZIP not available". It catches
+reintroduction of the shortcut pattern at edit time without blocking legitimate edits.
+
+**The fix** (`race_fetch`): `blob_fetch::race_fetch` already exists and is used in
+`custody_sweep`. It is NOT yet wired into the on-demand resolution path at `http.rs:5589/5601`.
+That is the gap. See the backlog item for the full three-part fix plan (pointer propagation,
+heal-on-read, EPR-head-aware syncing status).
+
+See: `genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md`
+
+## Governance note
+
+This manifest records one gate-enforced invariant. No general authoring gate is
+warranted for the rest of the directory (operator WIP is active; other editing
+conventions live in `CLAUDE.md`). The inject advisory is the lightest signal that
+surfaces the lesson where the shortcut lives.
