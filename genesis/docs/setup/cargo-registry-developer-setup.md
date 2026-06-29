@@ -20,6 +20,30 @@ both. You do NOT need to modify your global cargo config.
 You only need a credential for `cargo publish`. `cargo build` and `cargo fetch`
 work anonymously against the group endpoint.
 
+## Authorization prerequisite (read this first)
+
+A valid token is necessary but **not sufficient** — your Nexus user must also
+hold the **`repository-view`** privileges (NOT `repository-admin`, which only
+governs repo *configuration*) for `cargo-internal`, minimally `add` + `read`.
+On this instance that's bundled into the **`cargo-deployer`** role; the CI user
+(`ethosenginebot`) and any human who publishes needs it on their account.
+
+How to tell auth from authorization when a publish fails:
+
+- **401** → the token itself failed (expired/invalid/wrong format).
+- **403** → the token authenticated fine, but the user lacks the
+  `cargo-internal` view privilege. Anonymous reads still return 200 because
+  anonymous has read; once you authenticate, only *your* privileges apply.
+
+Quick probe:
+
+```bash
+curl -sk -o /dev/null -w "HTTP %{http_code}\n" \
+  -H "Authorization: Bearer ${NPM_TOKEN}" \
+  https://nexus.ethosengine.com/repository/cargo-internal/config.json
+# 200 = authorized · 403 = missing cargo-deployer role · 401 = bad token
+```
+
 ## Credential setup
 
 Three options, in order of preference:
@@ -27,8 +51,9 @@ Three options, in order of preference:
 ### Option A — Use your existing Nexus npm token (preferred)
 
 If you already have `NPM_TOKEN` set (any contributor working with the existing
-Nexus instance does), the same token works for Cargo — Nexus uses the same
-user-token system across all repository formats.
+Nexus instance does), the same token works for Cargo — the npm Bearer token
+authenticates across all repository formats (verified against `cargo-internal`:
+a valid token returns 403-not-401 there until the view privilege is granted).
 
 Set `CARGO_REGISTRIES_ELOHIM_TOKEN` in your shell:
 
@@ -38,6 +63,13 @@ export CARGO_REGISTRIES_ELOHIM_TOKEN="Bearer ${NPM_TOKEN}"
 
 Persist by appending to your shell rc file. Recommended because it doesn't put
 a file on disk.
+
+> Recent cargo requires a credential provider to send a token to an
+> authenticated registry. If `cargo publish` errors with *"authenticated
+> registries require a credential-provider to be configured"*, export:
+> ```bash
+> export CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS="cargo:token"
+> ```
 
 ### Option B — File-based credentials
 
@@ -97,7 +129,9 @@ prevents accidental crates.io publishes) and the required `[package]` fields
 | Symptom | Likely cause |
 |---|---|
 | `cargo build` fails on `serde` fetch | Proxy is down; check Nexus dashboard |
-| `cargo publish` returns 401 | Token expired or not authorized for `cargo-internal` |
+| `cargo publish` returns 401 | Token expired/invalid — re-issue it |
+| `cargo publish` returns 403 | Token is valid but the user lacks `cargo-internal` view privilege — grant the `cargo-deployer` role (see Authorization prerequisite) |
+| `cargo publish` errors "authenticated registries require a credential-provider" | Export `CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS="cargo:token"` |
 | `cargo publish` returns 409 (Conflict) | Version already published; bump version |
 | Cargo fetches from `crates.io` directly | `.cargo/config.toml` not picked up; check you're in the repo |
 | `cargo search` returns 404 | Nexus's cargo plugin doesn't implement the search API endpoint; this is expected, build/fetch still work via the sparse-protocol endpoints |
