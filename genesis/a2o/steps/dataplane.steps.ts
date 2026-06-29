@@ -38,6 +38,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import {
   resolvePeerUrl,
   resolveStorageUrl,
+  getRaw,
   probeHealth,
   probeSyncDocHeads,
   probeBlob,
@@ -129,20 +130,15 @@ When(
   'I query {string} on peer {string}',
   async function (this: E2EWorld, path: string, peerName: string) {
     const baseUrl = getPeerUrl(this, peerName);
-    const { request: undiciRequest } = await import('undici');
-    const { statusCode, body } = await undiciRequest(`${baseUrl}${path}`, {
-      method: 'GET',
-      bodyTimeout: 15_000,
-      headersTimeout: 15_000,
-    });
-    const text = await body.text();
+    // Delegate to the single shared HTTP path in surfaces.ts (no inline undici import).
+    const { status, text } = await getRaw(`${baseUrl}${path}`);
     let parsed: unknown;
     try {
       parsed = JSON.parse(text);
     } catch {
       parsed = text; // surface returned non-JSON (e.g. Prometheus text)
     }
-    lastCapture.set(this, { peerName, path, status: statusCode, body: parsed });
+    lastCapture.set(this, { peerName, path, status, body: parsed });
   }
 );
 
@@ -356,13 +352,8 @@ Then(
   'resolving {string} on peer {string} does NOT return App-not-found',
   async function (this: E2EWorld, path: string, peerName: string) {
     const url = getPeerUrl(this, peerName);
-    const { request: undiciRequest } = await import('undici');
-    const { statusCode, body } = await undiciRequest(`${url}${path}`, {
-      method: 'GET',
-      bodyTimeout: 15_000,
-      headersTimeout: 15_000,
-    });
-    const text = await body.text();
+    // Delegate to the single shared HTTP path in surfaces.ts (no inline undici import).
+    const { status: statusCode, text } = await getRaw(`${url}${path}`);
     assert.notStrictEqual(
       statusCode,
       404,
@@ -514,10 +505,14 @@ Then(
 
     const actual = metrics.get(metricName);
     if (actual === undefined) {
-      // Metric not present — treat as 0 for counter-style assertions
-      const impliedActual = 0;
-      assertMetric(metricName, peerName, cmp, expected, impliedActual);
-      return;
+      // Metric absent from scrape — a typo'd name would silently false-pass a >= 0 assertion.
+      // Treat as an observability gap (pending), not a confirmed zero measurement.
+      // eslint-disable-next-line no-console
+      console.log(
+        `  PENDING: metric "${metricName}" on ${peerName} — ` +
+          `metric not present in scrape (typo? not yet emitted?)`
+      );
+      return 'pending';
     }
     assertMetric(metricName, peerName, cmp, expected, actual);
   }

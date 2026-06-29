@@ -113,14 +113,18 @@ export interface HealthProjection {
   writer: boolean;
 }
 
-/** From doorway health.rs ConductorHealth */
+/**
+ * From doorway health.rs ConductorHealth.
+ * NOTE: ConductorHealth lacks #[serde(rename_all = "camelCase")] unlike its sibling
+ * P2PHealth/ProjectionRole structs — so wire fields are snake_case, not camelCase.
+ */
 export interface HealthConductor {
   connected: boolean;
-  connectedWorkers: number;
-  totalWorkers: number;
-  poolSize: number;
-  poolsHealthy: number;
-  poolsTotal: number;
+  connected_workers: number;
+  total_workers: number;
+  pool_size: number;
+  pools_healthy: number;
+  pools_total: number;
 }
 
 /**
@@ -240,12 +244,21 @@ export function parsePrometheusMetrics(text: string): ParsedMetrics {
     if (line.startsWith('#') || line === '') continue;
 
     // Format: `metric_name[{labels}] value [timestamp]`
-    // Find the last space to split off the value (timestamps can be large ints)
-    const lastSpace = line.lastIndexOf(' ');
-    if (lastSpace === -1) continue;
+    // Find the first space after the label-set close (or after the metric name when no labels),
+    // then take only the first whitespace-separated token from the remainder as the value.
+    // lastIndexOf(' ') is wrong here: when a line has a trailing timestamp it picks the
+    // timestamp token instead of the value token.
+    const braceEnd = line.indexOf('}');
+    const searchFrom = braceEnd === -1 ? 0 : braceEnd + 1;
+    const firstSpace = line.indexOf(' ', searchFrom);
+    if (firstSpace === -1) continue;
 
-    const valueStr = line.slice(lastSpace + 1);
-    const nameAndLabels = line.slice(0, lastSpace).trim();
+    const nameAndLabels = line.slice(0, firstSpace);
+    // Take only the first whitespace-separated token after metric+labels; optional timestamp ignored.
+    const valueStr = line
+      .slice(firstSpace + 1)
+      .trimStart()
+      .split(/\s+/)[0];
 
     // Strip label set to get the base metric name
     const braceIdx = nameAndLabels.indexOf('{');
@@ -264,7 +277,7 @@ export function parsePrometheusMetrics(text: string): ParsedMetrics {
 // ---------------------------------------------------------------------------
 
 /** Raw GET — returns status + response body text. Never throws on non-2xx. */
-async function getRaw(url: string): Promise<{ status: number; text: string }> {
+export async function getRaw(url: string): Promise<{ status: number; text: string }> {
   const { statusCode, body } = await request(url, {
     method: 'GET',
     // 15 s timeout — remote alpha peers can be slow
