@@ -1,6 +1,7 @@
 {
   "$comment": "Per-human deployment records driven by elohim/holochain/Jenkinsfile. All humans now run the consolidated single-container pattern (elohim-node) \u2014 see genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml for the shared template. Adam uses an explicit manifest file (the historical reference impl); everyone else sed-renders the template. See genesis/plans/2026-04-16-elohim-node-consolidation-design.md for background and 2026-04-21-consolidate-human-deployments.md for the migration that retired the legacy 4-container pattern. The edgenode{Memory,Cpu}{Request,Limit} fields are THE source of truth for per-human conductor resource budgets \u2014 each set is tied to a deviceArchetype from genesis/plans/2026-04-13-device-archetypes-design.md. Treat these as the archetype's validated minimum; when bumped temporarily to unblock work, leave an entry-level $comment noting the intended floor and the follow-up that restores it.",
   "schemaVersion": 1,
+  "$shemCpuReliefComment": "2026-06-29: edgenodeCpuLimit 2000m->1000m for the remote/shem fixtures (pete, terrance, frank, gertrude, susan, caleb, daniel, emma, eve, nancy) -- restores the recycled-laptop/chromebook archetype floor; the 2000m values were contention band-aids bumped while shem was starved. WHY: shem (24 allocatable cores) ran ~26 cores actual usage -- 12 remote conductors each at generous 2000m limits, ~110% saturated, CFS-throttling -> wedged adam storage data-path (/db 503 while /health 200), blocking elohim.host deploys. Capping to floor drops aggregate remote limit ~24->~14 cores so each conductor reliably gets its share. adam (firstman.yaml, dual doorway+storage role) is INTENTIONALLY NOT capped -- keeps 2x2000m and now gets relief to use it. matthew/jessica/james (household, on-prem) untouched. If seed-time conductor admin-port timeouts reappear, the TARGETED lever is db-pool/backpressure, NOT re-bumping CPU (cf. matthew $cpuBumpComment). FOLLOW-UP: profile why idle remote conductors burn 1.4-3.9 cores steady-state (suspect n^2 gossip among co-located peers).",
   "humans": [
     {
       "name": "adam",
@@ -121,7 +122,7 @@
       "edgenodeMemoryRequest": "768Mi",
       "edgenodeMemoryLimit": "3Gi",
       "edgenodeCpuRequest": "250m",
-      "edgenodeCpuLimit": "2000m",
+      "edgenodeCpuLimit": "1000m",
       "$cpuLimitBump": "2026-05-27: bumped 1000m \u2192 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 \u2014 accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md",
       "$memoryBumpComment": "2026-06-10: edgenodeMemoryLimit 1536Mi \u2192 3Gi (request 512Mi \u2192 768Mi). OOM-confirmed: constraint=CONSTRAINT_MEMCG, anon-rss ~1488MiB hitting the 1536Mi ceiling \u2014 same class as james/jessica OOMs. All nine shem-placed humans OOMKill in ~90s at 1536Mi; james at 3Gi and jessica at 4Gi are stable (james actual RSS ~2.1Gi; jessica ~1.4Gi). 3Gi gives 2\u00d7 headroom over the observed RSS floor. Restoration: when shem is stable + conductor cold-start memory is profiled, step back toward the recycled-laptop archetype floor (512Mi/1536Mi)."
     },
@@ -147,7 +148,7 @@
       "edgenodeMemoryRequest": "2Gi",
       "edgenodeMemoryLimit": "6Gi",
       "edgenodeCpuRequest": "500m",
-      "edgenodeCpuLimit": "2000m"
+      "edgenodeCpuLimit": "1000m"
     },
     {
       "name": "frank",
@@ -165,7 +166,7 @@
       "edgenodeMemoryRequest": "768Mi",
       "edgenodeMemoryLimit": "3Gi",
       "edgenodeCpuRequest": "250m",
-      "edgenodeCpuLimit": "2000m",
+      "edgenodeCpuLimit": "1000m",
       "$cpuLimitBump": "2026-05-27: bumped 1000m \u2192 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 \u2014 accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md",
       "$memoryBumpComment": "2026-06-10: edgenodeMemoryLimit 1536Mi \u2192 3Gi (request 512Mi \u2192 768Mi). OOM-confirmed: constraint=CONSTRAINT_MEMCG, anon-rss ~1488MiB hitting the 1536Mi ceiling \u2014 same class as james/jessica OOMs. All nine shem-placed humans OOMKill in ~90s at 1536Mi; james at 3Gi and jessica at 4Gi are stable (james actual RSS ~2.1Gi; jessica ~1.4Gi). 3Gi gives 2\u00d7 headroom over the observed RSS floor. Restoration: when shem is stable + conductor cold-start memory is profiled, step back toward the recycled-laptop archetype floor (512Mi/1536Mi)."
     },
@@ -185,7 +186,7 @@
       "edgenodeMemoryRequest": "768Mi",
       "edgenodeMemoryLimit": "3Gi",
       "edgenodeCpuRequest": "250m",
-      "edgenodeCpuLimit": "2000m",
+      "edgenodeCpuLimit": "1000m",
       "$cpuLimitBump": "2026-05-27: bumped 1000m \u2192 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 \u2014 accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md",
       "$memoryBumpComment": "2026-06-10: edgenodeMemoryLimit 1536Mi \u2192 3Gi (request 512Mi \u2192 768Mi). OOM-confirmed: constraint=CONSTRAINT_MEMCG, anon-rss ~1488MiB hitting the 1536Mi ceiling \u2014 same class as james/jessica OOMs. All nine shem-placed humans OOMKill in ~90s at 1536Mi; james at 3Gi and jessica at 4Gi are stable (james actual RSS ~2.1Gi; jessica ~1.4Gi). 3Gi gives 2\u00d7 headroom over the observed RSS floor. Restoration: when shem is stable + conductor cold-start memory is profiled, step back toward the recycled-laptop archetype floor (512Mi/1536Mi)."
     },
@@ -205,7 +206,7 @@
       "edgenodeMemoryRequest": "768Mi",
       "edgenodeMemoryLimit": "3Gi",
       "edgenodeCpuRequest": "250m",
-      "edgenodeCpuLimit": "2000m",
+      "edgenodeCpuLimit": "1000m",
       "$cpuLimitBump": "2026-05-27: bumped 1000m \u2192 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 \u2014 accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md",
       "$memoryBumpComment": "2026-06-10: edgenodeMemoryLimit 1536Mi \u2192 3Gi (request 512Mi \u2192 768Mi). OOM-confirmed: constraint=CONSTRAINT_MEMCG, anon-rss ~1488MiB hitting the 1536Mi ceiling \u2014 same class as james/jessica OOMs. All nine shem-placed humans OOMKill in ~90s at 1536Mi; james at 3Gi and jessica at 4Gi are stable (james actual RSS ~2.1Gi; jessica ~1.4Gi). 3Gi gives 2\u00d7 headroom over the observed RSS floor. Restoration: when shem is stable + conductor cold-start memory is profiled, step back toward the recycled-laptop archetype floor (512Mi/1536Mi)."
     },
@@ -225,7 +226,7 @@
       "edgenodeMemoryRequest": "768Mi",
       "edgenodeMemoryLimit": "3Gi",
       "edgenodeCpuRequest": "250m",
-      "edgenodeCpuLimit": "2000m",
+      "edgenodeCpuLimit": "1000m",
       "$cpuLimitBump": "2026-05-27: bumped 1000m \u2192 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 \u2014 accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md",
       "$memoryBumpComment": "2026-06-10: edgenodeMemoryLimit 1536Mi \u2192 3Gi (request 512Mi \u2192 768Mi). OOM-confirmed: constraint=CONSTRAINT_MEMCG, anon-rss ~1488MiB hitting the 1536Mi ceiling \u2014 same class as james/jessica OOMs. All nine shem-placed humans OOMKill in ~90s at 1536Mi; james at 3Gi and jessica at 4Gi are stable (james actual RSS ~2.1Gi; jessica ~1.4Gi). 3Gi gives 2\u00d7 headroom over the observed RSS floor. Restoration: when shem is stable + conductor cold-start memory is profiled, step back toward the recycled-laptop archetype floor (512Mi/1536Mi)."
     },
@@ -245,7 +246,7 @@
       "edgenodeMemoryRequest": "768Mi",
       "edgenodeMemoryLimit": "3Gi",
       "edgenodeCpuRequest": "250m",
-      "edgenodeCpuLimit": "2000m",
+      "edgenodeCpuLimit": "1000m",
       "$cpuLimitBump": "2026-05-27: bumped 1000m \u2192 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 \u2014 accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md",
       "$memoryBumpComment": "2026-06-10: edgenodeMemoryLimit 1536Mi \u2192 3Gi (request 512Mi \u2192 768Mi). OOM-confirmed: constraint=CONSTRAINT_MEMCG, anon-rss ~1488MiB hitting the 1536Mi ceiling \u2014 same class as james/jessica OOMs. All nine shem-placed humans OOMKill in ~90s at 1536Mi; james at 3Gi and jessica at 4Gi are stable (james actual RSS ~2.1Gi; jessica ~1.4Gi). 3Gi gives 2\u00d7 headroom over the observed RSS floor. Restoration: when shem is stable + conductor cold-start memory is profiled, step back toward the recycled-laptop archetype floor (512Mi/1536Mi)."
     },
@@ -265,7 +266,7 @@
       "edgenodeMemoryRequest": "768Mi",
       "edgenodeMemoryLimit": "3Gi",
       "edgenodeCpuRequest": "250m",
-      "edgenodeCpuLimit": "2000m",
+      "edgenodeCpuLimit": "1000m",
       "$cpuLimitBump": "2026-05-27: bumped 1000m \u2192 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 \u2014 accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md",
       "$memoryBumpComment": "2026-06-10: edgenodeMemoryLimit 1536Mi \u2192 3Gi (request 512Mi \u2192 768Mi). OOM-confirmed: constraint=CONSTRAINT_MEMCG, anon-rss ~1488MiB hitting the 1536Mi ceiling \u2014 same class as james/jessica OOMs. All nine shem-placed humans OOMKill in ~90s at 1536Mi; james at 3Gi and jessica at 4Gi are stable (james actual RSS ~2.1Gi; jessica ~1.4Gi). 3Gi gives 2\u00d7 headroom over the observed RSS floor. Restoration: when shem is stable + conductor cold-start memory is profiled, step back toward the recycled-laptop archetype floor (512Mi/1536Mi)."
     },
@@ -285,7 +286,7 @@
       "edgenodeMemoryRequest": "768Mi",
       "edgenodeMemoryLimit": "3Gi",
       "edgenodeCpuRequest": "250m",
-      "edgenodeCpuLimit": "2000m",
+      "edgenodeCpuLimit": "1000m",
       "$cpuLimitBump": "2026-05-27: bumped 1000m \u2192 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 \u2014 accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md",
       "$memoryBumpComment": "2026-06-10: edgenodeMemoryLimit 1536Mi \u2192 3Gi (request 512Mi \u2192 768Mi). OOM-confirmed: constraint=CONSTRAINT_MEMCG, anon-rss ~1488MiB hitting the 1536Mi ceiling \u2014 same class as james/jessica OOMs. All nine shem-placed humans OOMKill in ~90s at 1536Mi; james at 3Gi and jessica at 4Gi are stable (james actual RSS ~2.1Gi; jessica ~1.4Gi). 3Gi gives 2\u00d7 headroom over the observed RSS floor. Restoration: when shem is stable + conductor cold-start memory is profiled, step back toward the recycled-laptop archetype floor (512Mi/1536Mi)."
     },
@@ -305,7 +306,7 @@
       "edgenodeMemoryRequest": "768Mi",
       "edgenodeMemoryLimit": "3Gi",
       "edgenodeCpuRequest": "250m",
-      "edgenodeCpuLimit": "2000m",
+      "edgenodeCpuLimit": "1000m",
       "$cpuLimitBump": "2026-05-27: bumped 1000m \u2192 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 \u2014 accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md",
       "$memoryBumpComment": "2026-06-10: edgenodeMemoryLimit 1536Mi \u2192 3Gi (request 512Mi \u2192 768Mi). OOM-confirmed: constraint=CONSTRAINT_MEMCG, anon-rss ~1488MiB hitting the 1536Mi ceiling \u2014 same class as james/jessica OOMs. All nine shem-placed humans OOMKill in ~90s at 1536Mi; james at 3Gi and jessica at 4Gi are stable (james actual RSS ~2.1Gi; jessica ~1.4Gi). 3Gi gives 2\u00d7 headroom over the observed RSS floor. Restoration: when shem is stable + conductor cold-start memory is profiled, step back toward the recycled-laptop archetype floor (512Mi/1536Mi)."
     }
