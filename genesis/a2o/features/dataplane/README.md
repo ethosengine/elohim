@@ -81,3 +81,40 @@ The JSON counterpart lives at `summary.byConcern` in `reports/sprint-report.json
 | ✅ | all scenarios in this concern passed |
 | ❌ | at least one scenario failed |
 | ◌ | no failures, but at least one scenario is pending/not-yet-implemented |
+
+## CI wiring
+
+The `Dataplane Validation` stage in `elohim/holochain/Jenkinsfile` runs after `Deploy Edge Node - Alpha` on `dev` pushes (and on `feat-*`/`claude/*` branches that touch `doorway/**`, `elohim/elohim-storage/**`, or `elohim/holochain/edgenode/**`). The bash body lives in `scripts/ci/run-dataplane-validation.sh` (CPS size-limit discipline: no inline heredoc in the Jenkinsfile).
+
+The stage is **advisory**: `catchError(buildResult:'SUCCESS', stageResult:'UNSTABLE')`. A red concern surfaces as UNSTABLE — visible in the Jenkins stage view — without blocking the orchestrator's downstream cascade (seeding, genesis). Once every concern passes on `dev`, flip the `catchError` to `buildResult:'FAILURE'` to harden it to a gate.
+
+Artifacts archived per build:
+- `genesis/a2o/reports/sprint-report-dataplane.json` — machine-readable; consumed by the agentic-developer loop
+- `genesis/a2o/reports/sprint-report-dataplane.md` — human-readable stage-view summary
+- `genesis/a2o/reports/cucumber-report-dataplane.json` — raw cucumber output (scenario-level detail)
+
+The cucumber run uses `--format json:reports/cucumber-report-dataplane.json` (alongside config defaults), keeping this run's output distinct from the main `cucumber-report.json`.
+
+## Agentic-developer loop consumption
+
+The loop reads `sprint-report-dataplane.json` → `summary.byConcern{}` as its **per-concern measure surface**.
+
+```json
+{
+  "summary": {
+    "byConcern": {
+      "blob-replication":       { "passed": 0, "failed": 2, "pending": 0, "scenarios": [...] },
+      "epr-projection-fallback":{ "passed": 0, "failed": 1, "pending": 0, "scenarios": [...] },
+      "content-sync":           { "passed": 3, "failed": 0, "pending": 0, "scenarios": [...] },
+      "peer-mesh":              { "passed": 2, "failed": 0, "pending": 0, "scenarios": [...] }
+    }
+  }
+}
+```
+
+Semantics for the loop:
+- A concern with `failed > 0` (❌) is a **named candidate** for the next fix iteration.
+- A concern flipping ❌ → ✅ (`failed` drops to 0, `passed > 0`) across two consecutive builds is **measurable forward progress** — equivalent to a ci-findings ledger entry resolving.
+- A concern with `passed == 0` and `failed == 0` (◌) means no scenarios ran for it; the substrate scope gate (`@requires:<cap>`) may have skipped them when the capability is unavailable.
+
+No new ledger is needed. The `byConcern` block IS the measure surface — it is the dataplane analog of the `ci-findings.jsonl` fingerprint table, but concern-scoped rather than error-fingerprint-scoped.

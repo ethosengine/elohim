@@ -1861,6 +1861,47 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             }
         }
 
+        // Advisory @dataplane cucumber suite — bash body in scripts/ci/run-dataplane-validation.sh.
+        // catchError->UNSTABLE: red concerns surface without blocking the orchestrator cascade.
+        // Flip to FAILURE once all concerns go green on dev.
+        stage('Dataplane Validation') {
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf {
+                        branch 'dev'
+                        allOf {
+                            anyOf {
+                                changeset 'doorway/**'
+                                changeset 'elohim/elohim-storage/**'
+                                changeset 'elohim/holochain/edgenode/**'
+                            }
+                            anyOf {
+                                expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                                expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                            }
+                        }
+                        expression { return params.FORCE_DEPLOY == true }
+                        expression { return params.FORCE_BUILD == true }
+                    }
+                }
+            }
+            steps {
+                container('builder') {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withEnv(["E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host"]) {
+                            sh "bash '${env.WORKSPACE}/scripts/ci/run-dataplane-validation.sh'"
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'genesis/a2o/reports/sprint-report-dataplane.*', allowEmptyArchive: true
+                }
+            }
+        }
+
         stage('Deploy Edge Node - Staging') {
             when {
                 allOf {
