@@ -40,6 +40,7 @@ import {
   resolveStorageUrl,
   getRaw,
   probeHealth,
+  probeSyncDocs,
   probeSyncDocHeads,
   probeBlob,
   probeContent,
@@ -237,6 +238,31 @@ Then('peer {string} is healthy', async function (this: E2EWorld, peerName: strin
   );
 });
 
+/**
+ * Assert that p2p.divergentAnchor is at most the given bound.
+ * divergentAnchor counts DHT anchors the gossip reconciler found diverged on the last
+ * reconcile pass. A value within the bound confirms the mesh is converging, not diverging.
+ *
+ * NOTE: Uses regex because '/' in Cucumber expressions is parsed as alternation.
+ */
+Then(
+  /^peer "([^"]+)" \/health divergentAnchor <= (\d+)$/,
+  async function (this: E2EWorld, peerName: string, maxAnchorStr: string) {
+    const maxAnchor = Number.parseInt(maxAnchorStr, 10);
+    const url = getPeerUrl(this, peerName);
+    const { body } = await probeHealth(url);
+    assert.ok(
+      body.p2p !== undefined,
+      `${peerName} /health: p2p section absent — P2P may not be enabled`
+    );
+    const divergentAnchor = body.p2p?.divergentAnchor ?? 0;
+    assert.ok(
+      divergentAnchor <= maxAnchor,
+      `${peerName} /health: p2p.divergentAnchor is ${divergentAnchor}, expected <= ${maxAnchor}`
+    );
+  }
+);
+
 // ---------------------------------------------------------------------------
 // Then — /sync assertions
 // ---------------------------------------------------------------------------
@@ -278,6 +304,25 @@ Then(
     assert.ok(
       body.heads.length >= minHeads,
       `/sync doc "${docId}" on ${peerName}: ${body.heads.length} heads, expected >= ${minHeads}`
+    );
+  }
+);
+
+/**
+ * Assert that the /sync/v1/elohim/docs list has at least the given number of documents.
+ * Confirms the content-projection producer has run and the sync table is non-empty.
+ *
+ * NOTE: Uses regex because '/' in Cucumber expressions is parsed as alternation.
+ */
+Then(
+  /^\/sync\/v1\/elohim\/docs list on peer "([^"]+)" has at least (\d+) documents?$/,
+  async function (this: E2EWorld, peerName: string, minCountStr: string) {
+    const minCount = Number.parseInt(minCountStr, 10);
+    const url = getPeerUrl(this, peerName);
+    const { body } = await probeSyncDocs(url, 'elohim');
+    assert.ok(
+      body.total >= minCount,
+      `/sync/v1/elohim/docs on ${peerName}: total=${body.total}, expected >= ${minCount}`
     );
   }
 );

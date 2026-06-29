@@ -273,6 +273,21 @@ export function parsePrometheusMetrics(text: string): ParsedMetrics {
 }
 
 // ---------------------------------------------------------------------------
+// Path-segment encoding helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Encode a doc/entity id for use in a URL path segment. Unlike encodeURIComponent,
+ * this preserves ':' because doc ids use a 'type:uuid' namespace syntax and the
+ * Rust storage handler receives the raw path segment (the colon is not decoded by
+ * the Axum extractor — percent-encoding '%3A' and a literal ':' are treated as
+ * different keys). Every other special character is still percent-encoded.
+ */
+function encodeDocId(id: string): string {
+  return encodeURIComponent(id).replace(/%3A/gi, ':');
+}
+
+// ---------------------------------------------------------------------------
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
@@ -322,6 +337,7 @@ export async function probeSyncDocs(
 
 /**
  * GET /sync/v1/{hAppId}/docs/{docId}/heads on the given peer.
+ * docId is encoded with encodeDocId() which preserves ':' (namespace separator).
  */
 export async function probeSyncDocHeads(
   peerUrl: string,
@@ -329,7 +345,7 @@ export async function probeSyncDocHeads(
   docId: string
 ): Promise<ProbeResult<SyncDocHeadsSurface>> {
   return getJson<SyncDocHeadsSurface>(
-    `${peerUrl}/sync/v1/${encodeURIComponent(hAppId)}/docs/${encodeURIComponent(docId)}/heads`
+    `${peerUrl}/sync/v1/${encodeURIComponent(hAppId)}/docs/${encodeDocId(docId)}/heads`
   );
 }
 
@@ -349,12 +365,13 @@ export async function probeBlob(peerUrl: string, hash: string): Promise<number> 
 
 /**
  * GET /db/content/{id} on the given peer.
+ * contentId is encoded with encodeDocId() which preserves ':' (namespace separator).
  */
 export async function probeContent(
   peerUrl: string,
   contentId: string
 ): Promise<ProbeResult<ContentItemSurface>> {
-  return getJson<ContentItemSurface>(`${peerUrl}/db/content/${encodeURIComponent(contentId)}`);
+  return getJson<ContentItemSurface>(`${peerUrl}/db/content/${encodeDocId(contentId)}`);
 }
 
 /**
