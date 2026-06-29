@@ -31,6 +31,23 @@ pipeline {
         }
       }
     }
+
+    // Publish to the internal Nexus registry on main only (release-grade;
+    // crate versions are immutable). Idempotent + 409-safe: a no-op unless
+    // the version in Cargo.toml was bumped. Reuses the CI npm token
+    // (`ee-nexus-npm-token`) — it authenticates cross-format; the only
+    // prerequisite is the CI user holding repository-view add/read on
+    // cargo-internal (Nexus role `cargo-deployer`).
+    stage('Publish — cargo (elohim registry)') {
+      when {
+        anyOf { branch 'main'; expression { env.BRANCH_NAME == 'main' } }
+      }
+      steps {
+        withCredentials([string(credentialsId: 'ee-nexus-npm-token', variable: 'NEXUS_NPM_TOKEN')]) {
+          sh "bash '${env.WORKSPACE}/scripts/ci/cargo-publish-epr.sh'"
+        }
+      }
+    }
   }
 
   post {
