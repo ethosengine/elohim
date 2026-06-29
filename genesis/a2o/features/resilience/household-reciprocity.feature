@@ -1,4 +1,4 @@
-@e2e @resilience @resilience-p1
+@e2e @resilience @resilience-p1 @concern:reconcile-inventory @dataplane
 Feature: Household reciprocity — the M1 custody pair is named, not assumed
 
   # This feature is the standing flag from the 2026-06-04 terrance-drift RCA:

@@ -1,4 +1,4 @@
-@e2e @resilience @resilience-dimensions
+@e2e @resilience @resilience-dimensions @concern:blob-durability @dataplane
 Feature: Resilience dimensions — the matrix that proves the felt-durability surface
   As a person deciding whether to trust this network with what matters to me
   I want every dimension of the resilience story — who protects it, how many
