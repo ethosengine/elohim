@@ -1,0 +1,42 @@
+---
+epr-meta-version: 1
+id: a2o-governance
+covers: subtree
+purpose: >
+  The a2o (acceptance-to-outcome) surface — executable BDD scenarios, Cucumber step definitions,
+  script infrastructure for reporting, and the framework runtime. Owned as a whole; no edit-time
+  gate is needed for everyday authoring (CLAUDE.md carries the conventions), but new feature
+  subdirectories must carry their own .epr-meta to prevent silent governance drop.
+rules:
+  - id: new-feature-subdir-needs-meta
+    class: ask
+    when: { write: ".epr-meta", new: true }
+    require-sibling: ".epr-meta"
+    why: >
+      A new subdirectory under genesis/a2o/ must be born with its own .epr-meta —
+      place one alongside the first file so governance is never silently dropped by
+      descending one directory. See genesis/a2o/features/dataplane/.epr-meta as an example.
+---
+# genesis/a2o — acceptance-to-outcome testing
+
+Executable BDD scenarios that verify deployed artifacts match genesis intent.
+
+## What lives here
+
+- `features/` — Gherkin feature files organised by domain (`lamad/`, `auth/`, `dataplane/`, …)
+- `steps/` — Cucumber step-definition TypeScript
+- `src/framework/` — world, fixtures, page-models, substrate-scope gate
+- `scripts/` — sprint-report aggregator, coverage scanner, `look`/`graphos` tooling
+- `schemas/` — JSON schema for the sprint-report wire format
+
+## Conventions (authoritative, not gate-enforced in v1)
+
+Feature authoring conventions are documented in `genesis/a2o/CLAUDE.md` — tag requirements
+(`@e2e`, `@concern:`, `@requires:`), persona patterns, step-definition paths, and the story-first
+workflow. No edit-time gate is needed here; the conventions are stable and well-understood.
+
+## Governance note
+
+This manifest records considered ownership (`covers: subtree`) with no general authoring gate.
+The one wired rule (`new-feature-subdir-needs-meta`) prevents orphan subtrees — the one mechanical
+drift that CLAUDE.md cannot catch at author time.

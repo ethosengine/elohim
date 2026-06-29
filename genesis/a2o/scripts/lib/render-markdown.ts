@@ -1,4 +1,4 @@
-import type { SprintReport, Finding } from './aggregate.js';
+import type { SprintReport, Finding, ConcernRollup } from './aggregate.js';
 
 function renderFinding(f: Finding): string[] {
   const lines: string[] = [];
@@ -19,6 +19,44 @@ function renderFinding(f: Finding): string[] {
   lines.push('');
   lines.push(`</details>`);
   lines.push('');
+  return lines;
+}
+
+function concernGlyph(rollup: ConcernRollup): string {
+  if (rollup.failed > 0) return '❌';
+  if (rollup.pending > 0) return '◌';
+  return '✅';
+}
+
+function renderByConcern(report: SprintReport): string[] {
+  const byConcern = report.summary.byConcern ?? {};
+  const concerns = Object.keys(byConcern).sort();
+  if (concerns.length === 0) return [];
+
+  const lines: string[] = [];
+  lines.push(`## Dataplane validation by concern`);
+  lines.push('');
+  lines.push(`| concern | status | passed | failed | pending |`);
+  lines.push(`|---|---|---|---|---|`);
+  for (const name of concerns) {
+    const r = byConcern[name];
+    lines.push(
+      `| \`${name}\` | ${concernGlyph(r)} | ${r.passed} | ${r.failed} | ${r.pending} |`
+    );
+  }
+  lines.push('');
+
+  for (const name of concerns) {
+    const r = byConcern[name];
+    lines.push(`### ${concernGlyph(r)} \`${name}\``);
+    lines.push('');
+    for (const s of r.scenarios) {
+      const glyph = s.status === 'passed' ? '✅' : s.status === 'failed' ? '❌' : '◌';
+      lines.push(`- ${glyph} ${s.name} — \`${s.surface}\``);
+    }
+    lines.push('');
+  }
+
   return lines;
 }
 
@@ -67,6 +105,7 @@ export function renderMarkdown(report: SprintReport): string {
   );
   lines.push('');
 
+  lines.push(...renderByConcern(report));
   lines.push(...renderVisualValidation(report));
 
   const byPillar = new Map<string, Finding[]>();

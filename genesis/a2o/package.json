@@ -27,7 +27,7 @@
     "test:genesis:epic": "cucumber-js --dry-run --tags '@epic:$npm_config_name' '../docs/content/elohim-protocol/**/*.feature'",
     "test:genesis:layer": "cucumber-js --dry-run --tags '@governance_layer:$npm_config_name' '../docs/content/elohim-protocol/**/*.feature'",
     "generate:skeletons": "tsx scripts/generate-step-skeletons.ts",
-    "test:unit": "tsx --test 'src/**/__tests__/*.test.ts' 'scripts/__tests__/*.test.ts'",
+    "test:unit": "tsx --test 'src/**/__tests__/*.test.ts' 'scripts/__tests__/*.test.ts' 'scripts/__tests__/*.spec.ts'",
     "a2o:setup": "playwright install chromium",
     "look": "E2E_DOORWAY_ALPHA=${E2E_DOORWAY_ALPHA:-https://doorway-alpha.elohim.host} tsx scripts/look.ts",
     "graphos": "tsx scripts/graphos.ts",
