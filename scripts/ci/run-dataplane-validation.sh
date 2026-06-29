@@ -75,7 +75,7 @@ try:
 except Exception as e:
     print(f'  (could not parse report: {e})')
     sys.exit(0)
-bc = r.get('byConcern', {})
+bc = r.get('summary', {}).get('byConcern', {})
 if not bc:
     print('  (no @concern: tagged scenarios ran)')
 for concern, stats in bc.items():
