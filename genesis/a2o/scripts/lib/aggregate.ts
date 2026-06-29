@@ -54,6 +54,19 @@ export interface Finding {
   suggestedObjective: string;
 }
 
+export interface ConcernScenario {
+  name: string;
+  status: 'passed' | 'failed' | 'pending';
+  surface: string;
+}
+
+export interface ConcernRollup {
+  passed: number;
+  failed: number;
+  pending: number;
+  scenarios: ConcernScenario[];
+}
+
 export interface SprintReport {
   generatedAt: string;
   runId: string;
@@ -62,6 +75,7 @@ export interface SprintReport {
   summary: {
     scenarios: { total: number; passed: number; failed: number; skipped: number; pending: number };
     findings: { total: number; bySource: Record<string, number>; byPillar: Record<string, number> };
+    byConcern: Record<string, ConcernRollup>;
     visualValidation?: {
       validatedPassing: number;
       validatedRegressed: number;
@@ -240,7 +254,29 @@ function computeSummary(scenarios: ScenarioResult[], findings: Finding[]): Sprin
   return {
     scenarios: scenarioCounts,
     findings: { total: findings.length, bySource, byPillar },
+    byConcern: {} as Record<string, ConcernRollup>,
   };
+}
+
+function computeByConcern(scenarios: ScenarioResult[]): Record<string, ConcernRollup> {
+  const result: Record<string, ConcernRollup> = {};
+  for (const s of scenarios) {
+    const concernTag = s.tags.find(t => t.startsWith('@concern:'));
+    if (!concernTag) continue;
+    const concern = concernTag.slice('@concern:'.length);
+    if (!result[concern]) {
+      result[concern] = { passed: 0, failed: 0, pending: 0, scenarios: [] };
+    }
+    const rollup = result[concern];
+    // Map 'undefined'/'skipped' → pending for concern-level accounting
+    const status: ConcernScenario['status'] =
+      s.status === 'passed' ? 'passed' : s.status === 'failed' ? 'failed' : 'pending';
+    if (status === 'passed') rollup.passed += 1;
+    else if (status === 'failed') rollup.failed += 1;
+    else rollup.pending += 1;
+    rollup.scenarios.push({ name: s.name, status, surface: s.feature });
+  }
+  return result;
 }
 
 function computeVisualValidation(
@@ -272,6 +308,8 @@ export function aggregate(input: AggregateInput): SprintReport {
 
   const findings = groupIntoFindings(raws);
   const summary = computeSummary(input.scenarios, findings);
+
+  summary.byConcern = computeByConcern(input.scenarios);
 
   if (emitVisual) {
     summary.visualValidation = computeVisualValidation(input.scenarios);

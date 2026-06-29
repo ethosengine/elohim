@@ -17,6 +17,7 @@ const report: SprintReport = {
       bySource: { 'console-error': 1, 'scenario-failure': 1, 'pending-step': 1 },
       byPillar: { browser: 1, lamad: 1, imagodei: 1 },
     },
+    byConcern: {},
   },
   findings: [
     {
