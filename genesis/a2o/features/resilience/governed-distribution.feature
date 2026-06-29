@@ -1,4 +1,4 @@
-@e2e @resilience @governance @local @wip
+@e2e @resilience @governance @local @wip @concern:blob-durability @dataplane
 Feature: Governed auto-distribution via a revocable compute delegation
   As Matthew dogfooding a keyless Eclipse Che peer-client
   I want my content writes to drive distribute_shards only while a bounded, revocable

@@ -1,4 +1,4 @@
-@e2e @resilience @requires:household-nodes @wip @regression
+@e2e @resilience @requires:household-nodes @wip @regression @concern:blob-durability @dataplane
 Feature: The household-diversity dataplane reads the household projection
   As a household whose content must survive losing any single home,
   I want salvage and ingest placement to actually know which peers live in

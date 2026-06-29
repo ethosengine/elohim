@@ -1,4 +1,4 @@
-@e2e @resilience @local @wip
+@e2e @resilience @local @wip @concern:blob-durability @dataplane
 Feature: App ZIP blobs heal on read via peer race-fetch
   As a household member visiting a projected EPR app
   I want a serving peer that lost the app's ZIP bytes to fetch them from

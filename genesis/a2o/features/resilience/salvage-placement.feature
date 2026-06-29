@@ -1,4 +1,4 @@
-@e2e @resilience @felt @requires:shem @requires:multi-replica @wip
+@e2e @resilience @felt @requires:shem @requires:multi-replica @wip @concern:blob-durability @dataplane
 Feature: An under-replicated blob is salvaged by the deterministically-closest opt-in peer
   As a household whose content is held by too few peers to be safe
   I want an always-on peer that has opted in to spare capacity to notice the

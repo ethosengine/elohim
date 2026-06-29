@@ -19,9 +19,39 @@ in the sprint report.
 | `projection` | DHT-to-storage projector lag; coordinator hot-swap; signal delivery to the Angular subscriber |
 | `blob-replication` | EPR blobHash metadata propagation to federation peers; cross-peer EPR record consistency (RED-FIRST: gap on elohim.host as of 2026-06-29) |
 | `epr-projection-fallback` | EprRouter fallback when blobHash is null on a federation peer; peer-proxy or syncing-status response rather than "App not found" (RED-FIRST: gap on elohim.host as of 2026-06-29) |
+| `blob-durability` | Deterministic floor — blob heal-on-read (race-fetch), chaos/churn survival, grandma-vertical felt safety, household-diversity placement, salvage placement, governed distribution. Sourced from `features/resilience/` (not this directory). |
+| `keyspace-coverage` | Cluster-wide RS coverage, placement-gap counts, and weave-lens capacity eyes. Sourced from `features/resilience/operational-weave.feature`. |
+| `reconcile-inventory` | Commitment inventory reconciliation — commitment-backed card counting, custody-pair naming, peer-discovered commitment convergence, substrate delivery reconciliation. Sourced from `features/resilience/`. |
 
 Add new concerns here as they are introduced. Concern names must be lowercase kebab-case (e.g.
 `@concern:my-new-concern`), and must appear in the table above before the feature file is merged.
+
+### Deterministic-floor concerns (sourced from `features/resilience/`)
+
+The three concerns `blob-durability`, `keyspace-coverage`, and `reconcile-inventory` are the
+**deterministic floor** of the dataplane validation suite. Their scenarios live in
+`genesis/a2o/features/resilience/` (not this directory) but are tagged `@concern:<name> @dataplane`
+so the `byConcern` aggregator surfaces them in the same matrix alongside the live concerns above.
+This means the per-concern sprint report and the agentic-developer loop measure the resilience layer
+**without re-authoring** any scenarios — tagging is the only bridge needed.
+
+Files and their concern assignments:
+
+| file | concern |
+|---|---|
+| `resilience/app-blob-heal-on-read.feature` | `blob-durability` |
+| `resilience/chaos-peer-churn.feature` | `blob-durability` |
+| `resilience/governed-distribution.feature` | `blob-durability` |
+| `resilience/grandma-photos-survive-node-loss.feature` | `blob-durability` |
+| `resilience/household-diversity-dataplane.feature` | `blob-durability` |
+| `resilience/observable-distribution.feature` | `blob-durability` |
+| `resilience/resilience-dimensions.feature` | `blob-durability` |
+| `resilience/salvage-placement.feature` | `blob-durability` |
+| `resilience/operational-weave.feature` | `keyspace-coverage` |
+| `resilience/commitment-backed-card-lighting.feature` | `reconcile-inventory` |
+| `resilience/household-reciprocity.feature` | `reconcile-inventory` |
+| `resilience/substrate-reconciliation.feature` | `reconcile-inventory` |
+| `resilience/conductor-memory-soak.feature` | (untagged — conductor OOM, not a dataplane concern) |
 
 ## Tagging conventions
 

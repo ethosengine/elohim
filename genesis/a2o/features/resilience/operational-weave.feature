@@ -1,4 +1,4 @@
-@e2e @resilience @resilience-p1 @local
+@e2e @resilience @resilience-p1 @local @concern:keyspace-coverage @dataplane
 Feature: Operational weave lens — cluster-scoped capacity eyes
   As an operator running a household mesh
   I want a single cluster-wide weave view (placement gaps, RS coverage, capacity)

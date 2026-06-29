@@ -1,4 +1,4 @@
-@e2e @resilience @chaos
+@e2e @resilience @chaos @concern:blob-durability @dataplane
 Feature: Chaos peer churn — the dataplane proves itself by surviving us
   As a steward of a network that promises durability through people
   I want peers killed, flapped, and cascaded on purpose, during reads

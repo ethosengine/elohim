@@ -1,4 +1,4 @@
-@resilience-p1 @substrate
+@resilience-p1 @substrate @concern:reconcile-inventory @dataplane
 Feature: Delivery reconciles to the available compute when a peer goes offline
   As a household that learns on its own hardware
   I want a distant peer's machine going dark to never interrupt us
