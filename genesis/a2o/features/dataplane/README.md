@@ -13,12 +13,10 @@ in the sprint report.
 | concern | what it covers |
 |---|---|
 | `content-sync` | CRDT convergence — two nodes exchange an Automerge document and reach identical state |
-| `blob-custody` | libp2p/iroh blob placement; the salvage-diversity strategy re-places under household awareness |
 | `peer-mesh` | DHT-peer discovery, connection establishment, and gossip propagation across household nodes |
-| `routing` | EprRouter correctness — concern-scoped content reaches the right renderer, no empty-router poison |
-| `projection` | DHT-to-storage projector lag; coordinator hot-swap; signal delivery to the Angular subscriber |
 | `blob-replication` | EPR blobHash metadata propagation to federation peers; cross-peer EPR record consistency (RED-FIRST: gap on elohim.host as of 2026-06-29) |
 | `epr-projection-fallback` | EprRouter fallback when blobHash is null on a federation peer; peer-proxy or syncing-status response rather than "App not found" (RED-FIRST: gap on elohim.host as of 2026-06-29) |
+| `federation-deploy` | An EPR resolves on ALL federation doorways (alpha-A AND elohim.host) — kills the per-host stageSpaBlob crutch. Primary surfaces: per-doorway `GET /db/content/{id}.blobHash` non-null + `GET /` not App-not-found across all doorways. |
 | `blob-durability` | Deterministic floor — blob heal-on-read (race-fetch), chaos/churn survival, grandma-vertical felt safety, household-diversity placement, salvage placement, governed distribution. Sourced from `features/resilience/` (not this directory). |
 | `keyspace-coverage` | Cluster-wide RS coverage, placement-gap counts, and weave-lens capacity eyes. Sourced from `features/resilience/operational-weave.feature`. |
 | `reconcile-inventory` | Commitment inventory reconciliation — commitment-backed card counting, custody-pair naming, peer-discovered commitment convergence, substrate delivery reconciliation. Sourced from `features/resilience/`. |
