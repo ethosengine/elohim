@@ -17,6 +17,8 @@ in the sprint report.
 | `peer-mesh` | DHT-peer discovery, connection establishment, and gossip propagation across household nodes |
 | `routing` | EprRouter correctness — concern-scoped content reaches the right renderer, no empty-router poison |
 | `projection` | DHT-to-storage projector lag; coordinator hot-swap; signal delivery to the Angular subscriber |
+| `blob-replication` | EPR blobHash metadata propagation to federation peers; cross-peer EPR record consistency (RED-FIRST: gap on elohim.host as of 2026-06-29) |
+| `epr-projection-fallback` | EprRouter fallback when blobHash is null on a federation peer; peer-proxy or syncing-status response rather than "App not found" (RED-FIRST: gap on elohim.host as of 2026-06-29) |
 
 Add new concerns here as they are introduced. Concern names must be lowercase kebab-case (e.g.
 `@concern:my-new-concern`), and must appear in the table above before the feature file is merged.
