@@ -44,6 +44,20 @@ SPA_SIZE="$(du -h spa-bundle.zip | cut -f1)"
 echo "[${SLUG}] blob hash: ${SPA_HASH}"
 echo "[${SLUG}] blob size: ${SPA_SIZE}"
 
+# Publish the content-addressed hash for the post-stage serve-verify (deploy
+# resilience, 2026-06-30). Opt-in: writes ONLY when STAGE_HASH_OUT names a path
+# (unset => no-op, so every existing caller is byte-for-byte unaffected). The
+# Jenkinsfile points this at a per-(host,slug,kind) workspace file;
+# verify-host-serves.sh reads it to assert the host actually SERVES this
+# freshly-staged bundle, not a stale one. Defensive: an unwritable path WARNs
+# and continues (the serve-verify degrades) — it must never abort a stage that
+# would otherwise land, even under set -e.
+if [ -n "${STAGE_HASH_OUT:-}" ]; then
+    if ! printf '%s\n' "${SPA_HASH}" > "${STAGE_HASH_OUT}" 2>/dev/null; then
+        echo "  ⊘ WARN: could not publish staged hash to STAGE_HASH_OUT='${STAGE_HASH_OUT}' — serve-verify will degrade to serves-200 + non-null checks" >&2
+    fi
+fi
+
 # Field-by-kind (SSR row collapse): KIND=server PATCHes/reads serverBlobHash on
 # the ONE elohim-host-landing EPR node (not a separate -ssr row); KIND=browser
 # stays blobHash. Both ride db/content/{slug} with identical partial-update
