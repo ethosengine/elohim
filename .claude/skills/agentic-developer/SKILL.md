@@ -147,6 +147,38 @@ closes with done or a clean bail.
    (Principle 7 already does this for CI change-detection — generalize it to
    everything your shift touches.)
 
+9. **Tenacity — a capability gap is a build target, not a bail.** The
+   pipeline, the runtime, and the dev-mode control surface should be able to
+   perform whatever operation the Objective needs; when one can't, you *extend
+   it* rather than stop. Three escalating moves, in order:
+
+   - **Pipeline blocker → fix the pipeline.** A Jenkinsfile /
+     `genesis/orchestrator/**` change that unblocks the build/deploy is
+     in-scope shift work, like any source edit (subject to the usual guards).
+   - **Runtime issue → operator-seat per-node troubleshooting.** Reach the
+     dev-mode settings config service (the runtime-orchestration developer-mode
+     bridge) and diagnose/fix the deployed node(s) from the operator's
+     perspective — the same control surface a steward would use.
+   - **Missing op → add the service.** If the runtime doesn't expose an
+     operation you need, build the endpoint/service that does, push it through
+     the pipeline, deploy it, then use it. (If you can't finish it, capture it
+     per principle 8 — but prefer building it.)
+
+   **The bound (unchanged):** this licenses building *capability*, never
+   destroying *state* or moving the *judge*. Irreversible/destructive actions
+   (data, migrations, re-key/wipe, env flips, spend) still bail/ceiling per
+   principle 3; the measure/oracle stays off-limits per principle 6; and you
+   never clobber the operator's uncommitted WIP — route around it with isolated
+   worktrees and build-from-committed-state, never `git add -A` over it.
+
+   **Why no effort is wasted:** the runtime's OS-settings / dev-mode capability
+   surface you build to get *this* deploy green is the same surface that carries
+   the end-user's resiliency — it is how a steward later helps Grandma recover,
+   or tunes a stewarded user's experience over a remote/dev-mode session. Every
+   per-node op, config service, and diagnostic endpoint you add to unblock a
+   shift permanently widens the remote-session help surface for real people.
+   Building the machine that builds the experience is building the experience.
+
 ## Shift modes
 
 A shift runs in one of two modes, decided at kickoff and encoded in the journal header. The mode shapes the iteration loop's shape, the observer/investigator dispatch pattern, and how aggressively you parallelize fix attempts during build waits.

@@ -36,6 +36,12 @@ impl From<App> for AppView {
 
 impl From<Content> for ContentView {
     fn from(c: Content) -> Self {
+        // REQ-F10 trust label. Priority: notarized (dht_anchor_hash) beats
+        // published (p2p_published_at) beats unconfirmed. The "unconfirmed" arm
+        // covers BOTH the crdt_converged_at-only (amber) row and the all-null
+        // row — a converged-only row is functional but must never read as
+        // notarized. Computed by reference before the fields are moved.
+        let trust = trust_label(c.dht_anchor_hash.is_some(), c.p2p_published_at.is_some());
         Self {
             id: c.id,
             h_app_id: c.h_app_id,
@@ -55,7 +61,22 @@ impl From<Content> for ContentView {
             updated_at: c.updated_at,
             content_body: c.content_body,
             dht_anchor_hash: c.dht_anchor_hash,
+            trust,
         }
+    }
+}
+
+/// Compute the REQ-F10 `trust` legibility label from a row's provenance markers.
+/// `notarized` (green) > `published` (blue/peer-attested) > `unconfirmed`
+/// (amber — CRDT-converged-only OR all-null). Single source so both
+/// `From<Content>` and `content_view_from_epr_head` agree.
+fn trust_label(has_dht_anchor: bool, has_p2p_published: bool) -> String {
+    if has_dht_anchor {
+        "notarized".to_string()
+    } else if has_p2p_published {
+        "published".to_string()
+    } else {
+        "unconfirmed".to_string()
     }
 }
 
@@ -108,6 +129,11 @@ pub fn content_view_from_epr_head(head: &crate::epr_codec::EprHead) -> ContentVi
             .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string()),
         content_body: None,
         dht_anchor_hash: None,
+        // EPR-head projection carries no dht_anchor_hash and no
+        // p2p_published_at column — it is a minimal placeholder while the body
+        // fetches, so it labels honestly as unconfirmed (never over-claim a
+        // notarization the projection cannot evidence).
+        trust: trust_label(false, false),
     }
 }
 
@@ -234,5 +260,83 @@ impl From<crate::db::models::Comment> for CommentView {
             governance_state: c.governance_state,
             created_at: c.created_at,
         }
+    }
+}
+
+#[cfg(test)]
+mod trust_label_tests {
+    use super::*;
+
+    /// Build a bare Content row with all provenance markers NULL; callers set
+    /// only the marker under test.
+    fn bare_content() -> Content {
+        Content {
+            id: "epr:trust-fixture".to_string(),
+            h_app_id: "lamad".to_string(),
+            title: "Trust fixture".to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "public".to_string(),
+            validation_status: "valid".to_string(),
+            created_by: None,
+            created_at: "2026-07-01T00:00:00Z".to_string(),
+            updated_at: "2026-07-01T00:00:00Z".to_string(),
+            content_body: None,
+            dht_anchor_hash: None,
+            p2p_published_at: None,
+            server_blob_hash: None,
+            crdt_converged_at: None,
+        }
+    }
+
+    #[test]
+    fn trust_notarized_for_dht_anchor_row() {
+        let c = Content {
+            dht_anchor_hash: Some("uhCkk_anchor".to_string()),
+            ..bare_content()
+        };
+        assert_eq!(ContentView::from(c).trust, "notarized");
+    }
+
+    #[test]
+    fn trust_notarized_wins_over_published_and_converged() {
+        // Priority guard: dht_anchor beats p2p_published beats crdt_converged.
+        let c = Content {
+            dht_anchor_hash: Some("uhCkk_anchor".to_string()),
+            p2p_published_at: Some("2026-07-01T00:00:00Z".to_string()),
+            crdt_converged_at: Some("2026-07-01T00:00:00Z".to_string()),
+            ..bare_content()
+        };
+        assert_eq!(ContentView::from(c).trust, "notarized");
+    }
+
+    #[test]
+    fn trust_published_for_p2p_published_row() {
+        let c = Content {
+            p2p_published_at: Some("2026-07-01T00:00:00Z".to_string()),
+            ..bare_content()
+        };
+        assert_eq!(ContentView::from(c).trust, "published");
+    }
+
+    #[test]
+    fn trust_unconfirmed_for_crdt_converged_only_row() {
+        // The amber tier: converged-but-not-notarized must read as unconfirmed,
+        // never notarized — the whole point of REQ-F10 legibility.
+        let c = Content {
+            crdt_converged_at: Some("2026-07-01T00:00:00Z".to_string()),
+            ..bare_content()
+        };
+        assert_eq!(ContentView::from(c).trust, "unconfirmed");
+    }
+
+    #[test]
+    fn trust_unconfirmed_for_all_null_row() {
+        assert_eq!(ContentView::from(bare_content()).trust, "unconfirmed");
     }
 }

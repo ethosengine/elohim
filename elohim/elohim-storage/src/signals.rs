@@ -923,17 +923,26 @@ pub fn handle_mishpat_signal(
                     target_cid,
                     signed_at,
                 }) => {
-                    let affected = crate::db::mishpat_commitments::set_revoked_at(
+                    // A revoke target is either a `mishpat_commitments` row OR an
+                    // A-class lens (distinct tables over the same CID space) — set
+                    // both; each no-ops (0 rows) when the CID lives in the other
+                    // table. Without the lenses call a revoke targeting a lens
+                    // silently matched 0 rows and the lens stayed live in the market.
+                    let affected_commitments = crate::db::mishpat_commitments::set_revoked_at(
                         conn,
                         &target_cid,
                         &signed_at,
                     )
                     .map_err(|e| StorageError::Database(e.to_string()))?;
+                    let affected_lenses =
+                        crate::db::lenses::set_revoked_at(conn, &target_cid, &signed_at)
+                            .map_err(|e| StorageError::Database(e.to_string()))?;
                     tracing::info!(
                         target_cid = %target_cid,
                         action_hash = %action_hash,
-                        affected,
-                        "handle_mishpat_signal: revokes-commitment projected → set_revoked_at"
+                        affected_commitments,
+                        affected_lenses,
+                        "handle_mishpat_signal: revokes-commitment projected → set_revoked_at (commitments + lenses)"
                     );
                 }
                 Err(e) => {

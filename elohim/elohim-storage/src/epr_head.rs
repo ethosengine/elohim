@@ -79,8 +79,15 @@ pub fn derive_epr_head(
     gate_provenance: bool,
     enrich_pillars: bool,
 ) -> Result<Option<EprHead>, StorageError> {
-    let content_opt =
-        db::content_diesel::get_content_with_tags(conn, app_ctx, id, gate_provenance)?;
+    // Map the passthrough `gate_provenance` bool onto the tri-state trust gate
+    // with the fixed migration mapping (`true → Amber`, `false → Invisible`).
+    // `derive_epr_head`'s public bool signature is preserved (A2 scope).
+    let min_trust = if gate_provenance {
+        db::content_diesel::MinTrust::Amber
+    } else {
+        db::content_diesel::MinTrust::Invisible
+    };
+    let content_opt = db::content_diesel::get_content_with_tags(conn, app_ctx, id, min_trust)?;
 
     let content_with_tags = match content_opt {
         Some(cwt) => cwt,

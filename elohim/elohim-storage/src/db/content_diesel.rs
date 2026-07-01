@@ -15,6 +15,56 @@ pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 pub type DbConn = PooledConnection<ConnectionManager<SqliteConnection>>;
 
 // ============================================================================
+// Trust gate
+// ============================================================================
+
+/// Minimum trust tier a read admits — the "HTTP vs HTTPS" serving gate.
+/// (CRDT:HTTP :: CRDT+DHT-notary:HTTPS — amber serves like HTTP "Not secure".)
+///
+/// This replaces the earlier binary `require_provenance: bool` on the content
+/// read fns. The fixed migration mapping is `true → Amber`, `false → Invisible`
+/// — behaviour-preserving for all current data because `crdt_converged_at` is
+/// NULL on every row until the deploy-producer (A3) lands, so `Amber` equals
+/// the old `dht_anchor_hash OR p2p_published_at` gate today while additionally
+/// admitting future amber (converged-only) rows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MinTrust {
+    /// No trust filter — internal callers (drain/sync/replication) see all rows.
+    Invisible,
+    /// Serving floor: converged OR published OR notarized (admits the amber tier).
+    Amber,
+    /// Peer-attested custody or notarized (no bare-converged).
+    Blue,
+    /// Notarized only — authority/attribution/economic reads.
+    Green,
+}
+
+/// Apply the trust gate as a per-row WHERE filter on a boxed `content` query.
+///
+/// REQ-N7: this is a per-row WHERE filter, never a fail-closed collect. The
+/// boxed query is returned so callers keep their `.into_boxed()` chain intact.
+fn apply_min_trust<'a>(
+    q: content::BoxedQuery<'a, diesel::sqlite::Sqlite>,
+    min_trust: MinTrust,
+) -> content::BoxedQuery<'a, diesel::sqlite::Sqlite> {
+    match min_trust {
+        MinTrust::Invisible => q,
+        MinTrust::Amber => q.filter(
+            content::dht_anchor_hash
+                .is_not_null()
+                .or(content::p2p_published_at.is_not_null())
+                .or(content::crdt_converged_at.is_not_null()),
+        ),
+        MinTrust::Blue => q.filter(
+            content::dht_anchor_hash
+                .is_not_null()
+                .or(content::p2p_published_at.is_not_null()),
+        ),
+        MinTrust::Green => q.filter(content::dht_anchor_hash.is_not_null()),
+    }
+}
+
+// ============================================================================
 // Query Types
 // ============================================================================
 
@@ -82,6 +132,18 @@ pub struct UpdateContentInput {
     /// peers still satisfy the `require_provenance` read gate. None means
     /// "no change" — preserves the existing value on the row.
     pub p2p_published_at: Option<String>,
+    /// RFC-3339 timestamp marking the "amber" tier — `blob_hash` populated by
+    /// the deploy-time non-notarized producer (A3) or CRDT convergence, NOT by
+    /// DHT notarization. `Some(_)` switches this update into the AMBER path,
+    /// which additionally applies no-clobber precedence to `blob_hash`: the
+    /// amber `blob_hash` is written ONLY if the existing row's `blob_hash` is
+    /// NULL/empty, so a later notarized (green) `blob_hash` is never overwritten
+    /// by amber. `None` = normal update path (no amber stamp, blob_hash
+    /// coalesces as usual). NEVER pair this with a `dht_anchor_hash` write —
+    /// amber must not launder into notarized provenance (Content is not in
+    /// `is_integrity_kind`, so this diesel-direct write authors no DHT entry and
+    /// is not reverted by the reconcile controller).
+    pub crdt_converged_at: Option<String>,
 }
 
 fn default_content_type() -> String {
@@ -153,28 +215,21 @@ pub struct BulkResult {
 
 /// Get content by ID - scoped by app
 ///
-/// `require_provenance`: when true, rows lacking both `dht_anchor_hash` and
-/// `p2p_published_at` are filtered out — returning `Ok(None)` as if the row
-/// did not exist. External HTTP handlers should pass `true`; internal drain
-/// and replication paths should pass `false`.
+/// `min_trust`: the trust gate. Rows below the tier are filtered out —
+/// returning `Ok(None)` as if the row did not exist. External HTTP handlers
+/// pass `MinTrust::Amber` (the serving floor); internal drain and replication
+/// paths pass `MinTrust::Invisible`. See [`MinTrust`].
 pub fn get_content(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     content_id: &str,
-    require_provenance: bool,
+    min_trust: MinTrust,
 ) -> Result<Option<Content>, StorageError> {
-    let mut q = content::table
+    let q = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq(content_id))
         .into_boxed();
-
-    if require_provenance {
-        q = q.filter(
-            content::dht_anchor_hash
-                .is_not_null()
-                .or(content::p2p_published_at.is_not_null()),
-        );
-    }
+    let q = apply_min_trust(q, min_trust);
 
     q.first(conn)
         .optional()
@@ -183,28 +238,21 @@ pub fn get_content(
 
 /// Get content with tags - scoped by app
 ///
-/// `require_provenance`: see [`get_content`]. External HTTP handlers (e.g.
-/// `/epr-head/{id}`) should pass `true`; internal replication/sync paths in
-/// `p2p/mod.rs` should pass `false` so unpublished rows remain visible to the
-/// drain loop and shard inventory.
+/// `min_trust`: see [`get_content`]. External HTTP handlers (e.g.
+/// `/epr-head/{id}`) pass `MinTrust::Amber`; internal replication/sync paths in
+/// `p2p/mod.rs` pass `MinTrust::Invisible` so unpublished rows remain visible to
+/// the drain loop and shard inventory.
 pub fn get_content_with_tags(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     content_id: &str,
-    require_provenance: bool,
+    min_trust: MinTrust,
 ) -> Result<Option<ContentWithTags>, StorageError> {
-    let mut q = content::table
+    let q = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq(content_id))
         .into_boxed();
-
-    if require_provenance {
-        q = q.filter(
-            content::dht_anchor_hash
-                .is_not_null()
-                .or(content::p2p_published_at.is_not_null()),
-        );
-    }
+    let q = apply_min_trust(q, min_trust);
 
     let content_opt: Option<Content> = q
         .first(conn)
@@ -247,11 +295,31 @@ pub fn get_content_tags(
 /// `true`; internal drain/replication/sync paths pass `false`. This is a
 /// server-side parameter — NOT part of `ContentQuery` — so that clients
 /// cannot disable the gate via URL params.
+/// Page ALL content rows across every app scope, provenance-ungated.
+///
+/// Used ONLY by the Automerge DocStore corpus back-fill
+/// (`crate::sync::projector::backfill_content_docs`) — a projection REBUILD over
+/// already-notarized content, NOT an HTTP read surface, hence no `h_app_id`
+/// scoping and no provenance gate. Ordered by `id` for stable pagination across
+/// pages. `offset`/`limit` are clamped to sane values.
+pub fn list_all_content_rows(
+    conn: &mut SqliteConnection,
+    offset: i64,
+    limit: i64,
+) -> Result<Vec<Content>, StorageError> {
+    content::table
+        .order(content::id.asc())
+        .offset(offset.max(0))
+        .limit(limit.max(1))
+        .load::<Content>(conn)
+        .map_err(|e| StorageError::Internal(format!("list_all_content_rows failed: {}", e)))
+}
+
 pub fn list_content(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     query: &ContentQuery,
-    require_provenance: bool,
+    min_trust: MinTrust,
 ) -> Result<Vec<ContentWithTags>, StorageError> {
     // Prepare search pattern if needed (must outlive the query)
     let search_pattern = query.search.as_ref().map(|s| format!("%{}%", s));
@@ -282,17 +350,12 @@ pub fn list_content(
         base_query = base_query.filter(content::reach.eq(reach));
     }
 
-    // Provenance gate: exclude rows that have been neither notarized on Holochain
-    // (dht_anchor_hash) nor published to libp2p Kad (p2p_published_at). Either marker
-    // is sufficient. External HTTP reads set this to true; internal drain-loop
-    // queries set it to false so the loop can see unpublished rows.
-    if require_provenance {
-        base_query = base_query.filter(
-            content::dht_anchor_hash
-                .is_not_null()
-                .or(content::p2p_published_at.is_not_null()),
-        );
-    }
+    // Trust gate: exclude rows below the requested tier. `Amber` (the serving
+    // floor) admits rows notarized on Holochain (dht_anchor_hash), published to
+    // libp2p Kad (p2p_published_at), OR CRDT-converged (crdt_converged_at) —
+    // any one marker suffices. External HTTP reads pass `Amber`; internal
+    // drain-loop queries pass `Invisible` so the loop can see unpublished rows.
+    base_query = apply_min_trust(base_query, min_trust);
 
     // Execute query
     let contents: Vec<Content> = base_query
@@ -491,8 +554,8 @@ pub fn update_content(
     let id = &input.id;
 
     // Verify the row exists in this app scope. Internal update path — always
-    // `require_provenance: false` so we can update rows pre-drain.
-    let existing = get_content_with_tags(conn, ctx, id, false)?
+    // `MinTrust::Invisible` so we can update rows pre-drain.
+    let existing = get_content_with_tags(conn, ctx, id, MinTrust::Invisible)?
         .ok_or_else(|| StorageError::NotFound(format!("Content not found: {}", id)))?;
 
     // Apply scalar field updates — use provided value or fall back to existing
@@ -514,10 +577,34 @@ pub fn update_content(
         .metadata_json
         .as_deref()
         .or(existing.content.metadata_json.as_deref());
-    let new_blob_hash = input
+    // blob_hash resolution. Normal path: coalesce (provided value wins, else
+    // keep existing). AMBER path (`crdt_converged_at.is_some()`): no-clobber —
+    // the amber blob_hash is written ONLY when the existing row's blob_hash is
+    // NULL/empty. This is the precedence guard the deploy-producer (A3) relies
+    // on: a notarized (green) blob_hash already on the row must NEVER be
+    // overwritten by an amber write, only the reverse (green overwrites amber).
+    let existing_blob_empty = existing
+        .content
         .blob_hash
         .as_deref()
-        .or(existing.content.blob_hash.as_deref());
+        .map(|s| s.is_empty())
+        .unwrap_or(true);
+    let is_amber_write = input.crdt_converged_at.is_some();
+    let new_blob_hash = if is_amber_write && !existing_blob_empty {
+        // Amber must not clobber a present (possibly notarized) blob_hash.
+        existing.content.blob_hash.as_deref()
+    } else {
+        input
+            .blob_hash
+            .as_deref()
+            .or(existing.content.blob_hash.as_deref())
+    };
+    // crdt_converged_at: no-clobber preserve on the normal path; stamp on the
+    // amber path. Never touches dht_anchor_hash (this UPDATE has no anchor set).
+    let new_crdt_converged_at = input
+        .crdt_converged_at
+        .as_deref()
+        .or(existing.content.crdt_converged_at.as_deref());
     // No-clobber: a serverBlobHash-only PATCH falls back to the existing
     // server_blob_hash; a blob_hash-only PATCH leaves server_blob_hash untouched.
     let new_server_blob_hash = input
@@ -547,6 +634,7 @@ pub fn update_content(
             content::blob_hash.eq(new_blob_hash),
             content::server_blob_hash.eq(new_server_blob_hash),
             content::p2p_published_at.eq(new_p2p_published_at),
+            content::crdt_converged_at.eq(new_crdt_converged_at),
             content::updated_at.eq(&now),
         ))
         .execute(conn)
@@ -575,8 +663,8 @@ pub fn update_content(
             }
         }
 
-        // Return updated record — internal fetch, no provenance gate.
-        get_content_with_tags(conn, ctx, id, false)?
+        // Return updated record — internal fetch, no trust gate.
+        get_content_with_tags(conn, ctx, id, MinTrust::Invisible)?
             .ok_or_else(|| StorageError::Internal("Failed to fetch updated content".into()))
     })
 }
@@ -598,9 +686,9 @@ pub fn delete_content(
     Ok(deleted > 0)
 }
 
-/// Internal-only: lists content rows tagged with `tag`. The `require_provenance`
-/// parameter must be passed by the caller; pass `false` for internal callers
-/// (this function has no external HTTP route as of 2026-04-08).
+/// Internal-only: lists content rows tagged with `tag`. Internal helper —
+/// always `MinTrust::Invisible` (this function has no external HTTP route as of
+/// 2026-04-08).
 pub fn get_content_by_tag(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
@@ -617,7 +705,7 @@ pub fn get_content_by_tag(
             limit,
             ..Default::default()
         },
-        false,
+        MinTrust::Invisible,
     )
 }
 
@@ -904,13 +992,13 @@ pub fn content_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i6
 /// Count content matching a query (respects filters, ignores limit/offset).
 /// Used for pagination total counts.
 ///
-/// `require_provenance`: see [`list_content`]. External paginators MUST pass
-/// `true` so totals stay consistent with the gated row set.
+/// `min_trust`: see [`list_content`]. External paginators MUST pass
+/// `MinTrust::Amber` so totals stay consistent with the gated row set.
 pub fn count_content(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     query: &ContentQuery,
-    require_provenance: bool,
+    min_trust: MinTrust,
 ) -> Result<i64, StorageError> {
     let search_pattern = query.search.as_ref().map(|s| format!("%{}%", s));
 
@@ -935,15 +1023,9 @@ pub fn count_content(
         base_query = base_query.filter(content::reach.eq(reach));
     }
 
-    // Provenance gate: mirrors list_content. External paginators must set this
-    // to true so totals stay consistent with the filtered row set.
-    if require_provenance {
-        base_query = base_query.filter(
-            content::dht_anchor_hash
-                .is_not_null()
-                .or(content::p2p_published_at.is_not_null()),
-        );
-    }
+    // Trust gate: mirrors list_content. External paginators must pass
+    // `MinTrust::Amber` so totals stay consistent with the filtered row set.
+    base_query = apply_min_trust(base_query, min_trust);
 
     base_query
         .count()
@@ -1130,6 +1212,7 @@ mod tests {
                 created_by TEXT,
                 dht_anchor_hash TEXT,
                 p2p_published_at TEXT,
+                crdt_converged_at TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
@@ -1204,10 +1287,12 @@ mod tests {
         let lamad_count = content_count(&mut conn, &lamad_ctx).unwrap();
         assert_eq!(lamad_count, 1, "Lamad should have 1 content item");
 
-        let lamad_manifesto = get_content(&mut conn, &lamad_ctx, "manifesto", false).unwrap();
+        let lamad_manifesto =
+            get_content(&mut conn, &lamad_ctx, "manifesto", MinTrust::Invisible).unwrap();
         assert!(lamad_manifesto.is_some(), "Lamad should find manifesto");
 
-        let lamad_resources = get_content(&mut conn, &lamad_ctx, "resources", false).unwrap();
+        let lamad_resources =
+            get_content(&mut conn, &lamad_ctx, "resources", MinTrust::Invisible).unwrap();
         assert!(
             lamad_resources.is_none(),
             "Lamad should NOT find elohim's resources"
@@ -1217,10 +1302,12 @@ mod tests {
         let elohim_count = content_count(&mut conn, &elohim_ctx).unwrap();
         assert_eq!(elohim_count, 1, "Elohim should have 1 content item");
 
-        let elohim_resources = get_content(&mut conn, &elohim_ctx, "resources", false).unwrap();
+        let elohim_resources =
+            get_content(&mut conn, &elohim_ctx, "resources", MinTrust::Invisible).unwrap();
         assert!(elohim_resources.is_some(), "Elohim should find resources");
 
-        let elohim_manifesto = get_content(&mut conn, &elohim_ctx, "manifesto", false).unwrap();
+        let elohim_manifesto =
+            get_content(&mut conn, &elohim_ctx, "manifesto", MinTrust::Invisible).unwrap();
         assert!(
             elohim_manifesto.is_none(),
             "Elohim should NOT find lamad's manifesto"
@@ -1450,7 +1537,7 @@ mod tests {
                 offset: 0,
                 ..Default::default()
             },
-            false,
+            MinTrust::Invisible,
         )
         .unwrap();
         assert_eq!(
@@ -1468,7 +1555,7 @@ mod tests {
                 offset: 0,
                 ..Default::default()
             },
-            true,
+            MinTrust::Amber,
         )
         .unwrap();
         assert_eq!(
@@ -1513,10 +1600,17 @@ mod tests {
         .execute(&mut conn)
         .unwrap();
 
-        let unrestricted = count_content(&mut conn, &ctx, &ContentQuery::default(), false).unwrap();
+        let unrestricted = count_content(
+            &mut conn,
+            &ctx,
+            &ContentQuery::default(),
+            MinTrust::Invisible,
+        )
+        .unwrap();
         assert_eq!(unrestricted, 2, "unrestricted count should see both rows");
 
-        let gated = count_content(&mut conn, &ctx, &ContentQuery::default(), true).unwrap();
+        let gated =
+            count_content(&mut conn, &ctx, &ContentQuery::default(), MinTrust::Amber).unwrap();
         assert_eq!(gated, 1, "gated count should filter out unpublished rows");
     }
 
@@ -1545,14 +1639,14 @@ mod tests {
 
         // Gated fetch: row has no dht_anchor_hash and no p2p_published_at →
         // external reads must see None, as if the row did not exist.
-        let gated = get_content(&mut conn, &ctx, "cid-unpublished", true).unwrap();
+        let gated = get_content(&mut conn, &ctx, "cid-unpublished", MinTrust::Amber).unwrap();
         assert!(
             gated.is_none(),
             "gated get_content must hide unpublished rows from external readers"
         );
 
         // Ungated fetch: internal callers (drain loop) must still see it.
-        let ungated = get_content(&mut conn, &ctx, "cid-unpublished", false).unwrap();
+        let ungated = get_content(&mut conn, &ctx, "cid-unpublished", MinTrust::Invisible).unwrap();
         assert!(
             ungated.is_some(),
             "ungated get_content must still return unpublished rows for internal callers"
@@ -1596,12 +1690,13 @@ mod tests {
 
         // Gated (external) read: the ingest-anchored row is visible WITHOUT any
         // p2p_published_at stamp; the un-anchored row is hidden.
-        let anchored_read = get_content(&mut conn, &ctx, "cid-anchored", true).unwrap();
+        let anchored_read = get_content(&mut conn, &ctx, "cid-anchored", MinTrust::Amber).unwrap();
         assert!(
             anchored_read.is_some(),
-            "ingest dht_anchor_hash must satisfy require_provenance at create time"
+            "ingest dht_anchor_hash must satisfy the Amber trust gate at create time"
         );
-        let unanchored_read = get_content(&mut conn, &ctx, "cid-unanchored", true).unwrap();
+        let unanchored_read =
+            get_content(&mut conn, &ctx, "cid-unanchored", MinTrust::Amber).unwrap();
         assert!(
             unanchored_read.is_none(),
             "content with neither anchor nor publish must stay hidden from external reads"
@@ -1641,14 +1736,14 @@ mod tests {
         };
 
         // External call pattern — what handle_db_content_list will invoke.
-        let external = list_content(&mut conn, &ctx, &q, true).unwrap();
+        let external = list_content(&mut conn, &ctx, &q, MinTrust::Amber).unwrap();
         assert!(
             external.is_empty(),
             "external list must not leak unpublished content"
         );
 
         // Internal call pattern — what p2p replication/drain paths invoke.
-        let internal = list_content(&mut conn, &ctx, &q, false).unwrap();
+        let internal = list_content(&mut conn, &ctx, &q, MinTrust::Invisible).unwrap();
         assert_eq!(
             internal.len(),
             1,
@@ -1684,14 +1779,16 @@ mod tests {
         create_content(&mut conn, &ctx, row).unwrap();
 
         // External call pattern — what handle_db_content_by_id will invoke.
-        let external = get_content_with_tags(&mut conn, &ctx, "cid-unpublished", true).unwrap();
+        let external =
+            get_content_with_tags(&mut conn, &ctx, "cid-unpublished", MinTrust::Amber).unwrap();
         assert!(
             external.is_none(),
             "external get must not leak unpublished content"
         );
 
         // Internal call pattern.
-        let internal = get_content_with_tags(&mut conn, &ctx, "cid-unpublished", false).unwrap();
+        let internal =
+            get_content_with_tags(&mut conn, &ctx, "cid-unpublished", MinTrust::Invisible).unwrap();
         assert!(
             internal.is_some(),
             "internal get must still see unpublished content"
@@ -1858,6 +1955,7 @@ mod tests {
             blob_hash: None,
             server_blob_hash: None,
             p2p_published_at: None,
+            crdt_converged_at: None,
         };
         assert_eq!(input.id, "test-id");
     }
@@ -1893,7 +1991,7 @@ mod tests {
 
         // Provenance gate hides it: require_provenance=true → None.
         assert!(
-            get_content_with_tags(&mut conn, &ctx, "patch-prov-test", true)
+            get_content_with_tags(&mut conn, &ctx, "patch-prov-test", MinTrust::Amber)
                 .unwrap()
                 .is_none(),
             "pre-stamp: provenance gate must hide an unpublished row"
@@ -1912,7 +2010,7 @@ mod tests {
 
         // Provenance gate now passes — the row is visible to external reads.
         assert!(
-            get_content_with_tags(&mut conn, &ctx, "patch-prov-test", true)
+            get_content_with_tags(&mut conn, &ctx, "patch-prov-test", MinTrust::Amber)
                 .unwrap()
                 .is_some(),
             "post-stamp: provenance gate must reveal a stamped row"
@@ -1993,9 +2091,10 @@ mod tests {
         };
         bulk_create_content(&mut conn, &ctx, vec![create]).unwrap();
         // Pre-state: server_blob_hash absent (the normal pre-deploy state).
-        let pre = get_content_with_tags(&mut conn, &ctx, "elohim-host-landing", false)
-            .unwrap()
-            .unwrap();
+        let pre =
+            get_content_with_tags(&mut conn, &ctx, "elohim-host-landing", MinTrust::Invisible)
+                .unwrap()
+                .unwrap();
         assert_eq!(pre.content.server_blob_hash, None);
 
         // PATCH only server_blob_hash — must persist it and leave blob_hash/title alone.
@@ -2018,9 +2117,10 @@ mod tests {
         assert_eq!(result.content.title, "Landing");
 
         // GET-equivalent re-read returns serverBlobHash (round-trip).
-        let got = get_content_with_tags(&mut conn, &ctx, "elohim-host-landing", false)
-            .unwrap()
-            .unwrap();
+        let got =
+            get_content_with_tags(&mut conn, &ctx, "elohim-host-landing", MinTrust::Invisible)
+                .unwrap()
+                .unwrap();
         assert_eq!(
             got.content.server_blob_hash.as_deref(),
             Some("sha256-ssrserver")
@@ -2042,6 +2142,237 @@ mod tests {
             result2.content.server_blob_hash.as_deref(),
             Some("sha256-ssrserver"),
             "blob_hash-only PATCH must retain the previously-set serverBlobHash (no clobber)"
+        );
+    }
+
+    /// A2 proof (RED before the tri-state gate): a row with ONLY
+    /// `crdt_converged_at` set — no `dht_anchor_hash`, no `p2p_published_at` —
+    /// is the "amber" tier. `MinTrust::Amber` (the serving floor) must admit it;
+    /// `MinTrust::Green` (notarized-only, for authority/attribution/economic
+    /// reads) must exclude it. A `dht_anchor_hash`-bearing row is admitted by
+    /// BOTH. The old binary provenance gate could not express this distinction.
+    #[test]
+    fn amber_admitted_green_excluded() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        let mk = |id: &str| CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "commons".to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+            dht_anchor_hash: None,
+        };
+
+        // Amber row: converged only (no anchor, no publish stamp).
+        create_content(&mut conn, &ctx, mk("cid-amber")).unwrap();
+        diesel::sql_query(
+            "UPDATE content SET crdt_converged_at = datetime('now') WHERE id = 'cid-amber'",
+        )
+        .execute(&mut conn)
+        .unwrap();
+
+        // Green row: DHT-notarized (dht_anchor_hash set at ingest).
+        let mut anchored = mk("cid-green");
+        anchored.dht_anchor_hash = Some("bafy-notarized-anchor".to_string());
+        create_content(&mut conn, &ctx, anchored).unwrap();
+
+        let q = ContentQuery {
+            limit: 10,
+            ..Default::default()
+        };
+
+        // Amber tier admits BOTH the converged row and the notarized row.
+        let amber = list_content(&mut conn, &ctx, &q, MinTrust::Amber).unwrap();
+        let amber_ids: std::collections::HashSet<&str> =
+            amber.iter().map(|c| c.content.id.as_str()).collect();
+        assert!(
+            amber_ids.contains("cid-amber"),
+            "Amber must admit a converged-only row"
+        );
+        assert!(
+            amber_ids.contains("cid-green"),
+            "Amber must admit a notarized row"
+        );
+
+        // Green tier excludes the bare-converged amber row, admits only notarized.
+        let green = list_content(&mut conn, &ctx, &q, MinTrust::Green).unwrap();
+        let green_ids: std::collections::HashSet<&str> =
+            green.iter().map(|c| c.content.id.as_str()).collect();
+        assert!(
+            !green_ids.contains("cid-amber"),
+            "Green must EXCLUDE a bare-converged (non-notarized) row"
+        );
+        assert!(
+            green_ids.contains("cid-green"),
+            "Green must admit a notarized row"
+        );
+
+        // Cross-check the same distinction on get_content (single-row path).
+        assert!(
+            get_content(&mut conn, &ctx, "cid-amber", MinTrust::Amber)
+                .unwrap()
+                .is_some(),
+            "Amber get_content admits the converged row"
+        );
+        assert!(
+            get_content(&mut conn, &ctx, "cid-amber", MinTrust::Green)
+                .unwrap()
+                .is_none(),
+            "Green get_content hides the converged row"
+        );
+    }
+
+    /// Build a bare SPA-bundle content row (no blob_hash, no provenance) — the
+    /// exact pre-deploy state that 404s on the live host today.
+    fn mk_bundle(id: &str) -> CreateContentInput {
+        CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "app".to_string(),
+            content_format: "spa-bundle".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "commons".to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+            dht_anchor_hash: None,
+        }
+    }
+
+    /// The app-bundle slug query `lookup_slug_blob_hash` runs (content_format in
+    /// the app-bundle set, MinTrust::Amber). Returns the resolved blob_hash for
+    /// `id`, or None if the row is below the Amber floor / has no hash.
+    fn slug_lookup_amber(conn: &mut SqliteConnection, ctx: &AppContext, id: &str) -> Option<String> {
+        let q = ContentQuery {
+            content_format: Some("spa-bundle".to_string()),
+            limit: 100,
+            ..Default::default()
+        };
+        list_content(conn, ctx, &q, MinTrust::Amber)
+            .unwrap()
+            .into_iter()
+            .find(|c| c.content.id == id)
+            .and_then(|c| c.content.blob_hash.filter(|h| !h.is_empty()))
+    }
+
+    /// A3 proof (RED before A3): a seeded SPA-bundle row with no blob_hash and no
+    /// conductor bridge 404s at the slug lookup today. The deploy-producer amber
+    /// write (marker set, `(true, None)` branch) records `blob_hash` +
+    /// `crdt_converged_at` diesel-direct, NEVER `dht_anchor_hash`. The row then
+    /// resolves through the SAME query `lookup_slug_blob_hash` runs
+    /// (MinTrust::Amber) — so the SPA mount serves 200. Authority reads (Green)
+    /// still exclude it (amber is never authoritative).
+    #[test]
+    fn amber_patch_no_conductor_serves_200() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let id = "epr:elohim-host-landing";
+        create_content(&mut conn, &ctx, mk_bundle(id)).unwrap();
+
+        // RED: pre-amber the row is below the Amber floor (no provenance marker)
+        // → the slug lookup resolves nothing → 404.
+        assert_eq!(
+            slug_lookup_amber(&mut conn, &ctx, id),
+            None,
+            "pre-amber: no provenance marker → slug lookup 404s"
+        );
+
+        // The amber write — exactly what ContentService::update_amber does: set
+        // blob_hash + stamp crdt_converged_at, never dht_anchor_hash.
+        let amber = UpdateContentInput {
+            id: id.to_string(),
+            blob_hash: Some("sha256-amberbundle".to_string()),
+            crdt_converged_at: Some(chrono::Utc::now().to_rfc3339()),
+            ..Default::default()
+        };
+        update_content(&mut conn, &ctx, amber).unwrap();
+
+        // Row state: blob_hash + crdt_converged_at set, dht_anchor_hash STILL NULL.
+        let row = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.blob_hash.as_deref(), Some("sha256-amberbundle"));
+        assert!(row.crdt_converged_at.is_some(), "amber tier stamped");
+        assert!(
+            row.dht_anchor_hash.is_none(),
+            "amber write must NEVER set dht_anchor_hash (no laundering into notarized)"
+        );
+
+        // GREEN: the amber row now resolves at the slug lookup → mount serves 200.
+        assert_eq!(
+            slug_lookup_amber(&mut conn, &ctx, id),
+            Some("sha256-amberbundle".to_string()),
+            "amber row resolves at the Amber-floor slug lookup → SPA mount serves 200"
+        );
+
+        // Defense-in-depth: an authority read at Green must NOT see the amber row.
+        let green = list_content(
+            &mut conn,
+            &ctx,
+            &ContentQuery {
+                content_format: Some("spa-bundle".to_string()),
+                limit: 100,
+                ..Default::default()
+            },
+            MinTrust::Green,
+        )
+        .unwrap();
+        assert!(
+            green.iter().all(|c| c.content.id != id),
+            "Green (authority/attribution) read must exclude the amber row"
+        );
+    }
+
+    /// A3 precedence guard: once a row carries a notarized (green) blob_hash, a
+    /// later amber write must NOT overwrite it — green wins, amber never the
+    /// reverse. The crdt marker may still be stamped (harmless), and the existing
+    /// dht_anchor_hash is preserved.
+    #[test]
+    fn amber_write_never_clobbers_notarized_blob_hash() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let id = "epr:pinned-landing";
+
+        let mut green = mk_bundle(id);
+        green.blob_hash = Some("sha256-greenbundle".to_string());
+        green.dht_anchor_hash = Some("bafy-notarized-anchor".to_string());
+        create_content(&mut conn, &ctx, green).unwrap();
+
+        // Amber write tries to set a DIFFERENT blob_hash.
+        let amber = UpdateContentInput {
+            id: id.to_string(),
+            blob_hash: Some("sha256-amberbundle".to_string()),
+            crdt_converged_at: Some(chrono::Utc::now().to_rfc3339()),
+            ..Default::default()
+        };
+        update_content(&mut conn, &ctx, amber).unwrap();
+
+        let row = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.blob_hash.as_deref(),
+            Some("sha256-greenbundle"),
+            "amber must NOT clobber a present (notarized) blob_hash"
+        );
+        assert_eq!(
+            row.dht_anchor_hash.as_deref(),
+            Some("bafy-notarized-anchor"),
+            "existing notarized anchor preserved"
         );
     }
 }

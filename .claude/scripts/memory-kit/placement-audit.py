@@ -31,6 +31,7 @@ LEDGER = "--ledger" in FLAGS
 HEADLINE = "--headline" in FLAGS
 COVERAGE = "--coverage" in FLAGS
 STASIS = "--stasis" in FLAGS
+EPR_META = "--epr-meta" in FLAGS
 CS_OVERRIDE = None
 if "--cluster-state" in sys.argv[1:]:
     i = sys.argv.index("--cluster-state")
@@ -183,7 +184,10 @@ def load_manifest():
         indent = len(raw) - len(raw.lstrip(" "))
         s = raw.strip()
         if indent == 0:
-            section, key = s.rstrip(":"), None
+            # strip any inline comment BEFORE the colon — `dimensions:   # …` must resolve to
+            # `dimensions`, else the section never matches and its weights/exclusions are silently
+            # dropped (DIMENSION_WEIGHTS == {} → every weight falls back to 1.0, defeating tuning).
+            section, key = s.split("#", 1)[0].strip().rstrip(":"), None
         elif section in ("targets", "dimensions") and indent == 2 and s.endswith(":"):
             key = s[:-1].strip()
             cfg[section].setdefault(key, {})
@@ -270,6 +274,58 @@ def scan_memory():
             fm = parse_front_matter(f.read_text(errors="replace"))
             out.append({"path": str(f.relative_to(ROOT)), "linked": bool(fm.get("cites")),
                         "requires_env": requires_env_of(fm)})
+    return out
+
+
+# ── STRAY-DOC CENSUS — the REMEDIAL leg (2026-06-26) ─────────────────────────
+# The compose-gate (.epr-meta) is PREVENTIVE: it makes a new doc born governed, but it never
+# reaches back to relocate a draft already parked outside a home, nor heals a redirect stub a
+# prior move left behind. cleanup-scan and every other sweep only ever looked INSIDE the
+# registered SURFACES — so the unscoped gap (repo-root *.md and the genesis/docs root, above
+# the surface subdirs) was the one place residue could pile up invisibly. This census closes
+# that gap; like the pressure dirs, it must trend to 0. Two zones, conventional docs allowed.
+STRAY_ZONES = [("<root>", ""), ("genesis/docs", "genesis/docs")]
+# Structural/conventional docs that legitimately live at a scanned root → never stray.
+# Matched CASE-INSENSITIVELY: this repo uses a lowercase `claude.md` directory-doc pattern (a
+# routing-referenced, non-auto-loaded nav doc — see _PROCESS_MARKERS in subject_routing.py, which
+# lower()s before matching) alongside the uppercase gospel `CLAUDE.md`; both are legitimate.
+# ROADMAP.md is deliberately ABSENT: this repo homes the roadmap under genesis/data/timeline/
+# roadmap/ (the doc-lifecycle design's P0 retires the root stub), so a root ROADMAP.md is a
+# REDIRECT-STUB to surface, not a home. A future intentional root redirect can be allow-listed.
+STRAY_ALLOW = {
+    "": {"README.md", "CLAUDE.md", "AGENTS.md", "GEMINI.md", "LICENSE.md",
+         "CONTRIBUTING.md", "SECURITY.md", "CHANGELOG.md", "CODE_OF_CONDUCT.md"},
+    "genesis/docs": {"PLACEMENT.md", "CLAUDE.md", "README.md"},
+}
+STUB_RE = re.compile(r"\b(moved|now lives|relocated|see instead|split into|"
+                     r"preserved in git history|generated|do not edit|projected from)\b", re.I)
+
+
+def scan_stray():
+    """The unscoped gap: *.md parked at the repo root or the genesis/docs root — outside every
+    registered SURFACE and not a conventional/structural doc. Each is classified REDIRECT-STUB
+    (a short 'moved/see/generated' pointer — a half-cleanup breadcrumb) or STRAY-DRAFT (an
+    ungoverned working draft that still owes a governed home). Residue → 0."""
+    out = []
+    for label, rel in STRAY_ZONES:
+        d = (ROOT / rel) if rel else ROOT
+        if not d.is_dir():
+            continue
+        allow = {a.lower() for a in STRAY_ALLOW.get(rel, set())}
+        for f in sorted(d.glob("*.md")):
+            if f.name.startswith(".") or f.name.lower() in allow:
+                continue
+            try:
+                if not f.is_file():   # a dir named *.md, or a broken symlink — never crash the headline
+                    continue
+                text = f.read_text(errors="replace")
+            except OSError:           # unreadable/permission/race — degrade like the sibling gates, don't blank SessionStart
+                continue
+            body = "\n".join(ln for ln in text.splitlines()
+                             if ln.strip() and not ln.lstrip().startswith("#"))
+            nlines = text.count("\n") + 1
+            kind = "REDIRECT-STUB" if (nlines <= 25 and STUB_RE.search(body)) else "STRAY-DRAFT"
+            out.append({"path": str(f.relative_to(ROOT)), "zone": label, "kind": kind})
     return out
 
 
@@ -629,6 +685,7 @@ def stasis_mode():
         ("history: bidirectional canonical link", _ratio(hist_ok, len(hist)) if hist else 1.0),
         ("traceability: docs carry explained trace links", trace_coverage(active)),
         ("MEMORY.md within byte budget", 1.0 if mmd_bytes <= MEMORY_MD_BUDGET * (1 + STASIS_MARGIN) else MEMORY_MD_BUDGET / max(mmd_bytes, 1)),
+        ("epr-meta: substantial dirs owned by an .epr-meta", epr_meta_coverage_data()["ratio"]),
     ]
     hard = [("_retired dumps == 0", dumps == 0), ("pressure dirs empty", pressure_docs == 0)]
     unmeasured = [
@@ -639,7 +696,7 @@ def stasis_mode():
     thr = 1 - STASIS_MARGIN
     # weighted by the manifest's per-dimension weights (KEYS aligned with `measured` order)
     KEYS = ["capture", "status", "well_formed", "memory_linked", "claude_md_rightsized",
-            "history_bidirectional", "traceability", "memory_md_budget"]
+            "history_bidirectional", "traceability", "memory_md_budget", "epr_meta_coverage"]
     weights = [DIMENSION_WEIGHTS.get(k, 1.0) for k in KEYS]
     wsum = sum(weights) or 1.0
     score = sum(r * w for (_, r), w in zip(measured, weights)) / wsum
@@ -763,6 +820,67 @@ def map_currency_line():
             f"   ({'walk current ✅' if n == 0 else '⚠ MAP.md may be stale vs seeds → refresh the walk'})")
 
 
+# ── .epr-meta governance coverage — the directory-level meta-behavior dimension. Reuses the
+# subtree-coverage walk in _lib/epr_meta.py (a `covers: subtree` manifest is fully responsible for
+# its subtree → the walk terminates there; a substantial unclaimed dir is a GAP). The downward dual
+# of claude-md-audit's missing-CLAUDE.md census: that asks "does every complex dir front-load init
+# context?", this asks "is every substantial region OWNED by a self-responsible .epr-meta?". ──
+def epr_meta_coverage_data() -> dict:
+    """Run the subtree-coverage census with the repo's tuned thresholds + submodule/yaml exclusions —
+    the SINGLE config source `_lib/epr_meta.governance_cfg`, shared with the in-flight resolver hook so
+    the descending census and the ascending nudge can never disagree about which dirs are governable."""
+    from _lib import epr_meta as _em  # _lib is on sys.path via the bootstrap above
+    c = _em.governance_cfg(ROOT)
+    return _em.subtree_coverage(ROOT, min_files=c["min_files"], min_subdirs=c["min_subdirs"],
+                                min_exts=c["min_exts"], exclude_globs=c["exclude_globs"])
+
+
+def epr_meta_line() -> str:
+    """Headline token: are the codebase's substantial directories OWNED by a self-responsible
+    .epr-meta? `covers: subtree` to claim a region. Absent/error → graceful gate-liveness note."""
+    try:
+        d = epr_meta_coverage_data()
+    except Exception as e:  # noqa: BLE001
+        return f"  epr-meta: ⚠ gate-error ({type(e).__name__})"
+    total = d["covered_count"] + d["gap_count"]
+    if total == 0:
+        return "  epr-meta: no governable regions ✅"
+    if d["gap_count"] == 0:
+        return f"  epr-meta: {d['covered_count']}/{total} regions claimed   (all governable context owned ✅)"
+    return (f"  epr-meta: {d['covered_count']}/{total} regions claimed"
+            f"   (⚠ {d['gap_count']} unclaimed → `placement-audit.py --epr-meta` to remediate)")
+
+
+def epr_meta_mode() -> int:
+    """The remediation queue: every substantial directory not yet owned by a `covers: subtree`
+    manifest. Each row is resolved by ONE placement — an `.epr-meta` (with rules, or with none and a
+    `why:` recording the considered decision) declaring `covers: subtree` at/above that altitude."""
+    d = epr_meta_coverage_data()
+    total = d["covered_count"] + d["gap_count"]
+    if AS_JSON:
+        print(json.dumps(d, indent=1))
+        return 0
+    print(f"EPR-META GOVERNANCE COVERAGE — {d['covered_count']}/{total} substantial regions owned "
+          f"(ratio {d['ratio']:.3f})")
+    print("=" * 72)
+    print("A region is OWNED when an `.epr-meta` at/above it declares `covers: subtree` (it is then")
+    print("fully responsible for its subtree — integrity by construction, never re-audited). Resolve")
+    print("each gap with ONE placement: rules where there's a mechanizable drift, or a rules-free")
+    print("manifest with a `why:` recording the considered 'no edit-time gate needed' decision.\n")
+    if d["covered"]:
+        print(f"OWNED regions ({d['covered_count']}):")
+        for c in d["covered"]:
+            print(f"  ✓ {c}")
+        print()
+    if d["gaps"]:
+        print(f"UNCLAIMED regions ({d['gap_count']}) — the remediation queue, by file-count:")
+        for g in sorted(d["gaps"], key=lambda g: -g["files"]):
+            print(f"  {g['files']:>4}f {g['subdirs']:>2}d  {g['path']:<54} {g['exts']}")
+    else:
+        print("All governable regions are owned ✅")
+    return 0
+
+
 def _gate_subprocess(gate: str, script: str, flag: str, timeout: int = 15) -> str:
     """Run a headline gate's backing script with INSTRUMENT LIVENESS: a gate that
     crashes must surface as `⚠ gate-error`, never silently vanish. (Incident
@@ -828,10 +946,12 @@ def headline_mode():
     if STATE_ROOT.is_dir():
         pe = all(len([f for f in sub.glob("*.md") if f.name not in ("CLAUDE.md", "README.md")]) == 0
                  for sub in STATE_ROOT.iterdir() if sub.is_dir())
+    ns = len(scan_stray())  # remedial leg: ungoverned .md at the repo/docs root (residue → 0)
     due = decompose_due_count()
     print("MEMORY BUDGET  (`placement-audit.py --ledger` = per-file queue · `--focus` = testable scope)")
     print(f"  debt: {no_exit} no-status · {mem_un} unlinked-memory · {claimed} claimed-unverified"
-          f"   |   pressure-dirs: {'empty ✅' if pe else '⚠ NON-EMPTY (pressure)'}")
+          f"   |   pressure-dirs: {'empty ✅' if pe else '⚠ NON-EMPTY (pressure)'}"
+          f" · stray: {'clean ✅' if ns == 0 else f'⚠ {ns} (relocate — see scoreboard)'}")
     print(f"  testable env: {', '.join(a) or 'none'}   |   blocked-by-env: {', '.join(u) or 'none'}")
     cov = decompose_coverage(surface)
     print(f"  review: {cov['captured']}/{cov['active']} specs+plans decomposed · "
@@ -861,6 +981,11 @@ def headline_mode():
     sc = scope_line()
     if sc:
         print(sc)
+    # DIRECTORY-GOVERNANCE gate: is every substantial code region OWNED by a self-responsible .epr-meta?
+    try:
+        print(epr_meta_line())
+    except Exception as e:  # noqa: BLE001 — instrument liveness
+        print(f"  epr-meta: ⚠ gate-error ({type(e).__name__})")
     return 0
 
 
@@ -875,6 +1000,8 @@ def main() -> int:
         return coverage_mode()
     if STASIS:
         return stasis_mode()
+    if EPR_META:
+        return epr_meta_mode()
 
     docs, status_vals = scan_docs()
     surface_docs = [d for d in docs if not d["home"].startswith("_state")]
@@ -909,17 +1036,20 @@ def main() -> int:
             fm = parse_front_matter(f.read_text(errors="replace"))
             if not (fm.get("verified_by") or fm.get("landed_commit")):
                 dumps.append(str(f.relative_to(ROOT)))
+    stray = scan_stray()  # remedial leg: residue parked outside every governed home
     total = len(surface_docs)
     with_state = sum(1 for d in surface_docs if d["bucket"] != "NONE")
     debt_total = (len(no_exit) + len(landed_unverified) + len(drift_dead) + len(orphans)
-                  + len(history_broken) + len(history_no_backref) + len(dumps) + len(mem_unlinked))
+                  + len(history_broken) + len(history_no_backref) + len(dumps) + len(mem_unlinked)
+                  + len(stray))
 
     if AS_JSON:
         print(json.dumps({"total_docs": total, "memory_unlinked": len(mem_unlinked),
                           "debt_total": debt_total, "no_exit": len(no_exit),
                           "landed_unverified": len(landed_unverified), "orphans": len(orphans),
                           "history_broken": len(history_broken),
-                          "history_no_backref": len(history_no_backref), "dumps": len(dumps)},
+                          "history_no_backref": len(history_no_backref), "dumps": len(dumps),
+                          "stray": len(stray)},
                          indent=2, sort_keys=True))
         return 0
 
@@ -940,9 +1070,14 @@ def main() -> int:
         (len(history_no_backref), "HIST-NO-BACKREF", "history record no canonical links TO (inbound)"),
         (len(dumps), "DUMP", "_retired/ holding unverified content"),
         (len(mem_unlinked), "MEM-UNLINKED", f"memory entry with no cites: ({len(mem)-len(mem_unlinked)}/{len(mem)} linked)"),
+        (len(stray), "STRAY-DOC", "ungoverned .md at repo/docs root (outside every home)"),
     ]:
         print(f"  {n:>4}  {tag:<15} {desc}")
     print(f"  {'-'*4}\n  {debt_total:>4}  DEBT TOTAL")
+    if stray:
+        print("  stray docs (relocate to a governed home, or remove the breadcrumb):")
+        for s in stray:
+            print(f"    - [{s['kind']}] {s['path']}")
     print(f"  doc lifecycle-state coverage: {with_state}/{total} ({(100*with_state//total) if total else 0}%)"
           f"   |  distinct status strings: {len(status_vals)}")
 

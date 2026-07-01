@@ -3703,18 +3703,22 @@ impl P2PNode {
                 ..Default::default()
             };
 
-            let page =
-                match crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query, false) {
-                    Ok(page) => page,
-                    Err(e) => {
-                        warn!(
-                            error = %e,
-                            offset,
-                            "hydrate_replication_state: list_content failed, stopping early"
-                        );
-                        break;
-                    }
-                };
+            let page = match crate::db::content_diesel::list_content(
+                &mut conn,
+                &app_ctx,
+                &query,
+                crate::db::content_diesel::MinTrust::Invisible,
+            ) {
+                Ok(page) => page,
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        offset,
+                        "hydrate_replication_state: list_content failed, stopping early"
+                    );
+                    break;
+                }
+            };
 
             let page_len = page.len();
             for item in &page {
@@ -6414,6 +6418,10 @@ impl P2PNode {
                     {
                         Ok(_) => {
                             info!(h_app_id = %h_app_id, doc_id = %doc_id, "Applied announced change");
+                            // CRDT-heal: reverse-project a converged content doc into
+                            // the local SQL row (amber tier). Before moving the strings
+                            // into the response.
+                            self.heal_content_row(&h_app_id, &doc_id).await;
                             SyncResponse::ChangeAck {
                                 h_app_id,
                                 doc_id,
@@ -6575,6 +6583,9 @@ impl P2PNode {
                         peer = %peer, doc_id = %doc_id,
                         new_heads = ?new_heads, "Changes applied successfully"
                     );
+                    // CRDT-heal: reverse-project a converged content doc into the
+                    // local SQL row (amber tier) now that the changes landed.
+                    self.heal_content_row(&h_app_id, &doc_id).await;
                 }
             }
             SyncResponse::Heads {
@@ -6610,6 +6621,46 @@ impl P2PNode {
             _ => {
                 debug!(peer = %peer, request_id = ?request_id, "Unhandled sync response type");
             }
+        }
+    }
+
+    /// Production CRDT-heal leg: after a content-sync doc converges into our
+    /// DocStore (via `apply_changes`), re-derive the serving-critical `blob_hash`
+    /// into the local SQL `content` row at the amber tier — so SERVING (which
+    /// reads SQL, not the DocStore) heals WITHOUT the notary. This is the B1
+    /// reverse projector wired into the live consumer; both sync-handler
+    /// `apply_changes` call-sites (AnnounceChange + Changes) share this helper.
+    ///
+    /// Scope: only content-node docs under the "elohim" sync namespace — every
+    /// other doc/namespace is a silent no-op.
+    ///
+    /// Loop-safety (verified): `reverse_project_content_doc` writes via
+    /// `content_diesel::update_content` DIRECTLY — NOT `content_service.update` —
+    /// so it emits NO `StorageEvent::ContentUpdated`. No `ContentUpdated` means
+    /// `spawn_content_projection_listener` never re-projects this row back into
+    /// the DocStore, so there is no heal → re-project → converge → heal loop.
+    ///
+    /// A `None` `db_pool` (a p2p-only node with no SQL projection) skips silently;
+    /// a reverse-projection error is logged (warn) but never fails the sync round.
+    async fn heal_content_row(&self, h_app_id: &str, doc_id: &str) {
+        if h_app_id != crate::sync::projector::PROJECTION_NAMESPACE
+            || !doc_id.starts_with("node:")
+        {
+            return;
+        }
+        let Some(pool) = self.db_pool.as_ref() else {
+            return;
+        };
+        match crate::sync::projector::reverse_project_content_doc(
+            &self.sync_manager,
+            pool,
+            doc_id,
+        )
+        .await
+        {
+            Ok(true) => debug!("content heal: reverse-projected {doc_id}"),
+            Ok(false) => {}
+            Err(e) => warn!(doc_id = %doc_id, error = %e, "content heal: reverse-projection failed"),
         }
     }
 

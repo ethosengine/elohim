@@ -373,10 +373,15 @@ fn view_blob_hash_for_id(
     app_ctx: &db::AppContext,
     id: &str,
 ) -> Option<String> {
-    db::content_diesel::get_content_with_tags(conn, app_ctx, id, true)
-        .ok()
-        .flatten()
-        .and_then(|cwt| cwt.content.blob_hash)
+    db::content_diesel::get_content_with_tags(
+        conn,
+        app_ctx,
+        id,
+        db::content_diesel::MinTrust::Amber,
+    )
+    .ok()
+    .flatten()
+    .and_then(|cwt| cwt.content.blob_hash)
 }
 
 impl HttpServer {
@@ -713,8 +718,13 @@ impl HttpServer {
                 limit: 100,
                 ..Default::default()
             };
-            // External slug index — require provenance marker on every row.
-            match db::content_diesel::list_content(&mut conn, &app_ctx, &query, true) {
+            // External slug index — require the Amber serving floor on every row.
+            match db::content_diesel::list_content(
+                &mut conn,
+                &app_ctx,
+                &query,
+                db::content_diesel::MinTrust::Amber,
+            ) {
                 Ok(items) => {
                     for item in items {
                         let blob_hash = item.content.blob_hash.clone().unwrap_or_default();
@@ -4268,7 +4278,12 @@ impl HttpServer {
                     StorageError::Internal(format!("Failed to get connection: {}", e))
                 })?;
                 let app_ctx = db::AppContext::default_lamad();
-                match db::content_diesel::list_content(&mut conn, &app_ctx, &query, true) {
+                match db::content_diesel::list_content(
+                    &mut conn,
+                    &app_ctx,
+                    &query,
+                    db::content_diesel::MinTrust::Amber,
+                ) {
                     Ok(items) => {
                         // Reach-based filtering: unauthenticated requests only see commons/public
                         let has_auth = req.headers().get(header::AUTHORIZATION).is_some()
@@ -4657,8 +4672,10 @@ impl HttpServer {
                 })?;
                 let app_ctx = db::AppContext::default_lamad();
                 let result = db::content_diesel::get_content_with_tags(
-                    &mut conn, &app_ctx, content_id,
-                    true, // require_provenance: external HTTP boundary
+                    &mut conn,
+                    &app_ctx,
+                    content_id,
+                    db::content_diesel::MinTrust::Amber, // external HTTP boundary → serving floor
                 )
                 .map(|opt| opt.map(ContentView::from));
 
@@ -4929,6 +4946,29 @@ impl HttpServer {
                 ))
             }
             Method::PATCH => {
+                // Deploy-producer AMBER marker (A3). Honored ONLY on this PATCH
+                // surface, which is the already-admin-gated (X-API-Key at the
+                // doorway boundary) seed/deploy path — this adds NO new
+                // unauthenticated surface, it only changes the behaviour of the
+                // existing notarized-field PATCH when no conductor is present.
+                // When set AND the `(true, None)` branch is hit (a notarized
+                // field is touched but there is no conductor bridge to
+                // re-notarize), the deploy producer writes `blob_hash`
+                // diesel-direct at the amber tier instead of 503-ing. Accept
+                // either `?deployTier=amber` or `X-Deploy-Tier: amber`. Read
+                // BEFORE the body consumes `req`.
+                let amber_marker = req
+                    .uri()
+                    .query()
+                    .map(|q| q.split('&').any(|kv| kv == "deployTier=amber"))
+                    .unwrap_or(false)
+                    || req
+                        .headers()
+                        .get("X-Deploy-Tier")
+                        .and_then(|v| v.to_str().ok())
+                        .map(|v| v.eq_ignore_ascii_case("amber"))
+                        .unwrap_or(false);
+
                 let body = req
                     .collect()
                     .await
@@ -4961,6 +5001,23 @@ impl HttpServer {
                             .content
                             .update_via_conductor(&hc, content_id, view)
                             .await
+                    }
+                    (true, None) if amber_marker && view.blob_hash.is_some() => {
+                        // A3 deploy-producer amber write. No conductor bridge to
+                        // re-notarize, but the admin-gated deploy carried the
+                        // amber marker AND a blob_hash: record the serving
+                        // `blob_hash` diesel-direct at the amber tier
+                        // (crdt_converged_at stamped, NEVER dht_anchor_hash,
+                        // NEVER p2p_published_at). Content is not in
+                        // `is_integrity_kind`, so this authors no DHT entry and
+                        // the reconcile controller does not revert it. No-clobber
+                        // precedence in the db layer means a later notarized
+                        // (green) blob_hash always wins. This un-404s the live
+                        // elohim.host SPA mount when the conductor is absent:
+                        // lookup_slug_blob_hash (MinTrust::Amber) now resolves.
+                        // Scoped to `blob_hash.is_some()` so a marker on a
+                        // reach-only PATCH still 503s (reach stays conductor-only).
+                        services.content.update_amber(content_id, view)
                     }
                     (true, None) => {
                         // A notarized change (blob_hash/reach) needs the
@@ -5808,7 +5865,14 @@ impl HttpServer {
                 limit: 100,
                 ..Default::default()
             };
-            let items = db::content_diesel::list_content(&mut conn, &app_ctx, &query, true)?;
+            // REQ-F7: the slug→blob_hash lookup serves at the Amber floor so a
+            // converged-only (amber) row resolves instead of 404-ing.
+            let items = db::content_diesel::list_content(
+                &mut conn,
+                &app_ctx,
+                &query,
+                db::content_diesel::MinTrust::Amber,
+            )?;
             for item in items {
                 let hash = item.content.blob_hash.clone().unwrap_or_default();
                 if hash.is_empty() {
@@ -12242,6 +12306,21 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/epr/:scope/lens-market — plural-Mishpat lens market (lens-market S7).
+        // `:scope` is the EPR SLUG-ID (e.g. epr:lamad-spa), NOT a dag-cbor CID.
+        // Read-projection of the A-class `lenses` table keyed on `governs_epr`.
+        // Dispatch lives in api/epr.rs (`is_lens_market_path`); THIS registry entry
+        // is the route-shadow guard — unregistered, doorway's manifest matcher would
+        // miss it and the hosted path would fall through to the SPA bootstrap (HTML).
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/epr/{scope}/lens-market")
+                .handler("get_epr_lens_market")
+                .cache_ttl(30)
+                .public_if_reach("commons")
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/collective + /api/v1/collab — Multi-collective collaboration EPR M1
         // See genesis/docs/content/elohim-protocol/architecture/2026-05-23-multi-collective-collaboration-epr-design.md
         // Writes require auth (imagodei conductor bridge); reads are public.
@@ -12636,6 +12715,16 @@ mod tests {
         assert!(
             paths.contains(&"/api/v1/commitments/facing/rea"),
             "missing /api/v1/commitments/facing/rea (REA economic facing Wave 4.2)"
+        );
+        // Plural-Mishpat lens market (lens-market S7). Same route-shadow guard
+        // discipline as /api/v1/weave: the GET arm is dispatched through
+        // api/epr.rs (`is_lens_market_path`) but, unregistered here, would be
+        // invisible to doorway's manifest matcher and fall through to the SPA
+        // bootstrap (HTML, not JSON) on every hosted path — unreachable except
+        // storage-direct (project_doorway_main_route_needs_is_service_path).
+        assert!(
+            paths.contains(&"/api/v1/epr/{scope}/lens-market"),
+            "missing /api/v1/epr/{{scope}}/lens-market (lens-market S7 — doorway reachability)"
         );
         // Wave 3 M1 — vf-graphql bridge endpoint
         assert!(

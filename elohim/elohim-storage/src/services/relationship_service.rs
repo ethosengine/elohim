@@ -329,7 +329,13 @@ impl RelationshipService {
         let mut conn = self.conn()?;
         // Internal existence check for relationship validation; pre-drain rows
         // must still count as existing, so provenance gate is off.
-        let exists = content_diesel::get_content(&mut conn, &self.ctx, id, false)?.is_some();
+        let exists = content_diesel::get_content(
+            &mut conn,
+            &self.ctx,
+            id,
+            content_diesel::MinTrust::Invisible,
+        )?
+        .is_some();
 
         if !exists {
             return Err(StorageError::InvalidInput(format!(

@@ -2632,6 +2632,43 @@ async fn async_main(
                     pool.clone(),
                 );
                 info!("Content-projection producer spawned — Automerge content-sync plane lit");
+
+                // Corpus back-fill (gated, idempotent). The go-forward producer
+                // above only projects content written AFTER startup; on a fresh
+                // deploy or a sled DocStore reset the already-seeded corpus never
+                // converges until each row is re-written — so a degraded peer that
+                // lost a row's blobHash can't re-derive it from a healthy peer.
+                // When ELOHIM_DOCSTORE_BACKFILL is set, run a one-shot idempotent
+                // pass that projects every existing content row into the DocStore.
+                // Spawned (not awaited) so it never delays serving readiness;
+                // batched + yielding internally so it doesn't starve the write path.
+                if std::env::var("ELOHIM_DOCSTORE_BACKFILL")
+                    .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                    .unwrap_or(false)
+                {
+                    let backfill_sync = node.sync_manager().clone();
+                    let backfill_pool = pool.clone();
+                    tokio::spawn(async move {
+                        match elohim_storage::sync::projector::backfill_content_docs(
+                            &backfill_sync,
+                            &backfill_pool,
+                            200,
+                        )
+                        .await
+                        {
+                            Ok(stats) => info!(
+                                scanned = stats.scanned,
+                                projected = stats.projected,
+                                skipped = stats.skipped,
+                                failed = stats.failed,
+                                "Automerge DocStore corpus back-fill complete"
+                            ),
+                            Err(e) => {
+                                error!(error = %e, "Automerge DocStore corpus back-fill failed")
+                            }
+                        }
+                    });
+                }
             }
             // iroh transport path: the iroh SyncManager (built at the iroh
             // co-scope above and moved into SyncManagerBackend) exposes a

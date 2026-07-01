@@ -12,4 +12,14 @@ serverBlobHash: string | null, blobCid: string | null, contentSizeBytes: number 
 /**
  * Parsed metadata object (was metadata_json string in storage)
  */
-metadata: JsonValue | null, reach: string, validationStatus: string, createdBy: string | null, createdAt: string, updatedAt: string, contentBody: string | null, dhtAnchorHash: string | null, };
+metadata: JsonValue | null, reach: string, validationStatus: string, createdBy: string | null, createdAt: string, updatedAt: string, contentBody: string | null, dhtAnchorHash: string | null, 
+/**
+ * REQ-F10 trust legibility label — the "HTTP vs HTTPS" address-bar signal
+ * for this content row. Computed from the row's provenance markers:
+ * `"notarized"` when `dht_anchor_hash` is set (green padlock — DHT-notarized),
+ * else `"published"` when `p2p_published_at` is set (peer-attested), else
+ * `"unconfirmed"` (amber — CRDT-converged-only or all-null; served like HTTP
+ * "Not secure"). NEVER derive authority/attribution from this field — an
+ * "unconfirmed" row is functional-but-not-notarized.
+ */
+trust: string, };

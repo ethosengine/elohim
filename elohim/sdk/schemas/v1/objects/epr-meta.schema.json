@@ -10,6 +10,11 @@
     "epr-meta-version": { "type": "integer", "const": 1 },
     "id": { "type": "string" },
     "root": { "type": "boolean" },
+    "covers": {
+      "type": "string",
+      "enum": ["subtree", "dir-only"],
+      "description": "Coverage-walk responsibility (the downward dual of `root`, which terminates the upward cascade). `subtree` = this manifest is FULLY RESPONSIBLE for everything beneath it; the epr-meta coverage walk (placement-audit.py --epr-meta) terminates here and the subtree counts as OWNED — integrity by construction, never re-audited. Opt-in: absent/`dir-only` does not claim the subtree, so an incidental manifest never trivially covers the whole repo. Read by the coverage signal, not the resolver."
+    },
     "extends": { "type": "string" },
     "max-cascade-depth": { "type": "integer", "minimum": 1, "maximum": 32 },
     "purpose": { "type": "string" },

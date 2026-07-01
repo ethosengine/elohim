@@ -54,6 +54,24 @@ else
     HASH_FIELD="blobHash"
 fi
 
+# A3 deploy-producer AMBER marker (browser leg only). blobHash is a DNA-notarized
+# field (storage's patch_needs_conductor=true). On a doorway whose storage backend
+# has NO conductor bridge, that PATCH 503s and the SPA mount 404s — the live
+# elohim.host per-host stranding class. `?deployTier=amber` tells storage to record
+# blobHash diesel-direct at the amber tier (crdt_converged_at stamped, NEVER
+# dht_anchor_hash; no-clobber so a later green blobHash always wins) so
+# lookup_slug_blob_hash (MinTrust::Amber) resolves and the mount serves 200. It
+# rides THIS PATCH, which is already admin-gated (X-API-Key) at the doorway — no
+# new surface. It MUST be a query param, not a header: the doorway proxy
+# (forward_to_storage) preserves the query string but forwards only an allowlist
+# of headers, so an X-Deploy-Tier header would be dropped before reaching storage.
+# Server leg keeps the canonical URL (serverBlobHash is already diesel-direct; the
+# marker would be a no-op there).
+PATCH_PATH="/db/content/${SLUG}"
+if [ "$KIND" = "browser" ]; then
+    PATCH_PATH="${PATCH_PATH}?deployTier=amber"
+fi
+
 # One PUT + (optional) PATCH+verify attempt. Returns non-zero on ANY failure
 # WITHOUT exiting the script: stage_once is invoked in an `if` condition, so
 # bash suspends `set -e` inside its body — each network op carries an explicit
@@ -94,7 +112,7 @@ stage_once() {
             -H 'Content-Type: application/json' \
             -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
             -d "{\"${HASH_FIELD}\":\"${SPA_HASH}\"}" \
-            "${DOORWAY_EPR_URL}/db/content/${SLUG}" \
+            "${DOORWAY_EPR_URL}${PATCH_PATH}" \
             >/dev/null || return 1
         echo "  ✓ patched ${SLUG} (${HASH_FIELD})"
 

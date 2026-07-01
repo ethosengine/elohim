@@ -1,0 +1,19 @@
+---
+epr-meta-version: 1
+covers: subtree
+---
+`.claude/scripts/` — the agentic memory + governance toolkit (the `_lib` cascade, the memory-kit
+audit/stasis tools, the lint harness). This manifest CLAIMS full responsibility for the subtree
+(`covers: subtree`): the coverage walk terminates here, integrity by construction — the way the core
+never re-audits an app-manifest's vocabulary (seam-map §3.7).
+
+**Considered, no enforcing rule yet (the deliberate opt-in, not a nag).** Edit-time governance of this
+tree is already carried by the managed-surface PreToolUse hook (`managed-surface-context.py`) and the
+`_lib/__tests__/*_test.py` convention (a new `_lib` module ships its runnable test). Those are the real,
+already-mechanized gates — adding a `.epr-meta` rule that fired on the same writes would be the
+"fires-on-nothing" footgun this very toolkit's `validate_meta` guards against. So this is the
+considered-coverage outcome: responsibility owned, no redundant rule. Add a rule here only if a NEW
+recurring, mechanizable drift appears in this tree.
+
+This is the first worked example of the epr-meta coverage campaign (`placement-audit.py --epr-meta`):
+the tree that built the coverage signal owns itself first.

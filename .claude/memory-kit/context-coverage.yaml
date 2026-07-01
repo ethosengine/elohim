@@ -79,6 +79,18 @@ dimensions:        # weight 0 disables a dimension; weights are relative (normal
     why: >
       The always-loaded index staying within budget is a hard context-capacity constraint, so it counts
       as a full dimension, not a footnote.
+  epr_meta_coverage:
+    weight: 1.0
+    why: >
+      Directory-level governance coverage: the fraction of structurally-substantial regions OWNED by a
+      self-responsible `.epr-meta` (one that declares `covers: subtree`). The downward dual of the
+      claude_md dimension — CLAUDE.md front-loads init context; `.epr-meta` is edit-time compose-gate
+      governance, so its coverage is the "is every governable region thoughtfully considered?" measure.
+      Introduced 2026-06-28 at half weight (a scaffold so near-zero coverage wouldn't mask the other
+      dimensions before the remediation campaign existed); PROMOTED to full weight 2026-06-28 once the
+      in-flight nudge shipped and the campaign began — it is now a first-class peer dimension, equal to
+      the other governance/coverage axes, exactly as the concern is framed. The headline token +
+      `--epr-meta` queue + the in-flight resolver-hook nudge carry the actionable signal regardless.
 
 hard:              # must be exactly 0 — these GATE the score regardless of the others
   why: >
@@ -95,3 +107,19 @@ exclusions:        # no-cover — the `# pragma: no cover` analogue; excluded fr
   globs:
     - "**/CLAUDE.md"
     - "genesis/docs/_state/**"
+
+epr_meta_governance:   # tunables for the epr_meta_coverage dimension's subtree-coverage walk
+  why: >
+    The substantiality thresholds + exclusions for "which directories are governable context". A region
+    is a GAP iff it clears these AND no `covers: subtree` .epr-meta owns it. min_exts is 1 (NOT claude-md's
+    2): a single-language code dir (pure .rs / pure .ts) is a prime .epr-meta governance target, whereas
+    claude-md skips single-ext dirs as needing less doc. Git submodules are excluded automatically
+    (from .gitmodules); add only first-party no-govern regions here (generated code, vendored, design raw).
+  min_files: 15        # this many direct files makes a dir architecturally real
+  min_subdirs: 4       # OR this many subdirs
+  min_exts: 1          # AND at least one distinct complexity-extension (code, not pure data/assets)
+  exclude:
+    - "**/generated"
+    - "**/generated/**"
+    - "genesis/docs/_state/**"
+    - "genesis/graphos/design-assets/**"

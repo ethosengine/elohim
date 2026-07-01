@@ -9,6 +9,7 @@
 use std::sync::Arc;
 
 use automerge::transaction::Transactable;
+use automerge::{Automerge, ReadDoc, ScalarValue, Value};
 use tokio::sync::broadcast::error::RecvError;
 
 use crate::db::context::AppContext;
@@ -23,8 +24,90 @@ pub fn content_doc_id(id: &str) -> String {
     format!("node:{id}")
 }
 
+/// One projected field value — a string or an integer scalar. Kept as an enum
+/// so the projection WRITE and the idempotency COMPARE share a single field
+/// list (`projected_fields`) and can never drift.
+enum FieldVal {
+    S(String),
+    I(i64),
+}
+
+/// The ordered field set projected from a content row into its Automerge doc —
+/// the single source of truth for both the write and the idempotency compare.
+///
+/// `blobHash`/`serverBlobHash`/`blobCid`/`contentSizeBytes` are LOAD-BEARING for
+/// peer convergence of the SERVING path: a peer whose content row lost its
+/// `blobHash` (e.g. a deploy PATCH that never landed on a degraded conductor) can
+/// only re-derive it by converging this doc from a healthy peer. `None` string
+/// fields project as `""` (the consumer treats empty as absent); a missing
+/// numeric projects as `0`.
+fn projected_fields(content: &Content) -> Vec<(&'static str, FieldVal)> {
+    vec![
+        ("id", FieldVal::S(content.id.clone())),
+        ("hAppId", FieldVal::S(content.h_app_id.clone())),
+        ("title", FieldVal::S(content.title.clone())),
+        (
+            "description",
+            FieldVal::S(content.description.clone().unwrap_or_default()),
+        ),
+        ("contentType", FieldVal::S(content.content_type.clone())),
+        ("contentFormat", FieldVal::S(content.content_format.clone())),
+        ("reach", FieldVal::S(content.reach.clone())),
+        (
+            "body",
+            FieldVal::S(content.content_body.clone().unwrap_or_default()),
+        ),
+        (
+            "metadata",
+            FieldVal::S(
+                content
+                    .metadata_json
+                    .clone()
+                    .unwrap_or_else(|| "{}".to_string()),
+            ),
+        ),
+        (
+            "blobHash",
+            FieldVal::S(content.blob_hash.clone().unwrap_or_default()),
+        ),
+        (
+            "serverBlobHash",
+            FieldVal::S(content.server_blob_hash.clone().unwrap_or_default()),
+        ),
+        (
+            "blobCid",
+            FieldVal::S(content.blob_cid.clone().unwrap_or_default()),
+        ),
+        (
+            "contentSizeBytes",
+            FieldVal::I(content.content_size_bytes.unwrap_or(0) as i64),
+        ),
+        ("updatedAt", FieldVal::S(content.updated_at.clone())),
+    ]
+}
+
+/// True when the doc ALREADY carries exactly the projected field set — the
+/// idempotency guard. A missing field, a changed value, or a scalar-type
+/// mismatch each mean "needs (re)projection". A freshly-created empty doc has no
+/// fields, so it never matches → always projects on first sight.
+fn doc_matches(doc: &Automerge, fields: &[(&'static str, FieldVal)]) -> bool {
+    for (key, val) in fields {
+        match doc.get(automerge::ROOT, *key) {
+            Ok(Some((Value::Scalar(scalar), _))) => match (val, scalar.as_ref()) {
+                (FieldVal::S(want), ScalarValue::Str(got)) if got.as_str() == want => {}
+                (FieldVal::I(want), ScalarValue::Int(got)) if got == want => {}
+                _ => return false,
+            },
+            _ => return false,
+        }
+    }
+    true
+}
+
 /// Project a single content row into its Automerge doc under the "elohim" sync
-/// namespace.
+/// namespace. Returns `true` if the doc was (re)written, `false` if it already
+/// matched — an **idempotent** skip that appends no new change, so re-running the
+/// producer or the corpus back-fill never inflates the doc's change history.
 ///
 /// THE NAMESPACE IS LOAD-BEARING: `initiate_sync_round` (p2p/mod.rs:6996) only
 /// lists `"elohim"`; a doc written under any other namespace sits inert forever.
@@ -37,42 +120,151 @@ pub fn content_doc_id(id: &str) -> String {
 pub async fn project_content_doc(
     sync: &SyncManager,
     content: &Content,
-) -> Result<(), StorageError> {
+) -> Result<bool, StorageError> {
     let doc_id = content_doc_id(&content.id);
     let mut doc = sync
         .get_or_create_doc(PROJECTION_NAMESPACE, &doc_id)
         .await?;
+    let fields = projected_fields(content);
+    if doc_matches(&doc, &fields) {
+        return Ok(false);
+    }
     doc.transact::<_, _, automerge::AutomergeError>(|tx| {
-        tx.put(automerge::ROOT, "id", content.id.as_str())?;
-        tx.put(automerge::ROOT, "title", content.title.as_str())?;
-        tx.put(
-            automerge::ROOT,
-            "contentType",
-            content.content_type.as_str(),
-        )?;
-        tx.put(
-            automerge::ROOT,
-            "contentFormat",
-            content.content_format.as_str(),
-        )?;
-        tx.put(automerge::ROOT, "reach", content.reach.as_str())?;
-        tx.put(
-            automerge::ROOT,
-            "body",
-            content.content_body.as_deref().unwrap_or(""),
-        )?;
-        tx.put(
-            automerge::ROOT,
-            "metadata",
-            content.metadata_json.as_deref().unwrap_or("{}"),
-        )?;
-        tx.put(automerge::ROOT, "updatedAt", content.updated_at.as_str())?;
+        for (key, val) in &fields {
+            match val {
+                FieldVal::S(s) => tx.put(automerge::ROOT, *key, s.as_str())?,
+                FieldVal::I(i) => tx.put(automerge::ROOT, *key, *i)?,
+            }
+        }
         Ok(())
     })
     .map_err(|e| StorageError::Sync(format!("projector transact failed: {e:?}")))?;
     sync.apply_changes(PROJECTION_NAMESPACE, &doc_id, vec![doc.save()])
         .await?;
-    Ok(())
+    Ok(true)
+}
+
+/// Outcome of a corpus back-fill pass.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct BackfillStats {
+    pub scanned: u64,
+    pub projected: u64,
+    pub skipped: u64,
+    pub failed: u64,
+}
+
+/// Back-fill the Automerge DocStore from the pre-existing SQL content corpus.
+///
+/// The go-forward producer (`spawn_content_projection_listener`) only projects
+/// content written AFTER it starts. On a fresh deploy or a sled DocStore reset,
+/// the large already-seeded corpus would never converge until each row was
+/// re-written. This one-shot, **idempotent** pass closes that gap: it pages every
+/// content row (all app scopes, provenance-ungated — a projection REBUILD over
+/// already-notarized content, not a read surface) and projects each via
+/// `project_content_doc`, which skips rows already present with matching values.
+/// Safe to run on every cold start (gated at the call site).
+///
+/// Batched, and yields between pages so it never starves the live write path or
+/// the 60s sync timer. `batch` bounds the per-page SELECT (clamped to ≥ 1).
+pub async fn backfill_content_docs(
+    sync: &SyncManager,
+    pool: &DbPool,
+    batch: i64,
+) -> Result<BackfillStats, StorageError> {
+    let batch = batch.max(1);
+    let mut stats = BackfillStats::default();
+    let mut offset: i64 = 0;
+    loop {
+        let rows = {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+            content_diesel::list_all_content_rows(&mut conn, offset, batch)?
+        };
+        if rows.is_empty() {
+            break;
+        }
+        let page_len = rows.len();
+        for content in &rows {
+            stats.scanned += 1;
+            match project_content_doc(sync, content).await {
+                Ok(true) => stats.projected += 1,
+                Ok(false) => stats.skipped += 1,
+                Err(e) => {
+                    stats.failed += 1;
+                    tracing::error!(id = %content.id, error = %e, "backfill: projection failed");
+                }
+            }
+        }
+        offset += page_len as i64;
+        // Yield so a large back-fill never monopolises the runtime.
+        tokio::task::yield_now().await;
+        if (page_len as i64) < batch {
+            break;
+        }
+    }
+    tracing::info!(
+        scanned = stats.scanned,
+        projected = stats.projected,
+        skipped = stats.skipped,
+        failed = stats.failed,
+        "backfill: corpus projection pass complete"
+    );
+    Ok(stats)
+}
+
+/// Reverse-project a converged content doc back into the SQL content projection —
+/// the CONSUMER heal leg (the missing other half of the sync plane; today
+/// `apply_changes` writes the sled DocStore ONLY). When a peer's content doc
+/// converges into our DocStore, re-derive the serving-critical `blob_hash` into the
+/// local SQL row at the **amber** tier, so SERVING (which reads SQL, not the
+/// DocStore) heals WITHOUT the notary. Returns `true` if a heal was written.
+///
+/// Division of labor (spec §5.5): the shard/replication plane heals ABSENCE (a
+/// missing row/bytes, via `bulk_create_content`); this heals DRIFT — a stale/null
+/// `blob_hash` on a row that already EXISTS locally. An absent row is skipped
+/// (`Ok(false)`) — that is the shard plane's job, not the drift-heal's.
+///
+/// Guards: (1) **empty-never-wins** — only heals when the converged `blob_hash` is
+/// non-empty (a peer holding `""` never marks us amber or clobbers us); (2)
+/// **no-clobber** — the write rides `update_content`'s amber path (`crdt_converged_at`
+/// set), which never overwrites a present (possibly green/notarized) `blob_hash`
+/// (A3); (3) **namespace** — writes under `default_lamad` (the serving scope), never
+/// the doc's `"elohim"` sync namespace (REQ-F5).
+pub async fn reverse_project_content_doc(
+    sync: &SyncManager,
+    pool: &DbPool,
+    doc_id: &str,
+) -> Result<bool, StorageError> {
+    let Some(id) = doc_id.strip_prefix("node:") else {
+        return Ok(false); // not a content-node doc
+    };
+    // Empty-never-wins: read the converged blob_hash; skip if absent/empty.
+    let blob_hash = match sync
+        .get_doc_field(PROJECTION_NAMESPACE, doc_id, "blobHash")
+        .await
+    {
+        Ok(h) if !h.is_empty() => h,
+        _ => return Ok(false),
+    };
+    let mut conn = pool
+        .get()
+        .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+    let ctx = AppContext::default_lamad();
+    let input = content_diesel::UpdateContentInput {
+        id: id.to_string(),
+        blob_hash: Some(blob_hash),
+        // The amber marker: switches update_content into the no-clobber amber path
+        // (stamps crdt_converged_at, NEVER dht_anchor_hash).
+        crdt_converged_at: Some(chrono::Utc::now().to_rfc3339()),
+        ..Default::default()
+    };
+    match content_diesel::update_content(&mut conn, &ctx, input) {
+        Ok(_) => Ok(true),
+        // Absent row → the shard/replication plane heals it, not the drift-heal.
+        Err(StorageError::NotFound(_)) => Ok(false),
+        Err(e) => Err(e),
+    }
 }
 
 /// Re-SELECT the full content row by id.
@@ -88,7 +280,7 @@ async fn load_content_row(pool: &DbPool, id: &str) -> Result<Option<Content>, St
         .get()
         .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
     let ctx = AppContext::default_lamad();
-    content_diesel::get_content(&mut conn, &ctx, id, false)
+    content_diesel::get_content(&mut conn, &ctx, id, content_diesel::MinTrust::Invisible)
 }
 
 /// Spawn the content-projection listener.
@@ -189,6 +381,7 @@ mod tests {
             dht_anchor_hash: None,
             p2p_published_at: None,
             server_blob_hash: None,
+            crdt_converged_at: None,
         }
     }
 
@@ -233,6 +426,232 @@ mod tests {
             super::PROJECTION_NAMESPACE,
             "elohim",
             "sync-partition namespace is a wire contract with every peer + the DNA"
+        );
+    }
+
+    /// Re-projecting identical content is a no-op — no new change is appended, so
+    /// the corpus back-fill (and a redundant go-forward update) never inflate a
+    /// doc's change history. This is the idempotency the back-fill relies on.
+    #[tokio::test]
+    async fn project_is_idempotent_on_unchanged_content() {
+        let (sync, _temp) = test_sync_manager().await;
+        let content = sample_content("idem-1", "v1");
+
+        assert!(
+            super::project_content_doc(&sync, &content).await.unwrap(),
+            "first projection must write"
+        );
+        let heads1 = sync.get_heads("elohim", "node:idem-1").await.unwrap();
+        assert!(!heads1.is_empty());
+
+        assert!(
+            !super::project_content_doc(&sync, &content).await.unwrap(),
+            "re-projecting unchanged content must be a skip"
+        );
+        let heads2 = sync.get_heads("elohim", "node:idem-1").await.unwrap();
+        assert_eq!(
+            heads1, heads2,
+            "idempotent re-projection must not append a change"
+        );
+    }
+
+    /// A changed serving-critical field (blobHash) forces a re-projection and the
+    /// new value converges into the doc.
+    #[tokio::test]
+    async fn project_rewrites_when_a_field_changes() {
+        let (sync, _temp) = test_sync_manager().await;
+        let mut content = sample_content("chg-1", "v1");
+
+        assert!(super::project_content_doc(&sync, &content).await.unwrap());
+        let heads1 = sync.get_heads("elohim", "node:chg-1").await.unwrap();
+
+        content.blob_hash = Some("sha256-deadbeef".to_string());
+        assert!(
+            super::project_content_doc(&sync, &content).await.unwrap(),
+            "a changed field must re-project"
+        );
+        let heads2 = sync.get_heads("elohim", "node:chg-1").await.unwrap();
+        assert_ne!(heads1, heads2, "a changed field must append a change");
+
+        let blob = sync
+            .get_doc_field("elohim", "node:chg-1", "blobHash")
+            .await
+            .unwrap();
+        assert_eq!(blob, "sha256-deadbeef");
+    }
+
+    /// The projected doc carries the serving-critical blob fields (this is what
+    /// lets a degraded peer re-derive a lost `blobHash` from a healthy peer).
+    #[tokio::test]
+    async fn projects_serving_critical_blob_fields() {
+        let (sync, _temp) = test_sync_manager().await;
+        let mut content = sample_content("blob-1", "landing");
+        content.blob_hash = Some("sha256-abc".to_string());
+        content.server_blob_hash = Some("sha256-ssr".to_string());
+
+        super::project_content_doc(&sync, &content).await.unwrap();
+
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:blob-1", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-abc"
+        );
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:blob-1", "serverBlobHash")
+                .await
+                .unwrap(),
+            "sha256-ssr"
+        );
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:blob-1", "hAppId")
+                .await
+                .unwrap(),
+            "lamad"
+        );
+    }
+
+    /// End-to-end back-fill over a real (in-memory) SQL corpus: the first pass
+    /// projects every row; the second is a full no-op. Proves the O(rows) back-fill
+    /// is idempotent and safe to run on every cold start.
+    #[tokio::test]
+    async fn backfill_projects_all_rows_and_is_idempotent() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+
+        {
+            let mut conn = pool.get().unwrap();
+            for i in 0..3 {
+                let input = CreateContentInput {
+                    id: format!("bf-{i}"),
+                    title: format!("row {i}"),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash: Some(format!("sha256-{i}")),
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "household".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: Some("body".to_string()),
+                    dht_anchor_hash: None,
+                };
+                content_diesel::create_content(&mut conn, &ctx, input).unwrap();
+            }
+        }
+
+        // First pass projects all 3 (batch smaller than corpus exercises paging).
+        let s1 = super::backfill_content_docs(&sync, &pool, 2).await.unwrap();
+        assert_eq!(s1.scanned, 3);
+        assert_eq!(s1.projected, 3);
+        assert_eq!(s1.skipped, 0);
+        assert_eq!(sync.count_documents("elohim").await.unwrap(), 3);
+
+        // Second pass is a full no-op — the idempotency guarantee.
+        let s2 = super::backfill_content_docs(&sync, &pool, 2).await.unwrap();
+        assert_eq!(s2.scanned, 3);
+        assert_eq!(s2.projected, 0);
+        assert_eq!(s2.skipped, 3);
+        assert_eq!(sync.count_documents("elohim").await.unwrap(), 3);
+
+        // The seeded blobHash converged into the sync doc.
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:bf-0", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-0"
+        );
+    }
+
+    /// B1 proof — the consumer heal leg: a converged real blob_hash re-derives into
+    /// a NULL SQL row (amber-stamped, never notarized); an EMPTY converged blob_hash
+    /// never overwrites a present real hash (empty-never-wins). This is the
+    /// elohim.host `blobHash: null` 404 as a red→green, WITHOUT the notary.
+    #[tokio::test]
+    async fn reverse_project_heals_null_and_empty_never_wins() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+
+        // Local rows: heal-null (blob_hash NULL — the elohim.host case); heal-real
+        // (a present real blob_hash that empty must never clobber).
+        {
+            let mut conn = pool.get().unwrap();
+            for (id, bh) in [
+                ("heal-null", None),
+                ("heal-real", Some("sha256-existing".to_string())),
+            ] {
+                content_diesel::create_content(
+                    &mut conn,
+                    &ctx,
+                    CreateContentInput {
+                        id: id.to_string(),
+                        title: "t".to_string(),
+                        description: None,
+                        content_type: "concept".to_string(),
+                        content_format: "markdown".to_string(),
+                        blob_hash: bh,
+                        blob_cid: None,
+                        content_size_bytes: None,
+                        metadata_json: None,
+                        reach: "household".to_string(),
+                        created_by: None,
+                        tags: vec![],
+                        content_body: Some("b".to_string()),
+                        dht_anchor_hash: None,
+                    },
+                )
+                .unwrap();
+            }
+        }
+
+        // Peer A's converged doc for heal-null carries a REAL blob_hash.
+        let mut peer_a = sample_content("heal-null", "t");
+        peer_a.blob_hash = Some("sha256-converged".to_string());
+        super::project_content_doc(&sync, &peer_a).await.unwrap();
+        // Peer B's converged doc for heal-real carries an EMPTY blob_hash (None → "").
+        let peer_b = sample_content("heal-real", "t");
+        super::project_content_doc(&sync, &peer_b).await.unwrap();
+
+        assert!(
+            super::reverse_project_content_doc(&sync, &pool, "node:heal-null")
+                .await
+                .unwrap(),
+            "null local + real converged → heals"
+        );
+        assert!(
+            !super::reverse_project_content_doc(&sync, &pool, "node:heal-real")
+                .await
+                .unwrap(),
+            "empty converged → skipped (empty never wins)"
+        );
+
+        let mut conn = pool.get().unwrap();
+        let healed =
+            content_diesel::get_content(&mut conn, &ctx, "heal-null", content_diesel::MinTrust::Invisible)
+                .unwrap()
+                .unwrap();
+        assert_eq!(healed.blob_hash.as_deref(), Some("sha256-converged"));
+        assert!(healed.crdt_converged_at.is_some(), "healed row is amber-stamped");
+        assert!(healed.dht_anchor_hash.is_none(), "heal never notarizes");
+
+        let untouched =
+            content_diesel::get_content(&mut conn, &ctx, "heal-real", content_diesel::MinTrust::Invisible)
+                .unwrap()
+                .unwrap();
+        assert_eq!(
+            untouched.blob_hash.as_deref(),
+            Some("sha256-existing"),
+            "empty never clobbers a real hash"
         );
     }
 }

@@ -114,7 +114,10 @@ impl EprService {
                 let app_ctx = AppContext::default_lamad();
                 if let Ok(Some(content_with_tags)) =
                     crate::db::content_diesel::get_content_with_tags(
-                        &mut conn, &app_ctx, &id, false,
+                        &mut conn,
+                        &app_ctx,
+                        &id,
+                        crate::db::content_diesel::MinTrust::Invisible,
                     )
                 {
                     let reach = &content_with_tags.content.reach;
@@ -484,7 +487,10 @@ impl EprService {
 
             "self" | "private" => {
                 let content = crate::db::content_diesel::get_content_with_tags(
-                    conn, app_ctx, content_id, false,
+                    conn,
+                    app_ctx,
+                    content_id,
+                    crate::db::content_diesel::MinTrust::Invisible,
                 )
                 .map_err(|e| format!("Content lookup failed: {}", e))?
                 .ok_or_else(|| "Content not found".to_string())?;

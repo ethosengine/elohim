@@ -1,0 +1,14 @@
+-- Add crdt_converged_at column to content for the tri-state trust gate (CRDT content dataplane, Phase A1).
+-- Marks a row whose serving-critical field (blob_hash) was populated by CRDT convergence or the
+-- deploy-time non-notarized producer — the "amber" / converged-but-unconfirmed trust tier, distinct
+-- from notarized (dht_anchor_hash / green) and peer-published (p2p_published_at / blue).
+--
+-- Nullable: absent = not converged via this path (the normal state for notarized/seeded rows).
+-- This is the load-bearing distinction that lets the serving gate (require_min_trust) admit
+-- converged-but-unconfirmed state (serve like HTTP "Not secure") WITHOUT laundering it into
+-- notarized/authority provenance. Source of truth: this is an OPERATIONAL serving marker, never a
+-- notarized field — no dht_anchor_hash by design (the value it marks is amber, not green).
+--
+-- Spec: genesis/docs/superpowers/specs/2026-07-01-crdt-authoritative-content-state-dht-notary-decouple-design.md (REQ-F3; §4.3 tri-state gate)
+-- Plan: genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md (A1)
+ALTER TABLE content ADD COLUMN crdt_converged_at TEXT;
