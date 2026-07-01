@@ -52,7 +52,12 @@ impl ContentService {
     /// directly with `require_provenance: true`.
     pub fn get(&self, id: &str) -> Result<Option<crate::db::models::Content>, StorageError> {
         let mut conn = self.conn()?;
-        content_diesel::get_content(&mut conn, &self.ctx, id, false)
+        content_diesel::get_content(
+            &mut conn,
+            &self.ctx,
+            id,
+            content_diesel::MinTrust::Invisible,
+        )
     }
 
     /// List content with filters — INTERNAL use only.
@@ -65,7 +70,12 @@ impl ContentService {
         query: &content_diesel::ContentQuery,
     ) -> Result<Vec<crate::db::models::ContentWithTags>, StorageError> {
         let mut conn = self.conn()?;
-        content_diesel::list_content(&mut conn, &self.ctx, query, false)
+        content_diesel::list_content(
+            &mut conn,
+            &self.ctx,
+            query,
+            content_diesel::MinTrust::Invisible,
+        )
     }
 
     /// Get content by tag — INTERNAL use only.
@@ -162,8 +172,13 @@ impl ContentService {
         // Compute merged metadata_json before entering the DB layer
         let merged_metadata_json =
             if let Some(patch_meta) = &view.metadata {
-                let existing = content_diesel::get_content(&mut conn, &self.ctx, id, false)?
-                    .ok_or_else(|| StorageError::NotFound(format!("Content not found: {}", id)))?;
+                let existing = content_diesel::get_content(
+                    &mut conn,
+                    &self.ctx,
+                    id,
+                    content_diesel::MinTrust::Invisible,
+                )?
+                .ok_or_else(|| StorageError::NotFound(format!("Content not found: {}", id)))?;
 
                 let existing_meta: serde_json::Value = existing
                     .metadata_json
@@ -247,8 +262,13 @@ impl ContentService {
     ) -> Result<crate::db::models::ContentWithTags, StorageError> {
         let existing = {
             let mut conn = self.conn()?;
-            content_diesel::get_content_with_tags(&mut conn, &self.ctx, id, false)?
-                .ok_or_else(|| StorageError::NotFound(format!("Content not found: {}", id)))?
+            content_diesel::get_content_with_tags(
+                &mut conn,
+                &self.ctx,
+                id,
+                content_diesel::MinTrust::Invisible,
+            )?
+            .ok_or_else(|| StorageError::NotFound(format!("Content not found: {}", id)))?
         };
 
         // Merge metadata (same logic as the legacy `update` method above).
@@ -437,14 +457,18 @@ impl ContentService {
 
         let updated = {
             let mut conn = self.conn()?;
-            content_diesel::get_content_with_tags(&mut conn, &self.ctx, id, false)?.ok_or_else(
-                || {
-                    StorageError::Internal(format!(
-                        "content {id} projection written but row missing on re-read — \
-                         this should not happen; check upsert_with_anchor for id"
-                    ))
-                },
+            content_diesel::get_content_with_tags(
+                &mut conn,
+                &self.ctx,
+                id,
+                content_diesel::MinTrust::Invisible,
             )?
+            .ok_or_else(|| {
+                StorageError::Internal(format!(
+                    "content {id} projection written but row missing on re-read — \
+                         this should not happen; check upsert_with_anchor for id"
+                ))
+            })?
         };
 
         self.events

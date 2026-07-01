@@ -373,10 +373,15 @@ fn view_blob_hash_for_id(
     app_ctx: &db::AppContext,
     id: &str,
 ) -> Option<String> {
-    db::content_diesel::get_content_with_tags(conn, app_ctx, id, true)
-        .ok()
-        .flatten()
-        .and_then(|cwt| cwt.content.blob_hash)
+    db::content_diesel::get_content_with_tags(
+        conn,
+        app_ctx,
+        id,
+        db::content_diesel::MinTrust::Amber,
+    )
+    .ok()
+    .flatten()
+    .and_then(|cwt| cwt.content.blob_hash)
 }
 
 impl HttpServer {
@@ -713,8 +718,13 @@ impl HttpServer {
                 limit: 100,
                 ..Default::default()
             };
-            // External slug index — require provenance marker on every row.
-            match db::content_diesel::list_content(&mut conn, &app_ctx, &query, true) {
+            // External slug index — require the Amber serving floor on every row.
+            match db::content_diesel::list_content(
+                &mut conn,
+                &app_ctx,
+                &query,
+                db::content_diesel::MinTrust::Amber,
+            ) {
                 Ok(items) => {
                     for item in items {
                         let blob_hash = item.content.blob_hash.clone().unwrap_or_default();
@@ -4268,7 +4278,12 @@ impl HttpServer {
                     StorageError::Internal(format!("Failed to get connection: {}", e))
                 })?;
                 let app_ctx = db::AppContext::default_lamad();
-                match db::content_diesel::list_content(&mut conn, &app_ctx, &query, true) {
+                match db::content_diesel::list_content(
+                    &mut conn,
+                    &app_ctx,
+                    &query,
+                    db::content_diesel::MinTrust::Amber,
+                ) {
                     Ok(items) => {
                         // Reach-based filtering: unauthenticated requests only see commons/public
                         let has_auth = req.headers().get(header::AUTHORIZATION).is_some()
@@ -4657,8 +4672,10 @@ impl HttpServer {
                 })?;
                 let app_ctx = db::AppContext::default_lamad();
                 let result = db::content_diesel::get_content_with_tags(
-                    &mut conn, &app_ctx, content_id,
-                    true, // require_provenance: external HTTP boundary
+                    &mut conn,
+                    &app_ctx,
+                    content_id,
+                    db::content_diesel::MinTrust::Amber, // external HTTP boundary → serving floor
                 )
                 .map(|opt| opt.map(ContentView::from));
 
@@ -5808,7 +5825,14 @@ impl HttpServer {
                 limit: 100,
                 ..Default::default()
             };
-            let items = db::content_diesel::list_content(&mut conn, &app_ctx, &query, true)?;
+            // REQ-F7: the slug→blob_hash lookup serves at the Amber floor so a
+            // converged-only (amber) row resolves instead of 404-ing.
+            let items = db::content_diesel::list_content(
+                &mut conn,
+                &app_ctx,
+                &query,
+                db::content_diesel::MinTrust::Amber,
+            )?;
             for item in items {
                 let hash = item.content.blob_hash.clone().unwrap_or_default();
                 if hash.is_empty() {

@@ -85,6 +85,7 @@ diesel::table! {
         dht_anchor_hash -> Nullable<Text>,
         p2p_published_at -> Nullable<Text>,
         server_blob_hash -> Nullable<Text>,
+        crdt_converged_at -> Nullable<Text>,
     }
 }
 

@@ -226,7 +226,7 @@ async fn load_content_row(pool: &DbPool, id: &str) -> Result<Option<Content>, St
         .get()
         .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
     let ctx = AppContext::default_lamad();
-    content_diesel::get_content(&mut conn, &ctx, id, false)
+    content_diesel::get_content(&mut conn, &ctx, id, content_diesel::MinTrust::Invisible)
 }
 
 /// Spawn the content-projection listener.
@@ -327,6 +327,7 @@ mod tests {
             dht_anchor_hash: None,
             p2p_published_at: None,
             server_blob_hash: None,
+            crdt_converged_at: None,
         }
     }
 

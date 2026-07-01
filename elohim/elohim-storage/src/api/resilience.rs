@@ -281,7 +281,12 @@ async fn handle_verify_resilience(
 
     // 3. Look up original content to get blob_hash for comparison
     // Internal resilience check — inspects local content regardless of publish state.
-    let content = crate::db::content_diesel::get_content(&mut conn, ctx, content_id, false)?;
+    let content = crate::db::content_diesel::get_content(
+        &mut conn,
+        ctx,
+        content_id,
+        crate::db::content_diesel::MinTrust::Invisible,
+    )?;
 
     let data_shards = manifest_row.data_shard_count;
     let _parity_shards = manifest_row.parity_shard_count;

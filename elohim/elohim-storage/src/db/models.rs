@@ -103,6 +103,14 @@ pub struct Content {
     /// NULL = SSR not materialized (CSR fallback). Classification: C (Operational
     /// projection of the deploy artifact — not a DNA-notarized content-entry field).
     pub server_blob_hash: Option<String>,
+    /// Timestamp when this row's serving-critical field (`blob_hash`) was populated by
+    /// CRDT convergence or the deploy-time non-notarized producer — the "amber" /
+    /// converged-but-unconfirmed trust tier (CRDT:HTTP :: CRDT+DHT-notary:HTTPS — amber
+    /// serves like HTTP "Not secure", distinct from notarized `dht_anchor_hash`/green and
+    /// peer-published `p2p_published_at`/blue). NULL = not converged via this path.
+    /// Classification: C (Operational serving marker — NEVER a notarized field, by design;
+    /// it must not launder converged state into authority/attribution provenance).
+    pub crdt_converged_at: Option<String>,
 }
 
 /// Content with tags attached (API response)

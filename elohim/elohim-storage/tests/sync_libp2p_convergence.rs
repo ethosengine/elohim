@@ -374,6 +374,7 @@ fn sample_content(id: &str, title: &str) -> Content {
         dht_anchor_hash: None,
         p2p_published_at: None,
         server_blob_hash: None,
+        crdt_converged_at: None,
     }
 }
 
