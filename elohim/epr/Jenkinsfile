@@ -178,9 +178,7 @@ spec:
     }
   }
 
-  post {
-    always {
-      cleanWs()
-    }
-  }
+  // No post { cleanWs() }: the agent is an ephemeral k8s pod, so the workspace
+  // is discarded when the pod terminates — and cleanWs() isn't available on this
+  // Jenkins (the ws-cleanup step is unregistered; build #2 failed only on it).
 }
