@@ -33,6 +33,8 @@ The Jenkins → brit-attestation-producer migration is staged so each stage inde
 
 **Rollback:** revert ci-builder tag references in the two Jenkinsfiles.
 
+**Alternative (2026-07-01 — brit crates now on Nexus):** the brit crates are published to the internal `cargo-internal` (`elohim`) registry — 4 brit-authored @ 0.1.0 (`brit-cli`, `brit-build-ref`, `brit-epr`, `brit-graph`) + their forked `gix-object` closure. So step 2 can become `RUN cargo install brit-cli brit-build-ref --registry elohim` (with a `.cargo/config.toml` declaring `[registries.elohim]` + the crates.io→`elohim-mirror` source replacement, and a `CARGO_REGISTRIES_ELOHIM_TOKEN` read credential), avoiding the submodule checkout + full-fork source build. `brit-verify` stays source-only (not published). See `elohim/brit/docs/specs/2026-07-01-publish-brit-crates-to-nexus-design.md`.
+
 ## Stage 1c — Per-pipeline post.success attestation writes (separate plan)
 
 **Plan:** `genesis/docs/superpowers/plans/2026-XX-XX-jenkins-stage-1c-attestation-writes.md` (TO WRITE after Stage 1b stabilizes)
