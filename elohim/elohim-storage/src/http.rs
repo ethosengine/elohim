@@ -4946,6 +4946,29 @@ impl HttpServer {
                 ))
             }
             Method::PATCH => {
+                // Deploy-producer AMBER marker (A3). Honored ONLY on this PATCH
+                // surface, which is the already-admin-gated (X-API-Key at the
+                // doorway boundary) seed/deploy path — this adds NO new
+                // unauthenticated surface, it only changes the behaviour of the
+                // existing notarized-field PATCH when no conductor is present.
+                // When set AND the `(true, None)` branch is hit (a notarized
+                // field is touched but there is no conductor bridge to
+                // re-notarize), the deploy producer writes `blob_hash`
+                // diesel-direct at the amber tier instead of 503-ing. Accept
+                // either `?deployTier=amber` or `X-Deploy-Tier: amber`. Read
+                // BEFORE the body consumes `req`.
+                let amber_marker = req
+                    .uri()
+                    .query()
+                    .map(|q| q.split('&').any(|kv| kv == "deployTier=amber"))
+                    .unwrap_or(false)
+                    || req
+                        .headers()
+                        .get("X-Deploy-Tier")
+                        .and_then(|v| v.to_str().ok())
+                        .map(|v| v.eq_ignore_ascii_case("amber"))
+                        .unwrap_or(false);
+
                 let body = req
                     .collect()
                     .await
@@ -4978,6 +5001,23 @@ impl HttpServer {
                             .content
                             .update_via_conductor(&hc, content_id, view)
                             .await
+                    }
+                    (true, None) if amber_marker && view.blob_hash.is_some() => {
+                        // A3 deploy-producer amber write. No conductor bridge to
+                        // re-notarize, but the admin-gated deploy carried the
+                        // amber marker AND a blob_hash: record the serving
+                        // `blob_hash` diesel-direct at the amber tier
+                        // (crdt_converged_at stamped, NEVER dht_anchor_hash,
+                        // NEVER p2p_published_at). Content is not in
+                        // `is_integrity_kind`, so this authors no DHT entry and
+                        // the reconcile controller does not revert it. No-clobber
+                        // precedence in the db layer means a later notarized
+                        // (green) blob_hash always wins. This un-404s the live
+                        // elohim.host SPA mount when the conductor is absent:
+                        // lookup_slug_blob_hash (MinTrust::Amber) now resolves.
+                        // Scoped to `blob_hash.is_some()` so a marker on a
+                        // reach-only PATCH still 503s (reach stays conductor-only).
+                        services.content.update_amber(content_id, view)
                     }
                     (true, None) => {
                         // A notarized change (blob_hash/reach) needs the

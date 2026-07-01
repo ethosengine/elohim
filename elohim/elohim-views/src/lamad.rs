@@ -37,6 +37,14 @@ pub struct ContentView {
     pub updated_at: String,
     pub content_body: Option<String>,
     pub dht_anchor_hash: Option<String>,
+    /// REQ-F10 trust legibility label — the "HTTP vs HTTPS" address-bar signal
+    /// for this content row. Computed from the row's provenance markers:
+    /// `"notarized"` when `dht_anchor_hash` is set (green padlock — DHT-notarized),
+    /// else `"published"` when `p2p_published_at` is set (peer-attested), else
+    /// `"unconfirmed"` (amber — CRDT-converged-only or all-null; served like HTTP
+    /// "Not secure"). NEVER derive authority/attribution from this field — an
+    /// "unconfirmed" row is functional-but-not-notarized.
+    pub trust: String,
 }
 
 /// One node in a content relationship graph.

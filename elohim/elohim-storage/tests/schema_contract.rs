@@ -1479,6 +1479,9 @@ fn sample_content_view(server_blob_hash: Option<String>) -> elohim_views::Conten
         updated_at: "2026-06-26T00:00:00Z".into(),
         content_body: None,
         dht_anchor_hash: None,
+        // No dht_anchor_hash and no p2p_published marker on this fixture → the
+        // REQ-F10 trust label is "unconfirmed" (amber). Schema requires `trust`.
+        trust: "unconfirmed".into(),
     }
 }
 

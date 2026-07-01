@@ -4,7 +4,7 @@
   "title": "ContentView",
   "description": "Content record as returned by the storage API. Source of truth: DHT (Notarized, Category A).",
   "type": "object",
-  "required": ["id", "hAppId", "title", "contentType", "contentFormat", "reach", "validationStatus", "createdAt", "updatedAt"],
+  "required": ["id", "hAppId", "title", "contentType", "contentFormat", "reach", "validationStatus", "createdAt", "updatedAt", "trust"],
   "properties": {
     "id": { "type": "string" },
     "hAppId": { "type": "string" },
@@ -23,7 +23,11 @@
     "createdAt": { "type": "string" },
     "updatedAt": { "type": "string" },
     "contentBody": { "type": ["string", "null"] },
-    "dhtAnchorHash": { "type": ["string", "null"] }
+    "dhtAnchorHash": { "type": ["string", "null"] },
+    "trust": {
+      "type": "string",
+      "description": "REQ-F10 trust legibility label: 'notarized' (green/DHT-notarized) | 'published' (peer-attested) | 'unconfirmed' (amber/CRDT-converged-only or all-null). Never an authority/attribution source."
+    }
   },
   "additionalProperties": false
 }

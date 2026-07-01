@@ -132,6 +132,18 @@ pub struct UpdateContentInput {
     /// peers still satisfy the `require_provenance` read gate. None means
     /// "no change" — preserves the existing value on the row.
     pub p2p_published_at: Option<String>,
+    /// RFC-3339 timestamp marking the "amber" tier — `blob_hash` populated by
+    /// the deploy-time non-notarized producer (A3) or CRDT convergence, NOT by
+    /// DHT notarization. `Some(_)` switches this update into the AMBER path,
+    /// which additionally applies no-clobber precedence to `blob_hash`: the
+    /// amber `blob_hash` is written ONLY if the existing row's `blob_hash` is
+    /// NULL/empty, so a later notarized (green) `blob_hash` is never overwritten
+    /// by amber. `None` = normal update path (no amber stamp, blob_hash
+    /// coalesces as usual). NEVER pair this with a `dht_anchor_hash` write —
+    /// amber must not launder into notarized provenance (Content is not in
+    /// `is_integrity_kind`, so this diesel-direct write authors no DHT entry and
+    /// is not reverted by the reconcile controller).
+    pub crdt_converged_at: Option<String>,
 }
 
 fn default_content_type() -> String {
@@ -565,10 +577,34 @@ pub fn update_content(
         .metadata_json
         .as_deref()
         .or(existing.content.metadata_json.as_deref());
-    let new_blob_hash = input
+    // blob_hash resolution. Normal path: coalesce (provided value wins, else
+    // keep existing). AMBER path (`crdt_converged_at.is_some()`): no-clobber —
+    // the amber blob_hash is written ONLY when the existing row's blob_hash is
+    // NULL/empty. This is the precedence guard the deploy-producer (A3) relies
+    // on: a notarized (green) blob_hash already on the row must NEVER be
+    // overwritten by an amber write, only the reverse (green overwrites amber).
+    let existing_blob_empty = existing
+        .content
         .blob_hash
         .as_deref()
-        .or(existing.content.blob_hash.as_deref());
+        .map(|s| s.is_empty())
+        .unwrap_or(true);
+    let is_amber_write = input.crdt_converged_at.is_some();
+    let new_blob_hash = if is_amber_write && !existing_blob_empty {
+        // Amber must not clobber a present (possibly notarized) blob_hash.
+        existing.content.blob_hash.as_deref()
+    } else {
+        input
+            .blob_hash
+            .as_deref()
+            .or(existing.content.blob_hash.as_deref())
+    };
+    // crdt_converged_at: no-clobber preserve on the normal path; stamp on the
+    // amber path. Never touches dht_anchor_hash (this UPDATE has no anchor set).
+    let new_crdt_converged_at = input
+        .crdt_converged_at
+        .as_deref()
+        .or(existing.content.crdt_converged_at.as_deref());
     // No-clobber: a serverBlobHash-only PATCH falls back to the existing
     // server_blob_hash; a blob_hash-only PATCH leaves server_blob_hash untouched.
     let new_server_blob_hash = input
@@ -598,6 +634,7 @@ pub fn update_content(
             content::blob_hash.eq(new_blob_hash),
             content::server_blob_hash.eq(new_server_blob_hash),
             content::p2p_published_at.eq(new_p2p_published_at),
+            content::crdt_converged_at.eq(new_crdt_converged_at),
             content::updated_at.eq(&now),
         ))
         .execute(conn)
@@ -1918,6 +1955,7 @@ mod tests {
             blob_hash: None,
             server_blob_hash: None,
             p2p_published_at: None,
+            crdt_converged_at: None,
         };
         assert_eq!(input.id, "test-id");
     }
@@ -2191,6 +2229,150 @@ mod tests {
                 .unwrap()
                 .is_none(),
             "Green get_content hides the converged row"
+        );
+    }
+
+    /// Build a bare SPA-bundle content row (no blob_hash, no provenance) — the
+    /// exact pre-deploy state that 404s on the live host today.
+    fn mk_bundle(id: &str) -> CreateContentInput {
+        CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "app".to_string(),
+            content_format: "spa-bundle".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "commons".to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+            dht_anchor_hash: None,
+        }
+    }
+
+    /// The app-bundle slug query `lookup_slug_blob_hash` runs (content_format in
+    /// the app-bundle set, MinTrust::Amber). Returns the resolved blob_hash for
+    /// `id`, or None if the row is below the Amber floor / has no hash.
+    fn slug_lookup_amber(conn: &mut SqliteConnection, ctx: &AppContext, id: &str) -> Option<String> {
+        let q = ContentQuery {
+            content_format: Some("spa-bundle".to_string()),
+            limit: 100,
+            ..Default::default()
+        };
+        list_content(conn, ctx, &q, MinTrust::Amber)
+            .unwrap()
+            .into_iter()
+            .find(|c| c.content.id == id)
+            .and_then(|c| c.content.blob_hash.filter(|h| !h.is_empty()))
+    }
+
+    /// A3 proof (RED before A3): a seeded SPA-bundle row with no blob_hash and no
+    /// conductor bridge 404s at the slug lookup today. The deploy-producer amber
+    /// write (marker set, `(true, None)` branch) records `blob_hash` +
+    /// `crdt_converged_at` diesel-direct, NEVER `dht_anchor_hash`. The row then
+    /// resolves through the SAME query `lookup_slug_blob_hash` runs
+    /// (MinTrust::Amber) — so the SPA mount serves 200. Authority reads (Green)
+    /// still exclude it (amber is never authoritative).
+    #[test]
+    fn amber_patch_no_conductor_serves_200() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let id = "epr:elohim-host-landing";
+        create_content(&mut conn, &ctx, mk_bundle(id)).unwrap();
+
+        // RED: pre-amber the row is below the Amber floor (no provenance marker)
+        // → the slug lookup resolves nothing → 404.
+        assert_eq!(
+            slug_lookup_amber(&mut conn, &ctx, id),
+            None,
+            "pre-amber: no provenance marker → slug lookup 404s"
+        );
+
+        // The amber write — exactly what ContentService::update_amber does: set
+        // blob_hash + stamp crdt_converged_at, never dht_anchor_hash.
+        let amber = UpdateContentInput {
+            id: id.to_string(),
+            blob_hash: Some("sha256-amberbundle".to_string()),
+            crdt_converged_at: Some(chrono::Utc::now().to_rfc3339()),
+            ..Default::default()
+        };
+        update_content(&mut conn, &ctx, amber).unwrap();
+
+        // Row state: blob_hash + crdt_converged_at set, dht_anchor_hash STILL NULL.
+        let row = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.blob_hash.as_deref(), Some("sha256-amberbundle"));
+        assert!(row.crdt_converged_at.is_some(), "amber tier stamped");
+        assert!(
+            row.dht_anchor_hash.is_none(),
+            "amber write must NEVER set dht_anchor_hash (no laundering into notarized)"
+        );
+
+        // GREEN: the amber row now resolves at the slug lookup → mount serves 200.
+        assert_eq!(
+            slug_lookup_amber(&mut conn, &ctx, id),
+            Some("sha256-amberbundle".to_string()),
+            "amber row resolves at the Amber-floor slug lookup → SPA mount serves 200"
+        );
+
+        // Defense-in-depth: an authority read at Green must NOT see the amber row.
+        let green = list_content(
+            &mut conn,
+            &ctx,
+            &ContentQuery {
+                content_format: Some("spa-bundle".to_string()),
+                limit: 100,
+                ..Default::default()
+            },
+            MinTrust::Green,
+        )
+        .unwrap();
+        assert!(
+            green.iter().all(|c| c.content.id != id),
+            "Green (authority/attribution) read must exclude the amber row"
+        );
+    }
+
+    /// A3 precedence guard: once a row carries a notarized (green) blob_hash, a
+    /// later amber write must NOT overwrite it — green wins, amber never the
+    /// reverse. The crdt marker may still be stamped (harmless), and the existing
+    /// dht_anchor_hash is preserved.
+    #[test]
+    fn amber_write_never_clobbers_notarized_blob_hash() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let id = "epr:pinned-landing";
+
+        let mut green = mk_bundle(id);
+        green.blob_hash = Some("sha256-greenbundle".to_string());
+        green.dht_anchor_hash = Some("bafy-notarized-anchor".to_string());
+        create_content(&mut conn, &ctx, green).unwrap();
+
+        // Amber write tries to set a DIFFERENT blob_hash.
+        let amber = UpdateContentInput {
+            id: id.to_string(),
+            blob_hash: Some("sha256-amberbundle".to_string()),
+            crdt_converged_at: Some(chrono::Utc::now().to_rfc3339()),
+            ..Default::default()
+        };
+        update_content(&mut conn, &ctx, amber).unwrap();
+
+        let row = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.blob_hash.as_deref(),
+            Some("sha256-greenbundle"),
+            "amber must NOT clobber a present (notarized) blob_hash"
+        );
+        assert_eq!(
+            row.dht_anchor_hash.as_deref(),
+            Some("bafy-notarized-anchor"),
+            "existing notarized anchor preserved"
         );
     }
 }

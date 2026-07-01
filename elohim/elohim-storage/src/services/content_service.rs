@@ -167,6 +167,39 @@ impl ContentService {
         id: &str,
         view: crate::views::UpdateContentInputView,
     ) -> Result<crate::db::models::ContentWithTags, StorageError> {
+        self.update_with_convergence(id, view, None)
+    }
+
+    /// Deploy-producer AMBER write (A3): a diesel-direct `blob_hash` update that
+    /// stamps `crdt_converged_at` (the amber tier — CRDT:HTTP :: notarized:HTTPS)
+    /// and NEVER `dht_anchor_hash`. Used only on the `(true, None)` PATCH branch
+    /// (notarized field touched, but no conductor bridge to re-notarize): instead
+    /// of 503-ing, the deploy producer records the serving `blob_hash` at the
+    /// amber floor so `lookup_slug_blob_hash` (MinTrust::Amber) resolves it and
+    /// the SPA mount serves 200 while the conductor is absent.
+    ///
+    /// The db layer applies no-clobber precedence: the amber `blob_hash` is
+    /// written only when the row's existing `blob_hash` is NULL/empty, so a later
+    /// notarized (green) `blob_hash` always wins and amber never overwrites it.
+    /// Emits `ContentUpdated` (Phase B relies on this to seed the DocStore).
+    pub fn update_amber(
+        &self,
+        id: &str,
+        view: crate::views::UpdateContentInputView,
+    ) -> Result<crate::db::models::ContentWithTags, StorageError> {
+        let now = chrono::Utc::now().to_rfc3339();
+        self.update_with_convergence(id, view, Some(now))
+    }
+
+    /// Shared PATCH body for [`update`] (normal) and [`update_amber`] (amber).
+    /// `crdt_converged_at = Some(_)` switches the db layer into the amber path
+    /// (stamp + blob_hash no-clobber precedence); `None` is the normal path.
+    fn update_with_convergence(
+        &self,
+        id: &str,
+        view: crate::views::UpdateContentInputView,
+        crdt_converged_at: Option<String>,
+    ) -> Result<crate::db::models::ContentWithTags, StorageError> {
         let mut conn = self.conn()?;
 
         // Compute merged metadata_json before entering the DB layer
@@ -216,6 +249,7 @@ impl ContentService {
             blob_hash: view.blob_hash,
             server_blob_hash: view.server_blob_hash,
             p2p_published_at: view.p2p_published_at,
+            crdt_converged_at,
         };
 
         let result = content_diesel::update_content(&mut conn, &self.ctx, input)?;
