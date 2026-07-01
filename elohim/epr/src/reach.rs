@@ -91,10 +91,9 @@ mod tests {
             }
         }
 
-        let schema: serde_json::Value = serde_json::from_str(include_str!(
-            "../../sdk/schemas/v1/enums/reach.schema.json"
-        ))
-        .expect("reach.schema.json parses as JSON");
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../../sdk/schemas/v1/enums/reach.schema.json"))
+                .expect("reach.schema.json parses as JSON");
 
         // `_ordinal: true` is what makes order load-bearing (positional
         // ordinal codegen). If this marker is ever dropped, revisit the

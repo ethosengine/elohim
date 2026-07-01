@@ -1,50 +1,178 @@
+// elohim-epr pipeline — native Rust codec crate + TS SDK.
+//
+// Runs as a k8s dynamic agent (the cluster convention; there is no static
+// `rust-node` agent). Rust comes from `nix develop` into elohim/epr/flake.nix
+// on the ci-builder-nix image (which bundles nix + a cargo-nextest binary);
+// node/pnpm for the TS SDK come from the same image's node:20 base.
+//
+// No shared cargo-cache PVC: unlike steward/DNA (sequential via dependsOn, so
+// they can share the RWO cache-holochain claim), elohim-epr has dependsOn:[]
+// and could be dispatched concurrently — a shared RWO PVC would Multi-Attach.
+// The crate is small, so an ephemeral pod-local cargo build is the safe trade.
 pipeline {
-  agent { label 'rust-node' }
+  agent {
+    kubernetes {
+      cloud 'kubernetes'
+      yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccount: ee-jenkins
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                  - operations
+                  - edge
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "build"
+      effect: "NoSchedule"
+  containers:
+    - name: builder
+      image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
+      # :latest is a moving tag — force a pull so a cached node cannot serve a
+      # stale nix/nextest layer (same rationale as the DNA pipeline).
+      imagePullPolicy: Always
+      command: [cat]
+      tty: true
+      resources:
+        requests:
+          memory: "4Gi"
+          cpu: "1"
+          ephemeral-storage: "10Gi"
+        limits:
+          memory: "8Gi"
+          cpu: "4"
+          ephemeral-storage: "20Gi"
+'''
+    }
+  }
 
   options {
-    overrideIndexTriggers(false)
+    overrideIndexTriggers(false)  // Only orchestrator or manual triggers — no webhook/branch indexing.
     buildDiscarder(logRotator(numToKeepStr: '30'))
-    timeout(time: 20, unit: 'MINUTES')
+    timeout(time: 30, unit: 'MINUTES')
+  }
+
+  // Accepted so the orchestrator can propagate its dispatch params uniformly
+  // (triggerPipeline always sends these). This pipeline runs its full gate on
+  // any valid trigger, so they are no-ops here — declaring them just avoids
+  // "parameter is not defined" warnings.
+  parameters {
+    booleanParam(name: 'FORCE_BUILD', defaultValue: false, description: 'No-op — the full gate always runs on a valid trigger.')
+    booleanParam(name: 'DEPLOY_ONLY', defaultValue: false, description: 'No-op — elohim-epr has no deploy stage; accepted for uniform propagation.')
+    string(name: 'CHANGED_PATHS', defaultValue: '', description: 'No-op — newline-delimited changed paths from the orchestrator; unused here.')
   }
 
   stages {
-    stage('Rust — fmt + clippy') {
+    // Downstream-pipeline guard (fleet convention): only run for an orchestrator
+    // (UpstreamCause), manual (UserIdCause), or branch-indexing trigger.
+    stage('Check Trigger') {
       steps {
-        dir('elohim') {
-          sh 'cargo fmt --check'
-          sh 'cargo clippy -p elohim-epr -- -D warnings'
-        }
-      }
-    }
-    stage('Rust — tests') {
-      steps {
-        dir('elohim') {
-          sh 'cargo nextest run -p elohim-epr --all-targets'
-        }
-      }
-    }
-    stage('TS — tests') {
-      steps {
-        dir('elohim/sdk/epr-ts') {
-          sh 'pnpm install --frozen-lockfile'
-          sh 'pnpm test'
+        script {
+          def validTrigger = currentBuild.getBuildCauses().any { cause ->
+            cause._class.contains('UserIdCause') ||
+            cause._class.contains('UpstreamCause') ||
+            cause._class.contains('BranchIndexingCause')
+          }
+          if (!validTrigger) {
+            echo "⏭️ PIPELINE SKIPPED — dispatch via the orchestrator or a manual trigger"
+            currentBuild.result = 'NOT_BUILT'
+            currentBuild.displayName = "#${env.BUILD_NUMBER} SKIPPED"
+            env.PIPELINE_SKIPPED = 'true'
+          } else {
+            echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
+          }
         }
       }
     }
 
-    // Publish to the internal Nexus registry on main only (release-grade;
-    // crate versions are immutable). Idempotent + 409-safe: a no-op unless
-    // the version in Cargo.toml was bumped. Reuses the CI npm token
-    // (`ee-nexus-npm-token`) — it authenticates cross-format; the only
-    // prerequisite is the CI user holding repository-view add/read on
-    // cargo-internal (Nexus role `cargo-deployer`).
+    stage('Rust — fmt + clippy') {
+      when { expression { env.PIPELINE_SKIPPED != 'true' } }
+      steps {
+        container('builder') {
+          dir('elohim') {
+            sh '''
+              nix develop --impure --accept-flake-config "path:$WORKSPACE/elohim/epr" --command bash -c '
+                set -euo pipefail
+                export RUSTFLAGS=""
+                export RUSTC_WRAPPER=""
+                cargo --version
+                cargo fmt -p elohim-epr -- --check
+                cargo clippy -p elohim-epr --all-targets -- -D warnings
+              '
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Rust — tests') {
+      when { expression { env.PIPELINE_SKIPPED != 'true' } }
+      steps {
+        container('builder') {
+          dir('elohim') {
+            sh '''
+              nix develop --impure --accept-flake-config "path:$WORKSPACE/elohim/epr" --command bash -c '
+                set -euo pipefail
+                export RUSTFLAGS=""
+                export RUSTC_WRAPPER=""
+                cargo nextest run -p elohim-epr --all-targets
+              '
+            '''
+          }
+        }
+      }
+    }
+
+    // @elohim/epr is a root pnpm-workspace member with only external deps, so
+    // install + test are filtered from the workspace root (its lockfile is the
+    // root pnpm-lock.yaml — there is no local one). A filtered install pulls
+    // just this package's subgraph, not the whole monorepo.
+    stage('TS — tests') {
+      when { expression { env.PIPELINE_SKIPPED != 'true' } }
+      steps {
+        container('builder') {
+          sh '''
+            corepack enable
+            pnpm install --frozen-lockfile --filter @elohim/epr
+            pnpm --filter @elohim/epr test
+          '''
+        }
+      }
+    }
+
+    // Publish to the internal Nexus registry on main only (release-grade; crate
+    // versions are immutable). The script is idempotent + 409-safe — a no-op
+    // unless the version in Cargo.toml was bumped. Runs inside `nix develop`
+    // because `cargo publish` needs the toolchain; it clears RUSTFLAGS/
+    // RUSTC_WRAPPER itself. Reuses the CI npm token (`ee-nexus-npm-token`),
+    // which authenticates cross-format against cargo-internal.
     stage('Publish — cargo (elohim registry)') {
       when {
-        anyOf { branch 'main'; expression { env.BRANCH_NAME == 'main' } }
+        allOf {
+          expression { env.PIPELINE_SKIPPED != 'true' }
+          anyOf { branch 'main'; expression { env.BRANCH_NAME == 'main' } }
+        }
       }
       steps {
-        withCredentials([string(credentialsId: 'ee-nexus-npm-token', variable: 'NEXUS_NPM_TOKEN')]) {
-          sh "bash '${env.WORKSPACE}/scripts/ci/cargo-publish-epr.sh'"
+        container('builder') {
+          withCredentials([string(credentialsId: 'ee-nexus-npm-token', variable: 'NEXUS_NPM_TOKEN')]) {
+            dir('elohim') {
+              sh '''
+                nix develop --impure --accept-flake-config "path:$WORKSPACE/elohim/epr" --command bash -c '
+                  set -euo pipefail
+                  bash "$WORKSPACE/scripts/ci/cargo-publish-epr.sh"
+                '
+              '''
+            }
+          }
         }
       }
     }
