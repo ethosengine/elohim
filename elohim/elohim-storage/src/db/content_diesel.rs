@@ -247,6 +247,26 @@ pub fn get_content_tags(
 /// `true`; internal drain/replication/sync paths pass `false`. This is a
 /// server-side parameter — NOT part of `ContentQuery` — so that clients
 /// cannot disable the gate via URL params.
+/// Page ALL content rows across every app scope, provenance-ungated.
+///
+/// Used ONLY by the Automerge DocStore corpus back-fill
+/// (`crate::sync::projector::backfill_content_docs`) — a projection REBUILD over
+/// already-notarized content, NOT an HTTP read surface, hence no `h_app_id`
+/// scoping and no provenance gate. Ordered by `id` for stable pagination across
+/// pages. `offset`/`limit` are clamped to sane values.
+pub fn list_all_content_rows(
+    conn: &mut SqliteConnection,
+    offset: i64,
+    limit: i64,
+) -> Result<Vec<Content>, StorageError> {
+    content::table
+        .order(content::id.asc())
+        .offset(offset.max(0))
+        .limit(limit.max(1))
+        .load::<Content>(conn)
+        .map_err(|e| StorageError::Internal(format!("list_all_content_rows failed: {}", e)))
+}
+
 pub fn list_content(
     conn: &mut SqliteConnection,
     ctx: &AppContext,

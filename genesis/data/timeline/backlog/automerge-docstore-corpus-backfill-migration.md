@@ -7,10 +7,24 @@ title: "Automerge DocStore corpus back-fill — idempotent migration to project 
 slug: "automerge-docstore-corpus-backfill-migration"
 written: "2026-06-27"
 author: "plan flow Step 1c(3) complementary-capture (automerge content-sync plane sprint)"
-status: "backlog"
+status: "in-review"
 priority: "medium"
 jobs: [elohim]
 ---
+
+## LANDED (producer side) — 2026-07-01 (committed feat branch, CI-gate pending)
+
+Implemented by the `automerge-content-sync-projection-completeness` shift:
+`sync::projector::backfill_content_docs` (gated `ELOHIM_DOCSTORE_BACKFILL`, batched,
+yields) over `content_diesel::list_all_content_rows` (unscoped, provenance-ungated),
+projecting via the now-**idempotent** `project_content_doc` (skip-if-unchanged, so
+re-runs never inflate change history). Wired one-shot at startup (main.rs libp2p
+block). Full-field projection now includes `blobHash`/`serverBlobHash`/`blobCid`/
+`contentSizeBytes`. Verified: 11/11 `sync::` lib tests green (incl. DB-driven
+`backfill_projects_all_rows_and_is_idempotent`). Reset-recovery story = re-run on
+cold start with the env flag (idempotent, safe). **Note the capstone is still open:**
+the consumer heal path — see [[automerge-consumer-reverse-projection-docstore-to-sql]].
+Close this item when the change clears the dev CI gate.
 
 ## What
 

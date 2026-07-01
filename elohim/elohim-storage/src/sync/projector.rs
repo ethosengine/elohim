@@ -9,6 +9,7 @@
 use std::sync::Arc;
 
 use automerge::transaction::Transactable;
+use automerge::{Automerge, ReadDoc, ScalarValue, Value};
 use tokio::sync::broadcast::error::RecvError;
 
 use crate::db::context::AppContext;
@@ -23,8 +24,90 @@ pub fn content_doc_id(id: &str) -> String {
     format!("node:{id}")
 }
 
+/// One projected field value — a string or an integer scalar. Kept as an enum
+/// so the projection WRITE and the idempotency COMPARE share a single field
+/// list (`projected_fields`) and can never drift.
+enum FieldVal {
+    S(String),
+    I(i64),
+}
+
+/// The ordered field set projected from a content row into its Automerge doc —
+/// the single source of truth for both the write and the idempotency compare.
+///
+/// `blobHash`/`serverBlobHash`/`blobCid`/`contentSizeBytes` are LOAD-BEARING for
+/// peer convergence of the SERVING path: a peer whose content row lost its
+/// `blobHash` (e.g. a deploy PATCH that never landed on a degraded conductor) can
+/// only re-derive it by converging this doc from a healthy peer. `None` string
+/// fields project as `""` (the consumer treats empty as absent); a missing
+/// numeric projects as `0`.
+fn projected_fields(content: &Content) -> Vec<(&'static str, FieldVal)> {
+    vec![
+        ("id", FieldVal::S(content.id.clone())),
+        ("hAppId", FieldVal::S(content.h_app_id.clone())),
+        ("title", FieldVal::S(content.title.clone())),
+        (
+            "description",
+            FieldVal::S(content.description.clone().unwrap_or_default()),
+        ),
+        ("contentType", FieldVal::S(content.content_type.clone())),
+        ("contentFormat", FieldVal::S(content.content_format.clone())),
+        ("reach", FieldVal::S(content.reach.clone())),
+        (
+            "body",
+            FieldVal::S(content.content_body.clone().unwrap_or_default()),
+        ),
+        (
+            "metadata",
+            FieldVal::S(
+                content
+                    .metadata_json
+                    .clone()
+                    .unwrap_or_else(|| "{}".to_string()),
+            ),
+        ),
+        (
+            "blobHash",
+            FieldVal::S(content.blob_hash.clone().unwrap_or_default()),
+        ),
+        (
+            "serverBlobHash",
+            FieldVal::S(content.server_blob_hash.clone().unwrap_or_default()),
+        ),
+        (
+            "blobCid",
+            FieldVal::S(content.blob_cid.clone().unwrap_or_default()),
+        ),
+        (
+            "contentSizeBytes",
+            FieldVal::I(content.content_size_bytes.unwrap_or(0) as i64),
+        ),
+        ("updatedAt", FieldVal::S(content.updated_at.clone())),
+    ]
+}
+
+/// True when the doc ALREADY carries exactly the projected field set — the
+/// idempotency guard. A missing field, a changed value, or a scalar-type
+/// mismatch each mean "needs (re)projection". A freshly-created empty doc has no
+/// fields, so it never matches → always projects on first sight.
+fn doc_matches(doc: &Automerge, fields: &[(&'static str, FieldVal)]) -> bool {
+    for (key, val) in fields {
+        match doc.get(automerge::ROOT, *key) {
+            Ok(Some((Value::Scalar(scalar), _))) => match (val, scalar.as_ref()) {
+                (FieldVal::S(want), ScalarValue::Str(got)) if got.as_str() == want => {}
+                (FieldVal::I(want), ScalarValue::Int(got)) if got == want => {}
+                _ => return false,
+            },
+            _ => return false,
+        }
+    }
+    true
+}
+
 /// Project a single content row into its Automerge doc under the "elohim" sync
-/// namespace.
+/// namespace. Returns `true` if the doc was (re)written, `false` if it already
+/// matched — an **idempotent** skip that appends no new change, so re-running the
+/// producer or the corpus back-fill never inflates the doc's change history.
 ///
 /// THE NAMESPACE IS LOAD-BEARING: `initiate_sync_round` (p2p/mod.rs:6996) only
 /// lists `"elohim"`; a doc written under any other namespace sits inert forever.
@@ -37,42 +120,97 @@ pub fn content_doc_id(id: &str) -> String {
 pub async fn project_content_doc(
     sync: &SyncManager,
     content: &Content,
-) -> Result<(), StorageError> {
+) -> Result<bool, StorageError> {
     let doc_id = content_doc_id(&content.id);
     let mut doc = sync
         .get_or_create_doc(PROJECTION_NAMESPACE, &doc_id)
         .await?;
+    let fields = projected_fields(content);
+    if doc_matches(&doc, &fields) {
+        return Ok(false);
+    }
     doc.transact::<_, _, automerge::AutomergeError>(|tx| {
-        tx.put(automerge::ROOT, "id", content.id.as_str())?;
-        tx.put(automerge::ROOT, "title", content.title.as_str())?;
-        tx.put(
-            automerge::ROOT,
-            "contentType",
-            content.content_type.as_str(),
-        )?;
-        tx.put(
-            automerge::ROOT,
-            "contentFormat",
-            content.content_format.as_str(),
-        )?;
-        tx.put(automerge::ROOT, "reach", content.reach.as_str())?;
-        tx.put(
-            automerge::ROOT,
-            "body",
-            content.content_body.as_deref().unwrap_or(""),
-        )?;
-        tx.put(
-            automerge::ROOT,
-            "metadata",
-            content.metadata_json.as_deref().unwrap_or("{}"),
-        )?;
-        tx.put(automerge::ROOT, "updatedAt", content.updated_at.as_str())?;
+        for (key, val) in &fields {
+            match val {
+                FieldVal::S(s) => tx.put(automerge::ROOT, *key, s.as_str())?,
+                FieldVal::I(i) => tx.put(automerge::ROOT, *key, *i)?,
+            }
+        }
         Ok(())
     })
     .map_err(|e| StorageError::Sync(format!("projector transact failed: {e:?}")))?;
     sync.apply_changes(PROJECTION_NAMESPACE, &doc_id, vec![doc.save()])
         .await?;
-    Ok(())
+    Ok(true)
+}
+
+/// Outcome of a corpus back-fill pass.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct BackfillStats {
+    pub scanned: u64,
+    pub projected: u64,
+    pub skipped: u64,
+    pub failed: u64,
+}
+
+/// Back-fill the Automerge DocStore from the pre-existing SQL content corpus.
+///
+/// The go-forward producer (`spawn_content_projection_listener`) only projects
+/// content written AFTER it starts. On a fresh deploy or a sled DocStore reset,
+/// the large already-seeded corpus would never converge until each row was
+/// re-written. This one-shot, **idempotent** pass closes that gap: it pages every
+/// content row (all app scopes, provenance-ungated — a projection REBUILD over
+/// already-notarized content, not a read surface) and projects each via
+/// `project_content_doc`, which skips rows already present with matching values.
+/// Safe to run on every cold start (gated at the call site).
+///
+/// Batched, and yields between pages so it never starves the live write path or
+/// the 60s sync timer. `batch` bounds the per-page SELECT (clamped to ≥ 1).
+pub async fn backfill_content_docs(
+    sync: &SyncManager,
+    pool: &DbPool,
+    batch: i64,
+) -> Result<BackfillStats, StorageError> {
+    let batch = batch.max(1);
+    let mut stats = BackfillStats::default();
+    let mut offset: i64 = 0;
+    loop {
+        let rows = {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+            content_diesel::list_all_content_rows(&mut conn, offset, batch)?
+        };
+        if rows.is_empty() {
+            break;
+        }
+        let page_len = rows.len();
+        for content in &rows {
+            stats.scanned += 1;
+            match project_content_doc(sync, content).await {
+                Ok(true) => stats.projected += 1,
+                Ok(false) => stats.skipped += 1,
+                Err(e) => {
+                    stats.failed += 1;
+                    tracing::error!(id = %content.id, error = %e, "backfill: projection failed");
+                }
+            }
+        }
+        offset += page_len as i64;
+        // Yield so a large back-fill never monopolises the runtime.
+        tokio::task::yield_now().await;
+        if (page_len as i64) < batch {
+            break;
+        }
+    }
+    tracing::info!(
+        scanned = stats.scanned,
+        projected = stats.projected,
+        skipped = stats.skipped,
+        failed = stats.failed,
+        "backfill: corpus projection pass complete"
+    );
+    Ok(stats)
 }
 
 /// Re-SELECT the full content row by id.
@@ -134,10 +272,15 @@ pub fn spawn_content_projection_listener(
     })
 }
 
-/// The sync-partition namespace. MUST equal the `h_app_id` listed by
-/// `initiate_sync_round` (p2p/mod.rs:6996). Changing one without the other
-/// silently disables content sync. (Promoted to a named const in Task G4;
-/// guarded by `projection_namespace_matches_sync_timer`.)
+/// The sync-partition namespace — the single source of truth for the `h_app_id`
+/// that partitions content sync. BOTH sides reference this const: the producer
+/// (`project_content_doc`, below) writes docs under it, and the consumer
+/// (`initiate_sync_round` in p2p/mod.rs) lists documents under it. Because both
+/// reference the const directly, producer/consumer drift is now compile-impossible
+/// (each used to carry a bare `"elohim"` literal — a silent content-sync killer if
+/// either drifted). The remaining invariant — the wire value stays `"elohim"`
+/// unless every peer + the DNA migrate in lockstep — is pinned by
+/// `projection_namespace_is_wire_contract`.
 pub const PROJECTION_NAMESPACE: &str = "elohim";
 
 #[cfg(test)]
@@ -212,14 +355,162 @@ mod tests {
         assert_eq!(super::content_doc_id("edit-prop-1"), "node:edit-prop-1");
     }
 
-    /// Guard the load-bearing namespace coupling. `initiate_sync_round`
-    /// (p2p/mod.rs:6996) lists ONLY `"elohim"`. If that constant and the
-    /// producer ever diverge, content sync silently dies — this test fails loudly
-    /// if `PROJECTION_NAMESPACE` drifts from the sync-timer's `h_app_id`.
+    /// Pin the on-the-wire sync namespace. Producer/consumer drift is now
+    /// compile-enforced — `initiate_sync_round` (p2p/mod.rs) and
+    /// `project_content_doc` both reference `PROJECTION_NAMESPACE` directly, so
+    /// neither can silently diverge. (The previous version of this test compared
+    /// a LOCAL COPY of the `"elohim"` literal to the const and so guarded nothing:
+    /// renaming the sync-timer's `h_app_id` would have passed while killing content
+    /// sync fleet-wide.) What remains to guard is the WIRE VALUE: remote peers and
+    /// the DNA expect `"elohim"`. Changing the const moves both sides coherently
+    /// but alters the wire protocol — this fails loudly so that change is deliberate
+    /// and coordinated, never an incidental rename.
     #[test]
-    fn projection_namespace_matches_sync_timer() {
-        // Mirror of the literal hardcoded at p2p/mod.rs:6996 (initiate_sync_round).
-        const PROJECTION_NS: &str = "elohim";
-        assert_eq!(PROJECTION_NS, super::PROJECTION_NAMESPACE);
+    fn projection_namespace_is_wire_contract() {
+        assert_eq!(
+            super::PROJECTION_NAMESPACE,
+            "elohim",
+            "sync-partition namespace is a wire contract with every peer + the DNA"
+        );
+    }
+
+    /// Re-projecting identical content is a no-op — no new change is appended, so
+    /// the corpus back-fill (and a redundant go-forward update) never inflate a
+    /// doc's change history. This is the idempotency the back-fill relies on.
+    #[tokio::test]
+    async fn project_is_idempotent_on_unchanged_content() {
+        let (sync, _temp) = test_sync_manager().await;
+        let content = sample_content("idem-1", "v1");
+
+        assert!(
+            super::project_content_doc(&sync, &content).await.unwrap(),
+            "first projection must write"
+        );
+        let heads1 = sync.get_heads("elohim", "node:idem-1").await.unwrap();
+        assert!(!heads1.is_empty());
+
+        assert!(
+            !super::project_content_doc(&sync, &content).await.unwrap(),
+            "re-projecting unchanged content must be a skip"
+        );
+        let heads2 = sync.get_heads("elohim", "node:idem-1").await.unwrap();
+        assert_eq!(
+            heads1, heads2,
+            "idempotent re-projection must not append a change"
+        );
+    }
+
+    /// A changed serving-critical field (blobHash) forces a re-projection and the
+    /// new value converges into the doc.
+    #[tokio::test]
+    async fn project_rewrites_when_a_field_changes() {
+        let (sync, _temp) = test_sync_manager().await;
+        let mut content = sample_content("chg-1", "v1");
+
+        assert!(super::project_content_doc(&sync, &content).await.unwrap());
+        let heads1 = sync.get_heads("elohim", "node:chg-1").await.unwrap();
+
+        content.blob_hash = Some("sha256-deadbeef".to_string());
+        assert!(
+            super::project_content_doc(&sync, &content).await.unwrap(),
+            "a changed field must re-project"
+        );
+        let heads2 = sync.get_heads("elohim", "node:chg-1").await.unwrap();
+        assert_ne!(heads1, heads2, "a changed field must append a change");
+
+        let blob = sync
+            .get_doc_field("elohim", "node:chg-1", "blobHash")
+            .await
+            .unwrap();
+        assert_eq!(blob, "sha256-deadbeef");
+    }
+
+    /// The projected doc carries the serving-critical blob fields (this is what
+    /// lets a degraded peer re-derive a lost `blobHash` from a healthy peer).
+    #[tokio::test]
+    async fn projects_serving_critical_blob_fields() {
+        let (sync, _temp) = test_sync_manager().await;
+        let mut content = sample_content("blob-1", "landing");
+        content.blob_hash = Some("sha256-abc".to_string());
+        content.server_blob_hash = Some("sha256-ssr".to_string());
+
+        super::project_content_doc(&sync, &content).await.unwrap();
+
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:blob-1", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-abc"
+        );
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:blob-1", "serverBlobHash")
+                .await
+                .unwrap(),
+            "sha256-ssr"
+        );
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:blob-1", "hAppId")
+                .await
+                .unwrap(),
+            "lamad"
+        );
+    }
+
+    /// End-to-end back-fill over a real (in-memory) SQL corpus: the first pass
+    /// projects every row; the second is a full no-op. Proves the O(rows) back-fill
+    /// is idempotent and safe to run on every cold start.
+    #[tokio::test]
+    async fn backfill_projects_all_rows_and_is_idempotent() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+
+        {
+            let mut conn = pool.get().unwrap();
+            for i in 0..3 {
+                let input = CreateContentInput {
+                    id: format!("bf-{i}"),
+                    title: format!("row {i}"),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash: Some(format!("sha256-{i}")),
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "household".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: Some("body".to_string()),
+                    dht_anchor_hash: None,
+                };
+                content_diesel::create_content(&mut conn, &ctx, input).unwrap();
+            }
+        }
+
+        // First pass projects all 3 (batch smaller than corpus exercises paging).
+        let s1 = super::backfill_content_docs(&sync, &pool, 2).await.unwrap();
+        assert_eq!(s1.scanned, 3);
+        assert_eq!(s1.projected, 3);
+        assert_eq!(s1.skipped, 0);
+        assert_eq!(sync.count_documents("elohim").await.unwrap(), 3);
+
+        // Second pass is a full no-op — the idempotency guarantee.
+        let s2 = super::backfill_content_docs(&sync, &pool, 2).await.unwrap();
+        assert_eq!(s2.scanned, 3);
+        assert_eq!(s2.projected, 0);
+        assert_eq!(s2.skipped, 3);
+        assert_eq!(sync.count_documents("elohim").await.unwrap(), 3);
+
+        // The seeded blobHash converged into the sync doc.
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:bf-0", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-0"
+        );
     }
 }
