@@ -213,6 +213,60 @@ pub async fn backfill_content_docs(
     Ok(stats)
 }
 
+/// Reverse-project a converged content doc back into the SQL content projection —
+/// the CONSUMER heal leg (the missing other half of the sync plane; today
+/// `apply_changes` writes the sled DocStore ONLY). When a peer's content doc
+/// converges into our DocStore, re-derive the serving-critical `blob_hash` into the
+/// local SQL row at the **amber** tier, so SERVING (which reads SQL, not the
+/// DocStore) heals WITHOUT the notary. Returns `true` if a heal was written.
+///
+/// Division of labor (spec §5.5): the shard/replication plane heals ABSENCE (a
+/// missing row/bytes, via `bulk_create_content`); this heals DRIFT — a stale/null
+/// `blob_hash` on a row that already EXISTS locally. An absent row is skipped
+/// (`Ok(false)`) — that is the shard plane's job, not the drift-heal's.
+///
+/// Guards: (1) **empty-never-wins** — only heals when the converged `blob_hash` is
+/// non-empty (a peer holding `""` never marks us amber or clobbers us); (2)
+/// **no-clobber** — the write rides `update_content`'s amber path (`crdt_converged_at`
+/// set), which never overwrites a present (possibly green/notarized) `blob_hash`
+/// (A3); (3) **namespace** — writes under `default_lamad` (the serving scope), never
+/// the doc's `"elohim"` sync namespace (REQ-F5).
+pub async fn reverse_project_content_doc(
+    sync: &SyncManager,
+    pool: &DbPool,
+    doc_id: &str,
+) -> Result<bool, StorageError> {
+    let Some(id) = doc_id.strip_prefix("node:") else {
+        return Ok(false); // not a content-node doc
+    };
+    // Empty-never-wins: read the converged blob_hash; skip if absent/empty.
+    let blob_hash = match sync
+        .get_doc_field(PROJECTION_NAMESPACE, doc_id, "blobHash")
+        .await
+    {
+        Ok(h) if !h.is_empty() => h,
+        _ => return Ok(false),
+    };
+    let mut conn = pool
+        .get()
+        .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+    let ctx = AppContext::default_lamad();
+    let input = content_diesel::UpdateContentInput {
+        id: id.to_string(),
+        blob_hash: Some(blob_hash),
+        // The amber marker: switches update_content into the no-clobber amber path
+        // (stamps crdt_converged_at, NEVER dht_anchor_hash).
+        crdt_converged_at: Some(chrono::Utc::now().to_rfc3339()),
+        ..Default::default()
+    };
+    match content_diesel::update_content(&mut conn, &ctx, input) {
+        Ok(_) => Ok(true),
+        // Absent row → the shard/replication plane heals it, not the drift-heal.
+        Err(StorageError::NotFound(_)) => Ok(false),
+        Err(e) => Err(e),
+    }
+}
+
 /// Re-SELECT the full content row by id.
 ///
 /// `StorageEvent::ContentCreated/Updated` carries only `{id, ..}`, so the
@@ -512,6 +566,92 @@ mod tests {
                 .await
                 .unwrap(),
             "sha256-0"
+        );
+    }
+
+    /// B1 proof — the consumer heal leg: a converged real blob_hash re-derives into
+    /// a NULL SQL row (amber-stamped, never notarized); an EMPTY converged blob_hash
+    /// never overwrites a present real hash (empty-never-wins). This is the
+    /// elohim.host `blobHash: null` 404 as a red→green, WITHOUT the notary.
+    #[tokio::test]
+    async fn reverse_project_heals_null_and_empty_never_wins() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+
+        // Local rows: heal-null (blob_hash NULL — the elohim.host case); heal-real
+        // (a present real blob_hash that empty must never clobber).
+        {
+            let mut conn = pool.get().unwrap();
+            for (id, bh) in [
+                ("heal-null", None),
+                ("heal-real", Some("sha256-existing".to_string())),
+            ] {
+                content_diesel::create_content(
+                    &mut conn,
+                    &ctx,
+                    CreateContentInput {
+                        id: id.to_string(),
+                        title: "t".to_string(),
+                        description: None,
+                        content_type: "concept".to_string(),
+                        content_format: "markdown".to_string(),
+                        blob_hash: bh,
+                        blob_cid: None,
+                        content_size_bytes: None,
+                        metadata_json: None,
+                        reach: "household".to_string(),
+                        created_by: None,
+                        tags: vec![],
+                        content_body: Some("b".to_string()),
+                        dht_anchor_hash: None,
+                    },
+                )
+                .unwrap();
+            }
+        }
+
+        // Peer A's converged doc for heal-null carries a REAL blob_hash.
+        let mut peer_a = sample_content("heal-null", "t");
+        peer_a.blob_hash = Some("sha256-converged".to_string());
+        super::project_content_doc(&sync, &peer_a).await.unwrap();
+        // Peer B's converged doc for heal-real carries an EMPTY blob_hash (None → "").
+        let peer_b = sample_content("heal-real", "t");
+        super::project_content_doc(&sync, &peer_b).await.unwrap();
+
+        assert!(
+            super::reverse_project_content_doc(&sync, &pool, "node:heal-null")
+                .await
+                .unwrap(),
+            "null local + real converged → heals"
+        );
+        assert!(
+            !super::reverse_project_content_doc(&sync, &pool, "node:heal-real")
+                .await
+                .unwrap(),
+            "empty converged → skipped (empty never wins)"
+        );
+
+        let mut conn = pool.get().unwrap();
+        let healed =
+            content_diesel::get_content(&mut conn, &ctx, "heal-null", content_diesel::MinTrust::Invisible)
+                .unwrap()
+                .unwrap();
+        assert_eq!(healed.blob_hash.as_deref(), Some("sha256-converged"));
+        assert!(healed.crdt_converged_at.is_some(), "healed row is amber-stamped");
+        assert!(healed.dht_anchor_hash.is_none(), "heal never notarizes");
+
+        let untouched =
+            content_diesel::get_content(&mut conn, &ctx, "heal-real", content_diesel::MinTrust::Invisible)
+                .unwrap()
+                .unwrap();
+        assert_eq!(
+            untouched.blob_hash.as_deref(),
+            Some("sha256-existing"),
+            "empty never clobbers a real hash"
         );
     }
 }
