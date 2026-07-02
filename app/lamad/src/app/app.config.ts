@@ -16,7 +16,7 @@ import {
   claimsFromDeclaration,
   type BundleRouteContext,
 } from '@elohim/service';
-import { LAMAD_ROUTE_CLAIMS } from './route-claims.declaration';
+import { LAMAD_ROUTE_CLAIMS } from './generated/route-claims';
 import { AGENT_CONTEXT, ECONOMIC_EVENT_FACTORY, EVENT_API } from '@elohim/rea-runtime';
 import { environment } from '../environments/environment';
 import { LEARNER_BACKEND } from './interfaces/learner-backend.interface';

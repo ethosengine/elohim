@@ -68,7 +68,7 @@ import type {
 import { GovernanceApiService, claimsFromDeclaration, epr } from '@elohim/service';
 import { AttentionTrackerService, EventService } from '@elohim/rea-runtime';
 
-import { LAMAD_ROUTE_CLAIMS } from '../../route-claims.declaration';
+import { LAMAD_ROUTE_CLAIMS } from '../../generated/route-claims';
 
 import type {
   ContentAnalyticsLoader,

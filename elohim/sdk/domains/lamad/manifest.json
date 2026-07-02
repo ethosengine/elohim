@@ -40,6 +40,9 @@
     "observations": { "$ref": "./manifest/observations.json" }
   },
   "rendering": { "$ref": "./manifest/rendering.json" },
+  "routeClaims": [
+    { "contentType": "path", "template": "path/{id}", "fragments": { "step": "path/{id}/step/{n}" } }
+  ],
   "gates": { "$ref": "./manifest/gates.json" },
   "observation_kinds": { "$ref": "./manifest/observation-kinds.json" },
   "attestations": { "$ref": "./manifest/attestations.json" },
