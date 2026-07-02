@@ -718,6 +718,9 @@ export const EPR_LINK = {
   FALLBACK: 'elohim-mention-base',
   // The visible marker dot inside the fallback chip (role=presentation).
   FALLBACK_MARK: '[part="fallback-mark"]',
+  // The honest "unavailable" note beside the L4 fallback (elohim-epr-link.ts
+  // renderDegraded() — e.g. "Unavailable at your reach" / "No longer available").
+  FALLBACK_NOTE: '[part="fallback-note"]',
   // The nested context-menu custom element (opened on right-click / Shift+F10).
   CONTEXT_MENU: 'elohim-context-menu',
 } as const;
