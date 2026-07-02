@@ -14,6 +14,13 @@ NAMESPACE="$1"
 DEPLOYMENT="$2"
 DOORWAY_HOST="$3"
 
+# DEPLOYMENT is interpolated into an ERE below — require a literal DNS-1123
+# name so regex metacharacters can never widen the match.
+if ! [[ "$DEPLOYMENT" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then
+    echo "ERROR: DEPLOYMENT '$DEPLOYMENT' is not a plain DNS-1123 name"
+    exit 1
+fi
+
 echo "═══════════════════════════════════════════════════════════"
 echo "RESTART DOORWAY POD — refresh EprRouter post-seed"
 echo "═══════════════════════════════════════════════════════════"
@@ -29,7 +36,17 @@ if [ -z "$PODS" ]; then
     PODS=$(kubectl get pods -n "${NAMESPACE}" -l "app=${DEPLOYMENT}" -o name 2>/dev/null || true)
 fi
 if [ -z "$PODS" ]; then
-    PODS=$(kubectl get pods -n "${NAMESPACE}" -o name 2>/dev/null | grep -F "${DEPLOYMENT}" || true)
+    # ANCHORED name match: a Deployment's pods are exactly
+    # `pod/<deployment>-<replicaset-hash>-<pod-hash>` — two dash-segments after
+    # the deployment name. An unanchored substring grep here deleted the
+    # alpha-b federation peer's pod as collateral when targeting
+    # `elohim-doorway-alpha` (`elohim-doorway-alpha-b-…` is a substring
+    # superset; genesis #1229, 2026-07-01 — and the health-wait below only
+    # covers ${DOORWAY_HOST}, so the collateral peer restarted UNVERIFIED).
+    # Note: the label branches above rarely hit for doorway deployments (labels
+    # carry `app.kubernetes.io/name: doorway` / `app: elohim-doorway`, not the
+    # deployment name), so THIS branch is the one that usually selects.
+    PODS=$(kubectl get pods -n "${NAMESPACE}" -o name 2>/dev/null | grep -E "^pod/${DEPLOYMENT}(-[a-z0-9]+){2}\$" || true)
 fi
 
 if [ -z "$PODS" ]; then

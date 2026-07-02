@@ -121,6 +121,23 @@ pub(crate) fn kad_key_for_atom(cid: &str) -> String {
     format!("{EPR_ATOM_KAD_KEY_PREFIX}:{cid}")
 }
 
+/// Page cursors for the client side of `ListDocuments` sync rounds: request ID →
+/// the `offset` that page was requested at. When a `DocumentList` response
+/// reports `has_more`, the next page is requested from the same peer at
+/// `offset + page_len` (`sync_protocol::next_doc_list_offset`), so a DocStore
+/// past one page (`SYNC_LIST_PAGE_LIMIT` docs) is never silently unsyncable —
+/// without this, every doc past the first page sat outside every sync round
+/// forever (the corpus back-fill projects the WHOLE content table, so a modest
+/// corpus crosses one page easily). Entries are removed on response AND on
+/// `OutboundFailure`, bounding the map by in-flight requests.
+type DocListCursorMap =
+    Arc<tokio::sync::Mutex<std::collections::HashMap<request_response::OutboundRequestId, u32>>>;
+
+/// Page size for `ListDocuments` sync-round enumeration — shared by the round
+/// opener (`initiate_sync_round`, page 0) and the `DocumentList` follow-up
+/// (next pages), so the cursor arithmetic and the request size can't drift.
+const SYNC_LIST_PAGE_LIMIT: u32 = 1000;
+
 /// Map of pending EPR resolve requests: request ID → (requested content ID, reply sender)
 type PendingEprMap = Arc<
     tokio::sync::Mutex<
@@ -516,6 +533,9 @@ pub struct P2PNode {
     pending_shard_pushes: PendingShardPushMap,
     /// Pending shard verification (Have) requests
     pending_verifications: PendingVerificationMap,
+    /// Page cursors for in-flight ListDocuments sync-round requests — see
+    /// `DocListCursorMap` for the silent-tail rationale.
+    doc_list_cursors: DocListCursorMap,
     /// Identity-driven replication state
     replication_state: replication::ReplicationState,
     /// Maps in-flight replication GetContent request IDs to content IDs.
@@ -1800,6 +1820,7 @@ impl P2PNode {
             pending_verifications: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
+            doc_list_cursors: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
             replication_state: replication::ReplicationState::new(),
             pending_replication_fetches: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
@@ -4734,6 +4755,9 @@ impl P2PNode {
                 },
             ) => {
                 warn!(peer = %peer, request_id = ?request_id, error = ?error, "Outbound sync request failed");
+                // Drop any page cursor for the failed request so the map stays
+                // bounded by genuinely in-flight requests.
+                self.doc_list_cursors.lock().await.remove(&request_id);
             }
             behaviour::ElohimStorageBehaviourEvent::SyncProtocol(
                 request_response::Event::InboundFailure {
@@ -6494,17 +6518,67 @@ impl P2PNode {
         request_id: request_response::OutboundRequestId,
         response: SyncResponse,
     ) {
+        // Reclaim any page cursor for this request UP FRONT: every response
+        // shape (DocumentList, Error, NotFound, …) must clear it, or a peer
+        // answering ListDocuments with an Error would strand entries in the
+        // cursor map. (OutboundFailure has its own removal in the event arm.)
+        let page_offset = self.doc_list_cursors.lock().await.remove(&request_id);
         match response {
             SyncResponse::DocumentList {
                 h_app_id,
                 documents,
                 total,
-                ..
+                has_more,
             } => {
                 debug!(
                     peer = %peer, h_app_id = %h_app_id, doc_count = documents.len(),
-                    total = total, "Received document list from peer"
+                    total = total, has_more = has_more, "Received document list from peer"
                 );
+
+                // Follow the page cursor BEFORE processing this page: without
+                // this, every doc past the first page sat outside every sync
+                // round forever (silent tail — the corpus back-fill projects
+                // the whole content table, so one page overflows easily).
+                match page_offset {
+                    Some(offset) => {
+                        if let Some(next_offset) = crate::p2p::sync_protocol::next_doc_list_offset(
+                            offset,
+                            documents.len(),
+                            has_more,
+                        ) {
+                            let next_request = SyncRequest::ListDocuments {
+                                h_app_id: h_app_id.clone(),
+                                prefix: None,
+                                offset: next_offset,
+                                limit: SYNC_LIST_PAGE_LIMIT,
+                            };
+                            let mut swarm = self.swarm.write().await;
+                            let next_id = swarm
+                                .behaviour_mut()
+                                .sync_protocol
+                                .send_request(&peer, next_request);
+                            drop(swarm);
+                            self.doc_list_cursors
+                                .lock()
+                                .await
+                                .insert(next_id, next_offset);
+                            debug!(
+                                peer = %peer, offset = next_offset, request_id = ?next_id,
+                                "Requested next document-list page"
+                            );
+                        }
+                    }
+                    None if has_more => {
+                        // Untracked page with more remaining (e.g. a restart
+                        // raced the response). The next 60s round re-enumerates
+                        // from offset 0 — log so a stuck tail is diagnosable.
+                        debug!(
+                            peer = %peer, total = total,
+                            "DocumentList has_more without a tracked page cursor — deferring to next sync round"
+                        );
+                    }
+                    None => {}
+                }
 
                 // Compare with local documents and request changes for diverged ones
                 for remote_doc in &documents {
@@ -6643,24 +6717,21 @@ impl P2PNode {
     /// A `None` `db_pool` (a p2p-only node with no SQL projection) skips silently;
     /// a reverse-projection error is logged (warn) but never fails the sync round.
     async fn heal_content_row(&self, h_app_id: &str, doc_id: &str) {
-        if h_app_id != crate::sync::projector::PROJECTION_NAMESPACE
-            || !doc_id.starts_with("node:")
+        if h_app_id != crate::sync::projector::PROJECTION_NAMESPACE || !doc_id.starts_with("node:")
         {
             return;
         }
         let Some(pool) = self.db_pool.as_ref() else {
             return;
         };
-        match crate::sync::projector::reverse_project_content_doc(
-            &self.sync_manager,
-            pool,
-            doc_id,
-        )
-        .await
+        match crate::sync::projector::reverse_project_content_doc(&self.sync_manager, pool, doc_id)
+            .await
         {
             Ok(true) => debug!("content heal: reverse-projected {doc_id}"),
             Ok(false) => {}
-            Err(e) => warn!(doc_id = %doc_id, error = %e, "content heal: reverse-projection failed"),
+            Err(e) => {
+                warn!(doc_id = %doc_id, error = %e, "content heal: reverse-projection failed")
+            }
         }
     }
 
@@ -7052,7 +7123,7 @@ impl P2PNode {
                 h_app_id: crate::sync::projector::PROJECTION_NAMESPACE.to_string(),
                 prefix: None,
                 offset: 0,
-                limit: 1000,
+                limit: SYNC_LIST_PAGE_LIMIT,
             };
 
             let mut swarm = self.swarm.write().await;
@@ -7060,6 +7131,10 @@ impl P2PNode {
                 .behaviour_mut()
                 .sync_protocol
                 .send_request(&peer_id, request);
+            drop(swarm);
+            // Track the page cursor so a has_more response can request the
+            // next page (silent-tail guard — see DocListCursorMap).
+            self.doc_list_cursors.lock().await.insert(request_id, 0);
             debug!(peer = %peer_id, request_id = ?request_id, "Sent ListDocuments sync request");
         }
     }

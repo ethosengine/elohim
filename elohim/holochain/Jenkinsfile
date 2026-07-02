@@ -156,6 +156,26 @@ def fetchHappFromHarbor(String destPath, String version = null) {
 }
 
 /**
+ * Federation-peer public-boundary health (alpha-b / elohim.host), non-blocking.
+ * Every post-deploy probe used to point at the PRIMARY only, so a deploy that
+ * left the federation peer publicly unhealthy was invisible (the alpha-b APPLY
+ * has junit shape in deployDoorwaysWithTestShape, but nothing verified the
+ * public boundary). Content-level divergence assertions live in the Dataplane
+ * Validation stage (@concern:federation-deploy). Top-level def = own CPS
+ * method — the pipeline block sits against the JVM 64KB hard limit.
+ */
+def checkFederationPeerPublicHealth(boolean alphaDeployed) {
+    if (!alphaDeployed) {
+        return
+    }
+    if (checkEdgeNodeHealth('https://elohim.host')) {
+        echo "Federation peer healthy: https://elohim.host/health"
+    } else {
+        echo "WARNING: federation peer (elohim.host / alpha-b) failed its public /health check — peer may be down or running a stale deploy; see Dataplane Validation"
+    }
+}
+
+/**
  * Check if edge node is healthy
  */
 def checkEdgeNodeHealth(String url) {
@@ -164,6 +184,45 @@ def checkEdgeNodeHealth(String url) {
         returnStdout: true
     ).trim()
     return result == '200'
+}
+
+/**
+ * Quality Gate: Storage — CI home for the elohim-storage lib suite (1835
+ * tests incl. the CRDT sync/heal proofs). Before this gate the pipeline only
+ * BUILT the storage image, so a storage-logic regression rode to prod as long
+ * as it compiled (found 2026-07-01, crdt-content-dataplane handoff §3).
+ * Mirrors Quality Gate: Doorway — the Dockerfile's `check` target reuses the
+ * BuildKit dep cache, no Rust toolchain needed in the CI builder. Non-blocking
+ * (unstable) while the gate stabilizes; flip to blocking once green streak
+ * established. Top-level def = own CPS method (pipeline block at 64KB limit).
+ */
+def runStorageQualityGate() {
+    try {
+        // Stage-local timeout: a runaway gate (cold dep-graph compile, hung
+        // test) degrades to UNSTABLE instead of eating the global 120-min
+        // budget and aborting the deploy stages behind it.
+        timeout(time: 45, unit: 'MINUTES') {
+            sh "bash '${env.WORKSPACE}/scripts/ci/storage-quality-gate.sh'"
+        }
+    } catch (Exception e) {
+        echo "Quality Gate: Storage - failures (non-blocking while stabilizing): ${e.message}"
+        unstable('Storage quality gate failed')
+    }
+}
+
+/**
+ * Build Storage — script body extracted verbatim from the stage (own CPS
+ * method; the pipeline block sits against the JVM 64KB hard limit).
+ */
+def buildStorageImage() {
+    def props = loadBuildVars()
+
+    withBuildVars(props) {
+        echo "Building elohim-storage: ${IMAGE_TAG}"
+        // Bash body in scripts/ci (Jenkinsfile-size canon: helpers stay
+        // heredoc-free); reads IMAGE_TAG/GIT_COMMIT_HASH from withBuildVars env.
+        sh "bash '${env.WORKSPACE}/scripts/ci/build-storage-image.sh'"
+    }
 }
 
 /**
@@ -1338,51 +1397,22 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        stage('Quality Gate: Storage') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.DEPLOY_ONLY != true }
+                expression { shouldRunStep('cargo-build-storage') }
+            }}
+            steps { container('builder') { script { runStorageQualityGate() } } }
+        }
+
         stage('Build Storage') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
                 expression { params.DEPLOY_ONLY != true }
                 expression { shouldRunStep('cargo-build-storage') }
             }}
-            steps {
-                container('builder') {
-                    script {
-                        def props = loadBuildVars()
-
-                        withBuildVars(props) {
-                            echo "Building elohim-storage: ${IMAGE_TAG}"
-
-                            sh """#!/bin/bash
-                                set -euo pipefail
-
-                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
-
-                                # CACHE_BUST=\${GIT_COMMIT_HASH} forces re-execution of the cargo build
-                                # layer when source changes. BuildKit retains layer cache for unchanged
-                                # COPY+RUN pairs (base image, apt installs, cargo deps), which is what
-                                # we want — removing --no-cache restores ~15 min savings on rebuilds
-                                # with no source change. Earlier "stale Rust versions" concern is
-                                # addressed by pinning the base image tag.
-
-                                # Pull fresh base image to avoid stale cached Rust versions
-                                nerdctl -n k8s.io pull rust:1.88.0-slim-bookworm || true
-
-                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
-                                    nerdctl -n k8s.io build \\
-                                    --build-arg CACHE_BUST=${GIT_COMMIT_HASH} \\
-                                    --build-arg GIT_COMMIT_SHORT=\$(echo ${GIT_COMMIT_HASH} | cut -c1-7) \\
-                                    --build-arg GIT_COMMIT_FULL=${GIT_COMMIT_HASH} \\
-                                    --build-arg BUILD_TIMESTAMP=\$(date -u +'%Y-%m-%dT%H:%M:%SZ') \\
-                                    --build-arg RUSTC_VERSION=\$(rustc --version 2>/dev/null | head -1 || echo unknown) \\
-                                    -t elohim-storage:${IMAGE_TAG} \\
-                                    -f elohim/elohim-storage/Dockerfile .
-
-                                nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} elohim-storage:${GIT_COMMIT_HASH}
-                            """
-                        }
-                    }
-                }
-            }
+            steps { container('builder') { script { buildStorageImage() } } }
         }
 
         stage('P2P Simulation Test') {
@@ -1855,6 +1885,12 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                             } else {
                                 echo "Edge Node deployed but health check failed - may need more time"
                             }
+
+                            // Federation-peer public health (alpha-b) — helper def.
+                            // Keyed on alpha being IN this deploy (not on it being
+                            // first in registry order — primaryEnv can be staging
+                            // under custom HUMAN_ASSIGNMENTS while alpha still ships).
+                            checkFederationPeerPublicHealth(humansByEnv.containsKey('alpha'))
                         }
                     }
                 }
