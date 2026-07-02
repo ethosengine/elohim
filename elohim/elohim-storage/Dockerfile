@@ -32,7 +32,11 @@ FROM ${CONDUCTOR_SOURCE_IMAGE} AS conductor-source
 # NOTE: Build context should be repo root directory
 # Run: docker build -f elohim/elohim-storage/Dockerfile -t elohim-storage .
 # Match dev environment Rust version for dependency compatibility
-FROM rust:1.94.0-slim-bookworm AS builder
+# `deps` pre-builds the dependency graph against placeholder sources; the
+# `check` (CI quality gate, `--target check` only) and `builder` (release)
+# stages both branch off it, so a source-only change never recompiles
+# third-party crates in either path.
+FROM rust:1.94.0-slim-bookworm AS deps
 
 WORKDIR /app
 
@@ -45,6 +49,12 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     libsodium-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# rustfmt for the `check` stage's fmt gate. Lives HERE (right after apt, before
+# any COPY) so the layer caches until the base-image pin bumps — placed later
+# it would re-download from static.rust-lang.org on every path-dep source
+# change (frequent), making upstream flake a spurious gate failure.
+RUN rustup component add rustfmt
 
 # Copy manifests and local crates first for dependency caching
 COPY elohim/elohim-storage/Cargo.toml elohim/elohim-storage/Cargo.lock ./
@@ -220,6 +230,60 @@ RUN rm -rf src benches target/release/elohim-storage target/release/libelohim* \
     target/release/deps/elohim* target/release/deps/libelohim* \
     target/release/build/diesel* target/release/.fingerprint/diesel* \
     target/release/build/elohim* target/release/.fingerprint/elohim*
+
+# ═══════════════════════════════════════════════════════════════════════════
+# check-deps: dev-profile dependency warm for the quality gate — branched OFF
+# the release path so the default build (deps → builder → runtime) never pays
+# for it (the deps cache chain includes every path-dep source tree, so it
+# churns far more often than "manifest changes"). Requires BuildKit: a legacy
+# builder executes ALL stages in file order — CI uses buildkitd; local one-off
+# builds need DOCKER_BUILDKIT=1.
+# ═══════════════════════════════════════════════════════════════════════════
+FROM deps AS check-deps
+# Recreate the placeholder targets (deps removed them after the release warm).
+RUN mkdir -p src benches && \
+    echo 'fn main() { println!("placeholder"); }' > src/main.rs && \
+    echo 'pub fn placeholder() {}' > src/lib.rs && \
+    echo 'fn main() {}' > benches/graph_traversal.rs
+# Debug-info trim — mirrors the repo root .cargo/config.toml policy (validated
+# 2026-06-04, −57% target size), which is NOT copied into the image: without
+# this the test build emits full DWARF (multi-GB layers, heavier links).
+RUN mkdir -p .cargo && printf '[profile.dev]\ndebug = "line-tables-only"\n[profile.dev.package."*"]\ndebug = false\n' > .cargo/config.toml
+# Warm the dev+test dependency graph against placeholder src: without this,
+# every quality-gate run cold-compiles the full graph.
+RUN RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --no-run
+# Same placeholder-poisoning rm as the release path, dev-profile dirs — the
+# check stage's test build must never reuse a placeholder-built
+# embed_migrations! output (empty migrations → false green).
+RUN rm -rf src benches target/debug/elohim-storage target/debug/libelohim* \
+    target/debug/deps/elohim* target/debug/deps/libelohim* \
+    target/debug/build/diesel* target/debug/.fingerprint/diesel* \
+    target/debug/build/elohim* target/debug/.fingerprint/elohim*
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Quality gate (CI `--target check`) — the CI home for the storage lib suite.
+# The release image build alone proves "compiles", NOT "passes": storage-logic
+# regressions rode green edge builds until 2026-07-01 (1835 lib tests incl.
+# the CRDT sync/heal proofs had no CI home). Mirrors doorway's `check` target:
+# built ONLY via `--target check`; the default build path never descends here.
+# Keep this stage's COPY block in sync with builder's.
+# Deliberately test+fmt only (no clippy): clippy's check-profile dep compile
+# is a third full graph; lint debt is covered by the pre-push heavy gates.
+# Deliberately NO CACHE_BUST: COPY layers key on content hashes, so an
+# unchanged tree is a full cache hit and a changed tree re-runs exactly once.
+# ═══════════════════════════════════════════════════════════════════════════
+FROM check-deps AS check
+COPY elohim/elohim-storage/migrations ./migrations
+COPY elohim/elohim-storage/src ./src
+COPY elohim/elohim-storage/benches ./benches
+COPY elohim/sdk /sdk
+RUN cargo fmt --check
+RUN CARGO_INCREMENTAL=0 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Release build stage (the default image path: deps → builder → runtime).
+# ═══════════════════════════════════════════════════════════════════════════
+FROM deps AS builder
 
 # Cache buster — pass --build-arg CACHE_BUST=$(git rev-parse HEAD) to invalidate
 # when source changes but Docker thinks COPY layers are identical
