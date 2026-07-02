@@ -12,7 +12,7 @@ import { execSync } from 'child_process';
  */
 export function discoverManifests(rootDir) {
   const output = execSync(
-    "find . -name 'build-manifest.json' -not -path '*/node_modules/*' -not -path '*/.superpowers/*'",
+    "find . -name 'build-manifest.json' -not -path '*/node_modules/*' -not -path '*/.superpowers/*' -not -path '*/.claude/*'",
     { cwd: rootDir, encoding: 'utf8' }
   );
   return output.trim().split('\n').filter(Boolean);
