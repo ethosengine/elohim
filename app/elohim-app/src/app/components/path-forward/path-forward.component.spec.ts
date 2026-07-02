@@ -4,14 +4,19 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { of } from 'rxjs';
 
-import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import { EPR_RESOLUTION_PROVIDER } from '@app/elohim/providers/epr-resolution.provider';
 import { ResilienceService } from '@app/lamad/services/resilience.service';
 
 import { PathForwardComponent } from './path-forward.component';
 
-// Embedded epr-relationship-card resolves live heads at runtime; stub the
-// resolver + resilience services so structural assertions stay network-free.
-const resolverStub = { resolve: () => of(null) };
+// Embedded epr-relationship-card resolves live heads through the ambient
+// EprResolutionProvider (I2); stub it + resilience so structural assertions
+// stay network-free.
+const resolutionStub = {
+  resolveHead: () => Promise.resolve({ state: 'missing' }),
+  resolveRoute: () => null,
+  resolveBody: () => Promise.resolve({ state: 'missing' }),
+};
 const resilienceStub = { getContentResilience: () => of(null) };
 
 describe('PathForwardComponent', () => {
@@ -24,7 +29,7 @@ describe('PathForwardComponent', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: EprResolverService, useValue: resolverStub },
+        { provide: EPR_RESOLUTION_PROVIDER, useValue: resolutionStub },
         { provide: ResilienceService, useValue: resilienceStub },
       ],
     }).compileComponents();

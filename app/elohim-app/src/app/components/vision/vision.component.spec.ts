@@ -4,15 +4,19 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { of } from 'rxjs';
 
-import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import { EPR_RESOLUTION_PROVIDER } from '@app/elohim/providers/epr-resolution.provider';
 import { ResilienceService } from '@app/lamad/services/resilience.service';
 
 import { VisionComponent } from './vision.component';
 
-// The embedded epr-relationship-card resolves live heads at runtime; in unit
-// tests we stub the resolver + resilience services so the structural assertions
-// (testids, counts, glosses) don't depend on the network.
-const resolverStub = { resolve: () => of(null) };
+// The embedded epr-relationship-card resolves live heads through the ambient
+// EprResolutionProvider (I2); in unit tests we stub it + resilience so the
+// structural assertions (testids, counts, glosses) don't depend on the network.
+const resolutionStub = {
+  resolveHead: () => Promise.resolve({ state: 'missing' }),
+  resolveRoute: () => null,
+  resolveBody: () => Promise.resolve({ state: 'missing' }),
+};
 const resilienceStub = { getContentResilience: () => of(null) };
 
 describe('VisionComponent', () => {
@@ -25,7 +29,7 @@ describe('VisionComponent', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: EprResolverService, useValue: resolverStub },
+        { provide: EPR_RESOLUTION_PROVIDER, useValue: resolutionStub },
         { provide: ResilienceService, useValue: resilienceStub },
       ],
     }).compileComponents();

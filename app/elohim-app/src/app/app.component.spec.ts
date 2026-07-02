@@ -8,12 +8,21 @@ import { Observable, Subject } from 'rxjs';
 
 import { environment } from '../environments/environment';
 import { AppComponent } from './app.component';
+import { EPR_RESOLUTION_PROVIDER } from './elohim/providers/epr-resolution.provider';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
 import { ProtocolRouteContextService } from './elohim/services/protocol-route-context.service';
 import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 import { BlobBootstrapService } from '@app/lamad/services/blob-bootstrap.service';
 import { type Mock, vi } from 'vitest';
+
+// AppComponent installs the ambient EprResolutionProvider on ngOnInit (I2) —
+// a stub is enough since these tests don't assert on resolution behavior.
+const mockEprResolution = {
+  resolveHead: vi.fn().mockResolvedValue({ state: 'missing' }),
+  resolveRoute: vi.fn().mockReturnValue(null),
+  resolveBody: vi.fn().mockResolvedValue({ state: 'missing' }),
+};
 
 describe('AppComponent', () => {
   let routerEventsSubject: Subject<NavigationEnd>;
@@ -83,6 +92,7 @@ describe('AppComponent', () => {
         { provide: TauriAuthService, useValue: mockTauriAuth },
         { provide: BlobBootstrapService, useValue: mockBlobBootstrap },
         { provide: ProtocolRouteContextService, useValue: mockProtocolRouteCtx },
+        { provide: EPR_RESOLUTION_PROVIDER, useValue: mockEprResolution },
       ],
     }).compileComponents();
   });

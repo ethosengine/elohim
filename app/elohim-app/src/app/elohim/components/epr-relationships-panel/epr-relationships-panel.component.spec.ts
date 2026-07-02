@@ -11,7 +11,7 @@ import { RouterModule } from '@angular/router';
 import { of } from 'rxjs';
 
 import { EprRelationshipsPanelComponent } from './epr-relationships-panel.component';
-import { EprResolverService } from '../../services/epr-resolver.service';
+import { EPR_RESOLUTION_PROVIDER } from '../../providers/epr-resolution.provider';
 import { ResilienceService } from '@app/lamad/services/resilience.service';
 import type { EprRelationship } from '../../models/epr-head.model';
 
@@ -32,13 +32,17 @@ describe('EprRelationshipsPanelComponent', () => {
   let component: EprRelationshipsPanelComponent;
 
   beforeEach(async () => {
-    const mockResolver = { resolve: vi.fn().mockReturnValue(of(null)) };
+    const mockResolution = {
+      resolveHead: vi.fn().mockResolvedValue({ state: 'missing' }),
+      resolveRoute: vi.fn().mockReturnValue(null),
+      resolveBody: vi.fn().mockResolvedValue({ state: 'missing' }),
+    };
     const mockResilience = { getContentResilience: vi.fn().mockReturnValue(of(null)) };
 
     await TestBed.configureTestingModule({
       imports: [EprRelationshipsPanelComponent, RouterModule.forRoot([])],
       providers: [
-        { provide: EprResolverService, useValue: mockResolver },
+        { provide: EPR_RESOLUTION_PROVIDER, useValue: mockResolution },
         { provide: ResilienceService, useValue: mockResilience },
       ],
     }).compileComponents();
