@@ -14,7 +14,7 @@ image: {"local": "images/placeholder-organization.webp", "placeholder": true, "s
 
 # Anthropic
 
-Ai safety research. This presence was created from the elohim.host manifesto "Inspired by" acknowledgments (see `.claude/data/contributor-cohort-seed-source-2026-06-21.md`).
+Ai safety research. This presence was created from the elohim.host manifesto "Inspired by" acknowledgments (see `genesis/docs/content/elohim-protocol/history/2026-06-21-contributor-cohort-seed-source-manifesto-inspired-by.md`).
 
 ## Observations
 

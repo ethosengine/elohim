@@ -1,11 +1,27 @@
+---
+title: "Conductor leak — NATIVE-HEAP reframe (glibc-arena fill, NOT go-pion), 2026-06-18"
+id: conductor-leak-rca-native-heap-reframe
+type: history-gotcha
+status: superseded
+tier: history
+created: 2026-06-18
+topic: [conductor-leak, rca, glibc-arena, native-heap, superseded]
+---
+
 # Conductor leak — NATIVE-HEAP reframe (glibc-arena fill, NOT go-pion), 2026-06-18
 
-Supersedes the go-pion framing of `conductor-leak-rca-empirical-reframe-2026-06-18.md`.
+> **STATUS: SUPERSEDED as doc-of-record (history record).** This doc's native glibc-arena mechanism
+> was CONFIRMED and tightened by `2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`, then
+> closed by the cure: the glibc→jemalloc allocator swap flattened the leak
+> (`2026-06-19-conductor-leak-jemalloc-cure-verdict.md`). Preserved as the analysis of record for
+> the mechanism; superseded as the live doc-of-record by the synthesis + cure verdict.
+
+Supersedes the go-pion framing of `2026-06-18-conductor-leak-rca-empirical-reframe.md`.
 This pass did the one thing every prior pass skipped: **read the live smaps localizer
 that shipped in `aa9f97f09` and has been flowing to Loki/Prometheus on alpha unread.**
 The data overturns two load-bearing claims of the previous RCA.
 
-> **DOC OF RECORD = `conductor-leak-rca-diverse-eyes-synthesis-2026-06-18.md`** (6-lens
+> **DOC OF RECORD = `2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`** (6-lens
 > adversarial fan-out that confirmed this reframe and tightened it). Two refinements it makes
 > to THIS doc, honor them: (a) **`near=<DNA>-shm` is SPATIAL adjacency only — zero causal
 > attribution** (the parser carries the nearest preceding *file-backed* basename forward); do

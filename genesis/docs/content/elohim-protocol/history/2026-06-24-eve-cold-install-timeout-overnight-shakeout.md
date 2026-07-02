@@ -1,3 +1,19 @@
+---
+title: "Overnight shakeout 2026-06-24 — eve cold-install timeout + alpha deploy-lag findings"
+id: eve-cold-install-timeout-overnight-shakeout
+type: history-gotcha
+status: noted
+tier: history
+created: 2026-06-24
+author: autonomous overnight session
+topic: [eve, conductor, install-timeout, happ-install, deploy-lag, alpha, shakeout]
+# Overnight-session record: the eve cold-install HAPP_INSTALL_TIMEOUT_SECS fix (fb3fea6fd) + the
+# "frontend errors are deploy-lag, not code bugs" verdict. Routed out of .claude/data 2026-07-02
+# (machine-ledger law).
+derived_from:
+  - .claude/data/overnight-shakeout-2026-06-24.md  # original home; routed 2026-07-02
+---
+
 # Overnight shakeout — 2026-06-24
 
 Autonomous session. Goal: land eve-fix, integrate loose changes, shake out frontend
@@ -42,6 +58,23 @@ guaranteed (sidesteps the cold compile); or (2) **bump `HAPP_INSTALL_TIMEOUT_SEC
 the edgenode template + adam manifest (operator-tunable, one line; redeploy) — 300 sits safely
 under the 330s liveness window. Recommend the pre-seed for eve now + raising the shipped default
 to 300 for durability.
+
+### FINAL STATE (~05:50Z, shakeout concluded)
+
+- **eve HEALED ✅** — `ready=1`, 0 restarts/15min on a fresh pod. Once the thundering herd settled, eve's
+  cold install completed *within* the 180s budget → cache warm → stable. **All 4 formerly-failing nodes
+  recovered** (adam/nancy/terrance/eve). The eve-fix is fully validated; the operator pre-seed / 300s bump
+  are now optional hardening, not required.
+- **Genesis a2o validation: PENDING (infra-delayed, not blocked by the fixes).** My a2o push (`80c959d8c`)
+  `abortPrevious`-killed the eve-fix's genesis run (#1197 ABORTED) — the concurrent-push pattern. The a2o
+  test-drift fixes are typecheck+eslint-clean and correct-vs-shipped-component; they'll validate on the next
+  clean genesis run. Genesis-green still needs the operator manifesto reseed regardless.
+- **⚠ Principle-7 over-build finding:** the a2o/doc-only push (`80c959d8c`, touching only `genesis/a2o/**` +
+  `.claude/data/`) triggered orchestrator #1305 to dispatch a **full edge rebuild + redeploy** (adam now on
+  `1.0.0-dev-80c959d8`, storage source byte-identical to `fb3fea6f`) — re-cold-starting every shem node (a
+  second thundering-herd cycle). The orchestrator's changeset analysis is over-building edge on non-edge
+  changes. **Consequence for tonight: stopped pushing** — each dev push re-churns the cluster. Follow-up
+  Objective: scope edge dispatch to actual edge-source changes (genesis/orchestrator changeset rules).
 
 ### Navigation audit (completing the frontend ask)
 

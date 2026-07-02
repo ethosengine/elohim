@@ -10,7 +10,7 @@ occurred_at: 2026-06-17
 
 The toolkit's instruments (P0 metrics surface, P1/P2 samplers) produce *evidence*. This discipline makes the **decisions** that evidence supports **durable** — so a settled design call (e.g. "arc is falsified", "the OOM is a conductor heap leak") is recorded once, with its evidence and the instrument that produced it, and is not re-litigated months later from memory.
 
-It formalizes the RCA's "tune → document → report" loop (`matthew-edge-resiliency-rca-fanout-2026-06-15.md` §3): every tunable we turn, or hypothesis we test, gets a record with the measured effect and the verdict.
+It formalizes the RCA's "tune → document → report" loop (`genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md` §3): every tunable we turn, or hypothesis we test, gets a record with the measured effect and the verdict.
 
 ## When to write one
 - A lever was turned and its effect measured (`target_arc_factor=0` → no memory bound).
@@ -52,6 +52,6 @@ Why these fields: **Instrument** makes the decision *reproducible* (re-run the q
 
 ## Lineage
 - `genesis/docs/superpowers/plans/2026-06-17-design-decision-toolkit-plan.md` (P3)
-- `.claude/data/matthew-edge-resiliency-rca-fanout-2026-06-15.md` (§3 tune→document→report)
+- `genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md` (§3 tune→document→report)
 - `genesis/data/timeline/backlog/conductor-memory-attribution-verdict.md`
 - `genesis/data/timeline/backlog/arc-shrink-ineffective-memory-soak.md`

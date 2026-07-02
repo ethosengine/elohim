@@ -1,8 +1,18 @@
+---
+title: "jemalloc-PRODUCTION conductor change set — verified, ready-to-apply (2026-06-19)"
+id: conductor-leak-jemalloc-prod-changeset
+type: history-gotcha
+status: noted
+tier: history
+created: 2026-06-19
+topic: [conductor-leak, jemalloc, production, changeset, edgenode]
+---
+
 # jemalloc-PRODUCTION conductor change set — verified, ready-to-apply (2026-06-19)
 
-*The production form of the leak cure. Companion to `conductor-leak-jemalloc-cure-verdict-2026-06-19.md`
-(the verdict: jemalloc allocator swap cured the OOM) and the RCA chain (`-diverse-eyes-synthesis-`,
-`-native-heap-reframe-`, `-canary-runbook-`). Authored + adversarially verified via workflow
+*The production form of the leak cure. Companion to `2026-06-19-conductor-leak-jemalloc-cure-verdict.md`
+(the verdict: jemalloc allocator swap cured the OOM) and the RCA chain (`2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`,
+`2026-06-18-conductor-leak-rca-native-heap-reframe.md`, `2026-06-18-conductor-leak-canary-runbook.md`). Authored + adversarially verified via workflow
 (map→author→3-lens verify→revise); the edited Cargo feature graph PARSE OK offline.*
 
 ## Current state (verified 2026-06-19)

@@ -1,4 +1,21 @@
+---
+title: "Conductor anon-heap leak — upstream-bug research (2026-06-17)"
+id: conductor-leak-upstream-research-tx5-pin-verdict
+type: history-gotcha
+status: superseded
+tier: history
+created: 2026-06-17
+topic: [conductor-leak, upstream, tx5, kitsune2, pin-verdict, superseded]
+---
+
 # Conductor anon-heap leak — upstream-bug research (2026-06-17)
+
+> **STATUS: SUPERSEDED (history record).** This pass's "no clean upstream pin-to-fix; best match =
+> tx5/holochain_p2p send-path buffer accumulation" verdict rested on the transport-leak framing that
+> was later falsified. The conductor OOM leak was a native glibc-malloc arena retention in the
+> holochain child, **cured by the glibc→jemalloc allocator swap** — see the closing verdict
+> `2026-06-19-conductor-leak-jemalloc-cure-verdict.md`. Preserved as the upstream-survey trail; its
+> pin recommendation is superseded.
 
 READ-ONLY research. Does a known upstream bug match our localized conductor memory leak, and is there a version to pin to?
 

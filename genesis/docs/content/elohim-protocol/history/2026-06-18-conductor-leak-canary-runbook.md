@@ -1,11 +1,21 @@
+---
+title: "Conductor leak — canary runbook (2026-06-18)"
+id: conductor-leak-canary-runbook
+type: history-gotcha
+status: noted
+tier: history
+created: 2026-06-18
+topic: [conductor-leak, oom, jemalloc, canary, glibc-arena, alpha]
+---
+
 # Conductor leak — canary runbook (2026-06-18)
 
-Two canaries to close the RCA from `conductor-leak-rca-diverse-eyes-synthesis-2026-06-18.md`:
+Two canaries to close the RCA from `2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`:
 the leak is a **native (Rust/C) glibc-malloc heap leak in the embedded `holochain` child**
 (layer-confirmed ~88%); the **specific call site (Layer C) is still open** and only a native
 heap profiler names it. Canary A is a no-rebuild probe/interim mitigation; Canary B is the
 site-namer. Both validate against the existing cure signal in
-`conductor-leak-deploy-recipe-2026-06-17.md`.
+`2026-06-17-conductor-leak-tx5-zombie-fix-deploy-recipe.md`.
 
 Operator-owned actions (cluster + build host) are flagged 🛠 — I cannot run `kubectl` or the
 Go+nix build from the dev container.
@@ -175,6 +185,6 @@ fix tested green in unit tests and did NOT flatten the slope in production.
 
 ## Files
 - Fork change (staged): `elohim/holochain-conductor/crates/holochain/{Cargo.toml, src/bin/holochain/main.rs}`.
-- RCA: `conductor-leak-rca-diverse-eyes-synthesis-2026-06-18.md` (+ `…-native-heap-reframe-…`).
-- Deploy/build env + cure signal: `conductor-leak-deploy-recipe-2026-06-17.md`.
+- RCA: `2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md` (+ `…-native-heap-reframe-…`).
+- Deploy/build env + cure signal: `2026-06-17-conductor-leak-tx5-zombie-fix-deploy-recipe.md`.
 - Spawn seam (env inheritance, no env_clear): `elohim/elohim-storage/src/conductor/process_manager.rs:64,68`.

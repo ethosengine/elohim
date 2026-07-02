@@ -1,8 +1,20 @@
 ---
-title: Always-On Peer-Hoster Readiness Assessment — Async Store-and-Forward CRDT Sync
-written: 2026-06-21
-author: workflow:peer-hoster-async-sync-readiness
-status: assessment
+id: "backlog-peer-hoster-async-sync-readiness-assessment"
+kind: "backlog"
+contentType: "backlog-item"
+contentFormat: "markdown"
+title: "Always-On Peer-Hoster Readiness Assessment — Async Store-and-Forward CRDT Sync"
+slug: "peer-hoster-async-sync-readiness-assessment"
+written: "2026-06-21"
+author: "workflow:peer-hoster-async-sync-readiness"
+status: "backlog"
+priority: "medium"
+tags: [peer-hoster, always-on, crdt, automerge, store-and-forward, peerid-addressing, durability, readiness-assessment, seam-3-10]
+# OPEN concern: point-in-time readiness assessment (verdict NO — async store-and-forward CRDT sync
+# does not work end-to-end peer-natively yet). The gap list is the backlog. Routed out of
+# .claude/data 2026-07-02 (machine-ledger law); referenced by the seam map (seam 3.10). NOTE:
+# partially advanced by the 2026-06-27/07-01 Automerge content-sync plane landings — re-verify
+# section-level verdicts against sync/projector.rs + p2p/mod.rs before acting.
 ---
 
 # Always-On Peer-Hoster Readiness Assessment

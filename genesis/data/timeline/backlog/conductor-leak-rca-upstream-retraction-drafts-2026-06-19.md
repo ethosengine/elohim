@@ -1,3 +1,13 @@
+---
+id: backlog-conductor-leak-rca-upstream-retraction-drafts
+kind: backlog
+title: "Conductor-leak RCA correction — upstream retraction drafts (posted comments referenced a now-refuted RCA)"
+status: open
+priority: medium
+tags: [conductor-leak, upstream, tx5, rca-correction, retraction, self-heal]
+occurred_at: 2026-06-19
+---
+
 # Conductor-leak RCA correction — action artifact (2026-06-19)
 
 The alpha conductor OOM was diagnosed as a tx5/go-pion off-heap transport leak; that RCA is
@@ -5,8 +15,8 @@ The alpha conductor OOM was diagnosed as a tx5/go-pion off-heap transport leak; 
 swapping the global allocator glibc→jemalloc** (flat ~2.1–2.9 GB past the old ~5 h OOM cadence; DNA
 hash unchanged; go-pion exonerated — Go heap flat ~52 MB). Shipped: fork `b477ca7` + che-dw
 `ca69302` → build #13 `elohim-edgenode:latest` jemalloc-prod; Part C `ed111a5cc`. Truth docs:
-`conductor-leak-jemalloc-cure-verdict-2026-06-19.md`, `-prod-changeset-2026-06-19.md`,
-`conductor-leak-rca-diverse-eyes-synthesis-2026-06-18.md`, `-native-heap-reframe-2026-06-18.md`.
+`genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md`, `genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-prod-changeset.md`,
+`genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`, `genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md`.
 
 Produced by the `wrong-rca-correction-sweep` workflow (one sub-agent, `sweep:backlog`, timed out →
 the 3 timeline/backlog verdict records are an ADDENDUM below, corrected by hand).
@@ -19,7 +29,7 @@ the 3 timeline/backlog verdict records are an ADDENDUM below, corrected by hand)
 2. `HANDOFF-2026-06-17-upstream-tx5-transport-pin.md` → CORRECTED ("WAIT on upstream tx5 fix" moot; cured locally by allocator swap; arc-factor falsification still holds).
 3. `HANDOFF-2026-06-17-fbootstrap-deploy-gate.md` (§"REAL leak fix", lines 118/125–131) → leak-RCA corrected; **F-BOOTSTRAP fix itself STANDS**.
 4. `.claude/handoffs/archive/HANDOFF-2026-06-17-conductor-leak-hunt.md` (§3.1/H4) → H4 (glibc allocator) was the closest hypothesis; trail down-ranked it wrongly.
-5. `SELF-HEALING-CONTROL-PLANE-DESIGN-2026-06-13.md` (line 314/286) → leak-axis corrected; **control-plane design STANDS**.
+5. `genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md` (line 314/286) → leak-axis corrected; **control-plane design STANDS**.
 6. `genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-auto-policy.md` (line 26) → leak-claim corrected; **arc-policy design + {0,1} infeasibility STAND**.
 7. `genesis/docs/superpowers/plans/2026-06-14-dataplane-arc-plan.md` (line 123) → leak-gate resolved; **{0,1} actuation + corpus-scaling STAND**.
 8. `genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md` (~18/31–38/64) → alpha-OOM evidence void; corpus-scaling rationale stands on first principles.
@@ -76,5 +86,5 @@ doorway-metrics handoff · the 2026-06-18 resilience-cards sprint handoff+RESULT
 conductor-memory-attribution-instrument-plan (correct methodology) · design-decision-toolkit-plan ·
 upstream-self-protection / inbound-admission-backpressure / stability-surface-read-model plans ·
 node-resource-tunables spec · dataplane-actuation/proofs plans · P2P-DATAPLANE CONTRACT-LEDGER
-(correctly defers) · node-consolidation plan (go-pion = Docker FROM only) · `.claude/data/conductor-leak-rca-*`
-(investigation-trail truth docs) · brit/gix CHANGELOG false-positives.
+(correctly defers) · node-consolidation plan (go-pion = Docker FROM only) · `genesis/docs/content/elohim-protocol/history/2026-06-1*-conductor-leak-*`
+(investigation-trail truth docs, relocated from `.claude/data/`) · brit/gix CHANGELOG false-positives.

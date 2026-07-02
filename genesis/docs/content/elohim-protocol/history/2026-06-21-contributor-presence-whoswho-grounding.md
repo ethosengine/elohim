@@ -1,8 +1,18 @@
 ---
 title: Who's-Who / Contributor-Presence Grounding — the inspirer-attribution backbone
-written: 2026-06-21
+id: contributor-presence-whoswho-grounding
+type: history-gotcha
+status: noted
+tier: history
+created: 2026-06-21
 author: fork:contributor-presence-grounding
-status: grounding
+topic: [contributor-presence, who-is-who, attribution, recognition, imagodei, grounding]
+# Grounding pass that fed the contributor-presence bootstrap spec; point-in-time substrate map.
+# Routed out of .claude/data 2026-07-02 (machine-ledger law).
+derived_from:
+  - .claude/data/contributor-presence-whoswho-grounding-2026-06-21.md  # original home; routed 2026-07-02
+canonical:
+  - genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md
 ---
 
 # Who's-Who / Contributor-Presence Grounding

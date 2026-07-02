@@ -1,7 +1,17 @@
+---
+title: "Conductor leak — CURED by the jemalloc allocator swap (verdict, 2026-06-19)"
+id: conductor-leak-jemalloc-cure-verdict
+type: history-gotcha
+status: noted
+tier: history
+created: 2026-06-19
+topic: [conductor-leak, oom, jemalloc, glibc-arena, cure, alpha]
+---
+
 # Conductor leak — CURED by the jemalloc allocator swap (verdict, 2026-06-19)
 
-*Live-telemetry verdict closing the RCA in `conductor-leak-rca-diverse-eyes-synthesis-2026-06-18.md`
-+ `-native-heap-reframe-` + `-canary-runbook-`. The leak is the native glibc-malloc anon heap
+*Live-telemetry verdict closing the RCA in `2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`
++ `2026-06-18-conductor-leak-rca-native-heap-reframe.md` + `2026-06-18-conductor-leak-canary-runbook.md`. The leak is the native glibc-malloc anon heap
 leak in the embedded `holochain` child (layer-confirmed ~88%; Layer-C call site was still open).*
 
 ## TL;DR
@@ -85,8 +95,8 @@ The pasted "A (deploy elohim-edgenode:latest tx5-fix) vs B (keep profiler)" fram
   `elohim_node_conductor_smaps_anon_bytes{class="other"}`, `kube_pod_container_status_restarts_total`,
   `kube_pod_container_resource_limits{resource="memory"}`, `kube_pod_container_info`.
 - Git: `b8481f090` body + stat; che-devworkspaces @ `e87a680`.
-- Prior RCA chain: `conductor-leak-rca-diverse-eyes-synthesis-2026-06-18.md`,
-  `-native-heap-reframe-2026-06-18.md`, `-canary-runbook-2026-06-18.md`,
-  `conductor-leak-deploy-recipe-2026-06-17.md`.
+- Prior RCA chain: `2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`,
+  `2026-06-18-conductor-leak-rca-native-heap-reframe.md`, `2026-06-18-conductor-leak-canary-runbook.md`,
+  `2026-06-17-conductor-leak-tx5-zombie-fix-deploy-recipe.md`.
 </content>
 </invoke>

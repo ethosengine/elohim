@@ -19,7 +19,7 @@ cites:
 > glibc-malloc arena leak, arc-INDEPENDENT (arc=0 nodes leaked the same shape), CURED by glibc→jemalloc.
 > Arc-shrink does NOT touch it. The forward corpus-memory-scaling design and the spike-verified "fractional
 > arc infeasible on kitsune2 0.3.2/0.4.1 without forking holochain_p2p" finding are unaffected and stand.
-> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-rca-native-heap-reframe-2026-06-18.md
+> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md
 
 
 ## 1. Problem & through-line
@@ -30,7 +30,7 @@ The answer is **arc-shrink**: hold a *bounded shard* of the DHT, not the whole t
 
 This spec **formalizes** what two parent docs assert and does not contradict them:
 - **Sealed scaling note** `genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md` (commit 79e9ef506) — the lever/trade (lines 50–57), the evidence table (31–38), the Nth-bump breadcrumb (42–48), and the leak-vs-bounded-large open question (59–64). This spec is "Next steps" item 3 of that note (line 74): *"Design the arc-factor policy — per-archetype arc targets + a shrink-as-N-grows rule, aligned with tiered-quilt sharding."*
-- **Self-healing vision §12** `SELF-HEALING-CONTROL-PLANE-DESIGN-2026-06-13.md` lines 302–314 (arc-shrink subsection). This spec turns its three assertions into code-shaped contracts: Pillar 3's `derive()` (§3 here), Pillars 1+2's coverage invariant (§4), Pillar 4's REA actuation (§5).
+- **Self-healing vision §12** `genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md` lines 302–314 (arc-shrink subsection). This spec turns its three assertions into code-shaped contracts: Pillar 3's `derive()` (§3 here), Pillars 1+2's coverage invariant (§4), Pillar 4's REA actuation (§5).
 
 **It bounds the corpus-memory CLASS regardless of how the leak-vs-bounded-large question resolves** (scaling note line 279). If the climb is DHT-sync convergence, arc-shrink lowers the plateau; if it is a genuine leak, arc-shrink shrinks the structure that leaks. The discriminator (`ps -o rss,comm` conductor-child vs storage-parent; or `target_arc_factor: 0` on one loaded node) is the operator's confirm, not a precondition for this design.
 

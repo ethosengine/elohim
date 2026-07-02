@@ -1,8 +1,18 @@
 ---
+id: "backlog-modular-runtime-plugin-integrity-feasibility"
+kind: "backlog"
+contentType: "backlog-item"
+contentFormat: "markdown"
 title: "Feasibility — Modular, Device-Tuned elohim Runtime with Holochain-Level Plugin Integrity"
-written: 2026-06-21
-author: workflow:modular-runtime-plugin-integrity-feasibility
-status: assessment
+slug: "modular-runtime-plugin-integrity-feasibility"
+written: "2026-06-21"
+author: "workflow:modular-runtime-plugin-integrity-feasibility"
+status: "backlog"
+priority: "medium"
+tags: [runtime-footprint, cargo-features, plugin, native-extension, integrity, bounds-validator, delegates-compute, readiness-assessment, seam-3-3, seam-3-4]
+# OPEN concern: single-node composition feasibility (footprint tuning + plugin loader + integrity
+# wiring). The gap list is the backlog. Routed out of .claude/data 2026-07-02 (machine-ledger law);
+# referenced by the seam map as the Home for seams 3.3/3.4.
 ---
 
 # Feasibility — Modular, Device-Tuned elohim Runtime with Holochain-Level Plugin Integrity

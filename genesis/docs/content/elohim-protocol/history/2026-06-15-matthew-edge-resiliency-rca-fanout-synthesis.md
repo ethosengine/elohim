@@ -1,3 +1,13 @@
+---
+title: "Matthew Edge Resiliency — RCA Fanout Synthesis (2026-06-15)"
+id: matthew-edge-resiliency-rca-fanout-synthesis
+type: history-gotcha
+status: noted
+tier: history
+created: 2026-06-15
+topic: [conductor-oom, doorway-watchdog, arc-factor, matthew-edge, rca, alpha]
+---
+
 # Matthew Edge Resiliency — RCA Fanout Synthesis (2026-06-15)
 
 Seven-lens fanout + an operator-verified household-topology investigation, reconciled into one decision-grade report. Live evidence captured against ns `elohim-alpha` (Prometheus uid `prometheus`, Loki uid `loki`) ~16:10–18:12Z 2026-06-15. Source claims verified in-tree at write time (see §3 footnote).

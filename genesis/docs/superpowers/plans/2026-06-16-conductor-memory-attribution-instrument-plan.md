@@ -3,7 +3,7 @@ title: Conductor Memory Attribution Instrument — the leak-vs-cache discriminat
 id: conductor-memory-attribution-instrument-plan
 status: Draft
 cites:
-  - .claude/data/matthew-edge-resiliency-rca-fanout-2026-06-15.md
+  - matthew-edge-resiliency-rca-fanout-synthesis | Matthew Edge Resiliency | sha256:a4fafb4f91612eba | path: genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md
   - genesis/data/timeline/backlog/arc-shrink-ineffective-memory-soak.md
   - genesis/docs/superpowers/plans/2026-06-14-dataplane-arc-plan.md
 domain: dataplane / conductor-memory

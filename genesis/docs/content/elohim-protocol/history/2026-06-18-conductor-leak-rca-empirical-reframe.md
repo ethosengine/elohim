@@ -1,4 +1,21 @@
+---
+title: "Conductor leak — EMPIRICAL RCA reframe (Go live-heap resident growth), 2026-06-18"
+id: conductor-leak-rca-empirical-reframe
+type: history-gotcha
+status: superseded
+tier: history
+created: 2026-06-18
+topic: [conductor-leak, rca, go-pion, empirical, superseded]
+---
+
 # Conductor leak — EMPIRICAL RCA reframe (Go live-heap resident growth), 2026-06-18
+
+> **STATUS: SUPERSEDED (history record).** This pass's go-pion / Go-live-heap conclusion was
+> overturned by the native-heap reframe (`2026-06-18-conductor-leak-rca-native-heap-reframe.md`,
+> confirmed by `2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`): the leak is a native
+> glibc-malloc arena retention, **cured by the glibc→jemalloc allocator swap**
+> (`2026-06-19-conductor-leak-jemalloc-cure-verdict.md`). Preserved as part of the investigation
+> trail; its own conclusion is superseded.
 
 Picks up `HANDOFF-2026-06-18-conductor-leak-rca-reopened.md` (zombie-PeerConnection
 hypothesis falsified in production). Per that handoff's meta-lesson — **profile, don't
@@ -104,7 +121,7 @@ against the vendored pion package with Go 1.24). Both knobs OFF unless env-set, 
    `smaps_hist` on a busy anchor (matthew/james). Localizes the growing band + ranges with
    zero conductor rebuild.
 2. **Decisive:** build a conductor with 4b (the existing patched-conductor pipeline — see
-   `conductor-leak-deploy-recipe-2026-06-17.md`), deploy a canary anchor with
+   `2026-06-17-conductor-leak-tx5-zombie-fix-deploy-recipe.md`), deploy a canary anchor with
    `TX5_GO_MEMSTATS_SECS=30` + `TX5_GO_PPROF_ADDR=127.0.0.1:6060`. memstats settles
    leak-vs-non-return within an hour; `pprof -base` names the allocation site.
 3. **Sanity (free):** a canary with `GODEBUG=madvdontneed=1` — if RSS flattens, it WAS
@@ -169,8 +186,8 @@ run; the per-op driver above + the §1–§2 solo telemetry already establish th
 the operation. A follow-up correlation pass could quantify the send-count↔slope coefficient.)_
 
 ## 7. Key files / forks (unchanged, proven)
-- Falsified RCA + source map: `.claude/data/conductor-leak-rca-tx5-gopion-backpressure-2026-06-17.md`
-- Deploy recipe + build env: `.claude/data/conductor-leak-deploy-recipe-2026-06-17.md`
+- Falsified RCA + source map: `2026-06-17-conductor-leak-tx5-zombie-hypothesis-falsified.md`
+- Deploy recipe + build env: `2026-06-17-conductor-leak-tx5-zombie-fix-deploy-recipe.md`
 - Instrumentation: `elohim/elohim-storage/src/services/system_metrics.rs`, `src/metrics.rs`, `src/main.rs`; `elohim/tx5/crates/tx5-go-pion-sys/pprof_debug.go`
 - Forks: `ethosengine/tx5@elohim-0.8.1-zombie-fix`, `ethosengine/holochain@elohim-0.6`
 - Memory: `project_storage_metrics_surface_and_leak_verdict`

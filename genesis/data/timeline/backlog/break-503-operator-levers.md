@@ -52,5 +52,5 @@ Once alpha is reachable: run the seeder (`seed-provide-rows.ts` heals `humans.ag
 ## Links
 - Arc falsification + real memory lever: `arc-shrink-ineffective-memory-soak.md`
 - CID enforcement rollout: `cid-enforcement-rollout.md`
-- RCA (theories 3/9/13, staged experiments): `.claude/data/matthew-edge-resiliency-rca-fanout-2026-06-15.md`
+- RCA (theories 3/9/13, staged experiments): `genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md`
 - Shift journal: `.claude/shifts/2026-06-16T0357-alpha-conductor-oom-arc-leecher.journal.md`

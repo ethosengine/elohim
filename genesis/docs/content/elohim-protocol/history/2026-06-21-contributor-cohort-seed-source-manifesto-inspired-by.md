@@ -1,11 +1,21 @@
 ---
 title: Contributor-cohort seed source — the manifesto "Inspired by" lists
-written: 2026-06-21
+id: contributor-cohort-seed-source-manifesto-inspired-by
+type: history-gotcha
+status: noted
+tier: history
+created: 2026-06-21
 author: operator (Matthew Dowell) LinkedIn post, 9mo prior; captured by session
-status: seed-source
+topic: [contributor-presence, inspired-by, seed-cohort, attribution, standing-gradient, imagodei]
+# Seed-source record for the manifesto "Inspired by" presence cohort (seeded to genesis/data/presences/).
+# Routed out of .claude/data 2026-07-02 (machine-ledger law).
+derived_from:
+  - .claude/data/contributor-cohort-seed-source-2026-06-21.md  # original home; routed 2026-07-02
 relates:
-  - .claude/data/contributor-presence-whoswho-grounding-2026-06-21.md
+  - genesis/docs/content/elohim-protocol/history/2026-06-21-contributor-presence-whoswho-grounding.md
   - .claude/memory/who-is-who-networking-skill-contributor-credit.md
+canonical:
+  - genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md
 ---
 
 # Contributor-cohort seed source

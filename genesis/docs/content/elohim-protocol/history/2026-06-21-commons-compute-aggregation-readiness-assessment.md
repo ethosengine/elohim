@@ -1,8 +1,18 @@
 ---
 title: Substrate Readiness — Native Recursive Signal Aggregation at Global Commons-Compute Scale
-written: 2026-06-21
+id: commons-compute-aggregation-readiness-assessment
+type: history-gotcha
+status: noted
+tier: history
+created: 2026-06-21
 author: workflow:commons-aggregation-readiness
-status: assessment
+topic: [aggregation, coverage-rollup, recursion, rea, delegates-compute, view-federation, commons, readiness-assessment]
+# Point-in-time readiness assessment (2026-06-21) — the aggregation/rollup seam (3.11) + the R6
+# confidentiality seam (3.13). Routed out of .claude/data 2026-07-02 (machine-ledger law).
+derived_from:
+  - .claude/data/commons-compute-aggregation-readiness-2026-06-21.md  # original home; routed 2026-07-02
+canonical:
+  - genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
 ---
 
 # Substrate Readiness Assessment: Native Recursive Signal Aggregation at Commons-Compute Scale

@@ -8,7 +8,7 @@ supersedes_practice: "direct string-equality identity joins in household_resilie
 relates:
   - genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md
   - genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
-  - .claude/data/matthew-edge-resiliency-rca-fanout-2026-06-15.md
+  - genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md
 ---
 
 # Coherent transport-identity resolver

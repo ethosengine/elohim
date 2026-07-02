@@ -1,3 +1,13 @@
+---
+title: "Upstream comments — tx5/go-pion zombie-PeerConnection leak (2026-06-17)"
+id: tx5-zombie-peerconnection-upstream-contribution
+type: history-gotcha
+status: noted
+tier: history
+created: 2026-06-17
+topic: [conductor-leak, tx5, upstream, contribution, ethosengine-bot]
+---
+
 # Upstream comments — tx5/go-pion zombie-PeerConnection leak (2026-06-17)
 
 **Status: POSTED as `EthosengineBot` (2026-06-17), after building + empirically verifying the fix.**
@@ -8,7 +18,7 @@
 
 Each comment carries the empirical confirmation (built tx5 with #194+#199, teardown tests pass with the fix / time out without it) and the credibility guardrail (framed as *the tx5-transport contribution*, not "the cause of #5664" — recent #5664 profiles are iroh builds with a separate `magicsock` VecDeque grower). Drafts below are the posted text.
 
-Survey + RCA sources: `.claude/data/conductor-leak-rca-tx5-gopion-backpressure-2026-06-17.md`, `HANDOFF-2026-06-17-upstream-tx5-transport-pin.md`.
+Survey + RCA sources: `2026-06-17-conductor-leak-tx5-zombie-hypothesis-falsified.md`, `HANDOFF-2026-06-17-upstream-tx5-transport-pin.md`.
 
 ---
 

@@ -1,6 +1,22 @@
+---
+title: "Conductor zombie-leak fix — deploy recipe (2026-06-17)"
+id: conductor-leak-tx5-zombie-fix-deploy-recipe
+type: history-gotcha
+status: superseded
+tier: history
+created: 2026-06-17
+topic: [conductor-leak, tx5, zombie-connection, deploy, edgenode, superseded]
+---
+
 # Conductor zombie-leak fix — deploy recipe (2026-06-17)
 
-How to get the verified tx5 zombie-connection fix (+ #5719 amplifier brake) onto the alpha conductors. RCA + verification: `conductor-leak-rca-tx5-gopion-backpressure-2026-06-17.md`. The fix is **proven** (tx5 teardown tests pass with it / time out without) and lives in the pushed forks.
+> **STATUS: SUPERSEDED (history record).** The tx5 zombie-connection fix this recipe deploys was
+> falsified in production as the leak cure. The conductor OOM leak was ultimately a native
+> glibc-malloc arena retention in the holochain child, **cured by the glibc→jemalloc allocator
+> swap** — see the closing verdict `2026-06-19-conductor-leak-jemalloc-cure-verdict.md`. Preserved
+> as part of the investigation trail; the deploy mechanics remain a valid binary-swap reference.
+
+How to get the verified tx5 zombie-connection fix (+ #5719 amplifier brake) onto the alpha conductors. RCA + verification: `2026-06-17-conductor-leak-tx5-zombie-hypothesis-falsified.md`. The fix is **proven** (tx5 teardown tests pass with it / time out without) and lives in the pushed forks.
 
 ## The mechanism: a binary SWAP (not a full image rebuild)
 The holo-host edgenode base does **not** compile holochain — it `wget`s a **prebuilt** binary and `mv`s it to **`/bin/holochain`** (+ `hc` → `/bin/hc`):

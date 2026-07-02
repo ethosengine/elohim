@@ -1,4 +1,21 @@
+---
+title: "Conductor anon-leak — RCA progress (source-level), 2026-06-17 [tx5-zombie hypothesis, falsified]"
+id: conductor-leak-tx5-zombie-hypothesis-falsified
+type: history-gotcha
+status: superseded
+tier: history
+created: 2026-06-17
+topic: [conductor-leak, tx5, go-pion, zombie-connection, falsified]
+---
+
 # Conductor anon-leak — RCA progress (source-level), 2026-06-17
+
+> **STATUS: SUPERSEDED (history record).** The tx5/go-pion zombie-PeerConnection root cause worked
+> out below was falsified in production (fix deployed fleet-wide, binary confirmed patched, leak
+> persisted). The conductor OOM leak was ultimately a native glibc-malloc arena retention in the
+> holochain child, **cured by the glibc→jemalloc allocator swap** — see the closing verdict
+> `2026-06-19-conductor-leak-jemalloc-cure-verdict.md`. Preserved as the source-level investigation
+> trail; the tx5-teardown source mechanism it documents is correct, only the leak conclusion is wrong.
 
 **Reached via the `ethosengine/{holochain,tx5,kitsune2}` forks.** Source read at the conductor's pinned versions: tx5 0.8.1 / `kitsune2_transport_tx5` 0.3.2 / `pion/webrtc v4.1.3` / `pion/sctp v1.8.39`. Goes past where #5664 stalled (its dumps were iroh; ours is tx5/go-pion, off-heap CGo).
 
@@ -6,7 +23,7 @@
 > The fix below was built, deployed fleet-wide, and the conductor binary **confirmed patched (sha256 `36ddf7ab`) and running** — and the leak **PERSISTED at the same rate** (matthew/james kept climbing ~1.1–1.2 GB/h to OOM post-deploy). So the dead-peer zombie-PeerConnection root cause is **falsified**: the teardown fix (#194/#199) demonstrably works (unit tests pass), but teardown is **not** the leak. Everything below is the now-falsified hypothesis + (correct) source-mechanism detail — only the *conclusion* is wrong. **Fresh investigation: `HANDOFF-2026-06-18-conductor-leak-rca-reopened.md` (profile, don't reason from source).** The deploy pipeline + binary-extraction chain are all proven correct (ruled out as the failure).
 >
 > ## ~~✅ CONFIRMED · BUILT · VERIFIED · DELIVERED (2026-06-17)~~ (superseded by the production result above)
-> **Root cause [thought] confirmed** (source chain below; independently corroborated by the maintainers' own fix tx5 **#194**, which rewrites the exact `Evt::State` arm). **Fix built + empirically verified** locally: built tx5 with #194+#199 (go-pion backend, real pion CGo stack) — the teardown tests `conn_dropped_on_peer_connection_state_{disconnected,closed,failed}` **PASS with the fix and TIME OUT without it** (reverted the one arm to demonstrate). **Delivered:** `ethosengine/tx5@elohim-0.8.1-zombie-fix` (#194+#199, floor) + `ethosengine/holochain@elohim-0.6` (#5719 amplifier brake + tx5 `[patch]`) pushed; upstream comments posted as EthosengineBot on holochain#5664, tx5#196, tx5#207 (see `upstream-comments-tx5-zombie-leak-2026-06-17.md`). Remaining: the custom-edgenode build + canary deploy (needs a Go+nix build host; the final cluster confirmation).
+> **Root cause [thought] confirmed** (source chain below; independently corroborated by the maintainers' own fix tx5 **#194**, which rewrites the exact `Evt::State` arm). **Fix built + empirically verified** locally: built tx5 with #194+#199 (go-pion backend, real pion CGo stack) — the teardown tests `conn_dropped_on_peer_connection_state_{disconnected,closed,failed}` **PASS with the fix and TIME OUT without it** (reverted the one arm to demonstrate). **Delivered:** `ethosengine/tx5@elohim-0.8.1-zombie-fix` (#194+#199, floor) + `ethosengine/holochain@elohim-0.6` (#5719 amplifier brake + tx5 `[patch]`) pushed; upstream comments posted as EthosengineBot on holochain#5664, tx5#196, tx5#207 (see `2026-06-17-tx5-zombie-peerconnection-upstream-contribution.md`). Remaining: the custom-edgenode build + canary deploy (needs a Go+nix build host; the final cluster confirmation).
 >
 > The earlier "NOT a confirmed single root cause" framing below was the in-progress state — superseded by this banner. The two refuted hypotheses (no-backpressure, unbounded-recv) remain correct refutations en route.
 
@@ -63,4 +80,4 @@ Build tx5, run `crates/tx5/benches/throughput.rs` / `tx5-demo` (no conductor, no
 - `elohim/tx5` (ethosengine/tx5) — origin=fork, upstream=holochain/tx5; ⚠ on main tip `27fbdd1` (stale local `v0.8.1` tag); buffer/send code identical to v0.8.1 — re-pin `3e3b71b` for a fidelity build.
 - `elohim/kitsune2` (ethosengine/kitsune2) — at `22de6e4` = the conductor's flake.lock rev (exact fidelity).
 
-Related: `HANDOFF-2026-06-17-upstream-tx5-transport-pin.md` §3.1, `conductor-leak-upstream-research-2026-06-17.md`, memory `project_storage_metrics_surface_and_leak_verdict`, plan `genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md`.
+Related: `HANDOFF-2026-06-17-upstream-tx5-transport-pin.md` §3.1, `2026-06-17-conductor-leak-upstream-research-tx5-pin-verdict.md`, memory `project_storage_metrics_surface_and_leak_verdict`, plan `genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md`.

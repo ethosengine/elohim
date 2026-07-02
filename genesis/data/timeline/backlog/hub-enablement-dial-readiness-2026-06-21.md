@@ -1,8 +1,18 @@
 ---
-title: Hub Enablement Readiness — the hubbiness dial, hardware tiering + graduation, and the non-technical-steward provisioning path
-written: 2026-06-21
-author: workflow:hub-enablement-dial-readiness
-status: assessment
+id: "backlog-hub-enablement-dial-readiness-2026-06-21"
+kind: "backlog"
+contentType: "backlog-item"
+contentFormat: "markdown"
+title: "Hub Enablement Readiness — the hubbiness dial, hardware tiering + graduation, and the non-technical-steward provisioning path"
+slug: "hub-enablement-dial-readiness-2026-06-21"
+written: "2026-06-21"
+author: "workflow:hub-enablement-dial-readiness"
+status: "backlog"
+priority: "medium"
+tags: [hub, enablement, hubbiness-dial, hardware-tiering, graduation, steward-provisioning, readiness-assessment, seam-3-12]
+# OPEN concern: point-in-time readiness assessment (verdict NO — a non-technical steward cannot yet
+# toggle a recycled laptop into a household hub). The gap list is the backlog. Routed out of
+# .claude/data 2026-07-02 (machine-ledger law); referenced by the seam map (seam 3.12).
 ---
 
 # Hub Enablement Readiness Assessment

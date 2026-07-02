@@ -7,8 +7,8 @@ Feature: Conductor memory soak — a node stays alive under sustained load
 
   # Harvested 2026-06-19 from the conductor heap-leak debugging session.
   # Root cause + cure record:
-  #   .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md
-  #   .claude/data/conductor-leak-jemalloc-prod-changeset-2026-06-19.md
+  #   genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md
+  #   genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-prod-changeset.md
   #
   # SCOPE NOTE: the *build mandate* that delivers this (the conductor binary must
   # link the jemalloc allocator, HC_FEATURES must include `jemalloc`, and a

@@ -34,7 +34,7 @@ Feature: App ZIP blobs heal on read via peer race-fetch
     When I list economic events with action "serve-blob" for the healed blob hash
     Then at least one event names the source peer as provider
 
-  # @regression for the #3 serve-blob gap (RCA .claude/data/genesis-seed-stages-rca-2026-06-18.md):
+  # @regression for the #3 serve-blob gap (RCA genesis/docs/content/elohim-protocol/history/2026-06-18-genesis-seed-stages-unstable-resilience-card-rca.md):
   # the PROACTIVE quilt-draw replication path moved bytes via a bare blob_store.store()
   # and booked NO serve-blob event — so "Verify Delivery Events" read 0 even though
   # propagation passed. finalize_quilt_draw now routes the proactive draw through the

@@ -1,3 +1,20 @@
+---
+title: "RCA: Genesis seeding/verify stages Unstable + all-zeros resilience card"
+id: genesis-seed-stages-unstable-resilience-card-rca
+type: history-gotcha
+status: noted
+tier: history
+created: 2026-06-18
+author: session (feat/frontend-eyes-sprint)
+topic: [genesis-pipeline, seeding, resilience-card, humans-junction, agent-pub-key, rca]
+# Verified RCA that grounds the post-leak-fix stabilization plan; point-in-time live-alpha evidence.
+# Routed out of .claude/data 2026-07-02 (machine-ledger law).
+derived_from:
+  - .claude/data/genesis-seed-stages-rca-2026-06-18.md  # original home; routed 2026-07-02
+canonical:
+  - genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md
+---
+
 # Genesis seeding/verify stages Unstable + all-zeros resilience card — RCA
 
 **Date:** 2026-06-18 · **Branch:** feat/frontend-eyes-sprint · **Pipeline:** `genesis/Jenkinsfile` (job `elohim-genesis`, runs against live alpha)

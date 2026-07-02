@@ -1,3 +1,24 @@
+---
+title: "Design — light the EPR resilience card's data path (self_cid derivation + provide-loop + re-anchor backfill)"
+id: resilience-card-self-cid-provide-loop-design
+status: Implemented
+class: substrate
+context-tier: disclosed
+steward: cartographer
+graduation-trigger: superseded-by-implementation — graduate to history once the provide-loop + re-anchor levers are verified lighting the card on live alpha
+created: 2026-06-14
+topic: [resilience-card, self-cid, provide-loop, re-anchor-backfill, p2p-status, libp2p, peer-id, elohim-storage]
+# Workstream D of the EPR Content Durability Arc. Landed in elohim-storage (ProvideLoopState is
+# live in main.rs/p2p/mod.rs + p2p-status-view.schema.json provideLoop). Routed out of
+# .claude/data 2026-07-02 (machine-ledger law).
+cites:
+  - genesis/data/timeline/backlog/resilience-card-self-cid-provide-loop-gate.md
+  - epr-durability-replication-arc-plan | EPR Content Durability Arc | sha256:f263ed845af2f916 | path: genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md
+  - elohim/elohim-storage/src/main.rs
+  - elohim/elohim-storage/src/reconcile/custody.rs
+  - elohim/sdk/schemas/v1/views/p2p-status-view.schema.json
+---
+
 # Design — light the EPR resilience card's data path (elohim-storage levers)
 
 Workstream D of the EPR Content Durability Arc. Drives the corrected diagnosis in
