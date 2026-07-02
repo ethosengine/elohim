@@ -103,9 +103,10 @@ pub async fn handle(
             let id = extract_id(id_part)
                 .ok_or_else(|| StorageError::InvalidInput("Contributor ID required".to_string()))?;
             let mut conn = get_conn(pool)?;
-            let view = crate::services::contributor_reflexive_facing::build_contributor_reflexive_view(
-                &mut conn, ctx, id,
-            );
+            let view =
+                crate::services::contributor_reflexive_facing::build_contributor_reflexive_view(
+                    &mut conn, ctx, id,
+                );
             Ok(response::from_option(
                 Ok(view),
                 &format!("Reflexive view for {} not found", id),
