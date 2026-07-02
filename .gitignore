@@ -106,6 +106,7 @@ genesis/research/repos/
 !.claude/memory-kit/CLAUDE.md
 !.claude/memory-kit/TRAJECTORY.md
 .claude/memory-kit/*.json
+.claude/memory-kit/*.lock
 .claude/data/push-lease.json
 # epr-meta in-flight coverage-nudge debounce state — ephemeral per-session nudge suppression, regenerable
 .claude/data/epr-meta-advice.json

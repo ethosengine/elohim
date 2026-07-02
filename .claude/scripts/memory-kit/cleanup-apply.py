@@ -22,7 +22,18 @@ import sys
 from datetime import date
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+# Bootstrap _lib by walking up
+_here = Path(__file__).resolve()
+for _ in range(8):
+    if (_here / ".claude" / "scripts" / "_lib").is_dir():
+        sys.path.insert(0, str(_here / ".claude" / "scripts"))
+        break
+    _here = _here.parent
+from _lib.paths import repo_root_from_file  # noqa: E402
+
+# parents[2] resolved to `.claude/` (2026-07-02 review: the mutation half of the
+# hygiene workflow archived into .claude/.claude/archive) — use the anchored walk-up.
+REPO_ROOT = repo_root_from_file(__file__)
 
 # Matches an accepted entry. The id comment carries the relative path.
 ACCEPT_PATTERN = re.compile(

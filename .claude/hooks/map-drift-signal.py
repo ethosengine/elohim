@@ -109,38 +109,42 @@ def main() -> int:
 
     name = Path(rel).name
 
-    store_path = drift_store_path(repo)
-    default = {"schema_version": 1, "threshold": DEFAULT_THRESHOLD,
-               "last_map_refresh": None, "changed": {}}
-    store = _store.load_json(store_path, default=default)
-    if not isinstance(store, dict):
-        store = default
-    store.setdefault("changed", {})
-    store.setdefault("threshold", DEFAULT_THRESHOLD)
-    store.setdefault("last_map_refresh", None)
+    # INDEX.md is graph maintenance, not a seed — it neither resets nor accumulates. Skip it
+    # before touching the store (no read-modify-write needed, so no lock needed).
+    if name in MAP_ARTIFACTS and name != WALK_ARTIFACT:
+        return 0
 
+    store_path = drift_store_path(repo)
     now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    # The walk just got refreshed → reset the accumulator. The seeds and the walk
-    # are back in sync as far as this cheap signal can tell. (INDEX.md edits are
-    # graph-maintenance, not the walk — they neither reset nor accumulate.)
-    if name == WALK_ARTIFACT:
-        store["changed"] = {}
-        store["last_map_refresh"] = now_iso
-        _store.save_json(store_path, store)
-        return 0
+    def _mutate(data) -> dict:
+        store = data if isinstance(data, dict) else {
+            "schema_version": 1, "threshold": DEFAULT_THRESHOLD,
+            "last_map_refresh": None, "changed": {}}
+        store.setdefault("schema_version", 1)
+        store.setdefault("threshold", DEFAULT_THRESHOLD)
+        store.setdefault("last_map_refresh", None)
+        store.setdefault("changed", {})
+        # The walk just got refreshed → reset the accumulator. The seeds and the walk are back
+        # in sync as far as this cheap signal can tell.
+        if name == WALK_ARTIFACT:
+            store["changed"] = {}
+            store["last_map_refresh"] = now_iso
+            return store
+        # An architecture seed changed → accumulate it (deduped by path, hit-counted).
+        entry = store["changed"].get(rel) or {"hits": 0, "first_signal_at": now_iso}
+        entry["hits"] = entry.get("hits", 0) + 1
+        entry["last_signal_at"] = now_iso
+        entry.setdefault("first_signal_at", now_iso)
+        store["changed"][rel] = entry
+        return store
 
-    if name in MAP_ARTIFACTS:  # INDEX.md — graph maintenance, not a seed; ignore
-        return 0
-
-    # An architecture seed changed → accumulate it (deduped by path, hit-counted).
-    entry = store["changed"].get(rel) or {"hits": 0, "first_signal_at": now_iso}
-    entry["hits"] = entry.get("hits", 0) + 1
-    entry["last_signal_at"] = now_iso
-    entry.setdefault("first_signal_at", now_iso)
-    store["changed"][rel] = entry
-
-    _store.save_json(store_path, store)  # best-effort; never raises
+    # Serialize the read-modify-write so concurrent sessions don't lose each other's updates.
+    _store.locked_update(
+        store_path, _mutate,
+        default={"schema_version": 1, "threshold": DEFAULT_THRESHOLD,
+                 "last_map_refresh": None, "changed": {}},
+    )
     return 0  # hooks are best-effort; never block the tool call
 
 

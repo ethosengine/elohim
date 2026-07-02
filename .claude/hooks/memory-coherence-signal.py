@@ -102,18 +102,22 @@ def main() -> int:
         return 0
 
     store_path = drift_path(repo)
-    store = _store.load_json(store_path, default={"schema_version": 1, "entries": {}})
-    if not isinstance(store, dict):
-        store = {"schema_version": 1, "entries": {}}
-    store.setdefault("entries", {})
     now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    for slug in matched:
-        e = store["entries"].get(slug) or {"hits": 0, "last_changed": "", "last_signal_at": ""}
-        e["hits"] = e.get("hits", 0) + 1
-        e["last_changed"] = rel
-        e["last_signal_at"] = now_iso
-        store["entries"][slug] = e
-    _store.save_json(store_path, store)  # best-effort; never raises
+
+    def _mutate(data) -> dict:
+        store = data if isinstance(data, dict) else {"schema_version": 1, "entries": {}}
+        store.setdefault("schema_version", 1)
+        store.setdefault("entries", {})
+        for slug in matched:
+            e = store["entries"].get(slug) or {"hits": 0, "last_changed": "", "last_signal_at": ""}
+            e["hits"] = e.get("hits", 0) + 1
+            e["last_changed"] = rel
+            e["last_signal_at"] = now_iso
+            store["entries"][slug] = e
+        return store
+
+    # Serialize the read-modify-write so concurrent sessions don't drop each other's bumps.
+    _store.locked_update(store_path, _mutate, default={"schema_version": 1, "entries": {}})
     return 0
 
 

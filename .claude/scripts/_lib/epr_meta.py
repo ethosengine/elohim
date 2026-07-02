@@ -116,8 +116,6 @@ def merge_rules(chain: list[Path]) -> dict:
 import fnmatch
 from collections import namedtuple
 
-from _lib import frontmatter as _fm
-
 ENFORCEMENT_CLASSES = ("deny", "ask", "inject", "measure", "dispatch")
 _SEVERITY = {"deny": 3, "ask": 2, "inject": 1, "measure": 0, "dispatch": 0}
 Verdict = namedtuple("Verdict", ["cls", "reason", "rule_id"])
@@ -131,8 +129,11 @@ _KNOWN_RULE_KEYS = {"id", "class", "why", "when", "max-files", "measure"} | set(
 
 def validate_meta(cfg: dict) -> list[str]:
     """Hand-rolled, stdlib-only check against the schema contract. [] = valid.
-    Also surfaces footguns: an enforcing rule with no actionable predicate, and unknown rule keys
-    (a typo'd key would otherwise be silently ignored by _eval_rule)."""
+    Also surfaces footguns: an enforcing rule with no actionable predicate, a rule carrying MORE
+    THAN ONE actionable predicate (the evaluator fires on only the first — silent partial
+    enforcement), duplicate rule ids within one manifest (a later rule silently overrides an
+    earlier one on merge), and unknown rule keys (a typo'd key would otherwise be silently ignored
+    by _eval_rule)."""
     errs: list[str] = []
     if not isinstance(cfg, dict):
         return ["`.epr-meta` is not a mapping"]
@@ -141,21 +142,32 @@ def validate_meta(cfg: dict) -> list[str]:
     if "covers" in cfg and cfg["covers"] not in ("subtree", "dir-only"):
         errs.append(f"`covers` value `{cfg['covers']}` not in ('subtree', 'dir-only') "
                     f"— a typo here would silently leave the subtree unclaimed")
+    seen_ids: set[str] = set()
     for i, rule in enumerate(cfg.get("rules", []) or []):
         if not isinstance(rule, dict):
             errs.append(f"rules[{i}] is not a mapping"); continue
         rid = rule.get("id", "?")
         if "id" not in rule:
             errs.append(f"rules[{i}] missing `id`")
+        elif rid in seen_ids:
+            errs.append(f"rules[{i}] (`{rid}`) duplicate rule id — ids must be unique within a "
+                        f"manifest (a later rule silently overrides an earlier one on merge)")
+        else:
+            seen_ids.add(rid)
         cls = rule.get("class")
         if cls not in ENFORCEMENT_CLASSES:
             errs.append(f"rules[{i}] (`{rid}`) class `{cls}` not in {ENFORCEMENT_CLASSES}")
         unknown = set(rule) - _KNOWN_RULE_KEYS
         if unknown:
             errs.append(f"rules[{i}] (`{rid}`) unknown key(s) {sorted(unknown)} (typo?)")
-        if cls in ("deny", "ask", "inject") and not any(k in rule for k in _ACTIONABLE_KEYS):
+        actionable = [k for k in _ACTIONABLE_KEYS if k in rule]
+        if cls in ("deny", "ask", "inject") and not actionable:
             errs.append(f"rules[{i}] (`{rid}`) class `{cls}` has no actionable predicate "
                         f"(require-frontmatter/route-to/no-new-subdirs/…) — it fires on nothing")
+        if len(actionable) > 1:
+            errs.append(f"rules[{i}] (`{rid}`) carries multiple actionable predicates {actionable} "
+                        f"— only one predicate per rule is evaluated (first-match wins); split into "
+                        f"separate rules")
     for i, v in enumerate(cfg.get("validators", []) or []):
         if not isinstance(v, dict) or "ref" not in v:
             errs.append(f"validators[{i}] missing `ref`")
@@ -213,10 +225,10 @@ def _matches_when(when: dict, write: dict) -> bool:
 def _frontmatter_fields(content: str | None) -> set[str]:
     if not content:
         return set()
-    return set(_fm.parse(content).fields.keys())
+    return set(fm.parse(content).fields.keys())
 
 
-def _eval_rule(rule: dict, write: dict, merged: dict) -> Verdict | None:
+def _eval_rule(rule: dict, write: dict) -> Verdict | None:
     cls = rule.get("class", "inject")
     rid = rule.get("id", "?")
     why = rule.get("why", "")
@@ -276,7 +288,7 @@ def evaluate(merged: dict, write: dict) -> list[Verdict]:
     """PURE: read rules + write, return fired verdicts. No writes, no side-effects."""
     out: list[Verdict] = []
     for rule in merged.get("rules", {}).values():
-        v = _eval_rule(rule, write, merged)
+        v = _eval_rule(rule, write)
         if v is not None:
             out.append(v)
     return out

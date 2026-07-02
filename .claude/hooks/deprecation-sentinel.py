@@ -73,7 +73,7 @@ DEPRECATION_PATTERNS = re.compile(
 # RUSTSEC advisories, GHSA/CVE identifiers).
 SECURITY_PATTERNS = re.compile(
     r"(?:"
-    r"\b\d+ vulnerabilit(?:y|ies)\b"
+    r"\b(?!0 )\d+ vulnerabilit(?:y|ies)\b"  # zero-count audit lines are CLEAN results, not findings
     r"|\bCVE-\d{4}-\d+\b"
     r"|\bGHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}\b"
     r"|\bRUSTSEC-\d{4}-\d+\b"
@@ -148,6 +148,19 @@ ECHO_HISTORY_PATH_RE = re.compile(
 #   hunk (lines starting with + or -) can legitimately add a `#[deprecated]`
 #   attribute and should still be captured.  The shape guards below are
 #   line-level and do not suppress diff hunks.
+# Guard E — agentic tooling-source echo:
+#   Review findings, hook/scripts source lines, and workflow reports quote the
+#   sentinel's own vocabulary ("deprecated", "N vulnerabilities") while naming
+#   `.claude/` tooling paths or review-finding markers. Real dependency
+#   install/audit output never references `.claude/` — so any matching line is
+#   an echo of our own tooling, not a live finding (3 spurious captures on
+#   2026-07-02 came from printing a code-review findings list).
+ECHO_TOOLING_SOURCE_RE = re.compile(
+    r"\.claude/(?:hooks|scripts|skills|agents|data|memory)/"
+    r"|### FINDING\b"
+    r"|\bVERDICT: (?:CONFIRMED|REFUTED|UNCERTAIN)\b",
+)
+
 ECHO_GIT_ONELINE_RE = re.compile(r"^[0-9a-f]{7,12} ")
 ECHO_COMMIT_SUBJECT_RE = re.compile(
     r"^(?:chore|fix|feat|refactor|docs|test|perf|ci|build|revert)"
@@ -196,7 +209,7 @@ def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool
     Called after classify() returns non-None to prevent false echo entries
     from being fingerprinted and appended to the ledger.
 
-    The four guards:
+    The five guards:
       A) Line sourced from the ledger file (self-capture via recursive grep).
       B) Line sourced from the history/museum prose tree.
       C) Line that is git commit-message text (log oneline entry, or any
@@ -204,6 +217,8 @@ def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool
          (diff hunks start with + or - so carry real signal).
       D) DeprecationWarning sourced from `<string>:N:`/`<stdin>:N:` — an
          agent's own ephemeral `python3 -c`/stdin script, never a real file.
+      E) Agentic tooling-source echo — `.claude/` paths or review-finding
+         markers in the line (our own governance tooling narrating findings).
     """
     # Guard A — ledger self-capture
     if ECHO_LEDGER_PATH.search(line):
@@ -212,6 +227,11 @@ def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool
     # Guard D — ephemeral-script self-capture (<string>:N: / <stdin>:N:).
     # Placed early: cheapest deterministic skip, no command-flag dependency.
     if ECHO_EPHEMERAL_SOURCE_RE.search(line):
+        return True
+
+    # Guard E — agentic tooling-source echo (.claude/ paths, review-finding
+    # markers): our own governance tooling talking about deprecations/vulns.
+    if ECHO_TOOLING_SOURCE_RE.search(line):
         return True
 
     # Guard B — history prose (grep output carries file path in the line;

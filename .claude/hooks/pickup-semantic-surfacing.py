@@ -180,7 +180,12 @@ def palace_search(root: Path, query: str) -> list[dict]:
 
 
 def inject(root: Path, key: str, query: str, via: str) -> None:
-    """Search and print the injection block; sets the once-per-session flag on any attempt."""
+    """Search and emit the injection block; sets the once-per-session flag on any attempt.
+
+    Emission is event-aware: on UserPromptSubmit plain stdout reaches model
+    context, but on PreToolUse only hookSpecificOutput JSON does (2026-07-02
+    review — the tool-path injection was print()-based and never landed).
+    """
     try:
         state_path("surfaced", key).touch()
     except OSError:
@@ -191,14 +196,21 @@ def inject(root: Path, key: str, query: str, via: str) -> None:
         return  # silent no-op — noise is worse than nothing (§4b.3)
 
     banner = currency_banner(root)
-    print(f"PICKUP SURFACING (semantic recall — {banner}; via {via})")
-    print()
+    lines = [f"PICKUP SURFACING (semantic recall — {banner}; via {via})", ""]
     for h in hits[:TOP_K]:
-        print(f"  [cosine {h['cosine']:.2f}] {h['where']} · {h['source']}")
+        lines.append(f"  [cosine {h['cosine']:.2f}] {h['where']} · {h['source']}")
         for s in h["snippet"]:
-            print(f"      {s}")
-    print()
-    print("Recall hints, not truth — verify each source against disk before acting on them.")
+            lines.append(f"      {s}")
+    lines += ["", "Recall hints, not truth — verify each source against disk before acting on them."]
+    if via == "prompt":
+        print("\n".join(lines))
+    else:
+        print(json.dumps({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "additionalContext": "\n".join(lines),
+            }
+        }))
 
 
 def handle_prompt(payload: dict) -> None:

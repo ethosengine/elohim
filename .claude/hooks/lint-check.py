@@ -18,6 +18,24 @@ import sys
 import re
 from pathlib import Path
 
+# Real monorepo layout, derived from CLAUDE_PROJECT_DIR (fixed 2026-07-02 —
+# the prior hardcoded '/projects/elohim/elohim-app' etc. pointed at paths that
+# never existed here, so every runner raised FileNotFoundError into a blanket
+# except and the whole lint layer was silently dead).
+PROJECT = os.environ.get('CLAUDE_PROJECT_DIR', '/projects/elohim')
+APP_DIR = os.path.join(PROJECT, 'app', 'elohim-app')
+DOORWAY_APP_DIR = os.path.join(PROJECT, 'doorway', 'doorway-app')
+DOORWAY_SERVICE_DIR = os.path.join(PROJECT, 'doorway', 'doorway-service')
+SOPHIA_DIR = os.path.join(PROJECT, 'sophia')
+
+
+def project_root_exists(cwd: str) -> bool:
+    """A missing project root is a loud configuration error, never a silent no-op."""
+    if os.path.isdir(cwd):
+        return True
+    print(f"lint-check: project root missing: {cwd}", file=sys.stderr)
+    return False
+
 
 # ============================================================================
 # PROJECT DETECTION
@@ -40,8 +58,10 @@ def detect_project(file_path: str) -> str | None:
 # ESLINT RUNNERS
 # ============================================================================
 
-def run_eslint(file_path: str, cwd: str = '/projects/elohim/elohim-app') -> str:
+def run_eslint(file_path: str, cwd: str = APP_DIR) -> str:
     """Run ESLint on a TypeScript/HTML file."""
+    if not project_root_exists(cwd):
+        return ''
     try:
         result = subprocess.run(
             ['npx', 'eslint', file_path, '--format', 'stylish', '--no-error-on-unmatched-pattern'],
@@ -72,13 +92,15 @@ def run_eslint(file_path: str, cwd: str = '/projects/elohim/elohim-app') -> str:
 
 def run_stylelint(file_path: str) -> str:
     """Run Stylelint on a CSS/SCSS file."""
+    if not project_root_exists(APP_DIR):
+        return ''
     try:
         result = subprocess.run(
             ['npx', 'stylelint', file_path, '--formatter', 'string'],
             capture_output=True,
             text=True,
             timeout=30,
-            cwd='/projects/elohim/elohim-app'
+            cwd=APP_DIR
         )
         output = result.stdout.strip()
         if output:
@@ -96,17 +118,24 @@ def run_stylelint(file_path: str) -> str:
 
 def run_clippy_check(file_path: str) -> str:
     """Run cargo clippy and filter output to the edited file."""
+    if not project_root_exists(DOORWAY_SERVICE_DIR):
+        return ''
     try:
+        # CARGO_TARGET_DIR: never let a hook mint a legacy target/ inside the
+        # crate (the 30G-balloon trap); honor the session's pool slot if set.
+        env = {**os.environ, 'RUSTFLAGS': ''}
+        env.setdefault('CARGO_TARGET_DIR', '/tmp/claude-lint-check-clippy-target')
         result = subprocess.run(
             ['cargo', 'clippy', '--message-format=short', '--', '-W', 'clippy::all'],
             capture_output=True,
             text=True,
             timeout=60,
-            cwd='/projects/elohim/doorway',
-            env={**os.environ, 'RUSTFLAGS': ''}
+            cwd=DOORWAY_SERVICE_DIR,
+            env=env
         )
-        # Filter clippy output to lines mentioning the edited file
-        rel_path = file_path.split('/doorway/')[-1] if '/doorway/' in file_path else ''
+        # Filter clippy output to lines mentioning the edited file (clippy
+        # paths are relative to the manifest dir, doorway-service)
+        rel_path = file_path.split('/doorway-service/')[-1] if '/doorway-service/' in file_path else ''
         if not rel_path:
             return ''
 
@@ -130,7 +159,7 @@ def run_rustfmt_check(file_path: str) -> str:
             capture_output=True,
             text=True,
             timeout=15,
-            cwd='/projects/elohim/doorway'
+            cwd=DOORWAY_SERVICE_DIR
         )
         if result.returncode != 0:
             return '  File needs formatting (run `rustfmt`)'
@@ -144,7 +173,7 @@ def run_rustfmt_check(file_path: str) -> str:
 # ============================================================================
 
 COVERAGE_THRESHOLD = 70
-LCOV_PATH = '/projects/elohim/elohim-app/coverage/elohim-app/lcov.info'
+LCOV_PATH = os.path.join(APP_DIR, 'coverage', 'elohim-app', 'lcov.info')
 
 # Coverage annotation format: // @coverage: 85.2% (2025-01-30)
 COVERAGE_ANNOTATION_PATTERN = r'//\s*@coverage:\s*(\d+(?:\.\d+)?)\s*%\s*\((\d{4}-\d{2}-\d{2})\)'
@@ -369,11 +398,11 @@ def main():
 
         elif project == 'doorway-app':
             if file_path.endswith('.ts') or file_path.endswith('.html'):
-                lint_output = run_eslint(file_path, cwd='/projects/elohim/doorway-app')
+                lint_output = run_eslint(file_path, cwd=DOORWAY_APP_DIR)
 
         elif project == 'sophia':
             if file_path.endswith('.ts') or file_path.endswith('.tsx'):
-                lint_output = run_eslint(file_path, cwd='/projects/elohim/sophia')
+                lint_output = run_eslint(file_path, cwd=SOPHIA_DIR)
 
         elif project == 'doorway':
             parts = []
