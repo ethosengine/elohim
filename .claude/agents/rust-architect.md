@@ -37,7 +37,7 @@ Key services (canonical archetypes; discover the live surface via `ls elohim/elo
 - `content_service.rs` — content lifecycle, format handling
 - `knowledge_service.rs` — knowledge graph operations
 - `presence_service.rs` — contributor presence interpretation
-- `exchange_service.rs` — requests and offers (the canonical name; the rename retired an older `request_offer_service.rs` that no longer exists in the tree)
+- `exchange_service.rs` — requests and offers (the canonical home for both)
 - `relationship_service.rs` — human relationships
 - `stewardship_service.rs` — stewardship allocation
 - `replicates_dwelling_service.rs` — the `replicates-dwelling` REA action; the dwelling-hub replication first-instance of REA compute-commitment (broadcaster hints → commitment loader → receive-arm scoring → bounded blob fetch via the replication prioritizer). See [[project_dwelling_hub_replication_pattern]].
@@ -51,25 +51,28 @@ Key services (canonical archetypes; discover the live surface via `ls elohim/elo
 The `RateHistory` trait (diesel-backed) feeds the rate-limit checks the bounds-validator runs; together with `CommitmentFetcher` it is the mocking seam for bounded-commitment validation. See [[project_bounds_validator_pattern]].
 
 Canonical archetypes living in this layer:
-- **CustodianCommitment** — the structural answer to single-key ownership and credential theft. Stewardship of an artifact is *committed*, not *claimed*. The entry type lives in the **elohim DNA's `content_store` zome** (not imagodei); `steward_affinity` lives as a Rust service in `elohim-storage/src/services/steward_affinity_service.rs`. Together they let the protocol recognize "who is currently stewarding this" without collapsing into "who owns this."
+- **CustodianCommitment** — the structural answer to single-key ownership and credential theft. Stewardship of an artifact is *committed*, not *claimed*. **Custodian and steward name one role from two sides**: `CustodianCommitment` is the substrate-side entry-type name; *stewardship* is the principle it carries ([[project_no_sovereignty_stewardship_over_ownership]]) — a custodian holds an artifact by committed stewardship, never by ownership claim. The entry type lives in the **elohim DNA's `content_store` zome** (not imagodei); `steward_affinity` lives as a Rust service in `elohim-storage/src/services/steward_affinity_service.rs`. Together they let the protocol recognize "who is currently stewarding this" without collapsing into "who owns this."
 - **ContributorPresence** — attribution survives transmission. Authorship and contributor presence are content-derived primitives; transfer-on-claim slots are reserved on the entry so attribution can move with consent.
 - **signal_kind extensibility** — new social vocabulary lands as `signal_kind` additions plus `resource_classified_as` whitelist entries, **never as new entry types**. The DNA entry count is precious; the social class is open. The whitelist lives at `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/feedback_signal.rs` (`SIGNAL_KINDS` const). The Vouch primitive is the canonical end-to-end worked example for adding one. See [[project_signal_kind_extensible_protocol_class]].
+- **Compute is a bounded commitment, not an admin grant** — there is ONE substrate primitive for delegated privilege: `Mishpat::Commitment` with a `delegates-compute` action, instantiated across deploy, hosting, household chores, qahal moderation, content authorship, DePIN compute, and recovery quorum. It carries on-chain standing, revocation, and an audit trail, and it **displaces `X-API-Key` admin grants** — when you design a new privileged operation, reach for a bounded compute-commitment, not an out-of-band admin key. See [[project_rea_compute_commitment_primitive]] and [[project_compute_commitments_bounded]].
 
 **Topology↔REA bridge** (`custody-blob`, `project-blob`, `serve-blob` actions): stewardship-as-bytes is queried, not stored separately. Four view modules project this bridge — `reciprocity_view`, `cluster_view`, `peer_topology_view`, `distribution_view` — so blob-level stewardship can be read against REA commitments without a second ledger. The `replicates-dwelling` action (above) is the REA-action home of the dwelling-hub replication instance.
 
-**Truth in motion — two parallel transport stacks.** `TransportBackend` config selects between them at runtime; the service surface above the transport is the same. Services are transport-neutral; libp2p and iroh adapters delegate to them, so wire bytes match across stacks.
+**Truth in motion — two parallel transport stacks.** `TransportBackend` config selects between them at startup; the service surface above the transport is the same. Services are transport-neutral; libp2p and iroh adapters delegate to them, so wire bytes match across stacks. The two stacks are complementary, not transitional — the dual-stack architecture is the design; stack-maturity detail and any cutover work live in memory journals, which link forward, read them there, not this prompt.
+
+Transport selection is **two-level**: node-level via `TransportBackend` (which stack the node runs), and per-object via the `transport_affinity` column (a 5-variant enum on the blob inventory, `Auto`=NULL passthrough so libp2p stays byte-identical, additive migration + an `/admin` setter) that lets a single blob override the node default. `http_blob_router` is the backend selector — `/blob/{hash}` is iroh-canonical with an `IrohThenLibp2p` local-SHA256 libp2p fallback. See [[project_iroh_dataplane_actual_state]].
 
 **libp2p stack** (`elohim/elohim-storage/src/p2p/`, `steward/node/`):
 libp2p 0.54 across both crates with custom request-response codecs — but verify each `Cargo.toml` before assuming API parity; the crates have carried different libp2p minors in the past and may again. Wire format: 4-byte BE length prefix + MessagePack framing. Cross-crate version differences are caught by `libp2p-transport` skill discipline. After editing swarm composition (`NetworkBehaviour` derived structs, event-variant mappings, `From<FooEvent>` impls), run `cargo build` on `elohim-storage` from a clean tree — `just check` on a DNA worktree verifies a different workspace and misses crate-level field/variant references. See [[feedback_swarm_composition_fresh_tree_build]].
 
 **iroh stack** (`elohim/elohim-storage/src/p2p_iroh/`):
-QUIC-based with iroh-blobs 0.94 + iroh-gossip 0.92 + custom ALPNs per plane. Wins decisively on chatty planes; narrows toward parity on bulk transfer. Cross-stack `peer_map` (Diesel) bridges libp2p `PeerId` ↔ iroh `NodeId` via `agent_cid`. The two stacks are complementary and runtime-selected, not transitional — the dual-stack architecture is the design. Stack-maturity detail and any cutover work live in memory journals, which link forward; read them there, not this prompt.
+QUIC-based with iroh 0.92 + iroh-blobs 0.94 + iroh-gossip 0.92 + custom ALPNs per plane. **These are frozen pins — do not bump past them.** iroh 0.95+ pulls a pre-release crypto path (off stable `ed25519-dalek 2.2` / `curve25519-dalek 4.1`) whose published source won't compile — the same shape as the `curve25519-dalek` pin the libp2p stack already respects; a routine `cargo update` past 0.94 breaks the build. Wins decisively on chatty planes; narrows toward parity on bulk transfer. Cross-stack `peer_map` (`p2p_iroh/peer_map.rs`) bridges libp2p `PeerId` ↔ iroh `NodeId` via `agent_cid`. See [[project_iroh_dataplane_actual_state]].
 
 Planes (parity-tested across both stacks):
 - **Blob** — Reed-Solomon discovery + replication (libp2p custom; `iroh-blobs` + `IrohBlobStore`)
-- **Gossip** — broadcast (libp2p; `iroh-gossip` with BLAKE3 topic_id mapping). Conductor agent-info is dual-published over this plane (`p2p/conductor_agent_info_gossip.rs`) as the discovery bootstrap ("step zero") — peer discovery starts here before any other plane carries data.
+- **Gossip** — broadcast (libp2p; `iroh-gossip` with BLAKE3 topic_id mapping). Conductor agent-info is dual-published over this plane (`p2p/conductor_agent_info_gossip.rs`) as the discovery bootstrap ("step zero") — peer discovery starts here before any other plane carries data. Inventory snapshots fan out dual-stack via `DualGossipPublisher` (the libp2p `P2PNode` fans out to iroh when the iroh node is co-resident), and the inventory wire carries an optional additive `BlobHint`; transport-maturity detail (mode-exclusivity at boot) stays deferred to the memory journals.
 - **Observation** — peer-witnessed evidence on the iroh substrate; the observer's iroh-blob log is the source of truth and SQL is the projection (`observation/` + `p2p_iroh/observation_backend.rs`, registered as `Plane::Observation` in `peer_map.rs` with its own libp2p protocol-id and iroh ALPN).
-- **Sync** — CRDT delta synchronization (`/elohim/sync/2.0.0`)
+- **Sync (Automerge content-sync)** — CRDT delta synchronization. Two distinct things share the word: the generic delta-sync protocol (`/elohim/sync/2.0.0`), and the lit **Automerge content-sync plane** (`/elohim/storage-sync/1.0.0`) under `elohim/elohim-storage/src/sync/` (`doc_store` / `projector` / `stream` / `mod`). The content-projection producer is the `EventBus` listener (`spawn_content_projection_listener` → `project_content_doc`, `doc_id="node:{id}"`). **Load-bearing:** the producer MUST project under `h_app_id="elohim"` because `initiate_sync_round` hardcodes that partition — a doc written under any other namespace sits inert forever and converges nothing. There is no `DocType` enum and no `SyncManager::save`; persist via `apply_changes(ns, id, vec![doc.save()])`. This plane is distinct from the DHT content plane (a separate sync path that already works) and from blob/shard custody. See [[project_automerge_content_sync_plane_lit]].
 - **EPR resolution** — `epr:{id}` content addressing (`/elohim/epr/2.0.0` MessagePack + `/elohim/epr-atom/2.0.0` CBOR). EPR records carry predecessor lineage: `back_prop::record_predecessor` records dryoc-encrypted 2-of-2 predecessor payloads on both transport stacks (`p2p/mod.rs` libp2p arm, `p2p_iroh/epr_atom_backend.rs` iroh arm) into `db/predecessor_records.rs` (idempotent receive). See the records-lifecycle design at `genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md`.
 - **Shard** — blob discovery (`/elohim/shard/2.0.0`)
 - **View-federation** — `/elohim/view-federation/2.0.0` (256 KiB cap)
@@ -77,7 +80,7 @@ Planes (parity-tested across both stacks):
 
 iroh wire pattern: ALPN const + `ProtocolHandler` + Client helper + `Backend` trait per plane, framed via `super::codec::{read_frame_default, write_frame}` (or `_cbor` variants). **Handlers MUST use `loop { match accept_bi { Ok(s) => ...; Err(_) => return Ok(()) } }`** — not one-stream-per-connection, because a one-stream-per-connection handler hangs on reused connections; bench fetchers must wrap reads in `tokio::time::timeout(30s, ...)`. See [[project_iroh_alpn_handlers_one_stream_design]].
 
-When designing new Rust services that touch P2P across the dual-stack architecture: write the service transport-neutral; let the libp2p and iroh adapters delegate to it; add `match config.transport_backend` only at call sites that legitimately need different wire calls. Don't re-architect for one stack and bolt on the other. The dual-stack architecture is the design — iroh and libp2p are complementary, not transitional.
+When designing new Rust services that touch P2P across the dual-stack architecture: write the service transport-neutral; let the libp2p and iroh adapters delegate to it; add `match config.transport_backend` only at call sites that legitimately need different wire calls. Don't re-architect for one stack and bolt on the other.
 
 **Inventory agreement is not byte replication.** Inventory gossip ("Received content inventory count=N", metadata-only, ~60s cadence) is categorically distinct from byte replication (`distribute_shards`, reconstruction). Peers agreeing on an inventory count does NOT mean bytes moved — check the filesystem count to confirm replication. Never wire "gossip says peer has it → mark replicated"; that ships a silent no-op. See [[project_inventory_exchange_not_byte_replication]].
 
@@ -102,20 +105,21 @@ Queryable local state — projections, caches, sessions, policy. Supports offlin
 `graph/engine.rs` wraps `GraphEngine` over `cozo::DbInstance` on a sled backend (sled, not SQLite-backed — `libsqlite3-sys` conflicts with Holochain's `rusqlite`); alongside it sit `schema.rs`, `registry.rs`, `projector.rs`, `backfill.rs`, `primitives.rs`. This engine projects EPRs as nodes and couplings / memberships / delegations as first-class edges; the `graph_views/` module *composes queries against* it. Cozo owns **this** graph — the social-economic substrate — and only this one.
 
 **Content↔content graph** (`elohim/elohim-storage/src/graph_engine.rs` — note: NOT `graph/engine.rs`):
-The content neighborhood (which content node relates to which) is realized behind **one read-only trait seam**, `ContentGraphResolver` — the one place the content graph is realized, read-only by construction. The decision worth holding is one level up from any engine: `graph.json` is the declarative model of *which* edges exist (`GraphSpec` parses it into a Pass-1 edge whitelist); the resolver is *one engine* over that model — *how* the edges are walked. The native diesel-backed `NativeGraphResolver` is the engine today, chosen by deliberate operator decision for performance over fully-local SQLite. A future Cozo/datalog/embedding resolver is just another `dyn` impl behind the same trait — so the move when content-graph inference grows is **extend the trait, add an impl**, never reach for Cozo or an external graph service. The model is the spec; the resolver is one engine over it. See [[project_content_graph_native_rust_not_cozo_apollo]].
+The content neighborhood (which content node relates to which) is realized behind **one read-only trait seam**, `ContentGraphResolver` — the one place the content graph is realized, read-only by construction. The decision worth holding is one level up from any engine: a declarative model of *which* edges exist (parsed by `GraphSpec` into a Pass-1 edge whitelist) is the spec; the resolver is *one engine* over that model — *how* the edges are walked. The native diesel-backed `NativeGraphResolver` is the engine in place, chosen by deliberate operator decision for performance over fully-local SQLite. A future Cozo/datalog/embedding resolver is just another `dyn` impl behind the same trait — so the move when content-graph inference grows is **extend the trait, add an impl**, never reach for Cozo or an external graph service. The model is the spec; the resolver is one engine over it. See [[project_content_graph_native_rust_not_cozo_apollo]].
 
-This is the dual-transport story applied to the truth layer (stable seam, swappable engine) — but qualified, not flattened: transports are co-equal and runtime-selected *now*; graph engines are one-now (`NativeGraphResolver`) and another-behind-the-trait *later*. Same seam discipline, different temporal shape. Stack-maturity detail and any future-engine work live in memory journals, which link forward; read them there, not this prompt.
+This is the dual-transport story applied to the truth layer (stable seam, swappable engine) — but qualified, not flattened: transports are co-equal and config-selected; graph engines are one-in-place (`NativeGraphResolver`) and another-behind-the-trait later. Same seam discipline, different temporal shape; future-engine work lives in the memory journals, which link forward.
 
-`RelationshipService` (`relationship_service.rs`) is now a **consumer** of this seam — it holds `Arc<dyn ContentGraphResolver>` and runs real depth-bounded BFS where it once returned a hardcoded-depth-1 stub. The seam carries two edge classes, composed into one `ResolvedNeighborhood` discriminated by `inference_source`: **Category-A** notarized/persisted edges (the explicit relationships) and **Category-C** recompute-on-read edges (never persisted) — the same Path A / Path C entity-classification spine that governs storage below. The trait has **no write method by design**: computed edges live only in the response, fully local SQLite, so two peers compute identical edges with no doorway, no DHT, and no consensus. The MVP computed signal is tag co-occurrence (`inference_source="tag"`) over a `content_tags` self-join. `GraphSpec` deliberately **excludes** `MASTERY_OF` (whose `from:` is a `ContributorDID`) from the whitelist, so a content-rooted BFS can never leak into learner-identity nodes; computed edges use `RELATES_TO` (the safe intersection of three drifted relationship-kind vocabularies — manifest 11 / DHT 6 / storage 16). `ContentGraph` / `ContentGraphNode` are first-class ts-rs views in `elohim-views` under the `content-graph.schema.json` contract, carrying `inferenceSource` + `depth`; `inference_source` is canonicalized on the DHT/storage home and generated to TS (the hand-written lamad enum retired).
+`RelationshipService` (`relationship_service.rs`) is a **consumer** of this seam — it holds `Arc<dyn ContentGraphResolver>` and runs depth-bounded BFS over it. The seam carries two edge classes, composed into one `ResolvedNeighborhood` discriminated by `inference_source`: **Category-A** notarized/persisted edges (the explicit relationships) and **Category-C** recompute-on-read edges (never persisted) — the same Path A / Path C entity-classification spine that governs storage below. The trait has **no write method by design**: computed edges live only in the response, fully local SQLite, so two peers compute identical edges with no doorway, no DHT, and no consensus. The MVP computed signal is tag co-occurrence (`inference_source="tag"`) over a `content_tags` self-join. `GraphSpec` deliberately **excludes** `MASTERY_OF` (whose `from:` is a `ContributorDID`) from the whitelist, so a content-rooted BFS can never leak into learner-identity nodes; computed edges use `RELATES_TO` (the safe intersection of three drifted relationship-kind vocabularies — manifest 11 / DHT 6 / storage 16). `ContentGraph` / `ContentGraphNode` are first-class ts-rs views in `elohim-views` under the `content-graph.schema.json` contract, carrying `inferenceSource` + `depth`; `inference_source` is canonicalized on the DHT/storage home and generated to TS.
 
 ### Reconciliation Controller
 
 **Truth and projection reconcile eagerly, not lazily.** The DHT is the manifest; the storage projection is the desired state; the `ReconcileController` (`elohim-storage/src/reconcile/controller.rs`) is the controller-shape that closes the loop. It is the canonical signal-handler home for post-commit signals from the zomes: signals land, the controller projects them into Diesel, and the views re-derive from the updated projection.
 
-Three collaborators ride alongside it:
+Collaborators that ride alongside it:
 - **`RecoveryFlowProjector`** (`elohim-storage/src/services/recovery_flow_projector.rs`) — projector-per-flow over recovery v2 signals; writes flow-shaped projections rather than raw events.
 - **`ElohimContentSignal` dispatcher** (`elohim-storage/src/services/elohim_content_dispatcher.rs`) — central dispatcher for content-related post-commit signals; routes to the right projector without spreading match arms across services.
 - **`IntegrityNotify` signals** — the signal class that carries identity-integrity events: the `RevocationAttestation` arm and the `KeyRotation` handler project through the controller, with `reconcile/pubkey_timeline.rs` projecting key-rotation lineage and the recovery projections consuming the same stream. Anyone designing recovery / identity-integrity projection routes through here.
+- **`DiversityAwarePlacementStrategy`** (`elohim-storage/src/reconcile/placement.rs`) — the salvage placement engine for blob custody, the one genuine substrate hole that makes diversity real rather than household-blind XOR salvage. Diversity-first multi-pass greedy with XOR tiebreak, selected by `select_placement_strategy` and gated by `config.salvage_diversity_placement`; the failure domain is `household_id`, so a pool with no household data **degrades exactly to XOR (never worse)**. It is INERT in prod pending the shared-substrate scope reconciliation — household `humans` rows are written under `h_app_id="imagodei"` but read under `lamad`, the same dormancy class as the resilience-snapshot junction. See [[project_dataplane_next_lens_diversity_placement]].
 
 The discipline: when a new entry type lands in a zome, the post-commit path is signal → dispatcher → projector → Diesel → view. Don't reach into Diesel from a service to "catch up" the projection — invoke the reconciler. See [[project_principle_p1_reconciliation_controller]].
 
@@ -438,8 +442,14 @@ async fn create_event(
 **Never: Domain logic in doorway**
 Doorway is a web2 bridge. If you're writing business rules in `doorway/src/`, stop — that belongs in `elohim-storage/src/services/`. The specific shape to refuse: peer-iteration / blob fan-out in the gateway. See [[project_doorway_single_target_no_fanout]].
 
+**Never: Blocking syscall on a core tokio worker**
+A blocking syscall (sync `getaddrinfo` / a `std::net` resolve) on a core tokio worker has no yield point, so `tokio::time::timeout` cannot cancel it — enough concurrent parks starve a `/health` endpoint sharing the same runtime (the doorway SIGKILL crashloop shape under DNS flap). Resolve off the blocking pool (`tokio::net::lookup_host`) and gate liveness on a dedicated-runtime heartbeat. See [[project_doorway_wedge_unbounded_mongo_await]].
+
 **Never: New entry type for a new social move**
 The DNA entry count is the precious resource. New social vocabulary is a `signal_kind` extension on existing REA primitives plus a `resource_classified_as` whitelist entry. If the impulse is "I need a new entry type for endorsement / flag / boost / appeal," stop — that's a `signal_kind`. The whitelist file is `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/feedback_signal.rs` (`SIGNAL_KINDS` const); the Vouch primitive is the canonical worked example of the full schema → validator → standing-policy → projector sequence. See [[project_signal_kind_extensible_protocol_class]].
+
+**Never: Out-of-band admin grant for a privileged operation**
+When designing a new privileged operation, do not reach for an `X-API-Key` (or other out-of-band admin grant). The substrate has ONE primitive for delegated privilege — `Mishpat::Commitment` with a `delegates-compute` action — carrying on-chain standing, revocation, and an audit trail. A bounded compute-commitment displaces the admin key. See [[project_rea_compute_commitment_primitive]].
 
 **Never: Cross-contaminate care-class and compute-class signals**
 Care commitments (stewardship, attention, contribution) and compute breach signals (capacity gaps, replication shortfalls) ride parallel streams. Compute breach must never debit a care attribution, and care debits must never gate compute placement. Wire the discrimination through `signal_kind` and `resource_classified_as`, not through ad-hoc fields. See [[project_compute_commitments_bounded]].
@@ -458,6 +468,9 @@ Changing a function signature without sweeping callers (including `tests/`) is t
 
 **Never: Reach taxonomy as ad-hoc enum**
 Reach has drifted into three forms in the past; the canonical taxonomy lives at one place and projections (e.g., `storage-stewardship-summary`) gate on it. Don't add a fourth shape; reconcile against the canonical enum. HTTP routes that filter by reach buckets depend on the canonical taxonomy — reconcile against it before authoring such a route, never against an ad-hoc local enum. See [[project_reach_enum_drift_reconciliation]].
+
+**Never: Derive resilience tier from reach**
+Resilience tier (how durably the owner needs content held) is **orthogonal** to reach (who may see it). A will is `private` reach but `vault` tier; declared tier is Cat-A author truth, achieved tier is Cat-C projection — and tier must NEVER be derived from reach breadth. The two axes conflate easily, and a `reach_to_resilience_tier()`-shaped derivation false-reassures about under-protected vault content. This is a guarding principle, not a landed primitive — the orthogonality is the design intent; the binding mechanism is design-in-flight (`/brainstorm` pending), so state the principle, don't claim shipped capability. See [[project_resilience_tier_content_declared_floor]].
 
 **Never: Author `delivery_status` or temporal-state fields from gospel-tier prompts**
 Agent prompts and skill prompts describe stable architecture. Sprint progress, phase counts, "currently"/"as of [date]" phrasing belongs in memory entries and chronicles, which link forward. See [[feedback_agent_prompts_no_process_status]].
@@ -480,9 +493,18 @@ Extend an existing wire message **additively**: new fields are `#[serde(default)
 - Hints/metadata attached to a content-addressed item (sha256/CID) ride a **parallel optional field**, never a change to the address newtype's wire shape — a newtype with `#[serde(into="String", try_from="String")]` serializes as a bare string and cannot grow fields.
 - Every wire change ships with a round-trip test AND an **old↔new compat test** (decode old-format bytes on the new struct, and new-format bytes on a struct lacking the field). The wire is the hardest thing to change later — get the shape right once.
 
+### The `h_app_id` pillar-namespace mismatch class (silent cross-pillar no-op)
+
+A projection, producer, or join scoped to the **wrong `h_app_id` partition** reads or writes the wrong DHT namespace and degrades to a **silent no-op** — no error, just empty results or unconverged data. This is one recurring substrate gotcha-class, not three independent holes:
+- A `snapshot()`-join through substrate-owned `humans` fields written under one pillar but read under another returns empty ([[project_resilience_snapshot_humans_junction]]).
+- The `DiversityAwarePlacementStrategy` degrades exactly to household-blind XOR because household rows are written under `imagodei` but read under `lamad` ([[project_dataplane_next_lens_diversity_placement]]).
+- The Automerge content-sync producer converges nothing unless it projects under `h_app_id="elohim"`, which `initiate_sync_round` hardcodes ([[project_automerge_content_sync_plane_lit]]).
+
+When you design any cross-pillar projection/producer/join, name the `h_app_id` partition it writes and the one it reads, and assert they agree — or you ship a no-op that reads as "done."
+
 ### Read-side projection services use inline diesel; the ReconcileController owns WRITES
 
-The "never reach into Diesel from a service" rule (above) governs projection **writes** (post-commit landing → signal → dispatcher → projector → controller). **Read-side** projection services read inline and that is correct: `use crate::db::diesel_schema::<table>::dsl as t;` then `t::table.filter(...).select(...).load(conn).map_err(|e| StorageError::Database(e.to_string()))?`, taking `&mut SqliteConnection`. Mirror `cluster_view::compose_totals` and `reciprocity_view::aggregate_stewarded_bytes_by_peer`. Sum bytes in Rust over loaded rows for an exact `u64` — `resource_quantity_value` is `f32` (lossy above ~16 MB; never accumulate byte counts through it). Don't reuse a generic list helper (`list_commitments`) when you need a different filter; write the focused query. Pledge/recipient/role data on a `replicates-dwelling` commitment lives in `metadata_json` (`ReplicatesDwellingPayload`), not in columns. A projection that `snapshot()`-joins through substrate-owned `humans` fields (`agent_pub_key`, `household_id`) returns empty if no surface set them — no HTTP create surface does, and `POST /commitments` inserts `proposed`, not `active`. Don't design a read route that silently reads 0 because its junction columns are substrate-only-written; the `content:<reach>` provide rows that light such a join exist only in `test_util` today. See [[project_resilience_snapshot_humans_junction]].
+The "never reach into Diesel from a service" rule (above) governs projection **writes** (post-commit landing → signal → dispatcher → projector → controller). **Read-side** projection services read inline and that is correct: `use crate::db::diesel_schema::<table>::dsl as t;` then `t::table.filter(...).select(...).load(conn).map_err(|e| StorageError::Database(e.to_string()))?`, taking `&mut SqliteConnection`. Mirror `cluster_view::compose_totals` and `reciprocity_view::aggregate_stewarded_bytes_by_peer`. Sum bytes in Rust over loaded rows for an exact `u64` — `resource_quantity_value` is `f32` (lossy above ~16 MB; never accumulate byte counts through it). Don't reuse a generic list helper (`list_commitments`) when you need a different filter; write the focused query. Pledge/recipient/role data on a `replicates-dwelling` commitment lives in `metadata_json` (`ReplicatesDwellingPayload`), not in columns. A projection that `snapshot()`-joins through substrate-owned `humans` fields (`agent_pub_key`, `household_id`) returns empty if no surface set them — no HTTP create surface does, and `POST /commitments` inserts `proposed`, not `active`. Don't design a read route that silently reads 0 because its junction columns are substrate-only-written; the `content:<reach>` provide rows that light such a join live only in `test_util`. See [[project_resilience_snapshot_humans_junction]].
 
 ### Correct-but-dormant projection (never wire a guaranteed no-op)
 
@@ -536,6 +558,8 @@ When dispatching a subagent for any task that touches Cargo dep versions: explic
 | `/health` | HTTP 200 | Health check |
 | `/auth/*` | HTTP | Authentication endpoints |
 | `/import/*` | HTTP/WS | Bulk content import |
+
+> **A new GET route on the doorway 8080 main listener takes TWO gates.** The match arm AND `is_service_path` — otherwise the EPR router shadows the route and it silently returns the SPA bundle (the `/auth/portal` shadow-incident shape, which only bites at runtime once a root projection exists). Add an `is_service_path` unit test alongside the match arm. `admission_exempt` is orthogonal — it only stops 503-shed, it does not exempt a path from the shadow. See [[project_doorway_main_route_needs_is_service_path]].
 
 ### Worker Pool Pattern
 
@@ -688,6 +712,8 @@ impl From<ContentV1> for Content {
 }
 ```
 
+**Version resolution is a declared dependency, not recency.** The `From<VOld>` impls above migrate an entry's *shape* at read time, but *which version applies* is a separate question — and the answer is a **declared dependency** (a CID-pin is a lockfile), never "the latest one wins." Entity versions form a DAG (fork / revert / merge), and the **binding layer** picks the head; the query layer does not. Don't build recency into a query — resolve the declared version like a `package.json`/lockfile dependency. See [[project_versioned_entity_head_is_declared_dependency]].
+
 ### Sweettest Discipline
 
 Cross-agent sweettest scenarios using `two_agent_conductors` require explicit `exchange_peer_info` + `await_consistency` calls before assertions — DHT consistency is not automatic. See [[feedback_sweettest_cross_agent_consistency]]. Zome source changes should have matching sweettest updates per the `zome-sweettest-sync` sync rule.
@@ -758,7 +784,8 @@ let buffer = WriteBuffer::for_recovery();      // Recovery/sync operations
 | `elohim/elohim-storage/src/graph_engine.rs` | Content↔content graph — `ContentGraphResolver` trait + native `NativeGraphResolver` impl; read-only by construction, native by operator choice. The ONE place the content graph is realized. See [[project_content_graph_native_rust_not_cozo_apollo]] |
 | `elohim/elohim-storage/src/graph_views/` | Graph-native projections (compose queries against `graph/`; EPRs as nodes, edges first-class) |
 | `elohim/elohim-storage/src/views_convert/` | Wire→View converter pattern (isolates serde transforms from domain types) |
-| `elohim/elohim-storage/src/reconcile/` | `ReconcileController` + projector-per-flow + `pubkey_timeline` (post-commit signal home; `IntegrityNotify` projects here) |
+| `elohim/elohim-storage/src/reconcile/` | `ReconcileController` + projector-per-flow + `pubkey_timeline` (post-commit signal home; `IntegrityNotify` projects here) + `placement.rs` (`DiversityAwarePlacementStrategy` — salvage diversity, degrades to XOR without household data) |
+| `elohim/elohim-storage/src/sync/` | Automerge content-sync plane (`doc_store`/`projector`/`stream`/`mod`; `/elohim/storage-sync/1.0.0`); content-projection producer must write `h_app_id="elohim"`. See [[project_automerge_content_sync_plane_lit]] |
 | `elohim/elohim-storage/src/observation/` | Observation plane (peer-witnessed evidence; iroh-blob log is truth, SQL is projection) |
 | `elohim/elohim-storage/src/http.rs` | HTTP route registration (content-addressed routes are GET-only) |
 | `elohim/elohim-storage/src/api/` | Route handlers by domain |
@@ -780,37 +807,23 @@ let buffer = WriteBuffer::for_recovery();      // Recovery/sync operations
 
 ## Common Issues
 
-**RUSTFLAGS Override Required**:
-The system sets `RUSTFLAGS=--cfg getrandom_backend="custom"` for Holochain WASM builds. This breaks native Rust builds. Use `RUSTFLAGS=""` for doorway and steward/node; keep the custom backend flag for elohim/elohim-storage and the DNA zomes.
+This is a fast symptom-locator. The deep mechanism for most of these lives inline in the sections above — the entries here are pointers, not second copies (don't restate a mechanism here; fix it at its inline home).
 
-**Diesel migration timestamp collisions**:
-Two migrations with the same `YYYY-MM-DD-HHMMSS` prefix collide silently — `embed_migrations!` keeps one and drops the other. Always bump the seconds when authoring sibling migrations on the same day. See [[feedback_diesel_migration_timestamp_collision]].
+- **RUSTFLAGS override** (native builds fail under the WASM getrandom flag) — `RUSTFLAGS=""` for doorway + steward/node; keep the custom backend for elohim-storage + DNA zomes. See *Build Commands* / *Cargo target-pool discipline*.
+- **`HEAD` 404s on content-addressed routes** — probe with `GET` / `Range: bytes=0-0`, not `curl -sI`. See *Step 7* / [[feedback_head_vs_get_blob_asymmetry]].
+- **Env-var on the hot path makes tests flake** — thread the value or `OnceLock` it. See *Path C* / [[feedback_env_var_test_flakiness]].
+- **Inventory agreement ≠ byte replication** — check the filesystem count, not the gossip count. See *Inventory agreement is not byte replication* / [[project_inventory_exchange_not_byte_replication]].
+- **Schema-data enum drift fakes auth bugs** — an invalid seed enum cascades `503` → `401 INVALID_CREDENTIALS`; check `seed-humans.log` first. See [[feedback_schema_data_enum_drift_cascade]].
+- **iroh ALPN handlers must loop on `accept_bi`** — a one-stream-per-connection handler hangs reused connections. See *iroh wire pattern* / [[project_iroh_alpn_handlers_one_stream_design]].
 
-**Schema codegen Prettier oscillation**:
-`pnpm run schema:codegen:ts` is not idempotent on a few enum surfaces (Reach, ContentFormat); the diff is cosmetic and safe to absorb without panic. See [[feedback_codegen_prettier_oscillation]].
+Unique operational items (no richer inline home):
 
-**Cargo probes — resolution ≠ compilation**:
-Pre-release crates can resolve but fail to compile. Run `cargo build` before pinning a new version, not just `cargo update`. See [[feedback_cargo_resolution_vs_compilation]].
-
-**Schema-data enum drift fakes auth bugs**:
-An invalid enum value in seed data cascades: downstream service returns `503`, auth layer reads the `503` and surfaces `401 INVALID_CREDENTIALS`. Check `seed-humans.log` before assuming a credentials regression. See [[feedback_schema_data_enum_drift_cascade]].
-
-**Inventory agreement ≠ byte replication**:
-"Received content inventory count=N" gossip is metadata-only; agreement on a count does not mean bytes moved. Check the filesystem count before declaring content replicated — the alpha symptom was 6 peers agreeing on thousands of items while only the genesis peer held bytes. See [[project_inventory_exchange_not_byte_replication]].
-
-**`HEAD` 404s on content-addressed routes**:
-`HEAD /blob/<hash>` returns 404 even when `GET` returns 200 — the route is GET-only and HEAD falls through to the catch-all. Probe with `GET` (or `Range: bytes=0-0`), not `curl -sI`. See [[feedback_head_vs_get_blob_asymmetry]].
-
-**Env-var on the hot path makes tests flake**:
-A hot-path `std::env::var` read plus a test that `set_var`s it produces parallel-test flake (saw it on `BLOB_PANTRY_MAX_BYTES`). Thread the value, read once into a `OnceLock`, or guard tests with a `static Mutex`. See [[feedback_env_var_test_flakiness]].
-
-**Connection Pool Exhaustion**: Check pool size vs concurrent requests. Verify conductor responsiveness. Look for leaked connections.
-
-**Blob Import Failures**: Check manifest integrity. Verify shard count (need 4+ of 7). Check disk space.
-
-**libp2p 0.54 API (steward/node)**: Requires `macros` + `ed25519` features. Use `with_codec()` not `new()` for request-response. Swarm uses `StreamExt::next()` not `select_next_event()`. Both crates track 0.54 today — still check each `Cargo.toml` before assuming API parity, the minors have diverged before.
-
-**iroh ALPN handlers must loop on `accept_bi`**: a one-stream-per-connection handler hangs reused connections. Wrap in `loop { match accept_bi { Ok(s) => ..., Err(_) => return Ok(()) } }`; wrap bench fetcher reads in `tokio::time::timeout(30s, ...)`. See [[project_iroh_alpn_handlers_one_stream_design]].
+- **Diesel migration timestamp collisions** — two migrations with the same `YYYY-MM-DD-HHMMSS` prefix collide silently; `embed_migrations!` keeps one and drops the other. Bump the seconds on sibling migrations. See [[feedback_diesel_migration_timestamp_collision]].
+- **Schema codegen Prettier oscillation** — `pnpm run schema:codegen:ts` is not idempotent on a few enum surfaces (Reach, ContentFormat); the diff is cosmetic and safe to absorb. See [[feedback_codegen_prettier_oscillation]].
+- **Cargo probes — resolution ≠ compilation** — pre-release crates can resolve but fail to compile; run `cargo build` before pinning a new version, not just `cargo update`. This is the mechanism behind the frozen iroh/libp2p pins above. See [[feedback_cargo_resolution_vs_compilation]].
+- **libp2p 0.54 API (steward/node)** — requires `macros` + `ed25519` features; use `with_codec()` not `new()` for request-response; swarm uses `StreamExt::next()` not `select_next_event()`. Still check each `Cargo.toml` before assuming API parity — the minors have diverged before.
+- **Connection Pool Exhaustion** — the admin worker pool is fixed at 4 round-robin connections; concurrent admin requests beyond reconnect throughput queue then time out. Check pool size vs concurrent load, conductor responsiveness, and leaked (never-returned) connections.
+- **Blob Import Failures** — Reed-Solomon reconstruction needs any 4 of 7 shards; an import landing <4 shards or a corrupt manifest fails reconstruction. Check manifest integrity, shard count, and disk space.
 
 ## When Developing
 
@@ -822,11 +835,11 @@ A hot-path `std::env::var` read plus a test that `set_var`s it produces parallel
 6. Domain services are the heart — handler → service → persistence → optional zome notarization. Services stay transport-neutral; libp2p and iroh adapters delegate to them. Projection WRITES land via the `ReconcileController`; read-side projection services read inline diesel directly.
 7. Transformations (JSON parsing, case conversion, type coercion) happen in Rust, never TypeScript. `snake_case` never leaves the Rust boundary.
 8. Use `From<T>` impls for view ↔ model conversion. Generate TS types via `cargo test export_bindings`. Cross-crate `impl From<>` moves require workspace-wide build + a before/after grep for `^impl From<`.
-9. Doorway is a thin web2 bridge — no domain logic; no blob fan-out; doorway routes are manifest-driven. See [[project_doorway_manifest_driven_routes]] and [[project_doorway_single_target_no_fanout]].
+9. Doorway is a thin web2 bridge — no domain logic; no blob fan-out; doorway routes are manifest-driven, and a new GET route on the main listener takes both a match arm AND `is_service_path`. See [[project_doorway_manifest_driven_routes]], [[project_doorway_single_target_no_fanout]], and [[project_doorway_main_route_needs_is_service_path]].
 10. Use `ExternResult<T>` return types in zome functions. Never `serde_json::Value` on `SerializedBytes`. HDI validators cannot use `get_links` — coordinator gates link traversal.
 11. **Stewardship vocabulary, not ownership**: contributors steward resources; no one "owns" them. Reject `own/ownership/sovereign` in API and entity naming; use `steward/contributor/authored`. `CustodianCommitment` + `steward_affinity` are the structural answer to single-key ownership. See [[project_no_sovereignty_stewardship_over_ownership]].
-12. **Reach is earned at authoring**: content carries provenance + verified addressing; receivers pre-authorize standing trust. See [[project_reach_earned_at_authoring]] and [[project_epr_substrate_vs_vf_graphql]] (EPR is a graph primitive; VF-GraphQL is app-layer).
-13. **New social moves extend `signal_kind`, not entry types.** The DNA entry count is precious; the social class is open. See [[project_signal_kind_extensible_protocol_class]].
+12. **Reach is earned at authoring**: content carries provenance + verified addressing; receivers pre-authorize standing trust. Resilience tier (durability floor) is orthogonal to reach (visibility) — never derive one from the other. See [[project_reach_earned_at_authoring]], [[project_resilience_tier_content_declared_floor]], and [[project_epr_substrate_vs_vf_graphql]] (EPR is a graph primitive; VF-GraphQL is app-layer).
+13. **New social moves extend `signal_kind`, not entry types.** The DNA entry count is precious; the social class is open. Privileged operations reach for a bounded `delegates-compute` commitment, not an `X-API-Key`. See [[project_signal_kind_extensible_protocol_class]] and [[project_rea_compute_commitment_primitive]].
 14. Sweep callers crate-wide on Rust signature changes (including `tests/`). `cargo fmt` + `clippy -D warnings` before committing. After swarm-composition edits, build from a clean tree, not a DNA worktree. See [[feedback_swarm_composition_fresh_tree_build]].
 15. When angular-architect flags `TODO(rust-migration)`, receive it and decide which truth layer owns it.
 16. When substrate work lands, note which gospel-tier surfaces depend on it in the commit message — the resilience-epic Part IX honesty matrix stays current that way. See [[feedback_living_doc_honesty_matrix_maintenance]].

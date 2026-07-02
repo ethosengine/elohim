@@ -211,7 +211,7 @@ await http.post(`/db/contributor-presences/${presenceId}/claim`, input);
 | `elohim-app/src/app/shefa/services/exchange.service.ts` | Marketplace |
 | `elohim-app/src/app/shefa/README-REQUESTS-AND-OFFERS.md` | Marketplace design |
 | `app/elohim-app/src/app/shefa/README-INSURANCE-MUTUAL.md` | Insurance mutual design |
-| `genesis/docs/Shefa_Economic_Infrastructure_Whitepaper.md` | Economic whitepaper |
+| `genesis/docs/content/elohim-protocol/shefa.md` | Economic whitepaper |
 | `research/economic/README.md` | Unyt architecture exploration |
 | `elohim/sdk/storage-client-ts/src/generated/EconomicEventView.ts` | Generated type |
 | `elohim/elohim-storage/src/views.rs` | Rust view types (EconomicEventView, etc.) |

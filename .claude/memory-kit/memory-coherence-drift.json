@@ -2,64 +2,64 @@
   "schema_version": 1,
   "entries": {
     "project_local_stack_dht_anchor_gap": {
-      "hits": 24,
-      "last_changed": "elohim/elohim-storage/src/db/rea_commitments.rs",
-      "last_signal_at": "2026-06-19T14:20:17Z"
+      "hits": 68,
+      "last_changed": "elohim/elohim-storage/src/db/content_diesel.rs",
+      "last_signal_at": "2026-07-02T00:22:01Z"
     },
     "project_resilience_snapshot_humans_junction": {
-      "hits": 39,
-      "last_changed": "elohim/elohim-storage/src/services/household_resilience.rs",
-      "last_signal_at": "2026-06-20T16:35:51Z"
+      "hits": 43,
+      "last_changed": "elohim/elohim-storage/src/db/humans.rs",
+      "last_signal_at": "2026-06-27T02:09:29Z"
     },
     "project_sprint_branch_not_orchestrator_indexed": {
-      "hits": 5,
+      "hits": 17,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-06-10T00:39:05Z"
+      "last_signal_at": "2026-06-25T19:01:16Z"
     },
     "project_ci_playwright_image": {
-      "hits": 5,
+      "hits": 17,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-06-10T00:39:05Z"
+      "last_signal_at": "2026-06-25T19:01:16Z"
     },
     "feedback_pvc_threshold_and_recovery": {
-      "hits": 5,
+      "hits": 17,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-06-10T00:39:05Z"
+      "last_signal_at": "2026-06-25T19:01:16Z"
     },
     "feedback_cargo_target_dir_for_native_builds": {
-      "hits": 5,
+      "hits": 17,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-06-10T00:39:05Z"
+      "last_signal_at": "2026-06-25T19:01:16Z"
     },
     "feedback_multi_agent_pvc_pacing": {
-      "hits": 5,
+      "hits": 17,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-06-10T00:39:05Z"
+      "last_signal_at": "2026-06-25T19:01:16Z"
     },
     "feedback_sccache_cache_corruption_recovery": {
-      "hits": 5,
+      "hits": 17,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-06-10T00:39:05Z"
+      "last_signal_at": "2026-06-25T19:01:16Z"
     },
     "project_ci_storage_topology": {
-      "hits": 4,
+      "hits": 18,
       "last_changed": "elohim/holochain/Jenkinsfile",
-      "last_signal_at": "2026-06-16T00:29:43Z"
+      "last_signal_at": "2026-07-02T00:18:39Z"
     },
     "feedback_diesel_migration_timestamp_collision": {
-      "hits": 6,
+      "hits": 10,
       "last_changed": "elohim/elohim-storage/src/db/mod.rs",
-      "last_signal_at": "2026-06-20T21:24:07Z"
+      "last_signal_at": "2026-06-27T21:48:46Z"
     },
     "project_sweettest_native_build_env": {
-      "hits": 11,
-      "last_changed": "elohim/holochain/tests/sweettest/Cargo.toml",
-      "last_signal_at": "2026-06-09T00:10:35Z"
+      "hits": 13,
+      "last_changed": "elohim/holochain/tests/sweettest/src/tests/infrastructure.rs",
+      "last_signal_at": "2026-06-23T16:10:18Z"
     },
     "feedback_codegen_prettier_oscillation": {
-      "hits": 16,
+      "hits": 19,
       "last_changed": "elohim/sdk/schemas/scripts/codegen-ts.mjs",
-      "last_signal_at": "2026-06-20T15:17:44Z"
+      "last_signal_at": "2026-06-27T16:36:31Z"
     },
     "project_alpha_topology_bootstrap_pair": {
       "hits": 3,
@@ -77,34 +77,34 @@
       "last_signal_at": "2026-06-11T00:07:43Z"
     },
     "project_container_cargo_environment_quirks": {
-      "hits": 4,
+      "hits": 9,
       "last_changed": ".husky/pre-push",
-      "last_signal_at": "2026-06-11T00:52:17Z"
+      "last_signal_at": "2026-06-25T19:28:12Z"
     },
     "feedback_workflow_long_cargo_orphan_lock": {
-      "hits": 4,
+      "hits": 9,
       "last_changed": ".husky/pre-push",
-      "last_signal_at": "2026-06-11T00:52:17Z"
+      "last_signal_at": "2026-06-25T19:28:12Z"
     },
     "feedback_lint_autofix_string_scan_poison": {
-      "hits": 17,
-      "last_changed": "app/elohim-elements/elohim-core/src/elohim-skeleton.spec.ts",
-      "last_signal_at": "2026-06-11T04:39:59Z"
+      "hits": 36,
+      "last_changed": "app/elohim-elements/elohim-core/src/elohim-seam-map.ts",
+      "last_signal_at": "2026-07-02T16:35:34Z"
     },
     "project_devspace_disk_cleanup_procedure": {
-      "hits": 30,
+      "hits": 34,
       "last_changed": "genesis/agentic/pool-policy.json",
-      "last_signal_at": "2026-06-20T23:51:34Z"
+      "last_signal_at": "2026-06-22T09:32:57Z"
     },
     "project_rust_build_footprint_anatomy": {
-      "hits": 30,
+      "hits": 34,
       "last_changed": "genesis/agentic/pool-policy.json",
-      "last_signal_at": "2026-06-20T23:51:34Z"
+      "last_signal_at": "2026-06-22T09:32:57Z"
     },
     "feedback_deterministic_flag_agent_canon_stasis_pattern": {
-      "hits": 2,
+      "hits": 9,
       "last_changed": ".claude/hooks/deprecation-sentinel.py",
-      "last_signal_at": "2026-06-20T21:48:57Z"
+      "last_signal_at": "2026-07-02T16:19:54Z"
     }
   }
 }
