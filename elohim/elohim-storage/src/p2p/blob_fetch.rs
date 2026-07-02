@@ -217,7 +217,16 @@ pub async fn finalize_fetch_success(
 
         let new_event = NewEconomicEvent {
             id: &event_id,
-            h_app_id: "elohim",
+            // "lamad" = the DEFAULT read scope of /api/v1/economic-events
+            // (X-App-Id header default) and the scope custody-blob rows (the
+            // sibling REA plane) live under. This event was born under
+            // "elohim" — a leak of the SYNC-plane DocStore namespace
+            // (PROJECTION_NAMESPACE) into REA scoping — which made every
+            // serve-blob event structurally invisible to the scoped read
+            // surface (genesis delivery.serve-blob-events read 0 across
+            // #1224-#1230 while the atomic pair worked; the dormant-scope
+            // class: written under one h_app_id, read under another).
+            h_app_id: "lamad",
             action: "serve-blob",
             provider: source_peer,
             receiver: self_cid,
@@ -472,6 +481,37 @@ mod tests {
             .get_result(&mut conn)
             .unwrap();
         assert_eq!(count, 1, "exactly one serve-blob event");
+
+        // AND the event is VISIBLE through the scoped read surface consumers
+        // actually query: GET /api/v1/economic-events resolves its AppContext
+        // from the X-App-Id header with DEFAULT "lamad" (api/mod.rs), and
+        // list_economic_events filters h_app_id = ctx. An event written under
+        // any other scope is structurally invisible to that surface — the
+        // genesis delivery.serve-blob-events verdict read 0 forever while the
+        // atomic pair worked perfectly (#1224-#1230; the dormant-scope class:
+        // written under one h_app_id, read under another). custody-blob rows
+        // (the working sibling) live under the lamad default; serve-blob must
+        // match.
+        let visible = crate::db::economic_events::list_economic_events(
+            &mut conn,
+            &crate::db::AppContext::default_lamad(),
+            &crate::db::economic_events::EconomicEventQuery {
+                action: Some("serve-blob".to_string()),
+                // NB: derive-Default gives limit 0 (LIMIT 0 → always empty);
+                // the serde default_limit(100) applies only on deserialization.
+                limit: 50,
+                ..Default::default()
+            },
+        )
+        .expect("scoped list ok");
+        assert!(
+            visible
+                .iter()
+                .any(|e| e.resource_inventoried_as.as_deref() == Some(hash.as_str())),
+            "serve-blob event must be visible under the DEFAULT (lamad) read \
+             scope that /api/v1/economic-events serves; got {} visible events",
+            visible.len()
+        );
     }
 
     /// T20 review Fix #2 regression: the two SQL writes inside
