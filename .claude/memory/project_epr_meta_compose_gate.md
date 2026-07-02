@@ -1,0 +1,21 @@
+---
+name: project_epr_meta_compose_gate
+title: .epr-meta compose-gate LIVE — directory-local governance
+description: PreToolUse hook gates Edit/Write via cascading .epr-meta manifests; new docs in governed dirs need frontmatter or DENIED; malformed downgrades deny→ask.
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: da119ac8-d62b-4bca-83df-818d9e4fd563
+---
+
+The **`.epr-meta` compose-gate** (the "dev substrate IS the protocol" arc, **P1a**) is LIVE as of 2026-06-25: a registered PreToolUse hook (`.claude/hooks/epr-meta-resolver.py` + `_lib/epr_meta.py`) gating `Edit|Write` against cascading directory-local `.epr-meta` manifests. **Operational effect to remember:** authoring a NEW `.md` under `genesis/docs/superpowers/**` now requires frontmatter (root: `[id, status, cites]`; `specs/` → 7 fields) or it's DENIED; editing existing files is NOT gated (`new: true`). A malformed manifest is **strict-but-recoverable** (architect call): subtree downgrades `deny→ask`, the `.epr-meta` itself is always editable — because unvalidated governance is Private-reach intent that hasn't earned cross-machine DHT notarization (*proposed* `ask`, not *binding* `deny`).
+
+Committed `258ddb461`→`d42ac0dc1` on `feat/frontend-eyes-sprint` (5 TDD tasks + 1 review-hardening fix from a 3-lens panel). **Design docs are UNCOMMITTED** in the working tree (integrator's to land): the two specs, the plan, and the P0 roadmap re-home. Full design lives in `genesis/docs/superpowers/specs/2026-06-25-{epr-meta-compose-gate,doc-lifecycle-as-epr-development-substrate}-design.md`.
+
+**Pre-flight gotchas (not obvious):** pytest is NOT installed — `_lib` tests are plain runnable scripts at `.claude/scripts/_lib/__tests__/<name>_test.py` (`check()` + `tempfile`, run `python3 <file>`, template `subject_routing_test.py`); object schemas go in `elohim/sdk/schemas/v1/objects/` (not `views/`); PyYAML 6.0.3 present.
+
+**Arc P6 (`.ci-ignore`→`.epr-meta` convergence) LANDED 2026-06-25** (7 SDD task commits `5fa593bde`→`16d653e66` + doc-tidy `a8deed767`, MERGE-READY-WITH-FLAGS). The change-detection sweep retired the dead Groovy ci-ignore/cascade helpers + `orchestrator-strategy.mjs` leftovers (graph-walker is the sole authoritative detector); the fold added a top-level `ci-trigger:` leg to `.epr-meta` + `_lib/ci_trigger.py` + `.claude/scripts/ci-ignore-projector.py`, made `.ci-ignore` a GENERATED artifact (byte-identical to pre-fold) projected from the repo-root `/.epr-meta` `ci-trigger.ignore`, with a pre-push freshness gate. **HAND-OFF FLAG (integrator):** `jenkinsfile-cps-scope.test.mjs` "no orphan bridges" is RED on-branch — NOT a P6 defect: a concurrent session's `RESET_STORAGE` reseed feature was swept into `5fa593bde` via whole-file `git add` (base passes 7/7; `RESET_STORAGE_FROM_TAG` absent at base); the red is a linter false-positive on the `==` comparison-read. Resolve by the RESET_STORAGE owner, not as a regression.
+
+**Signal-quality validated + governance applied 2026-06-25** (same session, via temp-resolver-harness rounds — drive the live `epr-meta-resolver.py` with synthetic tool-input in throwaway temp repos; deterministic, zero repo pollution): naive skill-only agents author convergent governance across all enforced rule types (5/5 leading → 1 adversarial gap → skill refined → 3/3). The gap fix (a callout that "if no enforced predicate fits → decline & document; binds `inject` too — a predicate-less rule is malformed → ask-gates the whole subtree") is **uncommitted** in the skill (skill has been untracked since P1 = integrator's). **5 new `.epr-meta` committed** (govern drift-prone dirs): `superpowers/sprints/` (inject override — **LIVE-BUG FIX: the base deny was hard-blocking auto-generated frontmatter-less shift output**), `genesis/research/` (dedupe-of), `genesis/data/timeline/` (require-frontmatter id+kind), `genesis/docs/{specs,plans}/` (route-to the governed superpowers homes). `require-sibling` is NARROW (new-subtree-birth only, checks first-file name — NOT companion-file pairing).
+
+**Remaining arc slices (specced, not built):** P1b CID-envelope projector (graduation leg), P2 docs-comet, P3 DoD-rollup, P4 disclosure-tiering, P5 attention/liability. Guard: the `.epr-meta` is a projection of earned reach, never the authority itself ([[feedback-identity-sovereignty-ontology-guard]]).

@@ -1,6 +1,7 @@
 ---
 name: tiered-quilt-unblock-state
-description: "tiered-quilt — the attestation consolidation (wave-0 Stage A) already LANDED (Phase-2a); don't re-plan it; the real remaining unblock is the tier-substrate waves"
+title: Tiered-quilt unblock state
+description: "Attestation consolidation (wave-0) LANDED at 34fcf1070 — don't re-plan it; real remaining = Stage-B rename + tier-substrate waves (unblocks weave-epic-arc #2)."
 metadata: 
   node_type: memory
   type: project

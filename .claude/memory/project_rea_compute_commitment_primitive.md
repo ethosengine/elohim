@@ -1,13 +1,14 @@
 ---
 id: project-rea-compute-commitment-primitive
 name: rea-compute-commitment-primitive
-description: "Gospel-tier — reciprocal REA compute commitments are the substrate primitive for bounded authority delegation; one shape, instantiated everywhere (deploy, hosting, household chores, qahal moderation, content authorship, DePIN compute lending, recovery quorum); Z.D is the proving ground."
+title: REA compute-commitment primitive (gospel-tier)
+description: "One primitive for all bounded authority delegation: Mishpat::Commitment + delegates-compute action, on-chain standing/revocation; displaces X-API-Key grants."
 metadata: 
   node_type: memory
   type: project
   originSessionId: 0c3107ea-a896-4db5-ae15-c9e1d7921552
 cites:
-  - genesis/docs/architecture/rea-compute-commitment-primitive.md
+  - rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md
 ---
 
 **Canon (in-tree, authoritative):** `genesis/docs/architecture/rea-compute-commitment-primitive.md`

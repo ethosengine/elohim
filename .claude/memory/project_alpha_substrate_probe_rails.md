@@ -1,6 +1,7 @@
 ---
 name: alpha-substrate-probe-rails
-description: "What IS and ISN'T reachable read-only from the dev session for live-alpha substrate diagnosis (doorway proxy scope, Loki caveats)"
+title: Alpha substrate probe rails
+description: "Doorway /api/v1 reads hit matthew's pod ONLY; /p2p/status falls through to SPA; counters via Loki/CI only; Loki 502 storms make zero-results untrustworthy."
 metadata: 
   node_type: memory
   type: project

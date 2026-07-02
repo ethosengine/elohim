@@ -1,6 +1,7 @@
 ---
 name: project_ssr_render_trace_and_fixed_fetcher
-description: "elohim-render is the framework-agnostic p2p-native SSR core; AngularRenderer's fetcher is fixed at construction (ctx.data_fetcher ignored) → doorway per-request SSR user-credential is a latent no-op"
+title: SSR render-trace + per-request fetcher swap (elohim-render)
+description: "elohim-render SSR core: render() uses ctx.data_fetcher (a89f255f1 fixed anon-fetch credential drop); RenderTerminal trace splits truthful-empty vs stall."
 metadata: 
   node_type: memory
   type: project

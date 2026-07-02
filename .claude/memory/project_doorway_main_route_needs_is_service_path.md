@@ -1,6 +1,7 @@
 ---
 name: project_doorway_main_route_needs_is_service_path
-description: any new doorway 8080 main-listener route must be added to is_service_path or the EPR router silently shadows it
+title: Doorway main-listener route needs is_service_path
+description: A new doorway 8080 GET route needs BOTH the match arm and is_service_path, else the EPR router shadows it to the SPA bundle; admission_exempt is orthogonal.
 metadata: 
   node_type: memory
   type: project
@@ -20,6 +21,11 @@ Why #2: BEFORE the match block, the EPR router fires for `method == GET && !is_u
 handler** — your arm is never reached. This is the same shape as the `/auth/portal` catch-all
 incident and the all-zeros root-projection bugs ([[project_epr_router_empties_on_poisoned_scope]],
 [[project_sprint_branch_not_orchestrator_indexed]]).
+
+**`/auth/portal` worked example (fix `37c822d1c`):** `/auth/portal` returned 404 because a catch-all
+`starts_with("/auth")` was shadowing the EPR router. Fixed by extracting a shared `is_auth_owned_path`
+helper that now gates BOTH the auth guard AND `is_service_path` — one predicate, two callers, so the
+auth surface and the service-path allowlist can never disagree again.
 
 **`admission_exempt()` is a DIFFERENT, orthogonal gate** — it only stops the inbound-admission
 semaphore from 503-shedding the path. It does NOTHING about EPR shadowing. A scrape/health/util

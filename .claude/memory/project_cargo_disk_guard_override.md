@@ -1,6 +1,8 @@
 ---
+index: false
 name: project_cargo_disk_guard_override
-description: "At the 85% disk hard-ceiling, the cargo-disk-guard PreToolUse hook hard-DENIES heavy cargo and FORCE_HEAVY_GATES does NOT bypass it"
+title: Cargo disk-guard override
+description: "At the 85% disk hard-ceiling the PreToolUse hook DENIES heavy cargo; FORCE_HEAVY_GATES does not bypass it — free non-pool space or bump volume_hard_pct."
 metadata: 
   node_type: memory
   type: project

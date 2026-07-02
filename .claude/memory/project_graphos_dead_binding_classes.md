@@ -1,6 +1,7 @@
 ---
 name: graphos-dead-binding-classes
-description: "Six mechanical causes of \"theming theater\" in graphos/elohim-elements — bindings byte-correct in source but dead at runtime; only renders catch them"
+title: Graphos dead-binding classes
+description: "6 causes of theming theater — ghost names, border IACVT, inline hardcodes, setProperty clobber, inert kebab attrs, homonym fixtures; only renders catch them"
 metadata: 
   node_type: memory
   type: project

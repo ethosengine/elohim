@@ -1,6 +1,8 @@
 ---
+index: false
 name: project_resilience_tier_content_declared_floor
-description: "Resilience is content-relative — content self-declares a value/durability FLOOR (tier), an axis orthogonal to reach; the existing reach→tier mapping is the conflation to correct."
+title: Resilience tier = content-declared floor, not reach
+description: "Content self-declares its durability FLOOR (tier), orthogonal to reach; deriving tier from reach (reach_to_resilience_tier) is the conflation to correct."
 metadata: 
   node_type: memory
   type: project

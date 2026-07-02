@@ -1,7 +1,8 @@
 ---
 id: project-inventory-exchange-not-byte-replication
 name: P2P inventory exchange ≠ byte replication
-description: When alpha logs show "Received content inventory from peer count=N" but blobs only exist on the genesis peer, sync is metadata-only — byte-fetch is a separate step that must be diagnosed independently
+title: P2P inventory ≠ byte replication
+description: Inventory gossip is metadata-only ("Received content inventory count=N"); byte replication is separate — check per-peer blob counts before calling sync alive.
 type: project
 originSessionId: 872c2e1c-02fe-453a-93b3-e69dac1e54e3
 cites:

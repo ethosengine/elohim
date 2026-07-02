@@ -1,6 +1,7 @@
 ---
 name: agent-eyes-look-live-peer-loop
-description: How to SEE the app from Che — pnpm look (screenshots I can Read) + start:alpha live-data dev loop; verified working 2026-06-10
+title: "Agent eyes: look + live-peer dev loop"
+description: pnpm look (a2o) renders any URL to shot.png I can Read; pnpm start:alpha = local UI on live alpha data, no local stack; read-mostly rail against alpha.
 metadata: 
   node_type: memory
   type: project

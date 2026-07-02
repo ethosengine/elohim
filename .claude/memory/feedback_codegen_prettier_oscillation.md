@@ -1,7 +1,8 @@
 ---
 id: feedback-codegen-prettier-oscillation
 name: schema codegen produces oscillating Prettier diff
-description: schema:codegen:ts oscillates 18 generated TS files between single-line and multi-line union types; the codegen script has no idempotent fixed point
+title: Schema codegen Prettier oscillation
+description: schema:codegen:ts has no idempotent fixed point — Reach/ContentFormat union line-wraps flip every run across 18 generated files; cosmetic, not real drift.
 type: feedback
 originSessionId: bdf209e4-03e4-4d83-813b-19ac535d11dc
 cites:

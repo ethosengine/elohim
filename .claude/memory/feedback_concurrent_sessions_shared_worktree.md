@@ -1,6 +1,7 @@
 ---
 name: concurrent-sessions-shared-worktree
-description: "Multiple Claude sessions co-commit on shift/* branches in the SAME worktree — never bulk-revert \"ambient\" modifications, selectively stage your own hunks"
+title: Concurrent sessions share the worktree
+description: "Sessions co-commit on shift/* in ONE worktree — never bulk-revert ambient mods; commit path-limited (-m … -- paths); never amend without re-checking HEAD."
 metadata: 
   node_type: memory
   type: feedback

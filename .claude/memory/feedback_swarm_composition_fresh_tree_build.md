@@ -1,7 +1,8 @@
 ---
 id: feedback-swarm-composition-fresh-tree-build
 name: After editing swarm composition, do a fresh-tree cargo build before committing
-description: just check on a DNA worktree does not verify that crate-level type/field references resolve on a clean checkout of dev; for elohim-storage swarm/behaviour edits, run cargo build on the actual storage crate from a clean state
+title: Swarm edits need fresh-tree build first
+description: just check on a DNA worktree doesn't verify elohim-storage; swarm edits need a clean-tree cargo build + fmt/clippy pre-push — parallel sessions hide missing code.
 type: feedback
 originSessionId: 7cbbcc6f-985c-471c-9b04-22720c83ef2a
 cites:

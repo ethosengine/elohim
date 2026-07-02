@@ -1,7 +1,8 @@
 ---
 id: project-hub-optional-floor
 name: Hub-optional floor — laptop is a full participant
-description: The protocol's design floor is one device, no hub required. Hubs are graduations that add convenience/scale, never gates that grant participation. A laptop in a Kenyan village is a full participant — DHT entries, libp2p reach, REA commitments, recovery — sized to the smallest sovereign unit. References Kolibri/community-credit/mutual-aid patterns where no provider is required.
+title: Hub-optional floor — laptop is full participant
+description: One device is a full participant, no hub required; hubs graduate convenience/scale, never gate participation — a hub-required feature is a capture smell.
 type: project
 originSessionId: 155036b0-387a-441c-91c5-7a1333fb2f07
 cites:

@@ -1,0 +1,21 @@
+---
+epr-meta-version: 1
+id: claude-hooks-governance
+covers: subtree
+---
+
+`.claude/hooks/` — the thin hook-transport layer: PreToolUse gates (epr-meta compose-gate,
+managed-surface discipline, sensitive-file/seed/cargo guards) and PostToolUse signal
+accumulators (drift counters, sentinels). This manifest CLAIMS full responsibility for the
+subtree (`covers: subtree`): the coverage walk terminates here.
+
+**Considered, no enforcing rule yet (the deliberate opt-in, not a nag).** The real gates on
+this tree are structural, and none is expressible as an enforced `.epr-meta` predicate:
+(1) a hook file is INERT until registered in `.claude/settings.json` — an unregistered hook
+is dead code, and registration is the review surface; (2) hooks are fail-open by contract
+(any internal error exits 0 silently) with per-entry `timeout` in SECONDS (normalized
+2026-07-02 — values had been written as milliseconds, making the declared 2-15s budgets
+33min-4h no-ops); (3) hooks stay THIN — real logic lives in `.claude/scripts/_lib/` (tested
+under `_lib/__tests__/`) or `.claude/scripts/memory-kit/` (tested under its `__tests__/`),
+so the transport can be swapped (the brit/eprfs direction) without losing the rules. Add a
+rule here only if a NEW recurring, mechanizable drift appears in this tree.

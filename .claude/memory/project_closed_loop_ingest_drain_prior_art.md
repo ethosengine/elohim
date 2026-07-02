@@ -1,6 +1,7 @@
 ---
 name: project_closed_loop_ingest_drain_prior_art
-description: "Paced \"drain the seed\" / closed-loop ingest solved TWICE (orphaned by the holochain-as-db→projection pivot, not failed); live reusable kernel = drain_publish_queue + wait-for-drain; warm_stream boot-replay is open-loop pacing dressed as backpressure; diagnose hang location BEFORE building a 3rd scheme."
+title: Closed-loop ingest drain — prior art (solved twice)
+description: "Paced ingest drain solved TWICE; live kernel = drain_publish_queue + wait-for-drain; warm_stream is open-loop pacing — diagnose the hang before a 3rd scheme."
 metadata: 
   node_type: memory
   type: project

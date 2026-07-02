@@ -1,7 +1,9 @@
 ---
+index: false
 id: project-devspace-disk-cleanup-procedure
 name: devspace-disk-cleanup-procedure
-description: "/projects disk-pressure thresholds and the verified reclaim ladder — cargo-pool families are the dominant occupant, not worktree targets"
+title: Devspace disk cleanup procedure
+description: "Pool families dominate disk pressure; act at 85%+; reclaim ladder ends in operator-gated family prune — never prune the active family mid-push."
 metadata: 
   node_type: memory
   type: project

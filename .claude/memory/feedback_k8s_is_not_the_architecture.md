@@ -1,6 +1,7 @@
 ---
 name: k8s-is-not-the-architecture
-description: "Anti-pattern — confusing k8s resources (deployments.json, cluster-state, nodeTypes, pods) with the protocol's actual architecture; k8s is interim compute/hardware/network modeling, destined for subsumption into peer-native EPR compute contracts (brit/rakia)"
+title: "k8s is NOT the architecture"
+description: "k8s (deployments.json, cluster-state) models compute/hardware only; design lands in the peer-native DHT/REA home (brit/rakia) — k8s gaps are not protocol gaps."
 metadata: 
   node_type: memory
   type: feedback

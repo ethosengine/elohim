@@ -1,6 +1,7 @@
 ---
 name: collective-topology-author-stewards
-description: Operator-declared collective topology + per-corpus author-steward routing (2026-06-12) — adam stewards genesis content; FCT routes with the church collective; extended family incl. Seattle couple = first cross-region member set
+title: Collective topology + per-corpus author-steward routing
+description: Content→steward routing is per-corpus to real personas, never one synthetic genesis identity; adam stewards genesis, FCT routes with the church collective.
 metadata: 
   node_type: memory
   type: project

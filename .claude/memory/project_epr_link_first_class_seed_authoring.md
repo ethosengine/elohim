@@ -1,6 +1,7 @@
 ---
 name: project_epr_link_first_class_seed_authoring
-description: "Deferred design — make content-relationship (EPR link) authoring first-class in the lamad seed pipeline, content-addressed/sealed like doc cites; deferred until course docs graduate to peer-native."
+title: EPR-link first-class seed authoring (deferred design)
+description: "Seed slug links (children/related/presenceId) drift silently; plan = cite-gen-style seal tool, DEFERRED until docs graduate peer-native — don't build now."
 metadata: 
   node_type: memory
   type: project

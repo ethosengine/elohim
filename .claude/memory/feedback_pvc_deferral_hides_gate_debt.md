@@ -1,6 +1,7 @@
 ---
 name: feedback_pvc_deferral_hides_gate_debt
-description: Chronic PVC gate-deferral silently accumulates pre-existing clippy/test debt on dev; an integrator who actually runs the heavy gates surfaces weeks of it — distinguish from regressions via origin/dev byte-identity.
+title: PVC-deferral hides gate debt
+description: Chronic 85%+ disk pressure defers HEAVY_GATES, so dev "green" = deferred not passed; triage integration reds by origin/dev byte-identity, not as regressions.
 metadata: 
   node_type: memory
   type: feedback

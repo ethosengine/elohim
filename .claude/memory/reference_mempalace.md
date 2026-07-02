@@ -1,7 +1,8 @@
 ---
 id: reference-mempalace
 name: MemPalace — wired historian + librarian substrate
-description: Python CLI + library + MCP server (30 tools) with ChromaDB vector store and SQLite temporal entity-relationship graph. Wired in 2026-05-14; baked into udi-plus image; ~/.mempalace symlinked to /projects/elohim/.mempalace.
+title: MemPalace — wired substrate
+description: ChromaDB+SQLite memory substrate wired 2026-05-14, image-baked; 4 wings/12,866 drawers; MCP scoped per-subagent keeps 30 tool schemas out of parent context.
 type: reference
 originSessionId: b5ef4833-2583-4482-b36e-b595da75dafe
 cites:

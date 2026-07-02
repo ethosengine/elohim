@@ -1,12 +1,13 @@
 ---
 id: project-reach-enum-drift-reconciliation
 name: reach-enum-drift-reconciliation
-description: The reach taxonomy is in three drifted forms across the substrate — the schema enum (8 values), the Rust enum used in reach_earning.rs (8 values, different shape), and the resilience-epic Part V vocabulary (5 values). Reconciliation gates the storage-stewardship-summary route landing because the route's bucket filters depend on which reach taxonomy is canonical. Named in the resilience epic Part IX gap matrix and roadmap item 13.
+title: Reach enum drift — 3 vocabularies
+description: Reach taxonomy drifted 3 ways (schema enum 8 vals, Rust reach_earning.rs 8 different, resilience Part V 5); gates the storage-stewardship-summary route.
 metadata:
   type: project
 cites:
   - elohim/elohim-storage/src/services/reach_earning.rs
-  - resilience-protocol-spec | README | sha256:2c832b517c7204cc | path: genesis/docs/content/elohim-protocol/resilience/README.md
+  - resilience-protocol-spec | README | sha256:ca1b77326c40cacb | path: genesis/docs/content/elohim-protocol/resilience/README.md
   - elohim/sdk/schemas/v1/enums/reach.schema.json
 ---
 

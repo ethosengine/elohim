@@ -1,6 +1,7 @@
 ---
 name: project_epr_router_empties_on_poisoned_scope
-description: "A single poisoned project-epr scope row emptied alpha's whole EprRouter (fail-closed collect); stale-binary DHT-replay array-wrap is the poison class; resolvers must degrade per-row"
+title: EprRouter empties on one poisoned scope row
+description: "One poisoned scope row empties EprRouter (Welcome at /, 404 /lamad): fail-closed collect + stale-binary array-wrap; resolvers degrade per-row (f38be2635)."
 metadata: 
   node_type: memory
   type: project

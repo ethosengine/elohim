@@ -1,7 +1,8 @@
 ---
 id: project-sweettest-native-build-env
 name: sweettest-native-build-env
-description: "Native sweettest builds need RUSTFLAGS=\"\" (WASM getrandom flag leaks → undefined __getrandom_v03_custom at link), BINDGEN_EXTRA_CLANG_ARGS for clang-21, and `just pack` (not `just build`) to refresh the .dna bundle"
+title: Sweettest native build env
+description: "Sweettest needs RUSTFLAGS=\"\" (WASM getrandom flag breaks native link), BINDGEN_EXTRA_CLANG_ARGS for clang-21; `just pack` (not build) refreshes the .dna bundle."
 metadata: 
   node_type: memory
   type: project

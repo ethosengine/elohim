@@ -1,6 +1,7 @@
 ---
 name: reference_gh_cli_install
-description: GitHub CLI is NOT preinstalled in this container; how to restore it and which token is set
+title: gh CLI not preinstalled
+description: gh vanishes with the ephemeral container; restore the Go binary to /home/user/bin; GH_TOKEN (EthosengineBot, repo+admin:org) auths it; curl REST needs no install
 metadata: 
   node_type: memory
   type: reference

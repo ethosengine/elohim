@@ -1,7 +1,8 @@
 ---
 id: feedback-deterministic-flag-agent-canon-stasis-pattern
 name: deterministic-flag-agent-canon-stasis-pattern
-description: "Operator's preferred architecture for event→agent automation — deterministic flag, background Opus dispatch, canonical cite-sealed backlog with documented status, deterministic suppression on re-encounter, ceremony-pattern stasis sweep"
+title: Flag→agent→canon→stasis automation pattern
+description: "Compose event→agent automation from the sentinel spec: deterministic ledger flag → background Opus dispatch → cite-sealed backlog → no re-fire on blocked → stasis sweep."
 metadata: 
   node_type: memory
   type: feedback

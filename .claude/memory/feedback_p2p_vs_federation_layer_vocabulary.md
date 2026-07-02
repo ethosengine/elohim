@@ -1,6 +1,7 @@
 ---
 name: feedback_p2p_vs_federation_layer_vocabulary
-description: "Two-layer naming — \"p2p\" = Holochain DHT conductor + iroh/libp2p blob stores (substrate); \"federation\"/\"fediverse\" = doorways, a layer OVER p2p"
+title: p2p vs federation/fediverse layer vocabulary
+description: "p2p = DHT conductor + iroh/libp2p blob stores; federation = doorways riding OVER p2p (DHT-gossiped DoorwayRegistration); route WAN-NAT gaps by layer."
 metadata: 
   node_type: memory
   type: feedback

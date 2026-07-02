@@ -14,6 +14,14 @@ this in-repo primary. It holds the **light** native index — `MEMORY.md` plus t
 Claude's own native spec (only non-obvious facts useful across sessions). It is Claude-self-managed, NOT a curation
 target for the heavy discipline below, and durable knowledge does not pile up here.
 
+**`MEMORY.md` is a GENERATED projection** (decided 2026-07-02, after a hand-maintained index bloated past
+the harness ~24.4KB load cap and loaded truncated): each topic file carries `title:` + `description:`
+frontmatter (the one-line recall hook), and `memory-index-projector.py` renders the index from them —
+PostToolUse-wired, budget-signaled into the `cleanup:` gate via `memory-index-drift.json`, compose-gated by
+`.claude/memory/.epr-meta` (deny at birth without name/title/description; ask on hand-edits of the index).
+Budget relief is population work — umbrella entries (`index: false` on folded members) and graduation —
+never index hand-editing.
+
 This kit's discipline (cleanup · dedupe · comet [the head/tail/memorialized-core lifecycle model] · cites ·
 coherence · the `MEMORY.md` lightness budget · the time×meaning team) governs the **MANAGED ARTIFACTS** —
 `genesis/docs/` · specs · plans · `genesis/data/stories/` · the CLAUDE.md gospel surfaces — routed by
@@ -210,7 +218,7 @@ hooks               .claude/hooks/pre-tool-memory.py     ← PreToolUse * — in
                     .claude/hooks/managed-surface-context.py    ← PreToolUse Edit/Write — injects a managed surface's discipline+tooling BEFORE the edit (_lib/managed_surfaces registry)
                     .claude/hooks/epr-meta-resolver.py          ← PreToolUse Edit/Write — the .epr-meta compose-gate (new governed doc needs frontmatter or DENY; fail-open)
                     .claude/hooks/claude-md-drift-signal.py     ← PostToolUse Edit/Write — counters
-                    .claude/hooks/claude-md-structural-signal.py ← PostToolUse Bash — mv/cp/rm signal
+                    .claude/hooks/claude-md-structural-signal.py ← PreToolUse Bash — mv/cp/rm signal
                     .claude/hooks/memory-coherence-signal.py    ← PostToolUse Edit/Write — bumps a memory entry when edited code matches its cites:
                     .claude/hooks/placement-drift-signal.py     ← PostToolUse Edit/Write — terminal-status tripwire (feeds placement-audit / state-machine-gen)
                     .claude/hooks/cite-seal-signal.py           ← PostToolUse Edit/Write — born-linked nudge on graph members (doc-roots + gospel CLAUDE.mds) with cite debt

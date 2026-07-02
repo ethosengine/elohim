@@ -1,6 +1,7 @@
 ---
 name: project_iroh_dataplane_actual_state
-description: Actual build-state of the iroh parallel dataplane in elohim-storage (far more finished than plans/README claim) + the mode-exclusive-vs-dual-stack drift that gates the per-object toggle
+title: iroh dataplane actual state — merge-ready, dual-stack gap
+description: iroh stack ~85% real (trust tree over stale README); boot is mode-exclusive so DualGossipPublisher is structurally dead — dual plane needs a Dual boot mode.
 metadata: 
   node_type: memory
   type: project
