@@ -6,7 +6,7 @@
 > fix) is now closed: the anon was **glibc-malloc secondary-arena retention** (Rust/C allocations; Go heap
 > flat ~52MB), CURED by swapping the conductor's global allocator glibc→jemalloc — flat past the old OOM
 > cadence, DNA hash unchanged. NOT more RAM, NOT a SQLite cap, NOT arc — exactly as this verdict predicted.
-> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-rca-native-heap-reframe-2026-06-18.md
+> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md
 
 
 **Status:** verdict CONFIRMED + attribution CONFIRMED (2026-06-17 ~00:52 UTC) · **Class:** runtime memory / self-heal · **Env:** alpha (observed live) · **Resolves:** the P-ARC §B "leak-vs-bounded-large" hard gate · **Plan:** `genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md`
@@ -62,4 +62,4 @@ The P2 heap-profiling instrument must target the **child holochain process**, no
 ## Evidence
 - cadvisor instant + 4h range `container_memory_rss` / `container_memory_cache`, ns `elohim-alpha`, 2026-06-17 ~00:45 UTC (Prometheus uid `prometheus`).
 - Loki was 502-storming at verdict time → the container-level split came from Prometheus cadvisor instead (per-process split needs the sampler + Loki).
-- Lineage: `arc-shrink-ineffective-memory-soak.md` (arc falsified), `.claude/data/matthew-edge-resiliency-rca-fanout-2026-06-15.md` §4.2/§7 (leak-vs-bounded was "formally unconfirmed" — now confirmed: leak), `2026-06-14-dataplane-arc-plan.md` §B (gate resolved → leak branch).
+- Lineage: `arc-shrink-ineffective-memory-soak.md` (arc falsified), `genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md` §4.2/§7 (leak-vs-bounded was "formally unconfirmed" — now confirmed: leak), `2026-06-14-dataplane-arc-plan.md` §B (gate resolved → leak branch).

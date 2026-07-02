@@ -19,18 +19,22 @@ WASM_TARGET = "wasm32-unknown-unknown"
 # Required RUSTFLAGS for WASM compilation with getrandom
 WASM_RUSTFLAGS = '--cfg getrandom_backend="custom"'
 
-# Directories that contain WASM zomes (need special RUSTFLAGS)
+# Directories that contain WASM builds (need the custom getrandom RUSTFLAGS).
+# Real monorepo layout (fixed 2026-07-02 — the prior `holochain/…` prefixes
+# matched nothing, and elohim-storage sat in NATIVE_DIRS, which would have
+# advised CLEARING the flag it REQUIRES per CLAUDE.md).
 WASM_ZOME_DIRS = [
-    "holochain/dna/",
-    "holochain/elohim-wasm/",
+    "elohim/holochain/dna/",
+    "elohim/elohim-storage/",
 ]
 
-# Directories that should NOT have WASM RUSTFLAGS (native Rust)
+# Directories that should NOT have WASM RUSTFLAGS (native Rust — RUSTFLAGS="")
 NATIVE_DIRS = [
     "doorway/",
-    "holochain/elohim-storage/",
-    "holochain/rna/rust/",
-    "holochain/crates/",
+    "steward/",
+    "elohim/holochain/rna/rust/",
+    "elohim/holochain/tests/sweettest/",
+    "crates/",
 ]
 
 # Commands that trigger WASM builds

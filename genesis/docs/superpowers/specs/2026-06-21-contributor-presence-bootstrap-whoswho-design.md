@@ -13,8 +13,8 @@ cites:
   - rea-economic-facing-lens-design | the REA facing-lens pattern the contributor-reflexive view follows (not the unbuilt fold) | sha256:b83ead21be13bbaa | path: genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md
   - genesis/plans/2026-03-13-recognition-pipeline-plan.md
   - genesis/data/presences/presences.schema.json
-  - .claude/data/contributor-presence-whoswho-grounding-2026-06-21.md
-  - .claude/data/contributor-cohort-seed-source-2026-06-21.md
+  - contributor-presence-whoswho-grounding | Who's-Who / Contributor-Presence Grounding | sha256:afb3314fe34c11b7 | path: genesis/docs/content/elohim-protocol/history/2026-06-21-contributor-presence-whoswho-grounding.md
+  - contributor-cohort-seed-source-manifesto-inspired-by | Contributor-cohort seed source | sha256:435fb208b309e086 | path: genesis/docs/content/elohim-protocol/history/2026-06-21-contributor-cohort-seed-source-manifesto-inspired-by.md
 refines:
   - genesis/docs/superpowers/specs/2026-06-12-init-authoring-native-seeding-design.md
 ---
@@ -123,7 +123,7 @@ grain.
       content-inspirers; `operator-persona` for the dev/test personas; `prior-art` for the
       library presences).
 - [ ] Author the elohim.host "Inspired by" cohort as presence `*.md` files
-      (`.claude/data/contributor-cohort-seed-source-2026-06-21.md`): ~11 `person` + ~30
+      (`genesis/docs/content/elohim-protocol/history/2026-06-21-contributor-cohort-seed-source-manifesto-inspired-by.md`): ~11 `person` + ~30
       `organization`, each with `externalIdentifiers`, `standing: inspirational`, and a `source_of`
       edge to the manifesto establishing content. Skip the 3 that already exist (P2P Foundation,
       Holochain, ValueFlows) — backfill `standing` on those instead.

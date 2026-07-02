@@ -39,6 +39,10 @@ NOW = datetime.now(timezone.utc)
 # The personal slot is typically a symlink to the primary; both paths resolve
 # to the same files. We check the primary first to be explicit about intent.
 MEMORY_BUDGET_LINES = 200
+# BYTES are the binding constraint: the harness truncates the MEMORY.md LOAD at ~24.4KB, so an
+# index can look fine on line-count yet load truncated (the 2026-07-02 context-leak). Mirror the
+# owner of the hard byte cap: memory-index-projector.py HARD_BUDGET_BYTES.
+MEMORY_BUDGET_BYTES = 24000
 STALE_DAYS = 90
 RECENT_7D = 7
 RECENT_30D = 30
@@ -73,7 +77,10 @@ class Report:
     index_path: Path
     index_exists: bool
     index_lines: int = 0
-    index_over_budget: bool = False
+    index_bytes: int = 0
+    index_over_lines: bool = False
+    index_over_bytes: bool = False
+    index_over_budget: bool = False  # EITHER limit tripped (lines OR bytes)
     type_stats: dict[str, TypeStats] = field(default_factory=dict)
     untyped_files: list[str] = field(default_factory=list)
     recent_7d: list[tuple[str, datetime]] = field(default_factory=list)
@@ -118,7 +125,13 @@ def scan(memory_dir: Path) -> Report:
         return report
 
     report.index_lines, indexed_files = parse_index_entries(report.index_path)
-    report.index_over_budget = report.index_lines > MEMORY_BUDGET_LINES
+    try:
+        report.index_bytes = report.index_path.stat().st_size if report.index_path.is_file() else 0
+    except OSError:
+        report.index_bytes = 0
+    report.index_over_lines = report.index_lines > MEMORY_BUDGET_LINES
+    report.index_over_bytes = report.index_bytes > MEMORY_BUDGET_BYTES
+    report.index_over_budget = report.index_over_lines or report.index_over_bytes
 
     actual_files: set[str] = set()
     type_stats: dict[str, TypeStats] = {p: TypeStats() for p in TYPE_PREFIXES}
@@ -178,14 +191,28 @@ def render_report(report: Report) -> str:
     if not report.index_exists:
         out.append("- MEMORY.md does not exist in the memory directory.\n")
     else:
+        kb = round(report.index_bytes / 1024, 1)
         out.append(
-            f"- {report.index_lines} lines vs {MEMORY_BUDGET_LINES}-line budget — **{status}**\n"
+            f"- {report.index_lines} lines vs {MEMORY_BUDGET_LINES}-line budget; "
+            f"{report.index_bytes}B ({kb}KB) vs {MEMORY_BUDGET_BYTES}B byte budget — **{status}**\n"
         )
         if report.index_over_budget:
+            reasons = []
+            if report.index_over_lines:
+                reasons.append(f"{report.index_lines - MEMORY_BUDGET_LINES} lines over the "
+                               f"{MEMORY_BUDGET_LINES}-line budget")
+            if report.index_over_bytes:
+                reasons.append(f"{report.index_bytes - MEMORY_BUDGET_BYTES}B over the "
+                               f"{MEMORY_BUDGET_BYTES}B byte budget")
             out.append(
-                f"- Index has overflowed by {report.index_lines - MEMORY_BUDGET_LINES} lines. "
-                "Claude only loads the first ~200 lines of MEMORY.md into context — entries past "
-                "that point are invisible. Prune or consolidate.\n"
+                f"- Index is OVER BUDGET ({'; '.join(reasons)}). **Bytes are the binding "
+                f"constraint**: the harness truncates the MEMORY.md LOAD at ~{MEMORY_BUDGET_BYTES}B "
+                "(owner: memory-index-projector.py HARD_BUDGET_BYTES), so entries past that point "
+                "load truncated and go invisible even when the line count looks fine. MEMORY.md is "
+                "now GENERATED from topic-file frontmatter (memory-index-projector.py --apply) — do "
+                "not hand-trim it. Relieve pressure at the population level: fold related entries "
+                "under an UMBRELLA entry, GRADUATE durable knowledge to its managed home, or "
+                "archive-with-pointer.\n"
             )
 
     # B. Type distribution
@@ -284,7 +311,9 @@ def main() -> int:
     out_path.write_text(text, encoding="utf-8")
 
     print(f"memory dir: {memory_dir}")
-    print(f"index lines: {report.index_lines} (budget {MEMORY_BUDGET_LINES})")
+    print(f"index lines: {report.index_lines} (budget {MEMORY_BUDGET_LINES}); "
+          f"index bytes: {report.index_bytes} (budget {MEMORY_BUDGET_BYTES}) — "
+          f"{'OVER' if report.index_over_budget else 'within'} budget")
     typed_total = sum(s.count for s in report.type_stats.values())
     print(f"typed files: {typed_total}; untyped: {len(report.untyped_files)}")
     print(f"recent 7d: {len(report.recent_7d)}; stale (>{STALE_DAYS}d): {len(report.stale_candidates)}")

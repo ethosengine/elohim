@@ -1,7 +1,9 @@
 ---
+index: false
 id: feedback-sccache-spawn-enoent-rca
 name: sccache-spawn-enoent-rca
-description: "RCA for the sccache ENOENT bug that disabled sccache on the sweettest stage (efbac2938 → a92d91c2b). The prior framing ('cache-hit missing binary' or 'sccache cannot be exec'd in subprocess context') is WRONG. Actual failure: cargo intermittently fails to spawn the sccache binary itself with os error 2, ~1.7% of rustc invocations, after thousands of successful spawns in the same build. Matches sccache upstream issue #2023 class. Build-script involvement is incidental — the failing-to-spawn binary is sccache, not build-script-build."
+title: sccache spawn ENOENT RCA (sweettest)
+description: "Cargo intermittently fails to spawn the sccache binary itself (~1.7%, matches sccache #2023/#2687); classifier grep = `could not execute process .sccache rustc`."
 metadata: 
   node_type: memory
   type: feedback

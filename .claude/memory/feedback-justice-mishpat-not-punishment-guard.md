@@ -1,6 +1,7 @@
 ---
 name: feedback-justice-mishpat-not-punishment-guard
-description: "Justice in the protocol = Mishpat/capability/restoration, NOT punishment/carceral; reject \"blind justice\" (use El Roi/seen); punishment is not a category — only boundaries + negotiated consequences."
+title: "Justice = Mishpat/capability, NOT punishment (framing guard)"
+description: "Justice = restored capability (Mishpat), never punishment — only boundaries + negotiated consequences; reject 'blind justice' for El Roi's witnessed sight."
 metadata: 
   node_type: memory
   type: feedback

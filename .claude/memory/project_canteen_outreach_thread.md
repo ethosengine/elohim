@@ -1,6 +1,8 @@
 ---
+index: false
 name: canteen-outreach-thread
-description: "Stephen Lewis (Canteen, NYC) hackathon outreach — Matthew engaged on substance, declined to commit; reply anchored in the Beer arc"
+title: Canteen outreach thread (Stephen Lewis)
+description: "Creator-payments hackathon invite 2026-06-06 sparked the Beer arc; reply sent 2026-06-10 (engage, don't commit); Beer critique §6 = outreach phrasing source."
 metadata: 
   node_type: memory
   type: project

@@ -1,6 +1,7 @@
 ---
 name: ci-pull-policy-always-freshness
-description: Operator policy — CI tooling pods keep imagePullPolicy Always; outage mitigations on pull policy are temporary and must be reverted at recovery
+title: "CI pull policy: Always, freshness over outage-resilience"
+description: "CI pods keep imagePullPolicy Always: IfNotPresent on :latest buries toolchain drift (#1218); outage mitigations revert at recovery; digest-pin for permanence."
 metadata: 
   node_type: memory
   type: feedback

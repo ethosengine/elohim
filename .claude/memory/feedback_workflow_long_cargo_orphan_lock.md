@@ -1,7 +1,8 @@
 ---
 id: feedback-workflow-long-cargo-orphan-lock
 name: workflow-long-cargo-orphan-lock
-description: "Workflow gate agents running >10-min cargo commands orphan the process on Bash timeout; it keeps the artifact-dir lock and retries block — let it finish, don't kill"
+title: Workflow long-cargo orphan lock
+description: "Bash timeout orphans cargo still holding .cargo-lock; let it finish (work lands on disk), keep one profile per gate phase, run_in_background for >10min cargo."
 metadata: 
   node_type: memory
   type: feedback

@@ -5,8 +5,17 @@ Seed Data Validation Hook
 Validates JSON files written to genesis/data/lamad/ directories
 to ensure they conform to expected schemas before seeding.
 
+Vocabulary (contentTypes / contentFormats) is PROJECTED from the authoritative
+lamad manifest (elohim/sdk/domains/lamad/manifest.json + manifest/content-formats.json)
+at hook start — the prior hardcoded lists had drifted ("perseus", "iframe")
+and steered agents to formats the renderer map doesn't know (2026-07-02 review).
+Hardcoded lists remain only as a fallback when the manifest is unreadable.
+
+Handles both Write (full content) and Edit (post-edit content synthesized from
+disk + old_string→new_string) — the Edit path previously bypassed the gate.
+
 Hook Type: PreToolUse
-Matcher: Write
+Matcher: Edit|Write
 """
 import json
 import sys
@@ -24,19 +33,40 @@ SEED_DATA_PATHS = [
 # Required fields for content nodes
 CONTENT_REQUIRED_FIELDS = ["id", "title"]
 
-# Valid content types
-VALID_CONTENT_TYPES = [
-    "article", "quiz", "assessment", "video", "audio", "image",
-    "interactive", "simulation", "course", "path", "module",
-    "lesson", "exercise", "reference", "glossary", "case-study",
-    "scenario", "role", "epic", "readme", "overview", "graph",
-    "attestation", "badge", "extension", "agent", "audience",
+def _load_manifest_vocabulary():
+    """Project contentTypes/contentFormats from the authoritative lamad manifest."""
+    base = os.path.join(os.environ.get('CLAUDE_PROJECT_DIR', '/projects/elohim'),
+                        'elohim', 'sdk', 'domains', 'lamad')
+    types = formats = None
+    try:
+        with open(os.path.join(base, 'manifest.json')) as fh:
+            vocab = json.load(fh).get('vocabulary', {})
+        ct = vocab.get('contentTypes')
+        if isinstance(ct, dict) and '$ref' not in ct:
+            types = sorted(ct.keys())
+        with open(os.path.join(base, 'manifest', 'content-formats.json')) as fh:
+            fmt = json.load(fh)
+        if isinstance(fmt, dict):
+            names = set(fmt.keys())
+            for spec in fmt.values():
+                if isinstance(spec, dict):
+                    names.update(spec.get('aliases', []))
+            formats = sorted(names)
+    except (OSError, ValueError):
+        pass
+    return types, formats
+
+
+_MANIFEST_TYPES, _MANIFEST_FORMATS = _load_manifest_vocabulary()
+
+# Fallbacks only — the manifest is the source of truth when readable.
+VALID_CONTENT_TYPES = _MANIFEST_TYPES or [
+    "article", "quiz", "assessment", "course", "path", "module",
+    "lesson", "exercise", "scenario", "epic", "concept", "simulation",
 ]
 
-# Valid content formats
-VALID_CONTENT_FORMATS = [
-    "markdown", "html", "json", "yaml", "text", "binary",
-    "perseus", "gherkin", "html5-app", "iframe", "graph-viz",
+VALID_CONTENT_FORMATS = _MANIFEST_FORMATS or [
+    "markdown", "gherkin", "sophia-quiz-json", "html5-app", "spa-bundle",
 ]
 
 # Fields that should be strings
@@ -265,12 +295,27 @@ def main():
         data = json.load(sys.stdin)
 
         tool_name = data.get('tool_name', '')
-        if tool_name != 'Write':
+        if tool_name not in ('Write', 'Edit'):
             sys.exit(0)
 
         tool_input = data.get('tool_input', {})
         file_path = tool_input.get('file_path', '')
-        content = tool_input.get('content', '')
+
+        if tool_name == 'Write':
+            content = tool_input.get('content', '')
+        else:
+            # Synthesize the post-edit content: disk + old_string→new_string.
+            # (The Edit path previously bypassed the whole gate.)
+            old_s = tool_input.get('old_string') or ''
+            new_s = tool_input.get('new_string') or ''
+            try:
+                disk = open(file_path, encoding='utf-8').read()
+            except OSError:
+                sys.exit(0)
+            if not old_s or old_s not in disk:
+                sys.exit(0)  # the Edit will fail anyway; nothing to validate
+            count = -1 if tool_input.get('replace_all') else 1
+            content = disk.replace(old_s, new_s, count)
 
         if not file_path or not content:
             sys.exit(0)

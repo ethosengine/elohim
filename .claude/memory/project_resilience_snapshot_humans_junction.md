@@ -1,7 +1,9 @@
 ---
+index: false
 id: project-resilience-snapshot-humans-junction
 name: resilience-snapshot-humans-junction
-description: Why seeding provide-commitments alone can never light the resilience snapshot — both joins pass through substrate-owned humans fields
+title: Resilience snapshot humans-junction
+description: Both snapshot() joins pass through substrate-owned humans.agent_pub_key+household_id (no HTTP create sets them); commitments-only seeding lights nothing.
 metadata: 
   node_type: memory
   type: project

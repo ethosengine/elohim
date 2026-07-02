@@ -4,7 +4,7 @@
 **Branch:** commit-only on the shift branch — the operator pushes (never `git push` here).
 **Predecessor:** storage P0/P1 landed on `dev` @ `1907249a4` (durable Prometheus `/metrics` on elohim-storage). This handoff is the **P2 doorway leg** — doorway-service's OWN `/metrics`.
 **Plan:** `genesis/docs/superpowers/plans/2026-06-17-design-decision-toolkit-plan.md` (P2 line 64).
-**RCA:** `.claude/data/matthew-edge-resiliency-rca-fanout-2026-06-15.md` (§4.3 item 3 = line 65 is the instrument spec; §3 tunables; §4.3 = the live-flap proof).
+**RCA:** `genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md` (§4.3 item 3 = line 65 is the instrument spec; §3 tunables; §4.3 = the live-flap proof).
 **Verdict the toolkit serves:** `genesis/data/timeline/backlog/conductor-memory-attribution-verdict.md` — the alpha conductor OOM is an **anonymous-heap leak in the holochain conductor child**, NOT doorway (doorway working set is 75–94 MB; its restart is a **liveness-watchdog self-kill**, a *different* failure wearing the same alarm).
 
 ---

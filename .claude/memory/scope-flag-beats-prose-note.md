@@ -1,6 +1,7 @@
 ---
 name: scope-flag-beats-prose-note
-description: "Trust the cluster-state `available` flag + the focus baseline over any prose note or stale memory; @requires:<cap> = satisfiable-when-available, NOT held"
+title: Scope flag beats prose note
+description: "When a source says a cap is down, the `available:` flag + scope-reconcile win over prose/stale memory; @requires:<cap> = satisfiable-when-available, not held."
 metadata:
   node_type: memory
   type: feedback

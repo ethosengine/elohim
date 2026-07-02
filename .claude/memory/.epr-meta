@@ -1,0 +1,42 @@
+---
+epr-meta-version: 1
+id: claude-memory-governance
+covers: subtree
+purpose: >
+  The native agent-memory substrate: one durable fact per topic file, recallable through
+  frontmatter (title: + description: <= 160 chars — the projected hook). MEMORY.md is a
+  GENERATED projection of that frontmatter (memory-index-projector.py, PostToolUse-wired),
+  never a hand-maintained index — the 2026-07-02 context-leak (26KB hand-index > harness
+  load cap, truncated load) is the scar tissue. Durable knowledge GRADUATES outward to its
+  managed home (subject-routing.yaml); native memory stays light.
+rules:
+  - id: memory-frontmatter-at-birth
+    class: deny
+    when: { write: "*.md", new: true }
+    require-frontmatter: [name, title, description]
+    why: >
+      A memory born without name + title + description cannot project into the generated
+      MEMORY.md index — it is unrecallable, which defeats the only purpose of writing it.
+      Add frontmatter: name (slug), title (<= 60 chars), description (ONE line, <= 160
+      chars: what the fact is + when it bites), metadata.type (user|feedback|project|reference).
+  - id: memory-index-is-generated
+    class: ask
+    when: { write: "MEMORY.md" }
+    dedupe-of: .claude/scripts/memory-kit/memory-index-projector.py
+    why: >
+      MEMORY.md is GENERATED — hand edits are overwritten on the next projection. Put the
+      change in the topic file's title:/description: frontmatter, then run
+      `python3 .claude/scripts/memory-kit/memory-index-projector.py --apply` (the
+      PostToolUse hook also re-projects after every memory write).
+---
+
+# .claude/memory — native memory, projection-disciplined
+
+One fact per topic file; the file's `title:` + `description:` frontmatter IS its recall
+surface (projected into MEMORY.md, which is generated — see the rules above). Budget
+escalation is wired: over-soft-budget and per-file hook violations land in
+`.claude/memory-kit/memory-index-drift.json`, which feeds the `cleanup:` pressure gate
+toward the memory-stasis-loop. Real budget relief is population work — umbrella entries
+(`index: false` on folded members), graduation to stories/managed homes — never index
+hand-editing. Designed as a thin declarative layer that lifts into the brit/eprfs
+projection substrate unchanged.

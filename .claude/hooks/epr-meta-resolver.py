@@ -98,13 +98,40 @@ def main():
     # No separate dir-create event in Claude Code: a Write whose parent dir does not yet exist
     # is the new-subdir signal (drives no-new-subdirs / require-sibling).
     is_new_subdir = (tool == "Write") and not target.parent.exists()
-    # Write carries full content; Edit does not -> read on-disk for frontmatter checks.
-    content = ti.get("content")
-    if content is None and target.exists():
-        try:
-            content = target.read_text(errors="replace")
-        except Exception:
+
+    # Resolve the content the rules will see.
+    #   Write: the payload carries the full post-write content.
+    #   Edit:  synthesize the POST-edit content — read on-disk, apply old_string->new_string
+    #          (respecting replace_all) — so content-triggered rules (contains-any / validator)
+    #          evaluate what the edit INTRODUCES, not the stale pre-edit pre-image (which both
+    #          misses a newly-added match AND lets a match the edit REMOVES keep blocking).
+    if tool == "Edit":
+        if target.exists():
+            try:
+                disk = target.read_text(errors="replace")
+            except Exception:
+                disk = None
+            if disk is not None:
+                old = ti.get("old_string", "")
+                new = ti.get("new_string", "")
+                if not old or old not in disk:
+                    # old_string absent from disk -> the Edit itself will fail; nothing to gate.
+                    sys.exit(0)
+                content = disk.replace(old, new) if ti.get("replace_all") else disk.replace(old, new, 1)
+            else:
+                content = None  # unreadable -> content rules see nothing (the coverage nudge still runs)
+        else:
+            # Edit on a not-yet-existing file (the Edit will fail): leave content unresolved so
+            # content rules stay silent, but keep the hook alive for the coverage nudge / cascade.
             content = None
+    else:  # Write
+        content = ti.get("content")
+        if content is None and target.exists():
+            # Defensive: a Write lacking an explicit content field on an existing file.
+            try:
+                content = target.read_text(errors="replace")
+            except Exception:
+                content = None
 
     # IN-FLIGHT COVERAGE SIGNAL — independent of the rule cascade. Authoring an .epr-meta is itself
     # never nudged (you're already governing). Computed up-front so it can fire even when there is no

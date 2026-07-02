@@ -74,18 +74,14 @@ def drift_store_path(repo_root: Path) -> Path:
     return repo_root / ".claude" / "memory-kit" / "claude-md-drift.json"
 
 
-def load_store(path: Path) -> dict:
-    default = {"schema_version": 1, "threshold": DEFAULT_THRESHOLD, "files": {}}
-    data = _store.load_json(path, default=default)
+def normalize_store(data) -> dict:
+    """Coerce a loaded store to the canonical shape (tolerant of missing/malformed)."""
     if not isinstance(data, dict):
-        return default
-    data.setdefault("files", {})
+        data = {}
+    data.setdefault("schema_version", 1)
     data.setdefault("threshold", DEFAULT_THRESHOLD)
+    data.setdefault("files", {})
     return data
-
-
-def save_store(path: Path, data: dict) -> None:
-    _store.save_json(path, data)  # best-effort; never raises
 
 
 def get_or_init_file_entry(store: dict, claude_md_rel: str, mtime_iso: str) -> dict:
@@ -133,36 +129,44 @@ def main() -> int:
         return 0
 
     store_path = drift_store_path(repo)
-    store = load_store(store_path)
     now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
     is_direct_edit_target = edited_path.name == "CLAUDE.md"
 
-    for claude_md in enclosing:
-        try:
-            rel = str(claude_md.relative_to(repo))
-        except ValueError:
-            rel = str(claude_md)
-        try:
-            mtime_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(claude_md.stat().st_mtime))
-        except OSError:
-            mtime_iso = now_iso
+    def _mutate(data) -> dict:
+        store = normalize_store(data)
+        for claude_md in enclosing:
+            try:
+                rel = str(claude_md.relative_to(repo))
+            except ValueError:
+                rel = str(claude_md)
+            try:
+                mtime_iso = time.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime(claude_md.stat().st_mtime)
+                )
+            except OSError:
+                mtime_iso = now_iso
 
-        entry = get_or_init_file_entry(store, rel, mtime_iso)
-        entry["claude_md_mtime"] = mtime_iso
-        entry["last_signal_at"] = now_iso
+            entry = get_or_init_file_entry(store, rel, mtime_iso)
+            entry["claude_md_mtime"] = mtime_iso
+            entry["last_signal_at"] = now_iso
 
-        if is_direct_edit_target and edited_path == claude_md:
-            entry["direct_edits"] = entry.get("direct_edits", 0) + 1
-        else:
-            entry["scope_edits"] = entry.get("scope_edits", 0) + 1
+            if is_direct_edit_target and edited_path == claude_md:
+                entry["direct_edits"] = entry.get("direct_edits", 0) + 1
+            else:
+                entry["scope_edits"] = entry.get("scope_edits", 0) + 1
 
-        entry["rescore_counter"] = entry.get("rescore_counter", 0) + 1
-        if entry["rescore_counter"] >= RESCORE_EVERY_N_EDITS:
-            entry["drift_score"] = _drift_score.compute_score(entry)
-            entry["rescore_counter"] = 0
+            entry["rescore_counter"] = entry.get("rescore_counter", 0) + 1
+            if entry["rescore_counter"] >= RESCORE_EVERY_N_EDITS:
+                entry["drift_score"] = _drift_score.compute_score(entry)
+                entry["rescore_counter"] = 0
+        return store
 
-    save_store(store_path, store)
+    # Serialize the read-modify-write so concurrent sessions don't lose each other's increments.
+    _store.locked_update(
+        store_path, _mutate,
+        default={"schema_version": 1, "threshold": DEFAULT_THRESHOLD, "files": {}},
+    )
     return 0  # hooks are best-effort; never block the tool call
 
 

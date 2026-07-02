@@ -103,11 +103,13 @@
       "edgenodeCpuRequest": "250m",
       "edgenodeCpuLimit": "2000m",
       "edgenodeArcFactor": "0",
-      "$arcFactorComment": "2026-06-16: target_arc_factor 1->0 (leecher). james carries the LARGEST corpus (3654 docs) at a full authority arc, so its conductor working set is proportional to the whole corpus and OOM-cycles at its 8Gi limit (live 5.82GB and climbing) on the shared ethosengine box next to matthew \u2014 exactly the durable fix this entry's $memoryBumpComment2 named ('DURABLE FIX = arc-shrink'). Validated lever: jessica's identical flip boots HolochainP2pConfig{target_arc_factor:0} and runs at 1.34GB leecher. james is NOT a genesis peer (only adam+matthew are, genesisPeer:true), so no partition risk: matthew+adam+the shem nodes stay full-arc holders of the whole keyspace (12 full holders remain; coverage safe \u2014 the deploy sed path bypasses coverage_admits so this is a hand-verified call). Freeing ~5GB on ethosengine relieves matthew's doorway watchdog co-location park (RCA theory 3). Household durability is unaffected (Plane B storage-plane RS shards on disk, not Plane A authority arc). Revert to 1 to undo. See .claude/data/matthew-edge-resiliency-rca-fanout-2026-06-15.md + genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md.",
+      "$arcFactorComment": "2026-06-16: target_arc_factor 1->0 (leecher). james carries the LARGEST corpus (3654 docs) at a full authority arc, so its conductor working set is proportional to the whole corpus and OOM-cycles at its 8Gi limit (live 5.82GB and climbing) on the shared ethosengine box next to matthew \u2014 exactly the durable fix this entry's $memoryBumpComment2 named ('DURABLE FIX = arc-shrink'). Validated lever: jessica's identical flip boots HolochainP2pConfig{target_arc_factor:0} and runs at 1.34GB leecher. james is NOT a genesis peer (only adam+matthew are, genesisPeer:true), so no partition risk: matthew+adam+the shem nodes stay full-arc holders of the whole keyspace (12 full holders remain; coverage safe \u2014 the deploy sed path bypasses coverage_admits so this is a hand-verified call). Freeing ~5GB on ethosengine relieves matthew's doorway watchdog co-location park (RCA theory 3). Household durability is unaffected (Plane B storage-plane RS shards on disk, not Plane A authority arc). Revert to 1 to undo. See genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md + genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md.",
       "$cpuLimitBump": "2026-05-27: bumped 1000m \u2192 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 \u2014 accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md"
     },
     {
       "name": "pete",
+      "suspended": true,
+      "$suspendedComment": "Operator scope directive 2026-07-02: minimal coordination-ladder cast - one instance per tier: intimacy+family (matthew/jessica/james household), community/local (gertrude elder household + susan neighbor household), regional (on-prem region vs shem region {adam,gertrude,susan,eve}), global (adam federation anchor). Releases shem capacity (11 pods -> 4) and tests the request-starvation falsifier (backlog cluster-to-shem-p2p-request-starvation-11-peer-blackout). Un-suspend when shem relief lands or an epic scenario @requires a wider cast (frank = the raspberry-pi pantry-tier candidate).",
       "role": "pastor",
       "humanLabel": "pete-pastor",
       "humanId": "human-pete-pastor",
@@ -135,6 +137,8 @@
         "edgenodeCpuLimit": "500m"
       },
       "name": "terrance",
+      "suspended": true,
+      "$suspendedComment": "Operator scope directive 2026-07-02: minimal coordination-ladder cast - one instance per tier: intimacy+family (matthew/jessica/james household), community/local (gertrude elder household + susan neighbor household), regional (on-prem region vs shem region {adam,gertrude,susan,eve}), global (adam federation anchor). Releases shem capacity (11 pods -> 4) and tests the request-starvation falsifier (backlog cluster-to-shem-p2p-request-starvation-11-peer-blackout). Un-suspend when shem relief lands or an epic scenario @requires a wider cast (frank = the raspberry-pi pantry-tier candidate).",
       "role": "tutor",
       "humanLabel": "terrance-tutor",
       "humanId": "human-terrance-tutor",
@@ -152,6 +156,8 @@
     },
     {
       "name": "frank",
+      "suspended": true,
+      "$suspendedComment": "Operator scope directive 2026-07-02: minimal coordination-ladder cast - one instance per tier: intimacy+family (matthew/jessica/james household), community/local (gertrude elder household + susan neighbor household), regional (on-prem region vs shem region {adam,gertrude,susan,eve}), global (adam federation anchor). Releases shem capacity (11 pods -> 4) and tests the request-starvation falsifier (backlog cluster-to-shem-p2p-request-starvation-11-peer-blackout). Un-suspend when shem relief lands or an epic scenario @requires a wider cast (frank = the raspberry-pi pantry-tier candidate).",
       "role": "farmer",
       "humanLabel": "frank-farmer",
       "humanId": "human-frank-farmer",
@@ -213,6 +219,8 @@
     {
       "$comment": "Introduced 2026-05-22. Caleb is Susan's husband, father of three young children (not yet on the protocol). Second deployed peer in household-susan (Seattle WA metro). Two peers per household at this scale is the threshold where a single household survives a single-device failure on its own \u2014 caleb + susan together can hold a Shamir share, project content, and remain reachable through any single-device chaos. Until now only Dowell had multi-peer redundancy within a household; this extends that property to a second household and to the Pacific NW region specifically, so multi-regional backup pairs (Dowell-SA \u2194 Susan-Seattle) are not single-device-fragile on the remote leg. Typical-steward floor (device-recycled-laptop) matches Susan. Remote placement (remote/performance) co-locates with Susan on shem so the household's two peers share network egress + K8s scheduling pool, which mirrors the way a real-world household has both devices on the same home LAN.",
       "name": "caleb",
+      "suspended": true,
+      "$suspendedComment": "Operator scope directive 2026-07-02: minimal coordination-ladder cast - one instance per tier: intimacy+family (matthew/jessica/james household), community/local (gertrude elder household + susan neighbor household), regional (on-prem region vs shem region {adam,gertrude,susan,eve}), global (adam federation anchor). Releases shem capacity (11 pods -> 4) and tests the request-starvation falsifier (backlog cluster-to-shem-p2p-request-starvation-11-peer-blackout). Un-suspend when shem relief lands or an epic scenario @requires a wider cast (frank = the raspberry-pi pantry-tier candidate).",
       "role": "spouse",
       "humanLabel": "caleb-spouse",
       "humanId": "human-caleb-spouse",
@@ -233,6 +241,8 @@
     {
       "$comment": "Introduced 2026-05-22. Daniel is Jessica's brother (Matthew's brother-in-law), living in the Tulsa, Oklahoma metro. He is the fifth replicator in the reciprocal-backup chain and crucially provides a THIRD independent geographic region: San Antonio TX (Dowell + Gertrude) \u2194 Seattle WA (Susan + Caleb) \u2194 Tulsa OK (Daniel). Three regions means the chain can absorb the loss of any single region and still hit the Shamir t-of-n quorum threshold from any of the surviving two regions. This is the substrate-level realization of the 'high-availability' bar in the resilience README \u2014 not just multi-household but multi-region reciprocal backup. Daniel is a hub-class device-home-nuc (mirroring gertrude/eve/pete) because as a single-peer household his node is the entire household's resilience surface; the home-nuc floor gives him enough memory/CPU headroom to hold Shamir shares + project Dowell content + maintain reach without flapping. Remote/performance placement on shem gives geographic-storyline separation from the Dowell on-prem cluster.",
       "name": "daniel",
+      "suspended": true,
+      "$suspendedComment": "Operator scope directive 2026-07-02: minimal coordination-ladder cast - one instance per tier: intimacy+family (matthew/jessica/james household), community/local (gertrude elder household + susan neighbor household), regional (on-prem region vs shem region {adam,gertrude,susan,eve}), global (adam federation anchor). Releases shem capacity (11 pods -> 4) and tests the request-starvation falsifier (backlog cluster-to-shem-p2p-request-starvation-11-peer-blackout). Un-suspend when shem relief lands or an epic scenario @requires a wider cast (frank = the raspberry-pi pantry-tier candidate).",
       "role": "brother-in-law",
       "humanLabel": "daniel-brother",
       "humanId": "human-daniel-brother",
@@ -253,6 +263,8 @@
     {
       "$comment": "Introduced 2026-05-22. Emma is Daniel's wife, second peer in household-daniel (Tulsa OK metro). Gives the Plains-region leg its own intra-household redundancy: even if one Tulsa device dies, the household stays online to the chain. Mirrors the susan+caleb pattern for household-susan in Seattle. Recycled-laptop archetype (typical-steward floor) gives Emma a different device-shape from Daniel's home-nuc, so the household has device-archetype diversity inside the same region \u2014 chaos-test surface where 'home-nuc dies but recycled-laptop survives' is distinguishable.",
       "name": "emma",
+      "suspended": true,
+      "$suspendedComment": "Operator scope directive 2026-07-02: minimal coordination-ladder cast - one instance per tier: intimacy+family (matthew/jessica/james household), community/local (gertrude elder household + susan neighbor household), regional (on-prem region vs shem region {adam,gertrude,susan,eve}), global (adam federation anchor). Releases shem capacity (11 pods -> 4) and tests the request-starvation falsifier (backlog cluster-to-shem-p2p-request-starvation-11-peer-blackout). Un-suspend when shem relief lands or an epic scenario @requires a wider cast (frank = the raspberry-pi pantry-tier candidate).",
       "role": "spouse",
       "humanLabel": "emma-spouse",
       "humanId": "human-emma-spouse",
@@ -293,6 +305,8 @@
     {
       "$comment": "Introduced 2026-05-22 alongside the light-up-the-topology resiliency expansion. Nancy realizes the neighborhood-reach composition tier from resilience README Part V \u2014 'a block's worth of households agreeing to steward each other's elder-recovery shares'. Household-nancy is in Tech Valley, the same neighborhood as household-matthew, so neighborhood-reach replication tests have at least two distinct households to spread across (the resilience reducer in elohim/elohim-storage/src/services/household_resilience.rs:99 requires \u22653 households for the 'protected' tier; with matthew, nancy, and at least one of jessica/james stewarding via separate household-id, neighborhood-reach content can now hit protected without needing cross-neighborhood stewards). Typical-steward floor (device-recycled-laptop) mirrors jessica/susan. Edge/performance placement biases toward on-prem to keep Tech Valley physically grouped, but performance fallback to ethosengine keeps the scheduler flexible.",
       "name": "nancy",
+      "suspended": true,
+      "$suspendedComment": "Operator scope directive 2026-07-02: minimal coordination-ladder cast - one instance per tier: intimacy+family (matthew/jessica/james household), community/local (gertrude elder household + susan neighbor household), regional (on-prem region vs shem region {adam,gertrude,susan,eve}), global (adam federation anchor). Releases shem capacity (11 pods -> 4) and tests the request-starvation falsifier (backlog cluster-to-shem-p2p-request-starvation-11-peer-blackout). Un-suspend when shem relief lands or an epic scenario @requires a wider cast (frank = the raspberry-pi pantry-tier candidate).",
       "role": "neighbor",
       "humanLabel": "nancy-neighbor",
       "humanId": "human-nancy-neighbor",

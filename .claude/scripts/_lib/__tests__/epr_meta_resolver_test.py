@@ -100,4 +100,49 @@ with tempfile.TemporaryDirectory() as _td:
     check("parse-bomb manifest → ASK (refused pre-parse, no hang/RecursionError)",
           r.returncode == 0 and json.loads(r.stdout)["hookSpecificOutput"]["permissionDecision"] == "ask")
 
+# Edit is evaluated on its POST-edit content, so a content-triggered rule sees what the edit
+# INTRODUCES — not the stale on-disk pre-image. Modeled on the specs/ p2p-design-gate contains-any
+# rule; `new:` is dropped so the rule also applies to edits (the class this fix targets — a
+# `new: true` rule is Write-only by design, since Edit never sets is_new).
+with tempfile.TemporaryDirectory() as _td:
+    root = Path(_td)
+    (root / ".git").mkdir()
+    _wr(root / ".epr-meta", """
+        ---
+        epr-meta-version: 1
+        root: true
+        rules:
+          - id: p2p-design-gate
+            class: ask
+            when: { write: "*.md", contains-any: ["GET /api/v1", "PRIMARY KEY", "uuid"] }
+            validator: epr:validator-p2p-design-gate
+            why: "new data-entity designs pass the p2p-design-gate"
+        ---
+    """)
+    doc = root / "design.md"
+    doc.write_text("# Design\n\nA plain paragraph, no data-entity patterns yet.\n")
+    # Edit that INTRODUCES a matched pattern → the rule now fires (was silent pre-fix, which
+    # evaluated the stale pre-edit on-disk content that lacked the pattern).
+    r = _hook({"tool_name": "Edit", "tool_input": {
+        "file_path": str(doc),
+        "old_string": "no data-entity patterns yet.",
+        "new_string": "add a GET /api/v1/things route."}})
+    check("Edit introducing a matched pattern → post-edit content fires (ask)",
+          r.returncode == 0
+          and json.loads(r.stdout)["hookSpecificOutput"]["permissionDecision"] == "ask")
+    # Edit unrelated to any rule → post-edit content has no match → stays silent.
+    r = _hook({"tool_name": "Edit", "tool_input": {
+        "file_path": str(doc),
+        "old_string": "A plain paragraph",
+        "new_string": "A revised paragraph"}})
+    check("Edit unrelated to any rule stays silent (post-edit content, not pre-image)",
+          r.returncode == 0 and r.stdout.strip() == "")
+    # old_string absent from disk → the Edit will fail anyway → hook exits 0 silently.
+    r = _hook({"tool_name": "Edit", "tool_input": {
+        "file_path": str(doc),
+        "old_string": "this text is not in the file",
+        "new_string": "GET /api/v1/whatever"}})
+    check("Edit whose old_string is absent → silent (the Edit will fail anyway)",
+          r.returncode == 0 and r.stdout.strip() == "")
+
 print(f"\n  {_passed} assertions passed ✅")

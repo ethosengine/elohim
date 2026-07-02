@@ -16,7 +16,7 @@ occurred_at: 2026-06-17
 > 64MB sub-heaps) flattened it for hours past the old OOM cadence. go-pion exonerated (Go heap flat ~52MB);
 > tx5 #194/#199 deployed fleet-wide and the leak persisted. The smaps instrument + methodology here were RIGHT
 > and led to the cure; only the hypothesis-ranking conclusion is corrected. DNA hash unchanged.
-> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-rca-native-heap-reframe-2026-06-18.md · conductor-leak-jemalloc-prod-changeset-2026-06-19.md
+> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md · genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-prod-changeset.md
 
 
 This is the **mechanism** companion to `conductor-memory-attribution-verdict.md` (which settled *where*: the
@@ -124,7 +124,7 @@ Derived facts:
    (H2 trigger; `2026-06-14-federation-bootstrap-plan.md`, `MongoK2Store`). Likely both: report the
    unbounded-retain-on-failure upstream **and** fix bootstrap so resolution succeeds (removes the trigger).
    Upstream-vs-our-config fork = handoff §6. **Upstream search result (2026-06-17,
-   `.claude/data/conductor-leak-upstream-research-2026-06-17.md`): KNOWN-OPEN, no clean pin-to-fix** — the
+   `genesis/docs/content/elohim-protocol/history/2026-06-17-conductor-leak-upstream-research-tx5-pin-verdict.md`): KNOWN-OPEN, no clean pin-to-fix** — the
    closest match (#5664) is partly iroh-specific (not our transport), and no released 0.6.x fixes the
    per-send-buffer retention. Two concrete moves: (i) **pin forward to the first 0.6.x containing #5719** to cut
    the trigger re-drive, then **re-measure** — if the anon climb stops, that corroborates the per-send-buffer
@@ -149,6 +149,6 @@ Derived facts:
 - `genesis/data/timeline/backlog/decision-record-discipline.md` (the discipline this conforms to)
 - `genesis/docs/superpowers/plans/2026-06-17-design-decision-toolkit-plan.md` (toolkit P2/P3)
 - `genesis/docs/superpowers/plans/2026-06-14-federation-bootstrap-plan.md` (H2 trigger fix home)
-- `.claude/data/conductor-leak-upstream-research-2026-06-17.md` (upstream search: transport elimination tx5≠iroh, #5664/#5718/#5719/#408 analysis, source-read of `validation_receipt_workflow.rs:87`)
+- `genesis/docs/content/elohim-protocol/history/2026-06-17-conductor-leak-upstream-research-tx5-pin-verdict.md` (upstream search: transport elimination tx5≠iroh, #5664/#5718/#5719/#408 analysis, source-read of `validation_receipt_workflow.rs:87`)
 - Instrument source: `elohim/elohim-storage/src/services/system_metrics.rs:443-500` (`parse_smaps_anon`,
   `classify_mapping`), `elohim/elohim-storage/src/metrics.rs` (gauge surface, currently unscraped)

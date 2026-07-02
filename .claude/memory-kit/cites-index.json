@@ -1,12 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-06-08",
+  "generated_at": "2026-06-26",
   "cites": {
     "genesis/orchestrator/Jenkinsfile": [
       "feedback_cargo_target_dir_for_native_builds",
       "feedback_multi_agent_pvc_pacing",
       "feedback_pvc_threshold_and_recovery",
-      "feedback_sccache_cache_corruption_recovery",
       "project_ci_playwright_image",
       "project_sprint_branch_not_orchestrator_indexed"
     ],
@@ -88,13 +87,13 @@
     "observation-event-layer-design | the witness substrate built on this controller principle \u2014 observed state drives eager reconcile | sha256:2b57787e60a0ddc6 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md": [
       "project_principle_p1_reconciliation_controller"
     ],
-    "genesis/docs/architecture/rea-compute-commitment-primitive.md": [
+    "rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md": [
       "project_rea_compute_commitment_primitive"
     ],
     "elohim/elohim-storage/src/services/reach_earning.rs": [
       "project_reach_enum_drift_reconciliation"
     ],
-    "genesis/docs/content/elohim-protocol/resilience/README.md": [
+    "resilience-protocol-spec | README | sha256:2c832b517c7204cc | path: genesis/docs/content/elohim-protocol/resilience/README.md": [
       "project_reach_enum_drift_reconciliation"
     ],
     "elohim/sdk/schemas/v1/enums/reach.schema.json": [

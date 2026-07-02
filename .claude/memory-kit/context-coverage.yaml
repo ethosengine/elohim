@@ -20,11 +20,13 @@ targets:
       transient churn (a doc mid-edit) doesn't trip the gate. Tighten as agent context windows grow;
       loosen if the team tending the surface is smaller than the surface.
   memory_md_budget:
-    value: 46000
+    value: 24000
     why: >
-      MEMORY.md is injected into EVERY session. ~46KB is about what fits alongside the other
-      always-loaded surfaces before it crowds the working window. Over budget means the index costs more
-      context than it saves — split detail into topic files.
+      MEMORY.md is injected into EVERY session, and the harness TRUNCATES the load at ~24.4KB — a
+      bigger index silently loses its tail (the 2026-07-02 context-leak). 24000 is the real cap with
+      headroom, owned by memory-index-projector.py (HARD_BUDGET_BYTES; soft 20000 starts the
+      consolidation signal). Over budget means umbrella-fold or graduate — the index is GENERATED,
+      so per-entry trimming happens in topic-file description: frontmatter, never by hand here.
   claude_md_budget:
     value: 12000
     why: >

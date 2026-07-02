@@ -7,9 +7,9 @@ sprint: conductor-leak-cure
 cites:
   - HANDOFF-2026-06-17-upstream-tx5-transport-pin.md
   - HANDOFF-2026-06-17-fbootstrap-deploy-gate.md
-  - .claude/data/conductor-leak-upstream-research-2026-06-17.md
-  - .claude/data/arc-factor-feasibility-findings.md
-  - .claude/data/matthew-edge-resiliency-rca-fanout-2026-06-15.md
+  - conductor-leak-upstream-research-tx5-pin-verdict | Conductor anon-heap leak | sha256:ccbf95a2af47c660 | path: genesis/docs/content/elohim-protocol/history/2026-06-17-conductor-leak-upstream-research-tx5-pin-verdict.md
+  - arc-factor-feasibility-spike-findings | Arc-factor feasibility findings (for Pillar 3 spec) | sha256:1c8521e12ee40ecd | path: genesis/docs/content/elohim-protocol/history/2026-06-14-arc-factor-feasibility-spike-findings.md
+  - matthew-edge-resiliency-rca-fanout-synthesis | Matthew Edge Resiliency | sha256:a4fafb4f91612eba | path: genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md
 # MIXED plan (CLAUDE.md scope convention): no doc-level requires_env.
 # Build/source/instrument legs are in-tree/household-testable; deploy+canary+measure
 # legs are tagged inline @requires:alpha-cluster-6peer (HELD while alpha is degraded).
@@ -28,7 +28,7 @@ cites:
 > cadence. Allocator-only binary change; DNA hash unchanged. The fork infra
 > (ethosengine/holochain@elohim-0.6) became the *vehicle for the jemalloc build* (b477ca7), so Stage 0/1.1
 > are not wasted — but Stages 2–4 target the wrong mechanism and are DONE-DIFFERENTLY. Status → SUPERSEDED.
-> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-jemalloc-prod-changeset-2026-06-19.md · conductor-leak-rca-diverse-eyes-synthesis-2026-06-18.md · conductor-leak-rca-native-heap-reframe-2026-06-18.md
+> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-prod-changeset.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md
 
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

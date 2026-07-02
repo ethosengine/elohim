@@ -21,7 +21,7 @@ import sys
 import time
 from pathlib import Path
 
-APP_DIR = '/projects/elohim/elohim-app'
+APP_DIR = os.path.join(os.environ.get('CLAUDE_PROJECT_DIR', '/projects/elohim'), 'app', 'elohim-app')
 
 
 def run_tsc_check() -> dict:

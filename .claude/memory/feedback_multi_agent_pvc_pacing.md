@@ -1,7 +1,9 @@
 ---
+index: false
 id: feedback-multi-agent-pvc-pacing
 name: Pace multi-agent sprints — don't run cargo tests concurrently across agents
-description: When multiple agents work the codebase simultaneously, serialize cargo test runs to protect PVC / disk. Coordinate file scope between agents. Pre/post hooks help manage target dirs but agents can still starve each other.
+title: Multi-agent pacing + PVC thresholds
+description: Never run cargo test/build concurrently across agents — shared target-pool locks + PVC disk/RAM contention crash builds; see feedback_pvc_threshold_and_recovery.
 type: feedback
 originSessionId: 60007cbf-4a59-4bce-9be7-6e57d1568cf6
 cites:
@@ -16,6 +18,7 @@ When orchestrating multi-agent sprints, do NOT launch multiple agents that will 
 
 **How to apply:**
 - **One cargo-test-running agent at a time.** If another agent is doing storage/Rust work, my agents do non-cargo work (a2o narratives, docs, frontend changes, plan authoring).
+- **PVC thresholds:** the shared PVC is 118G; act at 85%+ usage via `cargo-pool legacy-targets --clean` (see [[feedback_pvc_threshold_and_recovery]]).
 - **Memory pressure is real, not just disk.** Cargo's linker phase + multiple sccache/rustc workers can OOM a shared machine. The constraint is PVC AND RAM. When in doubt, serialize cargo runs.
 - **Coordinate scope explicitly** when multi-agent: agree which file set each agent owns. Diagnostics that mention unfamiliar files (e.g., `stack.rs`, `subsidiarity.rs`, `escalation.rs` from a tiered-storage sprint while I'm in Phase 4 EPR scope) signal a parallel agent in another domain — don't fix their diagnostics, don't touch their files.
 - **The operator may be running parallel sprints** without my knowledge — multiple agentic threads under one operator umbrella. Specifically observed: tiered-storage sprint co-existing with EPR delivery sprint, 2026-05-11. If diagnostic notifications mention files outside my current scope, assume a parallel sprint owns them.

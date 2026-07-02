@@ -1,6 +1,7 @@
 ---
 name: project_content_graph_native_rust_not_cozo_apollo
-description: Content relationship graph is owned in native Rust storage services for mission-critical perf — NOT Cozo/Kuzu/Apollo; graph.json CozoScript is aspirational spec only; the ContentGraphResolver trait seam is being introduced 2026-06-08
+title: Content graph = native Rust, not Cozo/Kuzu/Apollo
+description: Lamad relationship graph is computed in native Rust storage for mission-critical perf; Cozo/Kuzu/Apollo rejected — extend the ContentGraphResolver trait instead.
 metadata: 
   node_type: memory
   type: project

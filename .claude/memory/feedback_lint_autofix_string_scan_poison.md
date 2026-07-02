@@ -1,7 +1,8 @@
 ---
 id: feedback-lint-autofix-string-scan-poison
 name: lint-autofix-string-scan-poison
-description: Mass eslint --fix can apply behavior-changing autofixes (unicorn/prefer-set-has on STRINGS) that silently break string-scan assertions — always run the full test suite after any --fix pass
+title: Lint autofix string-scan poison
+description: eslint --fix prefer-set-has on STRINGS builds a Set of chars, inverting string-scan assertions; run the full suite after any --fix and disable-comment the scans.
 metadata: 
   node_type: memory
   type: feedback

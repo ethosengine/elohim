@@ -18,6 +18,9 @@ cites:
   - elohim/elohim-storage/src/db/content_diesel.rs
   - genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md
   - genesis/data/timeline/backlog/conductor-websocket-flap-breaks-deploy-write-path.md
+  - genesis/docs/superpowers/specs/2026-07-01-crdt-authoritative-content-state-dht-notary-decouple-design.md
+  - genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md
+  - elohim/elohim-storage/tests/sync_libp2p_convergence.rs
 ---
 
 # CRDT-authoritative content state; DHT as a decoupled notary (architect vision)
@@ -101,3 +104,74 @@ rather than last-writer-wins.
 Domain D5 (data plane) / P1 (reconciliation controller). Depends on: producer
 foundation (LANDED). Effort: L–XL (architecture). Route: `/brainstorm` → spec, then a
 sequenced build (converge-heal first; notary-overlay coupling last).
+
+---
+
+## Landed 2026-07-01 — serving + heal machinery (folded from the session handoff)
+
+The `/brainstorm` route above HAPPENED: spec
+`genesis/docs/superpowers/specs/2026-07-01-crdt-authoritative-content-state-dht-notary-decouple-design.md`
++ plan `genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md`.
+Session commits (all on dev; merge `7c3f5295c`): `cbba5562f` (A1+A2) · `a16f687e2` (A3+A4) ·
+`9acaf7ead` (Phase B). **This supersedes the current-state bullet "the Automerge consumer writes the
+sled DocStore only" — the reverse projector now exists and is wired live.**
+
+**Phase A — notary-independent serving (the live fix):**
+- A1 `crdt_converged_at` column (migration `2026-07-01-120000`) + `Content` model/schema.
+- A2 tri-state `MinTrust { Invisible, Amber, Blue, Green }` replaces `require_provenance: bool`
+  across `get_content`/`get_content_with_tags`/`list_content`/`count_content` via `apply_min_trust()`
+  (`content_diesel.rs:31`/`:46`). Green = `dht_anchor_hash` (notarized) · Blue = `p2p_published_at`
+  (peer-published) · Amber = `crdt_converged_at` (converged, unconfirmed) · Invisible = internal.
+  External serving reads at **Amber** (un-404s during a notary outage); economic/attribution/
+  authority reads reserve **Green**. Amber is operational only — never an authority source.
+- A3 deploy-time **amber producer**: admin-gated `?deployTier=amber` marker on `PATCH /db/content`
+  writes `blob_hash` diesel-direct stamping `crdt_converged_at`, never `dht_anchor_hash`,
+  **write-iff-empty** (a later green stamp always wins). Query-param not header — the doorway proxy
+  drops non-allowlist headers. `stage-spa-blob.sh` browser leg passes the marker.
+- A4 `ContentView.trust`: `"notarized" | "published" | "unconfirmed"` (display legibility only;
+  `views_convert/lamad.rs:73` `trust_label()`), regenerated through ts-rs.
+
+**Phase B — the CRDT heal (this backlog item's core ask):**
+- B1 `reverse_project_content_doc()` (`sync/projector.rs:234`) — on a converged `node:{id}` doc,
+  re-derive `blob_hash` into the local SQL row at the amber tier. Guards: empty-never-wins, A3
+  no-clobber, `NotFound → skip` (absence is the shard plane's job — the shard plane heals
+  **absence**, the CRDT plane heals **drift**; keep the two heal planes distinct).
+- B2 wired into the live p2p consumer: `heal_content_row()` (`p2p/mod.rs:6645`) called after
+  `apply_changes` at BOTH SyncProtocol sites (`:6424` AnnounceChange, `:6588` Changes). Loop-safe:
+  writes via `update_content` directly, no `ContentUpdated` re-emit → no heal→reproject→converge loop.
+- B3 real-libp2p convergence proofs (`tests/sync_libp2p_convergence.rs`):
+  `converges_and_serves_zero_notary` reproduces the elohim.host 404 as red→green over a real
+  libp2p swarm with zero notary reachable.
+
+**Reach lifecycle decision (the "Google-Docs" concurrent-edit model):** reach is *inherited at
+fork* (a doc under CRDT edit inherits its origin snapshot's reach), *cohort-gated at edit* (open to
+whoever held reach + attestation on the origin — resolves the poisoning vector), *re-certified at
+republish* (agreement to republish = re-notarization + reach re-certification).
+
+**404 shapes (http.rs), for triage:** `App not found: <slug>` = absence (`:5658`, via
+`lookup_slug_blob_hash()` `:5852` returning None) · `App not found for content address: <cid>` =
+blob absent (`:5646`) · `blobHash: null` empty-hash = row exists, serving field empty. The
+2026-07-01 elohim.host failure was the FIRST shape: adam (alpha-b / `elohim.host`) never received a
+healthy `elohim-host-landing` row; matthew (alpha / `doorway-alpha.elohim.host`) was fine — the SQL
+`content` table does not replicate peer-to-peer, which is exactly what this plane fixes.
+
+**Discovered CI gap (unresolved):** the edge pipeline BUILDS elohim-storage (Docker release) but has
+**no `cargo test` stage** for it — only doorway runs fmt/clippy/test, so the 1830 lib tests + the
+convergence proofs have no CI home; storage-logic regressions pass edge as long as the image
+compiles. Proposed: a `Quality Gate: Storage` stage (or a `check` target in the storage Dockerfile).
+Same trap family as "#[ignore] is a CI no-op" / "PVC-deferral hides gate debt".
+
+**What remains (the open half of this item):**
+1. Light the CRDT plane LIVE between the two alpha peers (matthew↔adam) — confirm a libp2p/iroh
+   session under `h_app_id="elohim"` and a sync round propagating the `elohim-host-landing` doc
+   (federation peer discovery rides DHT-gossiped `DoorwayRegistration`, not doorway-to-doorway).
+2. Corpus back-fill is go-forward-only — run `backfill_content_docs` on the healthy peer so the
+   degraded peer has something to converge from (sibling: [[automerge-docstore-corpus-backfill-migration]]).
+3. Transport up between the peers — if the alpha-b deploy leg was UNSTABLE-swallowed (edge
+   Jenkinsfile `catchError` ~L798-807), adam may not even run current storage; `/p2p/status` is not
+   doorway-proxied (read via Loki/CI).
+4. Phase C notary overlay (HEAD-DAG `declare_content_head`, reach re-cert, author-sig) is specced
+   (plan C1–C5), operator-gated (sweettest/DNA pipeline + rust-architect link-vs-entry sign-off +
+   dev-merge). Items 1–3 do NOT block on it — amber convergence un-404s on its own.
+   Operator gates for the live 404: amber-marked redeploy AND/OR confirm the alpha-b deploy leg;
+   then a live convergence round on `elohim-host-landing`.

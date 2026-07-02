@@ -6,7 +6,7 @@ class: substrate
 sprint: composes 2026-06-10-epr-durability-replication-arc-plan (Workstreams A/D/E) — refines it with verified root causes now the conductor leak fix exists
 domain: D-substrate-distribution
 cites:
-  - .claude/data/genesis-seed-stages-rca-2026-06-18.md
+  - genesis-seed-stages-unstable-resilience-card-rca | RCA: Genesis seeding/verify stages Unstable + all-zeros resilience card | sha256:a93c5b647f8a9530 | path: genesis/docs/content/elohim-protocol/history/2026-06-18-genesis-seed-stages-unstable-resilience-card-rca.md
   - epr-durability-replication-arc-plan | EPR Content Durability Arc | sha256:f263ed845af2f916 | path: genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md
   - coherent-transport-identity-resolver-design | Coherent transport-identity resolver | sha256:63117b359cfa3891 | path: genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md
   - elohim/elohim-storage/src/p2p/acquisition.rs
@@ -29,7 +29,7 @@ informed-by:
 > prod che-dw build #13 / Part C `ed111a5cc`). The plan's "leak fix deployed → healthy mesh" precondition IS
 > now met — by jemalloc, not by `2af2607e7`. Tasks 1 (acquisition rollup) and 2 (quilt-draw serve-blob event)
 > are leak-INDEPENDENT repo bugs and stand unchanged.
-> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-jemalloc-prod-changeset-2026-06-19.md
+> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-prod-changeset.md
 
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development or superpowers:executing-plans, task-by-task. The **p2p-design-gate skill is MANDATORY** before implementing Task 2 (a new economic-event emission point) and Task 3-as-design (a new session-write path / identity surface). Story-first: land the a2o scenario with the implementation, same commit.

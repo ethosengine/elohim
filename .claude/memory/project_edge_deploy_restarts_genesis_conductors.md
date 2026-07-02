@@ -1,6 +1,7 @@
 ---
 name: project_edge_deploy_restarts_genesis_conductors
-description: The edge Deploy Edge Node stage UNCONDITIONALLY rolling-restarts every conductor StatefulSet (matthew/adam genesis pair included) via Jenkinsfile:712; there is NO push-reachable doorway-only deploy. A doorway fix that must not bounce the genesis pair needs an operator-driven doorway-only kubectl path.
+title: Edge deploy restarts genesis-pair conductors
+description: Edge Deploy stage unconditionally rollout-restarts every conductor StatefulSet (genesis pair included); a doorway-only fix needs the operator kubectl path.
 metadata: 
   node_type: memory
   type: project

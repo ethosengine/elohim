@@ -1,7 +1,8 @@
 ---
 id: project-container-cargo-environment-quirks
 name: container-cargo-environment-quirks
-description: "This container lacks cargo-nextest (gospel says it's installed — use plain cargo test) and /projects-volume cargo builds intermittently fail fingerprint writes (ENOENT) — /tmp target dirs work"
+title: Container cargo quirks
+description: "No nextest here (plain cargo test, unpiped exit codes); /projects target dirs ENOENT → use /tmp; WASM-warmed slot corrupts native builds; explicit cd per gate."
 metadata: 
   node_type: memory
   type: project
@@ -23,6 +24,10 @@ Observed 7x total incl. the PRE-PUSH HOOK's doorway AND storage clippy gates (po
 
 3. **DNA/WASM workspace contract (validated 2026-06-09, native-content-graph-seam, executing the substrate_signal migration).** The PreToolUse cargo hook DENIES a bare `just check` on the DNA workspace for lacking `CARGO_TARGET_DIR` — even though gospel says DNA/WASM workspaces are "plain cargo, use ./target." For a one-off DNA **type-check**, run raw: `RUSTFLAGS='--cfg getrandom_backend="custom"' CARGO_TARGET_DIR=/tmp/dna-check cargo check -p <zome> --target wasm32-unknown-unknown` (satisfies the hook + dodges the ENOENT; a one-off /tmp target does NOT affect `hc dna pack`, which uses ./target). For DNA **native unit tests** (e.g. integrity validators — they run on the host, not wasm): `RUSTFLAGS="" CARGO_TARGET_DIR=/tmp/dna-test cargo test -p <zome> <filter>` — RUSTFLAGS MUST be empty; the wasm getrandom flag breaks native linking. **`just pack` cannot use a /tmp target** (it canonicalizes ./target) so it hits the `/projects` fingerprint-ENOENT — i.e. DNA **pack-verification is practically deferred to deploy-time**; for a non-deploying slice the correctness gate is wasm-check-compiles + native-tests-pass, not pack.
 
-**Why:** verification claims based on nextest in this container are unreliable; and a red Rust gate may be the volume, not the code.
+4. **A native-flag build (`RUSTFLAGS=""`) in a pool slot previously built with the WASM `getrandom_custom` backend CORRUPTS that slot** (observed 2026-06-27, lens-market S1–S9 slice). The mixed-flag reuse invalidates the slot's fingerprints → overlay-fs whiteout → the same `failed to write .../.fingerprint/...: No such file or directory` ENOENT as point 2, but here it has a *cause*, not just bad luck: a single pool slot is NOT safe to share between native (`RUSTFLAGS=""`) and WASM (`getrandom_backend="custom"`) builds of elohim-storage. Fix = the documented `/tmp` target (point 2/3); it carried the rest of the slice cleanly. **Pre-empt:** for elohim-storage native gates, point `CARGO_TARGET_DIR` at `/tmp` from the first invocation rather than reusing a WASM-warmed pool slot.
+
+5. **Persisted shell cwd silently tests the WRONG crate.** A `cd …/elohim-facings` from an earlier Bash call persisted (working directory carries between calls), so a later "run storage tests" ran against the *facings* crate twice before it was caught — green, but proving nothing about storage. **Same family as point 1** (a gate that looks like it ran but didn't measure what you think). Use an explicit absolute `cd <crate>` (or `cargo … --manifest-path`) per build; never rely on inherited cwd for a verification gate.
+
+**Why:** verification claims based on nextest in this container are unreliable; a red Rust gate may be the volume (or a mixed-flag-poisoned slot), not the code; and a green gate may have measured the wrong crate.
 
 **How to apply:** for Rust gates here, run `cargo test` with `CARGO_TARGET_DIR=/tmp/cargo-<crate>` (keep `RUSTFLAGS=""` for native, the getrandom custom flag for elohim-storage), and check exit codes without pipes. For the pre-push hook: slot-symlink workaround above. Related: [[cargo-target-dir-for-native-builds]].

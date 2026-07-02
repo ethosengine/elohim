@@ -1,6 +1,7 @@
 ---
 name: project_storybook_smoke_test_story_budget
-description: "elohim-storybook \"Smoke-Test Stories\" stage has a cumulative per-story timeout budget; a fat story matrix tips it and fails the WHOLE build"
+title: Storybook smoke-test story-budget
+description: "Smoke-Test Stories stage shares a cumulative timeout budget; a fat story matrix fails the WHOLE build — keep Library A+B to ~3-4 stories on trimmed fixtures."
 metadata: 
   node_type: memory
   type: project

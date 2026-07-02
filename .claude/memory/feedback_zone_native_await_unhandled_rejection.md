@@ -1,7 +1,8 @@
 ---
 id: feedback-zone-native-await-unhandled-rejection
 name: zone-native-await-unhandled-rejection
-description: zone.js false-flags handled rejections as "Uncaught (in promise)" when the only consumer is a native await — zone drains its whole microtask queue in one native job and checks uncaught rejections at drain-end, but native await attaches its handler via a V8 thenable-job that runs AFTER the drain
+title: zone.js native-await phantom uncaught
+description: zone.js checks uncaught rejections at drain-end, before native await's V8 thenable-job attaches — handled rejections false-flag; fix with sync .then/.catch.
 metadata:
   node_type: memory
   type: feedback

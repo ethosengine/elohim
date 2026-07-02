@@ -20,7 +20,8 @@ import sys, os, json
 # Tunable; raise to fire less often, lower to fire more. A heavy week churns ~100-150 distinct docs/entries.
 THRESHOLD = 120
 ACTIVITY_FILES = ["placement-drift.json", "map-currency-drift.json",
-                  "claude-md-drift.json", "memory-coherence-drift.json"]
+                  "claude-md-drift.json", "memory-coherence-drift.json",
+                  "memory-index-drift.json"]  # projector budget/violation snapshot (memory-index-projector.py)
 COLLECTIONS = ("files", "entries", "due", "items")  # the per-accumulator collection of drifted things
 
 

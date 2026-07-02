@@ -35,6 +35,15 @@ check("validate_meta warns: unknown rule key (typo catch)",
       any("unknown key" in e for e in epr_meta.validate_meta(
           {"epr-meta-version": 1, "rules": [{"id": "x", "class": "deny",
               "no-new-subdirs": True, "reqire-frontmatter": ["id"]}]})))
+check("validate_meta warns: >1 actionable predicate (evaluator fires on only the first)",
+      any("multiple actionable predicates" in e for e in epr_meta.validate_meta(
+          {"epr-meta-version": 1, "rules": [{"id": "m", "class": "deny",
+              "no-new-subdirs": True, "require-frontmatter": ["id"]}]})))
+check("validate_meta warns: duplicate rule id within one manifest",
+      any("duplicate rule id" in e for e in epr_meta.validate_meta(
+          {"epr-meta-version": 1, "rules": [
+              {"id": "d", "class": "deny", "no-new-subdirs": True},
+              {"id": "d", "class": "ask", "route-to": {"dest": "x"}}]})))
 
 m = _merged([{"id": "fm", "class": "deny", "when": {"write": "*.md", "new": True},
               "require-frontmatter": ["id", "status"], "why": "need id+status"}])

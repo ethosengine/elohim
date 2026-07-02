@@ -1,7 +1,8 @@
 ---
 id: project-ci-storage-topology
 name: CI build storage topology — migrated openebs-jiva → openebs-hostpath; hostpath needs deterministic node pinning
-description: "CURRENT (2026-05-27): Holochain/edge CI cache PVCs are openebs-hostpath (node-local, WaitForFirstConsumer) and need a kubernetes.io/hostname nodeAffinity in each pipeline's pod spec or pods thrash on volume-node-affinity conflict. The pre-2026-05-27 openebs-jiva section below is SUPERSEDED history."
+title: CI build storage — hostpath PVCs in jenkins ns, node-pinned
+description: "CI cache PVCs (nix/cargo/sweettest-target) are openebs-hostpath in jenkins ns; pin with kubernetes.io/hostname nodeAffinity or pods thrash on volume binding."
 type: project
 originSessionId: 91882765-aece-476c-a49a-85b618774d32
 cites:
@@ -42,6 +43,8 @@ The Holochain/edge CI cache PVCs were cut over from `openebs-jiva-csi-default` (
 - the build only proceeds when cluster pressure shifts (observed ~1h thrash before pod 6 scheduled, elohim-edge #1010). This is anti-pattern AP-009 (pod-scheduling thrash).
 
 **Fix — make hostpath binding deterministic:** add a `kubernetes.io/hostname` nodeAffinity to each pipeline's Jenkinsfile pod spec. Operator assignment: elohim-edge → `thinkc-p1s`; elohim-holochain (DNA) + steward → `intel-nuc`.
+
+**Namespace:** the CI cache PVCs (nix-cache, cargo-cache, sweettest-target-cache) live in the `jenkins` namespace (per `genesis/manifests/nix-cache-pvc.yaml`), NOT `ethosengine` — the superseded section's namespace guidance is stale too.
 
 **Tradeoff:** if a PVC had previously bound to a DIFFERENT node, the pin triggers an immediate `FailedScheduling` and the operator must delete+reapply that PVC. Dead `nix-store` volume declarations are intentionally left in the Jenkinsfiles as breadcrumbs for future sccache work.
 

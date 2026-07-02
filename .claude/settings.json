@@ -6,7 +6,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/load-project-context.py\"",
-            "timeout": 5000
+            "timeout": 5
           },
           {
             "type": "command",
@@ -18,7 +18,7 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/genesis/agentic/bin/pool-preflight.sh\"",
-            "timeout": 15000,
+            "timeout": 15,
             "statusMessage": "Cargo target pool stewardship..."
           },
           {
@@ -43,7 +43,7 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/genesis/agentic/bin/pool-postflight.sh\"",
-            "timeout": 15000
+            "timeout": 15
           }
         ]
       }
@@ -54,7 +54,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/pickup-semantic-surfacing.py\" --event prompt",
-            "timeout": 15000
+            "timeout": 15
           }
         ]
       }
@@ -66,7 +66,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-memory.py\"",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       },
@@ -76,7 +76,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/pickup-semantic-surfacing.py\" --event tool",
-            "timeout": 15000
+            "timeout": 15
           }
         ]
       },
@@ -86,17 +86,17 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/sensitive-file-protection.py\"",
-            "timeout": 3000
+            "timeout": 3
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/seed-data-validation.py\"",
-            "timeout": 3000
+            "timeout": 3
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/managed-surface-context.py\"",
-            "timeout": 3000
+            "timeout": 3
           }
         ]
       },
@@ -106,17 +106,17 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/cargo-disk-guard.py\"",
-            "timeout": 5000
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/rust-holochain-validation.py\"",
-            "timeout": 3000
+            "timeout": 3
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/claude-md-structural-signal.py\"",
-            "timeout": 2000
+            "timeout": 2
           }
         ]
       },
@@ -126,7 +126,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/sonar-issues-guard.py\"",
-            "timeout": 3000
+            "timeout": 3
           }
         ]
       },
@@ -136,7 +136,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/epr-meta-resolver.py\"",
-            "timeout": 3000
+            "timeout": 3
           }
         ]
       }
@@ -148,62 +148,67 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/claude-md-drift-signal.py\"",
-            "timeout": 2000
+            "timeout": 2
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/memory-coherence-signal.py\"",
-            "timeout": 2000
+            "timeout": 2
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/scripts/memory-kit/memory-index-projector.py\" --hook",
+            "timeout": 10
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/cite-seal-signal.py\"",
-            "timeout": 2000
+            "timeout": 2
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/placement-drift-signal.py\"",
-            "timeout": 2000
+            "timeout": 2
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/map-drift-signal.py\"",
-            "timeout": 2000
+            "timeout": 2
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/sync-check.py\"",
-            "timeout": 5000
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/lint-check.py\"",
-            "timeout": 10000
+            "timeout": 10
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/testid-audit.py\"",
-            "timeout": 3000
+            "timeout": 3
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/epr-link-check.py\"",
-            "timeout": 3000
+            "timeout": 3
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/p2p-plan-audit.py\"",
-            "timeout": 3000
+            "timeout": 3
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/p2p-schema-audit.py\"",
-            "timeout": 3000
+            "timeout": 3
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/jenkinsfile-method-size.py\"",
-            "timeout": 3000
+            "timeout": 3
           }
         ]
       },
@@ -213,7 +218,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/ci-result-formatter.py\"",
-            "timeout": 3000
+            "timeout": 3
           }
         ]
       },
@@ -223,7 +228,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/deprecation-sentinel.py\"",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }

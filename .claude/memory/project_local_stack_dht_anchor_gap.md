@@ -1,7 +1,8 @@
 ---
 id: project-local-stack-dht-anchor-gap
 name: local-stack-dht-anchor-gap
-description: Local hc:start:seed bulk-import never DHT-anchors (provenance NULL → all external reads 404 by design); dev repair = SQLite p2p_published_at backfill; the gate is get_content require_provenance
+title: Local stack DHT-anchor gap
+description: Local bulk seed never DHT-anchors → provenance gate 404s all reads by design; dev repair = p2p_published_at backfill; real fix = import anchor step
 metadata: 
   node_type: memory
   type: project

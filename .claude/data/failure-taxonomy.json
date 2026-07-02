@@ -2,52 +2,96 @@
   "version": "1.0.0",
   "categories": {
     "DNA_BUILD": {
-      "pipelines": ["elohim-holochain"],
+      "pipelines": [
+        "elohim-holochain"
+      ],
       "search": "error\\[E\\d+\\]|cargo build.*failed",
-      "ctx": 5, "max": 10,
+      "ctx": 5,
+      "max": 10,
       "fix": "Check RUSTFLAGS, run cargo build --target wasm32-unknown-unknown locally",
-      "blocks": ["elohim-edge", "elohim-genesis"]
+      "blocks": [
+        "elohim-edge",
+        "elohim-genesis"
+      ]
     },
     "APP_BUILD": {
-      "pipelines": ["elohim"],
+      "pipelines": [
+        "elohim"
+      ],
       "search": "error TS\\d+|Cannot find module",
-      "ctx": 3, "max": 20,
+      "ctx": 3,
+      "max": 20,
       "fix": "Run npm run build locally, check model sync",
-      "blocks": ["elohim-genesis"]
+      "blocks": [
+        "elohim-genesis"
+      ]
     },
     "INFRASTRUCTURE": {
-      "pipelines": ["elohim-edge"],
-      "search": "hApp.*not found|nerdctl|denied",
-      "ctx": 5, "max": 10,
+      "pipelines": [
+        "elohim-edge"
+      ],
+      "search": "hApp.*not found|nerdctl.*(?:error|fatal|denied|no such|failed)|level=fatal.*nerdctl|denied",
+      "ctx": 5,
+      "max": 10,
       "fix": "Verify elohim-holochain succeeded, check Harbor creds",
-      "blocks": ["elohim-genesis"]
+      "blocks": [
+        "elohim-genesis"
+      ]
     },
     "SEEDING": {
-      "pipelines": ["elohim-genesis"],
+      "pipelines": [
+        "elohim-genesis"
+      ],
       "search": "PREFLIGHT|ETIMEDOUT|Cell not found",
-      "ctx": 10, "max": 5,
+      "ctx": 10,
+      "max": 5,
       "fix": "Check doorway-alpha.elohim.host/health, verify edge healthy",
       "blocks": []
     },
     "DEPLOYMENT": {
-      "pipelines": ["elohim", "elohim-edge"],
+      "pipelines": [
+        "elohim",
+        "elohim-edge"
+      ],
       "search": "kubectl.*failed|rollout|CrashLoopBackOff",
-      "ctx": 5, "max": 10,
+      "ctx": 5,
+      "max": 10,
       "fix": "Check Harbor image, kubectl describe pod",
-      "blocks": ["elohim-genesis"]
+      "blocks": [
+        "elohim-genesis"
+      ]
     },
     "TEST_FAILURE": {
-      "pipelines": ["elohim", "elohim-genesis"],
+      "pipelines": [
+        "elohim",
+        "elohim-genesis"
+      ],
       "search": "FAILED|AssertionError",
-      "ctx": 5, "max": 15,
+      "ctx": 5,
+      "max": 15,
       "fix": "Use getTestResults/getFlakyFailures, run npm test locally",
       "blocks": []
     }
   },
   "dependencies": {
-    "elohim-holochain": { "blocks": ["elohim-edge", "elohim-genesis"] },
-    "elohim-edge": { "blocks": ["elohim-genesis"] },
-    "elohim": { "blocks": ["elohim-genesis"] },
-    "elohim-genesis": { "blocks": [] }
+    "elohim-holochain": {
+      "blocks": [
+        "elohim-edge",
+        "elohim-genesis"
+      ]
+    },
+    "elohim-edge": {
+      "blocks": [
+        "elohim-genesis"
+      ]
+    },
+    "elohim": {
+      "blocks": [
+        "elohim-genesis"
+      ]
+    },
+    "elohim-genesis": {
+      "blocks": []
+    }
   }
 }

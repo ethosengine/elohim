@@ -29,5 +29,5 @@ The transport-id→agent_cid RESOLVER (`2026-06-15-coherent-transport-identity-r
 ## Links
 - Module: `elohim/elohim-storage/src/identity_namespace.rs` (commit `3d026f226`)
 - Convention: `elohim/elohim-storage/CLAUDE.md` → "Identity & Transport-Identity Coherence"
-- Root RCA: `.claude/data/matthew-edge-resiliency-rca-fanout-2026-06-15.md` §6
+- Root RCA: `genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md` §6
 - Resilience card join: `elohim/elohim-storage/src/services/household_resilience.rs` (lines 74, 172–174, 447–449)

@@ -1,6 +1,7 @@
 ---
 name: subagent-liveness-clock-skew
-description: "Never infer background-agent death from transcript mtime — container clocks are skewed (hours apart); a \"stale\" agent may still be writing and will race your edits"
+title: Subagent liveness ≠ transcript mtime
+description: "Container clocks skew hours apart — never infer agent death from transcript mtime vs date; check writer-relative freshness and TaskStop live racers first."
 metadata: 
   node_type: memory
   type: feedback

@@ -11,11 +11,38 @@ fail-silent always.
 
 import json
 import os
+import re
+import subprocess
 import sys
+import time
 
 PROJECT = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
+
+
+def headline_text():
+    """The placement-audit budget headline. Reuse the cache load-project-context.py wrote earlier
+    THIS SessionStart (<120s old) so the heavy audit runs once, not once per consumer; fall back to
+    our own subprocess otherwise. Both paths fail-open (return '')."""
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", PROJECT).strip("-")
+    cache = f"/tmp/claude-headline-{slug}.txt"
+    try:
+        if os.path.getmtime(cache) > time.time() - 120:
+            with open(cache, encoding="utf-8") as fh:
+                txt = fh.read()
+            if txt.strip():
+                return txt
+    except OSError:
+        pass  # no cache / stale / unreadable → recompute below
+    try:
+        return subprocess.run(
+            ["python3", os.path.join(PROJECT, ".claude/scripts/memory-kit/placement-audit.py"),
+             "--headline"],
+            capture_output=True, text=True, timeout=10, cwd=PROJECT,
+        ).stdout
+    except Exception:  # noqa: BLE001 — headline fetch is best-effort
+        return ""
 
 
 def jread(rel, default):
@@ -48,15 +75,7 @@ def main():
     # include terminal/historical specs and read as thousands of noise).
     claimed = 0
     try:
-        import subprocess
-
-        head = subprocess.run(
-            ["python3", os.path.join(PROJECT, ".claude/scripts/memory-kit/placement-audit.py"),
-             "--headline"],
-            capture_output=True, text=True, timeout=10, cwd=PROJECT,
-        ).stdout
-        import re
-
+        head = headline_text()
         m = re.search(r"(\d+)\s+claimed-unverified", head)
         if m:
             claimed = int(m.group(1))

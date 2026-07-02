@@ -1,7 +1,8 @@
 ---
 id: feedback-managed-surface-edit-discipline
 name: feedback-managed-surface-edit-discipline
-description: CLAUDE.md/spec/plan/doc edits flow through the memkit cite tooling — the managed-surface registry + PRE/POST hooks enforce it; never hand-write slug/fingerprint/path
+title: Managed-surface edit discipline
+description: CLAUDE.md/spec/plan edits use cite tooling (seal/describe/propagate/refresh); scope lives ONLY in _lib/managed_surfaces.py; stale cite → --refresh.
 metadata:
   type: feedback
 cites:
@@ -20,4 +21,4 @@ enforcement surface privately re-encoded a narrower scope. Scope must live in ON
 **How to apply:** trust the PreToolUse injection (`managed-surface-context.py`) — when it names a discipline +
 tool, use that tool. When adding a new managed home, add it to `_lib/managed_surfaces.py` (the cross-check test
 fails if it diverges from `subject-routing.yaml`), never to an individual hook. `status: stale` on a cite is a
-re-verify queue → `cite-gen --refresh <doc>` after re-verifying, not a thing to hand-edit. [[project-memory-in-repo-two-tier]]
+re-verify queue → `cite-gen --refresh <doc>` after re-verifying, not a thing to hand-edit.

@@ -1,7 +1,8 @@
 ---
 id: feedback-cargo-target-dir-for-native-builds
 name: cargo-target-dir-for-native-builds
-description: "Native cargo builds in elohim-storage / sweettest / doorway accumulate target/ dirs at workspace roots (multi-G each) unless `CARGO_TARGET_DIR` points at the pool slot. Set it in every cargo invocation."
+title: Set CARGO_TARGET_DIR for native builds
+description: "Native (non-WASM) cargo builds need CARGO_TARGET_DIR at the pool slot per workspace; forgotten legacy target/ dirs balloon to ~30G. WASM workspaces stay default."
 metadata: 
   node_type: memory
   type: feedback

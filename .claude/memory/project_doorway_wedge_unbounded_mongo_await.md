@@ -1,6 +1,8 @@
 ---
+index: false
 name: project_doorway_wedge_unbounded_mongo_await
-description: "Doorway-alpha liveness-SIGKILL crashloop. RCA-RESOLVED 2026-06-15: NOT warm_stream CPU (CFS-starvation FALSIFIED at cpu=2) and NOT the conductor kitsune2 queue (REFUTED) — root is a BLOCKING getaddrinfo in holochain_client's conductor connect parking tokio workers during a DNS flap. FIXED: off-pool async DNS (resolve_host_port) + dedicated-runtime heartbeat-gated liveness watchdog (commits f236416db, 19fb41974; band-aids be313cfc4)."
+title: Doorway wedge — blocking getaddrinfo parks tokio workers
+description: "Doorway-alpha SIGKILL crashloop root = blocking getaddrinfo in holochain_client connect parking tokio workers during DNS flaps; fixed via async DNS + watchdog."
 metadata: 
   node_type: memory
   type: project

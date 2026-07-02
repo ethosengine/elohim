@@ -1,6 +1,7 @@
 ---
 name: hook-bypass-integration-shakeout
-description: Operator rule (2026-06-12) — an agent working ON the CI/CD pipeline whose changes already passed the gates may push --no-verify during integration shakeout; it owns the pipeline as its gate while other agents use local compute
+title: Hook-bypass grant for CI-pipeline integration shakeout
+description: The agent working ON the CI pipeline may push --no-verify during integration shakeout only if gates already ran green; CI becomes its verification surface.
 metadata: 
   node_type: memory
   type: feedback

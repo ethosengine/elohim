@@ -1,5 +1,6 @@
 ---
 name: dna-hash-blind-to-coordinator-zomes
+title: DNA hash blind to coordinator zomes
 description: "Holochain DNA hash covers only integrity zomes + modifiers — coordinator-only changes need the update_coordinators hot-swap path, not reinstall"
 metadata: 
   node_type: memory

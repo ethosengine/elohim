@@ -1,6 +1,7 @@
 ---
 name: feedback_workflow_structuredoutput_hang
-description: Workflow agents with schema:/forced StructuredOutput can hang forever on empty-payload retry loops in this container — prefer schemaless prose returns + a stall-watcher
+title: Workflow StructuredOutput hang
+description: schema'd workflow agents retry empty {} StructuredOutput forever (48→481 calls, no completion notify) and hang the run — go schemaless prose + stall-watcher
 metadata: 
   node_type: memory
   type: feedback

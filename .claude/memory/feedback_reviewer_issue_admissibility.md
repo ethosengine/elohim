@@ -1,6 +1,7 @@
 ---
 name: reviewer-issue-admissibility
-description: Autonomous review loops deadlock on issues the implementer cannot fix — constrain reviewers to tree-fixable findings
+title: Reviewer issue admissibility
+description: Autonomous review loops deadlock on tree-unfixable complaints (history rewrites, transient TDD evidence); reviewer prompts need an issue-admissibility clause.
 metadata: 
   node_type: memory
   type: feedback

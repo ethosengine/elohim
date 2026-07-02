@@ -1,6 +1,8 @@
 ---
+index: false
 name: doorway-kitsune2-bootstrap-protocol
-description: "HC 0.6 conductors speak the kitsune2 bootstrap protocol (PUT /bootstrap/{space}/{agent} b64url-no-pad + GET /bootstrap/{space}); doorway served only legacy kitsune1 (POST+X-Op msgpack) until 2026-06-12 — conductors were DHT islands"
+title: Doorway kitsune2 bootstrap protocol (HC 0.6)
+description: "HC 0.6 conductors speak kitsune2 bootstrap (PUT /bootstrap/{space}/{agent}); doorway served only kitsune1 until 2026-06-12, leaving conductors DHT islands."
 metadata: 
   node_type: memory
   type: project

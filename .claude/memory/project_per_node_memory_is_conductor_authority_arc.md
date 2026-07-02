@@ -1,6 +1,7 @@
 ---
 name: project_per_node_memory_is_conductor_authority_arc
-description: "The GB-scale per-node memory (alpha agents climbing 2→4GB+, james OOM) is the embedded conductor's full-authority-arc DHT working set (target_arc_factor=1), NOT an elohim-storage leak; arc-factor is the scale lever."
+title: Per-node GB memory = conductor full-arc authority
+description: "Per-node 2→4GB+ climb (james OOM) = conductor full-arc DHT working set; target_arc_factor defaults to 1 so RAM ∝ corpus; arc-factor<1 is the scale lever."
 metadata: 
   node_type: memory
   type: project

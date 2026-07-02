@@ -260,7 +260,7 @@ code bug. **No seeder code change is warranted for `commitmentBackedCollectives`
 ## Reconciliation 2026-06-18 — CONTRADICTION FLAGGED (do not silently override; one probe settles it)
 
 A fresh root-cause triage of the genesis seed stages + this card
-(`.claude/data/genesis-seed-stages-rca-2026-06-18.md` /
+(`genesis/docs/content/elohim-protocol/history/2026-06-18-genesis-seed-stages-unstable-resilience-card-rca.md` /
 `genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md`,
 advisor-reviewed) reaches a verdict that **contradicts the 2026-06-15 conclusion above**
 for `commitmentBackedCollectives`. Stating both honestly — the operator (who has the

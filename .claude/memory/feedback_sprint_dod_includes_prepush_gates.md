@@ -1,7 +1,8 @@
 ---
 id: feedback-sprint-dod-includes-prepush-gates
 name: sprint-dod-includes-prepush-gates
-description: "Sprint task DoD must run the touched tree's pre-push gate clauses (lint/format:check/typecheck), not just unit tests — graphos sprint shipped 142-green with a red lint gate"
+title: Sprint DoD includes pre-push gates
+description: "Task DoD must run the touched tree's gate clauses (lint/format:check/typecheck), not just unit tests; graphos sprint went 142-green with a red a2o gate."
 metadata: 
   node_type: memory
   type: feedback

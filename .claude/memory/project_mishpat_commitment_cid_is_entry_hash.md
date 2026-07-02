@@ -1,6 +1,7 @@
 ---
 name: project_mishpat_commitment_cid_is_entry_hash
-description: "Mishpat commitment CID = entry_hash (the projection `cid`, used by bounded_by/graduation/revocation/fetch); action_hash is only the dht_anchor_hash null-guard — confusing them silently breaks every bounds-gate while per-task tests still pass"
+title: Mishpat commitment CID = entry_hash
+description: "Commitment cid = entry_hash (keys bounded_by/graduate/revoke/fetch); action_hash is only dht_anchor_hash; returning it as CID silently breaks every bounds-gate."
 metadata: 
   node_type: memory
   type: project

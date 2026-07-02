@@ -1,6 +1,8 @@
 ---
+index: false
 name: project_monty_lynn_outreach_thread
-description: Outreach thread to Dr. Monty Lynn (ACU) — three-audience pitch (theology/business/CS); Observer + Stafford Beer framing; sent ~2026-06-18
+title: Monty Lynn outreach thread (ACU)
+description: Three-audience pitch (theology/business/CS) to ACU prof; Observer (local AI→REA ledger) + Beer freedom-machine + Stargate hooks; sent ~2026-06-18.
 metadata:
   type: project
 ---

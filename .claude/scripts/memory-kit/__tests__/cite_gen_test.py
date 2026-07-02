@@ -51,7 +51,9 @@ check("emit desc from title first segment", env["desc"] == "Target Thing")
 check("emit carries a fingerprint", env["fingerprint"].startswith("sha256:"))
 
 # ── --into (migration pass 2): legacy DOC path -> envelope ──
-conv, left = cgmod.rewrite_into(citer)
+# (rewrite_into returns (converted, left_legacy, paths_stamped) since the
+# path-locator-cache addition — the test had drifted behind the signature)
+conv, left, _stamped = cgmod.rewrite_into(citer)
 check("rewrite_into converted the legacy doc cite", conv == 1)
 after = cg.parse_cites(fm.parse_file(citer))
 check("citer cite is now a slug envelope", after[0]["ref"] == "target-thing" and not after[0]["legacy_path"])

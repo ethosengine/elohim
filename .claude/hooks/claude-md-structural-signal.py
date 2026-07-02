@@ -2,7 +2,7 @@
 """
 CLAUDE.md Structural-Signal Accumulator
 
-PostToolUse hook (matcher: Bash). Detects directory-restructuring commands
+PreToolUse hook (matcher: Bash). Detects directory-restructuring commands
 (`mv`, `git mv`, `cp -r`, `rm -rf`, `mkdir`) and bumps a `structural_edits`
 counter on the affected CLAUDE.md scopes.
 
@@ -15,7 +15,7 @@ Detection is best-effort regex; false-negatives are fine (we'll catch via
 direct-edit signals as fallback), false-positives are fine (small bump,
 no harm). Complex shell pipelines / scripts may slip past.
 
-Hook Type: PostToolUse
+Hook Type: PreToolUse
 Matcher: Bash
 """
 from __future__ import annotations

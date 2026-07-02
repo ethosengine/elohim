@@ -92,7 +92,9 @@ MD_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.M)
 # dump) gate the score. The margin is tuned to the agentic developers' context capacity (a surface
 # they can hold without burning the window).
 STASIS_MARGIN = 0.15          # ±15% band; benchmark = 1.0 → at stasis when score >= 0.85
-MEMORY_MD_BUDGET = 46000      # bytes — MEMORY.md (always-loaded index)
+MEMORY_MD_BUDGET = 24000      # bytes — MEMORY.md (always-loaded index). The harness truncates the
+                              # load at ~24.4KB, so the prior 46000 enforced 1.9× the real cap —
+                              # aligned 2026-07-02 with memory-index-projector.py HARD_BUDGET_BYTES.
 CLAUDE_MD_BUDGET = 12000      # bytes — a gate an agent should hold without burning context
 # A LINK (every edge in the graph) = a PATH + a 1-2 sentence plain-text EXPLAINER of what's at the end.
 # Bare paths don't count: the traceability dimensions require the explainer, so a reader spends context

@@ -1,6 +1,7 @@
 ---
 name: overnight-permission-stalls
-description: Overnight autonomous sessions stall silently on permission prompts for sensitive paths (auth components) — pre-check permission coverage before overnight runs
+title: Overnight permission stalls
+description: An idle overnight session may be blocked on a permission prompt (auth paths), not done; check the transcript tail and never race a blocked session.
 metadata: 
   node_type: memory
   type: feedback

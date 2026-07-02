@@ -1,7 +1,8 @@
 ---
 id: feedback-no-brittle-commands-in-poststart
 name: feedback-no-brittle-commands-in-poststart
-description: "Devfile postStart failures abort whole-workspace startup; only add a command to postStart if it is idempotent, fast, and cannot reasonably fail"
+title: No brittle commands in devfile postStart
+description: "Devfile postStart failures abort whole-workspace startup; new tooling goes under commands: (exec on demand) — only idempotent, can't-fail commands auto-run"
 metadata: 
   node_type: memory
   type: feedback

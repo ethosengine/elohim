@@ -13,7 +13,7 @@ image: {"local": "images/placeholder-person.webp", "placeholder": true, "sourceU
 
 # Esther Perel
 
-Psychotherapist on relationships. This presence was created from the elohim.host manifesto "Inspired by" acknowledgments (see `.claude/data/contributor-cohort-seed-source-2026-06-21.md`).
+Psychotherapist on relationships. This presence was created from the elohim.host manifesto "Inspired by" acknowledgments (see `genesis/docs/content/elohim-protocol/history/2026-06-21-contributor-cohort-seed-source-manifesto-inspired-by.md`).
 
 ## Observations
 

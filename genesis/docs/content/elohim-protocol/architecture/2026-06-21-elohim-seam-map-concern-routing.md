@@ -208,7 +208,7 @@ canonical home · the adjacent-seam confusion to avoid.**
   cut today is a brittle `sed` that strips V8/SSR from the storage image
   (`elohim/elohim-storage/Dockerfile:99-110`).
 - **Home:** the 2026-06-21 footprint assessment
-  `.claude/data/modular-runtime-plugin-integrity-feasibility-2026-06-21.md`;
+  `genesis/data/timeline/backlog/modular-runtime-plugin-integrity-feasibility.md`;
   `elohim/elohim-storage/CLAUDE.md`; `steward/node/CLAUDE.md`; `doorway/doorway-service/CLAUDE.md`.
 - **Confusion:** the **`elohim-node` name overload** — the `steward/node` *binary* `elohim-node`
   (the dashboard/wizard daemon) vs the k8s *container* named `elohim-node` that runs
@@ -223,7 +223,7 @@ canonical home · the adjacent-seam confusion to avoid.**
   from routing a plugin's effects through the notary — the `bounds_validator` engine +
   `delegates-compute` authorization + the coordinator hot-swap pattern. See §3.6 for the
   bridge, the compile-time form of native extension.
-- **Home:** `.claude/data/modular-runtime-plugin-integrity-feasibility-2026-06-21.md`; the
+- **Home:** `genesis/data/timeline/backlog/modular-runtime-plugin-integrity-feasibility.md`; the
   integrity rails are `elohim/elohim-storage/src/services/bounds_validator.rs` (7-check engine)
   + the `delegates-compute` Commitment (`mishpat/.../commitments.rs:540-589`) + coordinator
   hot-swap (`happ_manager.rs:418-494`).
@@ -312,7 +312,7 @@ canonical home · the adjacent-seam confusion to avoid.**
 - **Add a new X (sync/shard protocol):** add a libp2p request-response behaviour + codec
   (skills `libp2p-protocols`/`libp2p-transport`); the CRDT engine is Automerge (`automerge-sync`).
 - **Home:** `elohim/elohim-storage/CLAUDE.md`; assessment
-  `.claude/data/peer-hoster-async-sync-readiness-2026-06-21.md`; CRDT store `sync/doc_store.rs`,
+  `genesis/data/timeline/backlog/peer-hoster-async-sync-readiness-assessment.md`; CRDT store `sync/doc_store.rs`,
   node↔node loop `p2p/mod.rs`, spoke route `http.rs`.
 - **Confusion:** peerId ≠ hostname — "reach my household node" is a peerId→household-binding
   problem (`household_id` at discovery), NOT a DNS/ingress problem. And peer-hoster (durable
@@ -326,7 +326,7 @@ canonical home · the adjacent-seam confusion to avoid.**
   entity); rollup engine `recursion.rs`, consumer path `graph_views/shefa/coverage.rs:25-44`,
   cross-DHT carrier `p2p/view_federation.rs` (`MAX_PAYLOAD = 256 KiB`).
 - **Home:** `elohim/elohim-storage/CLAUDE.md`; assessment
-  `.claude/data/commons-compute-aggregation-readiness-2026-06-21.md`; spec
+  `genesis/docs/content/elohim-protocol/history/2026-06-21-commons-compute-aggregation-readiness-assessment.md`; spec
   `2026-06-20-weave-epic-arc-design.md`; skill `rea-economics`.
 - **Confusion:** flat `CoverageRollup` (single-level fold) and recursive multi-level rollup are
   different rungs of the same engine — keep them distinct. A Case-A all-zeros bug is a *Track-1
@@ -341,7 +341,7 @@ canonical home · the adjacent-seam confusion to avoid.**
   swarm is private to the `HouseholdHub`/`CollectiveHub` impl, mDNS-first.
 - **Home:** `steward/node/CLAUDE.md`; arch `2026-05-02-elohim-hub-boundaries-design.md`
   (Hub trait, two-swarms table `:180-189`); assessment
-  `.claude/data/hub-enablement-dial-readiness-2026-06-21.md`; DNA-key lineage
+  `genesis/data/timeline/backlog/hub-enablement-dial-readiness-2026-06-21.md`; DNA-key lineage
   `2026-06-11-dna-upgrade-governance.md`; skill `hc-dev-orchestrator`.
 - **Confusion:** the hub-internal swarm (Seam 3.12, `steward/node`) ≠ Track-2 hub-to-hub
   federation (Seam 3.10/3.11, `elohim-storage`). Debugging blade consensus in
@@ -355,7 +355,7 @@ canonical home · the adjacent-seam confusion to avoid.**
   authorization (3.4):* this is **secrecy**, not who-you-are or may-you-act.
 - **Add a new X (encrypted content class):** a `KeyEnvelope` reader-key wrap (X25519 reader
   set) over the blob/quilt plane.
-- **Home:** `.claude/data/commons-compute-aggregation-readiness-2026-06-21.md` (R6
+- **Home:** `genesis/docs/content/elohim-protocol/history/2026-06-21-commons-compute-aggregation-readiness-assessment.md` (R6
   private-replica encryption); the blob plane (`BlobStore::store`);
   `2026-05-11-tiered-quilt-stewardship-design.md` (quilt). Conductor signing is the *integrity*
   side, not this.
@@ -465,13 +465,13 @@ and integrity-bound."
 
 This atlas is the durable, positive map: it says where each kind of work *goes* and how the
 seams compose. For the **current build-state** of any seam — what is wired, in flight, or still
-to build — read the dated readiness assessments in `.claude/data/` (they are point-in-time and
+to build — read the dated (2026-06-21) readiness assessments (they are point-in-time and
 go stale; this atlas does not):
 
-- `hub-enablement-dial-readiness-2026-06-21.md` — the hub / enablement seam (3.12)
-- `peer-hoster-async-sync-readiness-2026-06-21.md` — the peer-hoster dataplane seam (3.10)
-- `commons-compute-aggregation-readiness-2026-06-21.md` — the aggregation / rollup seam (3.11); its **R6** section also carries the confidentiality / encryption seam (3.13)
-- `modular-runtime-plugin-integrity-feasibility-2026-06-21.md` — the runtime/footprint (3.3) + plugin (3.4) seams
+- `genesis/data/timeline/backlog/hub-enablement-dial-readiness-2026-06-21.md` — the hub / enablement seam (3.12)
+- `genesis/data/timeline/backlog/peer-hoster-async-sync-readiness-assessment.md` — the peer-hoster dataplane seam (3.10)
+- `genesis/docs/content/elohim-protocol/history/2026-06-21-commons-compute-aggregation-readiness-assessment.md` — the aggregation / rollup seam (3.11); its **R6** section also carries the confidentiality / encryption seam (3.13)
+- `genesis/data/timeline/backlog/modular-runtime-plugin-integrity-feasibility.md` — the runtime/footprint (3.3) + plugin (3.4) seams
 
 A seam not named above grounds its current build-state from its **§3 Home** source files — these assessments are point-in-time and don't cover every seam.
 

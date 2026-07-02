@@ -1,6 +1,8 @@
 ---
+index: false
 name: sccache-cache-corruption-recovery
-description: "sccache null-byte/'unclosed delimiter' rustc errors. ISOLATED 2026-06-09: NOT a poisoned key — sccache leaks an S3 `.sccache_check` 404-NoSuchKey error string into its RlibDepDecoder rustc-via-stdin probe. Trigger is an EMPTY bucket, so a full wipe CAUSES it. Fix: RUSTC_WRAPPER='' or restore the sentinel — key-deletion does not apply. (SCCACHE_RECACHE only repaves compilation entries; earlier 2026-05-17 recovery procedures retained below.)"
+title: sccache cache corruption recovery
+description: "sccache 'unclosed delimiter'/null-byte = .sccache_check 404 leaked into rustc probe; empty bucket (a wipe!) triggers it; fix RUSTC_WRAPPER='' or heal sentinel."
 metadata: 
   node_type: memory
   id: feedback-sccache-cache-corruption-recovery

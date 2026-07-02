@@ -34,8 +34,19 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-MEMORY_ROOT = Path("/projects/.claude-config/projects/-projects-elohim/memory")
+# Bootstrap _lib by walking up
+_here = Path(__file__).resolve()
+for _ in range(8):
+    if (_here / ".claude" / "scripts" / "_lib").is_dir():
+        sys.path.insert(0, str(_here / ".claude" / "scripts"))
+        break
+    _here = _here.parent
+from _lib.paths import memory_dir, repo_root_from_file  # noqa: E402
+
+REPO_ROOT = repo_root_from_file(__file__)
+# was a hardcoded machine-specific /projects/.claude-config/... path — silently
+# no-oped off this checkout (2026-07-02 review)
+MEMORY_ROOT = memory_dir(REPO_ROOT)
 
 # Doc locations to scan for stale path citations.
 DOC_GLOBS = [

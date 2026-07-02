@@ -6,7 +6,7 @@
 > retention** in the conductor child (Rust/C allocations; Go heap flat ~52MB; tx5/go-pion exonerated). CURED
 > by swapping the global allocator glibc→jemalloc — flat past the old OOM cadence, DNA hash unchanged. The
 > "memory ∝ corpus × arc" theory remains falsified for this OOM.
-> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-rca-native-heap-reframe-2026-06-18.md
+> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md
 
 
 **Status:** open · **Captured:** 2026-06-16 (shift `alpha-conductor-oom-arc-leecher`) · **Class:** self-heal / runtime memory · **Env:** alpha-cluster (observed live)
@@ -31,5 +31,5 @@ This settles leak (anon-heap, growing) vs bounded (file-mmap SQLite page cache) 
 
 ## Links
 - Soak evidence + judgment: shift journal `.claude/shifts/2026-06-16T0357-alpha-conductor-oom-arc-leecher.journal.md` (iteration 2)
-- RCA: `.claude/data/matthew-edge-resiliency-rca-fanout-2026-06-15.md` (§4 instrumentation, §5 staged experiments)
+- RCA: `genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md` (§4 instrumentation, §5 staged experiments)
 - Falsified spec: `genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md`

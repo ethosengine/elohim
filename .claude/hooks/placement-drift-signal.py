@@ -140,31 +140,32 @@ def main() -> int:
     status = terminal_status_of(text)
 
     store_path = drift_store_path(repo)
-    default = {"schema_version": 1, "threshold": DEFAULT_THRESHOLD, "due": {}}
-    store = _store.load_json(store_path, default=default)
-    if not isinstance(store, dict):
-        store = default
-    store.setdefault("due", {})
-    store.setdefault("threshold", DEFAULT_THRESHOLD)
-
     now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    if status is None:
-        # Status was edited back to non-terminal (e.g. re-opened) → clear any queued
-        # entry so the headline does not over-report. Cheap self-healing path.
-        if rel in store["due"]:
-            del store["due"][rel]
-            _store.save_json(store_path, store)
-        return 0
+    def _mutate(data) -> dict:
+        store = data if isinstance(data, dict) else {
+            "schema_version": 1, "threshold": DEFAULT_THRESHOLD, "due": {}}
+        store.setdefault("schema_version", 1)
+        store.setdefault("threshold", DEFAULT_THRESHOLD)
+        store.setdefault("due", {})
+        if status is None:
+            # Status was edited back to non-terminal (e.g. re-opened) → clear any queued
+            # entry so the headline does not over-report. Cheap self-healing path.
+            store["due"].pop(rel, None)
+            return store
+        entry = store["due"].get(rel) or {"hits": 0, "status": status, "first_signal_at": now_iso}
+        entry["hits"] = entry.get("hits", 0) + 1
+        entry["status"] = status
+        entry["last_signal_at"] = now_iso
+        entry.setdefault("first_signal_at", now_iso)
+        store["due"][rel] = entry
+        return store
 
-    entry = store["due"].get(rel) or {"hits": 0, "status": status, "first_signal_at": now_iso}
-    entry["hits"] = entry.get("hits", 0) + 1
-    entry["status"] = status
-    entry["last_signal_at"] = now_iso
-    entry.setdefault("first_signal_at", now_iso)
-    store["due"][rel] = entry
-
-    _store.save_json(store_path, store)  # best-effort; never raises
+    # Serialize the read-modify-write so concurrent sessions don't lose each other's updates.
+    _store.locked_update(
+        store_path, _mutate,
+        default={"schema_version": 1, "threshold": DEFAULT_THRESHOLD, "due": {}},
+    )
     return 0  # hooks are best-effort; never block the tool call
 
 

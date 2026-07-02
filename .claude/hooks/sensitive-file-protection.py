@@ -114,9 +114,11 @@ def main():
             print(json.dumps(output))
             sys.exit(0)
 
-        # For Write operations, check if new content contains secrets
-        if tool_name == 'Write':
-            content = tool_input.get('content', '')
+        # For Write/Edit operations, check if new content contains secrets
+        # (Edit carries the pasted text in new_string — the 2026-07-02 review
+        # found the Edit path entirely uninspected).
+        if tool_name in ('Write', 'Edit'):
+            content = tool_input.get('content') or tool_input.get('new_string') or ''
             secret_patterns = check_content_for_secrets(content)
             if secret_patterns:
                 output = {

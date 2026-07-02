@@ -1,7 +1,8 @@
 ---
 id: feedback-frontend-review-eyes-first
 name: frontend-review-eyes-first
-description: Frontend review/refinement tasks start by RENDERING the app (pnpm look) before any code reading — operator called out that code-first rails skip the actual looking
+title: Frontend review = eyes first
+description: Render the surface before code review (pnpm look, graphos sheet); canonical = looking-at-frontend skill; can't-find ≠ never-implemented — suspect reachability.
 metadata: 
   node_type: memory
   type: feedback

@@ -19,7 +19,7 @@ cites:
 > CURED by glibc→jemalloc (conductors flat ~2.1–2.9GB). So the alpha evidence here is void and the ablation is
 > moot. The "per-node RAM ∝ corpus at full arc" scaling argument remains valid on first principles as a
 > future-scale concern — but it was never demonstrated by the alpha OOM.
-> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-rca-native-heap-reframe-2026-06-18.md
+> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md
 
 
 **The per-node memory problem is not a code leak — it is the authority-arc replication topology, and the fix is the sharding the design already specifies.**
