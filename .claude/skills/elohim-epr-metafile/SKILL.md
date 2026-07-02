@@ -111,6 +111,8 @@ one predicate, a `when:` matcher, and a `why:`.
 | `require-sibling: ".epr-meta"` | a new subtree is created without its own `.epr-meta` | "a new subtree must carry its own `.epr-meta`" + `why:` | `deny` |
 | `dedupe-of: path` | `when:` matches (anti-duplicate; the glob is the trigger) | "this concern already lives at `<path>`" + `why:` | `ask`/`deny` |
 | `validator: epr:<name>` | the named validator-EPR returns true for the write | "validator `<name>` flagged this" + `why:` | any¹ |
+| `measure: { loc-soft, loc-hard }` | post-edit line count at/over a ceiling | over `loc-hard` → a `measure` verdict (fingerprinted architecture finding in `.claude/data/architecture-findings.jsonl` + review-dispatch directive); over `loc-soft` only → an `inject` nudge, debounced per path | `measure` (never blocks) |
+| `policy: <id>@<version>` (binding, not a predicate) | always — expands at resolve time into the registry policy's concrete rule | the policy's class/predicate/why; the binding adds only `params:` / `when:` local variance | whatever the policy declares |
 
 ¹ **Only `epr:validator-p2p-design-gate` is registered in v1.** A `validator:` ref *not* in the registry
 (`REFERENCE_VALIDATORS`) silently degrades to an `inject` advisory **regardless of the rule's declared
@@ -126,8 +128,8 @@ currently fire on nothing.** Treat them as documentation of intent, not enforcem
 | Predicate / key / norm | State in v1 | What to do instead, today |
 |---|---|---|
 | `allowed-types: [globs]` | **Phantom** — no `_eval_rule` branch; validates clean, counts as "actionable", produces no verdict | express the intent with `route-to` (misplaced type → dest) or `require-frontmatter`; do **not** rely on `allowed-types` to block anything |
-| `measure: { count, emit }` / `max-files: {…}` / `class: measure` | **Inert** — `_eval_rule` returns no verdict; `combine()` ranks only `deny`/`ask`/`inject`; no counter is emitted | if you need a count signal now, emit it from a deterministic script into `.claude/data/*.jsonl`, not from a `measure` rule |
-| `class: dispatch` | **Inert** — no host-side background fire runs | use `inject` for an advisory; defer true dispatch to the wiring slice |
+| `measure: { count, emit }` / `max-files: {…}` | **Inert** — only the LoC-ceiling keys (`loc-soft`/`loc-hard`) are wired; count-shaped measures and `max-files` produce no verdict | if you need a count signal now, emit it from a deterministic script into `.claude/data/*.jsonl` |
+| `class: dispatch` | **Inert** — no host-side background fire runs (the `measure` hard-ceiling directive instructs the *session agent* to dispatch; the hook never spawns) | use `inject` for an advisory; defer true dispatch to the wiring slice |
 | `max-cascade-depth: N` (top-level) | **Inert** — `collect_cascade` always bounds on the hardcoded `MAX_CASCADE_DEPTH = 32`; the per-manifest key is parsed and discarded (there is no "default 8") | rely on `root: true` to terminate the cascade; the depth cap is a fixed 32 you cannot tune per-directory |
 | `extends: <path>` (top-level) | **Inert** — the cascade parent is pure filesystem ancestry; `extends:` is never read (a non-ancestor pointer is a silent no-op) | place a directory under the governed tree to inherit; shared/non-ancestor governance is a deferred slice |
 | self-hardening `bad-rule` override counter | **Not wired** — overrides aren't counted | rely on review |
@@ -138,7 +140,10 @@ currently fire on nothing.** Treat them as documentation of intent, not enforcem
 - `deny` — block the write.
 - `ask` — prompt; the human can proceed. The workhorse for directory hygiene.
 - `inject` — advise and proceed (adds context, never blocks). Free to author.
-- `measure` / `dispatch` — side-channels (count / fire background work). **Reserved** in v1 (above).
+- `measure` — the observation tier: never blocks, feeds signal ledgers. **Live for LoC ceilings**
+  (soft → debounced nudge; hard → fingerprinted architecture finding + dispatch directive, the
+  flag→agent→canon→stasis shape). Count-shaped measures remain reserved.
+- `dispatch` — **Reserved** (above).
 
 > **Authority is a norm, not a wired gate.** Convention: an agent may author `inject`/`ask` rules
 > autonomously; a new `deny` is a governance act → you should **surface it to the operator and let them
@@ -147,6 +152,35 @@ currently fire on nothing.** Treat them as documentation of intent, not enforcem
 > authoring an `.epr-meta` is itself currently ungoverned (no rule matches the `.epr-meta` basename).
 > There is no safety net catching an over-aggressive `deny`; the discipline is yours. That is exactly
 > why question 4 above pushes you toward `ask`.
+
+## The policy registry — define once, bind many
+
+A rule wanted in more than one directory (or one that is really a repo-wide norm) is a **policy**,
+not an inline rule. Policies live in the registry `.claude/epr-meta/policies.yaml` as
+Precedent-shaped objects (the Mishpat::Precedent lineage: binding ladder, scope, why,
+supersession) — the graduated home when epr-meta lifts into brit/eprfs is a Mishpat `Precedent`
+entry (CID = entry_hash), with manifest bindings becoming cites. A manifest binds one with:
+
+```yaml
+rules:
+  - id: rs-loc-ceiling                      # the binding's local id
+    policy: source-file-loc-ceiling@1       # registry id @ version — the pin is REQUIRED
+    params: { loc-hard: 9000 }              # optional local variance, merged over the policy's measure
+    when: { write: "*.rs" }                 # optional scope override
+```
+
+Contract, enforced by `validate_meta` + `expand_policies`:
+
+- **The policy owns semantics** (class, predicate, measure defaults, `why:`); **the binding owns
+  placement** (`when:` override, `params:`). A binding that redeclares class/predicates is
+  schema-invalid.
+- **The version pin is a declared dependency, never recency.** Tightening a policy = adding a new
+  version entry; every binding keeps its old semantics until it re-declares. `status: superseded`
+  + `superseded_by` record lineage; never delete a version that still has bindings.
+- **Unknown/unpinned refs fail LOUD**: the rule is dropped with an advisory (never silently kept,
+  never silently enforced-as-something-else). A silently vanished `deny` would be silent-allow —
+  the advisory is the tell.
+- **Inlining a rule whose id exists in the registry** draws a dedupe advisory: bind, don't redefine.
 
 ## Choosing a signal: the decision procedure
 
@@ -166,6 +200,8 @@ For the directory in front of you:
    | subtree sprawl / flat-dir invariant | `no-new-subdirs: true` at `class: deny` |
    | new subtrees with no governance of their own | `require-sibling: ".epr-meta"` at `class: deny` |
    | a content-shaped concern needing real logic (e.g. a P2P-design check) | `validator: epr:<name>`, class to taste |
+   | god-file growth (a source file outgrowing review/refactor scale) | bind `policy: source-file-loc-ceiling@1` (or re-bind with `params:` for a region's legitimate variance) |
+   | the same rule wanted in a second directory | STOP inlining — lift the definition into the policy registry and bind `policy: <id>@<version>` in both places |
 
    ² `deny` is justified here only because a doc with no `cites:`/`id` genuinely *can't* be linked into
    the substrate — proceeding is broken, not merely untidy (see step 4 / §Authority). Otherwise, step 4.

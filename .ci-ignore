@@ -13,7 +13,6 @@
 .claude/
 .github/
 .husky/
-ROADMAP.md
 genesis/orchestrator/Jenkinsfile
 genesis/orchestrator/build-graph.groovy
 CLAUDE.md

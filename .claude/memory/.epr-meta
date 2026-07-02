@@ -11,14 +11,7 @@ purpose: >
   managed home (subject-routing.yaml); native memory stays light.
 rules:
   - id: memory-frontmatter-at-birth
-    class: deny
-    when: { write: "*.md", new: true }
-    require-frontmatter: [name, title, description]
-    why: >
-      A memory born without name + title + description cannot project into the generated
-      MEMORY.md index — it is unrecallable, which defeats the only purpose of writing it.
-      Add frontmatter: name (slug), title (<= 60 chars), description (ONE line, <= 160
-      chars: what the fact is + when it bites), metadata.type (user|feedback|project|reference).
+    policy: memory-frontmatter-at-birth@1
   - id: memory-index-is-generated
     class: ask
     when: { write: "MEMORY.md" }
