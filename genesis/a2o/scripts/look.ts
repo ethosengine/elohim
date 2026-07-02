@@ -27,6 +27,13 @@ export interface LookOptions {
   timeoutMs?: number;
   /** Emulated prefers-color-scheme — render the OTHER theme without an OS. */
   scheme?: 'light' | 'dark';
+  /**
+   * Walk the page top→bottom before the shot so IntersectionObserver
+   * reveal-on-scroll sections actually paint — without this, a full-page
+   * screenshot of a scrollytelling surface (e.g. the landing) captures
+   * unrevealed sections as blank background.
+   */
+  scroll?: boolean;
 }
 
 export interface LookResult {
@@ -52,7 +59,7 @@ const REPORTS_DIR = 'reports/look';
 const USAGE =
   'Usage: look <url> [--as <FixtureHuman>] [--doorway <id|url>] ' +
   '[--wait-testid <id>] [--click-testid <id>] [--out <slug>] [--viewport <WxH>] ' +
-  '[--timeout <ms>] [--scheme light|dark]';
+  '[--timeout <ms>] [--scheme light|dark] [--scroll]';
 
 export function parseArgs(argv: string[]): LookOptions {
   const args = [...argv];
@@ -87,6 +94,9 @@ export function parseArgs(argv: string[]): LookOptions {
         i++;
         break;
       }
+      case '--scroll':
+        opts.scroll = true;
+        break;
       case '--out':
         opts.out = val;
         i++;
@@ -185,25 +195,15 @@ export async function runLook(opts: LookOptions): Promise<LookResult> {
     }
 
     if (opts.waitTestid) {
-      try {
-        await device.page
-          .locator(`[data-testid="${opts.waitTestid}"]`)
-          .waitFor({ state: 'visible', timeout: 15_000 });
-      } catch {
-        ok = false;
-      }
+      ok = (await waitForTestid(device.page, opts.waitTestid)) && ok;
     }
 
     if (opts.clickTestid) {
-      try {
-        await device.page.locator(`[data-testid="${opts.clickTestid}"]`).first().click({
-          timeout: 15_000,
-        });
-        // Let the opened surface (panel/menu/dialog) settle before the shot.
-        await device.page.waitForTimeout(500);
-      } catch {
-        ok = false;
-      }
+      ok = (await clickTestid(device.page, opts.clickTestid)) && ok;
+    }
+
+    if (opts.scroll) {
+      ok = (await walkPageForReveals(device.page)) && ok;
     }
 
     const finalUrl = device.page.url();
@@ -233,6 +233,64 @@ export async function runLook(opts: LookOptions): Promise<LookResult> {
 
   await writeFile(capturePath, JSON.stringify(result, null, 2));
   return result;
+}
+
+/** Best-effort wait for a testid to become visible; false on timeout. */
+async function waitForTestid(page: PlaywrightDevice['page'], testid: string): Promise<boolean> {
+  try {
+    await page.locator(`[data-testid="${testid}"]`).waitFor({ state: 'visible', timeout: 15_000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Best-effort click on a testid (opens panels/menus); false on failure. */
+async function clickTestid(page: PlaywrightDevice['page'], testid: string): Promise<boolean> {
+  try {
+    await page.locator(`[data-testid="${testid}"]`).first().click({ timeout: 15_000 });
+    // Let the opened surface (panel/menu/dialog) settle before the shot.
+    await page.waitForTimeout(500);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Walk the page top→bottom so IntersectionObserver reveal-on-scroll sections
+ * paint before the full-page shot, then settle back at the top. Returns false
+ * on failure instead of throwing (mirrors the other best-effort steps).
+ *
+ * The scroll body is a string, not a function: esbuild/tsx injects a `__name`
+ * helper into serialized functions that is undefined inside the page.
+ */
+async function walkPageForReveals(page: PlaywrightDevice['page']): Promise<boolean> {
+  const evaluator = page as unknown as {
+    evaluate(script: string): Promise<unknown>;
+    waitForTimeout(ms: number): Promise<void>;
+  };
+  try {
+    await evaluator.evaluate(`(async () => {
+      const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+      let y = 0;
+      // Re-read scrollHeight each step — content can grow as sections materialize.
+      while (y < document.documentElement.scrollHeight) {
+        window.scrollTo(0, y);
+        await delay(150);
+        y += 400;
+      }
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      await delay(1000);
+      window.scrollTo(0, 0);
+      await delay(600);
+    })()`);
+    // Let reveal transitions (0.8s CSS) finish before the shot.
+    await evaluator.waitForTimeout(1200);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Origin for the device's appUrl; tolerant of file:// and bad input. */
