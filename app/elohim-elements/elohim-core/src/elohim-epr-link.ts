@@ -10,12 +10,32 @@ export type EprLinkDisplay = 'inline' | 'chip' | 'card' | 'popover';
 
 export type EprLinkLoadLevel = 1 | 2 | 3 | 4;
 
+/**
+ * Typed resolution outcome. The head resolving is `resolved`; the distinct
+ * degraded states let the element render an honest face instead of one
+ * `unreachable` collapse:
+ * - `forbidden` — the head is gated at the reader's reach ("unavailable at your reach")
+ * - `missing`   — the head is 404 (honest missing state)
+ * - `error`     — network / decode failure
+ */
+export type EprLinkState = 'resolved' | 'forbidden' | 'missing' | 'error';
+
 export interface EprLinkResolution {
   title?: string;
   description?: string;
   pillar?: string;
   reach?: string;
   preview?: { title?: string; body?: string };
+  /**
+   * Typed degradation outcome. When absent, the element infers it: a truthy
+   * resolution reads as `resolved`, unless the legacy `unreachable` flag is set.
+   */
+  state?: EprLinkState;
+  /**
+   * Legacy degraded flag, superseded by `state`. Retained so existing hosts and
+   * tests that set `unreachable: true` still collapse to the degraded fallback
+   * face; new callers use `state` instead.
+   */
   unreachable?: boolean;
 }
 
@@ -59,13 +79,15 @@ export interface EprLinkResolution {
  *   selection, so the host can handle app-specific ids (network / relationships / steward /
  *   flag / challenge / feedback) it injected via `contextMenuItems`
  *
- * @cssprop --elohim-link-border   - Override chip border color
- * @cssprop --elohim-link-hover-bg - Override hover background
+ * @cssprop --elohim-link-border          - Override chip border color
+ * @cssprop --elohim-link-hover-bg        - Override hover background
+ * @cssprop --elohim-link-unavailable-fg  - Override the degraded "unavailable" note color
  *
- * @csspart skeleton  - The L1 skeleton placeholder
- * @csspart anchor    - The interactive chip/button rendered at L2/L3
- * @csspart fallback  - The <elohim-mention-base> rendered at L4 (unreachable)
- * @csspart menu      - The <elohim-context-menu>
+ * @csspart skeleton      - The L1 skeleton placeholder
+ * @csspart anchor        - The interactive chip/button rendered at L2/L3
+ * @csspart fallback      - The <elohim-mention-base> rendered at L4 (degraded)
+ * @csspart fallback-note - The honest "unavailable" note rendered beside the L4 fallback
+ * @csspart menu          - The <elohim-context-menu>
  *
  * @capabilityMaxLens detail
  * @capabilityThemes light, dark
@@ -75,7 +97,7 @@ export interface EprLinkResolution {
  * @capabilityTextuality textual, symbolic
  * @capabilityRequiredStandings pilot | steward | elohim-support
  * @capabilityContentCertainty observed
- * @capabilityStates empty:n/a, loading:designed, error:designed, stale:n/a, contested:n/a, offline:designed, unauthorized:n/a
+ * @capabilityStates empty:n/a, loading:designed, error:designed, stale:n/a, contested:n/a, offline:designed, unauthorized:designed
  */
 export class ElohimEprLink extends LitElement {
   @property() epr = '';
@@ -146,6 +168,19 @@ export class ElohimEprLink extends LitElement {
       display: inline-block;
     }
 
+    .fallback {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0.375rem;
+    }
+
+    /* Honest degraded affordance — full-contrast by default (never opacity-dimmed
+       below the a11y floor); hosts may recolor via the cssprop. */
+    .fallback-note {
+      font-size: 0.75em;
+      color: var(--elohim-link-unavailable-fg, inherit);
+    }
+
     @media (pointer: coarse) {
       .anchor {
         min-block-size: 44px;
@@ -191,17 +226,11 @@ export class ElohimEprLink extends LitElement {
       `;
     }
 
-    if (this.loadLevel === 4 && this.resolution.unreachable) {
-      return html`
-        <span class="menu-anchor">
-          <elohim-mention-base
-            epr=${this.epr}
-            label=${this.resolution.preview?.title ?? this.resolution.title ?? ''}
-            part="fallback"
-          ></elohim-mention-base>
-          ${this.renderContextMenu()}
-        </span>
-      `;
+    // L4 is the degraded band: forbidden / missing / error (and the legacy
+    // `unreachable` flag). Render an honest, legible face — never a bare
+    // `epr:{id}` when head metadata is available — plus the context menu.
+    if (this.loadLevel === 4) {
+      return this.renderDegraded();
     }
 
     const label = this.resolution.title ?? this.epr;
@@ -220,6 +249,39 @@ export class ElohimEprLink extends LitElement {
         ${this.renderContextMenu()}
       </span>
     `;
+  }
+
+  /**
+   * The degraded (L4) face. The label prefers any known title (head metadata
+   * or a legacy preview) so the raw `epr:{id}` only surfaces when nothing else
+   * is resolvable; the note states honestly WHY the target is unavailable.
+   */
+  private renderDegraded(): unknown {
+    const label = this.resolution.preview?.title ?? this.resolution.title ?? '';
+    const note = this.degradedNote();
+    return html`
+      <span class="menu-anchor">
+        <span class="fallback" part="fallback" role="note" aria-label=${note}>
+          <elohim-mention-base epr=${this.epr} label=${label}></elohim-mention-base>
+          <span class="fallback-note" part="fallback-note">${note}</span>
+        </span>
+        ${this.renderContextMenu()}
+      </span>
+    `;
+  }
+
+  /** Honest, human-legible reason for the degraded face, keyed off the state. */
+  private degradedNote(): string {
+    switch (this.resolution.state) {
+      case 'forbidden':
+        return 'Unavailable at your reach';
+      case 'missing':
+        return 'No longer available';
+      case 'error':
+        return 'Could not load';
+      default:
+        return 'Unavailable';
+    }
   }
 
   private renderContextMenu(): unknown {
@@ -307,8 +369,11 @@ export class ElohimEprLink extends LitElement {
    * - Without a `resolver`, we transition to L2 with empty resolution
    *   (just exposes the EPR id as-is). Tests use `setResolution()`
    *   to advance through levels.
-   * - With a `resolver`, we call it and advance to L3 on success,
-   *   or L4 with `unreachable: true` on null / rejection.
+   * - With a `resolver`, a `resolved` (or legacy plain) result advances to L3;
+   *   a typed degraded result (forbidden / missing / error), the legacy
+   *   `unreachable` flag, or a null return drops to the L4 degraded face.
+   *   A null return maps to `missing` — the most honest reading of "the
+   *   resolver found nothing".
    */
   private async resolve(): Promise<void> {
     if (!this.epr) return;
@@ -320,18 +385,28 @@ export class ElohimEprLink extends LitElement {
     }
     try {
       const result = await this.resolver(this.epr);
-      if (result) {
+      if (result && isResolvedResolution(result)) {
         this.loadLevel = 3;
         this.resolution = result;
       } else {
         this.loadLevel = 4;
-        this.resolution = { unreachable: true };
+        this.resolution = result ?? { state: 'missing' };
       }
     } catch {
       this.loadLevel = 4;
-      this.resolution = { unreachable: true };
+      this.resolution = { state: 'error' };
     }
   }
+}
+
+/**
+ * A resolution reads as fully `resolved` (interactive L3 chip) unless it
+ * declares a degraded `state` or the legacy `unreachable` flag. A plain
+ * `{ title }` result (no state, no flag) stays resolved — backward compatible.
+ */
+function isResolvedResolution(r: EprLinkResolution): boolean {
+  if (r.unreachable) return false;
+  return r.state === undefined || r.state === 'resolved';
 }
 
 declare global {

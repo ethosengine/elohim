@@ -51,6 +51,10 @@ export {
 export type {
   ResolvedEpr,
   ResolvedContent,
+  ResolvedContentPreview,
+  EprPreview,
+  EprPreviewOutcome,
+  EprPreviewState,
   ContextResolvedRoute,
   StepRef,
   CrossPathMatch,

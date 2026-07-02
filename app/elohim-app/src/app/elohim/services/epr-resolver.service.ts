@@ -14,18 +14,13 @@
  * See: protocol-specification.md Appendix E (Resolution Matrix)
  */
 
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
 // @coverage: 68.6% (2026-03-03)
 
-import { Observable, of, switchMap, map, catchError } from 'rxjs';
+import { Observable, of, map, catchError } from 'rxjs';
 
-import {
-  type IEprContentResolver,
-  type IEprUriResolver,
-} from '../interfaces/epr-resolver.interface';
-import { decodeEprHead } from '../utils/epr-codec';
 import {
   type EprRef,
   parseEpr,
@@ -34,7 +29,13 @@ import {
   BUNDLE_ROUTE_CONTEXT,
 } from '@elohim/service';
 
-import { StorageClientService, type StorageContentNode } from './storage-client.service';
+import {
+  type IEprContentResolver,
+  type IEprUriResolver,
+} from '../interfaces/epr-resolver.interface';
+import { decodeEprHead } from '../utils/epr-codec';
+
+import { StorageClientService } from './storage-client.service';
 
 import type { EprHead } from '../models/epr-head.model';
 
@@ -49,18 +50,81 @@ export interface ResolvedEpr {
   href: string;
 }
 
+/**
+ * Preview-tier content metadata — the subset a link/card needs to render,
+ * sourced from the anonymous-safe EPR Head (never the reach-gated body).
+ *
+ * "Heads flow freely, bodies are gated": a preview must render from head
+ * metadata alone, so a body 403/404 can never blank a card. Consumers that
+ * genuinely need the content BYTES fetch them explicitly via
+ * `StorageClientService.getContent()` at their own call site.
+ */
+export interface ResolvedContentPreview {
+  /** Stable content id (slug) */
+  id: string;
+  /** Human-readable title */
+  title: string;
+  /** Short description (empty string when the head carries none) */
+  description: string;
+  /** Access reach (commons/community/…) — governs routing/provide decisions */
+  reach?: string;
+  /** Content type (epic/concept/path/…) — feeds eprToRoute routing */
+  contentType?: string;
+  /** Content format (markdown/sophia-quiz-json/…) */
+  contentFormat?: string;
+  /** Discovery tags */
+  tags: string[];
+}
+
 export interface ResolvedContent {
   /** The parsed EPR reference */
   ref: EprRef;
-  /** Resolved content metadata (Tier 1/2) */
-  content: StorageContentNode;
-  /** Blob URL if content has a blob reference */
+  /** Resolved preview metadata (head-first — no body bytes) */
+  content: ResolvedContentPreview;
+  /** Blob URL if content has a blob reference (always null in head-first preview) */
   blobUrl: string | null;
   /** In-bundle router commands (null = cross-bundle or blob tier) */
   route: string[] | null;
   /** Universal address — always navigable, in every bundle (§12.1) */
   href: string;
 }
+
+/** Typed degradation state for a head-first preview resolution. */
+export type EprPreviewState = 'resolved' | 'forbidden' | 'missing' | 'error';
+
+/**
+ * Everything a link/card preview needs, computed from the EPR Head.
+ * Carries route/href so navigation never re-fetches to route.
+ */
+export interface EprPreview {
+  ref: EprRef;
+  id: string;
+  title: string;
+  description: string | null;
+  reach: string | null;
+  contentType: string | null;
+  contentFormat: string | null;
+  tags: string[];
+  route: string[] | null;
+  href: string;
+}
+
+/**
+ * Discriminated outcome of a head-first preview resolution.
+ *
+ * The body being unreachable (403/404) can NEVER surface here — only the
+ * anonymous-safe HEAD itself failing degrades, and it degrades to a typed,
+ * legible state the UI can render honestly:
+ * - `forbidden` — the head is gated at the reader's reach (rare, heads are
+ *   anonymous-safe by design); render an "unavailable at your reach" affordance.
+ * - `missing`   — 404; render an honest missing state.
+ * - `error`     — network/other; render an honest error state.
+ */
+export type EprPreviewOutcome =
+  | { state: 'resolved'; preview: EprPreview }
+  | { state: 'forbidden'; preview?: EprPreview }
+  | { state: 'missing' }
+  | { state: 'error' };
 
 /**
  * Result of context-aware EPR resolution.
@@ -135,39 +199,61 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
   }
 
   /**
-   * Full two-step resolution: resolve EPR → fetch metadata → resolve blob if needed.
+   * Head-first content resolution — everything a link/card preview needs.
    *
-   * This is the async path — fetches the content metadata, then resolves the
-   * blob URL from the metadata's blobHash. Returns everything a component needs
-   * to render a content link with preview.
+   * Resolution is served from the anonymous-safe EPR Head (`/epr-head/{id}`),
+   * NOT the reach-gated body (`/db/content/{id}`). "Heads flow freely, bodies
+   * are gated": a community-reach body 403s for an anonymous reader, but its
+   * head still carries title/description/reach/contentType — everything a
+   * preview and its route need. A body 403/404 therefore can never blank a
+   * card. Consumers that need the content BYTES fetch them explicitly via
+   * `StorageClientService.getContent()` at their own call site.
+   *
+   * Returns `null` only when the HEAD itself is unresolvable (forbidden /
+   * missing / network) — the genuinely-unavailable case. Callers that want to
+   * DISTINGUISH those states (to render a typed affordance) use
+   * {@link resolvePreview} instead.
    *
    * @example
    *   resolver.resolve('epr:manifesto-foundations').subscribe(resolved => {
-   *     // resolved.content  → { id, title, description, contentType, blobHash, ... }
-   *     // resolved.blobUrl  → "https://doorway.host/blob/sha256-abc..." or null
+   *     // resolved.content  → { id, title, description, contentType, reach, ... }
    *     // resolved.route    → ['/epr', 'manifesto-foundations'] (shell) or in-bundle commands
    *     // resolved.href     → '/epr/manifesto-foundations' // route-literal-ok: JSDoc @example illustrating minted output, not a literal mint
    *   });
    */
   resolve(input: string): Observable<ResolvedContent | null> {
-    const ref = parseEpr(input);
-
-    return this.storage.getContent(ref.id).pipe(
-      switchMap(content => {
-        if (!content) return of(null);
-
-        const blobHash = this.extractBlobHash(content);
-        const blobUrl = blobHash ? this.storage.getBlobUrl(blobHash) : null;
-        const res = eprToRoute(ref, this.routeCtx, content.contentType);
-        return of({
-          ref,
-          content,
-          blobUrl,
-          route: res?.commands ?? null,
-          href: res?.href ?? eprToUniversalHref(ref),
-        });
-      })
+    return this.resolvePreview(input).pipe(
+      map(outcome => (outcome.state === 'resolved' ? toResolvedContent(outcome.preview) : null))
     );
+  }
+
+  /**
+   * Head-first preview resolution with TYPED degradation.
+   *
+   * Fetches the EPR Head and maps it to preview fields + route/href. The head
+   * endpoint is anonymous-safe by design, so success is the common path even
+   * for community-reach content whose body is gated. On failure it never
+   * throws — it returns a discriminated {@link EprPreviewOutcome} so the UI can
+   * render an honest state (forbidden / missing / error) instead of collapsing
+   * to a raw `epr:{id}` string.
+   */
+  resolvePreview(input: string): Observable<EprPreviewOutcome> {
+    const ref = parseEpr(input);
+    const base = this.storage.getStorageBaseUrl();
+    const url = `${base}/epr-head/${encodeURIComponent(ref.id)}`;
+
+    return this.http
+      .get(url, {
+        responseType: 'arraybuffer',
+        headers: { Accept: 'application/vnd.ipld.dag-cbor' },
+      })
+      .pipe(
+        map((buffer): EprPreviewOutcome => {
+          const head = decodeEprHead(new Uint8Array(buffer));
+          return { state: 'resolved', preview: this.previewFromHead(ref, head) };
+        }),
+        catchError((err: unknown) => of(degradedOutcome(err)))
+      );
   }
 
   /**
@@ -295,18 +381,52 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
     }
   }
 
-  private extractBlobHash(content: StorageContentNode): string | null {
-    // Check explicit blobHash field (may be CID or sha256-{hex})
-    if (content.blobHash) return normalizeContentAddress(content.blobHash);
-
-    // Check if contentBody is a blob reference
-    const body = content.contentBody ?? '';
-    if (isContentAddress(body)) {
-      return normalizeContentAddress(body);
-    }
-
-    return null;
+  /** Map an EPR Head to the preview fields + route/href a link/card renders. */
+  private previewFromHead(ref: EprRef, head: EprHead): EprPreview {
+    const contentType = head.lamad?.contentType;
+    const res = eprToRoute(ref, this.routeCtx, contentType);
+    return {
+      ref,
+      id: head.id || ref.id,
+      title: head.lamad?.title ?? ref.id,
+      description: head.lamad?.description ?? null,
+      reach: head.qahal?.reach ?? null,
+      contentType: contentType ?? null,
+      contentFormat: head.lamad?.contentFormat ?? null,
+      tags: head.lamad?.tags ?? [],
+      route: res?.commands ?? null,
+      href: res?.href ?? eprToUniversalHref(ref),
+    };
   }
+}
+
+/** Project a head-first preview onto the ResolvedContent shape consumers use. */
+function toResolvedContent(preview: EprPreview): ResolvedContent {
+  return {
+    ref: preview.ref,
+    content: {
+      id: preview.id,
+      title: preview.title,
+      description: preview.description ?? '',
+      reach: preview.reach ?? undefined,
+      contentType: preview.contentType ?? undefined,
+      contentFormat: preview.contentFormat ?? undefined,
+      tags: preview.tags,
+    },
+    // Head-first preview never fetches the body, so there is no blob URL here;
+    // a consumer that needs the bytes fetches them explicitly (getContent).
+    blobUrl: null,
+    route: preview.route,
+    href: preview.href,
+  };
+}
+
+/** Classify a failed head fetch into a typed degradation outcome. */
+function degradedOutcome(err: unknown): EprPreviewOutcome {
+  const status = err instanceof HttpErrorResponse ? err.status : 0;
+  if (status === 401 || status === 403) return { state: 'forbidden' };
+  if (status === 404) return { state: 'missing' };
+  return { state: 'error' };
 }
 
 /**

@@ -1,8 +1,8 @@
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
-import { firstValueFrom, of } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 
 import {
   EprResolverService,
@@ -15,9 +15,42 @@ import { StorageClientService } from './storage-client.service';
 import { BUNDLE_ROUTE_CONTEXT, type EprRef } from '@elohim/service';
 import { vi } from 'vitest';
 
+import type { EprHead } from '../models/epr-head.model';
+
+/**
+ * Encode an EPR Head as the JSON bytes the head endpoint returns (arraybuffer).
+ * Built via a test-realm `ArrayBuffer` (not TextEncoder's buffer) so Angular's
+ * HttpTestingController `instanceof ArrayBuffer` check passes — the head JSON is
+ * ASCII, so charCode copy is exact.
+ */
+function headBuffer(head: Partial<EprHead>): ArrayBuffer {
+  const json = JSON.stringify(head);
+  const buffer = new ArrayBuffer(json.length);
+  const view = new Uint8Array(buffer);
+  for (let i = 0; i < json.length; i++) view[i] = json.charCodeAt(i);
+  return buffer;
+}
+
+const sampleHead: Partial<EprHead> = {
+  version: 1,
+  id: 'manifesto',
+  content: '',
+  lamad: {
+    title: 'Manifesto',
+    contentType: 'article',
+    description: 'The foundational document',
+    contentFormat: 'markdown',
+    tags: [],
+  },
+  shefa: {},
+  qahal: { reach: 'public' },
+  relationships: [],
+};
+
 describe('EprResolverService', () => {
   let service: EprResolverService;
   let storageSpy: any;
+  let httpMock: HttpTestingController;
 
   beforeEach(() => {
     storageSpy = {
@@ -41,7 +74,20 @@ describe('EprResolverService', () => {
       ],
     });
     service = TestBed.inject(EprResolverService);
+    httpMock = TestBed.inject(HttpTestingController);
   });
+
+  /** Match + answer the head request the head-first resolver issues. */
+  function flushHead(id: string, buffer: ArrayBuffer): void {
+    const req = httpMock.expectOne(`https://doorway.host/epr-head/${id}`);
+    expect(req.request.method).toBe('GET');
+    req.flush(buffer);
+  }
+
+  function flushHeadError(id: string, status: number, statusText: string): void {
+    const req = httpMock.expectOne(`https://doorway.host/epr-head/${id}`);
+    req.flush(new ArrayBuffer(0), { status, statusText });
+  }
 
   // ── isContentAddress ────────────────────────────────────────────────────
 
@@ -147,44 +193,96 @@ describe('EprResolverService', () => {
     });
   });
 
-  // ── resolve ─────────────────────────────────────────────────────────────
+  // ── resolve (head-first) ──────────────────────────────────────────────────
 
   describe('resolve', () => {
-    it('returns null when content is not found', async () => {
-      storageSpy.getContent.mockReturnValue(of(null));
-      const result = await firstValueFrom(service.resolve('epr:missing-content'));
-      expect(result).toBeNull();
-    });
+    it('resolves preview metadata + route/href from the HEAD, never the body', async () => {
+      const promise = firstValueFrom(service.resolve('epr:manifesto'));
+      flushHead('manifesto', headBuffer(sampleHead));
+      // The reach-gated body endpoint is NEVER touched by preview resolution.
+      httpMock.expectNone('https://doorway.host/db/content/manifesto');
+      const result = await promise;
 
-    it('resolves content with route and href (shell context)', async () => {
-      const mockContent = {
-        id: 'manifesto',
-        title: 'Manifesto',
-        contentType: 'article',
-        contentFormat: 'markdown',
-        contentBody: 'body text',
-        reach: 'public',
-        tags: [],
-      };
-      storageSpy.getContent.mockReturnValue(of(mockContent));
-      const result = await firstValueFrom(service.resolve('epr:manifesto'));
       expect(result).not.toBeNull();
       expect(result!.ref.id).toBe('manifesto');
-      expect(result!.content).toBe(mockContent);
+      expect(result!.content.title).toBe('Manifesto');
+      expect(result!.content.description).toBe('The foundational document');
+      expect(result!.content.reach).toBe('public');
       expect(result!.blobUrl).toBeNull();
       // Shell owns /epr — article is unclaimed → universal route
       expect(result!.route).toEqual(['/epr', 'manifesto']);
       expect(result!.href).toBe('/epr/manifesto');
     });
 
-    it('resolves blob URL when contentBody is a content address', async () => {
-      const hash = 'sha256-abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
-      storageSpy.getContent.mockReturnValue(
-        of({ id: 'blob-content', contentType: 'article', contentBody: hash, reach: 'public' })
-      );
-      storageSpy.getBlobUrl.mockReturnValue(`https://doorway.host/blob/${hash}`);
-      const result = await firstValueFrom(service.resolve('epr:blob-content'));
-      expect(result!.blobUrl).toBe(`https://doorway.host/blob/${hash}`);
+    it('returns null when the HEAD is forbidden (403) — a gated body cannot fail a preview differently', async () => {
+      const promise = firstValueFrom(service.resolve('epr:gated'));
+      flushHeadError('gated', 403, 'Forbidden');
+      expect(await promise).toBeNull();
+    });
+
+    it('returns null when the HEAD is missing (404)', async () => {
+      const promise = firstValueFrom(service.resolve('epr:missing-content'));
+      flushHeadError('missing-content', 404, 'Not Found');
+      expect(await promise).toBeNull();
+    });
+
+    it('does NOT call the storage body endpoint (getContent) at all', async () => {
+      const promise = firstValueFrom(service.resolve('epr:manifesto'));
+      flushHead('manifesto', headBuffer(sampleHead));
+      await promise;
+      expect(storageSpy.getContent).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── resolvePreview (typed degradation) ────────────────────────────────────
+
+  describe('resolvePreview', () => {
+    it('maps a resolved HEAD to preview fields (title, reach, contentType, route/href)', async () => {
+      const promise = firstValueFrom(service.resolvePreview('epr:manifesto'));
+      flushHead('manifesto', headBuffer(sampleHead));
+      const outcome = await promise;
+
+      expect(outcome.state).toBe('resolved');
+      if (outcome.state !== 'resolved') throw new Error('expected resolved');
+      expect(outcome.preview.title).toBe('Manifesto');
+      expect(outcome.preview.description).toBe('The foundational document');
+      expect(outcome.preview.reach).toBe('public');
+      expect(outcome.preview.contentType).toBe('article');
+      expect(outcome.preview.route).toEqual(['/epr', 'manifesto']);
+      expect(outcome.preview.href).toBe('/epr/manifesto');
+    });
+
+    it('degrades to forbidden on a 403 head (unavailable at your reach)', async () => {
+      const promise = firstValueFrom(service.resolvePreview('epr:gated'));
+      flushHeadError('gated', 403, 'Forbidden');
+      expect((await promise).state).toBe('forbidden');
+    });
+
+    it('degrades to forbidden on a 401 head', async () => {
+      const promise = firstValueFrom(service.resolvePreview('epr:gated'));
+      flushHeadError('gated', 401, 'Unauthorized');
+      expect((await promise).state).toBe('forbidden');
+    });
+
+    it('degrades to missing on a 404 head', async () => {
+      const promise = firstValueFrom(service.resolvePreview('epr:gone'));
+      flushHeadError('gone', 404, 'Not Found');
+      expect((await promise).state).toBe('missing');
+    });
+
+    it('degrades to error on a 5xx / network failure', async () => {
+      const promise = firstValueFrom(service.resolvePreview('epr:boom'));
+      flushHeadError('boom', 500, 'Server Error');
+      expect((await promise).state).toBe('error');
+    });
+
+    it('falls back to the epr id as title when the head omits lamad.title', async () => {
+      const promise = firstValueFrom(service.resolvePreview('epr:untitled'));
+      flushHead('untitled', headBuffer({ ...sampleHead, id: 'untitled', lamad: undefined as any }));
+      const outcome = await promise;
+      expect(outcome.state).toBe('resolved');
+      if (outcome.state !== 'resolved') throw new Error('expected resolved');
+      expect(outcome.preview.title).toBe('untitled');
     });
   });
 

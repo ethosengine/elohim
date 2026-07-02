@@ -61,6 +61,28 @@ function resilienceIcon(stewardCount: number): string {
   return '○';
 }
 
+/**
+ * Guard a resilience payload before rendering it.
+ *
+ * Resilience is a best-effort enrichment: through the `start:alpha` dev proxy
+ * the `/api/v1/resilience/{id}` route is unavailable and can answer with a
+ * truthy-but-malformed body (SPA fallback / partial view) that lacks
+ * `stewardship`. Reading `stewardship.stewardCount` off that threw
+ * `Cannot read properties of undefined (reading 'stewardCount')` and blanked
+ * the whole card. The badge is shown ONLY when every field the template and
+ * tooltip read is a real number; otherwise resilience is treated as absent and
+ * the card renders fully from head data alone.
+ */
+function isRenderableResilience(r: unknown): r is ResilienceView {
+  if (!r || typeof r !== 'object') return false;
+  const v = r as Partial<ResilienceView>;
+  return (
+    typeof v.stewardship?.stewardCount === 'number' &&
+    typeof v.distribution?.distinctPeers === 'number' &&
+    typeof v.health?.canSurviveFailures === 'number'
+  );
+}
+
 function resilienceTitle(resilience: ResilienceView): string {
   // Enrich the badge tooltip with the fetched-but-otherwise-unused distribution
   // and health fields. All values are household-honest: at a single-household
@@ -144,13 +166,22 @@ function resilienceTitle(resilience: ResilienceView): string {
         cursor: default;
       }
       .epr-rel-card__badge--resilience-green {
-        color: var(--epr-resilience-green, #16a34a); /* a11y-color-ok: semantic resilience-status palette (non-text indicator) */
+        color: var(
+          --epr-resilience-green,
+          #16a34a
+        ); /* a11y-color-ok: semantic resilience-status palette (non-text indicator) */
       }
       .epr-rel-card__badge--resilience-yellow {
-        color: var(--epr-resilience-yellow, #ca8a04); /* a11y-color-ok: semantic resilience-status palette (non-text indicator) */
+        color: var(
+          --epr-resilience-yellow,
+          #ca8a04
+        ); /* a11y-color-ok: semantic resilience-status palette (non-text indicator) */
       }
       .epr-rel-card__badge--resilience-none {
-        color: var(--epr-resilience-none, #9ca3af); /* a11y-color-ok: semantic resilience-status palette (non-text indicator) */
+        color: var(
+          --epr-resilience-none,
+          #9ca3af
+        ); /* a11y-color-ok: semantic resilience-status palette (non-text indicator) */
       }
       .epr-rel-card__badge--peers {
         font-size: 0.72rem;
@@ -201,20 +232,10 @@ function resilienceTitle(resilience: ResilienceView): string {
       </div>
     </ng-template>
 
-    <a
-      *ngIf="route"
-      class="epr-rel-card"
-      data-testid="epr-relationship-card"
-      [routerLink]="route"
-    >
+    <a *ngIf="route" class="epr-rel-card" data-testid="epr-relationship-card" [routerLink]="route">
       <ng-container *ngTemplateOutlet="cardBody"></ng-container>
     </a>
-    <a
-      *ngIf="!route"
-      class="epr-rel-card"
-      data-testid="epr-relationship-card"
-      [href]="href ?? ''"
-    >
+    <a *ngIf="!route" class="epr-rel-card" data-testid="epr-relationship-card" [href]="href ?? ''">
       <ng-container *ngTemplateOutlet="cardBody"></ng-container>
     </a>
   `,
@@ -297,9 +318,12 @@ export class EprRelationshipCardComponent implements OnChanges, OnDestroy {
       .pipe(takeUntil(this.inputChange$), takeUntil(this.destroy$))
       .subscribe(({ content, resilience }) => {
         if (content) {
+          // Head-first resolution: title / description / reach come from the
+          // anonymous-safe EPR Head, so a reach-gated body (403/404) never
+          // blanks the card — it renders fully legible from head data alone.
           this.title = content.content.title;
           this.description = content.content.description ?? null;
-          this.reach = (content.content as { reach?: string }).reach ?? null;
+          this.reach = content.content.reach ?? null;
           this.route = content.route;
           this.href = content.href;
         } else {
@@ -310,7 +334,9 @@ export class EprRelationshipCardComponent implements OnChanges, OnDestroy {
 
         this.reachIconValue = reachIcon(this.reach);
 
-        if (resilience) {
+        // Resilience is a strictly-optional enrichment: only a well-formed
+        // payload lights the steward badge; anything else leaves it hidden.
+        if (isRenderableResilience(resilience)) {
           this.resilience = resilience;
           this.resilienceIconValue = resilienceIcon(resilience.stewardship.stewardCount);
           this.resilienceTitleValue = resilienceTitle(resilience);

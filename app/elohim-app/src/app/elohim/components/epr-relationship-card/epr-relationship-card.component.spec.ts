@@ -41,7 +41,13 @@ const resolvedContent = {
 
 const resilienceView = {
   contentId: 'systems-thinking',
-  encoding: { strategy: 'rs', dataShards: 4, parityShards: 2, totalSizeBytes: 0, shardSizeBytes: 0 },
+  encoding: {
+    strategy: 'rs',
+    dataShards: 4,
+    parityShards: 2,
+    totalSizeBytes: 0,
+    shardSizeBytes: 0,
+  },
   distribution: { totalShards: 6, shardsWithLocations: 6, distinctPeers: 3, shards: [] },
   stewardship: { stewardCount: 3, allocations: [] },
   commitments: { activePeers: 3, totalCommittedBytes: 0, totalUsedBytes: 0 },
@@ -55,7 +61,10 @@ const prerequisiteRelationship: EprRelationship = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function query(fixture: ComponentFixture<EprRelationshipCardComponent>, testId: string): Element | null {
+function query(
+  fixture: ComponentFixture<EprRelationshipCardComponent>,
+  testId: string
+): Element | null {
   return fixture.nativeElement.querySelector(`[data-testid="${testId}"]`);
 }
 
@@ -155,6 +164,41 @@ describe('EprRelationshipCardComponent', () => {
     expect(query(fixture, 'epr-rel-card-peers')).toBeNull();
   });
 
+  // ── Malformed resilience (regression: stewardCount TypeError) ──────────────
+
+  it('renders legibly and hides the steward badge when resilience is a truthy-but-malformed body', () => {
+    // Through the start:alpha proxy the resilience route can answer with a
+    // truthy body that lacks `stewardship` (SPA fallback / partial view).
+    // Reading `stewardship.stewardCount` off that threw the console TypeError
+    // and blanked the card. The card must stay legible with only head data.
+    mockResilience.getContentResilience.mockReturnValue(of({ contentId: 'systems-thinking' }));
+
+    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
+    expect(() => {
+      component.ngOnChanges({ relationship: {} as any });
+      fixture.detectChanges();
+    }).not.toThrow();
+
+    // Title (head data) still renders; the resilience badge is hidden.
+    expect(query(fixture, 'epr-rel-card-title')!.textContent).toContain('Systems Thinking');
+    expect(query(fixture, 'epr-rel-card-resilience')).toBeNull();
+    expect(query(fixture, 'epr-rel-card-peers')).toBeNull();
+  });
+
+  it('hides the steward badge when stewardship is present but stewardCount is not a number', () => {
+    mockResilience.getContentResilience.mockReturnValue(
+      of({ ...resilienceView, stewardship: { allocations: [] } })
+    );
+
+    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
+    expect(() => {
+      component.ngOnChanges({ relationship: {} as any });
+      fixture.detectChanges();
+    }).not.toThrow();
+
+    expect(query(fixture, 'epr-rel-card-resilience')).toBeNull();
+  });
+
   // ── Resilience tooltip enrichment ─────────────────────────────────────────
 
   it('enriches the resilience tooltip with distinct peers, k-of-n shards and survivable failures', () => {
@@ -237,7 +281,7 @@ describe('EprRelationshipCardComponent', () => {
 
   it('uses the href fallback anchor when route is null (cross-bundle)', () => {
     mockResolver.resolve.mockReturnValue(
-      of({ ...resolvedContent, route: null, href: '/epr/systems-thinking' }),
+      of({ ...resolvedContent, route: null, href: '/epr/systems-thinking' })
     );
 
     component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
