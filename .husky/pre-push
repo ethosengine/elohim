@@ -353,7 +353,7 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -qE "^genesis/data/lamad/(content|paths)/|^elohim/sdk/schemas/v1/enums/reach.schema.json"; then
     PROJECTS="$PROJECTS reach-drift"
   fi
-  if echo "$CHANGED" | grep -q "^elohim/sdk/schemas/"; then
+  if echo "$CHANGED" | grep -qE "^elohim/sdk/schemas/|^elohim/sdk/domains/[^/]+/manifest\.json$|^app/lamad/src/app/generated/route-claims\.ts$|^app/elohim-app/src/app/generated/route-claims\.ts$|^genesis/seeder/src/generated/route-claims\.ts$"; then
     PROJECTS="$PROJECTS schema-codegen"
   fi
   if echo "$CHANGED" | grep -qE "^app/elohim-elements/[^/]+/src/.*\.ts$|^app/elohim-elements/[^/]+/custom-elements-manifest\.config\.mjs$"; then
@@ -564,7 +564,8 @@ run_gate() {
       schema-codegen)
         echo "[$PROJECT_NAME] Verifying schema codegen freshness..."
         pnpm run schema:codegen:ts -- --verify 2>&1 && \
-        pnpm run schema:codegen:rs -- --verify 2>&1
+        pnpm run schema:codegen:rs -- --verify 2>&1 && \
+        pnpm run route-claims:codegen:verify 2>&1
         rc=$?
         ;;
       rakia-codegen)

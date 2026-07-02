@@ -23,6 +23,7 @@
 import { InjectionToken } from '@angular/core';
 import { Observable } from 'rxjs';
 import type { EprRef } from '@elohim/service';
+import type { EprResolutionProvider } from 'elohim-core';
 
 // ============================================================================
 // Shared narrow types (re-shaped to avoid cross-pillar model imports)
@@ -389,6 +390,23 @@ export interface ILamadEprNav {
 }
 
 export const LAMAD_EPR_NAV = new InjectionToken<ILamadEprNav>('LamadEprNav');
+
+// ============================================================================
+// LAMAD_EPR_RESOLUTION_PROVIDER — the ambient EPR resolution contract (I2)
+// ============================================================================
+
+/**
+ * The single {@link EprResolutionProvider} (elohim-core contract), consumed by
+ * lamad call sites for `resolveHead` / `resolveRoute` / `resolveBody` instead of
+ * hand-wiring resolution. The concrete browser implementation lives in
+ * elohim-app (`EPR_RESOLUTION_PROVIDER`); lamad's app.config bridges it here via
+ * `useExisting`, keeping lamad decoupled from the elohim-app class. The
+ * HyperCard `resolveInContext` rule stays on {@link ILamadEprResolver}, layered
+ * ON this provider — it is deliberately NOT part of this contract.
+ */
+export const LAMAD_EPR_RESOLUTION_PROVIDER = new InjectionToken<EprResolutionProvider>(
+  'LamadEprResolutionProvider'
+);
 
 // ============================================================================
 // ILamadGovernanceSignal — narrow governance signal contract

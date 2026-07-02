@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import 'elohim-imagodei/register'; // registers <elohim-contributor-card> so the section's cards upgrade + render in-test
 import { ContentViewerComponent } from './content-viewer.component';
 import { ExplorationSidebarComponent } from '../exploration-sidebar/exploration-sidebar.component';
@@ -29,7 +29,30 @@ import { ResilienceService as LibResilienceService } from '@elohim/service/publi
 import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
 import { vi, Mock } from 'vitest';
 import { AttentionTrackerService, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
-import { GovernanceApiService } from '@elohim/service';
+import { GovernanceApiService, ContentDocSyncService, type ContentDocFields } from '@elohim/service';
+import { EPR_RESOLUTION_PROVIDER } from '@app/elohim/providers/epr-resolution.provider';
+
+// EprRelationshipsPanelComponent renders one <app-epr-relationship-card> per
+// relationship (mock LAMAD_EPR_RESOLVER below supplies one), which resolves
+// through the ambient EprResolutionProvider (I2) — stub it so structural
+// assertions stay network-free (mirrors elohim-app's e25f2766a fix).
+const mockEprResolution = {
+  resolveHead: vi.fn().mockResolvedValue({ state: 'missing' }),
+  resolveRoute: vi.fn().mockReturnValue(null),
+  resolveBody: vi.fn().mockResolvedValue({ state: 'missing' }),
+};
+
+// ContentDocSyncService is `providedIn: 'root'`, so it is NOT NullInjectorError'd
+// away like an unmocked DI-token service would be — Angular happily constructs
+// the real one. The real watchContent() schedules a genuine setInterval retry
+// loop (real AutomergeSync -> StorageClient HTTP calls against a relative
+// '/sync/v1/...' URL, unreachable in jsdom), which keeps NgZone perpetually
+// unstable and hangs any `await fixture.whenStable()`. Stub it inertly: no
+// timer, just a static readonly signal (watchContent's real return type),
+// mirroring mockEprResolution's network-free-structural-assertion role above.
+const mockDocSync = {
+  watchContent: vi.fn().mockReturnValue(signal<ContentDocFields | null>(null).asReadonly()),
+};
 
 // Mock the shared exploration sidebar. The standalone content-viewer delegates
 // its primary relation surface (mini-graph + related concepts + explore button)
@@ -253,6 +276,8 @@ describe('ContentViewerComponent', () => {
           },
         },
         { provide: LAMAD_STORAGE_API, useValue: storageApiSpyObj },
+        { provide: EPR_RESOLUTION_PROVIDER, useValue: mockEprResolution },
+        { provide: ContentDocSyncService, useValue: mockDocSync },
         { provide: LAMAD_AFFINITY_TRACKING, useValue: affinitySpyObj },
         { provide: LAMAD_AGENT, useValue: agentSpyObj },
         { provide: ContentService, useValue: contentSpyObj },

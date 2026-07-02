@@ -35,7 +35,7 @@ import {
 } from '../interfaces/epr-resolver.interface';
 import { decodeEprHead } from '../utils/epr-codec';
 
-import { StorageClientService } from './storage-client.service';
+import { StorageClientService, type StorageContentNode } from './storage-client.service';
 
 import type { EprHead } from '../models/epr-head.model';
 
@@ -123,6 +123,20 @@ export interface EprPreview {
 export type EprPreviewOutcome =
   | { state: 'resolved'; preview: EprPreview }
   | { state: 'forbidden'; preview?: EprPreview }
+  | { state: 'missing' }
+  | { state: 'error' };
+
+/**
+ * Discriminated outcome of an explicit, reach-gated BODY fetch.
+ *
+ * Unlike the head plane (anonymous-safe), the body CAN 403 at the reader's
+ * reach — so `forbidden` is a first-class state here. Only the click-through /
+ * embed path fetches the body; previews resolve from the head and never touch
+ * this.
+ */
+export type EprBodyOutcome =
+  | { state: 'resolved'; contentBody: string | null; contentFormat: string | null }
+  | { state: 'forbidden' }
   | { state: 'missing' }
   | { state: 'error' };
 
@@ -254,6 +268,32 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
         }),
         catchError((err: unknown) => of(degradedOutcome(err)))
       );
+  }
+
+  /**
+   * Explicit, reach-gated BODY fetch — the click-through / embed path.
+   *
+   * Unlike {@link resolvePreview} (head plane, anonymous-safe), this hits the
+   * reach-gated body (`/db/content/{id}`) and so CAN 403. It never throws — it
+   * returns a typed {@link EprBodyOutcome} (resolved / forbidden / missing /
+   * error) so an embedding caller renders the honest state. Previews must NOT
+   * call this; they resolve from the head via {@link resolvePreview}.
+   */
+  resolveBody(input: string): Observable<EprBodyOutcome> {
+    const ref = parseEpr(input);
+    const base = this.storage.getStorageBaseUrl();
+    const url = `${base}/db/content/${encodeURIComponent(ref.id)}`;
+
+    return this.http.get<StorageContentNode>(url).pipe(
+      map(
+        (node): EprBodyOutcome => ({
+          state: 'resolved',
+          contentBody: node.contentBody ?? null,
+          contentFormat: node.contentFormat ?? null,
+        })
+      ),
+      catchError((err: unknown) => of(degradedOutcome(err)))
+    );
   }
 
   /**
@@ -421,8 +461,16 @@ function toResolvedContent(preview: EprPreview): ResolvedContent {
   };
 }
 
-/** Classify a failed head fetch into a typed degradation outcome. */
-function degradedOutcome(err: unknown): EprPreviewOutcome {
+/**
+ * Classify a failed fetch into a typed degradation outcome. Shared by the head
+ * plane ({@link resolvePreview}) and the body plane ({@link resolveBody}): the
+ * degraded states are structurally identical across both (only a `resolved`
+ * outcome differs), so one classifier serves both and the result is assignable
+ * to either `EprPreviewOutcome` or `EprBodyOutcome`.
+ */
+function degradedOutcome(
+  err: unknown
+): { state: 'forbidden' } | { state: 'missing' } | { state: 'error' } {
   const status = err instanceof HttpErrorResponse ? err.status : 0;
   if (status === 401 || status === 403) return { state: 'forbidden' };
   if (status === 404) return { state: 'missing' };

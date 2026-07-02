@@ -1369,7 +1369,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "<elohim-epr-link> — the protocol's HyperCard navigation primitive.\n\nProgressive loading (L1–L4): renders a sized skeleton instantly, fills\nin title/metadata as Loader resolves, falls back to preview if the\ntarget is unreachable.\n\nDefault click: emits 'navigate' with the EPR ref. Parent decides what\nto do (card-flip in place, or hard nav, depending on display variant).\n\nRight-click: opens <elohim-context-menu>. The default menu is the MVP\nthree (Open / About this EPR / Copy EPR link); a host may inject a\nfuller action set via the `.contextMenuItems` property (e.g. the Epic E\nactions: View network & resilience, See relationships, Steward this\ncontent, Flag / Challenge / Open feedback). The element stays\nblank-slate: app-specific routing/governance/stewardship is NOT decided\nhere — every selection is re-emitted as `epr-menu-select` so the host\ncan act on ids it owns. Submenu items (View as..., Where this leads...)\ndeferred per spec §7.4.\n\nResolution is decoupled from the loader: production wiring injects a\nresolver function via the `.resolver` property. For tests / Storybook,\ndirect manipulation of internal state (via `setResolution()`) is the\nsupported test seam.",
+          "description": "<elohim-epr-link> — the protocol's HyperCard navigation primitive.\n\nProgressive loading (L1–L4): renders a sized skeleton instantly, fills\nin title/metadata as Loader resolves, falls back to preview if the\ntarget is unreachable.\n\nDefault click: emits 'navigate' with the EPR ref. Parent decides what\nto do (card-flip in place, or hard nav, depending on display variant).\n\nRight-click: opens <elohim-context-menu>. The default menu is the MVP\nthree (Open / About this EPR / Copy EPR link); a host may inject a\nfuller action set via the `.contextMenuItems` property (e.g. the Epic E\nactions: View network & resilience, See relationships, Steward this\ncontent, Flag / Challenge / Open feedback). The element stays\nblank-slate: app-specific routing/governance/stewardship is NOT decided\nhere — every selection is re-emitted as `epr-menu-select` so the host\ncan act on ids it owns. Submenu items (View as..., Where this leads...)\ndeferred per spec §7.4.\n\nResolution is decoupled from the loader two ways, prop over context:\n  1. an explicit `.resolver` function property (production wiring / tests), or\n  2. an AMBIENT EprResolutionProvider consumed via `@lit/context`,\n     installed once at the surface root — every `<elohim-epr-link>` beneath it\n     resolves through the provider's head plane with no per-element wiring.\nThe explicit prop always wins over context (backward compatible). For tests /\nStorybook, direct manipulation of internal state (via `setResolution()`) is\nthe supported test seam.",
           "name": "ElohimEprLink",
           "cssProperties": [
             {
@@ -1435,7 +1435,15 @@
                 "text": "Function | null"
               },
               "default": "null",
-              "description": "Optional async resolver injected at bundle level"
+              "description": "Optional async resolver override; wins over the ambient context provider"
+            },
+            {
+              "kind": "field",
+              "name": "_resolutionProvider",
+              "privacy": "private",
+              "readonly": true,
+              "default": "new ContextConsumer(this, { context: eprResolutionContext, subscribe: true, callback: (): void => { // Re-resolve when the ambient provider arrives/changes — but only when no // explicit resolver prop overrides it and there is a ref to resolve. if (!this.resolver && this.epr) void this.resolve(); }, })",
+              "description": "Ambient resolution provider, consumed via `@lit/context` from the surface\nroot. Used only when no explicit `.resolver` prop is set (the prop wins).\n`subscribe: true` re-fires the callback when the provider arrives or\nchanges so a late-installed provider still resolves the element."
             },
             {
               "kind": "field",
@@ -1587,7 +1595,7 @@
                   "text": "Promise<void>"
                 }
               },
-              "description": "Default resolution flow:\n- Without a `resolver`, we transition to L2 with empty resolution\n  (just exposes the EPR id as-is). Tests use `setResolution()`\n  to advance through levels.\n- With a `resolver`, a `resolved` (or legacy plain) result advances to L3;\n  a typed degraded result (forbidden / missing / error), the legacy\n  `unreachable` flag, or a null return drops to the L4 degraded face.\n  A null return maps to `missing` — the most honest reading of \"the\n  resolver found nothing\"."
+              "description": "Default resolution flow. The effective resolver is the explicit `.resolver`\nprop if set, else the ambient EprResolutionProvider from context\n(prop wins — backward compatible):\n- With NEITHER, we transition to L2 with empty resolution (just exposes the\n  EPR id as-is). Tests use `setResolution()` to advance through levels.\n- Otherwise a `resolved` (or legacy plain) result advances to L3; a typed\n  degraded result (forbidden / missing / error), the legacy `unreachable`\n  flag, or a null return drops to the L4 degraded face. A null return maps\n  to `missing` — the most honest reading of \"the resolver found nothing\"."
             }
           ],
           "events": [
@@ -6751,6 +6759,70 @@
         },
         {
           "kind": "js",
+          "name": "eprResolutionContext",
+          "declaration": {
+            "name": "eprResolutionContext",
+            "module": "./navigation/epr-resolution-provider.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "installEprResolutionProvider",
+          "declaration": {
+            "name": "installEprResolutionProvider",
+            "module": "./navigation/epr-resolution-provider.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprResolutionProvider",
+          "declaration": {
+            "name": "EprResolutionProvider",
+            "module": "./navigation/epr-resolution-provider.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprResolutionState",
+          "declaration": {
+            "name": "EprResolutionState",
+            "module": "./navigation/epr-resolution-provider.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprHeadPreview",
+          "declaration": {
+            "name": "EprHeadPreview",
+            "module": "./navigation/epr-resolution-provider.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprHeadResolution",
+          "declaration": {
+            "name": "EprHeadResolution",
+            "module": "./navigation/epr-resolution-provider.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprRouteResolution",
+          "declaration": {
+            "name": "EprRouteResolution",
+            "module": "./navigation/epr-resolution-provider.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprBodyResolution",
+          "declaration": {
+            "name": "EprBodyResolution",
+            "module": "./navigation/epr-resolution-provider.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "ElohimEprRelationshipsPanel",
           "declaration": {
             "name": "ElohimEprRelationshipsPanel",
@@ -8157,7 +8229,8 @@
         },
         {
           "kind": "variable",
-          "name": "{ getLocale, setLocale }"
+          "name": "{ getLocale, setLocale }",
+          "default": "(globalHost.__ELOHIM_CORE_LOCALIZE_RUNTIME__ ??= configureLocalization({ sourceLocale, targetLocales: [...targetLocales], loadLocale: async (locale: string) => { // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- dynamic locale import; shape verified at runtime by lit-localize return import(`./generated/${locale}.js`); }, }))"
         }
       ],
       "exports": [
@@ -8212,6 +8285,215 @@
           "declaration": {
             "name": "smokeGreeting",
             "module": "src/localize/source-locale.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/navigation/epr-link-interceptor.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "recordCrossBundleHandoff",
+          "return": {
+            "type": {
+              "text": "void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "cid",
+              "default": "''"
+            }
+          ],
+          "description": "Append a handoff entry to the shared session-nav-stack — the same\nsessionStorage shape elohim-app's SessionNavStackService reads, so the\nprotocol-omni back affordance survives the bundle boundary."
+        },
+        {
+          "kind": "function",
+          "name": "baseHrefOwnsPath",
+          "return": {
+            "type": {
+              "text": "boolean"
+            }
+          },
+          "parameters": [
+            {
+              "name": "path",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Default ownsPath: prefix match against this bundle's <base href>. A \"/\"\nbase owns everything — the shell (base \"/\") installs explicitly with a\nrouter-aware predicate instead of relying on this heuristic."
+        },
+        {
+          "kind": "function",
+          "name": "installEprLinkInterceptor",
+          "return": {
+            "type": {
+              "text": "() => void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "options",
+              "default": "{}",
+              "type": {
+                "text": "EprLinkInterceptorOptions"
+              }
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "recordCrossBundleHandoff",
+          "declaration": {
+            "name": "recordCrossBundleHandoff",
+            "module": "src/navigation/epr-link-interceptor.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "baseHrefOwnsPath",
+          "declaration": {
+            "name": "baseHrefOwnsPath",
+            "module": "src/navigation/epr-link-interceptor.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "installEprLinkInterceptor",
+          "declaration": {
+            "name": "installEprLinkInterceptor",
+            "module": "src/navigation/epr-link-interceptor.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/navigation/epr-resolution-provider.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "eprResolutionContext"
+        },
+        {
+          "kind": "function",
+          "name": "installEprResolutionProvider",
+          "return": {
+            "type": {
+              "text": "() => void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "host",
+              "type": {
+                "text": "HTMLElement"
+              }
+            },
+            {
+              "name": "provider",
+              "type": {
+                "text": "EprResolutionProvider"
+              }
+            }
+          ],
+          "description": "Install the ambient EPR resolution provider on a surface root element.\n\nSymmetric with `installEprLinkInterceptor` — the shell root calls both, so\n\"what does resolving mean\" has exactly one answer per surface. Attaches a\n`@lit/context` provider that answers `context-request` events bubbling up from\nany `<elohim-*>` element beneath `host`; those elements then resolve through\n`provider` with no per-element wiring. Encapsulates `@lit/context` so\nframework hosts (the Angular shell) never depend on it directly.\n\nReturns a teardown that detaches the value (elements degrade to their id-only\nface). The host typically outlives the app, so teardown is rarely needed."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "eprResolutionContext",
+          "declaration": {
+            "name": "eprResolutionContext",
+            "module": "src/navigation/epr-resolution-provider.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "installEprResolutionProvider",
+          "declaration": {
+            "name": "installEprResolutionProvider",
+            "module": "src/navigation/epr-resolution-provider.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/loader/loader.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Loader",
+          "members": [
+            {
+              "kind": "field",
+              "name": "verifyCid",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "return": {
+                "type": {
+                  "text": "Promise<LoaderResolution>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "verifyCidMatches",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "bytes",
+                  "type": {
+                    "text": "Uint8Array"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Loader",
+          "declaration": {
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
           }
         }
       ]
@@ -8337,90 +8619,6 @@
           "declaration": {
             "name": "Session",
             "module": "src/session/session.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/navigation/epr-link-interceptor.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "recordCrossBundleHandoff",
-          "return": {
-            "type": {
-              "text": "void"
-            }
-          },
-          "parameters": [
-            {
-              "name": "cid",
-              "default": "''"
-            }
-          ],
-          "description": "Append a handoff entry to the shared session-nav-stack — the same\nsessionStorage shape elohim-app's SessionNavStackService reads, so the\nprotocol-omni back affordance survives the bundle boundary."
-        },
-        {
-          "kind": "function",
-          "name": "baseHrefOwnsPath",
-          "return": {
-            "type": {
-              "text": "boolean"
-            }
-          },
-          "parameters": [
-            {
-              "name": "path",
-              "type": {
-                "text": "string"
-              }
-            }
-          ],
-          "description": "Default ownsPath: prefix match against this bundle's <base href>. A \"/\"\nbase owns everything — the shell (base \"/\") installs explicitly with a\nrouter-aware predicate instead of relying on this heuristic."
-        },
-        {
-          "kind": "function",
-          "name": "installEprLinkInterceptor",
-          "return": {
-            "type": {
-              "text": "() => void"
-            }
-          },
-          "parameters": [
-            {
-              "name": "options",
-              "default": "{}",
-              "type": {
-                "text": "EprLinkInterceptorOptions"
-              }
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "recordCrossBundleHandoff",
-          "declaration": {
-            "name": "recordCrossBundleHandoff",
-            "module": "src/navigation/epr-link-interceptor.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "baseHrefOwnsPath",
-          "declaration": {
-            "name": "baseHrefOwnsPath",
-            "module": "src/navigation/epr-link-interceptor.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "installEprLinkInterceptor",
-          "declaration": {
-            "name": "installEprLinkInterceptor",
-            "module": "src/navigation/epr-link-interceptor.ts"
           }
         }
       ]
@@ -9052,79 +9250,6 @@
           "declaration": {
             "name": "assertWithinViewport",
             "module": "src/testing/viewport.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/loader/loader.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Loader",
-          "members": [
-            {
-              "kind": "field",
-              "name": "verifyCid",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "resolve",
-              "return": {
-                "type": {
-                  "text": "Promise<LoaderResolution>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "verifyCidMatches",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "Promise<void>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                },
-                {
-                  "name": "bytes",
-                  "type": {
-                    "text": "Uint8Array"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "Loader",
-          "declaration": {
-            "name": "Loader",
-            "module": "src/loader/loader.ts"
           }
         }
       ]

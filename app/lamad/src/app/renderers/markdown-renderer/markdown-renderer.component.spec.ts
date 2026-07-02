@@ -9,7 +9,11 @@ import { of } from 'rxjs';
 import { MarkdownRendererComponent, TocEntry } from './markdown-renderer.component';
 import { ContentNode } from '../../models/content-node.model';
 import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
-import { LAMAD_EPR_RESOLVER, LAMAD_EPR_NAV } from '../../interfaces/cross-pillar.interface';
+import {
+  LAMAD_EPR_RESOLVER,
+  LAMAD_EPR_NAV,
+  LAMAD_EPR_RESOLUTION_PROVIDER,
+} from '../../interfaces/cross-pillar.interface';
 import { PathService } from '../../services/path.service';
 import { PathContextService } from '../../services/path-context.service';
 
@@ -66,6 +70,14 @@ describe('MarkdownRendererComponent', () => {
         {
           provide: LAMAD_EPR_NAV,
           useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => false), recordHandoff: vi.fn() },
+        },
+        {
+          provide: LAMAD_EPR_RESOLUTION_PROVIDER,
+          useValue: {
+            resolveRoute: vi.fn().mockReturnValue({ route: null, href: '/epr/test' }),
+            resolveHead: vi.fn().mockResolvedValue({ state: 'missing' }),
+            resolveBody: vi.fn().mockResolvedValue({ state: 'missing' }),
+          },
         },
       ],
     }).compileComponents();
@@ -455,6 +467,14 @@ describe('MarkdownRendererComponent — cross-path prefetch', () => {
         {
           provide: LAMAD_EPR_NAV,
           useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => false), recordHandoff: vi.fn() },
+        },
+        {
+          provide: LAMAD_EPR_RESOLUTION_PROVIDER,
+          useValue: {
+            resolveRoute: vi.fn().mockReturnValue({ route: null, href: '/epr/test' }),
+            resolveHead: vi.fn().mockResolvedValue({ state: 'missing' }),
+            resolveBody: vi.fn().mockResolvedValue({ state: 'missing' }),
+          },
         },
       ],
     }).compileComponents();

@@ -16,7 +16,7 @@ import {
   claimsFromDeclaration,
   type BundleRouteContext,
 } from '@elohim/service';
-import { LAMAD_ROUTE_CLAIMS } from './route-claims.declaration';
+import { LAMAD_ROUTE_CLAIMS } from './generated/route-claims';
 import { AGENT_CONTEXT, ECONOMIC_EVENT_FACTORY, EVENT_API } from '@elohim/rea-runtime';
 import { environment } from '../environments/environment';
 import { LEARNER_BACKEND } from './interfaces/learner-backend.interface';
@@ -40,11 +40,16 @@ import {
   LAMAD_CONTEXT_ASSEMBLY,
   LAMAD_LENS_REGISTRY,
   LAMAD_IDENTITY,
+  LAMAD_EPR_RESOLUTION_PROVIDER,
 } from './interfaces/cross-pillar.interface';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
 import { EprNavService } from '@app/elohim/services/epr-nav.service';
+import {
+  provideEprResolution,
+  EPR_RESOLUTION_PROVIDER,
+} from '@app/elohim/providers/epr-resolution.provider';
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
 import { ElohimPresenceService } from '@app/elohim/services/elohim-presence.service';
 import { HumanConsentService } from '@app/elohim/services/human-consent.service';
@@ -168,6 +173,11 @@ export const appConfig: ApplicationConfig = {
     { provide: LAMAD_AFFINITY_TRACKING, useExisting: AffinityTrackingService },
     { provide: LAMAD_EPR_RESOLVER, useExisting: EprResolverService },
     { provide: LAMAD_EPR_NAV, useExisting: EprNavService },
+    // I2: the single ambient EprResolutionProvider (baking THIS bundle's route
+    // context) + the narrow lamad token the markdown renderer consumes for its
+    // popover route minting. resolveInContext (HyperCard) stays on the resolver.
+    provideEprResolution(),
+    { provide: LAMAD_EPR_RESOLUTION_PROVIDER, useExisting: EPR_RESOLUTION_PROVIDER },
     // §12.3 / Slice 3 (§8.3): lamad's claims derive from its DECLARATION —
     // one authoring home; the executable commands come from the shared
     // interpreter. Everything not declared stays cross-bundle.

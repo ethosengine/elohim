@@ -15,6 +15,10 @@ import {
   detectClientMode,
   ELOHIM_CLIENT as LOCAL_ELOHIM_CLIENT,
 } from './elohim/providers/elohim-client.provider';
+import {
+  provideEprResolution,
+  EPR_RESOLUTION_PROVIDER,
+} from './elohim/providers/epr-resolution.provider';
 import { ELOHIM_CLIENT } from '@elohim/service';
 import { CustodianCommitmentService } from './elohim/services/custodian-commitment.service';
 import { CustodianMetricsReporterService } from './elohim/services/custodian-metrics-reporter.service';
@@ -33,24 +37,30 @@ import {
   LAMAD_GOVERNANCE,
   LAMAD_GOVERNANCE_SIGNAL,
   LAMAD_CONTEXT_ASSEMBLY,
+  LAMAD_EPR_RESOLUTION_PROVIDER,
 } from '@app/lamad/interfaces/cross-pillar.interface';
 import { LAMAD_AGENT } from '@app/lamad/interfaces/agent.interface';
 import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '@app/lamad/interfaces/storage.interface';
 import { LEARNER_BACKEND } from '@app/lamad/interfaces/learner-backend.interface';
 import { LearnerBackendApiService } from '@app/lamad/services/learner-backend-api.service';
 import { ECONOMIC_EVENT_FACTORY, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
-import { BUNDLE_ROUTE_CONTEXT, type BundleRouteContext } from '@elohim/service';
+import {
+  BUNDLE_ROUTE_CONTEXT,
+  claimsFromDeclaration,
+  type BundleRouteContext,
+} from '@elohim/service';
 import { CONTENT_SYNC_STORAGE_BASE_URL } from '@elohim/service';
-import { EconomicEventsApiService } from './shefa/services/economic-events-api.service';
+import { AffinityTrackingService } from './elohim/services/affinity-tracking.service';
+import { AgentService } from './elohim/services/agent.service';
+import { ContextAssemblyService } from './elohim/services/context-assembly.service';
+import { EprNavService } from './elohim/services/epr-nav.service';
+import { EprResolverService } from './elohim/services/epr-resolver.service';
+import { GovernanceSignalService } from './elohim/services/governance-signal.service';
+import { GovernanceService } from './elohim/services/governance.service';
 import { StorageApiService } from './elohim/services/storage-api.service';
 import { StorageClientService } from './elohim/services/storage-client.service';
-import { AgentService } from './elohim/services/agent.service';
-import { AffinityTrackingService } from './elohim/services/affinity-tracking.service';
-import { EprResolverService } from './elohim/services/epr-resolver.service';
-import { EprNavService } from './elohim/services/epr-nav.service';
-import { GovernanceService } from './elohim/services/governance.service';
-import { GovernanceSignalService } from './elohim/services/governance-signal.service';
-import { ContextAssemblyService } from './elohim/services/context-assembly.service';
+import { ELOHIM_OWNS_UNIVERSAL_ROUTE, ELOHIM_ROUTE_CLAIMS } from './generated/route-claims';
+import { EconomicEventsApiService } from './shefa/services/economic-events-api.service';
 
 /**
  * Resolve the doorway URL at runtime.
@@ -132,10 +142,20 @@ export const appConfig: ApplicationConfig = {
     { provide: EVENT_API, useExisting: StorageApiService },
     // §12.3: the shell claims nothing by type — it OWNS the universal /epr
     // route, so every unclaimed EPR resolves in-shell to ['/epr', id].
+    // Declared in elohim/sdk/domains/elohim/manifest.json (I3) — generated,
+    // never hand-edited here.
     {
       provide: BUNDLE_ROUTE_CONTEXT,
-      useValue: { claims: [], ownsUniversalRoute: true } satisfies BundleRouteContext,
+      useValue: {
+        claims: claimsFromDeclaration(ELOHIM_ROUTE_CLAIMS),
+        ownsUniversalRoute: ELOHIM_OWNS_UNIVERSAL_ROUTE,
+      } satisfies BundleRouteContext,
     },
+    // I2: the single ambient EprResolutionProvider, baking THIS bundle's
+    // BUNDLE_ROUTE_CONTEXT above so `resolveRoute` is claims-correct. Injected by
+    // the four resolution consumers (Angular) and installed at the shell root as
+    // the Lit @lit/context provider (app.component) for every <elohim-*> element.
+    provideEprResolution(),
     // LAMAD_HOLOCHAIN_CLIENT — cross-pillar token consumed by BlobBootstrapService
     // (app.component.ts) and ContentMasteryService (session-migration.service.ts).
     // HolochainClientService is providedIn:'root' in @app/elohim; this useExisting
@@ -162,6 +182,10 @@ export const appConfig: ApplicationConfig = {
     // LAMAD_EPR_RESOLVER / LAMAD_EPR_NAV — content-viewer (direct) + markdown-renderer.
     { provide: LAMAD_EPR_RESOLVER, useExisting: EprResolverService },
     { provide: LAMAD_EPR_NAV, useExisting: EprNavService },
+    // LAMAD_EPR_RESOLUTION_PROVIDER — the markdown renderer (viewer chain) consumes
+    // the single provider through this narrow token; bridge it to the shell's
+    // concrete EPR_RESOLUTION_PROVIDER (mirrors app/lamad/src/app/app.config.ts).
+    { provide: LAMAD_EPR_RESOLUTION_PROVIDER, useExisting: EPR_RESOLUTION_PROVIDER },
     // LAMAD_STORAGE_CLIENT — content-viewer (direct) + resilience / household-
     // resilience / projection-api / content-backend services in the viewer chain.
     { provide: LAMAD_STORAGE_CLIENT, useExisting: StorageClientService },

@@ -64,7 +64,13 @@
     "schema-codegen": {
       "description": "Verify schema codegen is fresh",
       "inputs": {
-        "sources": ["elohim/sdk/schemas/**"],
+        "sources": [
+          "elohim/sdk/schemas/**",
+          "elohim/sdk/domains/*/manifest.json",
+          "app/lamad/src/app/generated/route-claims.ts",
+          "app/elohim-app/src/app/generated/route-claims.ts",
+          "genesis/seeder/src/generated/route-claims.ts"
+        ],
         "buildProcess": []
       },
       "outputs": { "artifacts": [], "verify": null },

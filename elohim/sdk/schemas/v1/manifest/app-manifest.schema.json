@@ -191,6 +191,34 @@
         }
       },
       "additionalProperties": false
+    },
+    "routeClaims": {
+      "type": "array",
+      "description": "Bundle contentType route claims (RouteClaimTemplate, pillar-epr-decomposition spec §3.1), single-homed here per the 2026-07-02 epr-resolution-provider design I3. Generated consumers are the bundle claim tables (eprToRoute via BUNDLE_ROUTE_CONTEXT) and the seeder's project-epr grant claims (which become the doorway EprRouter's runtime claims index).",
+      "items": {
+        "type": "object",
+        "required": ["contentType", "template"],
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "description": "Content type this bundle claims a mount route for. References a vocabulary.contentTypes key."
+          },
+          "template": {
+            "type": "string",
+            "description": "Mount-relative route template WITHOUT leading slash, e.g. 'path/{id}'. {id} binds the EPR id; other placeholders bind fragment params."
+          },
+          "fragments": {
+            "type": "object",
+            "description": "Named sub-route templates keyed by fragment name (e.g. { step: 'path/{id}/step/{n}' }). Each value is a mount-relative template WITHOUT leading slash.",
+            "additionalProperties": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "ownsUniversalRoute": {
+      "type": "boolean",
+      "description": "This bundle owns the universal /epr/{id} route (the shell posture). At most one manifest may declare true (enforced by the route-claims codegen)."
     }
   },
   "additionalProperties": false,

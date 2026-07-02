@@ -148,10 +148,11 @@ Feature: Deep links to lamad land on the rendered page, not a 404 shell
   @browser-only @regression
   Scenario: View as Content opens the raw-node inspector, not a round-trip
     # EPR Slice 0 (lens-complete-epr-resolution): the overview's "View as Content"
-    # minted the claims-aware universal address, which 302s a CLAIMED path back to
-    # its OWN pretty mount — a round-trip to itself (the UX contradiction captured
-    # 2026-06-06 in epr-routing-complementary-captures; the earlier /epr/path-{id}
-    # nonexistent-id bug it first exposed is fixed). It now mints the raw subview,
+    # used to mint the plain claims-aware universal address, which — before the
+    # Slice-1 claims-302 demotion — bounced a CLAIMED path back to its OWN pretty
+    # mount, a round-trip to itself (the UX contradiction captured 2026-06-06 in
+    # epr-routing-complementary-captures; the earlier /epr/path-{id} nonexistent-id
+    # bug it first exposed is fixed). It now mints the raw subview,
     # so following the link lands on the raw-node inspector: the EPR shown AS an
     # atom (id/CID, format, provenance), distinct from the rich path experience.
     # Guards the round-trip from returning.
@@ -165,8 +166,9 @@ Feature: Deep links to lamad land on the rendered page, not a 404 shell
     # EPR Slice 0: /epr/{id}/raw is the raw-node inspector. The doorway serves the
     # shell for the /raw subview — never a 302 to a pillar mount, even for a
     # CLAIMED type — and the shell's epr/:resourceId/raw route renders the atom.
-    # Contrast the bare "/epr/{id}" sibling above, where a claimed type 302s to
-    # its mount: same EPR, different subview, different surface.
+    # Contrast the bare "/epr/{id}" sibling above, which (post Slice-1 demotion)
+    # ALSO serves the shell — the lens-complete composite outline — never a 302:
+    # same EPR, same serve-the-shell contract, different subview → different surface.
     Given a learner opens the deep link "/epr/foundations-christian-technology/raw"
     Then the lamad raw-node inspector renders
     And the rendered surface is not a raw error response

@@ -3,40 +3,39 @@
  *
  * Covers: title resolution, type label, reach badge, resilience badge,
  * link routing, and fallback when resolution returns null.
+ *
+ * Resolution now flows through the ambient EprResolutionProvider (I2):
+ * `resolveHead` is Promise-based, so the card resolves asynchronously — each
+ * test flushes a macrotask (`setTimeout(0)`) after `ngOnChanges` before asserting.
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RouterModule } from '@angular/router';
+
 import { of } from 'rxjs';
 
 import { EprRelationshipCardComponent } from './epr-relationship-card.component';
-import { EprResolverService } from '../../services/epr-resolver.service';
+import { EPR_RESOLUTION_PROVIDER } from '../../providers/epr-resolution.provider';
 import { ResilienceService } from '@app/lamad/services/resilience.service';
 import type { EprRelationship } from '../../models/epr-head.model';
+import type { EprHeadResolution } from 'elohim-core';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-const resolvedContent = {
-  ref: { id: 'systems-thinking', tier: 'doc' as const },
-  content: {
+const headResolution: EprHeadResolution = {
+  state: 'resolved',
+  head: {
     id: 'systems-thinking',
     title: 'Systems Thinking',
     description: 'An introduction.',
+    reach: 'community',
     contentType: 'concept',
     contentFormat: 'markdown',
-    reach: 'community',
-    contentBody: null,
-    blobHash: null,
-    blobCid: null,
-    metadataJson: null,
     tags: [],
-    createdAt: '',
-    updatedAt: '',
+    route: ['/epr', 'systems-thinking'],
+    href: '/epr/systems-thinking',
   },
-  route: ['/epr', 'systems-thinking'],
-  href: '/epr/systems-thinking',
-  blobUrl: null,
 };
 
 const resilienceView = {
@@ -73,17 +72,38 @@ function query(
 describe('EprRelationshipCardComponent', () => {
   let fixture: ComponentFixture<EprRelationshipCardComponent>;
   let component: EprRelationshipCardComponent;
-  let mockResolver: { resolve: ReturnType<typeof vi.fn> };
+  let mockResolution: {
+    resolveHead: ReturnType<typeof vi.fn>;
+    resolveRoute: ReturnType<typeof vi.fn>;
+    resolveBody: ReturnType<typeof vi.fn>;
+  };
   let mockResilience: { getContentResilience: ReturnType<typeof vi.fn> };
 
+  /** Set the relationship, trigger change detection, and flush the async head. */
+  async function apply(rel: EprRelationship): Promise<void> {
+    component.relationship = rel;
+    component.ngOnChanges({ relationship: {} as never });
+    fixture.detectChanges();
+    // resolveHead is Promise-based (from() emits on a microtask); flush a
+    // macrotask so the resolved state is rendered before we assert.
+    await new Promise(resolve => setTimeout(resolve, 0));
+    fixture.detectChanges();
+  }
+
   beforeEach(async () => {
-    mockResolver = { resolve: vi.fn().mockReturnValue(of(resolvedContent)) };
+    mockResolution = {
+      resolveHead: vi.fn().mockResolvedValue(headResolution),
+      resolveRoute: vi
+        .fn()
+        .mockReturnValue({ route: ['/epr', 'systems-thinking'], href: '/epr/systems-thinking' }),
+      resolveBody: vi.fn().mockResolvedValue({ state: 'missing' }),
+    };
     mockResilience = { getContentResilience: vi.fn().mockReturnValue(of(resilienceView)) };
 
     await TestBed.configureTestingModule({
       imports: [EprRelationshipCardComponent, RouterModule.forRoot([])],
       providers: [
-        { provide: EprResolverService, useValue: mockResolver },
+        { provide: EPR_RESOLUTION_PROVIDER, useValue: mockResolution },
         { provide: ResilienceService, useValue: mockResilience },
       ],
     }).compileComponents();
@@ -91,11 +111,7 @@ describe('EprRelationshipCardComponent', () => {
     fixture = TestBed.createComponent(EprRelationshipCardComponent);
     component = fixture.componentInstance;
 
-    // Set input and manually trigger ngOnChanges (standard Angular test pattern
-    // when inputs are set programmatically rather than via template binding).
-    component.relationship = prerequisiteRelationship;
-    component.ngOnChanges({ relationship: {} as any });
-    fixture.detectChanges();
+    await apply(prerequisiteRelationship);
   });
 
   // ── Title ──────────────────────────────────────────────────────────────────
@@ -139,7 +155,7 @@ describe('EprRelationshipCardComponent', () => {
     expect(el!.textContent).toContain('3');
   });
 
-  it('hides the distinct-peers badge when distinctPeers is 0', () => {
+  it('hides the distinct-peers badge when distinctPeers is 0', async () => {
     mockResilience.getContentResilience.mockReturnValue(
       of({
         ...resilienceView,
@@ -147,37 +163,29 @@ describe('EprRelationshipCardComponent', () => {
       })
     );
 
-    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
-    component.ngOnChanges({ relationship: {} as any });
-    fixture.detectChanges();
+    await apply({ type: 'PREREQUISITE', target: 'systems-thinking' });
 
     expect(query(fixture, 'epr-rel-card-peers')).toBeNull();
   });
 
-  it('hides the distinct-peers badge when resilience is unavailable', () => {
+  it('hides the distinct-peers badge when resilience is unavailable', async () => {
     mockResilience.getContentResilience.mockReturnValue(of(null));
 
-    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
-    component.ngOnChanges({ relationship: {} as any });
-    fixture.detectChanges();
+    await apply({ type: 'PREREQUISITE', target: 'systems-thinking' });
 
     expect(query(fixture, 'epr-rel-card-peers')).toBeNull();
   });
 
   // ── Malformed resilience (regression: stewardCount TypeError) ──────────────
 
-  it('renders legibly and hides the steward badge when resilience is a truthy-but-malformed body', () => {
+  it('renders legibly and hides the steward badge when resilience is a truthy-but-malformed body', async () => {
     // Through the start:alpha proxy the resilience route can answer with a
     // truthy body that lacks `stewardship` (SPA fallback / partial view).
     // Reading `stewardship.stewardCount` off that threw the console TypeError
     // and blanked the card. The card must stay legible with only head data.
     mockResilience.getContentResilience.mockReturnValue(of({ contentId: 'systems-thinking' }));
 
-    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
-    expect(() => {
-      component.ngOnChanges({ relationship: {} as any });
-      fixture.detectChanges();
-    }).not.toThrow();
+    await apply({ type: 'PREREQUISITE', target: 'systems-thinking' });
 
     // Title (head data) still renders; the resilience badge is hidden.
     expect(query(fixture, 'epr-rel-card-title')!.textContent).toContain('Systems Thinking');
@@ -185,16 +193,12 @@ describe('EprRelationshipCardComponent', () => {
     expect(query(fixture, 'epr-rel-card-peers')).toBeNull();
   });
 
-  it('hides the steward badge when stewardship is present but stewardCount is not a number', () => {
+  it('hides the steward badge when stewardship is present but stewardCount is not a number', async () => {
     mockResilience.getContentResilience.mockReturnValue(
       of({ ...resilienceView, stewardship: { allocations: [] } })
     );
 
-    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
-    expect(() => {
-      component.ngOnChanges({ relationship: {} as any });
-      fixture.detectChanges();
-    }).not.toThrow();
+    await apply({ type: 'PREREQUISITE', target: 'systems-thinking' });
 
     expect(query(fixture, 'epr-rel-card-resilience')).toBeNull();
   });
@@ -211,7 +215,7 @@ describe('EprRelationshipCardComponent', () => {
     expect(title).toContain('Survives 2 failure(s)');
   });
 
-  it('omits the distinct-peers tooltip fragment when distinctPeers is 0', () => {
+  it('omits the distinct-peers tooltip fragment when distinctPeers is 0', async () => {
     mockResilience.getContentResilience.mockReturnValue(
       of({
         ...resilienceView,
@@ -219,9 +223,7 @@ describe('EprRelationshipCardComponent', () => {
       })
     );
 
-    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
-    component.ngOnChanges({ relationship: {} as any });
-    fixture.detectChanges();
+    await apply({ type: 'PREREQUISITE', target: 'systems-thinking' });
 
     const el = query(fixture, 'epr-rel-card-resilience');
     const title = el!.getAttribute('title') ?? '';
@@ -238,7 +240,7 @@ describe('EprRelationshipCardComponent', () => {
     expect(el!.textContent).toContain('●');
   });
 
-  it('renders ◐ glyph for 1 <= stewardCount < 3', () => {
+  it('renders ◐ glyph for 1 <= stewardCount < 3', async () => {
     mockResilience.getContentResilience.mockReturnValue(
       of({
         ...resilienceView,
@@ -246,15 +248,13 @@ describe('EprRelationshipCardComponent', () => {
       })
     );
 
-    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
-    component.ngOnChanges({ relationship: {} as any });
-    fixture.detectChanges();
+    await apply({ type: 'PREREQUISITE', target: 'systems-thinking' });
 
     const el = query(fixture, 'epr-rel-card-resilience');
     expect(el!.textContent).toContain('◐');
   });
 
-  it('renders ○ glyph for stewardCount === 0', () => {
+  it('renders ○ glyph for stewardCount === 0', async () => {
     mockResilience.getContentResilience.mockReturnValue(
       of({
         ...resilienceView,
@@ -262,9 +262,7 @@ describe('EprRelationshipCardComponent', () => {
       })
     );
 
-    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
-    component.ngOnChanges({ relationship: {} as any });
-    fixture.detectChanges();
+    await apply({ type: 'PREREQUISITE', target: 'systems-thinking' });
 
     const el = query(fixture, 'epr-rel-card-resilience');
     expect(el!.textContent).toContain('○');
@@ -279,14 +277,13 @@ describe('EprRelationshipCardComponent', () => {
     expect(href).toContain('systems-thinking');
   });
 
-  it('uses the href fallback anchor when route is null (cross-bundle)', () => {
-    mockResolver.resolve.mockReturnValue(
-      of({ ...resolvedContent, route: null, href: '/epr/systems-thinking' })
-    );
+  it('uses the href fallback anchor when route is null (cross-bundle)', async () => {
+    mockResolution.resolveHead.mockResolvedValue({
+      state: 'resolved',
+      head: { ...headResolution.head, route: null, href: '/epr/systems-thinking' },
+    });
 
-    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
-    component.ngOnChanges({ relationship: {} as any });
-    fixture.detectChanges();
+    await apply({ type: 'PREREQUISITE', target: 'systems-thinking' });
 
     const card = query(fixture, 'epr-relationship-card');
     expect(card).toBeTruthy();
@@ -298,13 +295,11 @@ describe('EprRelationshipCardComponent', () => {
 
   // ── Fallback ──────────────────────────────────────────────────────────────
 
-  it('falls back to target id when resolution returns null', () => {
-    mockResolver.resolve.mockReturnValue(of(null));
+  it('falls back to target id when the head does not resolve', async () => {
+    mockResolution.resolveHead.mockResolvedValue({ state: 'missing' });
     mockResilience.getContentResilience.mockReturnValue(of(null));
 
-    component.relationship = { type: 'REFERENCES', target: 'unknown-content' };
-    component.ngOnChanges({ relationship: {} as any });
-    fixture.detectChanges();
+    await apply({ type: 'REFERENCES', target: 'unknown-content' });
 
     const el = query(fixture, 'epr-rel-card-title');
     expect(el).toBeTruthy();

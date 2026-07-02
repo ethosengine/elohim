@@ -1,0 +1,64 @@
+# .claude/epr-meta/policies.yaml — the define-once-bind-many policy registry for .epr-meta rules.
+#
+# Each entry is Precedent-shaped (mishpat_integrity::Precedent is the graduated protocol home:
+# binding ladder, scope, full_reasoning, citations, supersession lineage). Here in the dev-tooling
+# tier the registry is a repo-local YAML file (operational scaffold, classification C); the
+# `policy: <id>@<version>` reference shape in binding manifests is what keeps it liftable — when
+# epr-meta graduates into brit/eprfs, rows become Mishpat Precedent entries (CID = entry_hash)
+# and bindings become cites, with no manifest rewrite.
+#
+# Contract:
+#   • A manifest rule binds a policy with `policy: <id>@<version>` — the version pin is REQUIRED
+#     (which version applies is a DECLARED dependency, never recency; see the lens-version-DAG
+#     spec 2026-06-27). Editing a policy = adding a NEW version entry; existing bindings keep
+#     the old semantics until each binding re-declares. `status: superseded` + `superseded_by`
+#     record lineage; never delete a version that still has bindings.
+#   • The policy owns semantics: class, scope (the default `when`), predicate/measure defaults,
+#     and the why. The binding owns placement and local variance: an optional `when` override
+#     and `params` (merged over the policy's `measure` defaults).
+#   • `binding` maps the Precedent ladder onto the enforcement-class ladder:
+#     constitutional/binding-network ≈ deny · binding-local ≈ ask · persuasive ≈ inject ·
+#     observation ≈ measure (never blocks; feeds signal ledgers).
+#   • deny-class policies carry `established_by` operator provenance (the ratification
+#     convention — a deny is constitutional-shaped authority).
+
+epr-meta-policies-version: 1
+policies:
+  - id: source-file-loc-ceiling
+    version: 1
+    title: Source-file LoC ceiling — architecture-review trigger
+    binding: observation
+    class: measure
+    scope: { write: "*.rs" }
+    measure:
+      loc-soft: 3000
+      loc-hard: 7000
+      dispatch-agent: rust-architect
+    status: active
+    established_by: operator-2026-07-02
+    why: >
+      A first-party source file past the hard ceiling is a god-file: it corrodes its own
+      governance (line-number invariant anchors drift every edit; two-location sync traps
+      grow ~1000 lines apart) and outgrows what one context window can review. Soft ceiling
+      = edit-time nudge (new logic likely belongs in a module). Hard ceiling = a fingerprinted
+      architecture finding: canonicalize a modularization plan into the timeline backlog and
+      drive it as bounded work — never refactor mid-edit. Refactor-safety asymmetry the
+      reviewer must honor: coordinator zomes hot-swap via update_coordinators (cheap);
+      integrity-zome changes move the DNA hash (reinstall/partition trap — ride a deliberate
+      DNA-lineage event only); plain native Rust is gated by fmt/clippy/nextest alone.
+      Ratchet ceilings DOWN as the tail drains; never up.
+
+  - id: memory-frontmatter-at-birth
+    version: 1
+    title: Memory topic files must be born with projectable frontmatter
+    binding: constitutional
+    class: deny
+    scope: { write: "*.md", new: true }
+    require-frontmatter: [name, title, description]
+    status: active
+    established_by: operator-ratification-pending-2026-07-02
+    why: >
+      A memory born without name + title + description cannot project into the generated
+      MEMORY.md index — it is unrecallable, which defeats the only purpose of writing it.
+      Add frontmatter: name (slug), title (<= 60 chars), description (ONE line, <= 160
+      chars: what the fact is + when it bites), metadata.type (user|feedback|project|reference).

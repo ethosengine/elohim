@@ -837,20 +837,37 @@ def epr_meta_coverage_data() -> dict:
                                 min_exts=c["min_exts"], exclude_globs=c["exclude_globs"])
 
 
+def epr_meta_measure_data() -> dict:
+    """The measure-rule census (LoC ceilings): the batch dual of the resolver's per-edit measure
+    verdict, from the same policy registry + cascade semantics. {"hard": rows, "soft": rows}."""
+    from _lib import epr_meta as _em
+    c = _em.governance_cfg(ROOT)
+    return _em.measure_census(ROOT, exclude_globs=c["exclude_globs"])
+
+
 def epr_meta_line() -> str:
     """Headline token: are the codebase's substantial directories OWNED by a self-responsible
-    .epr-meta? `covers: subtree` to claim a region. Absent/error → graceful gate-liveness note."""
+    .epr-meta? `covers: subtree` to claim a region. Carries the measure-census clause when any
+    file sits at/over its LoC hard ceiling. Absent/error → graceful gate-liveness note."""
     try:
         d = epr_meta_coverage_data()
     except Exception as e:  # noqa: BLE001
         return f"  epr-meta: ⚠ gate-error ({type(e).__name__})"
+    arch = ""
+    try:
+        n_hard = len(epr_meta_measure_data()["hard"])
+        if n_hard:
+            arch = f" · ⚠ {n_hard} file(s) ≥ LoC hard ceiling (arch-review queue)"
+    except Exception:  # noqa: BLE001 — the measure clause must never kill the coverage line
+        arch = " · measure-census ⚠ gate-error"
     total = d["covered_count"] + d["gap_count"]
     if total == 0:
-        return "  epr-meta: no governable regions ✅"
+        return f"  epr-meta: no governable regions ✅{arch}"
     if d["gap_count"] == 0:
-        return f"  epr-meta: {d['covered_count']}/{total} regions claimed   (all governable context owned ✅)"
+        return (f"  epr-meta: {d['covered_count']}/{total} regions claimed"
+                f"   (all governable context owned ✅){arch}")
     return (f"  epr-meta: {d['covered_count']}/{total} regions claimed"
-            f"   (⚠ {d['gap_count']} unclaimed → `placement-audit.py --epr-meta` to remediate)")
+            f"   (⚠ {d['gap_count']} unclaimed → `placement-audit.py --epr-meta` to remediate){arch}")
 
 
 def epr_meta_mode() -> int:
@@ -880,6 +897,22 @@ def epr_meta_mode() -> int:
             print(f"  {g['files']:>4}f {g['subdirs']:>2}d  {g['path']:<54} {g['exts']}")
     else:
         print("All governable regions are owned ✅")
+    try:
+        m = epr_meta_measure_data()
+    except Exception as e:  # noqa: BLE001
+        print(f"\nMEASURE CENSUS: ⚠ gate-error ({type(e).__name__})")
+        return 0
+    if m["hard"] or m["soft"]:
+        print(f"\nMEASURE CENSUS (LoC ceilings from the policy registry, "
+              f"{len(m['hard'])} hard / {len(m['soft'])} soft):")
+        for r in m["hard"]:
+            print(f"  ⛔ {r['loc']:>6} ≥{r['hard']:>5}  {r['path']}   [{r['rule']}] → architecture-"
+                  f"review queue (modularization plan in genesis/data/timeline/backlog/)")
+        for r in m["soft"]:
+            print(f"  ⚠ {r['loc']:>6} ≥{r['soft']:>5}  {r['path']}   [{r['rule']}] soft — growth "
+                  f"pressure; new logic likely belongs in a module")
+        for e in m.get("errors", []):
+            print(f"  ! {e}")
     return 0
 
 

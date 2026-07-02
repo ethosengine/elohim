@@ -2,10 +2,16 @@
 # .claude/hooks/epr-meta-resolver.py
 """PreToolUse resolver for the .epr-meta compose-gate. Thin: stdin -> _lib.epr_meta -> verdict JSON.
 Fail-open: a guard bug never blocks dev."""
+import hashlib
 import json
 import sys
 import time
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover — non-POSIX
+    fcntl = None
 
 # --- _lib bootstrap (clone of managed-surface-context.py:26-32) ---
 _here = Path(__file__).resolve()
@@ -22,6 +28,109 @@ from _lib import store  # noqa: E402
 # INFORMS the agent-with-context without nagging every edit (the minimalism principle, applied to
 # the nudge itself). Tunable; the gap self-closes the moment a `covers: subtree` manifest is authored.
 _ADVICE_WINDOW = 4 * 3600
+
+# Measure-class findings (the observation tier — never blocks) land here, sentinel-style:
+# one line per LIVE fingerprint; a fingerprint PRESENT suppresses re-dispatch; the entry is
+# deleted when the finding is drained (file back under ceiling), never parked.
+_ARCH_LEDGER_REL = ".claude/data/architecture-findings.jsonl"
+
+
+def _advice_debounced(root: Path, key: str) -> bool:
+    """True if `key` was advised within _ADVICE_WINDOW; records the advice time otherwise.
+    Shares the coverage-nudge store so all epr-meta debounce state lives in one place.
+    Read-check-write runs under store.locked_update so concurrent sessions can't lose each
+    other's debounce keys (worst case on lock timeout: one extra advisory, never a suppression)."""
+    try:
+        state_p = root / ".claude/data/epr-meta-advice.json"
+        now = time.time()
+        hit = {"debounced": False}
+
+        def upd(seen):
+            seen = seen if isinstance(seen, dict) else {}
+            last = seen.get(key, 0)
+            if isinstance(last, (int, float)) and (now - last) < _ADVICE_WINDOW:
+                hit["debounced"] = True
+                return seen
+            seen[key] = now
+            return seen
+
+        store.locked_update(state_p, upd, {})
+        return hit["debounced"]
+    except Exception:  # noqa: BLE001 — store trouble → advise rather than suppress
+        return False
+
+
+def _handle_measures(measures, merged, root: Path, fp_path: str) -> list[str]:
+    """The measure side-channel: file each hard-ceiling verdict as a fingerprinted architecture
+    finding (flag→agent→canon→stasis, the deprecation-sentinel pattern). NEW fingerprint →
+    ledger append + dispatch directive; already-filed → debounced one-line citation."""
+    notes: list[str] = []
+    try:
+        rel = str(Path(fp_path).resolve().relative_to(root))
+    except (ValueError, OSError):
+        rel = fp_path
+    for v in measures:
+        try:
+            fpid = hashlib.sha256(f"{v.rule_id}|{rel}".encode()).hexdigest()[:12]
+            ledger = root / _ARCH_LEDGER_REL
+            rule = merged["rules"].get(v.rule_id, {})
+            agent = (rule.get("measure") or {}).get("dispatch-agent", "general-purpose")
+            # Read-check-append under an flock on the ledger fd itself, so concurrent sessions
+            # can't both see "not filed" and duplicate the row ("one line per LIVE fingerprint").
+            # Non-blocking with bounded retry — a hook never waits on a lock; on timeout we skip
+            # (the next edit of the still-over-ceiling file retries).
+            ledger.parent.mkdir(parents=True, exist_ok=True)
+            is_new = None  # None = lock not acquired
+            with open(ledger, "a+", encoding="utf-8", errors="replace") as fh:
+                locked = fcntl is None
+                if not locked:
+                    deadline = time.monotonic() + 0.5
+                    while time.monotonic() < deadline:
+                        try:
+                            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                            locked = True
+                            break
+                        except OSError:
+                            time.sleep(0.02)
+                if locked:
+                    fh.seek(0)
+                    known = set()
+                    for ln in fh.read().splitlines():
+                        try:
+                            known.add(json.loads(ln).get("fp"))
+                        except Exception:  # noqa: BLE001
+                            continue
+                    is_new = fpid not in known
+                    if is_new:
+                        entry = {"fp": fpid, "rule": v.rule_id, "policy": rule.get("policy-ref"),
+                                 "path": rel, "detail": v.reason[:300],
+                                 "first_seen": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                                 "status": "open"}
+                        fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            if is_new is None:
+                continue  # lock contention — another session owns this moment; next edit retries
+            if not is_new:
+                if not _advice_debounced(root, f"arch-fp:{fpid}"):
+                    notes.append(
+                        f"[.epr-meta measure] `{rel}` remains over its hard LoC ceiling — already "
+                        f"filed as architecture finding {fpid} ({_ARCH_LEDGER_REL}, status open). "
+                        f"Drain via its backlog plan; do not re-file.")
+                continue
+            notes.append(
+                f"[.epr-meta measure] NEW architecture finding {fpid}: {v.reason} Captured to "
+                f"{_ARCH_LEDGER_REL}. DISPATCH NOW (do not derail the current task): launch the "
+                f"`{agent}` agent via the Agent tool with run_in_background: true and the prompt "
+                f"'Architecture finding {fpid}: `{rel}` is at/over its LoC hard ceiling. Scope its "
+                f"module seams and canonicalize a modularization plan into "
+                f"genesis/data/timeline/backlog/ (timeline-CONVENTIONS-conformant, "
+                f"status-carrying) — plan the restructuring as bounded work; do NOT refactor "
+                f"inline. Honor the refactor-safety notes in the policy why "
+                f"(registry: .claude/epr-meta/policies.yaml).' If that agent type is unavailable "
+                f"this session, use general-purpose with the same prompt. Then continue your "
+                f"current task.")
+        except Exception:  # noqa: BLE001 — observation tier must never break the gate
+            continue
+    return notes
 
 
 def _emit_deny(reason: str):
@@ -177,9 +286,29 @@ def main():
                           "add one (this subtree's governance has no anchor).")
 
     merged = epr_meta.merge_rules(chain)
+    root = epr_meta.find_repo_root(target)
+    policies, pol_errs = epr_meta.load_policies(root)
+    exp_errs = epr_meta.expand_policies(merged, policies)
+    advisories += [f"[.epr-meta] {e}" for e in (*pol_errs, *exp_errs)]
+
     write = {"path": fp, "content": content, "is_new": is_new,
              "is_new_subdir": is_new_subdir}
-    verdict = epr_meta.combine(epr_meta.evaluate(merged, write))
+    verdicts = epr_meta.evaluate(merged, write)
+
+    # Measure side-channel (observation tier — never blocks): hard-ceiling verdicts become
+    # fingerprinted architecture findings + a dispatch directive, sentinel-style.
+    measures = [v for v in verdicts if v.cls == "measure"]
+    if measures:
+        advisories += _handle_measures(measures, merged, root, fp)
+
+    # Soft-ceiling injects re-fire on EVERY edit of an over-soft file — debounce per (rule, path)
+    # so the nudge informs once per working session instead of nagging each keystroke.
+    def _soft_debounced(v) -> bool:
+        r = merged["rules"].get(v.rule_id, {})
+        return (v.cls == "inject" and "measure" in r
+                and _advice_debounced(root, f"loc-soft:{v.rule_id}:{fp}"))
+
+    verdict = epr_meta.combine([v for v in verdicts if not _soft_debounced(v)])
     if verdict is None:
         if advisories:
             _emit_advise(" ".join(advisories))

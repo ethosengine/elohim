@@ -423,4 +423,33 @@ describe('EprResolverService', () => {
       });
     });
   });
+
+  // ── resolveBody — the explicit, reach-gated body plane (I2) ────────────────
+  describe('resolveBody (reach-gated body plane)', () => {
+    it('returns a resolved outcome with the content body + format on 200', async () => {
+      const p = firstValueFrom(service.resolveBody('epr:manifesto'));
+      const req = httpMock.expectOne('https://doorway.host/db/content/manifesto');
+      expect(req.request.method).toBe('GET');
+      req.flush({ contentBody: '# Manifesto', contentFormat: 'markdown' });
+      expect(await p).toEqual({
+        state: 'resolved',
+        contentBody: '# Manifesto',
+        contentFormat: 'markdown',
+      });
+    });
+
+    it('maps a 403 body to the typed forbidden outcome (reach-gated, unlike the head)', async () => {
+      const p = firstValueFrom(service.resolveBody('epr:gated'));
+      const req = httpMock.expectOne('https://doorway.host/db/content/gated');
+      req.flush({ error: 'forbidden' }, { status: 403, statusText: 'Forbidden' });
+      expect(await p).toEqual({ state: 'forbidden' });
+    });
+
+    it('maps a 404 body to the typed missing outcome', async () => {
+      const p = firstValueFrom(service.resolveBody('epr:gone'));
+      const req = httpMock.expectOne('https://doorway.host/db/content/gone');
+      req.flush({ error: 'not found' }, { status: 404, statusText: 'Not Found' });
+      expect(await p).toEqual({ state: 'missing' });
+    });
+  });
 });

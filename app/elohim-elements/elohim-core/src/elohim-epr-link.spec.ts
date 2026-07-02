@@ -1,8 +1,13 @@
+import { ContextProvider } from '@lit/context';
 import { expect, fixture, html } from '@open-wc/testing';
 import axe from 'axe-core';
 
 import './register.js';
 import { ElohimEprLink } from './elohim-epr-link.js';
+import {
+  eprResolutionContext,
+  type EprResolutionProvider,
+} from './navigation/epr-resolution-provider.js';
 import { clearMediaQueries, measureLuminanceChanges } from './testing/ua-prefs.js';
 import { renderInLocale, requiresLogicalProperties } from './testing/i18n.js';
 import {
@@ -335,6 +340,88 @@ describe('<elohim-epr-link>', () => {
     await el.updateComplete;
     const fallback = el.shadowRoot!.querySelector('elohim-mention-base');
     expect(fallback).to.exist;
+  });
+
+  // ── Ambient resolution provider (@lit/context) ────────────────────────────
+
+  /** Install an ambient EprResolutionProvider on a fresh host and return it. */
+  function withProvider(value: EprResolutionProvider): HTMLElement {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const provider = new ContextProvider(host, {
+      context: eprResolutionContext,
+      initialValue: value,
+    });
+    provider.hostConnected();
+    return host;
+  }
+
+  it('resolves through the ambient context provider when no explicit resolver prop is set', async () => {
+    const host = withProvider({
+      resolveHead: async (ref: string) => ({
+        state: 'resolved',
+        head: { id: ref, title: 'Ambient Title', reach: 'commons' },
+      }),
+      resolveRoute: () => null,
+      resolveBody: async () => ({ state: 'missing' }),
+    });
+
+    const el = document.createElement('elohim-epr-link') as ElohimEprLink;
+    el.setAttribute('display', 'chip');
+    el.epr = 'epr:ambient-thing';
+    host.appendChild(el);
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 0));
+    await el.updateComplete;
+
+    const button = el.shadowRoot!.querySelector('button.anchor');
+    expect(button?.textContent?.trim()).to.equal('Ambient Title');
+    host.remove();
+  });
+
+  it('lets an explicit .resolver prop win over the ambient context provider', async () => {
+    const host = withProvider({
+      resolveHead: async () => ({
+        state: 'resolved',
+        head: { id: 'x', title: 'AMBIENT (should not win)' },
+      }),
+      resolveRoute: () => null,
+      resolveBody: async () => ({ state: 'missing' }),
+    });
+
+    const el = document.createElement('elohim-epr-link') as ElohimEprLink;
+    el.resolver = async () => ({ state: 'resolved', title: 'EXPLICIT WINS' });
+    el.epr = 'epr:override';
+    host.appendChild(el);
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 0));
+    await el.updateComplete;
+
+    const button = el.shadowRoot!.querySelector('button.anchor');
+    expect(button?.textContent?.trim()).to.equal('EXPLICIT WINS');
+    host.remove();
+  });
+
+  it('degrades to the forbidden face when the ambient provider returns forbidden', async () => {
+    const host = withProvider({
+      resolveHead: async () => ({ state: 'forbidden', head: { id: 'm', title: 'Manifesto' } }),
+      resolveRoute: () => null,
+      resolveBody: async () => ({ state: 'forbidden' }),
+    });
+
+    const el = document.createElement('elohim-epr-link') as ElohimEprLink;
+    el.setAttribute('display', 'chip');
+    el.epr = 'epr:gated';
+    host.appendChild(el);
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 0));
+    await el.updateComplete;
+
+    const fallback = el.shadowRoot!.querySelector('elohim-mention-base');
+    expect(fallback!.getAttribute('label')).to.equal('Manifesto');
+    const note = el.shadowRoot!.querySelector('[part="fallback-note"]');
+    expect(note!.textContent?.trim()).to.equal('Unavailable at your reach');
+    host.remove();
   });
 
   it('Shift+F10 keyboard shortcut opens context menu', async () => {

@@ -467,18 +467,20 @@ Then('the response body is JSON, not an index.html shell', async function (this:
 // Slice 3 — doorway-side routing (HTTP transport, no browser)
 //
 // The doorway honors notarized alias promises (redirectTemplates / redirects_from)
-// and claimed-type 302s BEFORE any bundle boots, and materializes a /sitemap.xml
-// projection of the routing table. These steps observe that substrate behavior at
-// the transport layer with redirects unfollowed, so the 302 status + Location are
-// directly assertable. `Then the response status is {int}` is the SHARED delivery
+// as 302s BEFORE any bundle boots, and materializes a /sitemap.xml projection of
+// the routing table from the claims index. (The claimed-type universal-address 302
+// was DEMOTED in Slice 1 — a claimed /epr/{id} now serves the shell, so the claim
+// drives the sitemap mint, not a redirect.) These steps observe that substrate
+// behavior at the transport layer with redirects unfollowed, so the 302 status +
+// Location are directly assertable. `Then the response status is {int}` is the SHARED delivery
 // assertion (steps/delivery.steps.ts) — reused, not redefined.
 // ---------------------------------------------------------------------------
 
 /**
  * "When the path {string} is requested without following redirects from doorway
  * {string}" — a raw HTTP GET against the doorway with redirects unfollowed, so a
- * doorway-side 302 (alias promise or claimed-type redirect) surfaces as a 302
- * status + Location header rather than being chased to its target.
+ * doorway-side 302 (the notarized alias promise) surfaces as a 302 status +
+ * Location header rather than being chased to its target.
  *
  * The capture is stored in the SHARED delivery responseStore so the existing
  * `Then the response status is {int}` assertion resolves it.
@@ -497,8 +499,8 @@ When(
 
 /**
  * "Then the response Location header is {string}" — the doorway's 302 Location
- * is the expected canonical target (spec §4 alias law / §5.1 claimed-type
- * redirect). Reads the shared delivery responseStore.
+ * is the expected canonical target (spec §4 alias law — the surviving 302 class
+ * after the Slice-1 claims-302 demotion). Reads the shared delivery responseStore.
  *
  * Example: And the response Location header is "/epr/abc"
  */

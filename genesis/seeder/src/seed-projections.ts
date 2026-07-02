@@ -31,6 +31,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { DoorwayClient } from './doorway-client.js';
 import { deterministicPeerId, type Archetype } from './peer-id.js';
+import { LAMAD_ROUTE_CLAIMS, type RouteClaimTemplate } from './generated/route-claims.js';
 
 // =============================================================================
 // Types
@@ -56,12 +57,6 @@ export interface StewardDirectEndpoint {
   altHost: string | null;
   tlsCertSan: string;
   acceptsProjectionFor: string[];
-}
-
-export interface RouteClaimTemplate {
-  contentType: string;
-  template: string;
-  fragments?: Record<string, string>;
 }
 
 export interface RouteClaimGrant {
@@ -413,9 +408,10 @@ export function defaultProjectionSeeds(): ProjectionSpec[] {
     routeClaims: {
       schemaVersion: 1,
       claimsManifestCid: null,
-      claims: [
-        { contentType: 'path', template: 'path/{id}', fragments: { step: 'path/{id}/step/{n}' } },
-      ],
+      // Claims table is GENERATED from elohim/sdk/domains/lamad/manifest.json
+      // (I3 single home) — pnpm run route-claims:codegen. Grant assembly
+      // (schemaVersion, claimsManifestCid) stays seeder-side.
+      claims: [...LAMAD_ROUTE_CLAIMS],
     },
     redirectTemplates: [{ from: '/lamad/resource/{id}', to: '/epr/{id}' }],
   });

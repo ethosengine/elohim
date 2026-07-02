@@ -8,9 +8,23 @@ import { of } from 'rxjs';
 import { AnalyticsService } from '../../services/analytics.service';
 import { ConfigService } from '../../services/config.service';
 import { DomInteractionService } from '../../services/dom-interaction.service';
+import { EPR_RESOLUTION_PROVIDER } from '../../elohim/providers/epr-resolution.provider';
+import { ResilienceService } from '@app/lamad/services/resilience.service';
 
 import { HomeComponent } from './home.component';
 import { vi } from 'vitest';
+
+// The home tree mounts app-vision/app-learning-success/app-path-forward, each
+// embedding epr-relationship-card, which resolves through the ambient
+// EprResolutionProvider (I2) and ResilienceService — stub both so structural
+// assertions stay network-free (ResilienceService otherwise needs a real
+// LAMAD_STORAGE_CLIENT, which this shell-side spec has no reason to provide).
+const mockEprResolution = {
+  resolveHead: vi.fn().mockResolvedValue({ state: 'missing' }),
+  resolveRoute: vi.fn().mockReturnValue(null),
+  resolveBody: vi.fn().mockResolvedValue({ state: 'missing' }),
+};
+const mockResilience = { getContentResilience: () => of(null) };
 
 describe('HomeComponent', () => {
   let component: HomeComponent;
@@ -63,6 +77,8 @@ describe('HomeComponent', () => {
         // status-0 rejection that vitest reports as an unhandled error (exit 1 → CI FAILURE).
         // The testing backend captures them; unflushed requests are dropped on teardown.
         provideHttpClientTesting(),
+        { provide: EPR_RESOLUTION_PROVIDER, useValue: mockEprResolution },
+        { provide: ResilienceService, useValue: mockResilience },
       ],
     }).compileComponents();
 
