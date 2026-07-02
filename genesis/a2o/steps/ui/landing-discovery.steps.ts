@@ -102,8 +102,11 @@ function pathContainsId(pathname: string, id: string): boolean {
   return pathname.split('/').filter(Boolean).includes(id);
 }
 
-/** Wait for the page to land somewhere carrying `id` in its path, tolerant of
- *  a client-side redirect chain (e.g. /epr/{id} -> /lamad/path/{id}). */
+/** Wait for the page to land somewhere carrying `id` in its path — tolerant of
+ *  whichever address the card mints: the universal /epr/{id} (served in place as
+ *  the shell since the Slice-1 claims-302 demotion — no redirect to the pretty
+ *  mount), or a direct pretty mount like /lamad/path/{id}. No client-side redirect
+ *  chain is assumed. */
 async function waitForUrlToTargetId(page: PWPage, id: string, description: string): Promise<void> {
   try {
     await page.waitForURL((url: URL) => pathContainsId(url.pathname, id), {
