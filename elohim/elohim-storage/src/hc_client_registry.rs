@@ -87,10 +87,7 @@ impl HcClientRegistry {
     /// bounded boot ramp gave up, so the HTTP re-notarize path picks it up
     /// instead of reading a frozen boot-time `None`.
     pub fn lamad_client(&self) -> Option<Arc<HcClient>> {
-        self.lamad
-            .read()
-            .unwrap_or_else(|e| e.into_inner())
-            .clone()
+        self.lamad.read().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     /// Store a (re)connected `lamad` handle (called by the late-connect updater).
