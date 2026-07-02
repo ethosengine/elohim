@@ -8,7 +8,7 @@ description: Orchestrate the four-agent memory team (librarian, historian, carto
 This skill orchestrates the four-agent memory team (librarian, historian, cartographer, storyteller) through a coordinated ceremony whose **deliverable is substrate-grounded gospel-tier rewrites**. The ceremony exists because four lenses on a surface produce a better rewrite than one — and because Run #6 proved that the audit-numbers-moving ≠ substrate-coherence-improving. Audit-number hygiene (CLAUDE.md byte budgets, cleanup-scan flags, archive ratios, MEMORY.md size) lives in `/hygiene-sweep` on a separate cadence.
 
 **When to invoke**:
-- Signal: `substrate-currency-audit.py` ranks ≥1 gospel-tier surface as high-drift (≥10 findings or ≥3 process-status findings)
+- Signal: `substrate-currency-audit.py` ranks the gospel-tier surfaces by drift count (path-existence + process-status findings, highest first) and the top of that ranking carries enough drift to warrant a rewrite — there is no fixed numeric threshold; the audit emits a ranked list (plus headline counts and an uncited-recent-memory list) and the operator picks 1-2 off the top
 - Substrate landing: a phase ships, a substrate parallel rolls in, a vocabulary lands — and the gospel-tier hasn't absorbed it
 - Operator: when a gospel-tier surface feels stale, before a /shift that will read it as primer
 
@@ -70,7 +70,8 @@ message) two lightweight currency checks:
   seed still on disk and matching INDEX.md, walk-links in §2 resolve, §3 gap-ledger pointers real —
   per its `MAP-CURRENCY mandate` lens-job. The historian verifies the §3 gap ledger is *substantively*
   honest (closed gaps worth a `history/` record; recurring gap-shapes worth a `feedback_*`), per its
-  `MAP-CURRENCY mandate` lens-job. The **map-drift accumulator** (`.claude/memory-kit/map-drift.json`,
+  `MAP-CURRENCY mandate` lens-job. The **map-currency-drift accumulator**
+  (`.claude/memory-kit/map-currency-drift.json`, written by the `map-drift-signal.py` PostToolUse hook and
   surfaced at SessionStart through the budget headline) names which seeds moved without the map
   following; if absent, fall back to an `architecture/` directory-diff against MAP §1.
 - **ROADMAP-CURRENCY (cartographer).** The cartographer regenerates

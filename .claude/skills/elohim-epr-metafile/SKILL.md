@@ -396,6 +396,7 @@ rate *is* its convergence (coverage), not a teaching-rule failure.
 | `elohim/sdk/schemas/v1/objects/epr-meta.schema.json` | The frontmatter schema (`additionalProperties: false`). Note: enforced at *codegen/contract* time, not at hook time — the runtime gate uses the engine's hand-rolled validator. |
 | `.claude/scripts/_lib/__tests__/epr_meta_{eval,resolver,cascade,schema,examples}_test.py` | Runnable proofs (no pytest). Copy their payload shapes to self-test your own manifest. |
 | `genesis/docs/superpowers/.epr-meta` · `genesis/docs/superpowers/specs/.epr-meta` | The live exemplars (Examples A/B). |
+| `.claude/memory/.epr-meta` · `.claude/hooks/.epr-meta` | Live exemplars of two more shapes: a rules-bearing manifest paired with a deterministic projector + PostToolUse budget signal (memory discipline — `deny` at birth, `ask` on the generated index), and a rules-free considered-coverage claim over a code tree whose real gates are structural (settings.json registration, `_lib` tests). |
 | `genesis/docs/superpowers/specs/2026-06-25-epr-meta-compose-gate-design.md` | The spec — full mechanism (cascade, recursion guard, schema-first, the §8 worked manifest). Note: the spec describes the *intended* gate; this skill's reserved table marks what v1 has actually wired. |
 
 ## Related skills

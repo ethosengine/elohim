@@ -97,7 +97,7 @@ The palace is mined from four directories. Each becomes a wing:
 
 3. **`genesis/plans/`** (wing: `plans`) — historical plans and designs (~200 files of past sprint/feature/design work). Tracks "what did we propose, and how did it land?"
 
-4. **`genesis/docs/content/elohim-protocol/`** (wing: `elohim-protocol`) — the epic-graph. Each epic is a snapshot of the protocol at a point in time; the diffs between them are the actual narrative arc (`project_three_temporal_perspectives.md`). You can still walk this via `git log --follow <epic-path>` for chronological reading when embedding similarity is not enough.
+4. **`genesis/docs/content/elohim-protocol/`** (wing: `elohim-protocol`) — the epic-graph. Each epic is a snapshot of the protocol at a point in time; the diffs between them are the actual narrative arc (the three-temporal-perspectives framing, graduated into `.claude/scripts/memory-kit/CLAUDE.md`). You can still walk this via `git log --follow <epic-path>` for chronological reading when embedding similarity is not enough.
 
 When invoked, default to MemPalace search first (cheap, broad recall), then read the full source file when a hit looks resonant. A `.claude/archive/<YYYY-MM-DD>/` directory may also exist (cleanup destinations) — if so, mine it on demand; otherwise the four wings above are sufficient.
 
@@ -204,12 +204,12 @@ Total response ≤ 400 words. Bias toward **specific, load-bearing, non-obvious*
 
 When the substrate-currency ceremony fires and a surface (agent prompt / skill / CLAUDE.md) is picked for Phase 2 four-lens deep-read, you join cartographer/storyteller in parallel after the librarian-prologue lands its verified-facts report. Your specific lens: **which canonical-discipline citations from MEMORY.md and the palace is the surface missing?**
 
-A canonical-discipline citation is the codified wisdom we've earned — typically `feedback_*` or `project_*` memory entries — that an agent of this scope SHOULD know but doesn't yet reference. Examples from the Run #6 manual rewrite of `rust-architect.md`:
+A canonical-discipline citation is the codified wisdom we've earned — typically a `feedback_*` or `project_*` memory entry — that an agent of this scope SHOULD know but doesn't yet reference. Illustrative discipline-shapes (the ones `rust-architect.md`'s own citation block carries):
 
-- `[[feedback_serde_json_value_breaks_zome_boundary]]` — without this, the prompt is one subagent away from the bug recurring
-- `[[feedback_schema_first_ioc]]` — the canonical truth-boundary discipline; missing → drift
-- `[[project_hdi_no_get_links_in_validators]]` — HDI validator constraint; missing → wasted iteration
-- `[[project_iroh_phase11_all_backends_wired]]` — the iroh parallel stack; missing → surface still thinks libp2p is the only transport
+- the *serde_json::Value breaks the zome boundary* rule — without it, the prompt is one subagent away from the bug recurring
+- the *schema-first IoC* truth-boundary discipline — missing → drift
+- the *no `get_links` in HDI validators* constraint — missing → wasted iteration
+- the iroh parallel transport stack ([[project_iroh_dataplane_actual_state]]) — missing → the surface still thinks libp2p is the only transport
 
 Method (~10 min per surface):
 
@@ -260,7 +260,7 @@ MemPalace is now wired in via the `mempalace` MCP server (frontmatter). Pattern-
 
 - `.claude/scripts/memory-kit/CLAUDE.md` — memory system overview
 - `genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md` — full design + open questions
-- Memory pointers: `project_historian_pattern_surface_agent.md`, `project_three_temporal_perspectives.md`, `project_wisdom_resolves_into_epics.md`, `reference_mempalace.md`
+- Memory pointer: `reference_mempalace.md` (live). The historian-role, three-temporal-perspectives, and wisdom→epics framings were graduated into `.claude/scripts/memory-kit/CLAUDE.md` (2026-06-03 pair-off); read them there rather than as standalone memory entries.
 
 ## Content-addressed cites (semantic-links)
 

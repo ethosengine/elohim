@@ -1,6 +1,6 @@
 ---
 name: converge
-description: Cartographer-scoped forward-projection synthesis that ranks the dev corpus into a "what's next" menu. Applies vision×readiness scoring, memorial-tier safeguards, and search-bias compensation to convert backlog/dedupe/plan-status/sprint-digest reports into per-theme plan edits and a session-start handoff. Runs after librarian hygiene has produced clean inputs. Use when the operator asks "what's next?", before a major /shift kickoff, or when planning a roadmap pass. The output is a ranked menu, not a maintenance pass.
+description: Cartographer-scoped forward-projection synthesis that ranks the dev corpus into a "what's next" menu. Applies vision×readiness scoring, memorial-tier safeguards, and search-bias compensation to convert the memkit reports (cleanup-backlog-refresh, dedupe-clusters, sprint-digest, path-update-proposals) into per-theme plan edits and a session-start handoff. Runs after librarian hygiene has produced clean inputs. Use when the operator asks "what's next?", before a major /shift kickoff, or when planning a roadmap pass. The output is a ranked menu, not a maintenance pass.
 ---
 
 # Converge — Trajectory Synthesis + "What's Next" Menu
@@ -48,7 +48,8 @@ the menu it feeds, so this runs **first**:
    (never rank BLOCKED-BY-ENV). The roadmap's §4 single-highest-leverage-move becomes the **top of the
    next-actions menu** — they must agree.
 2. **MAP-currency glance (librarian + historian, the LEGIBILITY/PATH co-owners).** Check the
-   **map-drift accumulator** (`.claude/memory-kit/map-drift.json`, surfaced at the SessionStart budget
+   **map-drift accumulator** (`.claude/memory-kit/map-currency-drift.json`, written by
+   `map-drift-signal.py`, surfaced at the SessionStart budget
    headline): did architecture seeds or pillar guides move without `architecture/MAP.md` following? If
    so, that is a LEGIBILITY drift — surface it in the menu's "Quiet but load-bearing" section as a
    structural-hygiene candidate (the owning agents apply the fix per their authority split). MAP
