@@ -68,9 +68,9 @@ pub mod imagodei_lookup; // Phase 4 T5 — display name resolver
 pub mod inference_engine;
 pub mod inference_router;
 pub mod knowledge_service;
+pub mod lens_facing; // lens-market service layer — DB → affinity fold → LensBindingView (S5)
 pub mod limit_gradient_registry;
 pub mod manifest_registry;
-pub mod lens_facing; // lens-market service layer — DB → affinity fold → LensBindingView (S5)
 pub mod mastery_depth;
 pub mod measure;
 pub mod mishpat_commitment_facing;

@@ -1,6 +1,7 @@
 ---
 epr-meta-version: 1
 id: elohim-storage-src-resolution-gate
+covers: subtree
 purpose: >
   Rust implementation of elohim-storage — HTTP handlers, EPR/blob resolution,
   P2P dataplane, views, and service modules. One invariant is gate-enforced here:
@@ -18,7 +19,8 @@ rules:
       INVARIANT — peers are the store; doorways project with peer-fallback (race_fetch).
       Code writing "App not found" or "App ZIP not available" is on the EPR/blob
       resolution path. Any NotFound arm MUST include: (a) a peer-fallback call
-      (blob_fetch::race_fetch — already in custody_sweep, NOT yet wired at http.rs:5589/5601),
+      (blob_fetch::race_fetch — wired via get_blob_or_heal/T17 behind GET /blob and the
+      /apps resolver; keep NEW NotFound arms on that shared sequence),
       OR (b) an EPR-head-aware syncing-status body instead of a bare 404.
       Root cause and fix plan (read before adding a new resolution-path NotFound arm):
       genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md
@@ -48,10 +50,13 @@ because `epr:validator-epr-peer-fallback` is not yet registered in v1) when any 
 write in this directory contains "App not found" or "App ZIP not available". It catches
 reintroduction of the shortcut pattern at edit time without blocking legitimate edits.
 
-**The fix** (`race_fetch`): `blob_fetch::race_fetch` already exists and is used in
-`custody_sweep`. It is NOT yet wired into the on-demand resolution path at `http.rs:5589/5601`.
-That is the gap. See the backlog item for the full three-part fix plan (pointer propagation,
-heal-on-read, EPR-head-aware syncing status).
+**The fix landed** (T17): `get_blob_or_heal` (`http.rs`, `BlobHealOutcome`) now runs the
+shared local-read + peer-heal sequence behind BOTH `GET /blob/{hash}` and the `/apps/`
+resolver, finalizing via `blob_fetch::finalize_fetch_success` (atomic inventory+event
+pair). The invariant now guards REGRESSION: new NotFound arms must route through that
+shared sequence rather than re-introducing a bare 404. (Historical shortcut lived at
+http.rs:5589/5601, alpha-B 2026-06-29; pointer propagation is the CRDT plane, landed
+2026-07-02.)
 
 See: `genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md`
 

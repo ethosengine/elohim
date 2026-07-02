@@ -22,18 +22,13 @@ JENKINS_URL="${JENKINS_URL:-}"
 VALIDATE_URL="${JENKINS_URL%/}/pipeline-model-converter/validate"
 CONNECT_TIMEOUT="${LINT_CONNECT_TIMEOUT:-3}"
 MAX_TIME="${LINT_MAX_TIME:-15}"
-
-if [ -z "$JENKINS_URL" ]; then
-    echo "[jenkinsfile-lint] JENKINS_URL not set — skipping (CI will validate)"
-    exit 0
-fi
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 # Collect files: arguments win, else discover via git.
 FILES=()
 if [ "$#" -gt 0 ]; then
     FILES=("$@")
 else
-    REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
     while IFS= read -r f; do
         FILES+=("$REPO_ROOT/$f")
     done < <(cd "$REPO_ROOT" && git ls-files '*Jenkinsfile*' \
@@ -42,6 +37,32 @@ fi
 
 if [ "${#FILES[@]}" -eq 0 ]; then
     echo "[jenkinsfile-lint] No Jenkinsfiles to validate"
+    exit 0
+fi
+
+# ── Phase 1: LOCAL CPS bytecode-cost gate (no network, milliseconds). ──────
+# Catches the MethodTooLargeException class that the Jenkins validate
+# endpoint below structurally CANNOT: edge #1134 (2026-07-02) was a VALID
+# declarative model that still died at Jenkinsfile compile because the
+# stages-model CPS method exceeded 64KB JVM bytecode. Calibrated thresholds
+# live in the hook (labeled compile outcomes); argv mode never reads stdin.
+# Runs even when JENKINS_URL is unset/unreachable — this failure class must
+# never reach a push unchecked.
+HOOK="$REPO_ROOT/.claude/hooks/jenkinsfile-method-size.py"
+if [ -f "$HOOK" ]; then
+    if ! python3 "$HOOK" "${FILES[@]}"; then
+        echo "[jenkinsfile-lint] FAIL: CPS method-size HARD limit (details above)."
+        echo "    This class kills Jenkins at Jenkinsfile COMPILE (MethodTooLargeException)"
+        echo "    before any stage runs — the build dies stageless-red on delivery."
+        exit 1
+    fi
+    echo "[jenkinsfile-lint] CPS method-size gate: ${#FILES[@]} file(s) ok"
+else
+    echo "[jenkinsfile-lint] WARN: method-size hook not found at $HOOK — CPS-cost gate skipped"
+fi
+
+if [ -z "$JENKINS_URL" ]; then
+    echo "[jenkinsfile-lint] JENKINS_URL not set — skipping remote validation (CI will validate)"
     exit 0
 fi
 

@@ -34,10 +34,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::db::DbPool;
+use crate::generated_enums::CORE_REACH_LEVELS;
 use crate::services::provide_loop_status::ProvideLoopState;
 use crate::services::ContentService;
 use crate::StorageError;
-use crate::generated_enums::CORE_REACH_LEVELS;
 
 /// Tuning for a single re-anchor sweep.
 #[derive(Debug, Clone)]
