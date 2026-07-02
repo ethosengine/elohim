@@ -6727,12 +6727,148 @@ impl P2PNode {
         match crate::sync::projector::reverse_project_content_doc(&self.sync_manager, pool, doc_id)
             .await
         {
-            Ok(true) => debug!("content heal: reverse-projected {doc_id}"),
+            Ok(true) => {
+                debug!("content heal: reverse-projected {doc_id}");
+                // Pointer-heal implies bytes-heal: the reverse projection just
+                // wrote a blob_hash this peer may not hold. Without an eager
+                // fetch, serving discovers the absence lazily PER REQUEST and
+                // blocks in heal-on-read (observed live 2026-07-02: adam's
+                // healed pointer referenced bytes ~35min behind; every GET /
+                // hung >30s until custody replication caught up — backlog
+                // heal-pointer-bytes-ordering-blocking-serve).
+                self.heal_blob_bytes_if_absent(doc_id).await;
+            }
             Ok(false) => {}
             Err(e) => {
                 warn!(doc_id = %doc_id, error = %e, "content heal: reverse-projection failed")
             }
         }
+    }
+
+    /// Eagerly fetch the bytes behind a just-healed content pointer when the
+    /// local store lacks them — the bytes-heal half of the CRDT drift-heal.
+    ///
+    /// Mirrors the Wave-3 commitment-fetch idiom (`score_and_enqueue_snapshot`):
+    /// drop-on-saturation via `commitment_fetch_semaphore` (the next 60s sync
+    /// round re-heals and retries), candidates from `peer_blob_inventory`,
+    /// connected-filter at task start, `race_fetch` → `finalize_fetch_success`
+    /// (which books the serve-blob REA event atomically). No score-prefix
+    /// re-ordering here — a heal is a single opportunistic pull, not a
+    /// commitment-scored placement; plain freshness-windowed inventory order
+    /// is enough and keeps this path free of the transport-manifest seam.
+    async fn heal_blob_bytes_if_absent(&self, doc_id: &str) {
+        use crate::p2p::blob_fetch::{finalize_fetch_success, race_fetch, FetchOutcome};
+
+        let Ok(hash) = self
+            .sync_manager
+            .get_doc_field(
+                crate::sync::projector::PROJECTION_NAMESPACE,
+                doc_id,
+                "blobHash",
+            )
+            .await
+        else {
+            return; // no blobHash on the doc — nothing to pull
+        };
+        if hash.is_empty() || self.blob_store.exists(&hash).await {
+            return;
+        }
+        let Some(self_cid) = self.config.self_cid.clone() else {
+            return;
+        };
+        let Some(pool) = self.db_pool.clone() else {
+            return;
+        };
+        let permit = match self.commitment_fetch_semaphore.clone().try_acquire_owned() {
+            Ok(p) => p,
+            Err(_) => {
+                debug!(
+                    doc_id = %doc_id, hash = %hash,
+                    "bytes-heal: fetch semaphore saturated — dropping; next sync round retries"
+                );
+                return;
+            }
+        };
+
+        let cmd_tx = self.command_tx.clone();
+        let blob_store = self.blob_store.clone();
+        let peer_metrics = self.peer_metrics.clone();
+        let parallelism = self.config.fetch_blob_parallelism.max(1);
+        let timeout = std::time::Duration::from_secs(self.config.fetch_blob_timeout_seconds.max(1));
+        let doc_id_owned = doc_id.to_string();
+        let fresh_after = chrono::Utc::now()
+            .checked_sub_signed(chrono::Duration::seconds(
+                self.config.inventory_freshness_seconds as i64,
+            ))
+            .unwrap_or_else(chrono::Utc::now)
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string();
+
+        tokio::spawn(async move {
+            let _permit = permit; // held for task lifetime; releases on drop
+
+            let candidates: Vec<String> = match pool.get() {
+                Ok(mut c) => {
+                    crate::db::peer_blob_inventory::lookup_hosts(&mut c, &hash, &fresh_after)
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|r| r.peer_id)
+                        .collect()
+                }
+                Err(_) => return,
+            };
+            let connected_set: std::collections::HashSet<String> = peer_metrics
+                .iter()
+                .filter_map(|e| {
+                    if e.value().is_connected {
+                        Some(e.key().clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            let is_connected = move |peer: &str| connected_set.contains(peer);
+
+            let outcome = race_fetch(
+                &hash,
+                candidates,
+                &cmd_tx,
+                is_connected,
+                parallelism,
+                timeout,
+            )
+            .await;
+
+            match outcome {
+                FetchOutcome::Hit { bytes, source_peer } => {
+                    if let Ok(mut c) = pool.get() {
+                        match finalize_fetch_success(
+                            &mut c,
+                            &hash,
+                            &source_peer,
+                            &bytes,
+                            &self_cid,
+                            &blob_store,
+                        )
+                        .await
+                        {
+                            Ok(()) => info!(
+                                doc_id = %doc_id_owned, hash = %hash, source = %source_peer,
+                                "bytes-heal: pointer-heal completed with bytes (serve path warm)"
+                            ),
+                            Err(e) => warn!(
+                                doc_id = %doc_id_owned, hash = %hash, error = %e,
+                                "bytes-heal: finalize failed"
+                            ),
+                        }
+                    }
+                }
+                other => debug!(
+                    doc_id = %doc_id_owned, hash = %hash, outcome = ?other,
+                    "bytes-heal: no bytes pulled this round (next sync round retries)"
+                ),
+            }
+        });
     }
 
     /// Look up content from local DB and encode as an EPR Head (MessagePack).

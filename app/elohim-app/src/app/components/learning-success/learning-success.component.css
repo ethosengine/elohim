@@ -1,1 +1,19 @@
-/* Learning success component styles */
+/* Learning success component styles — repurposed as "Find your way in" */
+
+.start-here {
+  margin: 1.5rem 0 2.5rem;
+  max-width: 480px;
+}
+
+.way-in {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.way-in__hint {
+  font-size: 1rem;
+  line-height: 1.5;
+  opacity: 0.85;
+  margin: 0;
+}

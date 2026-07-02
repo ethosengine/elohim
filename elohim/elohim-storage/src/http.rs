@@ -214,6 +214,11 @@ pub struct HttpServer {
     /// Replaces a previously hardcoded 600s window so the same operator knob
     /// that governs the reconciler's staleness threshold also governs heal.
     inventory_freshness_seconds: u64,
+    /// In-request time budget (ms) for the peer-heal leg of `get_blob_or_heal`.
+    /// From `Config::heal_on_read_budget_ms`. On expiry the request degrades to
+    /// a `Syncing` outcome (503 + Retry-After) while the race-fetch continues
+    /// detached in the background so heal still converges (Fix B).
+    heal_on_read_budget_ms: u64,
     /// Iroh-side blob backend (BLAKE3-keyed). Wired at startup via
     /// [`HttpServer::with_iroh_blob_store`] when the iroh node is
     /// active. None means iroh is disabled or not yet wired — every
@@ -287,6 +292,31 @@ fn is_content_address(identifier: &str) -> bool {
     identifier.starts_with("sha256-") && identifier.len() > 10
 }
 
+/// Fix B syncing-status JSON body for the `GET /blob/{hash}` route: the
+/// in-request heal budget expired while bytes are still being pulled from peers
+/// in the background. Paired with a 503 + `Retry-After: 5`. Deliberately
+/// distinct from the `FinalizeFailed` 503 bodies (which are plain text) so a
+/// client can tell "syncing, retry" from "finalize failed, retry".
+fn syncing_blob_body(hash: &str) -> String {
+    format!(
+        r#"{{"status":"syncing","blobHash":"{}","hint":"bytes are being pulled from peers; retry"}}"#,
+        hash
+    )
+}
+
+/// Fix B syncing-status JSON body for the `/apps/` resolver. Same shape as
+/// [`syncing_blob_body`] but keyed by the app slug/identifier. Load-bearing: it
+/// MUST NOT say "App not found" — a transient byte-lag on a healed pointer is a
+/// syncing degrade (option (b) of the `.epr-meta` peer-fallback invariant), not
+/// a missing deploy, and the federation-deploy scenario greps for the
+/// App-not-found body.
+fn syncing_app_body(slug: &str) -> String {
+    format!(
+        r#"{{"status":"syncing","slug":"{}","hint":"bytes are being pulled from peers; retry"}}"#,
+        slug
+    )
+}
+
 /// Outcome of [`HttpServer::get_blob_or_heal`]: the shared local-read +
 /// T17 peer-heal sequence behind both `GET /blob/{hash}` and the `/apps/`
 /// resolver. Callers map each variant onto their own HTTP semantics — the
@@ -308,6 +338,16 @@ enum BlobHealOutcome {
     /// returns 503 to preserve downstream retry semantics. The variant carries
     /// the precise failure leg so the `/blob` route keeps its distinct bodies.
     FinalizeFailed(FinalizeFailure),
+    /// The in-request heal budget (`heal_on_read_budget_ms`) expired before the
+    /// peer race-fetch completed. The fetch is still running detached in the
+    /// background (heal converges on a later request), so both callers degrade
+    /// legibly with a syncing-status 503 + `Retry-After` rather than blocking
+    /// the request open for the full cross-peer race (observed >30s live). Fix B
+    /// of genesis backlog `heal-pointer-bytes-ordering-blocking-serve.md`;
+    /// option (b) of the `.epr-meta` peer-fallback invariant. `started` records
+    /// whether a background heal task was actually spawned (always `true` today;
+    /// the field keeps the distinction explicit for callers/classification).
+    Syncing { started: bool },
 }
 
 /// The two finalize failure legs the `/blob` route distinguishes, each with its
@@ -419,6 +459,7 @@ impl HttpServer {
             fetch_blob_timeout_seconds: 5,
             fetch_blob_parallelism: 3,
             inventory_freshness_seconds: 600,
+            heal_on_read_budget_ms: 5000,
             #[cfg(feature = "p2p-iroh")]
             iroh_blob_store: None,
             #[cfg(feature = "p2p-iroh")]
@@ -679,6 +720,7 @@ impl HttpServer {
         self.fetch_blob_timeout_seconds = config.fetch_blob_timeout_seconds;
         self.fetch_blob_parallelism = config.fetch_blob_parallelism;
         self.inventory_freshness_seconds = config.inventory_freshness_seconds;
+        self.heal_on_read_budget_ms = config.heal_on_read_budget_ms;
         self
     }
 
@@ -2420,6 +2462,20 @@ impl HttpServer {
                             )))
                             .unwrap());
                     }
+                    BlobHealOutcome::Syncing { started } => {
+                        // Fix B: the peer-heal exceeded its in-request budget; the
+                        // fetch continues in the background. Degrade with a
+                        // syncing 503 + Retry-After (distinct JSON body from the
+                        // FinalizeFailed plain-text 503s above) instead of
+                        // blocking the request open for the full cross-peer race.
+                        debug!(hash = %hash, background_fetch = started, "Fix B: heal budget expired — returning syncing 503");
+                        return Ok(Self::with_cors_headers(Response::builder())
+                            .status(StatusCode::SERVICE_UNAVAILABLE)
+                            .header(header::RETRY_AFTER, "5")
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(syncing_blob_body(hash))))
+                            .unwrap());
+                    }
                     BlobHealOutcome::NotFound => {
                         debug!(hash = %hash, "T17: race-fetch miss — returning 404");
                         return Ok(Self::with_cors_headers(Response::builder())
@@ -2643,98 +2699,145 @@ impl HttpServer {
                 // time; the closure checks membership in the snapshot above.
                 let connected_set: std::collections::HashSet<String> =
                     connected_peers.into_iter().collect();
-                let is_connected = move |peer: &str| connected_set.contains(peer);
-                let outcome = crate::p2p::blob_fetch::race_fetch(
-                    hash,
-                    candidates,
-                    &cmd_tx,
-                    is_connected,
-                    parallelism,
-                    per_peer_timeout,
-                )
-                .await;
 
-                match outcome {
-                    crate::p2p::blob_fetch::FetchOutcome::Hit { bytes, source_peer } => {
-                        // T20: persist + SQL collapse into a single async
-                        // `finalize_fetch_success` call.
-                        //
-                        // Ordering inside finalize: filesystem persist FIRST,
-                        // then `record_fetch_success`, then `serve-blob` REA
-                        // event (the latter two atomic via a single
-                        // `conn.transaction`). The FinalizeFailed legs below
-                        // cover all three failure cases: pool exhaustion
-                        // (cannot acquire conn), filesystem write failure (no
-                        // SQL written), or SQL failure inside the wrapping
-                        // transaction (rolled back by Diesel; orphan blob on
-                        // disk reconciled by the T18 parity sweep). Either way
-                        // the blob is not yet durably accounted for through
-                        // this gateway, and callers return 503 (not 404) to
-                        // preserve retry semantics on the downstream cache.
-                        let mut conn = match pool.get() {
-                            Ok(c) => c,
-                            Err(e) => {
+                // Fix B: run the race-fetch + finalize as a detached task and
+                // bound only the time THIS request waits on it. The heal can run
+                // for the full cross-peer race (observed >30s live) when a healed
+                // content pointer references bytes not yet replicated locally;
+                // holding the HTTP request open that long stacks every landing
+                // request under byte-lag. On budget expiry we return `Syncing`
+                // and let the task keep running (dropping its JoinHandle does NOT
+                // abort it — see blob_fetch::race_fetch), so the heal still
+                // converges for a later request. Captures are cloned so the task
+                // outlives the borrow of `self`.
+                let hash_owned = hash.to_string();
+                let hash_prefix_task = hash_prefix.clone();
+                let pool_bg = pool.clone();
+                let blob_store_bg = self.blob_store.clone();
+                let self_cid_bg = self.self_cid.clone();
+                let heal_task = tokio::spawn(async move {
+                    let is_connected = move |peer: &str| connected_set.contains(peer);
+                    let outcome = crate::p2p::blob_fetch::race_fetch(
+                        &hash_owned,
+                        candidates,
+                        &cmd_tx,
+                        is_connected,
+                        parallelism,
+                        per_peer_timeout,
+                    )
+                    .await;
+
+                    match outcome {
+                        crate::p2p::blob_fetch::FetchOutcome::Hit { bytes, source_peer } => {
+                            // T20: persist + SQL collapse into a single async
+                            // `finalize_fetch_success` call.
+                            //
+                            // Ordering inside finalize: filesystem persist FIRST,
+                            // then `record_fetch_success`, then `serve-blob` REA
+                            // event (the latter two atomic via a single
+                            // `conn.transaction`). The FinalizeFailed legs below
+                            // cover all three failure cases: pool exhaustion
+                            // (cannot acquire conn), filesystem write failure (no
+                            // SQL written), or SQL failure inside the wrapping
+                            // transaction (rolled back by Diesel; orphan blob on
+                            // disk reconciled by the T18 parity sweep). Either way
+                            // the blob is not yet durably accounted for through
+                            // this gateway, and callers return 503 (not 404) to
+                            // preserve retry semantics on the downstream cache.
+                            let mut conn = match pool_bg.get() {
+                                Ok(c) => c,
+                                Err(e) => {
+                                    error!(
+                                        hash = %hash_owned,
+                                        error = %e,
+                                        "T20: pool exhausted, cannot finalize fetch"
+                                    );
+                                    return BlobHealOutcome::FinalizeFailed(
+                                        FinalizeFailure::PoolExhausted,
+                                    );
+                                }
+                            };
+                            if let Err(e) = crate::p2p::blob_fetch::finalize_fetch_success(
+                                &mut conn,
+                                &hash_owned,
+                                &source_peer,
+                                &bytes,
+                                &self_cid_bg,
+                                &blob_store_bg,
+                            )
+                            .await
+                            {
                                 error!(
-                                    hash = %hash,
+                                    hash = %hash_owned,
+                                    source_peer = %source_peer,
                                     error = %e,
-                                    "T20: pool exhausted, cannot finalize fetch"
+                                    "T20: finalize_fetch_success failed; returning 503"
                                 );
-                                return BlobHealOutcome::FinalizeFailed(
-                                    FinalizeFailure::PoolExhausted,
-                                );
+                                return BlobHealOutcome::FinalizeFailed(FinalizeFailure::Persist);
                             }
-                        };
-                        if let Err(e) = crate::p2p::blob_fetch::finalize_fetch_success(
-                            &mut conn,
-                            hash,
-                            &source_peer,
-                            &bytes,
-                            &self.self_cid,
-                            &self.blob_store,
-                        )
-                        .await
-                        {
-                            error!(
-                                hash = %hash,
-                                source_peer = %source_peer,
-                                error = %e,
-                                "T20: finalize_fetch_success failed; returning 503"
-                            );
-                            return BlobHealOutcome::FinalizeFailed(FinalizeFailure::Persist);
-                        }
 
-                        info!(
-                            hash_prefix = %hash_prefix,
-                            source_peer = %source_peer,
-                            size = bytes.len(),
-                            candidate_count,
-                            source = candidate_source,
-                            "blob heal: race-fetch HIT — blob persisted and recorded"
-                        );
-                        return BlobHealOutcome::Bytes {
-                            bytes,
-                            healed_from: Some(source_peer),
-                        };
+                            info!(
+                                hash_prefix = %hash_prefix_task,
+                                source_peer = %source_peer,
+                                size = bytes.len(),
+                                candidate_count,
+                                source = candidate_source,
+                                "blob heal: race-fetch HIT — blob persisted and recorded"
+                            );
+                            BlobHealOutcome::Bytes {
+                                bytes,
+                                healed_from: Some(source_peer),
+                            }
+                        }
+                        crate::p2p::blob_fetch::FetchOutcome::Miss => {
+                            info!(
+                                hash_prefix = %hash_prefix_task,
+                                candidate_count,
+                                source = candidate_source,
+                                "blob heal: race-fetch ALL-MISSES — no peer served verified bytes; returning 404"
+                            );
+                            BlobHealOutcome::NotFound
+                        }
+                        crate::p2p::blob_fetch::FetchOutcome::NoCandidates => {
+                            // candidate_count > 0 here, but none were connected at
+                            // race time (the inventory rows pointed at peers that
+                            // have since disconnected). Distinct from the empty-set
+                            // leg below so a 404 names the failing reason precisely.
+                            info!(
+                                hash_prefix = %hash_prefix_task,
+                                candidate_count,
+                                source = candidate_source,
+                                "blob heal: race-fetch NO-CANDIDATES — candidates known but none connected; returning 404"
+                            );
+                            BlobHealOutcome::NotFound
+                        }
                     }
-                    crate::p2p::blob_fetch::FetchOutcome::Miss => {
-                        info!(
+                });
+
+                // Bound only the in-request wait; the task's own per-peer timeout
+                // still bounds a genuine miss. On budget expiry the JoinHandle is
+                // dropped (which does NOT abort the task) and we degrade to
+                // Syncing while heal converges in the background.
+                let budget = std::time::Duration::from_millis(self.heal_on_read_budget_ms);
+                match tokio::time::timeout(budget, heal_task).await {
+                    Ok(Ok(outcome)) => return outcome,
+                    Ok(Err(join_err)) => {
+                        // Task panicked — surface as a heal miss (404) rather than
+                        // masking a bug behind a syncing status.
+                        error!(
                             hash_prefix = %hash_prefix,
-                            candidate_count,
-                            source = candidate_source,
-                            "blob heal: race-fetch ALL-MISSES — no peer served verified bytes; returning 404"
+                            error = %join_err,
+                            "blob heal: background heal task panicked; returning 404"
                         );
                     }
-                    crate::p2p::blob_fetch::FetchOutcome::NoCandidates => {
-                        // candidate_count > 0 here, but none were connected at
-                        // race time (the inventory rows pointed at peers that
-                        // have since disconnected). Distinct from the empty-set
-                        // leg below so a 404 names the failing reason precisely.
+                    Err(_elapsed) => {
                         info!(
                             hash_prefix = %hash_prefix,
-                            candidate_count,
+                            budget_ms = self.heal_on_read_budget_ms,
                             source = candidate_source,
-                            "blob heal: race-fetch NO-CANDIDATES — candidates known but none connected; returning 404"
+                            "blob heal: in-request budget expired — fetch continues in background; returning syncing"
                         );
+                        return BlobHealOutcome::Syncing { started: true };
                     }
                 }
             } else {
@@ -5704,6 +5807,21 @@ impl HttpServer {
                     );
                 }
                 bytes
+            }
+            // Fix B: the peer-heal exceeded its in-request budget; the fetch
+            // continues in the background. This is a transient byte-lag on a
+            // (possibly freshly-healed) pointer, NOT a missing deploy — degrade
+            // with a syncing 503 + Retry-After keyed by the slug. Must NOT
+            // report "App not found" (option (b) of the .epr-meta peer-fallback
+            // invariant; the federation-deploy scenario greps the 404 body).
+            BlobHealOutcome::Syncing { started } => {
+                debug!(identifier = %identifier, blob_hash = %heal_hash, background_fetch = started, "Fix B: app heal budget expired — returning syncing 503");
+                return Ok(Response::builder()
+                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                    .header(header::RETRY_AFTER, "5")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(syncing_app_body(identifier))))
+                    .unwrap());
             }
             // NotFound (no peer served) and FinalizeFailed (bytes fetched but
             // could not be durably persisted/recorded) both leave us without a
@@ -13245,6 +13363,46 @@ mod apps_resolver_heal_tests {
         match server.get_blob_or_heal(&hash).await {
             BlobHealOutcome::NotFound => {}
             other => panic!("expected NotFound on miss with no p2p, got {other:?}"),
+        }
+    }
+
+    /// Fix B: the `/blob` syncing body is valid JSON with `status:"syncing"`,
+    /// echoes the blob hash, and is NOT a "not found" body — a client can
+    /// distinguish "retry, syncing" from a 404.
+    #[test]
+    fn syncing_blob_body_is_syncing_json() {
+        let hash = format!("sha256-{}", "d".repeat(64));
+        let body = syncing_blob_body(&hash);
+        let v: serde_json::Value = serde_json::from_str(&body).expect("valid JSON");
+        assert_eq!(v["status"], "syncing");
+        assert_eq!(v["blobHash"], hash);
+        assert!(v["hint"].as_str().unwrap().contains("peers"));
+        assert!(!body.to_lowercase().contains("not found"));
+    }
+
+    /// Fix B: the `/apps/` syncing body is valid JSON keyed by slug and, load-
+    /// bearingly, does NOT contain the "App not found" / "App ZIP" text the
+    /// federation-deploy scenario greps for — a byte-lag degrade must never read
+    /// as a missing deploy.
+    #[test]
+    fn syncing_app_body_is_syncing_json_not_app_not_found() {
+        let slug = "elohim-host-landing";
+        let body = syncing_app_body(slug);
+        let v: serde_json::Value = serde_json::from_str(&body).expect("valid JSON");
+        assert_eq!(v["status"], "syncing");
+        assert_eq!(v["slug"], slug);
+        assert!(v["hint"].as_str().unwrap().contains("peers"));
+        assert!(!body.contains("App not found"));
+        assert!(!body.contains("App ZIP"));
+    }
+
+    /// Pins the Fix B outcome variant shape: `Syncing` carries whether a
+    /// background heal task was spawned. Both call sites read `started`.
+    #[test]
+    fn blob_heal_outcome_syncing_carries_started() {
+        match (BlobHealOutcome::Syncing { started: true }) {
+            BlobHealOutcome::Syncing { started } => assert!(started),
+            other => panic!("expected Syncing, got {other:?}"),
         }
     }
 }

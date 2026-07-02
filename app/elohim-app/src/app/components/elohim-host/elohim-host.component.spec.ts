@@ -20,48 +20,38 @@ describe('ElohimHostComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should render the main heading', () => {
+  it('should render the wisdom-in-the-fabric heading', () => {
     const compiled = fixture.nativeElement;
     const heading = compiled.querySelector('h2');
     expect(heading).toBeTruthy();
-    expect(heading.textContent).toContain('elohim.host');
+    expect(heading.textContent).toBe('Wisdom in the fabric');
   });
 
-  it('should render constitutional layered architecture section', () => {
+  it('should describe the three honest-architecture layers', () => {
     const compiled = fixture.nativeElement;
-    const section = compiled.querySelector('.constitutional-architecture');
-    expect(section).toBeTruthy();
-
-    const layers = compiled.querySelectorAll('.layer-item');
-    expect(layers.length).toBe(4);
+    const text = compiled.textContent;
+    expect(text).toContain('Holochain DHT');
+    expect(text).toContain('libp2p');
+    expect(text).toContain('Doorways');
   });
 
-  it('should render technical architecture cards', () => {
+  it('should render the three bounded elohim roles', () => {
     const compiled = fixture.nativeElement;
-    const archCards = compiled.querySelectorAll('.architecture-card');
-    expect(archCards.length).toBe(2);
-
-    const constitutionalLayer = compiled.querySelector('.constitutional-layer');
-    expect(constitutionalLayer).toBeTruthy();
-
-    const runtimeLayer = compiled.querySelector('.runtime-layer');
-    expect(runtimeLayer).toBeTruthy();
-  });
-
-  it('should render feature cards', () => {
-    const compiled = fixture.nativeElement;
-    const cards = compiled.querySelectorAll('.card-grid .card');
-    expect(cards.length).toBe(3);
-
     const cardHeadings = compiled.querySelectorAll('.card-grid .card h3');
     const headingTexts = Array.from(cardHeadings).map(h => (h as HTMLElement).textContent);
-    expect(headingTexts).toContain('Redemptive Security Model');
-    expect(headingTexts).toContain('Value-Generative Economics');
+    expect(headingTexts).toContain('Counsel');
+    expect(headingTexts).toContain('Operator');
+    expect(headingTexts).toContain('Adjuster');
   });
 
-  it('should render flourishing models section', () => {
+  it('should explicitly disclaim the blockchain / nation-state framing', () => {
     const compiled = fixture.nativeElement;
-    const section = compiled.querySelector('.flourishing-models');
-    expect(section).toBeTruthy();
+    const text = compiled.textContent as string;
+    // The copy names blockchain/smart-contracts only to reject them.
+    expect(text).toContain('No blockchain');
+    expect(text).toContain('No smart contracts');
+    // The old, factually-wrong framing must be gone.
+    expect(text).not.toContain('Constitutional Blockchain');
+    expect(text).not.toContain('Nation-State');
   });
 });

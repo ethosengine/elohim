@@ -374,6 +374,11 @@ async fn async_main(
             }
         }
     }
+    if let Ok(v) = std::env::var("HEAL_ON_READ_BUDGET_MS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.heal_on_read_budget_ms = n;
+        }
+    }
     if let Ok(v) = std::env::var("SELF_CID") {
         if !v.is_empty() {
             config.self_cid = Some(v);

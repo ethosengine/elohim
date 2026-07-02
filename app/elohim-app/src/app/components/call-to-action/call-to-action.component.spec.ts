@@ -53,4 +53,23 @@ describe('CallToActionComponent', () => {
     const section = compiled.querySelector('section.section');
     expect(section).toBeTruthy();
   });
+
+  it('should render the progressive stewardship ladder with all four rungs', () => {
+    const compiled = fixture.nativeElement;
+    const ladder = compiled.querySelector('[data-testid="landing-stewardship-ladder"]');
+    expect(ladder).toBeTruthy();
+
+    const text = ladder.textContent as string;
+    expect(text).toContain('Visitor');
+    expect(text).toContain('Hosted');
+    expect(text).toContain('App Steward');
+    expect(text).toContain('Node Steward');
+  });
+
+  it('should render the manifesto epr-linked card', () => {
+    const compiled = fixture.nativeElement;
+    const card = compiled.querySelector('[data-testid="landing-manifesto-card"]');
+    expect(card).toBeTruthy();
+    expect(card.getAttribute('epr')).toBe('epr:manifesto');
+  });
 });

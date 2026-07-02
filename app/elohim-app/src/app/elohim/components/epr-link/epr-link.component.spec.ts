@@ -47,7 +47,10 @@ const mockResolved: ResolvedContent = {
 describe('EprLinkComponent (thin Lit wrapper)', () => {
   let fixture: ComponentFixture<EprLinkComponent>;
   let component: EprLinkComponent;
-  let resolverSpy: { resolve: ReturnType<typeof vi.fn> };
+  let resolverSpy: {
+    resolve: ReturnType<typeof vi.fn>;
+    resolvePreview: ReturnType<typeof vi.fn>;
+  };
   let routerNavSpy: ReturnType<typeof vi.spyOn>;
   let eprNavSpy: { navigate: ReturnType<typeof vi.fn> };
   let acquisitionSpy: {
@@ -57,8 +60,29 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
     pullStatus$: ReturnType<typeof vi.fn>;
   };
 
+  const resolvedPreviewOutcome = {
+    state: 'resolved' as const,
+    preview: {
+      ref: { id: 'manifesto', tier: 'doc' as const },
+      id: 'manifesto',
+      title: 'Elohim Protocol Manifesto',
+      description: 'The foundational document',
+      reach: 'public',
+      contentType: 'article',
+      contentFormat: 'markdown',
+      tags: [],
+      route: ['/epr', 'manifesto'],
+      href: '/epr/manifesto',
+    },
+  };
+
   beforeEach(async () => {
-    resolverSpy = { resolve: vi.fn().mockReturnValue(of(mockResolved)) };
+    resolverSpy = {
+      resolve: vi.fn().mockReturnValue(of(mockResolved)),
+      // The Lit element's `.resolver` adapter is wired to resolvePreview (typed
+      // degradation); navigation/pin gating still go through resolve().
+      resolvePreview: vi.fn().mockReturnValue(of(resolvedPreviewOutcome)),
+    };
     eprNavSpy = { navigate: vi.fn() };
     acquisitionSpy = {
       download: vi.fn().mockResolvedValue('browser'),
@@ -104,6 +128,51 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
       'elohim-epr-link'
     ) as HTMLElement & { resolver?: unknown };
     expect(typeof lit.resolver).toBe('function');
+  });
+
+  it("wires a head-first resolver that maps a 'resolved' outcome to title/description/reach", async () => {
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+
+    const lit = (fixture.nativeElement as HTMLElement).querySelector(
+      'elohim-epr-link'
+    ) as HTMLElement & {
+      resolver?: (epr: string) => Promise<Record<string, unknown> | null>;
+    };
+    const res = await lit.resolver!('epr:manifesto');
+    expect(res).toEqual({
+      state: 'resolved',
+      title: 'Elohim Protocol Manifesto',
+      description: 'The foundational document',
+      reach: 'public',
+    });
+    expect(resolverSpy.resolvePreview).toHaveBeenCalledWith('epr:manifesto');
+  });
+
+  it("surfaces the typed 'forbidden' outcome (not a generic null) so the element degrades honestly", async () => {
+    resolverSpy.resolvePreview.mockReturnValue(of({ state: 'forbidden' as const }));
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+
+    const lit = (fixture.nativeElement as HTMLElement).querySelector(
+      'elohim-epr-link'
+    ) as HTMLElement & {
+      resolver?: (epr: string) => Promise<Record<string, unknown> | null>;
+    };
+    expect(await lit.resolver!('epr:gated')).toEqual({ state: 'forbidden', title: undefined });
+  });
+
+  it("surfaces the typed 'missing' outcome for a 404 head", async () => {
+    resolverSpy.resolvePreview.mockReturnValue(of({ state: 'missing' as const }));
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+
+    const lit = (fixture.nativeElement as HTMLElement).querySelector(
+      'elohim-epr-link'
+    ) as HTMLElement & {
+      resolver?: (epr: string) => Promise<Record<string, unknown> | null>;
+    };
+    expect(await lit.resolver!('epr:gone')).toEqual({ state: 'missing' });
   });
 
   it('should navigate via Router when a navigate event is dispatched', async () => {

@@ -43,7 +43,12 @@ import { EprNavService } from '../../services/epr-nav.service';
 import { EprResolverService, type ResolvedContent } from '../../services/epr-resolver.service';
 import { PinProgressComponent } from '../pin-progress/pin-progress.component';
 
-import type { ContextMenuItem, ElohimEprLink, EprLinkDisplay } from 'elohim-core';
+import type {
+  ContextMenuItem,
+  ElohimEprLink,
+  EprLinkDisplay,
+  EprLinkResolution,
+} from 'elohim-core';
 
 export type { EprLinkDisplay } from 'elohim-core';
 
@@ -164,16 +169,27 @@ export class EprLinkComponent implements OnInit, OnDestroy {
     const host = this.elRef.nativeElement;
 
     // Wire the Lit element's resolver property (not an attribute — must be set
-    // as a DOM property after the element upgrades).
+    // as a DOM property after the element upgrades). Head-first: the resolver
+    // surfaces the TYPED preview outcome so the element degrades honestly
+    // (forbidden / missing / error) instead of collapsing to a raw epr id.
     const litEl = host.querySelector('elohim-epr-link') as ElohimEprLink;
-    litEl.resolver = async (eprRef: string) => {
-      const resolved = await firstValueFrom(this.eprResolver.resolve(eprRef));
-      if (!resolved) return null;
-      return {
-        title: resolved.content.title,
-        description: resolved.content.description || undefined,
-        reach: resolved.content.reach,
-      };
+    litEl.resolver = async (eprRef: string): Promise<EprLinkResolution | null> => {
+      const outcome = await firstValueFrom(this.eprResolver.resolvePreview(eprRef));
+      switch (outcome.state) {
+        case 'resolved':
+          return {
+            state: 'resolved',
+            title: outcome.preview.title,
+            description: outcome.preview.description ?? undefined,
+            reach: outcome.preview.reach ?? undefined,
+          };
+        case 'forbidden':
+          return { state: 'forbidden', title: outcome.preview?.title };
+        case 'missing':
+          return { state: 'missing' };
+        default:
+          return { state: 'error' };
+      }
     };
 
     // Inject the full Epic E action set as a DOM property (same as resolver —

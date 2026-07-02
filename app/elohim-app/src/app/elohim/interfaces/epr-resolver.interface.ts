@@ -25,6 +25,7 @@ import type {
   ContextResolvedRoute,
   StepRef,
   CrossPathMatch,
+  EprPreviewOutcome,
 } from '../services/epr-resolver.service';
 
 /**
@@ -69,8 +70,20 @@ export interface IEprUriResolver {
  * - epr: URI → EPR Head with three-pillar context (DAG-CBOR)
  */
 export interface IEprContentResolver {
-  /** Resolve an epr: URI to full content metadata from storage. */
+  /**
+   * Resolve an epr: URI to preview metadata + route (head-first).
+   *
+   * Served from the anonymous-safe EPR Head, so a reach-gated body can never
+   * fail a preview. Returns null only when the head itself is unresolvable.
+   */
   resolve(input: string): Observable<ResolvedContent | null>;
+
+  /**
+   * Head-first preview resolution with TYPED degradation (resolved / forbidden
+   * / missing / error) — for callers that render an honest unavailable state
+   * instead of collapsing to a raw epr id.
+   */
+  resolvePreview(input: string): Observable<EprPreviewOutcome>;
 
   /** Resolve an EPR Head with DAG-CBOR content negotiation. */
   resolveEprHead(input: string): Observable<EprHead | null>;

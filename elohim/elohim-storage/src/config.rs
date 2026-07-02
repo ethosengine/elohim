@@ -171,6 +171,16 @@ pub struct Config {
     #[serde(default = "default_fetch_blob_parallelism")]
     pub fetch_blob_parallelism: usize,
 
+    /// In-request time budget (milliseconds) for the peer-heal leg of
+    /// `get_blob_or_heal`. On a local blob miss the request waits at most this
+    /// long for the cross-peer race-fetch + finalize before degrading to a
+    /// syncing-status 503 (Retry-After); the fetch itself continues detached in
+    /// the background so heal still converges. Bounds the >30s blocking serve
+    /// observed live when a healed content pointer references bytes that have
+    /// not yet replicated locally. Loaded from env `HEAL_ON_READ_BUDGET_MS`.
+    #[serde(default = "default_heal_on_read_budget_ms")]
+    pub heal_on_read_budget_ms: u64,
+
     /// CID of this peer's steward (its agent's content-addressed identity).
     /// Used as `receiver` field in serve-blob REA events emitted on successful
     /// GET-time race-fetch. Loaded from env `SELF_CID` at boot.
@@ -310,6 +320,10 @@ fn default_fetch_blob_parallelism() -> usize {
     3
 }
 
+fn default_heal_on_read_budget_ms() -> u64 {
+    5000
+}
+
 fn default_salvage_target_replicas() -> usize {
     // Mirrors `min_replicas_for_eviction` (2) — the desired distinct-holder
     // count per blob the salvage pass restores toward.
@@ -350,6 +364,7 @@ impl Default for Config {
             inventory_freshness_seconds: default_inventory_freshness_seconds(),
             fetch_blob_timeout_seconds: default_fetch_blob_timeout_seconds(),
             fetch_blob_parallelism: default_fetch_blob_parallelism(),
+            heal_on_read_budget_ms: default_heal_on_read_budget_ms(),
             self_cid: None,
             transport_backend: TransportBackend::default(),
             genesis_self_heal_identity: false,

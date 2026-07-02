@@ -15,7 +15,7 @@ All render tooling lives in `genesis/a2o`. Artifacts land in `genesis/a2o/report
 
 | Surface | Command (from `genesis/a2o`) | Notes |
 |---|---|---|
-| **The app** | `pnpm look <url> [--as <FixtureHuman>] [--viewport WxH] [--out slug]` | Renders ANY url, auth-aware. Targets: local stack (`pnpm hc:start` + app :4200), `pnpm start:alpha` in `app/elohim-app` (local UI × live alpha data, read-mostly), or deployed alpha. |
+| **The app** | `pnpm look <url> [--as <FixtureHuman>] [--viewport WxH] [--out slug] [--scheme light\|dark] [--scroll]` | Renders ANY url, auth-aware. `--scroll` walks the page first so reveal-on-scroll sections paint (scrollytelling surfaces screenshot blank without it). Targets: local stack (`pnpm hc:start` + app :4200), `pnpm start:alpha` in `app/elohim-app` (local UI × live alpha data, read-mostly), or deployed alpha. |
 | **Pattern libraries (Storybook)** | `pnpm graphos list [filter]` (enumerate, no browser) · `pnpm graphos story <story-id>` (one story) · `pnpm graphos sheet <component>` (full cell/theme matrix, both libraries, one composite image — fastest design-language absorption) | Story ids: `default-*` = Library A blank-slate, `designed-*` = Library B themed, `foundations-*`, narrative `i-iv`. |
 | **Design guide** | `pnpm graphos story <docs-id>` (MDX pages; viewMode auto-derived, `--docs` forces) | Absorb the established aesthetic BEFORE designing or refining. |
 

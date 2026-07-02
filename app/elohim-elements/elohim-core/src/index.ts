@@ -27,7 +27,12 @@ export { ElohimContextMenu } from './elohim-context-menu.js';
 export type { ContextMenuItem } from './elohim-context-menu.js';
 
 export { ElohimEprLink } from './elohim-epr-link.js';
-export type { EprLinkDisplay, EprLinkLoadLevel, EprLinkResolution } from './elohim-epr-link.js';
+export type {
+  EprLinkDisplay,
+  EprLinkLoadLevel,
+  EprLinkResolution,
+  EprLinkState,
+} from './elohim-epr-link.js';
 
 export { ElohimEprRelationshipsPanel } from './elohim-epr-relationships-panel.js';
 export type { EprRelationship } from './elohim-epr-relationships-panel.js';

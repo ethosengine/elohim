@@ -61,6 +61,17 @@ describe('parseArgs', () => {
     assert.equal(o.timeoutMs, 90000);
   });
 
+  it('parses --scroll as a boolean flag (no value consumed)', () => {
+    const o = parseArgs([DUMMY_URL, '--scroll', '--out', 'my-slug']);
+    assert.equal(o.scroll, true);
+    assert.equal(o.out, 'my-slug');
+  });
+
+  it('leaves scroll undefined by default', () => {
+    const o = parseArgs([DUMMY_URL]);
+    assert.equal(o.scroll, undefined);
+  });
+
   it('throws on --timeout below 1000', () => {
     assert.throws(
       () => parseArgs([DUMMY_URL, '--timeout', '500']),

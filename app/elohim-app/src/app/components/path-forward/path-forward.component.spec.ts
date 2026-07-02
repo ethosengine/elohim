@@ -1,6 +1,18 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
+import { of } from 'rxjs';
+
+import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import { ResilienceService } from '@app/lamad/services/resilience.service';
+
 import { PathForwardComponent } from './path-forward.component';
+
+// Embedded epr-relationship-card resolves live heads at runtime; stub the
+// resolver + resilience services so structural assertions stay network-free.
+const resolverStub = { resolve: () => of(null) };
+const resilienceStub = { getContentResilience: () => of(null) };
 
 describe('PathForwardComponent', () => {
   let component: PathForwardComponent;
@@ -9,6 +21,12 @@ describe('PathForwardComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [PathForwardComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: EprResolverService, useValue: resolverStub },
+        { provide: ResilienceService, useValue: resilienceStub },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(PathForwardComponent);
@@ -27,29 +45,20 @@ describe('PathForwardComponent', () => {
     expect(heading.textContent).toBe('The Path Forward');
   });
 
-  it('should render card grid with three audience cards', () => {
+  it('should render three epr-linked audience cards', () => {
     const compiled = fixture.nativeElement;
     const grid = compiled.querySelector('.card-grid');
     expect(grid).toBeTruthy();
 
-    const cards = compiled.querySelectorAll('.card');
+    const cards = compiled.querySelectorAll('app-epr-relationship-card');
     expect(cards.length).toBe(3);
+    expect(component.audiences.length).toBe(3);
   });
 
-  it('should render cards for different stakeholders', () => {
-    const compiled = fixture.nativeElement;
-    const cardHeadings = compiled.querySelectorAll('.card h3');
-    expect(cardHeadings.length).toBe(3);
-
-    const headingTexts = Array.from(cardHeadings).map(h => (h as HTMLElement).textContent);
-    expect(headingTexts).toContain('For Policymakers');
-    expect(headingTexts).toContain('For Developers');
-    expect(headingTexts).toContain('For Communities');
-  });
-
-  it('should render descriptions for all cards', () => {
-    const compiled = fixture.nativeElement;
-    const descriptions = compiled.querySelectorAll('.card p');
-    expect(descriptions.length).toBe(3);
+  it('should point each card at a path-forward concept node', () => {
+    const targets = component.audiences.map(a => a.target);
+    expect(targets).toContain('concept-path-forward-policymakers');
+    expect(targets).toContain('concept-path-forward-developers');
+    expect(targets).toContain('concept-path-forward-communities');
   });
 });

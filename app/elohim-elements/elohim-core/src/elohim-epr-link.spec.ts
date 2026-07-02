@@ -104,6 +104,77 @@ describe('<elohim-epr-link>', () => {
     expect(fallback!.getAttribute('label')).to.equal('Partial Title');
   });
 
+  // ── Typed degradation (forbidden / missing / error) ───────────────────────
+
+  it('renders an honest "unavailable at your reach" affordance for the forbidden state', async () => {
+    const el = await fixture<ElohimEprLink>(html`
+      <elohim-epr-link epr="epr:gated-content" display="chip"></elohim-epr-link>
+    `);
+    el.setResolution(4, { state: 'forbidden', title: 'Manifesto' });
+    await el.updateComplete;
+    // The title still shows (never a raw epr id when metadata is present)…
+    const fallback = el.shadowRoot!.querySelector('elohim-mention-base');
+    expect(fallback).to.exist;
+    expect(fallback!.getAttribute('label')).to.equal('Manifesto');
+    // …paired with an honest reason the visitor can read.
+    const note = el.shadowRoot!.querySelector('[part="fallback-note"]');
+    expect(note).to.exist;
+    expect(note!.textContent?.trim()).to.equal('Unavailable at your reach');
+  });
+
+  it('renders an honest missing state for the missing state', async () => {
+    const el = await fixture<ElohimEprLink>(html`
+      <elohim-epr-link epr="epr:gone" display="chip"></elohim-epr-link>
+    `);
+    el.setResolution(4, { state: 'missing' });
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector('elohim-mention-base')).to.exist;
+    const note = el.shadowRoot!.querySelector('[part="fallback-note"]');
+    expect(note!.textContent?.trim()).to.equal('No longer available');
+  });
+
+  it('renders an honest error state for the error state', async () => {
+    const el = await fixture<ElohimEprLink>(html`
+      <elohim-epr-link epr="epr:boom" display="chip"></elohim-epr-link>
+    `);
+    el.setResolution(4, { state: 'error' });
+    await el.updateComplete;
+    const note = el.shadowRoot!.querySelector('[part="fallback-note"]');
+    expect(note!.textContent?.trim()).to.equal('Could not load');
+  });
+
+  it('never shows a raw epr id as the visible chip when the head resolves (state: resolved)', async () => {
+    const el = await fixture<ElohimEprLink>(html`
+      <elohim-epr-link display="inline"></elohim-epr-link>
+    `);
+    // A head-first resolver returns a typed resolved outcome.
+    el.resolver = async _epr => ({
+      state: 'resolved',
+      title: 'Governance Epic',
+      reach: 'community',
+    });
+    el.epr = 'epr:governance-epic';
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 0));
+    await el.updateComplete;
+    const button = el.shadowRoot!.querySelector('button.anchor');
+    expect(button?.textContent?.trim()).to.equal('Governance Epic');
+  });
+
+  it('advances to the forbidden degraded face when the resolver returns a forbidden outcome', async () => {
+    const el = await fixture<ElohimEprLink>(html`
+      <elohim-epr-link display="inline"></elohim-epr-link>
+    `);
+    el.resolver = async _epr => ({ state: 'forbidden' });
+    el.epr = 'epr:gated';
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 0));
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector('elohim-mention-base')).to.exist;
+    const note = el.shadowRoot!.querySelector('[part="fallback-note"]');
+    expect(note!.textContent?.trim()).to.equal('Unavailable at your reach');
+  });
+
   it('emits about event when About this EPR is selected from menu', async () => {
     const el = await fixture<ElohimEprLink>(html`
       <elohim-epr-link epr="epr:foo" display="chip"></elohim-epr-link>
@@ -304,6 +375,16 @@ describe('<elohim-epr-link> — a11y precondition gate', () => {
       <elohim-epr-link epr="epr:gated-content" display="chip"></elohim-epr-link>
     `);
     el.setResolution(4, { unreachable: true, preview: { title: 'Preview Title' } });
+    await el.updateComplete;
+    const results = await axe.run(el);
+    expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
+  });
+
+  it('passes axe-core scan at L4 (forbidden degraded face with honest note)', async () => {
+    const el = await fixture<ElohimEprLink>(html`
+      <elohim-epr-link epr="epr:gated-content" display="chip"></elohim-epr-link>
+    `);
+    el.setResolution(4, { state: 'forbidden', title: 'Manifesto' });
     await el.updateComplete;
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
