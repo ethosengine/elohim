@@ -276,6 +276,10 @@ FROM check-deps AS check
 COPY elohim/elohim-storage/migrations ./migrations
 COPY elohim/elohim-storage/src ./src
 COPY elohim/elohim-storage/benches ./benches
+# config/: cfg(test) include_str! targets (policy/config.rs reads
+# ../../config/peer-policy.example.toml) — test-only, so the release path
+# never needed it and edge #1137's first test-layer run failed compile on it.
+COPY elohim/elohim-storage/config ./config
 COPY elohim/sdk /sdk
 RUN cargo fmt --check
 RUN CARGO_INCREMENTAL=0 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib
