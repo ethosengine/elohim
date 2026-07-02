@@ -15,6 +15,10 @@ import {
   detectClientMode,
   ELOHIM_CLIENT as LOCAL_ELOHIM_CLIENT,
 } from './elohim/providers/elohim-client.provider';
+import {
+  provideEprResolution,
+  EPR_RESOLUTION_PROVIDER,
+} from './elohim/providers/epr-resolution.provider';
 import { ELOHIM_CLIENT } from '@elohim/service';
 import { CustodianCommitmentService } from './elohim/services/custodian-commitment.service';
 import { CustodianMetricsReporterService } from './elohim/services/custodian-metrics-reporter.service';
@@ -33,6 +37,7 @@ import {
   LAMAD_GOVERNANCE,
   LAMAD_GOVERNANCE_SIGNAL,
   LAMAD_CONTEXT_ASSEMBLY,
+  LAMAD_EPR_RESOLUTION_PROVIDER,
 } from '@app/lamad/interfaces/cross-pillar.interface';
 import { LAMAD_AGENT } from '@app/lamad/interfaces/agent.interface';
 import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '@app/lamad/interfaces/storage.interface';
@@ -136,6 +141,11 @@ export const appConfig: ApplicationConfig = {
       provide: BUNDLE_ROUTE_CONTEXT,
       useValue: { claims: [], ownsUniversalRoute: true } satisfies BundleRouteContext,
     },
+    // I2: the single ambient EprResolutionProvider, baking THIS bundle's
+    // BUNDLE_ROUTE_CONTEXT above so `resolveRoute` is claims-correct. Injected by
+    // the four resolution consumers (Angular) and installed at the shell root as
+    // the Lit @lit/context provider (app.component) for every <elohim-*> element.
+    provideEprResolution(),
     // LAMAD_HOLOCHAIN_CLIENT — cross-pillar token consumed by BlobBootstrapService
     // (app.component.ts) and ContentMasteryService (session-migration.service.ts).
     // HolochainClientService is providedIn:'root' in @app/elohim; this useExisting
@@ -162,6 +172,10 @@ export const appConfig: ApplicationConfig = {
     // LAMAD_EPR_RESOLVER / LAMAD_EPR_NAV — content-viewer (direct) + markdown-renderer.
     { provide: LAMAD_EPR_RESOLVER, useExisting: EprResolverService },
     { provide: LAMAD_EPR_NAV, useExisting: EprNavService },
+    // LAMAD_EPR_RESOLUTION_PROVIDER — the markdown renderer (viewer chain) consumes
+    // the single provider through this narrow token; bridge it to the shell's
+    // concrete EPR_RESOLUTION_PROVIDER (mirrors app/lamad/src/app/app.config.ts).
+    { provide: LAMAD_EPR_RESOLUTION_PROVIDER, useExisting: EPR_RESOLUTION_PROVIDER },
     // LAMAD_STORAGE_CLIENT — content-viewer (direct) + resilience / household-
     // resilience / projection-api / content-backend services in the viewer chain.
     { provide: LAMAD_STORAGE_CLIENT, useExisting: StorageClientService },

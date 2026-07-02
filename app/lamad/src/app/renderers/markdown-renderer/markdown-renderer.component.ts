@@ -28,13 +28,14 @@ import 'elohim-core/register';
 import {
   LAMAD_EPR_RESOLVER,
   LAMAD_EPR_NAV,
+  LAMAD_EPR_RESOLUTION_PROVIDER,
   type ILamadEprResolver,
   type ILamadEprNav,
   type LamadStepRef,
   type LamadCrossPathMatch,
 } from '../../interfaces/cross-pillar.interface';
 import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
-import { parseEpr } from '@elohim/service';
+import { parseEpr, eprToUniversalHref } from '@elohim/service';
 
 import type { ElohimEprPopover, EprHead } from 'elohim-core';
 
@@ -142,6 +143,11 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private readonly storageClient = inject(LAMAD_STORAGE_CLIENT);
   private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);
   private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
+  // I2: route minting for the hover popover flows through the single ambient
+  // provider. The HyperCard `resolveInContext` (click navigation) and the
+  // three-pillar `resolveEprHead` (popover head) stay on eprResolver, layered ON
+  // this provider — deliberately not part of the provider contract.
+  private readonly eprResolution = inject(LAMAD_EPR_RESOLUTION_PROVIDER);
   private readonly pathContext = inject(PathContextService);
   private readonly pathService = inject(PathService);
   private readonly router = inject(Router);
@@ -534,8 +540,12 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
     this.destroyPopover();
     this.hoveredEprAnchor = anchor; // Restore — destroyPopover clears it
 
-    // Route (in-bundle) or universal href (cross-bundle) for the "Open resource" link
-    const { route, href } = this.eprResolver.resolveUrl(eprUri);
+    // Route (in-bundle) or universal href (cross-bundle) for the "Open resource"
+    // link — minted through the ambient EprResolutionProvider (I2). resolveRoute
+    // returns null only for blob tier; fall back to the universal address there.
+    const routing = this.eprResolution.resolveRoute(eprUri);
+    const route = routing?.route ?? null;
+    const href = routing?.href ?? eprToUniversalHref(parseEpr(eprUri));
     // Joined string form of the in-bundle route; null when cross-bundle (the
     // popover's href property carries the universal address independently).
     const routeHref = route ? '/' + route.filter(Boolean).join('/').replace(/^\/+/, '') : null;

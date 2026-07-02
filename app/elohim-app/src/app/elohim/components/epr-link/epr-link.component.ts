@@ -43,12 +43,7 @@ import { EprNavService } from '../../services/epr-nav.service';
 import { EprResolverService, type ResolvedContent } from '../../services/epr-resolver.service';
 import { PinProgressComponent } from '../pin-progress/pin-progress.component';
 
-import type {
-  ContextMenuItem,
-  ElohimEprLink,
-  EprLinkDisplay,
-  EprLinkResolution,
-} from 'elohim-core';
+import type { ContextMenuItem, ElohimEprLink, EprLinkDisplay } from 'elohim-core';
 
 export type { EprLinkDisplay } from 'elohim-core';
 
@@ -168,32 +163,15 @@ export class EprLinkComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     const host = this.elRef.nativeElement;
 
-    // Wire the Lit element's resolver property (not an attribute — must be set
-    // as a DOM property after the element upgrades). Head-first: the resolver
-    // surfaces the TYPED preview outcome so the element degrades honestly
-    // (forbidden / missing / error) instead of collapsing to a raw epr id.
+    // Resolution is AMBIENT (I2): the shell root installs one EprResolutionProvider
+    // via @lit/context, so <elohim-epr-link> resolves its head through the provider
+    // with no per-element `.resolver` wiring here. Head-first previews and typed
+    // degradation (forbidden / missing / error) come from that provider — this
+    // wrapper only injects host-owned menu actions and translates events.
     const litEl = host.querySelector('elohim-epr-link') as ElohimEprLink;
-    litEl.resolver = async (eprRef: string): Promise<EprLinkResolution | null> => {
-      const outcome = await firstValueFrom(this.eprResolver.resolvePreview(eprRef));
-      switch (outcome.state) {
-        case 'resolved':
-          return {
-            state: 'resolved',
-            title: outcome.preview.title,
-            description: outcome.preview.description ?? undefined,
-            reach: outcome.preview.reach ?? undefined,
-          };
-        case 'forbidden':
-          return { state: 'forbidden', title: outcome.preview?.title };
-        case 'missing':
-          return { state: 'missing' };
-        default:
-          return { state: 'error' };
-      }
-    };
 
-    // Inject the full Epic E action set as a DOM property (same as resolver —
-    // a property, not an attribute).
+    // Inject the full Epic E action set as a DOM property (a property, not an
+    // attribute — must be set after the element upgrades).
     litEl.contextMenuItems = this.fullActionList;
 
     // Rung 4 (provide): pin-as-peer is gated to peer-capable nodes serving

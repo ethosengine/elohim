@@ -13,13 +13,14 @@ import { RouterModule } from '@angular/router';
 
 import { catchError, takeUntil } from 'rxjs/operators';
 
-import { Subject, forkJoin, of } from 'rxjs';
+import { Subject, forkJoin, of, from } from 'rxjs';
 
 import { ResilienceService, type ResilienceView } from '@app/lamad/services/resilience.service';
 
-import { EprResolverService } from '../../services/epr-resolver.service';
+import { EPR_RESOLUTION_PROVIDER } from '../../providers/epr-resolution.provider';
 
 import type { EprRelationship } from '../../models/epr-head.model';
+import type { EprHeadResolution } from 'elohim-core';
 
 // ── Type label map ────────────────────────────────────────────────────────────
 
@@ -262,7 +263,7 @@ export class EprRelationshipCardComponent implements OnChanges, OnDestroy {
 
   // ── DI ────────────────────────────────────────────────────────────────────
 
-  private readonly resolver = inject(EprResolverService);
+  private readonly resolution = inject(EPR_RESOLUTION_PROVIDER);
   private readonly resilienceService = inject(ResilienceService);
   private readonly cdr = inject(ChangeDetectorRef);
 
@@ -310,26 +311,31 @@ export class EprRelationshipCardComponent implements OnChanges, OnDestroy {
     const target = this.relationship.target;
 
     forkJoin({
-      content: this.resolver.resolve(target).pipe(catchError(() => of(null))),
+      // Head-first resolution via the ambient provider: title / description /
+      // reach come from the anonymous-safe EPR Head, so a reach-gated body
+      // (403/404) never blanks the card — it renders legibly from head alone.
+      head: from(this.resolution.resolveHead(target)).pipe(
+        catchError(() => of<EprHeadResolution>({ state: 'error' }))
+      ),
       resilience: this.resilienceService
         .getContentResilience(target)
         .pipe(catchError(() => of(null))),
     })
       .pipe(takeUntil(this.inputChange$), takeUntil(this.destroy$))
-      .subscribe(({ content, resilience }) => {
-        if (content) {
-          // Head-first resolution: title / description / reach come from the
-          // anonymous-safe EPR Head, so a reach-gated body (403/404) never
-          // blanks the card — it renders fully legible from head data alone.
-          this.title = content.content.title;
-          this.description = content.content.description ?? null;
-          this.reach = content.content.reach ?? null;
-          this.route = content.route;
-          this.href = content.href;
+      .subscribe(({ head, resilience }) => {
+        // Only a fully `resolved` head lights the card face — unchanged from the
+        // prior `resolve()` semantics (degraded heads fall back to the target).
+        const preview = head.state === 'resolved' ? head.head : undefined;
+        if (preview) {
+          this.title = preview.title;
+          this.description = preview.description ?? null;
+          this.reach = preview.reach ?? null;
+          this.route = preview.route ?? null;
+          this.href = preview.href ?? `/epr/${encodeURIComponent(target)}`; // route-literal-ok: universal /epr/{id} fallback when the head carries no minted href, not a raw literal mint
         } else {
           this.title = target;
           this.route = null;
-          this.href = `/epr/${encodeURIComponent(target)}`; // route-literal-ok: unresolved-target universal /epr/{id} fallback href (resolver returned null), not a raw literal mint
+          this.href = `/epr/${encodeURIComponent(target)}`; // route-literal-ok: unresolved-target universal /epr/{id} fallback href (head not resolved), not a raw literal mint
         }
 
         this.reachIconValue = reachIcon(this.reach);

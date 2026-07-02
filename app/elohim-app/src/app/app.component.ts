@@ -1,16 +1,17 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject, effect } from '@angular/core';
+import { Component, ElementRef, OnInit, OnDestroy, inject, effect } from '@angular/core';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 
 import { filter } from 'rxjs/operators';
 
-import { installEprLinkInterceptor } from 'elohim-core';
+import { installEprLinkInterceptor, installEprResolutionProvider } from 'elohim-core';
 
 import { BlobBootstrapService } from '@app/lamad/services/blob-bootstrap.service';
 
 import { environment } from '../environments/environment';
 
 import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
+import { EPR_RESOLUTION_PROVIDER } from './elohim/providers/epr-resolution.provider';
 import { EprNavService } from './elohim/services/epr-nav.service';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
 import { AuthService } from './imagodei/services/auth.service';
@@ -42,6 +43,8 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly blobBootstrap = inject(BlobBootstrapService);
   private readonly authService = inject(AuthService);
   private readonly tauriAuth = inject(TauriAuthService);
+  private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly eprResolution = inject(EPR_RESOLUTION_PROVIDER);
 
   /** Retry configuration for connection attempts */
   private readonly retryConfig: RetryConfig = {
@@ -58,6 +61,8 @@ export class AppComponent implements OnInit, OnDestroy {
   private holochainInitialized = false;
   /** Teardown for the capture-phase EPR link interceptor installed in ngOnInit. */
   private eprInterceptorCleanup: (() => void) | null = null;
+  /** Teardown for the ambient EPR resolution provider installed in ngOnInit. */
+  private eprResolutionCleanup: (() => void) | null = null;
 
   private readonly router = inject(Router);
 
@@ -107,6 +112,15 @@ export class AppComponent implements OnInit, OnDestroy {
       ownsPath: p => this.eprNav.ownsPath(p),
       beforeCrossBundle: () => this.eprNav.recordHandoff(),
     });
+
+    // Install the ambient EPR resolution provider on the SAME shell root as the
+    // interceptor. Every <elohim-*> element beneath app-root resolves through
+    // this one provider via @lit/context, replacing per-element `.resolver`
+    // hand-wiring — one answer to "what does resolving mean" for the surface.
+    this.eprResolutionCleanup = installEprResolutionProvider(
+      this.elRef.nativeElement,
+      this.eprResolution
+    );
 
     // Initialize auth and connections
     void this.initializeApp();
@@ -178,6 +192,8 @@ export class AppComponent implements OnInit, OnDestroy {
     }
     // Remove the capture-phase EPR link interceptor listener
     this.eprInterceptorCleanup?.();
+    // Detach the ambient EPR resolution provider
+    this.eprResolutionCleanup?.();
     // Clean up Tauri event listeners
     this.tauriAuth.destroy();
   }

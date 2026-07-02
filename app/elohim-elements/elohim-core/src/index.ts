@@ -34,6 +34,19 @@ export type {
   EprLinkState,
 } from './elohim-epr-link.js';
 
+export {
+  eprResolutionContext,
+  installEprResolutionProvider,
+} from './navigation/epr-resolution-provider.js';
+export type {
+  EprResolutionProvider,
+  EprResolutionState,
+  EprHeadPreview,
+  EprHeadResolution,
+  EprRouteResolution,
+  EprBodyResolution,
+} from './navigation/epr-resolution-provider.js';
+
 export { ElohimEprRelationshipsPanel } from './elohim-epr-relationships-panel.js';
 export type { EprRelationship } from './elohim-epr-relationships-panel.js';
 

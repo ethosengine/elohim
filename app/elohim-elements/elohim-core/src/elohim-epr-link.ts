@@ -1,9 +1,16 @@
+import { ContextConsumer } from '@lit/context';
 import { css, html, LitElement, nothing, type PropertyValues } from 'lit';
 import { property, state } from 'lit/decorators.js';
 
 import './elohim-skeleton.js';
 import './elohim-mention-base.js';
 import './elohim-context-menu.js';
+
+import {
+  eprResolutionContext,
+  type EprHeadResolution,
+} from './navigation/epr-resolution-provider.js';
+
 import type { ContextMenuItem } from './elohim-context-menu.js';
 
 export type EprLinkDisplay = 'inline' | 'chip' | 'card' | 'popover';
@@ -59,16 +66,20 @@ export interface EprLinkResolution {
  * can act on ids it owns. Submenu items (View as..., Where this leads...)
  * deferred per spec §7.4.
  *
- * Resolution is decoupled from the loader: production wiring injects a
- * resolver function via the `.resolver` property. For tests / Storybook,
- * direct manipulation of internal state (via `setResolution()`) is the
- * supported test seam.
+ * Resolution is decoupled from the loader two ways, prop over context:
+ *   1. an explicit `.resolver` function property (production wiring / tests), or
+ *   2. an AMBIENT {@link EprResolutionProvider} consumed via `@lit/context`,
+ *      installed once at the surface root — every `<elohim-epr-link>` beneath it
+ *      resolves through the provider's head plane with no per-element wiring.
+ * The explicit prop always wins over context (backward compatible). For tests /
+ * Storybook, direct manipulation of internal state (via `setResolution()`) is
+ * the supported test seam.
  *
  * @element elohim-epr-link
  *
  * @prop {string} epr - The epr:... reference
  * @prop {EprLinkDisplay} display - Visual variant (inline | chip | card | popover)
- * @prop {Function | null} resolver - Optional async resolver injected at bundle level
+ * @prop {Function | null} resolver - Optional async resolver override; wins over the ambient context provider
  * @prop {ContextMenuItem[] | null} contextMenuItems - Optional host-injected context-menu
  *   action set. When null, the default MVP three (Open / About this EPR / Copy EPR link)
  *   render — preserving standalone/Storybook usability.
@@ -110,6 +121,22 @@ export class ElohimEprLink extends LitElement {
    */
   @property({ attribute: false })
   resolver: ((epr: string) => Promise<EprLinkResolution | null>) | null = null;
+
+  /**
+   * Ambient resolution provider, consumed via `@lit/context` from the surface
+   * root. Used only when no explicit `.resolver` prop is set (the prop wins).
+   * `subscribe: true` re-fires the callback when the provider arrives or
+   * changes so a late-installed provider still resolves the element.
+   */
+  private readonly _resolutionProvider = new ContextConsumer(this, {
+    context: eprResolutionContext,
+    subscribe: true,
+    callback: (): void => {
+      // Re-resolve when the ambient provider arrives/changes — but only when no
+      // explicit resolver prop overrides it and there is a ref to resolve.
+      if (!this.resolver && this.epr) void this.resolve();
+    },
+  });
 
   /**
    * Optional host-injected context-menu action set. When null (default),
@@ -365,26 +392,31 @@ export class ElohimEprLink extends LitElement {
   }
 
   /**
-   * Default resolution flow:
-   * - Without a `resolver`, we transition to L2 with empty resolution
-   *   (just exposes the EPR id as-is). Tests use `setResolution()`
-   *   to advance through levels.
-   * - With a `resolver`, a `resolved` (or legacy plain) result advances to L3;
-   *   a typed degraded result (forbidden / missing / error), the legacy
-   *   `unreachable` flag, or a null return drops to the L4 degraded face.
-   *   A null return maps to `missing` — the most honest reading of "the
-   *   resolver found nothing".
+   * Default resolution flow. The effective resolver is the explicit `.resolver`
+   * prop if set, else the ambient {@link EprResolutionProvider} from context
+   * (prop wins — backward compatible):
+   * - With NEITHER, we transition to L2 with empty resolution (just exposes the
+   *   EPR id as-is). Tests use `setResolution()` to advance through levels.
+   * - Otherwise a `resolved` (or legacy plain) result advances to L3; a typed
+   *   degraded result (forbidden / missing / error), the legacy `unreachable`
+   *   flag, or a null return drops to the L4 degraded face. A null return maps
+   *   to `missing` — the most honest reading of "the resolver found nothing".
    */
   private async resolve(): Promise<void> {
     if (!this.epr) return;
     this.loadLevel = 1;
     this.resolution = {};
-    if (!this.resolver) {
+    // Precedence: explicit `.resolver` prop over the ambient context provider.
+    const explicit = this.resolver;
+    const provider = this._resolutionProvider.value;
+    if (!explicit && !provider) {
       this.loadLevel = 2;
       return;
     }
     try {
-      const result = await this.resolver(this.epr);
+      const result = explicit
+        ? await explicit(this.epr)
+        : headToLinkResolution(await provider!.resolveHead(this.epr));
       if (result && isResolvedResolution(result)) {
         this.loadLevel = 3;
         this.resolution = result;
@@ -397,6 +429,21 @@ export class ElohimEprLink extends LitElement {
       this.resolution = { state: 'error' };
     }
   }
+}
+
+/**
+ * Adapt the ambient provider's typed head outcome to the element's resolution
+ * shape. The head-plane states map 1:1 onto the element's degradation states;
+ * `resolved` carries the head's title/description/reach so the chip is legible,
+ * and `forbidden` keeps any known title for the honest fallback face.
+ */
+function headToLinkResolution(outcome: EprHeadResolution): EprLinkResolution {
+  return {
+    state: outcome.state,
+    title: outcome.head?.title,
+    description: outcome.head?.description ?? undefined,
+    reach: outcome.head?.reach ?? undefined,
+  };
 }
 
 /**
