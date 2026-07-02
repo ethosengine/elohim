@@ -382,7 +382,9 @@ fn sample_content(id: &str, title: &str) -> Content {
         blob_cid: None,
         content_size_bytes: None,
         metadata_json: Some("{}".to_string()),
-        reach: "household".to_string(),
+        // Broadcast-tier: the sync plane's fail-closed reach gate excludes
+        // non-broadcast (and unknown-vocabulary) reach values by design.
+        reach: "commons".to_string(),
         validation_status: "valid".to_string(),
         created_by: None,
         created_at: "2026-06-27T00:00:00Z".to_string(),
@@ -524,7 +526,12 @@ async fn converges_real_blobhash_zero_notary() {
 
     // Precondition: B holds nothing yet.
     assert!(
-        node_b.sync.get_heads(SYNC_NS, DOC_ID).await.unwrap().is_empty(),
+        node_b
+            .sync
+            .get_heads(SYNC_NS, DOC_ID)
+            .await
+            .unwrap()
+            .is_empty(),
         "node B must NOT hold the doc before sync"
     );
 
@@ -583,7 +590,9 @@ async fn converges_and_serves_zero_notary() {
                 blob_cid: None,
                 content_size_bytes: None,
                 metadata_json: None,
-                reach: "household".to_string(),
+                // Broadcast-tier: the sync plane's fail-closed reach gate excludes
+                // non-broadcast (and unknown-vocabulary) reach values by design.
+                reach: "commons".to_string(),
                 created_by: None,
                 tags: vec![],
                 content_body: Some("b".to_string()),

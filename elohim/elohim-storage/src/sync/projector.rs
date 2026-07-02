@@ -24,6 +24,42 @@ pub fn content_doc_id(id: &str) -> String {
     format!("node:{id}")
 }
 
+/// Gate for the cold-start corpus back-fill (`ELOHIM_DOCSTORE_BACKFILL`).
+///
+/// Default **ON** — the back-fill is a reconciliation-controller leg (SQL corpus
+/// = desired state, DocStore = converged state; eager reconcile, P1) and it is
+/// idempotent, so every cold start converges the DocStore with zero per-env
+/// config. A peer that never projects its corpus strands every pre-producer row
+/// out of the sync plane (the elohim.host `App not found` class). Only an
+/// explicit `0`/`false` opts out (escape hatch for constrained disks).
+pub fn backfill_enabled(env_val: Option<&str>) -> bool {
+    !matches!(
+        env_val.map(str::trim),
+        Some(v) if v == "0" || v.eq_ignore_ascii_case("false")
+    )
+}
+
+/// Broadcast-tier allowlist for the content-sync plane — FAIL-CLOSED.
+///
+/// The sync plane serves `ListDocuments`/`SyncChanges` to ANY connected peer
+/// with no receiver-side reach pre-authorization (unlike the shard plane's
+/// `reach_authorization`), and the projected doc carries the full content
+/// body. So only the broadcast tiers of the DNA-notarized reach enum
+/// (`community`/`public`/`commons`) may enter the plane; the private family
+/// (`private`/`self`/`intimate`) and the relationship-scoped tiers
+/// (`trusted`/`familiar`) must not — nor may UNKNOWN values (the reach
+/// vocabulary has known 3-way drift; an unrecognized value could be a
+/// drifted private tier, so unknown = excluded). Live corpus check
+/// 2026-07-01: 574 `public` + 5 `commons`, zero excluded rows — the
+/// fail-closed posture costs nothing today. Receiver-authorized sync for
+/// scoped tiers is a separate arc (rides the shard plane's auth model).
+pub fn reach_is_distribution_safe(reach: &str) -> bool {
+    matches!(
+        reach.trim().to_ascii_lowercase().as_str(),
+        "community" | "public" | "commons"
+    )
+}
+
 /// One projected field value — a string or an integer scalar. Kept as an enum
 /// so the projection WRITE and the idempotency COMPARE share a single field
 /// list (`projected_fields`) and can never drift.
@@ -33,57 +69,74 @@ enum FieldVal {
 }
 
 /// The ordered field set projected from a content row into its Automerge doc —
-/// the single source of truth for both the write and the idempotency compare.
+/// the single source of truth for both the write and the idempotency compare
+/// (`doc_matches` checks exactly this list; keys NOT in the list are "don't
+/// care", so a converged peer value a local row can't produce is never fought).
 ///
 /// `blobHash`/`serverBlobHash`/`blobCid`/`contentSizeBytes` are LOAD-BEARING for
 /// peer convergence of the SERVING path: a peer whose content row lost its
 /// `blobHash` (e.g. a deploy PATCH that never landed on a degraded conductor) can
-/// only re-derive it by converging this doc from a healthy peer. `None` string
-/// fields project as `""` (the consumer treats empty as absent); a missing
-/// numeric projects as `0`.
+/// only re-derive it by converging this doc from a healthy peer.
+///
+/// Two invariants keep a FLEET-WIDE backfill safe (every peer projects its own
+/// local corpus concurrently):
+///
+/// 1. **Empty-never-projects.** A serving field this peer doesn't know is
+///    ABSENT from its projection, never `""`/`0`. Projecting an empty value
+///    enters LWW competition against a healthy peer's real hash — and can WIN
+///    the merge (actor-id ordering), poisoning the fleet's converged value.
+///    The consumer mirrors this as empty-never-wins (`reverse_project_content_doc`).
+///    Deliberate consequence: a set→unset transition does not propagate; serving
+///    fields only ever move unset→set or set→set (deploy re-stages).
+/// 2. **No peer-local metadata.** `updatedAt` is NOT projected: two peers seeded
+///    at different times hold different values for identical content, so
+///    projecting it would make every peer's backfill append a ping-pong change
+///    per doc per restart (unbounded history inflation). Causality lives in the
+///    CRDT history itself.
 fn projected_fields(content: &Content) -> Vec<(&'static str, FieldVal)> {
-    vec![
+    let mut fields = vec![
         ("id", FieldVal::S(content.id.clone())),
         ("hAppId", FieldVal::S(content.h_app_id.clone())),
         ("title", FieldVal::S(content.title.clone())),
-        (
-            "description",
-            FieldVal::S(content.description.clone().unwrap_or_default()),
-        ),
         ("contentType", FieldVal::S(content.content_type.clone())),
         ("contentFormat", FieldVal::S(content.content_format.clone())),
         ("reach", FieldVal::S(content.reach.clone())),
-        (
-            "body",
-            FieldVal::S(content.content_body.clone().unwrap_or_default()),
-        ),
-        (
-            "metadata",
-            FieldVal::S(
-                content
-                    .metadata_json
-                    .clone()
-                    .unwrap_or_else(|| "{}".to_string()),
-            ),
-        ),
-        (
-            "blobHash",
-            FieldVal::S(content.blob_hash.clone().unwrap_or_default()),
-        ),
-        (
-            "serverBlobHash",
-            FieldVal::S(content.server_blob_hash.clone().unwrap_or_default()),
-        ),
-        (
-            "blobCid",
-            FieldVal::S(content.blob_cid.clone().unwrap_or_default()),
-        ),
-        (
-            "contentSizeBytes",
-            FieldVal::I(content.content_size_bytes.unwrap_or(0) as i64),
-        ),
-        ("updatedAt", FieldVal::S(content.updated_at.clone())),
-    ]
+    ];
+    // Nullable content fields follow the same absent-not-empty rule as the
+    // serving fields: a NULL/default value projects as ABSENCE, never as
+    // ""/"{}" — an empty put deterministically erases a peer's real value.
+    if let Some(d) = &content.description {
+        if !d.is_empty() {
+            fields.push(("description", FieldVal::S(d.clone())));
+        }
+    }
+    if let Some(b) = &content.content_body {
+        if !b.is_empty() {
+            fields.push(("body", FieldVal::S(b.clone())));
+        }
+    }
+    if let Some(m) = &content.metadata_json {
+        if !m.is_empty() && m != "{}" {
+            fields.push(("metadata", FieldVal::S(m.clone())));
+        }
+    }
+    for (key, val) in [
+        ("blobHash", &content.blob_hash),
+        ("serverBlobHash", &content.server_blob_hash),
+        ("blobCid", &content.blob_cid),
+    ] {
+        if let Some(v) = val {
+            if !v.is_empty() {
+                fields.push((key, FieldVal::S(v.clone())));
+            }
+        }
+    }
+    if let Some(size) = content.content_size_bytes {
+        if size > 0 {
+            fields.push(("contentSizeBytes", FieldVal::I(size as i64)));
+        }
+    }
+    fields
 }
 
 /// True when the doc ALREADY carries exactly the projected field set — the
@@ -121,6 +174,10 @@ pub async fn project_content_doc(
     sync: &SyncManager,
     content: &Content,
 ) -> Result<bool, StorageError> {
+    // Fail-closed reach gate — see `reach_is_distribution_safe`.
+    if !reach_is_distribution_safe(&content.reach) {
+        return Ok(false);
+    }
     let doc_id = content_doc_id(&content.id);
     let mut doc = sync
         .get_or_create_doc(PROJECTION_NAMESPACE, &doc_id)
@@ -139,6 +196,66 @@ pub async fn project_content_doc(
         Ok(())
     })
     .map_err(|e| StorageError::Sync(format!("projector transact failed: {e:?}")))?;
+    sync.apply_changes(PROJECTION_NAMESPACE, &doc_id, vec![doc.save()])
+        .await?;
+    Ok(true)
+}
+
+/// Reconciliation-mode projection — the corpus back-fill's write path.
+///
+/// OFFER what the doc lacks; never fight what it holds. A back-fill replays
+/// possibly-stale local rows causally AFTER the doc's current heads, so an
+/// assert-style write from here would deterministically overwrite fresher
+/// converged values (last-restarter-wins) and re-open the fight on every
+/// restart of every divergent peer — unbounded history inflation plus a
+/// stale hash re-asserted fleet-wide. Rule: a field is written iff the doc's
+/// current value is ABSENT or EMPTY (`""`/`0` — legacy pre-guard projections
+/// stay fillable); a present non-empty doc value is never contested from
+/// reconciliation, whatever the local row says. Fresh authoritative writes
+/// ride the EVENT path (`project_content_doc`), which asserts all fields.
+pub async fn project_content_doc_reconcile(
+    sync: &SyncManager,
+    content: &Content,
+) -> Result<bool, StorageError> {
+    if !reach_is_distribution_safe(&content.reach) {
+        return Ok(false);
+    }
+    let doc_id = content_doc_id(&content.id);
+    let mut doc = sync
+        .get_or_create_doc(PROJECTION_NAMESPACE, &doc_id)
+        .await?;
+    let fields: Vec<(&'static str, FieldVal)> = projected_fields(content)
+        .into_iter()
+        .filter(|(key, val)| match doc.get(automerge::ROOT, *key) {
+            Ok(Some((Value::Scalar(scalar), _))) => match (val, scalar.as_ref()) {
+                // Present-but-empty is fillable; equal or different-non-empty
+                // is left alone (equal = no-op, different = never fight).
+                (FieldVal::S(want), ScalarValue::Str(cur)) => {
+                    cur.as_str().is_empty() && !want.is_empty()
+                }
+                (FieldVal::I(want), ScalarValue::Int(cur)) => *cur == 0 && *want != 0,
+                // Scalar type mismatch: don't fight from reconciliation.
+                _ => false,
+            },
+            // Non-scalar present: don't fight. Absent: fill.
+            Ok(Some(_)) => false,
+            Ok(None) => true,
+            Err(_) => false,
+        })
+        .collect();
+    if fields.is_empty() {
+        return Ok(false);
+    }
+    doc.transact::<_, _, automerge::AutomergeError>(|tx| {
+        for (key, val) in &fields {
+            match val {
+                FieldVal::S(s) => tx.put(automerge::ROOT, *key, s.as_str())?,
+                FieldVal::I(i) => tx.put(automerge::ROOT, *key, *i)?,
+            }
+        }
+        Ok(())
+    })
+    .map_err(|e| StorageError::Sync(format!("projector reconcile transact failed: {e:?}")))?;
     sync.apply_changes(PROJECTION_NAMESPACE, &doc_id, vec![doc.save()])
         .await?;
     Ok(true)
@@ -187,7 +304,9 @@ pub async fn backfill_content_docs(
         let page_len = rows.len();
         for content in &rows {
             stats.scanned += 1;
-            match project_content_doc(sync, content).await {
+            // Reconcile mode, NOT event mode: a back-fill replays possibly-
+            // stale rows and must offer-not-fight (see the reconcile fn).
+            match project_content_doc_reconcile(sync, content).await {
                 Ok(true) => stats.projected += 1,
                 Ok(false) => stats.skipped += 1,
                 Err(e) => {
@@ -227,9 +346,11 @@ pub async fn backfill_content_docs(
 ///
 /// Guards: (1) **empty-never-wins** — only heals when the converged `blob_hash` is
 /// non-empty (a peer holding `""` never marks us amber or clobbers us); (2)
-/// **no-clobber** — the write rides `update_content`'s amber path (`crdt_converged_at`
-/// set), which never overwrites a present (possibly green/notarized) `blob_hash`
-/// (A3); (3) **namespace** — writes under `default_lamad` (the serving scope), never
+/// **green-inviolable** — the write rides `update_content`'s amber path
+/// (`crdt_converged_at` set), which never overwrites a notarized (`dht_anchor_hash`)
+/// `blob_hash` but DOES replace a non-green one, so amber rows converge set→set
+/// instead of freezing on their first heal (A3 precedence: green > amber);
+/// (3) **namespace** — writes under `default_lamad` (the serving scope), never
 /// the doc's `"elohim"` sync namespace (REQ-F5).
 pub async fn reverse_project_content_doc(
     sync: &SyncManager,
@@ -372,7 +493,7 @@ mod tests {
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: Some("{}".to_string()),
-            reach: "household".to_string(),
+            reach: "commons".to_string(),
             validation_status: "valid".to_string(),
             created_by: None,
             created_at: "2026-06-27T00:00:00Z".to_string(),
@@ -536,7 +657,7 @@ mod tests {
                     blob_cid: None,
                     content_size_bytes: None,
                     metadata_json: None,
-                    reach: "household".to_string(),
+                    reach: "commons".to_string(),
                     created_by: None,
                     tags: vec![],
                     content_body: Some("body".to_string()),
@@ -603,7 +724,7 @@ mod tests {
                         blob_cid: None,
                         content_size_bytes: None,
                         metadata_json: None,
-                        reach: "household".to_string(),
+                        reach: "commons".to_string(),
                         created_by: None,
                         tags: vec![],
                         content_body: Some("b".to_string()),
@@ -636,22 +757,433 @@ mod tests {
         );
 
         let mut conn = pool.get().unwrap();
-        let healed =
-            content_diesel::get_content(&mut conn, &ctx, "heal-null", content_diesel::MinTrust::Invisible)
-                .unwrap()
-                .unwrap();
+        let healed = content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "heal-null",
+            content_diesel::MinTrust::Invisible,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(healed.blob_hash.as_deref(), Some("sha256-converged"));
-        assert!(healed.crdt_converged_at.is_some(), "healed row is amber-stamped");
+        assert!(
+            healed.crdt_converged_at.is_some(),
+            "healed row is amber-stamped"
+        );
         assert!(healed.dht_anchor_hash.is_none(), "heal never notarizes");
 
-        let untouched =
-            content_diesel::get_content(&mut conn, &ctx, "heal-real", content_diesel::MinTrust::Invisible)
-                .unwrap()
-                .unwrap();
+        let untouched = content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "heal-real",
+            content_diesel::MinTrust::Invisible,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(
             untouched.blob_hash.as_deref(),
             Some("sha256-existing"),
             "empty never clobbers a real hash"
+        );
+    }
+
+    /// Empty serving-critical fields are NOT projected into the doc at all —
+    /// the producer-side mirror of the heal's empty-never-wins. Projecting
+    /// `""` would enter LWW competition against a healthy peer's real hash
+    /// (and can win the merge), so absence — not empty — is the wire form of
+    /// "this peer doesn't know". `updatedAt` is peer-local row metadata: two
+    /// peers seeded at different times hold different values for identical
+    /// content, so projecting it makes every fleet-wide backfill append a
+    /// no-op change per doc per peer (history inflation). Causality lives in
+    /// the CRDT history itself.
+    #[tokio::test]
+    async fn empty_serving_fields_are_not_projected() {
+        use automerge::ReadDoc;
+
+        let (sync, _temp) = test_sync_manager().await;
+        // sample_content: blob_hash/server_blob_hash/blob_cid/content_size_bytes all unset.
+        let content = sample_content("empty-1", "t");
+        super::project_content_doc(&sync, &content).await.unwrap();
+
+        for field in ["blobHash", "serverBlobHash", "blobCid"] {
+            assert!(
+                sync.get_doc_field("elohim", "node:empty-1", field)
+                    .await
+                    .is_err(),
+                "unset {field} must be ABSENT from the doc, not projected as \"\""
+            );
+        }
+        let doc = sync
+            .get_or_create_doc("elohim", "node:empty-1")
+            .await
+            .unwrap();
+        assert!(
+            doc.get(automerge::ROOT, "contentSizeBytes")
+                .unwrap()
+                .is_none(),
+            "unset contentSizeBytes must be absent, not projected as 0"
+        );
+        assert!(
+            doc.get(automerge::ROOT, "updatedAt").unwrap().is_none(),
+            "peer-local updatedAt must not be projected (backfill ping-pong inflation)"
+        );
+        // Nullable content fields follow the same absent-not-empty rule: a
+        // NULL description / default "{}" metadata must not project as ""/"{}"
+        // — an empty put deterministically erases a peer's real value in the
+        // converged doc (same LWW mechanic as the serving fields).
+        assert!(
+            doc.get(automerge::ROOT, "description").unwrap().is_none(),
+            "NULL description must be absent, not projected as empty string"
+        );
+        assert!(
+            doc.get(automerge::ROOT, "metadata").unwrap().is_none(),
+            "default metadata must be absent, not projected as {{}}"
+        );
+        // Sanity: real fields still project.
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:empty-1", "title")
+                .await
+                .unwrap(),
+            "t"
+        );
+    }
+
+    /// Only broadcast-tier reach enters the sync plane (fail-closed): the
+    /// plane has no receiver-side reach pre-authorization, so private-family,
+    /// relationship-scoped, and UNKNOWN (drifted-vocabulary) reach values must
+    /// never be projected — by either the event or the reconcile path.
+    #[tokio::test]
+    async fn non_broadcast_reach_is_never_projected() {
+        let (sync, _temp) = test_sync_manager().await;
+        for (i, reach) in [
+            "private",
+            "self",
+            "intimate",
+            "trusted",
+            "familiar",
+            "household",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let mut content = sample_content(&format!("reach-{i}"), "t");
+            content.reach = reach.to_string();
+            assert!(
+                !super::project_content_doc(&sync, &content).await.unwrap(),
+                "reach {reach} must not project (event path)"
+            );
+            assert!(
+                !super::project_content_doc_reconcile(&sync, &content)
+                    .await
+                    .unwrap(),
+                "reach {reach} must not project (reconcile path)"
+            );
+            assert!(
+                sync.get_heads("elohim", &format!("node:reach-{i}"))
+                    .await
+                    .is_err()
+                    || sync
+                        .get_heads("elohim", &format!("node:reach-{i}"))
+                        .await
+                        .unwrap()
+                        .is_empty(),
+                "no doc may exist for reach {reach}"
+            );
+        }
+        for (i, reach) in ["community", "public", "commons"].iter().enumerate() {
+            let mut content = sample_content(&format!("bcast-{i}"), "t");
+            content.reach = reach.to_string();
+            assert!(
+                super::project_content_doc(&sync, &content).await.unwrap(),
+                "broadcast reach {reach} must project"
+            );
+        }
+    }
+
+    /// Reconciliation (back-fill) OFFERS, never FIGHTS: a converged non-empty
+    /// doc value survives a reconcile from a row holding a DIFFERENT non-empty
+    /// value (the stale-restarter case), while a legacy empty-string doc value
+    /// stays fillable. The event path keeps assert semantics.
+    #[tokio::test]
+    async fn reconcile_fills_gaps_but_never_fights_converged_values() {
+        let (sync, _temp) = test_sync_manager().await;
+
+        // Fresh event projection establishes the converged truth (H2).
+        let mut fresh = sample_content("rec-1", "t");
+        fresh.blob_hash = Some("sha256-h2".to_string());
+        super::project_content_doc(&sync, &fresh).await.unwrap();
+        let heads_converged = sync.get_heads("elohim", "node:rec-1").await.unwrap();
+
+        // A stale peer's back-fill (row still holds H1) must not fight.
+        let mut stale = sample_content("rec-1", "t");
+        stale.blob_hash = Some("sha256-h1".to_string());
+        assert!(
+            !super::project_content_doc_reconcile(&sync, &stale)
+                .await
+                .unwrap(),
+            "reconcile must not contest a present non-empty doc value"
+        );
+        assert_eq!(
+            sync.get_heads("elohim", "node:rec-1").await.unwrap(),
+            heads_converged,
+            "the declined fight must append no change"
+        );
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:rec-1", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-h2"
+        );
+
+        // Legacy pre-guard docs hold blobHash:"" — reconcile treats empty as
+        // absent and fills it (the legacy self-heal path).
+        use automerge::transaction::Transactable;
+        let mut legacy = sync
+            .get_or_create_doc("elohim", "node:rec-2")
+            .await
+            .unwrap();
+        legacy
+            .transact::<_, _, automerge::AutomergeError>(|tx| {
+                tx.put(automerge::ROOT, "title", "t")?;
+                tx.put(automerge::ROOT, "blobHash", "")?;
+                Ok(())
+            })
+            .unwrap();
+        sync.apply_changes("elohim", "node:rec-2", vec![legacy.save()])
+            .await
+            .unwrap();
+        let mut healthy = sample_content("rec-2", "t");
+        healthy.blob_hash = Some("sha256-real".to_string());
+        assert!(
+            super::project_content_doc_reconcile(&sync, &healthy)
+                .await
+                .unwrap(),
+            "reconcile must fill a legacy empty-string value"
+        );
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:rec-2", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-real"
+        );
+    }
+
+    /// Amber heals converge set→set: an amber (converged-but-unnotarized)
+    /// blob_hash is REPLACEABLE by a newer amber heal, so a peer holding a
+    /// stale hash converges instead of serving it forever; a green
+    /// (dht-anchored) blob_hash is never overwritten by amber.
+    #[tokio::test]
+    async fn amber_heal_replaces_amber_but_never_green() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+        {
+            let mut conn = pool.get().unwrap();
+            for (id, bh, anchor) in [
+                ("amber-stale", None::<String>, None::<String>),
+                (
+                    "green-locked",
+                    Some("sha256-green-h1".to_string()),
+                    Some("uhCkk-fake-anchor".to_string()),
+                ),
+            ] {
+                content_diesel::create_content(
+                    &mut conn,
+                    &ctx,
+                    CreateContentInput {
+                        id: id.to_string(),
+                        title: "t".to_string(),
+                        description: None,
+                        content_type: "concept".to_string(),
+                        content_format: "markdown".to_string(),
+                        blob_hash: bh,
+                        blob_cid: None,
+                        content_size_bytes: None,
+                        metadata_json: None,
+                        reach: "commons".to_string(),
+                        created_by: None,
+                        tags: vec![],
+                        content_body: Some("b".to_string()),
+                        dht_anchor_hash: anchor,
+                    },
+                )
+                .unwrap();
+            }
+        }
+
+        // Round 1: heal amber-stale to H1 (row NULL → amber write).
+        let mut v1 = sample_content("amber-stale", "t");
+        v1.blob_hash = Some("sha256-h1".to_string());
+        super::project_content_doc(&sync, &v1).await.unwrap();
+        assert!(
+            super::reverse_project_content_doc(&sync, &pool, "node:amber-stale")
+                .await
+                .unwrap()
+        );
+
+        // Round 2: the fleet converges to H2 — the amber row must FOLLOW.
+        let mut v2 = sample_content("amber-stale", "t");
+        v2.blob_hash = Some("sha256-h2".to_string());
+        super::project_content_doc(&sync, &v2).await.unwrap();
+        assert!(
+            super::reverse_project_content_doc(&sync, &pool, "node:amber-stale")
+                .await
+                .unwrap()
+        );
+        {
+            let mut conn = pool.get().unwrap();
+            let row = content_diesel::get_content(
+                &mut conn,
+                &ctx,
+                "amber-stale",
+                content_diesel::MinTrust::Invisible,
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(
+                row.blob_hash.as_deref(),
+                Some("sha256-h2"),
+                "amber must replace amber (set→set convergence)"
+            );
+            assert!(row.dht_anchor_hash.is_none());
+        }
+
+        // Green is inviolable: a converged doc value never overwrites an
+        // anchored blob_hash.
+        let mut g2 = sample_content("green-locked", "t");
+        g2.blob_hash = Some("sha256-green-h2".to_string());
+        super::project_content_doc(&sync, &g2).await.unwrap();
+        super::reverse_project_content_doc(&sync, &pool, "node:green-locked")
+            .await
+            .unwrap();
+        {
+            let mut conn = pool.get().unwrap();
+            let row = content_diesel::get_content(
+                &mut conn,
+                &ctx,
+                "green-locked",
+                content_diesel::MinTrust::Invisible,
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(
+                row.blob_hash.as_deref(),
+                Some("sha256-green-h1"),
+                "amber must never clobber a green (anchored) blob_hash"
+            );
+        }
+    }
+
+    /// A doc that already converged a peer's real blobHash is left untouched by a
+    /// local re-projection whose row lacks that hash — the local peer's ignorance
+    /// is not a "change". Idempotency must hold so backfill on the degraded peer
+    /// never appends history against the converged value.
+    #[tokio::test]
+    async fn projection_skips_when_local_serving_field_is_empty_and_doc_converged() {
+        let (sync, _temp) = test_sync_manager().await;
+
+        let mut healthy = sample_content("conv-1", "t");
+        healthy.blob_hash = Some("sha256-real".to_string());
+        assert!(super::project_content_doc(&sync, &healthy).await.unwrap());
+        let heads_converged = sync.get_heads("elohim", "node:conv-1").await.unwrap();
+
+        // Same row as this peer sees it: blob_hash never landed locally.
+        let degraded = sample_content("conv-1", "t");
+        assert!(
+            !super::project_content_doc(&sync, &degraded).await.unwrap(),
+            "empty local serving field vs converged doc value must be a skip"
+        );
+        let heads_after = sync.get_heads("elohim", "node:conv-1").await.unwrap();
+        assert_eq!(
+            heads_converged, heads_after,
+            "the skip must not append a change"
+        );
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:conv-1", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-real",
+            "converged value survives the degraded re-projection"
+        );
+    }
+
+    /// Fleet-wide backfill safety: a degraded peer's projection (no blobHash)
+    /// merged with a healthy peer's projection (real blobHash) converges to the
+    /// real value in BOTH merge orders. With empty projected as `""` this is an
+    /// LWW coin-flip on actor id; with absence it is structurally guaranteed.
+    #[tokio::test]
+    async fn degraded_peer_backfill_cannot_clobber_converged_blob_hash() {
+        let (healthy_mgr, _t1) = test_sync_manager().await;
+        let (degraded_mgr, _t2) = test_sync_manager().await;
+
+        let mut healthy = sample_content("clob-1", "t");
+        healthy.blob_hash = Some("sha256-real".to_string());
+        super::project_content_doc(&healthy_mgr, &healthy)
+            .await
+            .unwrap();
+        let degraded = sample_content("clob-1", "t");
+        super::project_content_doc(&degraded_mgr, &degraded)
+            .await
+            .unwrap();
+
+        // Capture both peers' PRE-merge doc states (what a sync round would carry).
+        let healthy_bytes = healthy_mgr
+            .get_or_create_doc("elohim", "node:clob-1")
+            .await
+            .unwrap()
+            .save();
+        let degraded_bytes = degraded_mgr
+            .get_or_create_doc("elohim", "node:clob-1")
+            .await
+            .unwrap()
+            .save();
+
+        // Order 1: healthy converges INTO the degraded peer.
+        degraded_mgr
+            .apply_changes("elohim", "node:clob-1", vec![healthy_bytes])
+            .await
+            .unwrap();
+        assert_eq!(
+            degraded_mgr
+                .get_doc_field("elohim", "node:clob-1", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-real",
+            "degraded peer must converge to the real hash"
+        );
+
+        // Order 2: degraded converges INTO the healthy peer.
+        healthy_mgr
+            .apply_changes("elohim", "node:clob-1", vec![degraded_bytes])
+            .await
+            .unwrap();
+        assert_eq!(
+            healthy_mgr
+                .get_doc_field("elohim", "node:clob-1", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-real",
+            "healthy peer must retain the real hash after merging a degraded doc"
+        );
+    }
+
+    /// The corpus backfill is a reconciliation-controller leg: default ON so every
+    /// cold start converges the DocStore to the SQL corpus with zero per-env
+    /// config. Only an explicit `0`/`false` opts out.
+    #[test]
+    fn backfill_env_gate_defaults_on() {
+        assert!(super::backfill_enabled(None), "unset → backfill runs");
+        assert!(!super::backfill_enabled(Some("0")));
+        assert!(!super::backfill_enabled(Some("false")));
+        assert!(!super::backfill_enabled(Some("FALSE")));
+        assert!(super::backfill_enabled(Some("1")));
+        assert!(super::backfill_enabled(Some("true")));
+        assert!(
+            super::backfill_enabled(Some("unrecognized")),
+            "default-on posture: only an explicit off-value disables"
         );
     }
 }

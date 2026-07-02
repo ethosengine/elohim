@@ -296,6 +296,28 @@ impl request_response::Codec for SyncCodec {
     }
 }
 
+/// Hard ceiling on a `ListDocuments` page chain (offset bound). Bounds a
+/// lying always-`has_more` peer to `MAX/page` requests per round instead of an
+/// unbounded, backpressure-immune request loop. Honest stores below the cap
+/// are unaffected; a store larger than the cap syncs its first `MAX` docs per
+/// round (raise deliberately if a real corpus ever approaches it).
+pub const MAX_SYNC_LIST_OFFSET: u32 = 100_000;
+
+/// Compute the next `ListDocuments` page offset after a `DocumentList` response.
+///
+/// `None` means the chain ends: the peer reported no further pages, OR the
+/// cursor stopped advancing (zero-progress page / `u32` saturation — either
+/// would re-request the same page forever), OR the `MAX_SYNC_LIST_OFFSET`
+/// cap was reached (a peer claiming `has_more` forever must not drive an
+/// unbounded loop).
+pub fn next_doc_list_offset(offset: u32, page_len: usize, has_more: bool) -> Option<u32> {
+    if !has_more || page_len == 0 {
+        return None;
+    }
+    let next = offset.saturating_add(u32::try_from(page_len).unwrap_or(u32::MAX));
+    (next > offset && next <= MAX_SYNC_LIST_OFFSET).then_some(next)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -341,5 +363,35 @@ mod tests {
             }
             _ => panic!("Wrong variant"),
         }
+    }
+
+    /// The DocumentList page cursor: follow `has_more` until the horizon is
+    /// drained. A doc past the first page must never be silently unsyncable
+    /// (586-row corpus today, 1000-doc page — growth flips this from latent to
+    /// live). Every non-advancing or unbounded shape terminates: `page_len == 0`
+    /// with `has_more` is a lying/buggy peer (advance-by-zero = same page
+    /// forever); saturation at `u32::MAX` would likewise stop advancing, so it
+    /// terminates rather than re-requesting the identical page; and a peer
+    /// reporting `has_more` forever is bounded by `MAX_SYNC_LIST_OFFSET`.
+    #[test]
+    fn next_doc_list_offset_follows_has_more() {
+        assert_eq!(next_doc_list_offset(0, 1000, true), Some(1000));
+        assert_eq!(next_doc_list_offset(1000, 500, false), None);
+        assert_eq!(next_doc_list_offset(0, 0, true), None);
+        assert_eq!(
+            next_doc_list_offset(u32::MAX, 5, true),
+            None,
+            "a non-advancing (saturated) cursor must terminate, not spin on one page"
+        );
+        assert_eq!(
+            next_doc_list_offset(MAX_SYNC_LIST_OFFSET - 1000, 1000, true),
+            Some(MAX_SYNC_LIST_OFFSET),
+            "the last in-bound page is still requested"
+        );
+        assert_eq!(
+            next_doc_list_offset(MAX_SYNC_LIST_OFFSET, 1000, true),
+            None,
+            "a lying always-has_more peer is bounded by the chain cap"
+        );
     }
 }

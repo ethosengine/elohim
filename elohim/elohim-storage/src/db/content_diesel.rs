@@ -578,20 +578,18 @@ pub fn update_content(
         .as_deref()
         .or(existing.content.metadata_json.as_deref());
     // blob_hash resolution. Normal path: coalesce (provided value wins, else
-    // keep existing). AMBER path (`crdt_converged_at.is_some()`): no-clobber —
-    // the amber blob_hash is written ONLY when the existing row's blob_hash is
-    // NULL/empty. This is the precedence guard the deploy-producer (A3) relies
-    // on: a notarized (green) blob_hash already on the row must NEVER be
-    // overwritten by an amber write, only the reverse (green overwrites amber).
-    let existing_blob_empty = existing
-        .content
-        .blob_hash
-        .as_deref()
-        .map(|s| s.is_empty())
-        .unwrap_or(true);
+    // keep existing). AMBER path (`crdt_converged_at.is_some()`): GREEN is
+    // inviolable — an amber write never overwrites a notarized blob_hash
+    // (`dht_anchor_hash` present); only the reverse (green overwrites amber).
+    // Amber MAY replace a non-green blob_hash: re-stages and CRDT heals must
+    // converge set→set, else a peer holding a stale hash re-asserts it (and
+    // re-serves a possibly-dead blob) forever. (Earlier write-iff-empty
+    // semantics made the very first heal permanent — 2026-07-02 review
+    // MAJOR-1, stale-restarter case.)
+    let existing_is_green = existing.content.dht_anchor_hash.is_some();
     let is_amber_write = input.crdt_converged_at.is_some();
-    let new_blob_hash = if is_amber_write && !existing_blob_empty {
-        // Amber must not clobber a present (possibly notarized) blob_hash.
+    let new_blob_hash = if is_amber_write && existing_is_green {
+        // Amber must not clobber a notarized (green) blob_hash.
         existing.content.blob_hash.as_deref()
     } else {
         input
@@ -2256,7 +2254,11 @@ mod tests {
     /// The app-bundle slug query `lookup_slug_blob_hash` runs (content_format in
     /// the app-bundle set, MinTrust::Amber). Returns the resolved blob_hash for
     /// `id`, or None if the row is below the Amber floor / has no hash.
-    fn slug_lookup_amber(conn: &mut SqliteConnection, ctx: &AppContext, id: &str) -> Option<String> {
+    fn slug_lookup_amber(
+        conn: &mut SqliteConnection,
+        ctx: &AppContext,
+        id: &str,
+    ) -> Option<String> {
         let q = ContentQuery {
             content_format: Some("spa-bundle".to_string()),
             limit: 100,

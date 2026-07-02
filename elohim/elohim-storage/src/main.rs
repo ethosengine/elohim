@@ -2633,19 +2633,23 @@ async fn async_main(
                 );
                 info!("Content-projection producer spawned — Automerge content-sync plane lit");
 
-                // Corpus back-fill (gated, idempotent). The go-forward producer
-                // above only projects content written AFTER startup; on a fresh
-                // deploy or a sled DocStore reset the already-seeded corpus never
+                // Corpus back-fill (default ON, idempotent — reconciliation-
+                // controller leg, eager reconcile). The go-forward producer above
+                // only projects content written AFTER startup; on a fresh deploy
+                // or a sled DocStore reset the already-seeded corpus never
                 // converges until each row is re-written — so a degraded peer that
-                // lost a row's blobHash can't re-derive it from a healthy peer.
-                // When ELOHIM_DOCSTORE_BACKFILL is set, run a one-shot idempotent
-                // pass that projects every existing content row into the DocStore.
-                // Spawned (not awaited) so it never delays serving readiness;
-                // batched + yielding internally so it doesn't starve the write path.
-                if std::env::var("ELOHIM_DOCSTORE_BACKFILL")
-                    .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-                    .unwrap_or(false)
-                {
+                // lost a row's blobHash can't re-derive it from a healthy peer,
+                // and a healthy peer never OFFERS its pre-producer corpus to the
+                // sync plane at all (the elohim.host `App not found` stranding:
+                // the landing row predated the producer on every peer, so no
+                // DocStore ever held the doc and every 60s round listed nothing).
+                // Runs on every cold start; `project_content_doc` skips matched
+                // docs so re-runs append no history. ELOHIM_DOCSTORE_BACKFILL=0
+                // is the explicit opt-out. Spawned (not awaited) so it never
+                // delays serving readiness; batched + yielding internally so it
+                // doesn't starve the write path.
+                let backfill_env = std::env::var("ELOHIM_DOCSTORE_BACKFILL").ok();
+                if elohim_storage::sync::projector::backfill_enabled(backfill_env.as_deref()) {
                     let backfill_sync = node.sync_manager().clone();
                     let backfill_pool = pool.clone();
                     tokio::spawn(async move {
@@ -2668,6 +2672,12 @@ async fn async_main(
                             }
                         }
                     });
+                } else {
+                    // Loud opt-out: a silent missing back-fill cost a full
+                    // forensic sweep to diagnose (evidence-absence ≠ evidence).
+                    info!(
+                        "Automerge DocStore corpus back-fill DISABLED via ELOHIM_DOCSTORE_BACKFILL — pre-existing rows will not enter the sync plane until rewritten"
+                    );
                 }
             }
             // iroh transport path: the iroh SyncManager (built at the iroh
