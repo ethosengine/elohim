@@ -1397,22 +1397,18 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('Quality Gate: Storage') {
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.DEPLOY_ONLY != true }
-                expression { shouldRunStep('cargo-build-storage') }
-            }}
-            steps { container('builder') { script { runStorageQualityGate() } } }
-        }
-
         stage('Build Storage') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
                 expression { params.DEPLOY_ONLY != true }
                 expression { shouldRunStep('cargo-build-storage') }
             }}
-            steps { container('builder') { script { buildStorageImage() } } }
+            // Gate rides INSIDE this stage (not its own stage): adding a stage
+            // to the declarative model pushed the CPS stages-method past the
+            // JVM 64KB bytecode limit (edge #1134 MethodTooLargeException —
+            // string-byte proxies undercount model bytecode). Gate first
+            // (non-blocking UNSTABLE), then the release build.
+            steps { container('builder') { script { runStorageQualityGate(); buildStorageImage() } } }
         }
 
         stage('P2P Simulation Test') {
@@ -1886,10 +1882,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                                 echo "Edge Node deployed but health check failed - may need more time"
                             }
 
-                            // Federation-peer public health (alpha-b) — helper def.
-                            // Keyed on alpha being IN this deploy (not on it being
-                            // first in registry order — primaryEnv can be staging
-                            // under custom HUMAN_ASSIGNMENTS while alpha still ships).
+                            // Federation-peer public health (alpha-b); keyed on alpha IN the deploy set.
                             checkFederationPeerPublicHealth(humansByEnv.containsKey('alpha'))
                         }
                     }
