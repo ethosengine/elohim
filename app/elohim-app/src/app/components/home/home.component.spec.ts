@@ -9,6 +9,7 @@ import { AnalyticsService } from '../../services/analytics.service';
 import { ConfigService } from '../../services/config.service';
 import { DomInteractionService } from '../../services/dom-interaction.service';
 import { EPR_RESOLUTION_PROVIDER } from '../../elohim/providers/epr-resolution.provider';
+import { LAMAD_STORAGE_CLIENT } from '@app/lamad/interfaces/storage.interface';
 import { ResilienceService } from '@app/lamad/services/resilience.service';
 
 import { HomeComponent } from './home.component';
@@ -79,6 +80,16 @@ describe('HomeComponent', () => {
         provideHttpClientTesting(),
         { provide: EPR_RESOLUTION_PROVIDER, useValue: mockEprResolution },
         { provide: ResilienceService, useValue: mockResilience },
+        // Duplicate-identity guard (fixes elohim/dev CI intermittently). Under the
+        // full suite's fork-worker grouping, resilience.service.ts can load as two
+        // module instances, so the mock ResilienceService above binds ONE class
+        // identity while the rendered epr-relationship-card tree (app-vision /
+        // app-learning-success / app-path-forward) injects the OTHER. Angular then
+        // falls through to construct the real lamad ResilienceService, which needs
+        // LAMAD_STORAGE_CLIENT (resilience.service.ts:66). Provide the token from the
+        // SAME path the failing identity resolves (mirrors app.config.ts) so the
+        // fallback construction stays network-free regardless of which identity wins.
+        { provide: LAMAD_STORAGE_CLIENT, useValue: { getStorageBaseUrl: () => '' } },
       ],
     }).compileComponents();
 
