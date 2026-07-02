@@ -63,41 +63,169 @@ SCRIPT_DEFAULT = (10000, 11000)
 DEF_WARN = 6000
 DEF_HARD = 8000
 
-# Declarative `stages { }` block — the BLIND SPOT that let genesis #1146-#1151
-# through every check above. The declarative engine compiles the whole stages
-# list into one CPS method (the stage-model builder). Its bytecode is driven by
-# stage COUNT × per-stage when/steps wiring — NOT source bytes: holochain's
-# stages{} is 54,456B / 18 stages and COMPILES, while genesis's 43,114B / 32
-# stages FAILS (MethodTooLargeException WorkflowScript.___cps___21136, #1151) —
-# even though pipeline-total (47KB) / largest script{} (5.3KB) / largest def
-# (4.4KB) all passed. So the gate is STAGE COUNT. Known-good max: 23 (root app
-# pipeline). Known-fail: 31-32 (genesis). HARD flags the genesis range while
-# passing every compiling file; target ≤23 for a proven-safe margin. Relief:
-# merge adjacent stages, simplify when{} to one precomputed flag, or move stage
-# bodies into a shared library.
-STAGES_COUNT_WARN = 25
-STAGES_COUNT_HARD = 28
+# Declarative `stages { }` model cost — the check that replaced the naive
+# stage-COUNT gate after edge #1134 (2026-07-02): the count gate (HARD 28,
+# calibrated on genesis failing at 31-32) passed elohim/holochain at 19 stages,
+# which FAILED to compile (MethodTooLargeException, WorkflowScript.___cps___…)
+# — one added stage crossed the cliff while count said "fine". Stage count is
+# not the invariant; MODEL BYTECODE is, and it is driven by CODE tokens (string
+# LITERAL bytes are constant-pool entries — near-free; comments are free;
+# GString ${} interpolations and stage/when/steps wiring are real bytecode).
+#
+# Metric: cost = code_tokens(stages block, comment-stripped,
+#                 string-content-neutralized, interpolations kept) + 40×stages.
+# Calibration (labeled compile outcomes, 2026-07-02):
+#   PASS  edge@c1fd38c72   19 stages  tokens 3608  cost 4368   (edge #1133)
+#   FAIL  edge@2d340ff04   20 stages  tokens 3623  cost 4423   (edge #1134)
+#   PASS  edge@424628941   19 stages  tokens 3571  cost 4331   (edge #1135)
+#   FAIL  genesis@31-stage           tokens 3264  cost 4504   (genesis #1151)
+#   FAIL  genesis@32-stage           tokens 3313  cost 4593
+#   PASS  genesis@23-stage           tokens 2898  cost 3818
+#   PASS  root current     23 stages tokens 3436  cost 4356
+#   PASS  orchestrator     18 stages tokens 3431  cost 4151
+# The edge cliff is bracketed (4368, 4423]; files with a measured cliff get a
+# tight per-file HARD, others get the genesis-fail floor. This is a heuristic
+# ratchet on KNOWN cliffs, not a compiler — the only true gate is a real CPS
+# compile (future work); when the hook blocks, believe it.
+STAGES_COST_WARN = 4100
+STAGES_COST_HARD_DEFAULT = 4500
+STAGES_COST_HARD_PER_FILE = {
+    # path-suffix → HARD (measured cliff bracket for this file)
+    "elohim/holochain/Jenkinsfile": 4400,
+}
+STAGES_COST_STAGE_WEIGHT = 40
 
 
-def stages_block_size(text: str, start: int, end: int) -> dict | None:
-    """Size of the single top-level `stages { ... }` block inside the pipeline.
-    This whole block compiles into the declarative stage-model CPS method —
-    the one the per-script/per-def checks structurally cannot see."""
-    m = re.search(r"\bstages\s*\{", text)
-    if not m or m.start() < start or m.end() > end:
+def clean_groovy(text: str) -> str:
+    """Strip comments; neutralize string-literal CONTENT while keeping GString
+    ${...} interpolation regions verbatim (they compile to real bytecode;
+    plain string bytes are constant-pool entries and cost ~nothing)."""
+    out = []
+    i, n = 0, len(text)
+    mode = None  # None | 'line' | 'block' | ("str", quote, triple, gstring)
+    while i < n:
+        c = text[i]
+        nxt2 = text[i:i + 2]
+        nxt3 = text[i:i + 3]
+        if mode is None:
+            if nxt2 == "//":
+                mode = "line"
+                i += 2
+                continue
+            if nxt2 == "/*":
+                mode = "block"
+                i += 2
+                continue
+            if nxt3 in ("'''", '"""'):
+                mode = ("str", c, True, c == '"')
+                out.append(c * 3)
+                i += 3
+                continue
+            if c in "'\"":
+                mode = ("str", c, False, c == '"')
+                out.append(c)
+                i += 1
+                continue
+            out.append(c)
+            i += 1
+            continue
+        if mode == "line":
+            if c == "\n":
+                mode = None
+                out.append(c)
+            i += 1
+            continue
+        if mode == "block":
+            if nxt2 == "*/":
+                mode = None
+                i += 2
+            else:
+                i += 1
+            continue
+        _, quote, triple, gstring = mode
+        if c == "\\" and not triple:
+            i += 2
+            continue
+        if gstring and nxt2 == "${":
+            depth = 0
+            j = i + 1
+            while j < n:
+                if text[j] == "{":
+                    depth += 1
+                elif text[j] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                j += 1
+            out.append(text[i:j + 1])
+            i = j + 1
+            continue
+        if triple and nxt3 == quote * 3:
+            out.append(quote * 3)
+            mode = None
+            i += 3
+            continue
+        if not triple and c == quote:
+            out.append(quote)
+            mode = None
+            i += 1
+            continue
+        if c == "\n":
+            out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def stages_model_cost(raw_text: str) -> dict | None:
+    """Calibrated bytecode-cost proxy for the declarative stage-model CPS
+    method. Works on CLEANED text (comments/string-contents removed) so brace
+    matching is immune to braces inside strings and the measure tracks code,
+    not prose."""
+    cleaned = clean_groovy(raw_text)
+    m = re.search(r"^pipeline\s*\{", cleaned, re.MULTILINE)
+    if not m:
         return None
-    open_pos = m.end() - 1
+    p_open = cleaned.find("{", m.start())
     depth = 0
-    for i in range(open_pos, end + 1):
-        if text[i] == "{":
+    p_close = None
+    for i in range(p_open, len(cleaned)):
+        if cleaned[i] == "{":
             depth += 1
-        elif text[i] == "}":
+        elif cleaned[i] == "}":
             depth -= 1
             if depth == 0:
-                return {"size": i - open_pos + 1,
-                        "line": text[:open_pos].count("\n") + 1,
-                        "stages": len(re.findall(r"\bstage\s*\(", text[open_pos:i]))}
+                p_close = i
+                break
+    if p_close is None:
+        return None
+    sm = re.search(r"\bstages\s*\{", cleaned[p_open:p_close + 1])
+    if not sm:
+        return None
+    s_open = p_open + sm.end() - 1
+    depth = 0
+    for i in range(s_open, p_close + 1):
+        if cleaned[i] == "{":
+            depth += 1
+        elif cleaned[i] == "}":
+            depth -= 1
+            if depth == 0:
+                seg = cleaned[s_open:i + 1]
+                stages = len(re.findall(r"\bstage\s*\(", seg))
+                tokens = len(re.findall(r"\w+|[^\s\w]", seg))
+                return {
+                    "stages": stages,
+                    "tokens": tokens,
+                    "cost": tokens + STAGES_COST_STAGE_WEIGHT * stages,
+                    "line": cleaned[:s_open].count("\n") + 1,
+                }
     return None
+
+
+def stages_cost_hard(file_path: str) -> int:
+    for suffix, hard in STAGES_COST_HARD_PER_FILE.items():
+        if file_path.endswith(suffix):
+            return hard
+    return STAGES_COST_HARD_DEFAULT
 
 
 def find_pipeline_block(text: str) -> tuple[int, int] | None:
@@ -183,15 +311,8 @@ def script_thresholds(file_path: str) -> tuple[int, int]:
     return SCRIPT_DEFAULT
 
 
-def main() -> int:
-    try:
-        payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
-        return 0
-
-    tool_input = payload.get("tool_input") or {}
-    file_path = tool_input.get("file_path") or ""
-
+def check_file(file_path: str) -> int:
+    """Run all four checks on one Jenkinsfile. Returns 0 pass, 2 HARD fail."""
     if "Jenkinsfile" not in Path(file_path).name:
         return 0
 
@@ -209,24 +330,26 @@ def main() -> int:
     scripts = script_block_sizes(text, start, end)
     largest_script = scripts[0] if scripts else None
     largest_def = largest_def_body(text, start)
-    stages = stages_block_size(text, start, end)
+    stages = stages_model_cost(text)
     s_warn, s_hard = script_thresholds(file_path)
+    st_hard = stages_cost_hard(file_path)
 
     # Decide verdict — failure on any of the FOUR checks.
     # Per-script is the dominant in-pipeline signal (each is its own CPS
     # method, per-file calibrated); total catches maps of inline closures;
     # per-def catches the top-level helper bodies the first two structurally
     # cannot see (the unit is the single def — NEVER the region aggregate);
-    # stages{} catches the declarative stage-model method (stage COUNT × wiring)
-    # that none of the other three can see — the genesis #1146-#1151 breach.
+    # stages-model COST catches the declarative stage-model method (code
+    # tokens + stage wiring — NOT count, NOT string bytes) that none of the
+    # other three can see — the genesis #1151 AND edge #1134 breaches.
     total_fail = total_size >= TOTAL_HARD
     total_warn = total_size >= TOTAL_WARN
     script_fail = largest_script is not None and largest_script["size"] >= s_hard
     script_warn = largest_script is not None and largest_script["size"] >= s_warn
     def_fail = largest_def is not None and largest_def["size"] >= DEF_HARD
     def_warn = largest_def is not None and largest_def["size"] >= DEF_WARN
-    stages_fail = stages is not None and stages["stages"] >= STAGES_COUNT_HARD
-    stages_warn = stages is not None and stages["stages"] >= STAGES_COUNT_WARN
+    stages_fail = stages is not None and stages["cost"] >= st_hard
+    stages_warn = stages is not None and stages["cost"] >= STAGES_COST_WARN
 
     if total_fail or script_fail or def_fail or stages_fail:
         msg = [f"\n❌ {file_path}: Jenkinsfile method-size HARD limit exceeded"]
@@ -250,13 +373,18 @@ def main() -> int:
             )
         if stages_fail:
             msg.append(
-                f"   • declarative stages {{}}: {stages['stages']} stages "
-                f"({stages['size']}B) at line {stages['line']} "
-                f"(HARD {STAGES_COUNT_HARD} stages — genesis broke at 31-32, "
-                f"___cps___21136 #1151; holochain compiles at 18, root at 23). "
-                f"The stage-model CPS method is too large: merge adjacent stages "
-                f"to ≤23, simplify each when{{}} to ONE precomputed flag, or move "
-                f"stage bodies into a shared library."
+                f"   • declarative stages {{}} model cost: {stages['cost']} "
+                f"({stages['tokens']} code tokens + {STAGES_COST_STAGE_WEIGHT}×"
+                f"{stages['stages']} stages) at line {stages['line']} "
+                f"(HARD {st_hard} for this file — edge #1134 broke at 4423 with "
+                f"only 20 stages; genesis #1151 at 4504/31). The stage-model CPS "
+                f"method is at/over its measured 64KB-bytecode cliff: adding a "
+                f"stage is the most expensive move (~{STAGES_COST_STAGE_WEIGHT}+ "
+                f"units) — fold new steps into an existing stage's script block "
+                f"(call a top-level def), merge adjacent stages, simplify when{{}} "
+                f"to one precomputed flag, or move bodies to scripts/ci/*.sh. "
+                f"String/heredoc bytes are constant-pool-cheap — moving them "
+                f"does NOT buy stage headroom."
             )
         msg.append(
             "   Each `script { }` body, each top-level `def`, AND the "
@@ -273,7 +401,7 @@ def main() -> int:
         print("\n".join(msg), file=sys.stderr)
         return 2
 
-    if total_warn or script_warn or def_warn:
+    if total_warn or script_warn or def_warn or stages_warn:
         msg = [f"\n⚠️  {file_path}: Jenkinsfile method-size WARN"]
         if total_warn:
             msg.append(
@@ -293,6 +421,15 @@ def main() -> int:
                 f"comment-stripped bytes at line {ld['line']} "
                 f"(WARN {DEF_WARN}, HARD {DEF_HARD})"
             )
+        if stages_warn:
+            msg.append(
+                f"   • declarative stages {{}} model cost: {stages['cost']} "
+                f"({stages['tokens']} tokens + {STAGES_COST_STAGE_WEIGHT}×"
+                f"{stages['stages']} stages; WARN {STAGES_COST_WARN}, HARD "
+                f"{st_hard} for this file) — near the stage-model bytecode "
+                f"cliff: do NOT add a stage without dieting first (fold steps "
+                f"into an existing stage's script block instead)."
+            )
         msg.append(
             "   Split early: small script blocks + small defs; bash bodies "
             "to scripts/ci/*.sh."
@@ -301,6 +438,27 @@ def main() -> int:
         return 0
 
     return 0
+
+
+def main() -> int:
+    # ARGV mode (pre-push gate / standalone): explicit file paths, no stdin.
+    # `python3 jenkinsfile-method-size.py <Jenkinsfile> [...]` — exits 2 if
+    # ANY file trips a HARD limit. Never touches stdin (a bare invocation
+    # inside command chains must not hang waiting for hook JSON).
+    if len(sys.argv) > 1:
+        worst = 0
+        for arg in sys.argv[1:]:
+            worst = max(worst, check_file(arg))
+        return worst
+
+    # PostToolUse mode: hook JSON on stdin.
+    try:
+        payload = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        return 0
+    tool_input = payload.get("tool_input") or {}
+    file_path = tool_input.get("file_path") or ""
+    return check_file(file_path)
 
 
 if __name__ == "__main__":
