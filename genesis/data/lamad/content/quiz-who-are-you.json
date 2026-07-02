@@ -1,6 +1,7 @@
 {
   "id": "quiz-who-are-you",
   "contentType": "assessment",
+  "reach": "commons",
   "title": "Find Your Path in the Protocol",
   "description": "A brief quiz to help you discover which epic domain resonates with you",
   "content": [
