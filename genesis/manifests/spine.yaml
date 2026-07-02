@@ -1,0 +1,163 @@
+# spine.yaml — the delivery spine: arc-level invariants, each bound to a runnable check.
+#
+# WHY THIS EXISTS (2026-07-02, operator directive): cohesion was stored in prose
+# (240+ specs/plans, memory files, backlogs) which requires a strong reader every
+# session — the selection problem, not the work, is what sessions fail at. The
+# spine inverts control: these nodes are the INTERFACES; specs/plans/memories are
+# commentary hanging off them; sessions are interchangeable implementations of
+# "make the top red green"; CI + the convergence loop is the composition root.
+# Sibling of cluster-state.yaml (declared substrate capability) — this file is
+# declared delivery truth. Read by .claude/scripts/spine-status.py, which emits
+# the session-start headline.
+#
+# THE COVENANT (anti-pile admission control):
+#   1. Max 12 nodes. A candidate node must displace one or wait.
+#   2. status: green | red | unwired.
+#      - red    = a runnable check EXISTS and fails → this is schedulable work.
+#      - unwired = no runnable check yet → NOT schedulable; its ONLY legal first
+#        move is writing the red (see first_move). Prose specs do not advance it.
+#   3. Max 2 nodes flagged active: true (the WIP fence). Finishing beats starting.
+#   4. Status flips require evidence (build #, live probe, test run) — never edit
+#      status from memory or intention.
+#   5. New specs/plans should cite the spine node they serve; a plan that serves
+#      no node is a candidate for held/, not for writing.
+#   6. Session contract: (a) move reds toward green with proof, (b) file new reds
+#      as runnable checks, (c) one-line delta here. Nothing else is a deliverable.
+version: 1
+updated: 2026-07-02
+vision: >
+  A p2p backplane for a socially resilient, reach-gated substrate — a human-scale,
+  capture-resistant foundation for communication that can scale to global
+  coordination. Every guarantee constitutive, none opt-in.
+
+nodes:
+  - id: dataplane-convergence
+    invariant: >
+      Serving-critical content state converges peer-to-peer; no per-host
+      imperative write is load-bearing. A peer that missed a deploy heals.
+    status: green
+    active: false
+    checks:
+      - "a2o @concern:federation-deploy (genesis/a2o/features/dataplane/federation-deploy.feature)"
+      - "a2o @concern:content-sync, @concern:blob-replication, @concern:peer-mesh, @concern:epr-projection-fallback, @concern:reconcile-inventory (edge Dataplane Validation stage)"
+      - "cargo test --test sync_libp2p_convergence (elohim/elohim-storage)"
+    evidence: >
+      edge #1135 2026-07-02: four standing-red concerns flipped green; elohim.host
+      200 with blobHash converged from matthew (zero manual PATCH); 1838 lib tests.
+    guard: >
+      Regression risk = the fleet-safety invariants in sync/projector.rs
+      (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach
+      gate, amber set-to-set) — all pinned by lib tests.
+
+  - id: blob-durability
+    invariant: >
+      Blob bytes survive peer loss and churn: custody commitments honored,
+      RS-quilt placement household-diverse, salvage re-places without data loss.
+    status: red
+    active: true
+    checks:
+      - "a2o @concern:blob-durability — 8 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
+    evidence: "edge #1133 AND #1135: 0 passed / 19 failed / 1 pending — standing red, unchanged by the convergence arc."
+    refs:
+      - "genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md"
+      - "memory: project_dataplane_next_lens_diversity_placement (1a+1b landed; prod join dormant)"
+
+  - id: notary-authority
+    invariant: >
+      Converged state can be notarized: green tier is reachable for any content
+      (HEAD-DAG declare_content_head, reach re-certified at republish, author
+      signatures). Authority answers come from the notary, never from LWW order.
+    status: unwired
+    active: true
+    first_move: >
+      Write the red: a2o @concern:notary-authority — re-staged content reaches
+      trust=notarized on every federation peer; a non-author cannot move HEAD.
+      (Plan C1-C5 exists; the scenario is what makes it schedulable.)
+    refs:
+      - "genesis/docs/superpowers/specs/2026-07-01-crdt-authoritative-content-state-dht-notary-decouple-design.md"
+      - "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md"
+
+  - id: reach-enforced-everywhere
+    invariant: >
+      One reach vocabulary; receiver-side pre-authorization at EVERY egress plane
+      (DHT, CRDT sync, shard, HTTP, doorway). Scoped tiers flow only to
+      authorized receivers — enforcement, not exclusion.
+    status: unwired
+    active: false
+    first_move: >
+      Write the reds: one scenario per egress plane asserting a scoped-tier row
+      does NOT reach an unauthorized peer/client. Start with the CRDT sync plane
+      (today: broadcast-only fail-closed gate = exclusion, not enforcement —
+      reach_is_distribution_safe in sync/projector.rs) and the HTTP path
+      (backlog: http-reach-enforcement-gap).
+    refs:
+      - "genesis/data/timeline/backlog/http-reach-enforcement-gap.md"
+      - "memory: project_reach_enum_drift_reconciliation (3 vocabularies — unify first)"
+
+  - id: identity-cross-signed
+    invariant: >
+      Agent-to-transport identity bindings are cross-signed and verifiable; no
+      economic attribution rides a self-asserted binding.
+    status: unwired
+    active: false
+    first_move: >
+      Write the red: a test asserting AgentPeerBinding signature verification
+      rejects STAGE1_SIGNATURE_SENTINEL outside dev mode, plus a sweettest for
+      the cross-signing ceremony. Unblocks the transport-identity resolver spec.
+    refs:
+      - "genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md"
+      - "elohim/elohim-storage/CLAUDE.md — Identity & Transport-Identity Coherence (open security item)"
+
+  - id: operator-runtime-surface
+    invariant: >
+      Any peer operator can inspect a runtime, restart, reseed, and trigger
+      reconciliation as commitment-gated protocol verbs — with peer-local
+      telemetry served by the peer itself. The dev surface and the operator
+      OS-settings surface are the same surface.
+    status: unwired
+    active: false
+    first_move: >
+      Write the red: a2o scenario — an operator holding a delegates-compute
+      commitment requests a restart/backfill on a peer via the doorway; the peer
+      executes and attests; a caller WITHOUT the commitment is refused. (Kills
+      the kubectl-only class: restart-doorway-epr.sh; also the adam-invisibility
+      class — peers unobservable except through our cluster's Loki.)
+    refs:
+      - "task #10 (operator directive 2026-07-02)"
+      - "memory: project_rea_compute_commitment_primitive (delegates-compute displaces X-API-Key)"
+      - "task #7 (adam has zero Loki streams — the symmetry gap, live)"
+
+  - id: declarative-desired-state
+    invariant: >
+      Peers reconcile signed desired-state (images, config, seeds) the way
+      coordinators hot-swap: a version bump converges every peer without
+      imperative cluster surgery. CI builds and publishes; it does not deploy.
+    status: unwired
+    active: false
+    first_move: >
+      Write the red: scenario — bump a signed release manifest; every peer
+      converges (image + config) with no kubectl in the path; a peer that was
+      down converges on wake. (In-protocol precedent: happ_manager::
+      sync_coordinators. Endgame direction: the substrate as filesystem —
+      EPR heads riding files (brit metadata plane → elohimfs/FUSE projection);
+      park until this node is green.)
+    refs:
+      - "memory: project_brit_next_gen_epr_meta_foundation"
+      - "elohim/holochain/Jenkinsfile — ALLOW_COORDINATOR_UPDATE hot-swap (the model)"
+
+  - id: sync-scale-honesty
+    invariant: >
+      The sync plane's cost is sub-quadratic and measured: announce-on-change
+      (not poll-only), head-diff transfer, healthy request-response to every
+      mesh peer, recursion (CoverageRollup) doing cross-scope aggregation.
+    status: unwired
+    active: false
+    first_move: >
+      Write the red: a mesh-scale check — N peers, M docs, bounded
+      requests-per-round assertion (bench_sync_perf.rs is the seed harness);
+      plus task #9 (persistent sync-request timeouts from 3 peers) as a named
+      health scenario. AnnounceChange currently has NO send site — the 60s poll
+      is the only propagation.
+    refs:
+      - "task #9 (sync-timeout peers: 12D3KooWNguL…/GPmV…/Rnj3…)"
+      - "memory: project_weave_epic_arc (CoverageRollup built, unconsumed)"

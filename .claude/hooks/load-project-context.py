@@ -77,6 +77,22 @@ def get_memory_budget(project_dir: str) -> str:
         return ""
 
 
+def get_spine_status(project_dir: str) -> str:
+    """Delivery-spine headline (deterministic; from spine-status.py --headline).
+    The spine (genesis/manifests/spine.yaml) is the session's selection surface:
+    open on the top red contract instead of re-synthesizing the corpus."""
+    import subprocess
+    spine = os.path.join(project_dir, '.claude', 'scripts', 'spine-status.py')
+    if not os.path.exists(spine):
+        return ""
+    try:
+        r = subprocess.run([sys.executable, spine, '--headline'],
+                           capture_output=True, text=True, timeout=10)
+        return r.stdout.strip()
+    except Exception:
+        return ""
+
+
 def main():
     try:
         # Read hook input from stdin
@@ -98,6 +114,13 @@ def main():
         budget = get_memory_budget(project_dir)
         if budget:
             context_parts.append(budget)
+            context_parts.append("")
+
+        # Delivery spine — the selection surface (top red contract) that makes
+        # session start a selection problem, not a synthesis problem.
+        spine = get_spine_status(project_dir)
+        if spine:
+            context_parts.append(spine)
             context_parts.append("")
 
         # Add schema summary

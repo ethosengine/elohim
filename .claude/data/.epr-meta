@@ -1,0 +1,37 @@
+---
+epr-meta-version: 1
+id: claude-data-ledgers-governance
+covers: subtree
+purpose: >
+  Deterministic ledgers and cursors owned by hooks, sentinels, and harvesters —
+  machine-written, append-mostly (ci-findings.jsonl, deprecations.jsonl,
+  ci-cursor.json, dev-intent.jsonl, runtime-findings.jsonl and kin). NOT a
+  document store: prose analyses, RCAs, handoffs, and readiness notes that are
+  born here never get reconciled into canon (the context-leak-runaway class,
+  operator-flagged 2026-07-02 — eleven loose conductor-leak-*.md siblings are
+  the scar tissue).
+rules:
+  - id: route-prose-to-canon
+    class: ask
+    when: { write: "*.md", new: true }
+    route-to: { dest: genesis/data/timeline/backlog/ }
+    why: >
+      .claude/data is for machine-owned ledgers (*.jsonl, *.json), not prose.
+      A concern/RCA/analysis doc belongs in genesis/data/timeline/backlog/
+      (timeline-CONVENTIONS-conformant, status-carrying); a design belongs in
+      genesis/docs/superpowers/specs|plans/ (born with cites:); a resolved
+      investigation graduates to genesis/docs/content/elohim-protocol/history/;
+      a session handoff's durable facts belong in memory files or as commentary
+      citing a spine node (genesis/manifests/spine.yaml). If none of those fit,
+      that is usually the signal the content is conversation-scoped — let it go.
+---
+
+# .claude/data — deterministic ledgers, not a document store
+
+Machine-written accumulator files (JSONL ledgers, JSON cursors, locks) that the
+flag→agent→canon→stasis automation reads and writes. New ledger files for new
+sentinels are legitimate births. Prose `.md` files are not: they are the
+memory-dump drift wearing a data-directory costume, and every one that lands
+here bypasses the reconciliation rails (decompose, cites, timeline status).
+The `ask` at birth routes them to a canon home while the context still exists
+to place them correctly.
