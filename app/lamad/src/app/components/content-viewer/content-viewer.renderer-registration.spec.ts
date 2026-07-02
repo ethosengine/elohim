@@ -25,7 +25,7 @@ import {
   LAMAD_GOVERNANCE,
 } from '../../interfaces/cross-pillar.interface';
 import { LAMAD_AGENT } from '../../interfaces/agent.interface';
-import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
+import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
 import { ResilienceService as LibResilienceService } from '@elohim/service/public-api';
 import { GovernanceApiService } from '@elohim/service';
 import { AttentionTrackerService, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
@@ -70,6 +70,7 @@ describe('ContentViewerComponent — renderer registration (standalone route)', 
         { provide: LAMAD_EPR_RESOLVER, useValue: {} },
         { provide: LAMAD_EPR_NAV, useValue: {} },
         { provide: LAMAD_STORAGE_CLIENT, useValue: {} },
+        { provide: LAMAD_STORAGE_API, useValue: {} },
         { provide: LibResilienceService, useValue: {} },
         { provide: GovernanceApiService, useValue: {} },
         { provide: AttentionTrackerService, useValue: {} },

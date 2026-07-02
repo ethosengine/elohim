@@ -30,6 +30,17 @@ import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '../../interfaces/storag
 import { vi, Mock } from 'vitest';
 import { AttentionTrackerService, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
 import { GovernanceApiService } from '@elohim/service';
+import { EPR_RESOLUTION_PROVIDER } from '@app/elohim/providers/epr-resolution.provider';
+
+// EprRelationshipsPanelComponent renders one <app-epr-relationship-card> per
+// relationship (mock LAMAD_EPR_RESOLVER below supplies one), which resolves
+// through the ambient EprResolutionProvider (I2) — stub it so structural
+// assertions stay network-free (mirrors elohim-app's e25f2766a fix).
+const mockEprResolution = {
+  resolveHead: vi.fn().mockResolvedValue({ state: 'missing' }),
+  resolveRoute: vi.fn().mockReturnValue(null),
+  resolveBody: vi.fn().mockResolvedValue({ state: 'missing' }),
+};
 
 // Mock the shared exploration sidebar. The standalone content-viewer delegates
 // its primary relation surface (mini-graph + related concepts + explore button)
@@ -253,6 +264,7 @@ describe('ContentViewerComponent', () => {
           },
         },
         { provide: LAMAD_STORAGE_API, useValue: storageApiSpyObj },
+        { provide: EPR_RESOLUTION_PROVIDER, useValue: mockEprResolution },
         { provide: LAMAD_AFFINITY_TRACKING, useValue: affinitySpyObj },
         { provide: LAMAD_AGENT, useValue: agentSpyObj },
         { provide: ContentService, useValue: contentSpyObj },
