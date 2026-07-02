@@ -6,7 +6,7 @@
     "prestart": "pnpm --filter @elohim/storage-client build && bash scripts/fetch-fonts.sh && pnpm run build:sw && pnpm run build:wasm",
     "prebuild": "pnpm --filter @elohim/storage-client build && bash scripts/check-sophia.sh && bash scripts/fetch-fonts.sh && pnpm run build:sw && pnpm run build:wasm",
     "build:sw": "esbuild src/apps-sw.ts --bundle --outfile=src/assets/apps-sw.js --format=iife --target=es2020",
-    "build:wasm": "cd ../../elohim/elohim-cache-core && RUSTFLAGS='' wasm-pack build --target web --release",
+    "build:wasm": "bash scripts/build-wasm.sh",
     "build:sophia": "cd ../sophia && pnpm install && pnpm build && pnpm build:umd",
     "start": "ng serve --proxy-config proxy.conf.mjs --disable-host-check",
     "start:alpha": "ng serve --proxy-config proxy.conf.alpha.mjs --disable-host-check",
