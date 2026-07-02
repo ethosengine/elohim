@@ -18,7 +18,22 @@
     "dogfood",
     "html5-app"
   ],
-  "relatedNodeIds": [],
+  "relatedNodeIds": [
+    "manifesto",
+    "elohim-protocol",
+    "quiz-who-are-you",
+    "evolution-of-trust",
+    "lamad-reference-implementation",
+    "concept-path-forward-policymakers",
+    "concept-path-forward-developers",
+    "concept-path-forward-communities",
+    "value-scanner-epic",
+    "autonomous-entity-epic",
+    "governance-epic",
+    "social-medium-epic",
+    "economic-coordination-epic",
+    "public-observer-epic"
+  ],
   "metadata": {
     "category": "protocol-surface",
     "author": "Matthew Dowell",

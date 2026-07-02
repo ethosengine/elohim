@@ -1,46 +1,42 @@
-<section class="section">
+<section class="section" data-testid="landing-ways-in">
   <div class="section-content">
-    <h2>Learning from Successful Models</h2>
+    <h2>Find your way in</h2>
+    <p>
+      Learning here is an invitation, not a threat — you're as welcome to read one page as to
+      steward a node. The patterns underneath aren't utopian dreams but proven ones: Scandinavian
+      transparency, indigenous restorative justice that heals rather than punishes, and
+      intergenerational thinking that weighs the generations to come — encoded into the substrate
+      rather than left to good intentions.
+    </p>
 
+    <h3>Start here</h3>
+    <p>
+      The onboarding path begins with the manifesto and fans out into every epic. If you read one
+      thing, read this.
+    </p>
+    <div class="start-here">
+      <app-epr-relationship-card [relationship]="startHere"></app-epr-relationship-card>
+    </div>
+
+    <h3>Or find your own door</h3>
     <div class="card-grid">
-      <div class="card">
-        <h3>The Scandinavian Insight</h3>
-        <p>
-          Nordic countries demonstrate that high-trust societies are possible through transparency
-          that makes manipulation visible, safety nets that reduce zero-sum competition, cultural
-          antibodies against antisocial behavior, and economic structures that don't reward
-          exploitation.
-        </p>
-      </div>
-      <div class="card">
-        <h3>Indigenous Wisdom</h3>
-        <p>
-          Many indigenous cultures maintain communal harmony through restorative justice that heals
-          rather than punishes, collective stewardship of shared resources, and sacred relationship
-          with the commons.
-        </p>
-      </div>
-      <div class="card">
-        <h3>Intergenerational Thinking</h3>
-        <p>
-          Both traditions emphasize decision-making that considers impact on future generations,
-          creating sustainable systems that protect rather than exploit human vulnerability.
-        </p>
-      </div>
-      <div class="card">
-        <h3>Engineering Specifications</h3>
-        <p>
-          These aren't utopian dreams—they're proven patterns that can be encoded into digital
-          infrastructure. We have blueprints for building technology that supports rather than
-          undermines human flourishing.
-        </p>
-      </div>
+      @for (way of otherWays; track way.rel.target) {
+        <div class="way-in">
+          <p class="way-in__hint">{{ way.hint }}</p>
+          <app-epr-relationship-card
+            [attr.data-testid]="way.testid ?? null"
+            [relationship]="way.rel"
+          ></app-epr-relationship-card>
+        </div>
+      }
     </div>
 
     <p>
-      These principles must be encoded into our digital infrastructure: transparency as immune
-      system, economic alignment that rewards cooperation, and governance systems that cultivate
-      civic virtue rather than extracting from human connection.
+      Rather wander?
+      <a href="/lamad" data-testid="landing-wayin-browse">Browse everything in the library</a>
+      , or
+      <a href="/lamad/explore">explore the map</a>
+      .
     </p>
   </div>
 </section>

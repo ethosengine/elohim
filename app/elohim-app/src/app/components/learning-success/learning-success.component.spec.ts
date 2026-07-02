@@ -1,6 +1,18 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
+import { of } from 'rxjs';
+
+import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import { ResilienceService } from '@app/lamad/services/resilience.service';
+
 import { LearningSuccessComponent } from './learning-success.component';
+
+// Embedded epr-relationship-card resolves live heads at runtime; stub the
+// resolver + resilience services so structural assertions stay network-free.
+const resolverStub = { resolve: () => of(null) };
+const resilienceStub = { getContentResilience: () => of(null) };
 
 describe('LearningSuccessComponent', () => {
   let component: LearningSuccessComponent;
@@ -9,6 +21,12 @@ describe('LearningSuccessComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [LearningSuccessComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: EprResolverService, useValue: resolverStub },
+        { provide: ResilienceService, useValue: resilienceStub },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(LearningSuccessComponent);
@@ -20,37 +38,34 @@ describe('LearningSuccessComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should render the main heading', () => {
+  it('should render the "find your way in" heading', () => {
     const compiled = fixture.nativeElement;
     const heading = compiled.querySelector('h2');
     expect(heading).toBeTruthy();
-    expect(heading.textContent).toBe('Learning from Successful Models');
+    expect(heading.textContent).toBe('Find your way in');
   });
 
-  it('should render card grid with four cards', () => {
+  it('should carry the ways-in testid on the section', () => {
     const compiled = fixture.nativeElement;
-    const grid = compiled.querySelector('.card-grid');
-    expect(grid).toBeTruthy();
-
-    const cards = compiled.querySelectorAll('.card');
-    expect(cards.length).toBe(4);
+    const section = compiled.querySelector('[data-testid="landing-ways-in"]');
+    expect(section).toBeTruthy();
   });
 
-  it('should render all card headings', () => {
+  it('should offer the self-router quiz and trust-explorable doors', () => {
     const compiled = fixture.nativeElement;
-    const cardHeadings = compiled.querySelectorAll('.card h3');
-    expect(cardHeadings.length).toBe(4);
-
-    const headingTexts = Array.from(cardHeadings).map(h => (h as HTMLElement).textContent);
-    expect(headingTexts).toContain('The Scandinavian Insight');
-    expect(headingTexts).toContain('Indigenous Wisdom');
-    expect(headingTexts).toContain('Intergenerational Thinking');
-    expect(headingTexts).toContain('Engineering Specifications');
+    expect(compiled.querySelector('[data-testid="landing-wayin-quiz"]')).toBeTruthy();
+    expect(compiled.querySelector('[data-testid="landing-wayin-trust"]')).toBeTruthy();
   });
 
-  it('should render closing paragraph', () => {
+  it('should link into /lamad as a plain cross-bundle href', () => {
     const compiled = fixture.nativeElement;
-    const paragraphs = compiled.querySelectorAll('p');
-    expect(paragraphs.length).toBeGreaterThan(0);
+    const browse = compiled.querySelector('[data-testid="landing-wayin-browse"]');
+    expect(browse).toBeTruthy();
+    expect(browse.getAttribute('href')).toBe('/lamad');
+  });
+
+  it('should fold in proven-pattern sources including restorative justice', () => {
+    const compiled = fixture.nativeElement;
+    expect(compiled.textContent).toContain('restorative justice');
   });
 });

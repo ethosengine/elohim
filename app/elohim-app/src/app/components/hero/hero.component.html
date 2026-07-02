@@ -1,4 +1,4 @@
-<section class="hero">
+<section class="hero" data-testid="landing-hero">
   <div class="hero-content">
     <div class="content-container">
       <div class="logo-section" [class.hidden]="isVideoVisible || isDeepDiveVisible">
@@ -7,16 +7,25 @@
         </div>
         <h1>Elohim Protocol</h1>
         <p class="hero-subtitle">
-          Digital guardians for human flourishing. Technology organized around love.
+          Technology organized around love — digital infrastructure for human flourishing.
         </p>
-        <button
-          type="button"
-          class="listen-button"
-          (click)="toggleVideo()"
-          data-testid="hero-play-button"
-        >
-          Play to Learn
-        </button>
+        <div class="hero-cta">
+          <a
+            href="/epr/elohim-protocol"
+            class="cta-button hero-cta-primary"
+            data-testid="landing-cta-start"
+          >
+            Start the journey
+          </a>
+          <button
+            type="button"
+            class="listen-button hero-cta-secondary"
+            (click)="toggleDeepDive()"
+            data-testid="hero-play-button"
+          >
+            Watch the vision · 50 min, no code
+          </button>
+        </div>
       </div>
 
       <div class="video-section intro-video" [class.visible]="isVideoVisible">

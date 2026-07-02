@@ -1,6 +1,19 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
+import { of } from 'rxjs';
+
+import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import { ResilienceService } from '@app/lamad/services/resilience.service';
+
 import { VisionComponent } from './vision.component';
+
+// The embedded epr-relationship-card resolves live heads at runtime; in unit
+// tests we stub the resolver + resilience services so the structural assertions
+// (testids, counts, glosses) don't depend on the network.
+const resolverStub = { resolve: () => of(null) };
+const resilienceStub = { getContentResilience: () => of(null) };
 
 describe('VisionComponent', () => {
   let component: VisionComponent;
@@ -9,6 +22,12 @@ describe('VisionComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [VisionComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: EprResolverService, useValue: resolverStub },
+        { provide: ResilienceService, useValue: resilienceStub },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(VisionComponent);
@@ -20,37 +39,34 @@ describe('VisionComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should render the main heading', () => {
+  it('should render the "what is already here" heading', () => {
     const compiled = fixture.nativeElement;
     const heading = compiled.querySelector('h2');
     expect(heading).toBeTruthy();
-    expect(heading.textContent).toBe('The Vision Realized');
+    expect(heading.textContent).toBe("What's already here");
   });
 
-  it('should render vision grid with multiple items', () => {
+  it('should render the seven pillar glosses under the pillars testid', () => {
     const compiled = fixture.nativeElement;
-    const grid = compiled.querySelector('.vision-grid');
-    expect(grid).toBeTruthy();
+    const pillars = compiled.querySelector('[data-testid="landing-pillars"]');
+    expect(pillars).toBeTruthy();
 
-    const items = compiled.querySelectorAll('.vision-item');
-    expect(items.length).toBe(8);
+    const items = pillars.querySelectorAll('.vision-item');
+    expect(items.length).toBe(7);
+
+    const text = pillars.textContent;
+    expect(text).toContain('imagodei');
+    expect(text).toContain('mishpat');
+    expect(text).toContain('doorway');
   });
 
-  it('should render key vision statements', () => {
+  it('should render the six epic story cards', () => {
     const compiled = fixture.nativeElement;
-    const items = compiled.querySelectorAll('.vision-item');
-    const itemTexts = Array.from(items).map(item => (item as HTMLElement).textContent ?? '');
+    const container = compiled.querySelector('[data-testid="landing-epic-cards"]');
+    expect(container).toBeTruthy();
 
-    expect(itemTexts.some((text: string) => text.includes('Technology serves love'))).toBe(true);
-    expect(itemTexts.some((text: string) => text.includes('Communities self-govern'))).toBe(true);
-    expect(itemTexts.some((text: string) => text.includes('Dark patterns are impossible'))).toBe(
-      true
-    );
-  });
-
-  it('should render introductory and closing paragraphs', () => {
-    const compiled = fixture.nativeElement;
-    const paragraphs = compiled.querySelectorAll('p');
-    expect(paragraphs.length).toBe(2);
+    const cards = compiled.querySelectorAll('[data-testid="landing-epic-card"]');
+    expect(cards.length).toBe(6);
+    expect(component.epics.length).toBe(6);
   });
 });

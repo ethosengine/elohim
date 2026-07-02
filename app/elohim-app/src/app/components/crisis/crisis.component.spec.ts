@@ -20,39 +20,40 @@ describe('CrisisComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should render the main heading', () => {
+  it('should render the concrete grandma-trade heading', () => {
     const compiled = fixture.nativeElement;
     const heading = compiled.querySelector('h2');
     expect(heading).toBeTruthy();
-    expect(heading.textContent).toBe('The Architectural Crisis');
+    expect(heading.textContent).toBe('What Grandma Is Trading');
   });
 
-  it('should render three subsection headings', () => {
+  it('should carry the story-arc testid on the section', () => {
     const compiled = fixture.nativeElement;
-    const headings = compiled.querySelectorAll('h3');
-    expect(headings.length).toBe(3);
-    expect(headings[0].textContent).toContain('Economic Architecture');
-    expect(headings[1].textContent).toContain('Collective Intelligence Architecture');
-    expect(headings[2].textContent).toContain('Digital Architecture');
+    const section = compiled.querySelector('[data-testid="landing-story-arc"]');
+    expect(section).toBeTruthy();
   });
 
-  it('should render vision grids with items', () => {
+  it('should render four diagnosis cards', () => {
     const compiled = fixture.nativeElement;
-    const grids = compiled.querySelectorAll('.vision-grid');
-    expect(grids.length).toBe(3);
+    const grid = compiled.querySelector('.card-grid');
+    expect(grid).toBeTruthy();
 
-    const items = compiled.querySelectorAll('.vision-item');
-    expect(items.length).toBeGreaterThan(0);
+    const cards = compiled.querySelectorAll('.card');
+    expect(cards.length).toBe(4);
   });
 
-  it('should render quotes with authors', () => {
+  it('should keep the Edward O. Wilson quote', () => {
     const compiled = fixture.nativeElement;
     const quotes = compiled.querySelectorAll('.quote');
-    expect(quotes.length).toBe(2);
+    expect(quotes.length).toBe(1);
 
     const authors = compiled.querySelectorAll('.quote-author');
-    expect(authors.length).toBe(2);
+    expect(authors.length).toBe(1);
     expect(authors[0].textContent).toContain('Edward O. Wilson');
-    expect(authors[1].textContent).toContain('Marshall McLuhan');
+  });
+
+  it('should explicitly reject self-sovereign identity as the fix', () => {
+    const compiled = fixture.nativeElement;
+    expect(compiled.textContent).toContain('not solved by self-sovereign identity');
   });
 });
