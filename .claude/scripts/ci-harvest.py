@@ -59,6 +59,13 @@ SHALLOW_INIT = 5  # first run: look back this many builds, never full history
 MAX_BUILDS_PER_JOB = 10  # per harvest run
 MAX_NEW_FINDINGS = 12  # ledger appends per run (per-build console findings also capped)
 MAX_CONSOLE_FINDINGS_PER_BUILD = 4
+
+# bash `set -x` trace lines are COMMAND ECHOES, not output — a tool-name token
+# in the taxonomy must never match them (edge #1137: four `+ nerdctl … rmi`
+# echoes of a SUCCEEDING cleanup step burned the whole console-findings budget
+# while the one real rmi failure in the same tail went uncaptured; backlog
+# ci-harvest-nerdctl-cleanup-echo-overcapture).
+_CMD_ECHO = re.compile(r"^\s*\+ ")
 MAX_FAILED_TESTS_PER_BUILD = 8
 CONSOLE_TAIL = 60_000  # bytes of console tail to classify
 HTTP_TIMEOUT = 8
@@ -189,6 +196,8 @@ def collect_build_findings(job, build, taxonomy):
             seen_lines = set()
             for name, _pipes, rx, _mx in cats:
                 for line in tail.splitlines():
+                    if _CMD_ECHO.match(line):
+                        continue  # set -x echo — a command, not a failure
                     if rx.search(line):
                         norm = normalize(line)
                         if norm and norm not in seen_lines:
