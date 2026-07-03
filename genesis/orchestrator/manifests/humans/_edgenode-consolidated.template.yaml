@@ -285,6 +285,19 @@ spec:
             # without enabling re-key reinstalls.
             - name: ALLOW_DNA_REINSTALL
               value: "ALLOW_DNA_REINSTALL_PLACEHOLDER"
+            # Gate for the deterministic /admin/seed/shard-manifest lever
+            # (elohim-storage/src/http.rs, seed_shard_manifest.rs) — writes a
+            # shard manifest + agent-keyed shard_locations for blob-backed
+            # content WITHOUT waiting on full P2P gossip, so the blob-durability
+            # a2o suite + the resilience card's "stewarding" column can light
+            # deterministically on household-nodes. Off (403) by default so a
+            # real deployment can never fabricate distribution; rows it writes
+            # are stamped status="seeded" (never confused with runtime
+            # distribute_shards rows). Same per-env rendering as
+            # ALLOW_DNA_REINSTALL: true for alpha/staging (ephemeral,
+            # test/demo-seeded), false for prod.
+            - name: ALLOW_SEED_SHARD_MANIFEST
+              value: "ALLOW_SEED_SHARD_MANIFEST_PLACEHOLDER"
             - name: ENABLE_IMPORT_API
               value: "true"
             - name: ENABLE_CONTENT_DB
