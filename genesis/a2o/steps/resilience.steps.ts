@@ -237,8 +237,10 @@ Given(
 );
 
 /**
- * Ensure a given content item has been distributed to at least N households, then
- * verify (a `Given` precondition, so ensure-semantics is correct — not a bare read-assert).
+ * Ensure a given content item has been distributed to at least N households
+ * (a `Given`-precondition helper, so ensure-semantics is correct — not a bare
+ * read-assert). Shared by every "stewarded by N households" flavor of Given
+ * step below, so the honesty-gated seeding logic lives in exactly one place.
  *
  * Root cause (2026-07-03, blob-durability/genesis 73x fingerprint): content-alpha is
  * normally ingested inline-markdown (no blobHash) which never enters distribute_shards,
@@ -250,7 +252,69 @@ Given(
  * manifest for ... stewarded by N distinct households" below. Honesty-gated: a
  * disabled lever (403) or too few identity-healed households skips (pending)
  * rather than false-passing or false-failing.
- *
+ */
+async function ensureStewardedByHouseholds(
+  world: E2EWorld,
+  contentId: string,
+  minHouseholds: number
+): Promise<string | undefined> {
+  world.contentIds.set('lastContentId', contentId);
+
+  // 1. Idempotent: honor real distribution (live mesh / prior seed) if present.
+  let snap = await storageGet(`/api/v1/resilience/${contentId}/household`);
+  if (((snap['stewardingCollectives'] as number) ?? 0) >= minHouseholds) {
+    return undefined;
+  }
+
+  // 2. Deterministic lever, honesty-gated (ALLOW_SEED_SHARD_MANIFEST). Off → 403 →
+  // clean HELD skip, not a false-fail against a mesh that was never asked to distribute.
+  const probe = await storagePut('/admin/seed/shard-manifest', {});
+  if (probe.statusCode === 403) {
+    return 'pending';
+  }
+
+  // 3. One steward agent_pub_key per distinct household (identity-healed by
+  // seed-provide-rows.ts / POST /api/v1/identity/heal).
+  const humans = (await storageGet('/db/humans')) as unknown as Record<string, unknown>[];
+  const byHousehold = new Map<string, string>();
+  for (const h of humans) {
+    const hh = h['householdId'] as string | undefined;
+    const key = h['agentPubKey'] as string | undefined;
+    if (hh && key && !byHousehold.has(hh)) {
+      byHousehold.set(hh, key);
+    }
+  }
+  const stewards = [...byHousehold.values()].slice(0, minHouseholds);
+  if (stewards.length < minHouseholds) {
+    // Not enough seeded/identity-healed households — a precondition gap, not
+    // a code failure. Skip (pending), same as the shard-manifest lever step.
+    return 'pending';
+  }
+
+  // 4. Seed the manifest + agent-keyed shard_locations deterministically.
+  const { statusCode, json } = await storagePut('/admin/seed/shard-manifest', {
+    contentId,
+    reach: world.contentIds.get('lastContentReach') ?? 'commons',
+    blobHash: `sha256-seed-${contentId}`,
+    stewards,
+    totalSizeBytes: 4096,
+  });
+  assert.ok(
+    statusCode < 300,
+    `seed shard-manifest failed for "${contentId}": ${statusCode} ${JSON.stringify(json)}`
+  );
+
+  // 5. Verify.
+  snap = await storageGet(`/api/v1/resilience/${contentId}/household`);
+  const actual = (snap['stewardingCollectives'] as number) ?? 0;
+  assert.ok(
+    actual >= minHouseholds,
+    `"${contentId}" is stewarded by ${actual} households; expected ≥${minHouseholds}.`
+  );
+  return undefined;
+}
+
+/**
  * Example:
  *   Given "content-alpha" has been distributed to at least 2 households
  */
@@ -261,58 +325,163 @@ Given(
     contentId: string,
     minHouseholds: number
   ): Promise<string | undefined> {
-    // 1. Idempotent: honor real distribution (live mesh / prior seed) if present.
-    let snap = await storageGet(`/api/v1/resilience/${contentId}/household`);
-    if (((snap['stewardingCollectives'] as number) ?? 0) >= minHouseholds) {
-      return undefined;
-    }
+    return ensureStewardedByHouseholds(this, contentId, minHouseholds);
+  }
+);
 
-    // 2. Deterministic lever, honesty-gated (ALLOW_SEED_SHARD_MANIFEST). Off → 403 →
-    // clean HELD skip, not a false-fail against a mesh that was never asked to distribute.
-    const probe = await storagePut('/admin/seed/shard-manifest', {});
-    if (probe.statusCode === 403) {
+/**
+ * Short form of the ensure-step above — no per-household commitment clause.
+ *
+ * Example:
+ *   Given a content item "summer-1974" stewarded by 3 distinct households
+ */
+Given(
+  'a content item {string} stewarded by {int} distinct households',
+  async function (
+    this: E2EWorld,
+    contentId: string,
+    minHouseholds: number
+  ): Promise<string | undefined> {
+    return ensureStewardedByHouseholds(this, contentId, minHouseholds);
+  }
+);
+
+/**
+ * Short-protection variant — the "needs-help" felt state requires <=1 household
+ * holding the content, so this targets exactly the floor of the ensure-helper.
+ *
+ * Example:
+ *   Given a content item "wedding-album" stewarded by only 1 household
+ */
+Given(
+  'a content item {string} stewarded by only {int} household',
+  async function (
+    this: E2EWorld,
+    contentId: string,
+    minHouseholds: number
+  ): Promise<string | undefined> {
+    return ensureStewardedByHouseholds(this, contentId, minHouseholds);
+  }
+);
+
+/**
+ * Full form: ensures distribution to N households AND that the reach is set so
+ * commitment-backing (household_resilience.rs's content::reach-scoped
+ * `commitmentBackedCollectives` join) is checkable. No HTTP lever fabricates
+ * `rea_commitments` rows the way `/admin/seed/shard-manifest` fabricates
+ * shard_locations — so this step honors real seeded commitments if present and
+ * skips (pending) rather than claim commitment-backing that isn't real.
+ *
+ * Example:
+ *   Given a content item "summer-1974" stewarded by 3 distinct households each with an active "intimate" provide commitment
+ */
+Given(
+  'a content item {string} stewarded by {int} distinct households each with an active {string} provide commitment',
+  async function (
+    this: E2EWorld,
+    contentId: string,
+    minHouseholds: number,
+    reach: string
+  ): Promise<string | undefined> {
+    this.contentIds.set('lastContentReach', reach);
+    const distributed = await ensureStewardedByHouseholds(this, contentId, minHouseholds);
+    if (distributed === 'pending') {
       return 'pending';
     }
-
-    // 3. One steward agent_pub_key per distinct household (identity-healed by
-    // seed-provide-rows.ts / POST /api/v1/identity/heal).
-    const humans = (await storageGet('/db/humans')) as unknown as Record<string, unknown>[];
-    const byHousehold = new Map<string, string>();
-    for (const h of humans) {
-      const hh = h['householdId'] as string | undefined;
-      const key = h['agentPubKey'] as string | undefined;
-      if (hh && key && !byHousehold.has(hh)) {
-        byHousehold.set(hh, key);
-      }
-    }
-    const stewards = [...byHousehold.values()].slice(0, minHouseholds);
-    if (stewards.length < minHouseholds) {
-      // Not enough seeded/identity-healed households — a precondition gap, not
-      // a code failure. Skip (pending), same as the shard-manifest lever step.
+    const snap = await storageGet(`/api/v1/resilience/${contentId}/household`);
+    const backed = (snap['commitmentBackedCollectives'] as number) ?? 0;
+    if (backed < 1) {
       return 'pending';
     }
-
-    // 4. Seed the manifest + agent-keyed shard_locations deterministically.
-    const { statusCode, json } = await storagePut('/admin/seed/shard-manifest', {
-      contentId,
-      reach: this.contentIds.get('lastContentReach') ?? 'commons',
-      blobHash: `sha256-seed-${contentId}`,
-      stewards,
-      totalSizeBytes: 4096,
-    });
-    assert.ok(
-      statusCode < 300,
-      `seed shard-manifest failed for "${contentId}": ${statusCode} ${JSON.stringify(json)}`
-    );
-
-    // 5. Verify.
-    snap = await storageGet(`/api/v1/resilience/${contentId}/household`);
-    const actual = (snap['stewardingCollectives'] as number) ?? 0;
-    assert.ok(
-      actual >= minHouseholds,
-      `"${contentId}" is stewarded by ${actual} households; expected ≥${minHouseholds}.`
-    );
     return undefined;
+  }
+);
+
+/**
+ * Verify every stewarding household on the last-known content item carries a
+ * human-readable collective label ("names, not nines"). Reads
+ * details.stewardingCollectives[].label off the live snapshot — the same
+ * collectives.name join household_resilience.rs::snapshot() performs.
+ *
+ * Example:
+ *   Given each stewarding household has a human-readable collective name
+ */
+Given(
+  'each stewarding household has a human-readable collective name',
+  async function (this: E2EWorld) {
+    const contentId = this.contentIds.get('lastContentId');
+    assert.ok(contentId, 'No content id on the world — run a "stewarded by" step first');
+    const snap = await storageGet(`/api/v1/resilience/${contentId}/household`);
+    const details = (snap['details'] as Record<string, unknown> | undefined) ?? {};
+    const entries =
+      (details['stewardingCollectives'] as Record<string, unknown>[] | undefined) ?? [];
+    assert.ok(entries.length > 0, `No stewarding collectives found for "${contentId}"`);
+    for (const entry of entries) {
+      const label = entry['label'];
+      assert.ok(
+        typeof label === 'string' && label.trim().length > 0,
+        `Expected every stewarding household to have a human-readable label; got: ${JSON.stringify(entry)}`
+      );
+    }
+  }
+);
+
+/**
+ * Narrative bridge — grandma's edge node going offline does not itself change
+ * any resilience-projection row: `feltStatus` is computed from steward-
+ * household rows (shard_locations) and placement gaps, not any single peer's
+ * live/offline signal. The chaos proof that "K-of-N shards survive a household
+ * loss" lives in the Rust integration suite
+ * (elohim-storage/tests/chaos_dataplane.rs) and P-PROOFS' chaos-peer-churn
+ * feature; this HTTP-level a2o suite couples that proof to the felt surface by
+ * reading the SAME steward-household state the chaos proof already exercises.
+ * No action needed here — the step exists so the scenario reads naturally.
+ *
+ * Example:
+ *   When grandma's edge node goes offline
+ */
+When("grandma's edge node goes offline", async function (this: E2EWorld) {
+  // Intentional no-op — see doc comment above.
+});
+
+/**
+ * Ensure a placement-gap row exists for the content id (a household stopped
+ * holding a shard). No HTTP lever synthesizes a `placement_gaps` row — unlike
+ * the shard-manifest seed lever, those rows are written only by the runtime
+ * P2P reconcile path (`p2p/mod.rs`) when it genuinely detects a lapsed holder.
+ * Honor a real gap if one is already present; otherwise skip (pending) rather
+ * than fabricate a chaos event this HTTP-level suite cannot genuinely trigger.
+ *
+ * Example:
+ *   Given a placement-gap event has fired for "summer-1974" because one household stopped holding a shard
+ */
+Given(
+  'a placement-gap event has fired for {string} because one household stopped holding a shard',
+  async function (this: E2EWorld, contentId: string): Promise<string | undefined> {
+    const data = await storageGet(
+      `/api/v1/placement-gaps?contentId=${encodeURIComponent(contentId)}`
+    );
+    const items = (data['items'] as unknown[]) ?? [];
+    if (items.length === 0) {
+      return 'pending';
+    }
+    return undefined;
+  }
+);
+
+/**
+ * Ensure a content item exists but has never entered the distribution plane —
+ * the inverse precondition of the "stewarded by" steps. Plain inline-markdown
+ * ingest (no blobHash) never enters distribute_shards, so distributionState
+ * honestly reads "unmeasured" regardless of reach.
+ *
+ * Example:
+ *   Given a content item "private-letters" that has never entered the distribution plane
+ */
+Given(
+  'a content item {string} that has never entered the distribution plane',
+  async function (this: E2EWorld, contentId: string) {
+    await ingestInlineContent(this, 'intimate', contentId);
   }
 );
 
@@ -356,6 +525,30 @@ Given(
 // ---------------------------------------------------------------------------
 
 /**
+ * POST a minimal inline-markdown content item to elohim-storage. Shared by "I
+ * ingest a {string}-reach content item {string}" and any Given step that needs
+ * plain (never-blob-backed) content as a precondition — inline-body content
+ * carries no blobHash, so it never enters distribute_shards.
+ */
+async function ingestInlineContent(
+  world: E2EWorld,
+  reach: string,
+  contentId: string
+): Promise<void> {
+  const payload = {
+    id: contentId,
+    contentType: 'concept',
+    contentFormat: 'markdown',
+    reach,
+    title: contentId,
+    content: `# ${contentId}\n\nA test content item for resilience placement validation.`,
+  };
+  await storagePostContent(payload);
+  world.contentIds.set('lastContentId', contentId);
+  world.contentIds.set('lastContentReach', reach);
+}
+
+/**
  * POST a minimal content item to elohim-storage for placement testing.
  *
  * Example:
@@ -364,19 +557,17 @@ Given(
 When(
   'I ingest a {string}-reach content item {string}',
   async function (this: E2EWorld, reach: string, contentId: string) {
-    const payload = {
-      id: contentId,
-      contentType: 'concept',
-      contentFormat: 'markdown',
-      reach,
-      title: contentId,
-      content: `# ${contentId}\n\nA test content item for resilience placement validation.`,
-    };
-    await storagePostContent(payload);
-    this.contentIds.set('lastContentId', contentId);
-    this.contentIds.set('lastContentReach', reach);
+    await ingestInlineContent(this, reach, contentId);
   }
 );
+
+/**
+ * Shared @wip stub behind both content-viewer step spellings (see below) — one
+ * behavior, two cucumber expressions.
+ */
+async function openContentViewerStub(_contentId: string): Promise<string> {
+  return 'pending';
+}
 
 /**
  * Open the content-viewer page for a given content ID (@wip — requires Playwright).
@@ -384,8 +575,21 @@ When(
  * Example:
  *   When I open the content-viewer for "content-alpha"
  */
-When('I open the content-viewer for {string}', async function (this: E2EWorld, _contentId: string) {
-  return 'pending';
+When('I open the content-viewer for {string}', async function (this: E2EWorld, contentId: string) {
+  return openContentViewerStub(contentId);
+});
+
+/**
+ * Space-spelling alias of "I open the content-viewer for {string}" — 3
+ * scenarios (observable-distribution.feature, resilience-dimensions.feature)
+ * write "content viewer" (no hyphen). Delegates to the same stub so there is
+ * exactly one behavior behind both cucumber expressions.
+ *
+ * Example:
+ *   When I open the content viewer for "dim-pair"
+ */
+When('I open the content viewer for {string}', async function (this: E2EWorld, contentId: string) {
+  return openContentViewerStub(contentId);
 });
 
 /**
@@ -1475,3 +1679,204 @@ Then(
     );
   }
 );
+
+/**
+ * Numeric-literal sibling of "the response field {string} is {string}" — same
+ * readPath + equality pattern, comparing against a bare `{int}` rather than a
+ * quoted string. Guards with `typeof actual === 'number'` for consistency with
+ * "...is at least {int}" above.
+ *
+ * Example:
+ *   And the response field "stewardingCollectives" is 0
+ */
+Then(
+  'the response field {string} is {int}',
+  function (this: E2EWorld, fieldName: string, expected: number) {
+    const data = loadResponse(this);
+    const actual = readPath(data, fieldName);
+    assert.ok(
+      typeof actual === 'number' && actual === expected,
+      `Expected "${fieldName}" to be ${expected}; got: ${String(actual)}`
+    );
+  }
+);
+
+/**
+ * Assert a (possibly dotted) string field in the last stored response is NOT a
+ * given value — the negated sibling of "the response field {string} is {string}".
+ *
+ * Example:
+ *   And the response field "feltStatus.reassurance" is not "at-risk"
+ */
+Then(
+  'the response field {string} is not {string}',
+  function (this: E2EWorld, fieldName: string, unexpected: string) {
+    const data = loadResponse(this);
+    const actual = readPath(data, fieldName);
+    assert.notEqual(
+      String(actual),
+      unexpected,
+      `Expected "${fieldName}" to not be "${unexpected}"; got: "${String(actual)}"`
+    );
+  }
+);
+
+/**
+ * Assert a (possibly dotted) string field in the last stored response contains
+ * a substring.
+ *
+ * Example:
+ *   And the response field "feltStatus.headline" contains "still"
+ */
+Then(
+  'the response field {string} contains {string}',
+  function (this: E2EWorld, fieldName: string, expected: string) {
+    const data = loadResponse(this);
+    const actual = readPath(data, fieldName);
+    assert.ok(
+      typeof actual === 'string' && actual.includes(expected),
+      `Expected "${fieldName}" to contain "${expected}"; got: ${JSON.stringify(actual)}`
+    );
+  }
+);
+
+/**
+ * Assert a (possibly dotted) string field in the last stored response matches
+ * a regular expression, given as a string pattern.
+ *
+ * Example:
+ *   And the response field "feltStatus.headline" matches "^Held by 3 households: "
+ */
+Then(
+  'the response field {string} matches {string}',
+  function (this: E2EWorld, fieldName: string, pattern: string) {
+    const data = loadResponse(this);
+    const actual = readPath(data, fieldName);
+    const re = new RegExp(pattern);
+    assert.ok(
+      typeof actual === 'string' && re.test(actual),
+      `Expected "${fieldName}" to match /${pattern}/; got: ${JSON.stringify(actual)}`
+    );
+  }
+);
+
+/**
+ * Assert every entry in an array field (possibly dotted path) has a non-empty
+ * string subfield — e.g. every held-by collective carries a display label.
+ *
+ * Example:
+ *   And every "feltStatus.heldBy" entry has a non-empty "label"
+ */
+Then(
+  'every {string} entry has a non-empty {string}',
+  function (this: E2EWorld, arrayPath: string, subField: string) {
+    const data = loadResponse(this);
+    const items = readPath(data, arrayPath);
+    assert.ok(
+      Array.isArray(items),
+      `Expected "${arrayPath}" to be an array; got: ${JSON.stringify(items)}`
+    );
+    assert.ok((items as unknown[]).length > 0, `Expected "${arrayPath}" to be non-empty`);
+    for (const item of items as Record<string, unknown>[]) {
+      const value = item[subField];
+      assert.ok(
+        typeof value === 'string' && value.trim().length > 0,
+        `Expected every "${arrayPath}" entry to have a non-empty "${subField}"; got: ${JSON.stringify(item)}`
+      );
+    }
+  }
+);
+
+/**
+ * Assert a (possibly dotted) string field does not read a faceless SLA
+ * percentage ("99.9%" style) — the felt surface names households, not nines.
+ * Bounded \d{1,3} to avoid super-linear backtracking on adversarial input.
+ *
+ * Example:
+ *   And the response does not contain a faceless SLA percentage in "feltStatus.headline"
+ */
+Then(
+  'the response does not contain a faceless SLA percentage in {string}',
+  function (this: E2EWorld, fieldName: string) {
+    const data = loadResponse(this);
+    const actual = readPath(data, fieldName);
+    assert.ok(
+      typeof actual === 'string',
+      `Expected "${fieldName}" to be a string; got: ${JSON.stringify(actual)}`
+    );
+    assert.ok(
+      !/\d{1,3}(\.\d{1,3})?%/.test(actual),
+      `Expected "${fieldName}" to avoid a faceless SLA percentage; got: "${actual}"`
+    );
+  }
+);
+
+/**
+ * Assert a named verdict value does not appear anywhere inside an object field
+ * (possibly dotted path) — e.g. no "at-risk" reassurance hiding inside feltStatus
+ * while the family is told "still safe". Stringifies the sub-object and checks
+ * for the JSON-quoted verdict literal, so it catches the value regardless of
+ * which key it landed on.
+ *
+ * Example:
+ *   And no red "at-risk" verdict is shown in "feltStatus"
+ */
+Then(
+  'no red {string} verdict is shown in {string}',
+  function (this: E2EWorld, verdict: string, objectPath: string) {
+    const data = loadResponse(this);
+    const obj = readPath(data, objectPath);
+    assert.ok(
+      obj !== undefined && obj !== null && typeof obj === 'object',
+      `Expected "${objectPath}" to be an object; got: ${JSON.stringify(obj)}`
+    );
+    const json = JSON.stringify(obj);
+    assert.ok(
+      !json.includes(`"${verdict}"`),
+      `Expected no red "${verdict}" verdict within "${objectPath}"; got: ${json}`
+    );
+  }
+);
+
+/**
+ * GET a path from a NAMED doorway (not the elohim-storage backend) and store
+ * the response for follow-up Then steps — the doorway-qualified sibling of
+ * "I request {string}" (delivery.steps.ts:124, which always reads the FIRST
+ * registered doorway). Resilience scenarios exercise a specific doorway's own
+ * surface (e.g. /health for peerCount), so this resolves by id via
+ * this.getDoorway rather than assuming a single doorway.
+ *
+ * Example:
+ *   When I request "/health" on doorway "alpha"
+ */
+When(
+  'I request {string} on doorway {string}',
+  async function (this: E2EWorld, path: string, doorwayId: string) {
+    const doorway = this.getDoorway(doorwayId);
+    const { statusCode, body } = await request(`${doorway.url}${path}`);
+    const text = await body.text();
+    assert.equal(
+      statusCode,
+      200,
+      `GET ${path} on doorway "${doorwayId}" failed: ${statusCode} ${text}`
+    );
+    storeResponse(this, JSON.parse(text) as Record<string, unknown>);
+  }
+);
+
+/**
+ * Assert a (possibly dotted) numeric field in the last stored response is
+ * present and non-negative — e.g. the doorway /health peerCount, which is
+ * always known (>=0) even with zero connected peers.
+ *
+ * Example:
+ *   Then the response reports a non-negative "peerCount"
+ */
+Then('the response reports a non-negative {string}', function (this: E2EWorld, fieldName: string) {
+  const data = loadResponse(this);
+  const actual = readPath(data, fieldName);
+  assert.ok(
+    typeof actual === 'number' && actual >= 0,
+    `Expected "${fieldName}" to be a non-negative number; got: ${JSON.stringify(actual)}`
+  );
+});
