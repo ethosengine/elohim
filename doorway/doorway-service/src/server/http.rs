@@ -238,6 +238,16 @@ pub struct AppState {
     /// `degenerateRate` and `avgWallMs`. Always present (zeroed until first render).
     pub render_trace_stats: Arc<elohim_render::RenderTraceStats>,
 
+    /// SSR render-failure circuit breaker. After `FAILURE_THRESHOLD` consecutive
+    /// render errors it OPENS for a cooldown window: `serve_ssr_route` skips the
+    /// V8 diversion entirely and serves the fallback tagged
+    /// `x-ssr-skipped: error-backoff`, so a systemic render failure (e.g. a
+    /// server bundle the runtime cannot load) degrades to today's projected-bundle
+    /// serving at full speed instead of taxing every request with a doomed render
+    /// first. A single successful render closes it. One global breaker matches the
+    /// one-renderer reality — see `crate::render::breaker`.
+    pub ssr_render_breaker: crate::render::breaker::SsrRenderBreaker,
+
     /// Self-hostable pkarr relay service (cutover gate #10).
     /// When `Some`, serves `GET /pkarr/{key}` and `PUT /pkarr/{key}`.
     /// Enabled via `DOORWAY_PKARR_RESOLVER_ENABLED=true`.
@@ -525,6 +535,7 @@ impl AppState {
             warmup_state: None,
             renderer: init_renderer(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
+            ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
@@ -630,6 +641,7 @@ impl AppState {
             warmup_state: None,
             renderer: init_renderer(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
+            ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
@@ -750,6 +762,7 @@ impl AppState {
             warmup_state: None,
             renderer: init_renderer(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
+            ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
@@ -873,6 +886,7 @@ impl AppState {
             warmup_state: None,
             renderer: init_renderer(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
+            ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
@@ -2813,6 +2827,9 @@ enum SsrFallbackReason {
     SpecParseError,
     RendererAbsent,
     RenderError(String),
+    /// The render-failure circuit breaker is OPEN — SSR was skipped BEFORE any
+    /// render was attempted (no doomed-render tax during a systemic outage).
+    ErrorBackoff,
 }
 
 impl SsrFallbackReason {
@@ -2823,6 +2840,7 @@ impl SsrFallbackReason {
             SsrFallbackReason::SpecParseError => "spec-parse-error",
             SsrFallbackReason::RendererAbsent => "renderer-absent",
             SsrFallbackReason::RenderError(_) => "render-error",
+            SsrFallbackReason::ErrorBackoff => "error-backoff",
         }
     }
 }
@@ -2871,6 +2889,10 @@ async fn ssr_fallback_response(
             SsrFallbackReason::Overflow => {
                 ssr_spa_shell_fallback_with_skip_reason(Some("overflow"), Some(chrome_context_json))
             }
+            SsrFallbackReason::ErrorBackoff => ssr_spa_shell_fallback_with_skip_reason(
+                Some("error-backoff"),
+                Some(chrome_context_json),
+            ),
             SsrFallbackReason::RenderError(err) => {
                 ssr_spa_shell_fallback_with_error(&err, Some(chrome_context_json))
             }
@@ -2933,6 +2955,26 @@ async fn serve_ssr_route(
     // ONCE (authoritative slug + authenticated flag from this request). Both the
     // SSR serve and every fallback splice this identical island.
     let chrome_context_json = build_chrome_context_json(path, &req);
+
+    // Render-failure circuit breaker (FIRST gate, cheapest + most protective):
+    // after FAILURE_THRESHOLD consecutive render errors the breaker is OPEN, so
+    // we skip the V8 diversion entirely and serve the fallback tagged
+    // x-ssr-skipped: error-backoff — instead of each request burning a doomed
+    // render first (the un-cached-failure TTFB balloon during a systemic outage,
+    // e.g. a server bundle the runtime cannot load). A single successful render
+    // closes it. See `crate::render::breaker`.
+    if state.ssr_render_breaker.is_open() {
+        return ssr_fallback_response(
+            state,
+            req,
+            path,
+            &endpoint,
+            &chrome_context_json,
+            fallback,
+            SsrFallbackReason::ErrorBackoff,
+        )
+        .await;
+    }
 
     // Auth-mode enforcement: if the doorway publishes a render_capability claim
     // and the request's posture isn't in the claim's auth_modes, fall back with
@@ -3077,6 +3119,9 @@ async fn serve_ssr_route(
         };
         return match renderer.render(ctx).await {
             Ok(mut out) => {
+                // A successful render closes the failure breaker (resets the
+                // consecutive-error count).
+                state.ssr_render_breaker.record_success();
                 // Stamp the correlation token onto the trace so the header + Loki
                 // line join browser ↔ doorway ↔ peer.
                 if let Some(obs) = observation_id {
@@ -3115,6 +3160,21 @@ async fn serve_ssr_route(
             }
             Err(e) => {
                 let err_str = format!("{e}");
+                // Record the failure; a `true` return is the trip transition —
+                // emit ONE warn when the breaker OPENS, not one per subsequent
+                // skipped request (those are silent; ongoing failures still show
+                // via the per-render warn below on each half-open trial).
+                if state.ssr_render_breaker.record_failure() {
+                    tracing::warn!(
+                        target: "doorway::ssr",
+                        path = %path,
+                        threshold = crate::render::breaker::FAILURE_THRESHOLD,
+                        cooldown_ms = crate::render::breaker::COOLDOWN_MS,
+                        error = %err_str,
+                        "SSR render breaker OPEN — skipping SSR for the cooldown window \
+                         (subsequent skips are silent)"
+                    );
+                }
                 tracing::warn!(
                     target: "doorway::ssr",
                     path = %path,
@@ -5391,6 +5451,10 @@ mod ssr_session_tests {
         assert_eq!(
             SsrFallbackReason::RenderError("boom".to_string()).as_skip_str(),
             "render-error"
+        );
+        assert_eq!(
+            SsrFallbackReason::ErrorBackoff.as_skip_str(),
+            "error-backoff"
         );
     }
 

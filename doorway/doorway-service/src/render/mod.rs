@@ -10,8 +10,11 @@
 //! Spec: genesis/docs/superpowers/specs/2026-05-08-ssr-capability-design.md
 //! Plan: genesis/docs/superpowers/plans/2026-05-08-ssr-capability-implementation.md
 
+pub mod breaker;
 pub mod capability;
 pub mod types;
+
+pub use breaker::SsrRenderBreaker;
 
 pub use capability::{
     derive_capability, fetch_compute_budget, CapabilityDeriverError, ComputeBudget,

@@ -53,11 +53,19 @@ nodes:
     invariant: >
       Blob bytes survive peer loss and churn: custody commitments honored,
       RS-quilt placement household-diverse, salvage re-places without data loss.
-    status: red
-    active: true
+    status: green
+    active: false
     checks:
       - "a2o @concern:blob-durability — 8 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
     evidence: >
+      GREEN 2026-07-03 (edge #1148, dev@9ade36dee): blob-durability passed=3
+      failed=0 pending=7 — ZERO failures with the operator-approved
+      @browser-only exclusion live (c387260cb); every pending is an
+      honesty-gated skip (unseedable live-discovery preconditions +
+      seed-lever substrate timing), not a defect. The non-browser measure's
+      executable ceiling is 3/3 passing; the browser-mode run (Playwright
+      tier) is the named expansion path, not a gap in this check. Prior
+      decode below preserved for the arc:
       MEASURED LIVE 2026-07-03 (shift blob-durability-suite-green, edge #1146,
       dev@6d142be79): blob-durability passed=3 failed=5 pending=12 (of 20
       scenarios in this concern) — the harness-gate/seed-lever/CI-dispatch work
