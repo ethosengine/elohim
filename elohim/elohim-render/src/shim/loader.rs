@@ -13,11 +13,18 @@
 //!
 //! - `crypto` / `node:crypto` -> the injected JS shim (`node_crypto.js`), which
 //!   is real for `createHash` and loud, named stubs for the rest.
-//! - any other `node:*` specifier, or a bare specifier in [`NODE_BUILTINS`] ->
-//!   a synthetic module whose evaluation throws a clear, named error. This
-//!   bounds the blast radius of an unhandled builtin: instead of a cryptic
-//!   resolve-time TypeError panic, the render fails with a message naming the
-//!   builtin and where to add a shim, and the request falls back safely.
+//! - any other builtin the bundle actually imports (served by
+//!   [`node_builtins::synthetic_module_source`]) -> a LINK-SAFE synthetic module
+//!   that carries every named export the bundle links against (each a loud stub, or a
+//!   real impl for the few members the render path invokes). This is the crux:
+//!   a NAMED import (`import { createRequire } from "node:module"`) fails at LINK
+//!   time -- before any body runs -- if the module lacks that export, so a
+//!   throw-only body is not enough; the export must EXIST and be loud when CALLED.
+//! - any OTHER `node:*` specifier or unlisted bare builtin (not in the bundle's
+//!   surface) -> a synthetic module whose evaluation throws a clear, named error.
+//!   This bounds the blast radius of a genuinely-new builtin: instead of a
+//!   cryptic resolve-time TypeError panic, the render fails with a message naming
+//!   the builtin and where to add a shim, and the request falls back safely.
 //! - everything else (relative chunks, the `file://` main module) -> delegated
 //!   unchanged to `FsModuleLoader`.
 
@@ -30,6 +37,7 @@ use deno_core::{
 };
 use deno_error::JsErrorBox;
 
+use crate::shim::node_builtins;
 use crate::shim::node_crypto::CRYPTO_SHIM_JS;
 
 /// URL scheme for the synthetic builtin-shim modules this loader serves.
@@ -158,19 +166,24 @@ impl ModuleLoader for NodeShimLoader {
             let name = module_specifier.path().to_string();
             let source = match name.as_str() {
                 "crypto" => Cow::Borrowed(CRYPTO_SHIM_JS),
-                other => {
+                other => match node_builtins::synthetic_module_source(other) {
+                    // A builtin the bundle actually imports -> a link-safe module
+                    // carrying its named exports (loud stubs / real members).
+                    Some(src) => Cow::Owned(src),
+                    // A genuinely-unknown builtin -> the loud whole-module throw.
                     // Log once per distinct builtin (load is called once per unique
-                    // module) so an unhandled builtin is visible in server logs, not
-                    // just the render trace.
-                    tracing::warn!(
-                        target: "elohim_render::shim",
-                        builtin = %other,
-                        "SSR bundle imported an unshimmed Node builtin; \
-                         serving a loud error module (add a shim in src/shim/ if \
-                         the render path needs it)"
-                    );
-                    Cow::Owned(unimplemented_builtin_module(other))
-                }
+                    // module) so it is visible in server logs, not just the trace.
+                    None => {
+                        tracing::warn!(
+                            target: "elohim_render::shim",
+                            builtin = %other,
+                            "SSR bundle imported an unshimmed Node builtin; \
+                             serving a loud error module (add it to \
+                             src/shim/node_builtins.rs if the render path needs it)"
+                        );
+                        Cow::Owned(unimplemented_builtin_module(other))
+                    }
+                },
             };
             let module = ModuleSource::new(
                 ModuleType::JavaScript,

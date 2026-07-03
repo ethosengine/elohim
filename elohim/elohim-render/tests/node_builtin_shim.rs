@@ -63,3 +63,177 @@ async fn unknown_node_builtin_is_loud_named_error_not_panic() {
         "must be the loud shim error, NOT the raw relative-import TypeError: {msg}"
     );
 }
+
+/// The link-safety keystone. Every synthetic builtin shim must carry the exact
+/// named exports the bundle links against, so a NAMED import
+/// (`import { createRequire } from "node:module"`) LINKS rather than dying at
+/// link time with "does not provide an export named 'createRequire'". The
+/// fixture named-imports the full surface across ~10 builtins; reaching its
+/// `render()` at all proves linking, and the returned string proves each
+/// member's behaviour (real vs loud).
+#[tokio::test]
+async fn named_imports_across_builtins_link_and_behave() {
+    let mut rt = JsRuntime::with_shims();
+    let out = rt
+        .render_via_module(&fixture("node-builtins-link.mjs"), "/x")
+        .await
+        .expect("the named-import surface must LINK (reaching render proves it)");
+
+    // module.createRequire is real and returns a require function...
+    assert!(
+        out.contains("createRequire-fn:true"),
+        "createRequire must return a function: {out}"
+    );
+    assert!(
+        out.contains("createRequireBare-fn:true"),
+        "bare `module` specifier links the same as `node:module`: {out}"
+    );
+    // ...whose require is loud-if-called (the render path must not sync-require).
+    assert!(
+        out.contains("require-loud:true"),
+        "the returned require must throw a named error when called: {out}"
+    );
+    // util.promisify and events.setMaxListeners are real.
+    assert!(
+        out.contains("promisify-fn:true"),
+        "promisify must return a function: {out}"
+    );
+    assert!(
+        out.contains("setMaxListeners-noop:true"),
+        "setMaxListeners must be a real no-op returning undefined: {out}"
+    );
+    // A loud stub throws a NAMED error (names the builtin + the member).
+    assert!(
+        out.contains("createServer-loud:true"),
+        "net.createServer must throw a loud, named error when called: {out}"
+    );
+    // The whole named surface links (all bindings defined).
+    assert!(
+        out.contains("all-present:true"),
+        "every named import must resolve to a defined binding: {out}"
+    );
+}
+
+/// The `node:module` createRequire path in isolation — the exact link failure
+/// the deployed bundle hit at `polyfills.server.mjs:1` (`import { createRequire }
+/// from 'node:module'`). This is the minimal reproduction: it must LINK, and the
+/// returned require must be a function that throws a named error on call.
+#[tokio::test]
+async fn node_module_createrequire_links_and_returns_loud_require() {
+    let mut rt = JsRuntime::with_shims();
+    let out = rt
+        .render_via_module(&fixture("node-builtins-link.mjs"), "/x")
+        .await
+        .expect("node:module createRequire named import must link");
+    assert!(out.contains("createRequire-fn:true"), "{out}");
+    assert!(out.contains("require-loud:true"), "{out}");
+}
+
+/// Local-only harness: render the REAL deployed Angular server bundle end-to-end
+/// through the production `AngularRenderer` path, to prove no Node-builtin link
+/// or call failure remains on the boot path. Ignored by default — it needs the
+/// deployed bundle unpacked on disk, which is NOT in the repo.
+///
+/// # Fetch recipe (read-only against the deployed alpha)
+///
+/// ```sh
+/// mkdir -p /tmp/claude-ssr-bundle && cd /tmp/claude-ssr-bundle
+/// # 1. resolve the server bundle blob hash from the landing content doc:
+/// HASH=$(curl -s https://doorway-alpha.elohim.host/db/content/elohim-host-landing \
+///   | python3 -c 'import sys,json;print(json.load(sys.stdin)["serverBlobHash"])')
+/// # 2. download + unzip the ~4.1MB server bundle (main.server.mjs + chunks):
+/// curl -s "https://doorway-alpha.elohim.host/blob/$HASH" -o server-bundle.zip
+/// mkdir -p bundle && cd bundle && unzip -oq ../server-bundle.zip
+/// ```
+///
+/// Then run:
+/// ```sh
+/// cd elohim/elohim-render && RUSTFLAGS="" CARGO_TARGET_DIR=/tmp/claude-render-target \
+///   cargo test --test node_builtin_shim renders_deployed_bundle -- --ignored --nocapture
+/// ```
+///
+/// Override the bundle location with `ELOHIM_RENDER_DEPLOYED_BUNDLE=/path/to/main.server.mjs`.
+#[tokio::test]
+#[ignore = "requires the deployed SSR bundle unpacked on disk (see fetch recipe in the doc comment)"]
+async fn renders_deployed_bundle_without_node_builtin_wall() {
+    use async_trait::async_trait;
+    use elohim_render::{
+        AngularRenderer, DataFetcher, FetchRequest, FetchResponse, RenderContext, RenderLimits,
+        RenderSpec, Renderer,
+    };
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    // A stub fetcher: every data fetch returns an empty-ish JSON object. A
+    // truthful-empty render still proves module linking + bootstrap.
+    struct StubFetcher;
+    #[async_trait]
+    impl DataFetcher for StubFetcher {
+        async fn fetch(&self, _req: FetchRequest) -> elohim_render::Result<FetchResponse> {
+            Ok(FetchResponse {
+                status: 200,
+                headers: HashMap::new(),
+                body: b"{}".to_vec(),
+                content_hash: None,
+            })
+        }
+    }
+
+    let bundle: PathBuf = std::env::var("ELOHIM_RENDER_DEPLOYED_BUNDLE")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("/tmp/claude-ssr-bundle/bundle/main.server.mjs"));
+
+    if !bundle.exists() {
+        eprintln!(
+            "deployed bundle not found at {} — skipping (see fetch recipe in the doc comment)",
+            bundle.display()
+        );
+        return;
+    }
+
+    let renderer = AngularRenderer::new(bundle, Arc::new(StubFetcher))
+        .expect("renderer init on deployed bundle");
+    let ctx = RenderContext {
+        spec: RenderSpec::AngularSsr,
+        url: "/".into(),
+        data_fetcher: Arc::new(StubFetcher),
+        limits: RenderLimits {
+            wall_time_ms: 120_000,
+            memory_mb: 1024,
+            max_fetches: 256,
+            max_output_bytes: 8 * 1024 * 1024,
+        },
+    };
+
+    match renderer.render(ctx).await {
+        Ok(out) => {
+            eprintln!(
+                "deployed bundle rendered: status={} html_len={}",
+                out.status,
+                out.html.len()
+            );
+            eprintln!("html head: {}", &out.html[..out.html.len().min(600)]);
+        }
+        Err(e) => {
+            let msg = format!("{e}");
+            // The success bar for this harness: whatever wall we hit, it must NOT
+            // be a Node-builtin link or "not implemented" failure. A data-shape or
+            // DOM-global wall AFTER linking is out of scope for the builtin shim.
+            assert!(
+                !msg.contains("does not provide an export named"),
+                "a Node-builtin NAMED import still fails to link: {msg}"
+            );
+            assert!(
+                !msg.contains("shim:") || !msg.contains("is not implemented"),
+                "a Node-builtin shim member was called on the boot path but is a loud \
+                 stub — implement it for real: {msg}"
+            );
+            assert!(
+                !msg.contains("not prefixed with"),
+                "a bare builtin still reaches FsModuleLoader (resolve gap): {msg}"
+            );
+            eprintln!("render hit a NON-builtin wall (acceptable for this harness): {msg}");
+        }
+    }
+}
