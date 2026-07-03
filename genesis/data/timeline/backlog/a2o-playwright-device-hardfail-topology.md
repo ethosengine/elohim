@@ -34,10 +34,15 @@ returning `'pending'` the way the rest of the resilience-suite's browser-gated s
 (e.g. `requirePlaywright` elsewhere per `genesis/a2o/CLAUDE.md` → "Guard:
 `requirePlaywright(this)` returns null in non-Playwright mode").
 
-Three `@concern:blob-durability` scenarios in `observable-distribution.feature` (not
-`@wip`, not `@browser-only`-tagged) go red for this reason every non-browser CI run:
-"Operator can see their household device cluster", "Peer-topology page aggregates by
-household, not by peer", "Doorway operator dashboard topology tab is reachable".
+Confirmed via edge #1145 (2026-07-03, first live run past the `E2E_STORAGE_URL` +
+`ALLOW_SEED_SHARD_MANIFEST` gates): **5** `@concern:blob-durability` scenarios (not 3 as
+originally estimated) go red for this reason every non-browser CI run — 4 in
+`observable-distribution.feature` ("Operator can see their household device cluster",
+"Peer-topology page aggregates by household, not by peer", "Reciprocity page shows
+inflow, outflow, and net hosting", "Doorway operator dashboard topology tab is
+reachable") plus 1 in `resilience.steps.ts`'s viewport-archetype step ("Resilience
+hypercard stays fully inside a phone viewport" — a distinct `assert.fail('No Playwright
+device found')` site, not `requirePwDevice` itself, but the same root cause).
 
 ## Why not fixed in the same shift
 
@@ -49,8 +54,19 @@ stage in playwright mode) is a scoped design decision, not a one-line mechanical
 
 ## Proposed next step
 
-Either (a) tag these 3 scenarios `@browser-only` (they genuinely need a rendered page)
+Either (a) tag these 5 scenarios `@browser-only` (they genuinely need a rendered page)
 so they cleanly HELD-skip on the non-browser `@dataplane` runner, or (b) make
 `topology.steps.ts`'s device-requirement helper return `'pending'` like the rest of the
 suite. (a) is safer/narrower; (b) is more broadly correct but needs auditing every
 other consumer of that helper first.
+
+**2026-07-03 follow-up:** (a) alone does NOT resolve this for the dataplane-validation
+job — confirmed `scripts/ci/run-dataplane-validation.sh`'s cucumber invocation uses
+`--tags '@dataplane and not @wip'`, which does not exclude `@browser-only`. The complete
+(a)-shaped fix is two parts together: tag the 5 scenarios `@browser-only` in the feature
+files, AND extend the `--tags` filter in `run-dataplane-validation.sh` to
+`'@dataplane and not @wip and not @browser-only'`. Deliberately left undone by the
+`blob-durability-suite-green` shift (2026-07-03) — changing the tag filter changes which
+scenarios the measure command's own report counts, which reads closer to a measure-scope
+decision than a mechanical fix; left for operator/next-shift judgment rather than made
+unilaterally overnight.
