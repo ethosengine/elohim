@@ -15,6 +15,13 @@
 # Env:
 #   WORKSPACE            Jenkins workspace root (default: git rev-parse --show-toplevel)
 #   E2E_DOORWAY_ALPHA    target doorway URL (default: https://doorway-alpha.elohim.host)
+#   E2E_STORAGE_URL       internal elohim-storage base URL for scenarios that talk to
+#                        storage directly (default: alpha's genesis peer, matthew —
+#                        mirrors genesis/scripts/ci/e2e-verify-api.sh's INTERNAL_STORAGE_URL
+#                        pattern / genesis/Jenkinsfile resolveInternalStorageUrl()). Without
+#                        this every @dataplane scenario that resolves storage falls back to
+#                        localhost:8090 (unreachable in the builder container) and dies on
+#                        the reachability precondition before any real assertion runs.
 #   BUILD_TAG            Jenkins BUILD_TAG string used as run-id in the sprint report
 
 set -euo pipefail
@@ -26,10 +33,12 @@ CUCUMBER_OUT="${REPORTS_DIR}/cucumber-report-dataplane.json"
 SPRINT_JSON="${REPORTS_DIR}/sprint-report-dataplane.json"
 SPRINT_MD="${REPORTS_DIR}/sprint-report-dataplane.md"
 DOORWAY="${E2E_DOORWAY_ALPHA:-https://doorway-alpha.elohim.host}"
+STORAGE_URL="${E2E_STORAGE_URL:-http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090}"
 RUN_ID="${BUILD_TAG:-dataplane-$(date +%Y%m%dT%H%M%S)}"
 
 echo "=== Dataplane Validation ==="
 echo "  Doorway : ${DOORWAY}"
+echo "  Storage : ${STORAGE_URL}"
 echo "  Run-id  : ${RUN_ID}"
 echo "  Reports : ${REPORTS_DIR}"
 
@@ -46,6 +55,7 @@ pnpm install --frozen-lockfile --filter "@elohim/a2o..."
 cd "${A2O_DIR}"
 CUCUMBER_EXIT=0
 E2E_DOORWAY_ALPHA="${DOORWAY}" \
+E2E_STORAGE_URL="${STORAGE_URL}" \
   pnpm exec cucumber-js \
     --format "json:${CUCUMBER_OUT}" \
     --tags '@dataplane and not @wip' \
