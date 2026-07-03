@@ -76,6 +76,21 @@ pub enum BlobFetchResponse {
     Error(String),
 }
 
+impl BlobFetchResponse {
+    /// Bounded, single-line summary for logging.
+    ///
+    /// A `send_response` Err payload is the whole unsent response — never
+    /// Debug-format it: `Found` carries the full blob bytes. Renders the byte
+    /// length instead (Loki drops log entries over 256KB).
+    pub fn summary(&self) -> String {
+        match self {
+            Self::Found(bytes) => format!("Found({} bytes)", bytes.len()),
+            Self::NotFound => "NotFound".to_string(),
+            Self::Error(msg) => format!("Error({msg})"),
+        }
+    }
+}
+
 /// Codec for the blob fetch protocol. Length-prefixed MessagePack frames.
 #[derive(Debug, Clone)]
 pub struct BlobCodec {

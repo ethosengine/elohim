@@ -98,6 +98,34 @@ pub enum ShardResponse {
     ContentNotFound,
 }
 
+impl ShardResponse {
+    /// Bounded, single-line summary for logging.
+    ///
+    /// A `send_response` Err payload is the whole unsent response — never
+    /// Debug-format it: `Data`, `ContentList`, and `Content` can embed blob
+    /// bytes or the full inventory (observed 1+ MB single log lines; Loki
+    /// drops entries over 256KB). Renders variant + size facts only.
+    pub fn summary(&self) -> String {
+        match self {
+            Self::Data(bytes) => format!("Data({} bytes)", bytes.len()),
+            Self::Have(has) => format!("Have({has})"),
+            Self::PushAck => "PushAck".to_string(),
+            Self::NotFound => "NotFound".to_string(),
+            Self::Error(msg) => format!("Error({msg})"),
+            Self::ContentList {
+                items,
+                total,
+                has_more,
+            } => format!(
+                "ContentList({} items, total={total}, has_more={has_more})",
+                items.len()
+            ),
+            Self::Content(_) => "Content(record)".to_string(),
+            Self::ContentNotFound => "ContentNotFound".to_string(),
+        }
+    }
+}
+
 /// Codec for shard request/response
 #[derive(Debug, Clone, Default)]
 pub struct ShardCodec;
@@ -196,5 +224,48 @@ impl request_response::Codec for ShardCodec {
         io.flush().await?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn content_list_summary_stays_bounded() {
+        // Regression guard for the Loki >256KB log-drop class: a large inventory
+        // must render as counts, never as its Debug dump (which is ~MBs here).
+        let items: Vec<ContentInventoryItem> = (0..10_000)
+            .map(|i| ContentInventoryItem {
+                id: format!("content-{i:08}"),
+                title: format!("A reasonably long content title number {i} with padding"),
+                content_type: "concept".to_string(),
+                content_format: "markdown".to_string(),
+                reach: "public".to_string(),
+                blob_cid: Some(format!("bafkrei{i:056}")),
+                updated_at: "2026-07-03T00:00:00Z".to_string(),
+            })
+            .collect();
+        let resp = ShardResponse::ContentList {
+            items,
+            total: 10_000,
+            has_more: true,
+        };
+
+        let summary = resp.summary();
+        assert!(
+            summary.len() < 256,
+            "summary must stay bounded, got {} bytes: {summary}",
+            summary.len()
+        );
+        assert!(summary.contains("10000 items"));
+    }
+
+    #[test]
+    fn data_summary_reports_length_not_contents() {
+        let resp = ShardResponse::Data(vec![0u8; 5_000_000]);
+        let summary = resp.summary();
+        assert!(summary.len() < 64, "got: {summary}");
+        assert!(summary.contains("5000000 bytes"));
     }
 }
