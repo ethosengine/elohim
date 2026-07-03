@@ -93,6 +93,27 @@
         "stage": "Deploy Edge Node - Alpha",
         "function": null
       }
+    },
+    "dataplane-validation": {
+      "description": "Advisory @dataplane cucumber suite against deployed alpha (scripts/ci/run-dataplane-validation.sh), producing the per-concern sprint-report the agentic-developer loop measures against. Declared with no build/deploy dependency and no artifacts — the Jenkinsfile stage's own `when { branch 'dev' || ... }` already runs it on every dev-branch pipeline execution regardless of what triggered that execution; this entry's only job is making sure the PIPELINE ITSELF gets triggered when only the a2o test surface changes (2026-07-03: an a2o-only push was silently skipped end-to-end because no elohim-edge step declared these paths as sources — the suite went unmeasured, not merely unchanged).",
+      "inputs": {
+        "sources": [
+          "genesis/a2o/steps/**",
+          "genesis/a2o/features/dataplane/**",
+          "genesis/a2o/features/resilience/**",
+          "scripts/ci/run-dataplane-validation.sh"
+        ],
+        "buildProcess": ["elohim/holochain/Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Dataplane Validation",
+        "function": null
+      }
     }
   },
   "gate": {
