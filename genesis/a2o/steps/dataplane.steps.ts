@@ -39,6 +39,7 @@ import {
   resolvePeerUrl,
   resolveStorageUrl,
   getRaw,
+  postRaw,
   probeHealth,
   probeSyncDocs,
   probeSyncDocHeads,
@@ -379,6 +380,93 @@ Then(
     assert.ok(
       body.blobHash !== null && body.blobHash !== undefined && body.blobHash !== '',
       `EPR "${eprId}" on ${peerName}: blobHash is ${JSON.stringify(body.blobHash)} — blob not yet attached`
+    );
+  }
+);
+
+/**
+ * Assert a content row's REQ-F10 trust legibility tier on the peer.
+ *
+ * `trust` is computed on the ContentView from the row's provenance markers:
+ *   "notarized"   — dht_anchor_hash set (green padlock — DHT-notary HEAD anchor)
+ *   "published"   — p2p_published_at set (blue — peer-attested custody, served but not notarized)
+ *   "unconfirmed" — crdt_converged_at-only or all-null (amber — served like HTTP "Not secure")
+ *
+ * The notary-authority concern asserts "notarized" on every federation peer: the DHT-notary
+ * HEAD anchor must propagate uniformly, not stamp only on the peer whose conductor ran the
+ * deploy. A lower tier here means the anchor has not reached this peer — an honest red until
+ * the notary-overlay propagation lands (Plan C1/C3/C4).
+ */
+Then(
+  'EPR {string} trust is {string} on peer {string}',
+  async function (this: E2EWorld, eprId: string, expectedTrust: string, peerName: string) {
+    const url = getPeerUrl(this, peerName);
+    // Use getRaw (never throws) so a non-200 (e.g. 503 "catching-up" on a peer
+    // mid-reconcile, or a 404) surfaces as a crisp "not notarized" red rather
+    // than an opaque thrown HTTP error — the invariant is the same either way.
+    const { status, text } = await getRaw(`${url}/db/content/${encodeURIComponent(eprId)}`);
+    assert.strictEqual(
+      status,
+      200,
+      `EPR "${eprId}" on ${peerName}: GET /db/content returned HTTP ${status} (body: ${text.slice(0, 120)}) ` +
+        `— the peer cannot serve the notarized content view, so it has not reached trust="${expectedTrust}".`
+    );
+    let trust: unknown;
+    try {
+      trust = (JSON.parse(text) as Record<string, unknown>)['trust'];
+    } catch {
+      trust = undefined;
+    }
+    assert.strictEqual(
+      trust,
+      expectedTrust,
+      `EPR "${eprId}" on ${peerName}: trust is ${JSON.stringify(trust)}, expected "${expectedTrust}" ` +
+        `— the DHT-notary HEAD anchor (dht_anchor_hash) has not reached this peer at the expected tier ` +
+        `(served at a lower trust tier, or the trust field is absent on this build).`
+    );
+  }
+);
+
+/**
+ * Assert that the notary HEAD-authority surface exists AND refuses a non-author's move.
+ *
+ * The declared HEAD (declare_content_head, Plan C1/C3) is the notary's authority answer —
+ * which version of a content node the author declared. Moving it must be an author-only act.
+ *
+ * The check is read-only-and-safe while the surface is unwired: it first GETs the HEAD
+ * surface for a real (notarized) EPR; if that returns 404 the surface does not exist, so
+ * HEAD advances by last-writer recency and NO ONE is refused — the honest red today. Only
+ * when the surface exists does it issue an unauthenticated (non-author) move, and it targets
+ * a dedicated test-persona id, never production content — a correctly-built gate refuses the
+ * non-author before any mutation. So no write is ever attempted while the surface is a 404.
+ */
+Then(
+  'the HEAD authority surface refuses a non-author move of {string} on peer {string}',
+  async function (this: E2EWorld, contentId: string, peerName: string) {
+    const url = getPeerUrl(this, peerName);
+    // (1) Read-only existence check against a real, notarized EPR.
+    const headPath = `/db/content/${encodeURIComponent(contentId)}/head`;
+    const { status: headStatus } = await getRaw(`${url}${headPath}`);
+    assert.notStrictEqual(
+      headStatus,
+      404,
+      `HEAD-authority surface ${headPath} on ${peerName} returned 404 — the notary ` +
+        `HEAD-declaration surface (declare_content_head, Plan C1/C3) is not wired. Without it the ` +
+        `declared HEAD is chosen by last-writer recency (VERDICT L2 #3), not by the notary, so a ` +
+        `non-author's HEAD move cannot be refused — any peer on the wire wins the race. Expected 200 ` +
+        `(the notary-arbitrated HEAD) so a non-author move can be gated.`
+    );
+    // (2) Surface exists → an unauthenticated (non-author) move MUST be refused.
+    //     Targets a test-persona id; never production content. Only reached post-(1).
+    const nonAuthorProbeId = 'e2e-notary-authority-nonauthor-probe';
+    const probePath = `/db/content/${encodeURIComponent(nonAuthorProbeId)}/head`;
+    const { status: moveStatus } = await postRaw(`${url}${probePath}`, {
+      headActionHash: 'uhCkk-e2e-notary-authority-nonauthor-move',
+    });
+    assert.ok(
+      [401, 403].includes(moveStatus),
+      `Non-author move of HEAD on ${peerName}: expected 401/403 (authority refusal), got ` +
+        `${moveStatus} — a non-author was able to move the declared HEAD (authority not enforced).`
     );
   }
 );

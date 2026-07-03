@@ -303,6 +303,29 @@ export async function getRaw(url: string): Promise<{ status: number; text: strin
   return { status: statusCode, text };
 }
 
+/**
+ * Raw POST — returns status + response body text. Never throws on non-2xx.
+ * Unauthenticated by default (no auth header): a caller that presents no
+ * identity is, definitionally, a non-author — the exact "any peer on the wire"
+ * case the notary must refuse. Used by the notary-authority concern's guarded
+ * HEAD-move refusal probe. Sends an optional JSON body.
+ */
+export async function postRaw(
+  url: string,
+  jsonBody?: unknown
+): Promise<{ status: number; text: string }> {
+  const hasBody = jsonBody !== undefined;
+  const { statusCode, body } = await request(url, {
+    method: 'POST',
+    headers: hasBody ? { 'content-type': 'application/json' } : {},
+    body: hasBody ? JSON.stringify(jsonBody) : undefined,
+    bodyTimeout: 15_000,
+    headersTimeout: 15_000,
+  });
+  const text = await body.text();
+  return { status: statusCode, text };
+}
+
 /** GET + JSON parse. Throws on non-2xx status codes. */
 async function getJson<T>(url: string): Promise<ProbeResult<T>> {
   const { status, text } = await getRaw(url);
