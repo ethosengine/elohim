@@ -10,18 +10,30 @@
 # Apply per cluster:
 #   kubectl apply -f genesis/orchestrator/manifests/network-policies.yaml
 #
-# !! DRIFT WARNING (2026-06-10): the LIVE default-deny-cross-env policies in
-#    elohim-alpha / -staging / -prod each carry an ADDITIONAL ipBlock ingress
-#    rule admitting the 7 Calico VXLAN node-tunnel /32s. That is the cross-node
-#    fix: when a jenkins agent (or any cross-node source) reaches an elohim pod
-#    on another node, Calico rewrites the source to a VXLAN tunnel address that
-#    no namespaceSelector can match, so the traffic is dropped without it. Those
-#    /32s are NODE-SPECIFIC and are intentionally NOT committed here (they go
-#    stale as nodes change). A blind `kubectl apply -f` of this file STRIPS that
-#    rule and re-breaks cross-node ingress. To change these policies: patch the
-#    live object and PRESERVE the ipBlock rule (e.g. `kubectl patch netpol ...
-#    --type=json` to add a port), or re-add the current node tunnel IPs after
-#    applying. See operator memory cluster_cross_node_host_pod_broken.
+# CROSS-NODE INGRESS (2026-07-03, supersedes the 2026-06-10 drift warning):
+#    when a cross-node source reaches an elohim pod, Calico (VXLAN Always,
+#    default-ipv4-ippool 10.1.0.0/16) can rewrite the source to a node tunnel
+#    address that no namespaceSelector can match, so the traffic is dropped
+#    unless an ipBlock admits it. The LIVE policies carried 7 hand-patched
+#    node-specific tunnel /32s that were deliberately uncommitted ("go stale as
+#    nodes change") — which meant a blind `kubectl apply -f` of this file
+#    stripped the fix, and every node change was a silent re-break risk. The
+#    rule is now committed DURABLY as the whole pool range (ipBlock
+#    10.1.0.0/16, verified against the live IPPool 2026-07-03): node churn
+#    can't invalidate it and apply no longer strips it.
+#
+#    NAMED TRADEOFF: tunnel addresses and pod addresses share the one Calico
+#    pool, so admitting the range also admits any in-cluster pod IP — the
+#    cross-env deny below becomes documentation-of-intent rather than hard
+#    isolation for in-pool sources. Accepted (operator decision 2026-07-03):
+#    these namespaces are one dev cluster wearing environment costumes; the
+#    protocol-truth isolation story belongs to the doorway/p2p membrane, not
+#    k8s netpol (see feedback memory: k8s is dev scaffold — doorway is the
+#    eventual ingress/LB over the p2p dataplane).
+#
+#    Live objects may still carry other hand-patches (generation > 1). Diff
+#    the live object before any apply: kubectl get netpol default-deny-cross-env
+#    -n <ns> -o yaml.
 #
 # Prerequisites:
 #   - CNI plugin must support NetworkPolicy (Calico, Cilium, etc.)
@@ -94,6 +106,12 @@ spec:
           port: 8444
         - protocol: TCP
           port: 8445
+    # Cross-node sources whose address Calico rewrote to a node tunnel IP —
+    # admit the whole pool range so node churn can't strand a node (see the
+    # CROSS-NODE INGRESS header note, incl. the named isolation tradeoff).
+    - from:
+        - ipBlock:
+            cidr: 10.1.0.0/16
 
 ---
 # ============================================================================
@@ -117,11 +135,12 @@ spec:
     # Allow traffic from within the same namespace
     - from:
         - podSelector: {}
-    # Allow traffic from ingress controller
+    # Allow traffic from ingress controller (microk8s-bundled, ns is "ingress" —
+    # one cluster serves all three envs; "ingress-nginx" matched nothing live)
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
+              kubernetes.io/metadata.name: ingress
     # Allow DNS resolution
     - from:
         - namespaceSelector:
@@ -132,6 +151,10 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # Cross-node tunnel-rewritten sources (see CROSS-NODE INGRESS header note)
+    - from:
+        - ipBlock:
+            cidr: 10.1.0.0/16
 
 ---
 # ============================================================================
@@ -343,11 +366,12 @@ spec:
     # Allow traffic from within the same namespace
     - from:
         - podSelector: {}
-    # Allow traffic from ingress controller
+    # Allow traffic from ingress controller (microk8s-bundled, ns is "ingress" —
+    # one cluster serves all three envs; "ingress-nginx" matched nothing live)
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
+              kubernetes.io/metadata.name: ingress
     # Allow DNS resolution
     - from:
         - namespaceSelector:
@@ -358,3 +382,7 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # Cross-node tunnel-rewritten sources (see CROSS-NODE INGRESS header note)
+    - from:
+        - ipBlock:
+            cidr: 10.1.0.0/16

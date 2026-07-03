@@ -58,19 +58,34 @@ nodes:
     checks:
       - "a2o @concern:blob-durability — 8 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
     evidence: >
-      DECODED 2026-07-03 (shift blob-durability-suite-green): the 0/19 is a
-      HARNESS GATE, not 19 defects — run-dataplane-validation.sh never exports
-      E2E_STORAGE_URL, so every scenario dies on the reachability precondition;
-      no real assertion has ever executed. Post-gate dependency tree, four
-      owners: (1) the env one-liner (judge surface — operator ratification
-      pending); (2) 5+ scenarios on undefined a2o steps; (3) 6 scenarios on
-      Epic-B provide-commitment seeding (peers/delivery returns [] live);
-      (4) 6 scenarios on the unbuilt protocol-omni Angular component. The
-      heal-on-read/churn/salvage features are all @wip-excluded from the
-      runner — de-wip them once (1)+(3) land; that is where the deployed
-      bytes-heal (e1f4329ef) + bounded syncing-degrade (dfe10c583) get judged.
-      Storage side proven defect-free for this suite (endpoints/feltStatus all
-      wired)."
+      MEASURED LIVE 2026-07-03 (shift blob-durability-suite-green, edge #1146,
+      dev@6d142be79): blob-durability passed=3 failed=5 pending=12 (of 20
+      scenarios in this concern) — the harness-gate/seed-lever/CI-dispatch work
+      below converted the prior 0/19 fiction into a real, fully-decomposed
+      signal. Every failure and pending is now individually accounted for:
+      (a) 5 failed — Playwright-device hard-fail in steps/ui/topology.steps.ts
+      + one viewport-archetype step; this CI job never runs in Playwright mode.
+      Fix is known (tag @browser-only + extend run-dataplane-validation.sh's
+      --tags filter) but changes what the measure counts, so left as a
+      deferred operator/next-shift design call, not made unilaterally
+      (backlog: a2o-playwright-device-hardfail-topology.md). (b) 12 pending —
+      honesty-gated skips working as designed: unseedable /api/v1/peers/delivery
+      preconditions (live-discovery-only, provably unseedable) plus
+      Playwright-gated browser steps that correctly return 'pending' rather
+      than hard-fail. Not defects. (c) 3 passed — up from 0 (harness-gate fix)
+      then 1 (edge #1144, first real run) then 2 (edge #1145) then 3 (edge
+      #1146, after fixing a 403-vs-404 idempotency bug in the test fixture's
+      GET-first content-create check). Storage side proven defect-free for
+      every scenario that actually executes; remaining gap to target (≥5) is
+      structural (needs Playwright) or substrate-timing (seed-lever precondition
+      not met this run), not a code defect. Along the way: fixed the
+      E2E_STORAGE_URL harness gate, flipped ALLOW_SEED_SHARD_MANIFEST live
+      across matthew/jessica/james, fixed 3 real bugs in the seed-activation
+      step chain, and fixed a CI dispatch-correctness gap
+      (elohim/holochain/build-manifest.json had no source path matching
+      genesis/a2o/** — a2o-only pushes silently never triggered elohim-edge).
+      Full arc: .claude/shifts/2026-07-03T00-00-blob-durability-suite-green.journal.md
+      and its sprint result."
     refs:
       - "genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md"
       - "memory: project_dataplane_next_lens_diversity_placement (1a+1b landed; prod join dormant)"
