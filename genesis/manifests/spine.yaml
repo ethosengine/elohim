@@ -85,7 +85,14 @@ nodes:
       (elohim/holochain/build-manifest.json had no source path matching
       genesis/a2o/** — a2o-only pushes silently never triggered elohim-edge).
       Full arc: .claude/shifts/2026-07-03T00-00-blob-durability-suite-green.journal.md
-      and its sprint result."
+      and its sprint result. Edge #1147 (2026-07-03 15:28) reproduced 3/5/12
+      byte-identically — deterministic; the operator-approved fix (c387260cb,
+      @browser-only excluded from the non-browser run) is on
+      feat/frontend-eyes-sprint awaiting the next dev-merge + edge run, which is
+      the flip-to-green measurement. Sibling reds in #1147 (peer-mesh
+      caughtUp=false on elohim.host) and app #1585 (Upload SPA Blob /lamad
+      syncing) were the 2026-07-03 shem network-degradation window — live-probed
+      recovered 17:0x UTC (caughtUp=true both doorways, /lamad 200)."
     refs:
       - "genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md"
       - "memory: project_dataplane_next_lens_diversity_placement (1a+1b landed; prod join dormant)"
@@ -95,12 +102,20 @@ nodes:
       Converged state can be notarized: green tier is reachable for any content
       (HEAD-DAG declare_content_head, reach re-certified at republish, author
       signatures). Authority answers come from the notary, never from LWW order.
-    status: unwired
+    status: red
     active: true
-    first_move: >
-      Write the red: a2o @concern:notary-authority — re-staged content reaches
-      trust=notarized on every federation peer; a non-author cannot move HEAD.
-      (Plan C1-C5 exists; the scenario is what makes it schedulable.)
+    checks:
+      - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
+    evidence: >
+      RED WRITTEN + verified failing live 2026-07-03 (against alpha federation):
+      3 scenarios — baseline green (alpha-A serves trust=notarized with
+      dhtAnchorHash, proving the check is non-vacuous; Phase A/B trust field
+      already landed), 2 honest reds: (1) elohim.host serves the same EPR at
+      trust="published", dhtAnchorHash null — the notary HEAD anchor never
+      propagates to federation peers; (2) /db/content/{id}/head returns 404 —
+      declare_content_head (Plan C1/C3) unwired, so nothing can refuse a
+      non-author HEAD move. Both pass unchanged when Phase C lands. The node is
+      now schedulable: implement C1-C5 against these reds.
     refs:
       - "genesis/docs/superpowers/specs/2026-07-01-crdt-authoritative-content-state-dht-notary-decouple-design.md"
       - "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md"

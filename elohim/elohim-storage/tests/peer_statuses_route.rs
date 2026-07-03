@@ -10,8 +10,8 @@
 //! 1. **list_current empty** — returns empty Vec when table has no rows.
 //! 2. **list_current populated** — returns all rows.
 //! 3. **view conversion** — PeerStatusView fields are correctly mapped.
-//! 4. **list_by_household** — currently delegates to list_current (TODO C3),
-//!    so the household param is accepted and returns all rows.
+//! 4. **list_by_household** — joins through `stewarded_nodes.household_id`
+//!    (the C3 column) and returns only peers bound to the queried household.
 //! 5. **boolean coercion** — general_pool_member and accepting_stewardship_reserves
 //!    are correctly coerced from i32 to bool in PeerStatusView.
 
@@ -44,6 +44,12 @@ fn setup_db() -> SqliteConnection {
         );
         CREATE INDEX idx_peer_statuses_status ON peer_statuses(status);
         CREATE INDEX idx_peer_statuses_pool ON peer_statuses(general_pool_member);
+        -- Minimal stewarded_nodes projection: list_by_household joins through
+        -- stewarded_nodes.id / household_id only (the C3 column).
+        CREATE TABLE stewarded_nodes (
+            id TEXT PRIMARY KEY,
+            household_id TEXT
+        );
         "#,
     )
     .expect("Failed to create test schema");
@@ -133,23 +139,37 @@ fn view_conversion_maps_all_fields_correctly() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 4 — list_by_household falls back to list_current (TODO C3)
+// Test 4 — list_by_household filters through stewarded_nodes.household_id (C3)
 // ---------------------------------------------------------------------------
 
 #[test]
-fn list_by_household_falls_back_to_list_current_until_c3() {
+fn list_by_household_returns_only_peers_bound_to_household() {
     let mut conn = setup_db();
 
     upsert(&mut conn, &make_row("peer-one", "online", 1)).unwrap();
     upsert(&mut conn, &make_row("peer-two", "online", 0)).unwrap();
+    upsert(&mut conn, &make_row("peer-unbound", "online", 1)).unwrap();
 
-    // Until Task C3 adds the household_id column, list_by_household returns all rows.
+    // Bind peer-one to the queried household and peer-two to a different one;
+    // peer-unbound has no stewarded_nodes row at all. Only peer-one may come
+    // back — the old stub returned ALL peers per household, which inflated
+    // onlinePeerCount (see list_by_household's doc comment).
+    conn.batch_execute(
+        r#"
+        INSERT INTO stewarded_nodes (id, household_id) VALUES
+            ('peer-one', 'household-abc123'),
+            ('peer-two', 'household-other');
+        "#,
+    )
+    .expect("Failed to seed stewarded_nodes");
+
     let rows = list_by_household(&mut conn, "household-abc123").unwrap();
     assert_eq!(
         rows.len(),
-        2,
-        "list_by_household must return all rows until C3 migration lands"
+        1,
+        "list_by_household must return only peers whose stewarded_nodes row matches the household"
     );
+    assert_eq!(rows[0].peer_id, "peer-one");
 }
 
 // ---------------------------------------------------------------------------

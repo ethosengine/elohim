@@ -3941,7 +3941,8 @@ impl P2PNode {
                             .shard_protocol
                             .send_response(channel, response)
                         {
-                            warn!(peer = %peer, error = ?e, "Failed to send shard response");
+                            // Err payload is the whole unsent response — summarize, never Debug-dump it.
+                            warn!(peer = %peer, response = %e.summary(), "Failed to send shard response");
                         }
                     }
                     request_response::Message::Response {
@@ -4474,10 +4475,12 @@ impl P2PNode {
                         .blob_protocol
                         .send_response(channel, response)
                     {
+                        // Err payload is the whole unsent response (Found carries blob bytes) —
+                        // summarize, never Debug-dump it.
                         warn!(
                             target: "elohim_storage::blob_fetch",
                             peer = %peer,
-                            error = ?e,
+                            response = %e.summary(),
                             "T21: failed to send blob response"
                         );
                     }
@@ -4737,7 +4740,8 @@ impl P2PNode {
                         .sync_protocol
                         .send_response(channel, response)
                     {
-                        warn!(peer = %peer, error = ?e, "Failed to send sync response");
+                        // Err payload is the whole unsent response — summarize, never Debug-dump it.
+                        warn!(peer = %peer, response = %e.summary(), "Failed to send sync response");
                     }
                 }
                 request_response::Message::Response {
@@ -4789,7 +4793,8 @@ impl P2PNode {
                         .epr_protocol
                         .send_response(channel, response)
                     {
-                        warn!(peer = %peer, error = ?e, "Failed to send EPR response");
+                        // Err payload is the whole unsent response — summarize, never Debug-dump it.
+                        warn!(peer = %peer, response = %e.summary(), "Failed to send EPR response");
                     }
                 }
                 request_response::Message::Response {
@@ -4848,7 +4853,8 @@ impl P2PNode {
                         .epr_atom_protocol
                         .send_response(channel, response)
                     {
-                        warn!(peer = %peer, error = ?e, "Failed to send EPR atom response");
+                        // Err payload is the whole unsent response — summarize, never Debug-dump it.
+                        warn!(peer = %peer, response = %e.summary(), "Failed to send EPR atom response");
                     }
                 }
                 request_response::Message::Response {

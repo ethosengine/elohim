@@ -80,6 +80,38 @@ pub enum EprResponse {
     },
 }
 
+impl EprResponse {
+    /// Bounded, single-line summary for logging.
+    ///
+    /// A `send_response` Err payload is the whole unsent response — never
+    /// Debug-format it: `Head`/`HeadBatch` carry MessagePack-encoded EPR Head
+    /// bytes (a batch Debug-expands well past Loki's 256KB entry limit).
+    /// Renders byte length / count instead.
+    pub fn summary(&self) -> String {
+        match self {
+            Self::Head(bytes) => format!("Head({} bytes)", bytes.len()),
+            Self::HeadBatch(heads) => format!("HeadBatch({} heads)", heads.len()),
+            Self::Announced { accepted, reason } => {
+                format!("Announced(accepted={accepted}, reason={reason:?})")
+            }
+            Self::NotFound => "NotFound".to_string(),
+            Self::AccessDenied {
+                required_reach,
+                reason,
+            } => format!("AccessDenied(required_reach={required_reach}, reason={reason})"),
+            Self::Error(msg) => format!("Error({msg})"),
+            Self::DeliveryInfo {
+                serves_extracted,
+                serves_compressed,
+                cache_tier,
+                warm,
+            } => format!(
+                "DeliveryInfo(extracted={serves_extracted}, compressed={serves_compressed}, tier={cache_tier}, warm={warm})"
+            ),
+        }
+    }
+}
+
 /// Codec for EPR request/response
 #[derive(Debug, Clone, Default)]
 pub struct EprCodec;

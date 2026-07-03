@@ -103,6 +103,28 @@ pub enum EprAtomResponse {
     },
 }
 
+impl EprAtomResponse {
+    /// Bounded, single-line summary for logging.
+    ///
+    /// A `send_response` Err payload is the whole unsent response — never
+    /// Debug-format it: `Atom`/`AtomBatch` carry raw CBOR envelope bytes.
+    /// Renders byte length / count instead (Loki drops entries over 256KB).
+    pub fn summary(&self) -> String {
+        match self {
+            Self::Atom { envelope_bytes } => format!("Atom({} bytes)", envelope_bytes.len()),
+            Self::AtomBatch { atoms } => format!("AtomBatch({} entries)", atoms.len()),
+            Self::Announced { accepted, reason } => {
+                format!("Announced(accepted={accepted}, reason={reason:?})")
+            }
+            Self::NotFound => "NotFound".to_string(),
+            Self::Error { message } => format!("Error({message})"),
+            Self::IntegrityAck { received, reason } => {
+                format!("IntegrityAck(received={received}, reason={reason:?})")
+            }
+        }
+    }
+}
+
 /// Helper for `#[serde(with = "...")]` over `Vec<Option<Vec<u8>>>`.
 /// Each `Some(bytes)` is serialized as a CBOR byte string; `None` as null.
 mod serde_bytes_vec {

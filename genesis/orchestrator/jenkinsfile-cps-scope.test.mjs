@@ -349,8 +349,11 @@ export function lintJenkinsfile(text) {
 export function lintEnvBridgeSymmetry(text) {
     const writes = new Set();
     const reads = new Set();
-    for (const m of text.matchAll(/\benv\.([A-Z][A-Z0-9_]*)\s*=/g)) writes.add(m[1]);
-    for (const m of text.matchAll(/\benv\.([A-Z][A-Z0-9_]*)\b(?!\s*=)/g)) reads.add(m[1]);
+    // Write = a single `=` not followed by another `=`; `env.X == 'v'` is a
+    // READ (equality), not a write — the lookaheads must distinguish them or a
+    // comparison-only consumer reads as an orphan (RESET_STORAGE_FROM_TAG case).
+    for (const m of text.matchAll(/\benv\.([A-Z][A-Z0-9_]*)\s*=(?!=)/g)) writes.add(m[1]);
+    for (const m of text.matchAll(/\benv\.([A-Z][A-Z0-9_]*)\b(?!\s*=(?!=))/g)) reads.add(m[1]);
     const orphans = [];
     for (const w of writes) {
         if (!reads.has(w)) orphans.push(w);

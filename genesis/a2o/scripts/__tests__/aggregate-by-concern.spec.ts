@@ -2,7 +2,10 @@ import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { aggregate } from '../lib/aggregate.js';
+
 import type { ScenarioResult } from '../lib/load-cucumber.js';
+
+const TAG_DATAPLANE = '@dataplane';
 
 function makeByConcernScenarios(): ScenarioResult[] {
   return [
@@ -10,20 +13,20 @@ function makeByConcernScenarios(): ScenarioResult[] {
       name: 'Content sync delivers to peer',
       feature: 'features/dataplane/content-sync.feature',
       status: 'passed',
-      tags: ['@e2e', '@dataplane', '@concern:content-sync'],
+      tags: ['@e2e', TAG_DATAPLANE, '@concern:content-sync'],
     },
     {
       name: 'Content sync fails under partition',
       feature: 'features/dataplane/content-sync.feature',
       status: 'failed',
       failureMessage: 'AssertionError: expected sync within 5s',
-      tags: ['@e2e', '@dataplane', '@concern:content-sync'],
+      tags: ['@e2e', TAG_DATAPLANE, '@concern:content-sync'],
     },
     {
       name: 'Peer mesh discovers new node',
       feature: 'features/dataplane/peer-mesh.feature',
       status: 'passed',
-      tags: ['@e2e', '@dataplane', '@concern:peer-mesh'],
+      tags: ['@e2e', TAG_DATAPLANE, '@concern:peer-mesh'],
     },
   ];
 }
@@ -62,10 +65,10 @@ void describe('aggregate byConcern', () => {
       profile: 'alpha',
     });
 
-    const contentSync = r.summary.byConcern['content-sync']!;
+    const contentSync = r.summary.byConcern['content-sync'];
     assert.equal(contentSync.scenarios.length, 2);
 
-    const peerMesh = r.summary.byConcern['peer-mesh']!;
+    const peerMesh = r.summary.byConcern['peer-mesh'];
     assert.equal(peerMesh.scenarios.length, 1);
     assert.equal(peerMesh.scenarios[0].name, 'Peer mesh discovers new node');
     assert.equal(peerMesh.scenarios[0].status, 'passed');
@@ -90,7 +93,10 @@ void describe('aggregate byConcern', () => {
       profile: 'alpha',
     });
 
-    assert.deepEqual(Object.keys(r.summary.byConcern).sort(), ['content-sync', 'peer-mesh']);
+    assert.deepEqual(
+      Object.keys(r.summary.byConcern).sort((a, b) => a.localeCompare(b)),
+      ['content-sync', 'peer-mesh']
+    );
   });
 
   void it('byConcern is an empty object when no scenarios carry a @concern: tag', () => {
@@ -119,13 +125,13 @@ void describe('aggregate byConcern', () => {
           name: 'Step not yet implemented',
           feature: 'features/dataplane/blob-custody.feature',
           status: 'pending',
-          tags: ['@e2e', '@dataplane', '@concern:blob-custody'],
+          tags: ['@e2e', TAG_DATAPLANE, '@concern:blob-custody'],
         },
         {
           name: 'Undefined step',
           feature: 'features/dataplane/blob-custody.feature',
           status: 'undefined',
-          tags: ['@e2e', '@dataplane', '@concern:blob-custody'],
+          tags: ['@e2e', TAG_DATAPLANE, '@concern:blob-custody'],
         },
       ],
       consoleArtifacts: [],
@@ -134,7 +140,7 @@ void describe('aggregate byConcern', () => {
       profile: 'alpha',
     });
 
-    const blobCustody = r.summary.byConcern['blob-custody']!;
+    const blobCustody = r.summary.byConcern['blob-custody'];
     assert.ok(blobCustody, 'blob-custody concern must be present');
     assert.equal(blobCustody.passed, 0);
     assert.equal(blobCustody.failed, 0);

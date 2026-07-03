@@ -30,7 +30,7 @@ function concernGlyph(rollup: ConcernRollup): string {
 
 function renderByConcern(report: SprintReport): string[] {
   const byConcern = report.summary.byConcern ?? {};
-  const concerns = Object.keys(byConcern).sort();
+  const concerns = Object.keys(byConcern).sort((a, b) => a.localeCompare(b));
   if (concerns.length === 0) return [];
 
   const lines: string[] = [];
@@ -40,9 +40,7 @@ function renderByConcern(report: SprintReport): string[] {
   lines.push(`|---|---|---|---|---|`);
   for (const name of concerns) {
     const r = byConcern[name];
-    lines.push(
-      `| \`${name}\` | ${concernGlyph(r)} | ${r.passed} | ${r.failed} | ${r.pending} |`
-    );
+    lines.push(`| \`${name}\` | ${concernGlyph(r)} | ${r.passed} | ${r.failed} | ${r.pending} |`);
   }
   lines.push('');
 
@@ -51,7 +49,9 @@ function renderByConcern(report: SprintReport): string[] {
     lines.push(`### ${concernGlyph(r)} \`${name}\``);
     lines.push('');
     for (const s of r.scenarios) {
-      const glyph = s.status === 'passed' ? '✅' : s.status === 'failed' ? '❌' : '◌';
+      let glyph = '◌';
+      if (s.status === 'passed') glyph = '✅';
+      else if (s.status === 'failed') glyph = '❌';
       lines.push(`- ${glyph} ${s.name} — \`${s.surface}\``);
     }
     lines.push('');

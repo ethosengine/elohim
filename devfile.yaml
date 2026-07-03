@@ -124,22 +124,17 @@ components:
         # CC for native compilation (some crates need explicit gcc)
         - name: CC
           value: gcc
-        # sccache config injected via K8s secret auto-mount annotations
-        # (sccache-credentials Secret in the Che user namespace, labeled
-        # controller.devfile.io/mount-to-devworkspace=true and annotated
-        # mount-as=env). Backing store is Garage at
-        # garage.ethosengine.svc.cluster.local:3900 (S3-compatible). Provides:
-        #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
-        #   SCCACHE_BUCKET, SCCACHE_ENDPOINT, SCCACHE_S3_USE_SSL, SCCACHE_REGION
-        # sccache binary is baked into rust-nix-dev image at /usr/local/bin/sccache
-        # (added 2026-05-09 in ethosengine/che-devworkspaces). Flipping the
-        # wrapper here means every cargo invocation in the workspace consults
-        # Garage; cache hits are ~ms, misses fall through to local compile
-        # and populate the cache for the next workspace.
+        # sccache RETIRED for workspace builds (operator decision 2026-07-03):
+        # measured Rust hit rate was ~25% (39/157) while the cargo target pool
+        # already provides the warm-build story, and the wrapper carried two
+        # recurring failure classes (cache-corruption, spawn ENOENT — memory:
+        # feedback_sccache_failure_classes) plus a remote Garage S3 dependency
+        # the workspace can't operate. RUSTC_WRAPPER is now explicitly EMPTY —
+        # the image still ships the binary and the sccache-credentials Secret
+        # still auto-mounts, so re-enabling is a one-line flip back to
+        # `value: sccache`. CI keeps its own independent sccache config.
         - name: RUSTC_WRAPPER
-          value: sccache
-        - name: SCCACHE_LOG
-          value: warn
+          value: ''
         # Cargo target pool — family-shared target dirs to keep parallel
         # worktree builds from each materializing their own ~18GB target/.
         # Hooks at SessionStart/Stop run worktree stewardship; agents read

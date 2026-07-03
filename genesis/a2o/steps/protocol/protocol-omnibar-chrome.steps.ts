@@ -37,7 +37,7 @@ interface OmnibarChromeWorld {
 
 /** Escape a literal string for embedding inside a `new RegExp(...)`. */
 function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 /**
@@ -59,8 +59,10 @@ Then(
 
     // Exactly one — a second injection (e.g. both serving paths splicing) would
     // mount two omnibars. The light crate's own idempotency test counts this
-    // same marker; we hold the served bytes to the same invariant.
-    const occurrences = (html.match(new RegExp(`id="${escapeRegExp(islandId)}"`, 'g')) ?? []).length;
+    // same marker; we hold the served bytes to the same invariant. Literal
+    // split-count — the id is a plain string, no regex needed.
+    const marker = `id="${islandId}"`;
+    const occurrences = html.split(marker).length - 1;
     assert.equal(
       occurrences,
       1,
@@ -85,7 +87,9 @@ Then(
     //   <script src="/chrome/omni-element.<sha256hex>.js" defer></script>
     // Asserting the whole tag (not a bare substring) proves it is the live
     // loader, not a stray mention in a comment or the island JSON.
-    const loader = new RegExp(`<script src="${escapeRegExp(loaderBase)}[0-9a-f]+\\.js" defer>`);
+    const loader = new RegExp(
+      String.raw`<script src="${escapeRegExp(loaderBase)}[0-9a-f]+\.js" defer>`
+    );
     assert.match(
       html,
       loader,

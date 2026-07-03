@@ -269,8 +269,9 @@ function computeByConcern(scenarios: ScenarioResult[]): Record<string, ConcernRo
     }
     const rollup = result[concern];
     // Map 'undefined'/'skipped' → pending for concern-level accounting
-    const status: ConcernScenario['status'] =
-      s.status === 'passed' ? 'passed' : s.status === 'failed' ? 'failed' : 'pending';
+    let status: ConcernScenario['status'] = 'pending';
+    if (s.status === 'passed') status = 'passed';
+    else if (s.status === 'failed') status = 'failed';
     if (status === 'passed') rollup.passed += 1;
     else if (status === 'failed') rollup.failed += 1;
     else rollup.pending += 1;

@@ -164,6 +164,63 @@ pub enum SyncResponse {
     Error { message: String },
 }
 
+impl SyncResponse {
+    /// Bounded, single-line summary for logging.
+    ///
+    /// A `send_response` Err payload is the whole unsent response — never
+    /// Debug-format it: `Changes`/`RequestedChanges` embed serialized Automerge
+    /// change bytes and `DocumentList` the full document set. Renders counts
+    /// only (Loki drops log entries over 256KB).
+    pub fn summary(&self) -> String {
+        match self {
+            Self::Heads {
+                doc_id,
+                heads,
+                change_count,
+                ..
+            } => format!(
+                "Heads(doc={doc_id}, {} heads, change_count={change_count})",
+                heads.len()
+            ),
+            Self::Changes {
+                doc_id,
+                changes,
+                has_more,
+                new_heads,
+                ..
+            } => format!(
+                "Changes(doc={doc_id}, {} changes, has_more={has_more}, {} new_heads)",
+                changes.len(),
+                new_heads.len()
+            ),
+            Self::RequestedChanges {
+                doc_id,
+                changes,
+                not_found,
+                ..
+            } => format!(
+                "RequestedChanges(doc={doc_id}, {} changes, {} not_found)",
+                changes.len(),
+                not_found.len()
+            ),
+            Self::ChangeAck {
+                doc_id, was_new, ..
+            } => format!("ChangeAck(doc={doc_id}, was_new={was_new})"),
+            Self::DocumentList {
+                documents,
+                total,
+                has_more,
+                ..
+            } => format!(
+                "DocumentList({} documents, total={total}, has_more={has_more})",
+                documents.len()
+            ),
+            Self::NotFound { doc_id, .. } => format!("NotFound(doc={doc_id})"),
+            Self::Error { message } => format!("Error({message})"),
+        }
+    }
+}
+
 /// Information about a syncable document
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocumentInfo {

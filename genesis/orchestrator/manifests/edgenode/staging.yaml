@@ -356,6 +356,11 @@ spec:
         name: holochain-data
       spec:
         accessModes: [ReadWriteOnce]
+        # Explicit class — never inherit the cluster default (the 2026-07-03
+        # frank-prod lesson: unpinned PVCs fell through to Jiva and EIO-wedged).
+        # volumeClaimTemplates are immutable on a live STS: takes effect only on
+        # delete --cascade=orphan + recreate.
+        storageClassName: openebs-hostpath
         resources:
           requests:
             storage: 10Gi
@@ -363,6 +368,11 @@ spec:
         name: storage-data
       spec:
         accessModes: [ReadWriteOnce]
+        # Explicit class — never inherit the cluster default (the 2026-07-03
+        # frank-prod lesson: unpinned PVCs fell through to Jiva and EIO-wedged).
+        # volumeClaimTemplates are immutable on a live STS: takes effect only on
+        # delete --cascade=orphan + recreate.
+        storageClassName: openebs-hostpath
         resources:
           requests:
             storage: 5Gi
