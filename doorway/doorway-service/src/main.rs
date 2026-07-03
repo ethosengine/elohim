@@ -625,13 +625,19 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             tracing::debug!("SSR_BUNDLES_DIR unset — render_capability will be None");
             None
         };
-        // Concurrency semaphore: sized to render_capability.max_concurrent_renders.
-        // None when render_capability is None (no SSR claim, no limiter needed).
-        state.render_semaphore = render_capability.as_ref().map(|c| {
-            std::sync::Arc::new(tokio::sync::Semaphore::new(
-                c.max_concurrent_renders as usize,
-            ))
-        });
+        // Concurrency semaphore. A derived capability sizes it to
+        // max_concurrent_renders (unchanged). Capability absent but a renderer IS
+        // loaded → a conservative default (the live alpha state: SSR_BUNDLE_PATH
+        // set, capability URL unset), so the SSR landing hot path can't spawn
+        // unbounded V8 isolates on a cpu:1 pod (each cold render holds a 60s
+        // wall). Overflow sheds to the projected-bundle fallback — today's
+        // serving behavior — so the bound degrades safely. No renderer → None
+        // (nothing to render, no limiter). See doorway::render::ssr_semaphore_permits.
+        state.render_semaphore = doorway::render::ssr_semaphore_permits(
+            render_capability.as_ref(),
+            state.renderer.is_some(),
+        )
+        .map(|permits| std::sync::Arc::new(tokio::sync::Semaphore::new(permits)));
         state.render_capability = render_capability;
     }
 

@@ -7,9 +7,9 @@ title: "Blob-backed content create 500s on UNIQUE constraint despite the idempot
 slug: "a2o-blob-backed-content-idempotent-create-h-app-id-mismatch"
 written: "2026-07-03"
 author: "blob-durability-suite-green shift"
-status: "backlog"
+status: "resolved"
 priority: "low"
-ci_status: open
+ci_status: resolved
 fingerprints: []
 jobs: [elohim-edge]
 relatedNodeIds: [blob-durability]
@@ -58,3 +58,18 @@ either fix the GET to match the POST's scope, or make the content id include a
 per-run-unique suffix so the fixture never collides across CI runs (matches the "test
 fixture must be idempotent, not the storage" principle already documented at the top of
 `storagePostContent`).
+
+## Resolution (2026-07-03, same shift, second look)
+
+Not an h_app_id mismatch — both GET and POST `/db/content` resolve through the same
+legacy-prefix branch of `extract_app_context` (`http.rs:3882-3921`), so h_app_id scoping
+was never divergent. The real cause: `handle_db_content_by_id`'s GET handler
+(`http.rs:4752-4873`) applies a reach gate — a restricted-reach row (`intimate` here) with
+no `Authorization`/`X-Agent-Id` header on the request returns **403 Forbidden**, not 404,
+and *only* takes that branch when the row was actually found (`Ok(Some(view))`; a
+genuinely-missing id 404s). `storagePostContent`'s idempotency check only treated `200` as
+"exists" and fell through to POST on anything else, so a re-run against an
+already-existing restricted-reach id POSTed again and hit the real UNIQUE constraint.
+Fixed by also treating `403` as "exists, not readable by us" — a no-op, matching the
+200 case. Commit lands the fix directly in `genesis/a2o/steps/resilience.steps.ts`
+(`storagePostContent`).

@@ -97,6 +97,13 @@ async function storagePost(
  * must be idempotent, not the storage. GET `/db/content/{id}` first; if it
  * already exists (200) treat the create as a no-op and return the existing
  * record; otherwise POST it.
+ *
+ * A restricted-reach item (e.g. "intimate") the harness re-checks with no
+ * auth header comes back 403 Forbidden, not 404 — `handle_db_content_by_id`
+ * (elohim-storage/src/http.rs) only reaches the reach-gate FORBIDDEN branches
+ * when the row WAS found (`Ok(Some(view))`); a genuinely-missing id 404s.
+ * So 403 here means "exists, just not readable by us" — also a no-op, else
+ * the fallthrough POST 500s on the same UNIQUE constraint (edge #1144).
  */
 async function storagePostContent(
   payload: Record<string, unknown>
@@ -106,6 +113,9 @@ async function storagePostContent(
   const text = await body.text(); // drain the body even on a miss (undici requirement)
   if (statusCode === 200) {
     return JSON.parse(text) as Record<string, unknown>;
+  }
+  if (statusCode === 403) {
+    return { id, _existsButForbidden: true };
   }
   return storagePost('/db/content', payload);
 }
