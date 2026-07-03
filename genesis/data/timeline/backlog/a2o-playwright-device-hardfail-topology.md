@@ -3,13 +3,14 @@ id: "backlog-a2o-playwright-device-hardfail-topology"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "steps/ui/topology.steps.ts hard-fails (not skips) when no Playwright device — 3 blob-durability scenarios red in non-browser CI runs"
+title: "steps/ui/topology.steps.ts hard-fails (not skips) when no Playwright device — 5 blob-durability scenarios red in non-browser CI runs"
 slug: "a2o-playwright-device-hardfail-topology"
 written: "2026-07-03"
 author: "blob-durability-suite-green shift"
-status: "backlog"
+status: "resolved"
 priority: "medium"
-ci_status: open
+ci_status: resolved
+resolved: "2026-07-03"
 fingerprints: []
 jobs: [elohim-edge]
 relatedNodeIds: [blob-durability]
@@ -70,3 +71,26 @@ files, AND extend the `--tags` filter in `run-dataplane-validation.sh` to
 scenarios the measure command's own report counts, which reads closer to a measure-scope
 decision than a mechanical fix; left for operator/next-shift judgment rather than made
 unilaterally overnight.
+
+## Resolution (2026-07-03, operator-authorized)
+
+Operator authorized the recommended option (a). Part 1 (tagging) was already in
+place — all 5 scenarios already carry `@browser-only` in
+`observable-distribution.feature` (the 4 topology scenarios + "Resilience hypercard
+stays fully inside a phone viewport"). Part 2 applied: extended the `--tags` filter in
+`scripts/ci/run-dataplane-validation.sh` to
+`'@dataplane and not @wip and not @browser-only'`, with an inline comment anchoring the
+rationale.
+
+**Verified via cucumber `--dry-run` (no substrate needed):** the blob-durability set
+drops 20 → 10 scenarios; the full `@dataplane` suite drops 37 → 27. The entire
+10-scenario delta is blob-durability's `@browser-only` scenarios — no other concern and
+no non-browser scenario is affected. Coverage is preserved: `@browser-only` scenarios
+still run under the playwright-mode jobs (`test:browser:e2e`, delivery-browser profile).
+
+**Expected effect on the spine's blob-durability node:** `passed=3 failed=5` (RED) →
+`passed=3 failed=0` (GREEN — the 5 structural hard-fails become clean HELD-skips). This
+clears the failures and greens the concern; it does not by itself lift `passed` to ≥5
+(the remaining non-browser pending scenarios flip to passed only when their live-substrate
+preconditions are met — a substrate-timing condition, not a code gap). The closing CI
+measurement lands when this reaches `dev` and edge re-runs the Dataplane Validation stage.

@@ -52,13 +52,20 @@ pnpm install --frozen-lockfile --filter "@elohim/a2o..."
 # Run the @dataplane cucumber suite.
 # --format json:... ADDS this formatter alongside any config defaults so we get a
 # per-run file (cucumber-report-dataplane.json) distinct from the main report.
+# `and not @browser-only`: this stage runs plain cucumber-js (no
+# E2E_DEVICE_MODE=playwright), so any @browser-only scenario would hit
+# requirePwDevice / assert.fail on a missing device — a structural hard-fail on
+# a job that cannot render a page. @browser-only scenarios are covered by the
+# playwright-mode jobs (test:browser:e2e / delivery-browser). Excluding them
+# here yields a clean HELD-skip instead of a false red. See backlog
+# a2o-playwright-device-hardfail-topology.
 cd "${A2O_DIR}"
 CUCUMBER_EXIT=0
 E2E_DOORWAY_ALPHA="${DOORWAY}" \
 E2E_STORAGE_URL="${STORAGE_URL}" \
   pnpm exec cucumber-js \
     --format "json:${CUCUMBER_OUT}" \
-    --tags '@dataplane and not @wip' \
+    --tags '@dataplane and not @wip and not @browser-only' \
     || CUCUMBER_EXIT=$?
 
 # Build the per-concern sprint report.
