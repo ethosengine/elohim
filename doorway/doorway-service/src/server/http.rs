@@ -2788,6 +2788,373 @@ async fn fetch_ids_for_reach(
     }
 }
 
+/// Which fallback strategy `serve_ssr_route` uses when SSR can't or shouldn't
+/// render this request. The SSR body is identical across both dispatch sites;
+/// only what a shed/failure degrades TO differs.
+enum SsrFallback {
+    /// Legacy registry dispatch (`classify_dispatch` → `SsrRoute` in the main
+    /// match block): the pre-existing behavior — CSR shell for the gate/render
+    /// sheds, `forward_to_storage` for spec-parse / renderer-absent — unchanged.
+    Registry,
+    /// EPR-router dispatch: EVERY shed/failure serves the projected bundle (which
+    /// carries the same chrome island via `dispatch_to_projected_epr`), tagged
+    /// `x-ssr-skipped:<reason>`. Degrades to exactly today's EPR serving behavior.
+    /// Boxed — the view is ~472B and the other variant is empty (clippy
+    /// large_enum_variant); the fallback is off the hot path so the indirection
+    /// is free.
+    ProjectedEpr(Box<elohim_views::projection::EprProjectionView>),
+}
+
+/// The point at which SSR fell back — drives `x-ssr-skipped` observability and
+/// selects the legacy fallback shape.
+enum SsrFallbackReason {
+    AuthModeUnsupported,
+    Overflow,
+    SpecParseError,
+    RendererAbsent,
+    RenderError(String),
+}
+
+impl SsrFallbackReason {
+    fn as_skip_str(&self) -> &'static str {
+        match self {
+            SsrFallbackReason::AuthModeUnsupported => "auth-mode-not-supported",
+            SsrFallbackReason::Overflow => "overflow",
+            SsrFallbackReason::SpecParseError => "spec-parse-error",
+            SsrFallbackReason::RendererAbsent => "renderer-absent",
+            SsrFallbackReason::RenderError(_) => "render-error",
+        }
+    }
+}
+
+/// Tag a projected-bundle fallback response with `x-ssr-skipped:<reason>` so an
+/// EPR route that classified SSR-eligible but shed to the bundle is observable
+/// (the SSR arm never ran; the bundle already carries the chrome island). Pure.
+fn with_ssr_skipped_header(
+    mut resp: Response<Full<Bytes>>,
+    reason: &SsrFallbackReason,
+) -> Response<Full<Bytes>> {
+    resp.headers_mut().insert(
+        "x-ssr-skipped",
+        hyper::header::HeaderValue::from_static(reason.as_skip_str()),
+    );
+    resp
+}
+
+/// At the EPR-router dispatch: divert to the V8 SSR engine only when the route
+/// classified SSR-eligible AND a renderer is loaded. A non-SSR disposition, or a
+/// renderer-absent doorway, serves the projected bundle directly — the cheapest
+/// path and today's exact behavior. Pure, so the decision is unit-testable
+/// without a live storage or renderer.
+fn epr_should_serve_ssr(dispo: &Disposition, renderer_present: bool) -> bool {
+    matches!(dispo, Disposition::SsrRoute { .. }) && renderer_present
+}
+
+/// Produce the fallback response for `serve_ssr_route`. Consumes `req` (the
+/// legacy `forward_to_storage` fallbacks need it) and `fallback` (owned so the
+/// `ProjectedEpr` variant can move its `EprProjectionView` into the proxy).
+async fn ssr_fallback_response(
+    state: &AppState,
+    req: Request<Incoming>,
+    path: &str,
+    endpoint: &str,
+    chrome_context_json: &str,
+    fallback: SsrFallback,
+    reason: SsrFallbackReason,
+) -> Response<Full<Bytes>> {
+    match fallback {
+        SsrFallback::Registry => match reason {
+            SsrFallbackReason::AuthModeUnsupported => ssr_spa_shell_fallback_with_skip_reason(
+                Some("auth-mode-not-supported"),
+                Some(chrome_context_json),
+            ),
+            SsrFallbackReason::Overflow => {
+                ssr_spa_shell_fallback_with_skip_reason(Some("overflow"), Some(chrome_context_json))
+            }
+            SsrFallbackReason::RenderError(err) => {
+                ssr_spa_shell_fallback_with_error(&err, Some(chrome_context_json))
+            }
+            SsrFallbackReason::SpecParseError | SsrFallbackReason::RendererAbsent => {
+                let agent_cid_owned = resolve_agent_cid_from_request(state, &req);
+                let ctx = routes::ForwardCtx {
+                    agent_cid: agent_cid_owned.as_deref(),
+                };
+                routes::forward_to_storage(
+                    req,
+                    endpoint,
+                    path,
+                    &state.storage_proxy_client,
+                    &state.upstream_breakers,
+                    ctx,
+                )
+                .await
+            }
+        },
+        SsrFallback::ProjectedEpr(projection) => {
+            // EVERY fallback serves the projected bundle; the chrome island is
+            // spliced INSIDE dispatch_to_projected_epr (never double-spliced —
+            // the SSR-serve inject path is a disjoint branch that never runs on
+            // any request that reaches here). Tag for observability.
+            let resp =
+                dispatch_to_projected_epr(state, path, *projection, chrome_context_json).await;
+            with_ssr_skipped_header(resp, &reason)
+        }
+    }
+}
+
+/// Serve a `render:"angular-ssr"` route through the V8 SSR engine, gated by the
+/// peer `RenderCapabilityProfile` (auth-mode claim → render semaphore → render
+/// cache → per-request fetcher+credential → render trace/stats → chrome splice).
+/// Every shed/failure degrades via `fallback`. Shared by BOTH dispatch sites so
+/// the SSR body is never duplicated: the legacy registry arm passes
+/// `SsrFallback::Registry` (CSR shell / storage proxy), the EPR-router block
+/// passes `SsrFallback::ProjectedEpr` (the projected bundle, chrome-carrying).
+///
+/// OP-GATE INVARIANT: this helper's `forward_to_storage` fallback (Registry
+/// variant, spec-parse / renderer-absent) carries NO delegates-compute op-gate
+/// and NO write-method guard — the gate lives only in the StorageProxy arm. Both
+/// call sites are GET-only: the main-match `SsrRoute` arm classifies a gated
+/// write (`POST /db/content*`) as StorageProxy, never SsrRoute (no
+/// server-controlled render_spec — pinned by
+/// `gated_writes_classify_as_storage_proxy_not_ssr`), and the EPR-router block
+/// is guarded by `method == Method::GET`. A gated write can never reach here. If
+/// a manifest ever attaches a render_spec to `/db/content*`, hoist the gate into
+/// `forward_to_storage` rather than relying on this invariant.
+async fn serve_ssr_route(
+    state: &AppState,
+    req: Request<Incoming>,
+    path: &str,
+    spec: String,
+    endpoint: String,
+    observation_id: Option<&str>,
+    fallback: SsrFallback,
+) -> Response<Full<Bytes>> {
+    // Native runtime chrome: build the omnibar element's inline context island
+    // ONCE (authoritative slug + authenticated flag from this request). Both the
+    // SSR serve and every fallback splice this identical island.
+    let chrome_context_json = build_chrome_context_json(path, &req);
+
+    // Auth-mode enforcement: if the doorway publishes a render_capability claim
+    // and the request's posture isn't in the claim's auth_modes, fall back with
+    // x-ssr-skipped: auth-mode-not-supported. Closes the audit's anonymous-
+    // render-of-authenticated-content failure mode at the dispatch boundary.
+    if let Some(claim) = state.render_capability.as_ref() {
+        let posture = determine_auth_posture(&req);
+        if !claim.auth_modes.iter().any(|m| m == posture.as_claim_str()) {
+            tracing::info!(
+                target: "doorway::ssr",
+                path = %path,
+                posture = %posture.as_claim_str(),
+                claim_modes = ?claim.auth_modes,
+                "auth mode not in claim — SSR fallback"
+            );
+            return ssr_fallback_response(
+                state,
+                req,
+                path,
+                &endpoint,
+                &chrome_context_json,
+                fallback,
+                SsrFallbackReason::AuthModeUnsupported,
+            )
+            .await;
+        }
+    }
+
+    // Concurrency limiter: bound simultaneous V8 renders by
+    // render_capability.max_concurrent_renders (or the conservative default the
+    // semaphore was sized to when no capability was derived — see
+    // doorway::render::ssr_semaphore_permits). Overflow sheds to the fallback
+    // with x-ssr-skipped: overflow — no queueing (a fallback beats waiting).
+    let _render_permit = match state.render_semaphore.as_ref() {
+        Some(sem) => match Arc::clone(sem).try_acquire_owned() {
+            Ok(p) => Some(p),
+            Err(_) => {
+                tracing::info!(
+                    target: "doorway::ssr",
+                    path = %path,
+                    available = sem.available_permits(),
+                    "render semaphore at limit — SSR fallback"
+                );
+                // SSR saturation is otherwise INVISIBLE to status-code metrics
+                // (the shed still serves HTTP 200). Emit a distinct, greppable,
+                // aggregation-countable signal on its own `ssr_busy` target.
+                tracing::warn!(
+                    target: "ssr_busy",
+                    counter = "ssr_render_busy_total",
+                    path = %path,
+                    available = sem.available_permits(),
+                    "SSR render queue saturated — shedding to fallback (HTTP 200)"
+                );
+                return ssr_fallback_response(
+                    state,
+                    req,
+                    path,
+                    &endpoint,
+                    &chrome_context_json,
+                    fallback,
+                    SsrFallbackReason::Overflow,
+                )
+                .await;
+            }
+        },
+        // No semaphore → no limiter; renderer absence is handled below.
+        None => None,
+    };
+
+    if let Some(renderer) = state.renderer.as_ref() {
+        let render_spec = match elohim_render::RenderSpec::parse(&spec) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(
+                    target: "doorway::ssr",
+                    path = %path,
+                    spec = %spec,
+                    error = %e,
+                    "Unknown render spec — SSR fallback"
+                );
+                return ssr_fallback_response(
+                    state,
+                    req,
+                    path,
+                    &endpoint,
+                    &chrome_context_json,
+                    fallback,
+                    SsrFallbackReason::SpecParseError,
+                )
+                .await;
+            }
+        };
+
+        let url = format!(
+            "{}{}",
+            path,
+            req.uri()
+                .query()
+                .map(|q| format!("?{q}"))
+                .unwrap_or_default()
+        );
+
+        // MVP cache key: (url, spec_version). TTL invalidation (5-minute default).
+        // `fetched_inputs` is captured in the audit trail (RenderOutput) but not
+        // in the lookup key. Hash-aware invalidation lands with a DHT signal
+        // subscriber driving evictions (Task 14+).
+        let cache_key = crate::ssr::render_cache_key(&url, &[], "v1");
+        if let Some(cached_html) = state.cache.get_rendered(&cache_key) {
+            tracing::debug!(target: "doorway::ssr", path = %path, "SSR cache HIT");
+            return ssr_html_response_with_observability(
+                cached_html,
+                "HIT",
+                state.render_capability.as_ref(),
+                None,
+                Some(&chrome_context_json),
+            );
+        }
+
+        // Build the originating user's credential for the V8 fetch shim
+        // (anonymous → None). Forwards the session header to outbound storage
+        // fetches so reach-aware content renders for logged-in users instead of
+        // falling back to public — the SSR-audit anonymous-render failure mode.
+        let user_credential = build_ssr_user_credential(&req);
+        let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(
+            crate::ssr::ResolverFetcher::new(Arc::clone(&state.ssr_http_client), endpoint.clone())
+                .maybe_with_user_credential(user_credential),
+        );
+        // Test-only stall fault injection (env-gated, off by default), applied to
+        // the per-request fetcher (renders run against ctx.data_fetcher).
+        let fetcher = crate::ssr::maybe_inject_stall_fault(fetcher);
+        // 60s wall: cold-start parses a ~51MB bundle (171 .mjs files) + walks
+        // Angular bootstrap (which fetches); warm renders settle to tens of ms
+        // once deno_core's module loader caches imports + V8 JIT settles.
+        let ctx = elohim_render::RenderContext {
+            spec: render_spec,
+            url: url.clone(),
+            data_fetcher: fetcher,
+            limits: elohim_render::RenderLimits {
+                wall_time_ms: 60_000,
+                ..Default::default()
+            },
+        };
+        return match renderer.render(ctx).await {
+            Ok(mut out) => {
+                // Stamp the correlation token onto the trace so the header + Loki
+                // line join browser ↔ doorway ↔ peer.
+                if let Some(obs) = observation_id {
+                    out.trace.trace_id = obs.to_string();
+                }
+                // The render-trace signal: terminal classification + per-peer
+                // latency. Shipped to Loki (info) and the feed-forward seam for
+                // compute-commitment tuning.
+                tracing::info!(
+                    target: "doorway::ssr::trace",
+                    path = %path,
+                    terminal = out.trace.terminal.as_str(),
+                    fetches = out.trace.fetches.len(),
+                    wall_ms = out.trace.wall_ms,
+                    observation_id = observation_id.unwrap_or(""),
+                    "SSR render trace"
+                );
+                state.render_trace_stats.record(&out.trace);
+                let trace = out.trace;
+                let html = out.html;
+                // Cache the UN-injected render; the chrome island is
+                // request-specific (slug/auth), spliced at serve time on both
+                // MISS and a later HIT.
+                state.cache.put_rendered(
+                    &cache_key,
+                    html.clone(),
+                    std::time::Duration::from_secs(5 * 60),
+                );
+                ssr_html_response_with_observability(
+                    html,
+                    "MISS",
+                    state.render_capability.as_ref(),
+                    Some(&trace),
+                    Some(&chrome_context_json),
+                )
+            }
+            Err(e) => {
+                let err_str = format!("{e}");
+                tracing::warn!(
+                    target: "doorway::ssr",
+                    path = %path,
+                    error = %err_str,
+                    "SSR render error — SSR fallback"
+                );
+                ssr_fallback_response(
+                    state,
+                    req,
+                    path,
+                    &endpoint,
+                    &chrome_context_json,
+                    fallback,
+                    SsrFallbackReason::RenderError(err_str),
+                )
+                .await
+            }
+        };
+    }
+
+    // Renderer absent (SSR_BUNDLE_PATH not set) — fall back so the Angular CSR
+    // bundle can hydrate client-side (Registry: storage proxy; the EPR site
+    // never reaches here — it short-circuits renderer-absent to the bundle).
+    tracing::debug!(
+        target: "doorway::ssr",
+        path = %path,
+        "SSR-eligible route but no renderer — SSR fallback"
+    );
+    ssr_fallback_response(
+        state,
+        req,
+        path,
+        &endpoint,
+        &chrome_context_json,
+        fallback,
+        SsrFallbackReason::RendererAbsent,
+    )
+    .await
+}
+
 /// Route incoming HTTP requests
 async fn handle_request(
     state: Arc<AppState>,
@@ -2935,8 +3302,39 @@ async fn handle_request(
                 url_path = %projection.url_path,
                 "EPR router matched — dispatching to projected bundle"
             );
-            // Build the omnibar context once (authoritative slug + authenticated
-            // flag from this request) so an HTML serve carries the trust surface.
+            // The manifest `render` field is the agnostic SSR contract: a
+            // projection whose path is ALSO declared render:"angular-ssr" must
+            // serve through the V8 SSR engine (peer-capability-gated), not the
+            // static projected bundle — the EPR router would otherwise shadow it
+            // (Loki-verified: zero SSR renders reached the main-match arm). Also
+            // consult the registry; ONLY the SsrRoute disposition diverts. GET-
+            // only (the enclosing `method == Method::GET` guard), so a gated write
+            // can never reach the SSR helper — the op-gate invariant holds.
+            let dispo = classify_dispatch(&state.route_registry, &method, &path).await;
+            if epr_should_serve_ssr(&dispo, state.renderer.is_some()) {
+                if let Disposition::SsrRoute { spec, endpoint } = dispo {
+                    // EVERY SSR shed/failure degrades to the projected bundle
+                    // (chrome-carrying) — i.e. exactly today's EPR serving.
+                    return Ok(to_boxed(
+                        serve_ssr_route(
+                            &state,
+                            req,
+                            &path,
+                            spec,
+                            endpoint,
+                            observation_id.as_deref(),
+                            SsrFallback::ProjectedEpr(Box::new(projection)),
+                        )
+                        .await,
+                    ));
+                }
+                // Unreachable: epr_should_serve_ssr guaranteed SsrRoute.
+            }
+            // Any other disposition (StorageProxy / RegistryUnhandled / NotFound)
+            // or a renderer-absent doorway: serve the projected bundle as today —
+            // zero behavioral change for assets, deep links, SPA fallback, alias-
+            // 302s, and the catch-all. Build the omnibar context once so the HTML
+            // serve carries the trust surface.
             let chrome_context_json = build_chrome_context_json(&path, &req);
             return Ok(to_boxed(
                 dispatch_to_projected_epr(&state, &path, projection, &chrome_context_json).await,
@@ -3795,273 +4193,32 @@ async fn handle_request(
 
             match dispo {
                 Disposition::SsrRoute { spec, endpoint } => {
-                    // Manifest-driven SSR dispatch (Task 13).
+                    // Manifest-driven SSR dispatch (Task 13). The whole SSR body —
+                    // auth-mode gate, render semaphore, cache, per-request
+                    // fetcher+credential, render trace/stats, chrome splice, and
+                    // every fallback — lives in `serve_ssr_route` and is shared
+                    // with the EPR-router dispatch site (no duplication). This arm
+                    // passes SsrFallback::Registry: sheds go to the CSR shell,
+                    // spec-parse / renderer-absent forward to storage — the
+                    // pre-existing behavior, unchanged.
                     //
-                    // OP-GATE INVARIANT: this arm's forward_to_storage fallbacks
-                    // (below) carry NO delegates-compute op-gate and NO write-method
-                    // guard — the gate lives only in the StorageProxy arm. This is
-                    // safe ONLY because a gated write (`POST /db/content*`) never
-                    // classifies as SsrRoute: those routes carry no server-controlled
-                    // render_spec. A gated write must NEVER be allowed to reach here.
-                    // `gated_writes_classify_as_storage_proxy_not_ssr` pins the
-                    // classify BRANCH-contract (a storage route with no render_spec
-                    // → StorageProxy) against a synthetic registry; the LIVE guarantee
-                    // rests on the manifest never attaching a render_spec to
-                    // /db/content* — if it ever does, hoist the gate into
-                    // forward_to_storage rather than relying on this arm.
-                    // Do NOT duplicate the gate logic here; keep gated writes out.
-                    //
-                    // Auth-mode enforcement: if the doorway publishes a
-                    // render_capability claim and the request's posture isn't
-                    // in the claim's auth_modes, fall back to the CSR shell
-                    // with x-ssr-skipped: auth-mode-not-supported. Eliminates
-                    // the audit's anonymous-render-of-authenticated-content
-                    // failure mode at the dispatch boundary.
-                    if let Some(claim) = state.render_capability.as_ref() {
-                        let posture = determine_auth_posture(&req);
-                        if !claim
-                            .auth_modes
-                            .iter()
-                            .any(|m| m == posture.as_claim_str())
-                        {
-                            tracing::info!(
-                                target: "doorway::ssr",
-                                path = %p,
-                                posture = %posture.as_claim_str(),
-                                claim_modes = ?claim.auth_modes,
-                                "auth mode not in claim — falling back to CSR shell"
-                            );
-                            let chrome_context_json = build_chrome_context_json(p, &req);
-                            return Ok(to_boxed(ssr_spa_shell_fallback_with_skip_reason(
-                                Some("auth-mode-not-supported"),
-                                Some(chrome_context_json.as_str()),
-                            )));
-                        }
-                    }
-
-                    // Concurrency limiter (Task 19): bound the number of
-                    // simultaneous V8 renders by render_capability.max_
-                    // concurrent_renders. Overflow returns CSR shell with
-                    // x-ssr-skipped: overflow. No queueing — fallback is
-                    // always faster than waiting.
-                    let _render_permit = match state.render_semaphore.as_ref() {
-                        Some(sem) => match Arc::clone(sem).try_acquire_owned() {
-                            Ok(p) => Some(p),
-                            Err(_) => {
-                                tracing::info!(
-                                    target: "doorway::ssr",
-                                    path = %p,
-                                    available = sem.available_permits(),
-                                    "render semaphore at limit — falling back to CSR shell"
-                                );
-                                // SSR saturation is otherwise INVISIBLE to
-                                // status-code metrics: the shed returns HTTP 200
-                                // with the CSR shell. Emit a distinct, greppable,
-                                // log-aggregation-countable signal on its own
-                                // `ssr_busy` target so saturation is observable
-                                // (the post-deploy watch item). HTTP behavior is
-                                // unchanged — still 200 + CSR shell below.
-                                tracing::warn!(
-                                    target: "ssr_busy",
-                                    counter = "ssr_render_busy_total",
-                                    path = %p,
-                                    available = sem.available_permits(),
-                                    "SSR render queue saturated — shedding to CSR shell (HTTP 200)"
-                                );
-                                let chrome_context_json = build_chrome_context_json(p, &req);
-                                return Ok(to_boxed(
-                                    ssr_spa_shell_fallback_with_skip_reason(
-                                        Some("overflow"),
-                                        Some(chrome_context_json.as_str()),
-                                    ),
-                                ));
-                            }
-                        },
-                        // No claim → no limiter; renderer absence is handled
-                        // by the inner `if let Some(renderer)` branch below.
-                        None => None,
-                    };
-
-                    if let Some(renderer) = state.renderer.as_ref() {
-                        let render_spec = match elohim_render::RenderSpec::parse(&spec) {
-                            Ok(s) => s,
-                            Err(e) => {
-                                tracing::warn!(
-                                    target: "doorway::ssr",
-                                    path = %p,
-                                    spec = %spec,
-                                    error = %e,
-                                    "Unknown render spec — falling back to storage proxy"
-                                );
-                                let agent_cid_owned =
-                                    resolve_agent_cid_from_request(&state, &req);
-                                let ctx = routes::ForwardCtx {
-                                    agent_cid: agent_cid_owned.as_deref(),
-                                };
-                                return Ok(to_boxed(
-                                    routes::forward_to_storage(
-                        req,
-                        &endpoint,
-                        p,
-                        &state.storage_proxy_client,
-                        &state.upstream_breakers,
-                        ctx,
-                    )
-                    .await,
-                                ));
-                            }
-                        };
-
-                        let url = format!(
-                            "{}{}",
-                            p,
-                            req.uri()
-                                .query()
-                                .map(|q| format!("?{q}"))
-                                .unwrap_or_default()
-                        );
-
-                        // Native runtime chrome: build the omnibar element's inline
-                        // context island ONCE (authoritative slug + authenticated
-                        // flag from this request) so both the cache-HIT and the
-                        // fresh-render responses inject the identical island.
-                        let chrome_context_json = build_chrome_context_json(p, &req);
-
-                        // MVP cache key: (url, spec_version). Invalidation is TTL-based
-                        // (5-minute default). `fetched_inputs` is captured in the audit
-                        // trail (RenderOutput) but not in the lookup key. Hash-aware
-                        // invalidation lands when a DHT signal subscriber drives evictions
-                        // (Task 14+).
-                        let cache_key = crate::ssr::render_cache_key(&url, &[], "v1");
-                        if let Some(cached_html) = state.cache.get_rendered(&cache_key) {
-                            tracing::debug!(
-                                target: "doorway::ssr",
-                                path = %p,
-                                "SSR cache HIT"
-                            );
-                            return Ok(to_boxed(ssr_html_response_with_observability(
-                                cached_html,
-                                "HIT",
-                                state.render_capability.as_ref(),
-                                None,
-                                Some(&chrome_context_json),
-                            )));
-                        }
-
-                        // Build the originating user's credential for the V8
-                        // fetch shim (anonymous → None, no header forwarded).
-                        // Anonymous-render-of-authenticated-content is the
-                        // failure mode flagged in the SSR audit; this thread
-                        // forwards the user's session header to outbound
-                        // storage fetches so reach-aware content renders for
-                        // logged-in users instead of falling back to public.
-                        let user_credential = build_ssr_user_credential(&req);
-
-                        let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(
-                            crate::ssr::ResolverFetcher::new(
-                                Arc::clone(&state.ssr_http_client),
-                                endpoint.clone(),
-                            )
-                            .maybe_with_user_credential(user_credential),
-                        );
-                        // Test-only stall fault injection (env-gated, off by default).
-                        // Applied to the per-request fetcher because the renderer now
-                        // renders against ctx.data_fetcher (per-request swap), not its
-                        // construction-time bootstrap fetcher.
-                        let fetcher = crate::ssr::maybe_inject_stall_fault(fetcher);
-                        // Default RenderLimits.wall_time_ms is 2_000ms — too tight
-                        // for cold-start where V8 parses + interprets a 51MB bundle
-                        // (171 .mjs files, main.server.mjs ~484KB), walks Angular's
-                        // bootstrap (which makes HTTP fetches), and renders. 15s
-                        // wasn't enough either when fetch was wired (Angular awaits
-                        // ConfigService etc. on first call). 60s is generous for
-                        // cold start; warm renders are tens of ms once deno_core's
-                        // module loader caches imports + V8 JIT settles.
-                        let ctx = elohim_render::RenderContext {
-                            spec: render_spec,
-                            url: url.clone(),
-                            data_fetcher: fetcher,
-                            limits: elohim_render::RenderLimits {
-                                wall_time_ms: 60_000,
-                                ..Default::default()
-                            },
-                        };
-                        return Ok(to_boxed(match renderer.render(ctx).await {
-                            Ok(mut out) => {
-                                // Stamp the correlation token onto the trace so the
-                                // header + Loki line join browser ↔ doorway ↔ peer.
-                                if let Some(ref obs) = observation_id {
-                                    out.trace.trace_id = obs.clone();
-                                }
-                                // The render-trace signal: terminal classification +
-                                // per-peer latency. Shipped to Loki (info) and the
-                                // feed-forward seam for compute-commitment tuning.
-                                tracing::info!(
-                                    target: "doorway::ssr::trace",
-                                    path = %p,
-                                    terminal = out.trace.terminal.as_str(),
-                                    fetches = out.trace.fetches.len(),
-                                    wall_ms = out.trace.wall_ms,
-                                    observation_id = observation_id.as_deref().unwrap_or(""),
-                                    "SSR render trace"
-                                );
-                                // Feed-forward: fold this render into the in-process
-                                // aggregate the capability tuner / commitment scorer reads.
-                                state.render_trace_stats.record(&out.trace);
-                                let trace = out.trace;
-                                let html = out.html;
-                                // Cache the UN-injected render; the chrome island
-                                // is request-specific (slug/auth), so it is spliced
-                                // at serve time on both MISS and a later HIT.
-                                state.cache.put_rendered(
-                                    &cache_key,
-                                    html.clone(),
-                                    std::time::Duration::from_secs(5 * 60),
-                                );
-                                ssr_html_response_with_observability(
-                                    html,
-                                    "MISS",
-                                    state.render_capability.as_ref(),
-                                    Some(&trace),
-                                    Some(&chrome_context_json),
-                                )
-                            }
-                            Err(e) => {
-                                let err_str = format!("{e}");
-                                tracing::warn!(
-                                    target: "doorway::ssr",
-                                    path = %p,
-                                    error = %err_str,
-                                    "SSR render error — falling back to SPA shell"
-                                );
-                                ssr_spa_shell_fallback_with_error(
-                                    &err_str,
-                                    Some(chrome_context_json.as_str()),
-                                )
-                            }
-                        }));
-                    }
-                    // Renderer absent (SSR_BUNDLE_PATH not set) — forward to storage
-                    // so the Angular CSR bundle can hydrate on the client side.
-                    tracing::debug!(
-                        target: "doorway::ssr",
-                        path = %p,
-                        "SSR-eligible route but no renderer — falling back to storage proxy"
-                    );
-                    let agent_cid_owned = resolve_agent_cid_from_request(&state, &req);
-                    let ctx = routes::ForwardCtx {
-                        agent_cid: agent_cid_owned.as_deref(),
-                    };
+                    // OP-GATE INVARIANT (full statement on serve_ssr_route): a
+                    // gated write (`POST /db/content*`) never classifies as
+                    // SsrRoute (no server-controlled render_spec), so the helper's
+                    // un-gated forward_to_storage fallback can never serve one.
+                    // Pinned by `gated_writes_classify_as_storage_proxy_not_ssr`.
+                    // Do NOT add the gate here; keep gated writes out.
                     return Ok(to_boxed(
-                        routes::forward_to_storage(
-                        req,
-                        &endpoint,
-                        p,
-                        &state.storage_proxy_client,
-                        &state.upstream_breakers,
-                        ctx,
-                    )
-                    .await,
+                        serve_ssr_route(
+                            &state,
+                            req,
+                            p,
+                            spec,
+                            endpoint,
+                            observation_id.as_deref(),
+                            SsrFallback::Registry,
+                        )
+                        .await,
                     ));
                 }
 
@@ -5212,6 +5369,72 @@ mod ssr_session_tests {
             "island present: {html}"
         );
     }
+
+    // ── EPR→SSR fallback (the projected-bundle path) ─────────────────────────
+
+    #[test]
+    fn ssr_fallback_reason_skip_strings() {
+        // The x-ssr-skipped vocabulary the EPR fallback tags responses with.
+        assert_eq!(
+            SsrFallbackReason::AuthModeUnsupported.as_skip_str(),
+            "auth-mode-not-supported"
+        );
+        assert_eq!(SsrFallbackReason::Overflow.as_skip_str(), "overflow");
+        assert_eq!(
+            SsrFallbackReason::SpecParseError.as_skip_str(),
+            "spec-parse-error"
+        );
+        assert_eq!(
+            SsrFallbackReason::RendererAbsent.as_skip_str(),
+            "renderer-absent"
+        );
+        assert_eq!(
+            SsrFallbackReason::RenderError("boom".to_string()).as_skip_str(),
+            "render-error"
+        );
+    }
+
+    #[test]
+    fn epr_ssr_fallback_carries_skip_header_and_single_island() {
+        // The EPR→SSR fallback serves the projected bundle: the chrome island is
+        // spliced INSIDE dispatch_to_projected_epr (via maybe_inject_chrome), and
+        // the response is tagged x-ssr-skipped:<reason>. Exercise the pure
+        // composition without a live storage/renderer: inject once (as the proxy
+        // does), then tag — the island stays exactly-one and the header lands.
+        let ctx = r#"{"slug":"elohim-host-landing","authenticated":false}"#;
+        let (body, injected) = maybe_inject_chrome(
+            200,
+            "text/html; charset=utf-8",
+            Bytes::from_static(b"<!doctype html><html><body><app-root></app-root></body></html>"),
+            ctx,
+        );
+        assert!(injected, "the proxied HTML page must inject chrome");
+        let resp = Response::builder()
+            .status(200)
+            .header("content-type", "text/html; charset=utf-8")
+            .body(Full::new(body))
+            .unwrap();
+        let tagged = with_ssr_skipped_header(resp, &SsrFallbackReason::Overflow);
+        assert_eq!(
+            tagged.headers().get("x-ssr-skipped").unwrap(),
+            "overflow",
+            "fallback carries the skip reason"
+        );
+        let out = futures::executor::block_on(async {
+            tagged.into_body().collect().await.unwrap().to_bytes()
+        });
+        let html = String::from_utf8(out.to_vec()).unwrap();
+        assert_eq!(
+            html.matches("id=\"elohim-omni-context\"").count(),
+            1,
+            "exactly one context island survives the fallback: {html}"
+        );
+        assert_eq!(
+            html.matches("omni-element.").count(),
+            1,
+            "exactly one element loader: {html}"
+        );
+    }
 }
 
 #[cfg(test)]
@@ -5423,7 +5646,7 @@ mod dispatch_classification_tests {
     //! `stream_proxy` / future manifest path families to elohim-storage's
     //! manifest must NOT require a doorway code change to make them routable.
 
-    use super::{classify_dispatch, Disposition};
+    use super::{classify_dispatch, epr_should_serve_ssr, Disposition};
     use crate::services::RouteRegistry;
     use doorway_client::HttpMethod;
     use hyper::Method;
@@ -5566,6 +5789,52 @@ mod dispatch_classification_tests {
                 "POST {path} must classify as StorageProxy (gated arm), never SsrRoute; got {dispo:?}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn landing_routes_that_epr_router_also_serves_still_classify_ssr() {
+        // EPR-router SSR divert (rollout step 5): the four landing routes the EPR
+        // router mounts (render:"angular-ssr") must still classify as SsrRoute so
+        // the EPR-dispatch block can route them through the V8 SSR engine.
+        // classify_dispatch consults ONLY the registry — the EPR match is
+        // orthogonal — so a route BOTH mounted and rendered still yields SsrRoute
+        // + the render spec (the pin for the divert's classify contract).
+        let cases = [
+            ("/lamad/concept/:id", "/lamad/concept/abc"),
+            ("/lamad/path/:slug", "/lamad/path/intro"),
+            ("/lamad/path/:slug/step/:n", "/lamad/path/intro/step/2"),
+        ];
+        for (registered, concrete) in cases {
+            let registry =
+                registry_with_ssr_route(HttpMethod::Get, registered, "angular-ssr").await;
+            let dispo = classify_dispatch(&registry, &Method::GET, concrete).await;
+            assert!(
+                matches!(&dispo, Disposition::SsrRoute { spec, .. } if spec == "angular-ssr"),
+                "{registered} must classify as SsrRoute for the EPR SSR divert; got {dispo:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn epr_diverts_to_ssr_only_when_ssr_route_and_renderer_present() {
+        // The EPR-dispatch decision (pure, no HTTP): divert to the V8 SSR engine
+        // iff the disposition is SsrRoute AND a renderer is loaded. Every other
+        // combination serves the projected bundle (today's exact behavior).
+        let ssr = Disposition::SsrRoute {
+            spec: "angular-ssr".to_string(),
+            endpoint: "http://storage:8090".to_string(),
+        };
+        let proxy = Disposition::StorageProxy {
+            endpoint: "http://storage:8090".to_string(),
+        };
+        // SsrRoute + renderer → divert.
+        assert!(epr_should_serve_ssr(&ssr, true));
+        // SsrRoute but NO renderer → projected bundle (cheapest path, today's behavior).
+        assert!(!epr_should_serve_ssr(&ssr, false));
+        // Non-SSR dispositions never divert, renderer present or not.
+        assert!(!epr_should_serve_ssr(&proxy, true));
+        assert!(!epr_should_serve_ssr(&Disposition::RegistryUnhandled, true));
+        assert!(!epr_should_serve_ssr(&Disposition::NotFound, true));
     }
 }
 
