@@ -12,6 +12,8 @@ use deno_core::{
     RuntimeOptions,
 };
 
+use crate::shim::loader::NodeShimLoader;
+use crate::shim::node_crypto::node_crypto_ext;
 use crate::shim::{console::console_ext, text::text_ext, url::url_ext};
 
 use crate::{RenderError, Result};
@@ -66,15 +68,18 @@ impl JsRuntime {
     /// deno_core's `op_encode`/`op_decode` builtins. None of these are available
     /// in a bare deno_core runtime without a snapshot; the extensions inject them.
     ///
-    /// Includes `FsModuleLoader` so that `render_via_module` works from the
-    /// same runtime instance.
+    /// Includes the [`NodeShimLoader`] so that `render_via_module` works from the
+    /// same runtime instance AND the bundle's bare Node-builtin imports (`crypto`
+    /// / `node:crypto`) resolve to injected shims instead of panicking; the
+    /// `node_crypto_ext` op backs the crypto shim's `createHash`.
     pub fn with_shims() -> Self {
         let inner = DenoJsRuntime::new(RuntimeOptions {
-            module_loader: Some(Rc::new(FsModuleLoader)),
+            module_loader: Some(Rc::new(NodeShimLoader::new())),
             extensions: vec![
                 console_ext::init_ops_and_esm(),
                 url_ext::init_ops_and_esm(),
                 text_ext::init_ops_and_esm(),
+                node_crypto_ext::init_ops_and_esm(),
             ],
             ..Default::default()
         });
@@ -92,17 +97,20 @@ impl JsRuntime {
     /// `eval_string` receives a Promise result, so callers can `await fetch()`
     /// inside an async IIFE evaluated through `eval_string`.
     ///
-    /// Includes `FsModuleLoader` so that `render_via_module` works from the
-    /// same runtime instance.
+    /// Includes the [`NodeShimLoader`] so that `render_via_module` works from the
+    /// same runtime instance AND the Angular server bundle's bare Node-builtin
+    /// imports (`crypto` / `node:crypto`) resolve to injected shims instead of
+    /// panicking; the `node_crypto_ext` op backs the crypto shim's `createHash`.
     pub fn with_full_shims(fetcher: std::sync::Arc<dyn crate::DataFetcher>) -> Self {
         use crate::shim::fetch::{fetch_ext, FetcherHandle};
         let inner = DenoJsRuntime::new(RuntimeOptions {
-            module_loader: Some(Rc::new(FsModuleLoader)),
+            module_loader: Some(Rc::new(NodeShimLoader::new())),
             extensions: vec![
                 console_ext::init_ops_and_esm(),
                 url_ext::init_ops_and_esm(),
                 text_ext::init_ops_and_esm(),
                 fetch_ext::init_ops_and_esm(FetcherHandle(fetcher)),
+                node_crypto_ext::init_ops_and_esm(),
             ],
             ..Default::default()
         });
