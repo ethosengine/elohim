@@ -17,20 +17,58 @@ import { Duplex } from "node:stream";
 import { TLSSocket, connect } from "node:tls";
 import { createSocket } from "node:dgram";
 import { networkInterfaces } from "node:os";
+// Static crypto import: evaluates the crypto shim, which registers its CJS
+// exports on the global that `require("crypto")` reads (single source of truth).
+import cryptoDefault from "node:crypto";
 
 export function render(_url) {
   const parts = [];
 
-  // --- module.createRequire is REAL: returns a require function, loud if called.
+  // --- module.createRequire is REAL: returns a require function that resolves
+  //     Node builtins to CJS exports, and stays loud for non-builtin ids.
   const require = createRequire("file:///bundle/polyfills.server.mjs");
   parts.push("createRequire-fn:" + (typeof require === "function"));
   parts.push("createRequireBare-fn:" + (typeof createRequireBare === "function"));
+  // A NON-builtin id (an npm native addon `ws` try/catches) stays loud.
   try {
-    require("fs");
+    require("bufferutil");
     parts.push("require-call:DID-NOT-THROW");
   } catch (e) {
     parts.push("require-loud:" + /not supported in the SSR runtime/.test(e.message));
   }
+
+  // --- require("events") returns the CJS shape: the constructible EventEmitter
+  //     itself (Node: `require("events") === EventEmitter`), with siblings on it.
+  const evCjs = require("events");
+  parts.push("require-events-ctor:" + (typeof evCjs === "function"));
+  parts.push("require-events-self:" + (evCjs.EventEmitter === evCjs));
+  // `class X extends require("events")` must be a legal class definition (the
+  // loud EventEmitter is constructible; super() only throws on instantiation).
+  let extendsOk = false;
+  try {
+    class MyEmitter extends evCjs {}
+    extendsOk = typeof MyEmitter === "function";
+  } catch (_e) {
+    extendsOk = false;
+  }
+  parts.push("require-events-extends:" + extendsOk);
+  // A `node:` prefix resolves the same builtin.
+  parts.push("require-node-prefix:" + (require("node:events") === evCjs));
+  // A plain-namespace builtin: require("net") is an object carrying its members.
+  const netCjs = require("net");
+  parts.push(
+    "require-net-shape:" +
+      (typeof netCjs === "object" && typeof netCjs.createServer === "function"),
+  );
+
+  // require("crypto") is served from the crypto shim's global registration and is
+  // LITERALLY the same object as the ESM `import crypto from "node:crypto"` -- the
+  // crypto member list is not forked between the ESM and CJS surfaces.
+  parts.push("require-crypto-same:" + (require("crypto") === cryptoDefault));
+  parts.push(
+    "require-crypto-createHash:" +
+      (typeof require("crypto").createHash === "function"),
+  );
 
   // --- util.promisify is REAL.
   const pfn = promisify(function (cb) {

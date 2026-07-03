@@ -35,8 +35,9 @@
 //!
 //! - `module.createRequire` — the Angular polyfill calls it at eval time
 //!   (`globalThis['require'] ??= createRequire(import.meta.url)`), so it must
-//!   return a real `require` function (whose body is itself loud-if-called: the
-//!   render path must not synchronously require a module).
+//!   return a real `require` function. That `require` is NOT fully loud: it
+//!   resolves Node-builtin ids to synchronous CJS exports objects (see the CJS
+//!   interop section below). Non-builtin ids stay loud.
 //! - `util.promisify` — commonly called at module-eval time to wrap callback
 //!   APIs; a correct minimal implementation avoids an eval-time throw.
 //! - `events.setMaxListeners` — a listener-cap raise; a no-op is semantically
@@ -45,6 +46,31 @@
 //! Everything else stays a loud stub. Extend deliberately, one member at a time,
 //! as a render path proves it needs the member — never speculatively fabricate a
 //! return value (that trades a loud, precise failure for a silent-wrong render).
+//!
+//! # CJS `require(builtin)` interop — one source of truth with the ESM surface
+//!
+//! The deployed bundle bundles `ws` (CommonJS). esbuild's CJS-in-ESM shim routes
+//! its `require(...)` calls to `globalThis.require`, which the Angular polyfill
+//! sets to `createRequire(import.meta.url)`. So `ws` reaches for a SYNCHRONOUS
+//! `require("events")` / `require("stream")` / ... returning a CJS exports object
+//! at module-init time. A fully-loud `require` walls the boot at the first such
+//! call.
+//!
+//! The `require` this shim's `createRequire` returns therefore resolves any id
+//! that names a builtin on [`BUILTIN_SURFACE`] (stripping an optional `node:`
+//! prefix) to a CJS exports object built from the SAME table + [`real_member`]
+//! that back the ESM synthetic modules — the member lists are NOT forked (a test
+//! asserts CJS and ESM expose identical member names per builtin). A CJS exports
+//! object is normally a plain namespace (`{ createServer, isIP, ... }`); a builtin
+//! whose Node `module.exports` is a callable/constructible primary (only `events`:
+//! `require("events") === EventEmitter`, so `class X extends require("events")`
+//! works) is marked with [`BuiltinSurface::cjs_primary`], and its exports object
+//! IS that member with the siblings hung off it. `crypto` is deliberately absent
+//! from the table (it has a richer JS shim, [`crate::shim::node_crypto`]); its CJS
+//! form is the SAME `cryptoShim` object, which that shim registers on
+//! `globalThis.__elohimBuiltinCjs` at eval so `require("crypto")` returns it
+//! without forking the crypto member list. Non-builtin ids (npm native addons like
+//! `bufferutil`) stay loud — `ws` try/catches those and falls back to JS.
 //!
 //! # WARNING: pure ASCII
 //!
@@ -60,6 +86,16 @@ struct BuiltinSurface {
     /// Named exports the bundle statically imports from this builtin. Every one
     /// must exist as a named export for `import { X } from "..."` to link.
     named: &'static [&'static str],
+    /// For CJS `require(builtin)` only: the member (if any) that IS the Node
+    /// `module.exports` — a callable/constructible value with the other members
+    /// hung off it as properties, rather than a plain namespace object. This
+    /// mirrors Node's own shape for builtins like `events`
+    /// (`require("events") === EventEmitter`, so `class X extends
+    /// require("events")` and `require("events").EventEmitter` both work). `None`
+    /// (the common case) means the CJS exports is a plain `{ ...members }` object.
+    /// Irrelevant to the ESM surface, which always exports named + a default
+    /// Proxy.
+    cjs_primary: Option<&'static str>,
 }
 
 /// The static import surface of the deployed Angular server bundle, minus
@@ -72,78 +108,111 @@ const BUILTIN_SURFACE: &[BuiltinSurface] = &[
     BuiltinSurface {
         name: "buffer",
         named: &["Buffer"],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "cluster",
         named: &[],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "dgram",
         named: &["createSocket"],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "events",
         named: &["EventEmitter", "on", "setMaxListeners"],
+        // Node: `require("events") === EventEmitter`. `ws` does
+        // `class WebSocket extends require("events")`, so the CJS exports must be
+        // the constructible EventEmitter, not a plain namespace.
+        cjs_primary: Some("EventEmitter"),
     },
     BuiltinSurface {
         name: "fs",
         named: &[],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "http",
         named: &["Agent"],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "https",
         named: &[],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "module",
         named: &["createRequire"],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "net",
         named: &["createServer", "isIP", "isIPv4", "isIPv6"],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "os",
         named: &["networkInterfaces"],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "path",
         named: &[],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "process",
         named: &[],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "stream",
         named: &["Duplex"],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "tls",
         named: &["TLSSocket", "connect"],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "tty",
         named: &[],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "url",
         named: &[],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "util",
         named: &["promisify"],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "vm",
         named: &[],
+        cjs_primary: None,
     },
     BuiltinSurface {
         name: "worker_threads",
         named: &[],
+        cjs_primary: None,
+    },
+    BuiltinSurface {
+        name: "zlib",
+        // CJS-only: `ws`'s permessage-deflate does `require("zlib")` (never an ESM
+        // import) and calls `createDeflateRaw` / `createInflateRaw` at
+        // connection-compression time (not boot). Loud stubs so a connection-time
+        // call fails with a named error; the `Z_*` constants ws reads are absent
+        // (undefined) rather than misrepresented as loud-stub functions, and are
+        // not on the boot path.
+        named: &["createDeflateRaw", "createInflateRaw"],
+        cjs_primary: None,
     },
 ];
 
@@ -155,34 +224,11 @@ fn surface(name: &str) -> Option<&'static BuiltinSurface> {
 /// The REAL implementation body for `(builtin, member)`, or `None` for a loud
 /// stub. Each returned string is a JS expression that evaluates to the member's
 /// value (a function or class). Kept tiny and semantically-safe — never a
-/// fabricated data return.
+/// fabricated data return. `("module", "createRequire")` is NOT here — its body
+/// embeds the CJS registry and is generated by [`create_require_body`] (see
+/// [`member_body`]).
 fn real_member(builtin: &str, member: &str) -> Option<&'static str> {
     match (builtin, member) {
-        // The Angular polyfill calls createRequire at eval time and assigns the
-        // result to globalThis.require. It must return a real require function;
-        // that require is itself loud-if-called (an SSR render must not
-        // synchronously require a module). require.resolve / .cache / .main
-        // exist because esbuild banners sometimes probe them at eval time.
-        ("module", "createRequire") => Some(
-            "function createRequire(_from) {\n\
-            \x20 function require(id) {\n\
-            \x20   throw new Error(\n\
-            \x20     \"elohim-render module shim: require(\" + JSON.stringify(id) + \
-            \") is not supported in the SSR runtime. createRequire returns a stub \
-            require; the render path must not synchronously require a module.\"\n\
-            \x20   );\n\
-            \x20 }\n\
-            \x20 require.resolve = function (id) {\n\
-            \x20   throw new Error(\n\
-            \x20     \"elohim-render module shim: require.resolve(\" + \
-            JSON.stringify(id) + \") is not supported in the SSR runtime.\"\n\
-            \x20   );\n\
-            \x20 };\n\
-            \x20 require.cache = Object.create(null);\n\
-            \x20 require.main = undefined;\n\
-            \x20 return require;\n\
-            }",
-        ),
         // A correct minimal promisify: wrap a Node error-first callback API in a
         // Promise. Commonly invoked at module-eval time, so a loud stub would
         // throw before the render even starts.
@@ -208,6 +254,165 @@ fn real_member(builtin: &str, member: &str) -> Option<&'static str> {
         ("events", "setMaxListeners") => Some("function setMaxListeners() { return undefined; }"),
         _ => None,
     }
+}
+
+/// The JS expression that evaluates to the REAL value for `(builtin, member)`,
+/// or `None` for a loud stub. The single resolver both the ESM synthetic modules
+/// and the CJS `require` registry consult, so the two surfaces never fork: a
+/// member is real in both or loud in both. `createRequire` is the one member
+/// whose body is generated (it embeds the registry), so it lives here rather than
+/// in the `&'static str` [`real_member`] table.
+fn member_body(builtin: &str, member: &str) -> Option<String> {
+    if (builtin, member) == ("module", "createRequire") {
+        return Some(create_require_body());
+    }
+    real_member(builtin, member).map(str::to_string)
+}
+
+/// The JS expression for a member's value in a generated object: the real impl
+/// wrapped in parens, else `loud_call` (a call to whichever loud-stub factory is
+/// in scope — `__loud("member")` for an ESM module, `__loud("builtin","member")`
+/// for the CJS registry).
+fn member_value_expr(builtin: &str, member: &str, loud_call: &str) -> String {
+    match member_body(builtin, member) {
+        Some(body) => format!("({body})"),
+        None => loud_call.to_string(),
+    }
+}
+
+/// A JS string literal for `s`, double-quoted with the JS-significant chars
+/// escaped. Used for member names / builtin names embedded in generated source.
+/// (Our names are ASCII identifiers, but escaping keeps the generator correct if
+/// the table ever carries an odd char, and satisfies the ASCII-source rule.)
+fn js_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            _ => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// The `createRequire` implementation, including the embedded CJS builtin
+/// registry its returned `require` resolves against. Generated (not a static
+/// literal) so the registry is built from the SAME [`BUILTIN_SURFACE`] +
+/// [`member_body`] as the ESM synthetic modules.
+///
+/// The Angular polyfill calls this once at eval time
+/// (`globalThis.require ??= createRequire(import.meta.url)`), so the registry is
+/// built once. `require(id)` strips an optional `node:` prefix and returns the
+/// matching builtin's CJS exports; `crypto` is served from the global the crypto
+/// shim registers; anything else is loud. `require.resolve` / `.cache` / `.main`
+/// exist because esbuild banners probe them at eval time.
+fn create_require_body() -> String {
+    let mut out = String::new();
+    out.push_str("function createRequire(_from) {\n");
+    out.push_str("  const __registry = ");
+    out.push_str(&cjs_registry_expr());
+    out.push_str(";\n");
+    out.push_str("  function require(id) {\n");
+    out.push_str(
+        "    const key = (typeof id === \"string\" && id.slice(0, 5) === \"node:\") ? id.slice(5) : id;\n",
+    );
+    // crypto is served from the global the richer crypto shim registers on eval,
+    // so the CJS form is literally the same object as the ESM default export.
+    out.push_str(
+        "    if ((key === \"crypto\") && typeof globalThis !== \"undefined\" && globalThis.__elohimBuiltinCjs && globalThis.__elohimBuiltinCjs.crypto) {\n\
+        \x20     return globalThis.__elohimBuiltinCjs.crypto;\n\
+        \x20   }\n",
+    );
+    out.push_str(
+        "    if (typeof key === \"string\" && Object.prototype.hasOwnProperty.call(__registry, key)) {\n\
+        \x20     return __registry[key];\n\
+        \x20   }\n",
+    );
+    out.push_str(
+        "    throw new Error(\n\
+        \x20     \"elohim-render module shim: require(\" + JSON.stringify(id) + \
+        \") is not supported in the SSR runtime. Only Node builtins on the shim surface \
+        (elohim/elohim-render/src/shim/node_builtins.rs) resolve synchronously via require; \
+        this id is a non-builtin (e.g. an npm native addon) or an unshimmed builtin.\"\n\
+        \x20   );\n",
+    );
+    out.push_str("  }\n");
+    out.push_str(
+        "  require.resolve = function (id) {\n\
+        \x20   throw new Error(\n\
+        \x20     \"elohim-render module shim: require.resolve(\" + JSON.stringify(id) + \
+        \") is not supported in the SSR runtime.\"\n\
+        \x20   );\n\
+        \x20 };\n",
+    );
+    out.push_str("  require.cache = Object.create(null);\n");
+    out.push_str("  require.main = undefined;\n");
+    out.push_str("  return require;\n");
+    out.push('}');
+    out
+}
+
+/// The JS expression for the CJS builtin registry: an object mapping each bare
+/// builtin name to its CJS exports object, built from [`BUILTIN_SURFACE`] +
+/// [`member_body`] (the SAME source the ESM synthetic modules use). `module` is
+/// excluded — `require("module")` is never needed, and including it would recurse
+/// (its `createRequire` member embeds this very registry). `crypto` is excluded —
+/// it is served from `globalThis.__elohimBuiltinCjs` (see [`create_require_body`]).
+fn cjs_registry_expr() -> String {
+    let mut out = String::new();
+    out.push_str("(function () {\n");
+    out.push_str(
+        "  function __loud(builtin, member) {\n\
+        \x20   return function loudStub() {\n\
+        \x20     throw new Error(\n\
+        \x20       \"elohim-render \" + builtin + \" shim (CJS via require): \" + member + \
+        \"() is not implemented (SSR runtime shim, \
+        elohim/elohim-render/src/shim/node_builtins.rs). The server bundle require()'d it \
+        during render; implement it deliberately if the render path needs it.\"\n\
+        \x20     );\n\
+        \x20   };\n\
+        \x20 }\n",
+    );
+    out.push_str("  const reg = Object.create(null);\n");
+    for entry in BUILTIN_SURFACE {
+        // Skip `module` (recursion: its createRequire embeds this registry).
+        if entry.name == "module" {
+            continue;
+        }
+        out.push_str("  {\n");
+        for member in entry.named {
+            let loud_call = format!("__loud({}, {})", js_string(entry.name), js_string(member));
+            let val = member_value_expr(entry.name, member, &loud_call);
+            out.push_str(&format!("    const m_{member} = {val};\n"));
+        }
+        match entry.cjs_primary {
+            // module.exports IS the primary member; siblings hang off it.
+            Some(primary) => {
+                out.push_str(&format!("    const __exports = m_{primary};\n"));
+                for member in entry.named {
+                    out.push_str(&format!("    __exports.{member} = m_{member};\n"));
+                }
+            }
+            // Plain namespace object.
+            None => {
+                out.push_str("    const __exports = {};\n");
+                for member in entry.named {
+                    out.push_str(&format!("    __exports.{member} = m_{member};\n"));
+                }
+            }
+        }
+        out.push_str(&format!(
+            "    reg[{}] = __exports;\n",
+            js_string(entry.name)
+        ));
+        out.push_str("  }\n");
+    }
+    out.push_str("  return reg;\n");
+    out.push_str("})()");
+    out
 }
 
 /// Build the link-safe synthetic module source for a builtin, or `None` if the
@@ -244,16 +449,12 @@ fn render_module(entry: &BuiltinSurface) -> String {
         }}\n\n"
     ));
 
-    // Named exports: real impl where we have one, else a loud stub.
+    // Named exports: real impl where we have one, else a loud stub. `member_body`
+    // (not `real_member`) so the ESM `module` shim's `createRequire` gets the
+    // same registry-backed body the CJS path uses — one source, both surfaces.
     for member in entry.named {
-        match real_member(name, member) {
-            Some(body) => {
-                out.push_str(&format!("const {member} = ({body});\n"));
-            }
-            None => {
-                out.push_str(&format!("const {member} = __loud(\"{member}\");\n"));
-            }
-        }
+        let val = member_value_expr(name, member, &format!("__loud(\"{member}\")"));
+        out.push_str(&format!("const {member} = {val};\n"));
     }
 
     // The named-export statement (empty braces are legal if there are no names).
@@ -345,10 +546,15 @@ mod tests {
             src.contains("function createRequire(_from)"),
             "createRequire must be the real impl, not a loud stub: {src}"
         );
-        // The returned require is itself loud-if-called.
+        // The returned require resolves builtins from an embedded CJS registry...
         assert!(
-            src.contains("must not synchronously require a module"),
-            "the returned require must be loud-if-called: {src}"
+            src.contains("const __registry = "),
+            "createRequire must embed the CJS builtin registry: {src}"
+        );
+        // ...and is loud for NON-builtin ids (npm addons, unshimmed builtins).
+        assert!(
+            src.contains("is not supported in the SSR runtime"),
+            "the returned require must be loud for non-builtin ids: {src}"
         );
     }
 
@@ -364,11 +570,88 @@ mod tests {
             events.contains("function setMaxListeners()"),
             "setMaxListeners must be a real no-op: {events}"
         );
-        // EventEmitter stays a loud stub (not proven called on the render path).
+        // EventEmitter stays a loud stub in BOTH surfaces (not proven called on
+        // the render path; a WebSocket instantiation would upgrade it to real).
         assert!(
             events.contains("const EventEmitter = __loud(\"EventEmitter\")"),
             "EventEmitter stays a loud stub until proven needed: {events}"
         );
+    }
+
+    #[test]
+    fn createrequire_registry_resolves_builtins_and_stays_loud_for_others() {
+        let src = synthetic_module_source("module").expect("module has a shim");
+        // The registry carries the builtins ws require()s, keyed by bare name.
+        for name in ["events", "net", "stream", "http", "https", "tls", "util"] {
+            assert!(
+                src.contains(&format!("reg[\"{name}\"]")),
+                "CJS registry must carry '{name}': {src}"
+            );
+        }
+        // A `node:` prefix is stripped before lookup.
+        assert!(
+            src.contains("id.slice(5)"),
+            "require must strip a node: prefix before lookup: {src}"
+        );
+        // `module` itself is excluded (would recurse) and crypto is served from
+        // the global the crypto shim registers.
+        assert!(
+            !src.contains("reg[\"module\"]"),
+            "the module builtin must be excluded from the registry: {src}"
+        );
+        assert!(
+            src.contains("globalThis.__elohimBuiltinCjs.crypto"),
+            "require('crypto') is served from the crypto shim's global: {src}"
+        );
+    }
+
+    #[test]
+    fn events_cjs_exports_is_the_constructible_primary() {
+        // `require("events")` must be EventEmitter itself (constructible), with
+        // the siblings hung off it -- so `class X extends require("events")` and
+        // `require("events").EventEmitter` both work, per Node's shape.
+        let src = synthetic_module_source("module").expect("module has a shim");
+        assert!(
+            src.contains("const __exports = m_EventEmitter;"),
+            "events CJS exports must be the constructible primary: {src}"
+        );
+        assert!(
+            src.contains("__exports.EventEmitter = m_EventEmitter;"),
+            "events primary must self-reference .EventEmitter: {src}"
+        );
+    }
+
+    #[test]
+    fn cjs_and_esm_member_lists_never_fork() {
+        // The keystone single-source guard: for every builtin (except the
+        // excluded module/crypto), the members the CJS registry hangs off its
+        // exports are EXACTLY the ESM synthetic module's named exports. Both come
+        // from BUILTIN_SURFACE, so a future edit that adds a member to one surface
+        // but not the other trips this test.
+        let module_src = synthetic_module_source("module").expect("module shim");
+        for entry in BUILTIN_SURFACE {
+            if entry.name == "module" {
+                // module is not in the CJS registry (would recurse); its ESM
+                // surface is still checked by module_source_carries_named_exports.
+                continue;
+            }
+            let esm = synthetic_module_source(entry.name)
+                .unwrap_or_else(|| panic!("{} has an ESM shim", entry.name));
+            for member in entry.named {
+                // ESM: exported as a named binding.
+                assert!(
+                    esm.contains(&format!("const {member} = ")),
+                    "ESM {} must define {member}",
+                    entry.name
+                );
+                // CJS: assigned onto the registry exports for this builtin.
+                assert!(
+                    module_src.contains(&format!("__exports.{member} = m_{member};")),
+                    "CJS registry for {} must carry {member} (surfaces forked)",
+                    entry.name
+                );
+            }
+        }
     }
 
     #[test]

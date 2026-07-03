@@ -147,3 +147,15 @@ const cryptoShim = {
 };
 
 export default cryptoShim;
+
+// CJS interop: the deployed bundle's `ws` (CommonJS) reaches for
+// `require("crypto")` synchronously at module-init (`{ randomBytes, createHash }
+// = require("crypto")`). The module shim's `createRequire` serves that from
+// `globalThis.__elohimBuiltinCjs.crypto` (see src/shim/node_builtins.rs) so the
+// CJS exports is LITERALLY this same `cryptoShim` object -- the crypto member
+// list is never forked between the ESM and CJS surfaces. Registered here, at the
+// crypto module's eval, because that is the single place `cryptoShim` is built.
+if (typeof globalThis !== "undefined") {
+  const cjs = globalThis.__elohimBuiltinCjs || (globalThis.__elohimBuiltinCjs = Object.create(null));
+  cjs.crypto = cryptoShim;
+}

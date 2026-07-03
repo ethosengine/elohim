@@ -55,7 +55,7 @@ async fn unknown_node_builtin_is_loud_named_error_not_panic() {
         .expect_err("importing an unshimmed builtin must fail");
     let msg = format!("{err}");
     assert!(
-        msg.contains("zlib"),
+        msg.contains("readline"),
         "error names the unshimmed builtin: {msg}"
     );
     assert!(
@@ -88,10 +88,41 @@ async fn named_imports_across_builtins_link_and_behave() {
         out.contains("createRequireBare-fn:true"),
         "bare `module` specifier links the same as `node:module`: {out}"
     );
-    // ...whose require is loud-if-called (the render path must not sync-require).
+    // ...whose require is loud for NON-builtin ids (npm addons ws try/catches).
     assert!(
         out.contains("require-loud:true"),
-        "the returned require must throw a named error when called: {out}"
+        "require of a non-builtin must throw a named error: {out}"
+    );
+    // ...but RESOLVES Node builtins to CJS exports objects (the ws interop rung).
+    assert!(
+        out.contains("require-events-ctor:true"),
+        "require('events') must return the constructible EventEmitter: {out}"
+    );
+    assert!(
+        out.contains("require-events-self:true"),
+        "require('events').EventEmitter must self-reference: {out}"
+    );
+    assert!(
+        out.contains("require-events-extends:true"),
+        "`class X extends require('events')` must be a legal definition: {out}"
+    );
+    assert!(
+        out.contains("require-node-prefix:true"),
+        "require('node:events') must resolve the same builtin: {out}"
+    );
+    assert!(
+        out.contains("require-net-shape:true"),
+        "require('net') must be a namespace object carrying its members: {out}"
+    );
+    // require('crypto') is the SAME object as the ESM crypto default (single
+    // source across the ESM and CJS surfaces), with the real createHash.
+    assert!(
+        out.contains("require-crypto-same:true"),
+        "require('crypto') must be the same object as the ESM crypto default: {out}"
+    );
+    assert!(
+        out.contains("require-crypto-createHash:true"),
+        "require('crypto').createHash must be the real impl: {out}"
     );
     // util.promisify and events.setMaxListeners are real.
     assert!(
@@ -116,10 +147,11 @@ async fn named_imports_across_builtins_link_and_behave() {
 
 /// The `node:module` createRequire path in isolation — the exact link failure
 /// the deployed bundle hit at `polyfills.server.mjs:1` (`import { createRequire }
-/// from 'node:module'`). This is the minimal reproduction: it must LINK, and the
-/// returned require must be a function that throws a named error on call.
+/// from 'node:module'`). This is the minimal reproduction: it must LINK, the
+/// returned require must resolve Node builtins to CJS exports (the `ws` interop
+/// rung), and stay a loud, named throw for non-builtin ids.
 #[tokio::test]
-async fn node_module_createrequire_links_and_returns_loud_require() {
+async fn node_module_createrequire_links_and_resolves_cjs_builtins() {
     let mut rt = JsRuntime::with_shims();
     let out = rt
         .render_via_module(&fixture("node-builtins-link.mjs"), "/x")
@@ -127,6 +159,8 @@ async fn node_module_createrequire_links_and_returns_loud_require() {
         .expect("node:module createRequire named import must link");
     assert!(out.contains("createRequire-fn:true"), "{out}");
     assert!(out.contains("require-loud:true"), "{out}");
+    assert!(out.contains("require-events-ctor:true"), "{out}");
+    assert!(out.contains("require-net-shape:true"), "{out}");
 }
 
 /// Local-only harness: render the REAL deployed Angular server bundle end-to-end
