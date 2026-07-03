@@ -14,6 +14,7 @@ use deno_core::{
 
 use crate::shim::loader::NodeShimLoader;
 use crate::shim::node_crypto::node_crypto_ext;
+use crate::shim::node_globals::node_globals_ext;
 use crate::shim::{console::console_ext, text::text_ext, url::url_ext};
 
 use crate::{RenderError, Result};
@@ -68,6 +69,12 @@ impl JsRuntime {
     /// deno_core's `op_encode`/`op_decode` builtins. None of these are available
     /// in a bare deno_core runtime without a snapshot; the extensions inject them.
     ///
+    /// Also injects the runtime globals the Node-targeted Angular bundle expects
+    /// (`node_globals_ext`): `process` (nextTick, env, versions, platform, ...),
+    /// the timer family (`setTimeout`/`setInterval`/`setImmediate` + clears),
+    /// `performance` (op-backed monotonic `now()` + a minimal User Timing store),
+    /// and the `global` alias. See [`crate::shim::node_globals`].
+    ///
     /// Includes the [`NodeShimLoader`] so that `render_via_module` works from the
     /// same runtime instance AND the bundle's bare Node-builtin imports (`crypto`
     /// / `node:crypto`) resolve to injected shims instead of panicking; the
@@ -79,6 +86,7 @@ impl JsRuntime {
                 console_ext::init_ops_and_esm(),
                 url_ext::init_ops_and_esm(),
                 text_ext::init_ops_and_esm(),
+                node_globals_ext::init_ops_and_esm(),
                 node_crypto_ext::init_ops_and_esm(),
             ],
             ..Default::default()
@@ -97,6 +105,10 @@ impl JsRuntime {
     /// `eval_string` receives a Promise result, so callers can `await fetch()`
     /// inside an async IIFE evaluated through `eval_string`.
     ///
+    /// Also injects the runtime globals the Node-targeted Angular bundle expects
+    /// (`node_globals_ext`): `process`, the timer family, `performance`, and the
+    /// `global` alias. See [`crate::shim::node_globals`].
+    ///
     /// Includes the [`NodeShimLoader`] so that `render_via_module` works from the
     /// same runtime instance AND the Angular server bundle's bare Node-builtin
     /// imports (`crypto` / `node:crypto`) resolve to injected shims instead of
@@ -109,6 +121,7 @@ impl JsRuntime {
                 console_ext::init_ops_and_esm(),
                 url_ext::init_ops_and_esm(),
                 text_ext::init_ops_and_esm(),
+                node_globals_ext::init_ops_and_esm(),
                 fetch_ext::init_ops_and_esm(FetcherHandle(fetcher)),
                 node_crypto_ext::init_ops_and_esm(),
             ],

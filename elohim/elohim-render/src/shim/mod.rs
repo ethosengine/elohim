@@ -20,5 +20,6 @@ pub(crate) mod fetch;
 pub(crate) mod loader;
 pub(crate) mod node_builtins;
 pub(crate) mod node_crypto;
+pub(crate) mod node_globals;
 pub(crate) mod text;
 pub(crate) mod url;
