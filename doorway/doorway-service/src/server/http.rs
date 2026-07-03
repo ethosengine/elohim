@@ -2351,6 +2351,46 @@ mod handoff_routing_tests {
     }
 }
 
+/// Decide whether a proxied storage body is an HTML *page* that must carry the
+/// native runtime chrome, and if so splice the omnibar context island + loader
+/// into it (before `</body>`, via the same `inject_element` mechanism the SSR
+/// arm uses). Returns the (possibly transformed) bytes and whether injection
+/// happened (the caller uses that to mirror the SSR arm's `no-store`).
+///
+/// Injects ONLY for a servable page: a 2xx status AND a `text/html`
+/// content-type AND a valid-UTF-8 body. Assets (`.js`/`.css`/images) and
+/// non-2xx bodies flow through this same proxy and pass through byte-identical.
+/// Invalid-UTF-8 `text/html` is served unmodified (an un-injectable page must
+/// never fail the response). Pure (no IO) so it is unit-testable without HTTP.
+fn maybe_inject_chrome(
+    status: u16,
+    content_type: &str,
+    body: Bytes,
+    chrome_context_json: &str,
+) -> (Bytes, bool) {
+    let is_html_page = (200..300).contains(&status)
+        && content_type
+            .trim()
+            .to_ascii_lowercase()
+            .starts_with("text/html");
+    if !is_html_page {
+        return (body, false);
+    }
+    match std::str::from_utf8(&body) {
+        Ok(html) => (
+            Bytes::from(elohim_render::inject_element(html, chrome_context_json)),
+            true,
+        ),
+        Err(e) => {
+            tracing::debug!(
+                error = %e,
+                "EPR router: text/html body is not valid UTF-8 — serving unmodified (no chrome inject)"
+            );
+            (body, false)
+        }
+    }
+}
+
 /// Dispatch a request to a projected EPR (B13).
 ///
 /// MVP scope (§8.1 + §8.2):
@@ -2365,6 +2405,7 @@ async fn dispatch_to_projected_epr(
     state: &AppState,
     request_path: &str,
     projection: elohim_views::projection::EprProjectionView,
+    chrome_context_json: &str,
 ) -> Response<Full<Bytes>> {
     use elohim_views::projection::ProjectionMode;
 
@@ -2473,11 +2514,30 @@ async fn dispatch_to_projected_epr(
                 .map(|s| s.to_string());
             match resp.bytes().await {
                 Ok(body_bytes) => {
+                    // Native runtime chrome: an HTML page served via this proxy is
+                    // an EPR-router HTML serve (the landing `/`, a pillar mount),
+                    // and must carry the omnibar trust surface — the same island
+                    // the SSR arm splices. Assets (.js/.css/images) flow through
+                    // this same function and pass through byte-identical.
+                    let (body_bytes, chrome_injected) = maybe_inject_chrome(
+                        status.as_u16(),
+                        &content_type,
+                        body_bytes,
+                        chrome_context_json,
+                    );
                     let mut builder = Response::builder()
                         .status(status.as_u16())
                         .header("content-type", &content_type)
                         .header("x-epr-router", "dispatched");
-                    if let Some(cc) = cache_control {
+                    // Cache-control parity with the SSR arm: an injected page
+                    // carries the request-specific omnibar context (the
+                    // `authenticated` flag), so it must not be shared-cached —
+                    // mirror `ssr_html_response_with_observability`'s `no-store`.
+                    // Untouched bytes (assets, non-HTML, non-2xx) keep storage's
+                    // cache-control unchanged.
+                    if chrome_injected {
+                        builder = builder.header("cache-control", "no-store");
+                    } else if let Some(cc) = cache_control {
                         builder = builder.header("cache-control", cc);
                     }
                     builder
@@ -2552,12 +2612,16 @@ fn epr_universal_root(
 /// projection's bundle — the shell renders the lens-complete viewer. The
 /// claims-302 to a pretty pillar mount is demoted (EPR Slice 1); the universal
 /// address no longer redirects. No root projection registered → `/threshold`.
-async fn dispatch_epr_universal(state: &AppState, original_path: &str) -> Response<Full<Bytes>> {
+async fn dispatch_epr_universal(
+    state: &AppState,
+    original_path: &str,
+    chrome_context_json: &str,
+) -> Response<Full<Bytes>> {
     match epr_universal_root(&state.epr_router) {
         Some(root) => {
             tracing::debug!(path = %original_path,
                 "universal /epr address — serving shell (root projection bundle)");
-            dispatch_to_projected_epr(state, "/", root).await
+            dispatch_to_projected_epr(state, "/", root, chrome_context_json).await
         }
         None => {
             tracing::debug!(path = %original_path,
@@ -2871,8 +2935,11 @@ async fn handle_request(
                 url_path = %projection.url_path,
                 "EPR router matched — dispatching to projected bundle"
             );
+            // Build the omnibar context once (authoritative slug + authenticated
+            // flag from this request) so an HTML serve carries the trust surface.
+            let chrome_context_json = build_chrome_context_json(&path, &req);
             return Ok(to_boxed(
-                dispatch_to_projected_epr(&state, &path, projection).await,
+                dispatch_to_projected_epr(&state, &path, projection, &chrome_context_json).await,
             ));
         }
     }
@@ -3541,7 +3608,10 @@ async fn handle_request(
 
         // Universal EPR address (§12.1): /epr/{id} → root bundle (shell epr/:id route).
         (Method::GET, p) if p == "/epr" || p.starts_with("/epr/") => {
-            return Ok(to_boxed(dispatch_epr_universal(&state, p).await));
+            let chrome_context_json = build_chrome_context_json(p, &req);
+            return Ok(to_boxed(
+                dispatch_epr_universal(&state, p, &chrome_context_json).await,
+            ));
         }
 
         // EPR Head proxy routes (proxied to elohim-storage)
@@ -3761,8 +3831,10 @@ async fn handle_request(
                                 claim_modes = ?claim.auth_modes,
                                 "auth mode not in claim — falling back to CSR shell"
                             );
+                            let chrome_context_json = build_chrome_context_json(p, &req);
                             return Ok(to_boxed(ssr_spa_shell_fallback_with_skip_reason(
                                 Some("auth-mode-not-supported"),
+                                Some(chrome_context_json.as_str()),
                             )));
                         }
                     }
@@ -3796,8 +3868,12 @@ async fn handle_request(
                                     available = sem.available_permits(),
                                     "SSR render queue saturated — shedding to CSR shell (HTTP 200)"
                                 );
+                                let chrome_context_json = build_chrome_context_json(p, &req);
                                 return Ok(to_boxed(
-                                    ssr_spa_shell_fallback_with_skip_reason(Some("overflow")),
+                                    ssr_spa_shell_fallback_with_skip_reason(
+                                        Some("overflow"),
+                                        Some(chrome_context_json.as_str()),
+                                    ),
                                 ));
                             }
                         },
@@ -3958,7 +4034,10 @@ async fn handle_request(
                                     error = %err_str,
                                     "SSR render error — falling back to SPA shell"
                                 );
-                                ssr_spa_shell_fallback_with_error(&err_str)
+                                ssr_spa_shell_fallback_with_error(
+                                    &err_str,
+                                    Some(chrome_context_json.as_str()),
+                                )
                             }
                         }));
                     }
@@ -4770,8 +4849,11 @@ fn ssr_html_response_with_observability(
 ///
 /// Header values must be ASCII-printable; we sanitize CR/LF/non-ASCII to `?`
 /// so a panic message containing newlines doesn't trip hyper's validation.
-fn ssr_spa_shell_fallback_with_error(err: &str) -> Response<Full<Bytes>> {
-    let mut resp = ssr_spa_shell_fallback_with_skip_reason(None);
+fn ssr_spa_shell_fallback_with_error(
+    err: &str,
+    chrome_context_json: Option<&str>,
+) -> Response<Full<Bytes>> {
+    let mut resp = ssr_spa_shell_fallback_with_skip_reason(None, chrome_context_json);
     if !err.is_empty() {
         let sanitized: String = err
             .chars()
@@ -4799,13 +4881,24 @@ fn ssr_spa_shell_fallback_with_error(err: &str) -> Response<Full<Bytes>> {
 ///
 /// `skip_reason: None` is the generic fallback (no `x-ssr-skipped` header,
 /// just the SPA shell + `x-ssr-rendered: 0`).
-fn ssr_spa_shell_fallback_with_skip_reason(skip_reason: Option<&str>) -> Response<Full<Bytes>> {
+fn ssr_spa_shell_fallback_with_skip_reason(
+    skip_reason: Option<&str>,
+    chrome_context_json: Option<&str>,
+) -> Response<Full<Bytes>> {
     const SHELL: &str = concat!(
         "<!doctype html><html><body>",
         "<app-root></app-root>",
         "<script>console.log('SSR fallback \u{2014} CSR will hydrate')</script>",
         "</body></html>",
     );
+    // Native runtime chrome: the CSR fallback is still an HTML serve, so it must
+    // carry the omnibar trust surface too. The element self-mounts client-side
+    // before Angular hydrates, identically to the SSR-success path. Already
+    // `no-store`, so no cache-control divergence for the injected island.
+    let body: Bytes = match chrome_context_json {
+        Some(ctx) => Bytes::from(elohim_render::inject_element(SHELL, ctx)),
+        None => Bytes::from_static(SHELL.as_bytes()),
+    };
     let mut builder = Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "text/html; charset=utf-8")
@@ -4814,7 +4907,7 @@ fn ssr_spa_shell_fallback_with_skip_reason(skip_reason: Option<&str>) -> Respons
     if let Some(reason) = skip_reason {
         builder = builder.header("x-ssr-skipped", reason);
     }
-    builder.body(Full::new(Bytes::from(SHELL))).unwrap()
+    builder.body(Full::new(body)).unwrap()
 }
 
 // ─── Gate layer tests ─────────────────────────────────────────────────────────
@@ -4988,6 +5081,136 @@ mod ssr_session_tests {
             "no island injected: {html}"
         );
         assert_eq!(html, "<html><body>plain</body></html>");
+    }
+
+    // ── maybe_inject_chrome (the EPR-router HTML serve path) ─────────────────
+
+    #[test]
+    fn epr_html_page_gets_exactly_one_island_and_loader() {
+        // An HTML 200 proxied through the EPR router (`dispatch_to_projected_epr`)
+        // carries the omnibar chrome — exactly one island + one loader, before
+        // </body>, in order.
+        let ctx = r#"{"slug":"elohim-host-landing","authenticated":false}"#;
+        let (out, injected) = maybe_inject_chrome(
+            200,
+            "text/html; charset=utf-8",
+            Bytes::from_static(b"<!doctype html><html><body><app-root></app-root></body></html>"),
+            ctx,
+        );
+        assert!(injected, "an HTML 200 must inject chrome");
+        let html = String::from_utf8(out.to_vec()).unwrap();
+        assert_eq!(
+            html.matches("id=\"elohim-omni-context\"").count(),
+            1,
+            "exactly one context island: {html}"
+        );
+        assert_eq!(
+            html.matches("omni-element.").count(),
+            1,
+            "exactly one element loader: {html}"
+        );
+        let island_at = html.find("elohim-omni-context").unwrap();
+        let loader_at = html.find("omni-element.").unwrap();
+        let body_close = html.rfind("</body>").unwrap();
+        assert!(island_at < body_close, "island precedes </body>");
+        assert!(loader_at < body_close, "loader precedes </body>");
+        assert!(island_at < loader_at, "island precedes loader");
+        assert!(html.contains("<app-root></app-root>"), "document survives");
+    }
+
+    #[test]
+    fn epr_asset_body_is_byte_identical() {
+        // A JS/CSS asset (non-HTML content-type) flows through the same proxy —
+        // the bytes must be untouched (a mangled asset breaks the SPA).
+        let js = b"export const x = 1; // </body> lookalike, must not trip inject";
+        let (out, injected) = maybe_inject_chrome(
+            200,
+            "application/javascript",
+            Bytes::from_static(js),
+            r#"{"slug":"x"}"#,
+        );
+        assert!(!injected, "non-HTML must not inject");
+        assert_eq!(out.as_ref(), js.as_ref(), "asset bytes byte-identical");
+    }
+
+    #[test]
+    fn epr_non_2xx_html_is_untouched() {
+        // A non-2xx HTML body (e.g. storage 404/503 error page) is not a servable
+        // page — pass it through unmodified.
+        let err_html = Bytes::from_static(b"<html><body>not found</body></html>");
+        let (out, injected) =
+            maybe_inject_chrome(404, "text/html; charset=utf-8", err_html.clone(), "{}");
+        assert!(!injected, "non-2xx must not inject");
+        assert_eq!(out, err_html, "error-page bytes untouched");
+    }
+
+    #[test]
+    fn epr_invalid_utf8_html_is_untouched() {
+        // Invalid-UTF-8 `text/html` must be served unmodified — never fail the
+        // response over an un-injectable page.
+        let bad = Bytes::from_static(&[0xff, 0xfe, b'<', b'b', b'o', b'd', b'y', b'>']);
+        let (out, injected) = maybe_inject_chrome(200, "text/html", bad.clone(), "{}");
+        assert!(!injected, "invalid UTF-8 must not inject");
+        assert_eq!(out, bad, "invalid-UTF-8 bytes untouched");
+    }
+
+    // ── CSR fallback shells now carry the chrome island ──────────────────────
+
+    #[test]
+    fn fallback_shell_injects_chrome_when_context_present() {
+        // The SSR error/shed/auth-mode CSR fallback is still an HTML serve — with
+        // a context it carries exactly one island + loader before </body>.
+        let ctx = r#"{"slug":"abc","authenticated":false}"#;
+        let resp = ssr_spa_shell_fallback_with_skip_reason(Some("overflow"), Some(ctx));
+        let body = futures::executor::block_on(async {
+            resp.into_body().collect().await.unwrap().to_bytes()
+        });
+        let html = String::from_utf8(body.to_vec()).unwrap();
+        assert_eq!(
+            html.matches("id=\"elohim-omni-context\"").count(),
+            1,
+            "{html}"
+        );
+        assert_eq!(html.matches("omni-element.").count(), 1, "{html}");
+        let island_at = html.find("elohim-omni-context").unwrap();
+        let body_close = html.rfind("</body>").unwrap();
+        assert!(island_at < body_close, "island precedes </body>: {html}");
+    }
+
+    #[test]
+    fn fallback_shell_is_clean_without_context() {
+        // No context → the shell is unchanged (defensive: the None path stays the
+        // original bytes).
+        let resp = ssr_spa_shell_fallback_with_skip_reason(None, None);
+        let body = futures::executor::block_on(async {
+            resp.into_body().collect().await.unwrap().to_bytes()
+        });
+        let html = String::from_utf8(body.to_vec()).unwrap();
+        assert!(!html.contains("elohim-omni-context"), "no island: {html}");
+        assert!(
+            html.contains("<app-root></app-root>"),
+            "shell intact: {html}"
+        );
+    }
+
+    #[test]
+    fn fallback_error_shell_injects_and_carries_error_header() {
+        // The error fallback both surfaces `x-ssr-error` AND carries the island.
+        let ctx = r#"{"slug":"z","authenticated":true}"#;
+        let resp = ssr_spa_shell_fallback_with_error("boom", Some(ctx));
+        assert_eq!(
+            resp.headers().get("x-ssr-error").unwrap(),
+            "boom",
+            "error header preserved"
+        );
+        let body = futures::executor::block_on(async {
+            resp.into_body().collect().await.unwrap().to_bytes()
+        });
+        let html = String::from_utf8(body.to_vec()).unwrap();
+        assert!(
+            html.contains("id=\"elohim-omni-context\""),
+            "island present: {html}"
+        );
     }
 }
 
