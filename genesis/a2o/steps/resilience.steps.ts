@@ -237,21 +237,82 @@ Given(
 );
 
 /**
- * Verify that a given content item has been distributed to at least N households
- * (used by @wip UI scenarios as a precondition).
+ * Ensure a given content item has been distributed to at least N households, then
+ * verify (a `Given` precondition, so ensure-semantics is correct — not a bare read-assert).
+ *
+ * Root cause (2026-07-03, blob-durability/genesis 73x fingerprint): content-alpha is
+ * normally ingested inline-markdown (no blobHash) which never enters distribute_shards,
+ * so `stewardingCollectives` was permanently 0 regardless of cluster health — a
+ * test-authoring gap, not a substrate or commitment-activation bug. Fix mirrors the
+ * already-green `grandma-photos-survive-node-loss.feature` pattern: idempotent
+ * (honors real distribution first), then drives the deterministic
+ * `/admin/seed/shard-manifest` lever exactly like "the operator seeds a shard
+ * manifest for ... stewarded by N distinct households" below. Honesty-gated: a
+ * disabled lever (403) or too few identity-healed households skips (pending)
+ * rather than false-passing or false-failing.
  *
  * Example:
  *   Given "content-alpha" has been distributed to at least 2 households
  */
 Given(
   '{string} has been distributed to at least {int} households',
-  async function (this: E2EWorld, contentId: string, minHouseholds: number) {
-    const snap = await storageGet(`/api/v1/resilience/${contentId}/household`);
+  async function (
+    this: E2EWorld,
+    contentId: string,
+    minHouseholds: number
+  ): Promise<string | undefined> {
+    // 1. Idempotent: honor real distribution (live mesh / prior seed) if present.
+    let snap = await storageGet(`/api/v1/resilience/${contentId}/household`);
+    if (((snap['stewardingCollectives'] as number) ?? 0) >= minHouseholds) {
+      return undefined;
+    }
+
+    // 2. Deterministic lever, honesty-gated (ALLOW_SEED_SHARD_MANIFEST). Off → 403 →
+    // clean HELD skip, not a false-fail against a mesh that was never asked to distribute.
+    const probe = await storagePut('/admin/seed/shard-manifest', {});
+    if (probe.statusCode === 403) {
+      return 'pending';
+    }
+
+    // 3. One steward agent_pub_key per distinct household (identity-healed by
+    // seed-provide-rows.ts / POST /api/v1/identity/heal).
+    const humans = (await storageGet('/db/humans')) as unknown as Record<string, unknown>[];
+    const byHousehold = new Map<string, string>();
+    for (const h of humans) {
+      const hh = h['householdId'] as string | undefined;
+      const key = h['agentPubKey'] as string | undefined;
+      if (hh && key && !byHousehold.has(hh)) {
+        byHousehold.set(hh, key);
+      }
+    }
+    const stewards = [...byHousehold.values()].slice(0, minHouseholds);
+    if (stewards.length < minHouseholds) {
+      // Not enough seeded/identity-healed households — a precondition gap, not
+      // a code failure. Skip (pending), same as the shard-manifest lever step.
+      return 'pending';
+    }
+
+    // 4. Seed the manifest + agent-keyed shard_locations deterministically.
+    const { statusCode, json } = await storagePut('/admin/seed/shard-manifest', {
+      contentId,
+      reach: this.contentIds.get('lastContentReach') ?? 'commons',
+      blobHash: `sha256-seed-${contentId}`,
+      stewards,
+      totalSizeBytes: 4096,
+    });
+    assert.ok(
+      statusCode < 300,
+      `seed shard-manifest failed for "${contentId}": ${statusCode} ${JSON.stringify(json)}`
+    );
+
+    // 5. Verify.
+    snap = await storageGet(`/api/v1/resilience/${contentId}/household`);
     const actual = (snap['stewardingCollectives'] as number) ?? 0;
     assert.ok(
       actual >= minHouseholds,
       `"${contentId}" is stewarded by ${actual} households; expected ≥${minHouseholds}.`
     );
+    return undefined;
   }
 );
 
