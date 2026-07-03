@@ -139,6 +139,9 @@ pub struct ReconcileController<S: DnaSignalStream> {
 }
 
 impl<S: DnaSignalStream> ReconcileController<S> {
+    /// Upper bound on retained `observed_kinds` entries (bounded ring).
+    const OBSERVED_KINDS_CAP: usize = 256;
+
     /// Construct a controller subscribing to `stream`, without DB or cache.
     ///
     /// Suitable for stub-only test controllers that don't need persistence.
@@ -245,21 +248,25 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         &self.observed_kinds
     }
 
-    /// Record a dispatched signal kind for test introspection.
+    /// Record a dispatched signal kind for introspection.
     ///
-    /// No-op in release builds: `observed_kinds` was an append-per-signal `Vec`
+    /// Bounded ring: `observed_kinds` was originally an append-per-signal `Vec`
     /// with no bound, so a long-running production controller grew it without
-    /// limit. Gating the append to test builds preserves the ordered
-    /// introspection the dispatch tests rely on while leaving the field empty
-    /// (zero growth) in production.
-    #[cfg(test)]
+    /// limit. This keeps only the most-recent [`Self::OBSERVED_KINDS_CAP`]
+    /// entries — bounding production memory while preserving the ordered
+    /// introspection the dispatch tests rely on.
+    ///
+    /// The earlier fix gated the append behind `#[cfg(test)]`, but integration
+    /// test binaries in `tests/` link against the library's non-`cfg(test)`
+    /// build, so that left `observed_kinds` empty for them (the append became
+    /// the no-op arm) and their `observed_kinds()` assertions always failed.
+    /// Bounding rather than gating works in every build configuration.
     fn observe_kind(&mut self, kind: &str) {
+        if self.observed_kinds.len() >= Self::OBSERVED_KINDS_CAP {
+            self.observed_kinds.remove(0);
+        }
         self.observed_kinds.push(kind.to_string());
     }
-
-    #[cfg(not(test))]
-    #[inline]
-    fn observe_kind(&mut self, _kind: &str) {}
 
     // -----------------------------------------------------------------------
     // Internal dispatch

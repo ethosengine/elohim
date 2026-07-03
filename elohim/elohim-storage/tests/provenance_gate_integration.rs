@@ -3,7 +3,7 @@
 
 use diesel::{Connection, RunQueryDsl, SqliteConnection};
 use elohim_storage::db::content_diesel::{
-    create_content, list_content, ContentQuery, CreateContentInput,
+    create_content, list_content, ContentQuery, CreateContentInput, MinTrust,
 };
 use elohim_storage::db::context::AppContext;
 
@@ -33,6 +33,8 @@ fn test_conn() -> SqliteConnection {
             created_by TEXT,
             dht_anchor_hash TEXT,
             p2p_published_at TEXT,
+            server_blob_hash TEXT,
+            crdt_converged_at TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
@@ -92,7 +94,7 @@ fn unpublished_content_is_invisible_to_external_reads() {
             offset: 0,
             ..Default::default()
         },
-        true, // require_provenance: external HTTP boundary
+        MinTrust::Amber, // external HTTP boundary: the Amber serving floor
     )
     .unwrap();
     assert!(
@@ -108,7 +110,7 @@ fn unpublished_content_is_invisible_to_external_reads() {
             offset: 0,
             ..Default::default()
         },
-        false, // require_provenance: internal drain/replication path
+        MinTrust::Invisible, // internal drain/replication path sees all rows
     )
     .unwrap();
     assert_eq!(internal.len(), 1, "internal reads must still see the row");

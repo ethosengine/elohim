@@ -168,7 +168,13 @@ fn replicates_commons_signal_creates_active_provide_row() {
     let (action, state, scope, provider, anchor) = &rows[0];
     assert_eq!(action, "provide");
     assert_eq!(state, "active");
-    assert_eq!(scope.as_deref(), Some("content:commons"));
+    // Canonical stored form is the one-element JSON list (non-commons spec
+    // §11.2 Option A — see `record_provide_from_content_commitment`), never a
+    // bare scalar; readers resolve it via the tolerant accessor.
+    let scope_list: Vec<String> =
+        serde_json::from_str(scope.as_deref().expect("provide row must carry a scope"))
+            .expect("resource_classified_as must be a JSON list");
+    assert_eq!(scope_list, ["content:commons"]);
     assert_eq!(provider, "agent:steward-a");
     assert_eq!(
         anchor.as_deref(),
@@ -437,9 +443,14 @@ fn household_reach_signal_creates_content_household_provide_row() {
         .select(r::resource_classified_as)
         .first(&mut conn)
         .unwrap();
+    // Canonical stored form is the one-element JSON list (non-commons spec
+    // §11.2 Option A — see `record_provide_from_content_commitment`).
+    let scope_list: Vec<String> =
+        serde_json::from_str(scope.as_deref().expect("provide row must carry a scope"))
+            .expect("resource_classified_as must be a JSON list");
     assert_eq!(
-        scope.as_deref(),
-        Some("content:household"),
+        scope_list,
+        ["content:household"],
         "the household-reach commitment projects content:household, not content:commons"
     );
 }
