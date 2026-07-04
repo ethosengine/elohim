@@ -325,6 +325,7 @@ mod tests {
             entries: vec![ProjectionEntry {
                 path: ProjectionPath::new("current").unwrap(),
                 kind: EntryKind::Symlink,
+                source: None,
                 epr: None,
                 blob: Some("target-blob".into()),
                 size_bytes: Some(10),

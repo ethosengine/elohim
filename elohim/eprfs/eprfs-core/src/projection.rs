@@ -70,6 +70,40 @@ pub enum ProjectionStatus {
     Unknown,
 }
 
+/// Domain-neutral identity for the object that produced a projection entry.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectionSource {
+    pub namespace: String,
+    pub kind: ProjectionSourceKind,
+    pub id: String,
+}
+
+impl ProjectionSource {
+    pub fn new(
+        namespace: impl Into<String>,
+        kind: ProjectionSourceKind,
+        id: impl Into<String>,
+    ) -> Self {
+        Self {
+            namespace: namespace.into(),
+            kind,
+            id: id.into(),
+        }
+    }
+}
+
+/// Broad source class independent of any specific storage or domain adapter.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProjectionSourceKind {
+    Content,
+    Container,
+    Link,
+    External,
+    Unknown,
+}
+
 /// Policy for turning projection metadata into local files.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -88,6 +122,8 @@ pub enum MaterializationPolicy {
 pub struct ProjectionEntry {
     pub path: ProjectionPath,
     pub kind: EntryKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<ProjectionSource>,
     pub epr: Option<EprRef>,
     pub blob: Option<BlobCid>,
     pub size_bytes: Option<u64>,
@@ -101,6 +137,7 @@ impl ProjectionEntry {
         Self {
             path,
             kind: EntryKind::File,
+            source: None,
             epr: None,
             blob: Some(blob),
             size_bytes: None,
@@ -126,6 +163,15 @@ impl ProjectionManifest {
         let mut paths = HashSet::with_capacity(self.entries.len());
 
         for entry in &self.entries {
+            if let Some(source) = &entry.source {
+                if source.namespace.trim().is_empty() || source.id.trim().is_empty() {
+                    return Err(EprfsError::InvalidProjectionManifest(format!(
+                        "projection source is missing namespace or id for path: {}",
+                        entry.path.as_path().display()
+                    )));
+                }
+            }
+
             if !paths.insert(entry.path.clone()) {
                 return Err(EprfsError::InvalidProjectionManifest(format!(
                     "duplicate projection path: {}",
@@ -140,8 +186,30 @@ impl ProjectionManifest {
                         entry.path.as_path().display()
                     )));
                 }
+                EntryKind::Directory
+                    if matches!(
+                        entry.source.as_ref().map(|source| &source.kind),
+                        Some(ProjectionSourceKind::Content | ProjectionSourceKind::Link)
+                    ) =>
+                {
+                    return Err(EprfsError::InvalidProjectionManifest(format!(
+                        "directory path has content/link source: {}",
+                        entry.path.as_path().display()
+                    )));
+                }
                 EntryKind::File | EntryKind::Symlink if entry.blob.is_none() => {
                     return Err(EprfsError::MissingBlob(entry.path.as_path().to_path_buf()));
+                }
+                EntryKind::File
+                    if matches!(
+                        entry.source.as_ref().map(|source| &source.kind),
+                        Some(ProjectionSourceKind::Container | ProjectionSourceKind::External)
+                    ) =>
+                {
+                    return Err(EprfsError::InvalidProjectionManifest(format!(
+                        "file path has container/external source: {}",
+                        entry.path.as_path().display()
+                    )));
                 }
                 _ => {}
             }
@@ -186,6 +254,7 @@ mod tests {
             entries: vec![ProjectionEntry {
                 path: ProjectionPath::new("current").unwrap(),
                 kind: EntryKind::Symlink,
+                source: None,
                 epr: None,
                 blob: None,
                 size_bytes: None,
@@ -199,6 +268,68 @@ mod tests {
         assert!(matches!(
             manifest.validate(),
             Err(EprfsError::MissingBlob(path)) if path == PathBuf::from("current")
+        ));
+    }
+
+    #[test]
+    fn rejects_file_with_external_source() {
+        let manifest = ProjectionManifest {
+            root: ProjectionRoot {
+                id: ProjectionId::new("test"),
+                root: EprRef::new("epr:test"),
+            },
+            entries: vec![ProjectionEntry {
+                path: ProjectionPath::new("vendor/lib").unwrap(),
+                kind: EntryKind::File,
+                source: Some(ProjectionSource::new(
+                    "git",
+                    ProjectionSourceKind::External,
+                    "abc123",
+                )),
+                epr: None,
+                blob: Some(BlobCid::new("blob:vendor")),
+                size_bytes: None,
+                executable: false,
+                status: ProjectionStatus::Unknown,
+                metadata: Value::Null,
+            }],
+            metadata: Value::Null,
+        };
+
+        assert!(matches!(
+            manifest.validate(),
+            Err(EprfsError::InvalidProjectionManifest(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_empty_source_identity() {
+        let manifest = ProjectionManifest {
+            root: ProjectionRoot {
+                id: ProjectionId::new("test"),
+                root: EprRef::new("epr:test"),
+            },
+            entries: vec![ProjectionEntry {
+                path: ProjectionPath::new("README.md").unwrap(),
+                kind: EntryKind::File,
+                source: Some(ProjectionSource::new(
+                    "",
+                    ProjectionSourceKind::Content,
+                    "abc123",
+                )),
+                epr: None,
+                blob: Some(BlobCid::new("blob:readme")),
+                size_bytes: None,
+                executable: false,
+                status: ProjectionStatus::Unknown,
+                metadata: Value::Null,
+            }],
+            metadata: Value::Null,
+        };
+
+        assert!(matches!(
+            manifest.validate(),
+            Err(EprfsError::InvalidProjectionManifest(_))
         ));
     }
 }
