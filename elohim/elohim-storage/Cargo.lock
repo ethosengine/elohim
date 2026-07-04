@@ -2334,6 +2334,7 @@ dependencies = [
  "deno_core",
  "deno_error",
  "elohim-chrome-asset",
+ "getrandom 0.3.4",
  "serde",
  "serde_json",
  "sha2 0.10.9",

@@ -5,7 +5,7 @@
 
 use elohim_views::shared::parse_json_opt;
 use elohim_views::{
-    AppView, CommentView, ContentMasteryView, ContentView, ContentWithTagsView,
+    AppView, CommentView, ContentHeadView, ContentMasteryView, ContentView, ContentWithTagsView,
     HumanRelationshipView, RelationshipView, RelationshipWithContentView,
 };
 
@@ -144,6 +144,33 @@ impl From<ContentWithTags> for ContentWithTagsView {
             tags: c.tags,
         }
     }
+}
+
+/// Project a content row's notary markers into a [`ContentHeadView`] — the
+/// notary-authority HEAD answer (HEAD-election, Plan C3 / Leg 3 HTTP surface).
+///
+/// Returns `None` when BOTH `declared_head_action_hash` and `dht_anchor_hash`
+/// are absent: the notary has no HEAD for this id, and the caller renders that
+/// as an honest 404 rather than fabricating an answer. When present,
+/// `head_action_hash` prefers the explicitly-declared HEAD and falls back to
+/// the DHT anchor; `declared` records which of the two supplied it. `trust`
+/// reuses the shared `trust_label` so this surface agrees with `ContentView`.
+pub fn content_head_view_from_content(c: &Content) -> Option<ContentHeadView> {
+    // `?` yields None exactly when neither a declared head nor a DHT anchor
+    // exists — the "no notary answer" case the caller 404s.
+    let head_action_hash = c
+        .declared_head_action_hash
+        .clone()
+        .or_else(|| c.dht_anchor_hash.clone())?;
+    Some(ContentHeadView {
+        content_id: c.id.clone(),
+        head_action_hash,
+        declared: c.declared_head_action_hash.is_some(),
+        dht_anchor_hash: c.dht_anchor_hash.clone(),
+        trust: trust_label(c.dht_anchor_hash.is_some(), c.p2p_published_at.is_some()),
+        blob_hash: c.blob_hash.clone(),
+        updated_at: Some(c.updated_at.clone()),
+    })
 }
 
 // ============================================================================
@@ -291,6 +318,7 @@ mod trust_label_tests {
             p2p_published_at: None,
             server_blob_hash: None,
             crdt_converged_at: None,
+            declared_head_action_hash: None,
         }
     }
 
@@ -338,5 +366,46 @@ mod trust_label_tests {
     #[test]
     fn trust_unconfirmed_for_all_null_row() {
         assert_eq!(ContentView::from(bare_content()).trust, "unconfirmed");
+    }
+
+    // ── content_head_view_from_content: the three notary-answer states ──
+
+    #[test]
+    fn head_view_none_when_no_notary_answer() {
+        // Neither a declared head nor a DHT anchor → no HEAD → None (→ 404).
+        assert!(content_head_view_from_content(&bare_content()).is_none());
+    }
+
+    #[test]
+    fn head_view_anchor_only_falls_back_and_is_not_declared() {
+        // A DHT-anchored row with no explicit declaration: the anchor IS the head,
+        // declared=false, and trust reads notarized.
+        let c = Content {
+            dht_anchor_hash: Some("uhCkk_anchor".to_string()),
+            ..bare_content()
+        };
+        let v = content_head_view_from_content(&c).expect("anchor row has a head");
+        assert_eq!(v.head_action_hash, "uhCkk_anchor");
+        assert!(!v.declared);
+        assert_eq!(v.dht_anchor_hash.as_deref(), Some("uhCkk_anchor"));
+        assert_eq!(v.trust, "notarized");
+        assert_eq!(v.content_id, "epr:trust-fixture");
+    }
+
+    #[test]
+    fn head_view_declared_head_wins_over_anchor() {
+        // An explicitly-declared head takes precedence over the anchor for
+        // head_action_hash, and declared=true.
+        let c = Content {
+            declared_head_action_hash: Some("uhCkk_declared".to_string()),
+            dht_anchor_hash: Some("uhCkk_anchor".to_string()),
+            ..bare_content()
+        };
+        let v = content_head_view_from_content(&c).expect("declared row has a head");
+        assert_eq!(v.head_action_hash, "uhCkk_declared");
+        assert!(v.declared);
+        // The anchor is still surfaced for provenance even when the declared head leads.
+        assert_eq!(v.dht_anchor_hash.as_deref(), Some("uhCkk_anchor"));
+        assert_eq!(v.trust, "notarized");
     }
 }

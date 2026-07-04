@@ -115,4 +115,8 @@ export interface ContentView {
   updatedAt: string;
   contentBody?: string | null;
   dhtAnchorHash?: string | null;
+  /**
+   * REQ-F10 trust legibility label: 'notarized' (green/DHT-notarized) | 'published' (peer-attested) | 'unconfirmed' (amber/CRDT-converged-only or all-null). Never an authority/attribution source.
+   */
+  trust: string;
 }

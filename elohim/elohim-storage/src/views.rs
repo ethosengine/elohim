@@ -38,7 +38,7 @@ pub use crate::views_convert::infrastructure::{
     load_render_capability_from_url_blocking, put_blob_response_view_from_manifest,
     report_custodian_metrics_into_upsert,
 };
-pub use crate::views_convert::lamad::content_view_from_epr_head;
+pub use crate::views_convert::lamad::{content_head_view_from_content, content_view_from_epr_head};
 pub use crate::views_convert::qahal::{ranked_vote_view_from_ranked_vote, vote_view_from_vote};
 pub use crate::views_convert::shefa::node_stewardship_view_from_with_name;
 

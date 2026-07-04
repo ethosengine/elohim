@@ -147,6 +147,21 @@ pub enum ReaProjectionSignal {
         #[serde(default)]
         author: Option<HoloHashB64>,
     },
+    /// Notary-declared HEAD for a content id's version DAG (HEAD-election
+    /// projection, Plan C3 / notary-authority Leg 2). The authoring conductor
+    /// emits this ONLY for locally-authored HEAD declarations, so local
+    /// authorship is implied. Field names/types mirror the DNA signal exactly:
+    /// `ProjectionSignal::ContentHeadDeclared { content_id, head_action_hash,
+    /// entry_hash, author }` — the wire field is `head_action_hash` (a raw
+    /// 39-byte `ActionHash` array on the msgpack wire, hence `HoloHashB64`).
+    ContentHeadDeclared {
+        content_id: String,
+        head_action_hash: HoloHashB64,
+        #[serde(default)]
+        entry_hash: Option<HoloHashB64>,
+        #[serde(default)]
+        author: Option<HoloHashB64>,
+    },
 }
 
 /// Mirror-variant tags: a decode failure on one of these is a REAL projection
@@ -157,6 +172,7 @@ const REA_MIRROR_VARIANTS: &[&str] = &[
     "ReaCommitmentCommitted",
     "ReaEconomicEventCommitted",
     "ContentCommitted",
+    "ContentHeadDeclared",
 ];
 
 /// Cumulative count of REAL REA decode misses this process.
@@ -699,6 +715,34 @@ pub fn handle_rea_signal(
                 action_hash.as_str(),
             )?;
         }
+        ReaProjectionSignal::ContentHeadDeclared {
+            content_id,
+            head_action_hash,
+            ..
+        } => {
+            info!(
+                id = %content_id,
+                hash = %head_action_hash,
+                "Declaring Content HEAD from DHT"
+            );
+            // Own-conductor-witnessed HEAD declaration → verified stamp on the
+            // EXISTING row only (no insert: a HEAD declaration for a row this
+            // node never seeded is a no-op here). No value patch — the HEAD
+            // declaration carries only the action, not content fields.
+            let stamped = content_diesel::stamp_declared_head(
+                &mut conn,
+                ctx,
+                &content_id,
+                head_action_hash.as_str(),
+                None,
+            )?;
+            if !stamped {
+                debug!(
+                    id = %content_id,
+                    "ContentHeadDeclared: no local row to stamp — declared-head projection skipped"
+                );
+            }
+        }
     }
 
     Ok(())
@@ -1072,6 +1116,92 @@ mod tests {
                 assert!((content.trust_score - 1.0).abs() < f64::EPSILON);
             }
             _ => panic!("expected ContentCommitted variant"),
+        }
+    }
+
+    /// HEAD-election decode (notary-authority Leg 2): the `ContentHeadDeclared`
+    /// signal must decode from the REAL conductor wire — MessagePack (`ExternIO`),
+    /// where the DNA's `head_action_hash: ActionHash` (and entry_hash/author)
+    /// serialize as raw 39-BYTE ARRAYS, not base64 strings. The `HoloHashB64`
+    /// mirror field normalizes those bytes to the canonical "u"+base64url form;
+    /// a `String` field would silently drop every such signal (the d33b0e1f5
+    /// dark class). This is the raw-bytes HoloHash encoding trick from the REA
+    /// commitment msgpack test, applied to the new variant.
+    #[test]
+    fn content_head_declared_signal_decodes_from_conductor_msgpack_wire() {
+        use holochain_types::prelude::{ActionHash, AgentPubKey, EntryHash};
+        use serde::Serialize;
+
+        // DNA-side shape: content_store `ProjectionSignal::ContentHeadDeclared`
+        // with REAL holo_hash types (field-by-field mirror; the wire field name
+        // is `head_action_hash`).
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "payload")]
+        enum DnaProjectionSignal {
+            ContentHeadDeclared {
+                content_id: String,
+                head_action_hash: ActionHash,
+                entry_hash: EntryHash,
+                author: AgentPubKey,
+            },
+        }
+
+        let head_action_hash = ActionHash::from_raw_36(vec![0x44; 36]);
+        let entry_hash = EntryHash::from_raw_36(vec![0x55; 36]);
+        let author = AgentPubKey::from_raw_36(vec![0x66; 36]);
+        let dna_signal = DnaProjectionSignal::ContentHeadDeclared {
+            content_id: "elohim-host-landing".into(),
+            head_action_hash: head_action_hash.clone(),
+            entry_hash,
+            author,
+        };
+
+        // emit_signal encodes via ExternIO == rmp_serde::to_vec_named.
+        let wire =
+            rmp_serde::to_vec_named(&dna_signal).expect("encode DNA ContentHeadDeclared signal");
+
+        let decoded = decode_rea_projection_signal(&wire)
+            .expect("conductor msgpack wire format must decode into ReaProjectionSignal");
+        match decoded {
+            ReaProjectionSignal::ContentHeadDeclared {
+                content_id,
+                head_action_hash: got_head,
+                ..
+            } => {
+                assert_eq!(content_id, "elohim-host-landing");
+                // Normalized form must match holochain's canonical base64.
+                assert_eq!(got_head.0, format!("{head_action_hash}"));
+            }
+            other => panic!("unexpected variant: {other:?}"),
+        }
+    }
+
+    /// JSON-shape reference fixture for `ContentHeadDeclared` (adjacent tagging),
+    /// mirroring the ContentCommitted JSON test — guards the wire field names.
+    #[test]
+    fn decode_content_head_declared_signal_from_dna_wire_shape() {
+        let wire = serde_json::json!({
+            "type": "ContentHeadDeclared",
+            "payload": {
+                "content_id": "elohim-host-landing",
+                "head_action_hash": "uhCkk-declared-head",
+                "entry_hash": "uhCEk-content-entry",
+                "author": "uhCAk-author"
+            }
+        });
+
+        let signal: ReaProjectionSignal = serde_json::from_value(wire)
+            .expect("DNA wire shape for ContentHeadDeclared must decode");
+        match signal {
+            ReaProjectionSignal::ContentHeadDeclared {
+                content_id,
+                head_action_hash,
+                ..
+            } => {
+                assert_eq!(content_id, "elohim-host-landing");
+                assert_eq!(head_action_hash.0, "uhCkk-declared-head");
+            }
+            _ => panic!("expected ContentHeadDeclared variant"),
         }
     }
 

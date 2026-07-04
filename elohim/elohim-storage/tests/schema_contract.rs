@@ -180,6 +180,49 @@ fn assert_source_of_truth_declared(schema_value: &Value, schema_name: &str) {
     );
 }
 
+// ── Content HEAD (notary-authority, HEAD-election Plan C3 / Leg 3) ──
+
+#[test]
+fn content_head_view_matches_schema() {
+    use elohim_views::ContentHeadView;
+
+    // Full variant: explicitly-declared head with an anchor + serving blob.
+    let declared = ContentHeadView {
+        content_id: "epr:lamad-concept-001".to_string(),
+        head_action_hash: "uhCkkDECLAREDHEAD0123456789012345678901234567890123456789012"
+            .to_string(),
+        declared: true,
+        dht_anchor_hash: Some(
+            "uhCkkANCHOR0123456789012345678901234567890123456789012345678".to_string(),
+        ),
+        trust: "notarized".to_string(),
+        blob_hash: Some("sha256-abc123".to_string()),
+        updated_at: Some("2026-07-04T00:00:00Z".to_string()),
+    };
+    let json = serde_json::to_value(&declared).unwrap();
+    validate_against_schema("views/content-head.schema.json", &json);
+    assert_source_of_truth_declared(
+        &load_schema("views/content-head.schema.json"),
+        "content-head.schema.json",
+    );
+
+    // Anchor-only fallback: declared=false, optional serving fields null.
+    let anchor_only = ContentHeadView {
+        content_id: "epr:lamad-concept-002".to_string(),
+        head_action_hash: "uhCkkANCHOR0123456789012345678901234567890123456789012345678"
+            .to_string(),
+        declared: false,
+        dht_anchor_hash: Some(
+            "uhCkkANCHOR0123456789012345678901234567890123456789012345678".to_string(),
+        ),
+        trust: "notarized".to_string(),
+        blob_hash: None,
+        updated_at: None,
+    };
+    let json = serde_json::to_value(&anchor_only).unwrap();
+    validate_against_schema("views/content-head.schema.json", &json);
+}
+
 // ── Lens Market (plural Mishpat lenses over an EPR) ──────────────
 
 #[test]

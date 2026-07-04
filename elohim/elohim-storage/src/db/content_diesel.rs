@@ -729,6 +729,73 @@ pub struct ContentProjectionPatch {
     pub metadata_json: Option<String>,
 }
 
+/// Apply the present fields of a `ContentProjectionPatch` to an EXISTING content
+/// row via targeted per-field UPDATEs (`None` fields preserve the existing
+/// column). Mirrors `blob_cid` into the legacy `blob_hash` column so downstream
+/// readers keyed on `blob_hash` (SSR fetch shim, list/get views) see the new
+/// content address (same SHA256 per the Phase 0 refactor).
+///
+/// Shared by [`upsert_with_anchor`] and [`stamp_declared_head`] so the per-field
+/// projection semantics stay byte-identical between the two write paths.
+fn apply_content_patch_fields(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    patch: &ContentProjectionPatch,
+) -> Result<(), StorageError> {
+    if let Some(ref v) = patch.blob_cid {
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set((content::blob_cid.eq(v), content::blob_hash.eq(v)))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update blob_cid failed: {}", e)))?;
+    }
+    if let Some(v) = patch.content_size_bytes {
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set(content::content_size_bytes.eq(v))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update size failed: {}", e)))?;
+    }
+    if let Some(ref v) = patch.title {
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set(content::title.eq(v))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update title failed: {}", e)))?;
+    }
+    if let Some(ref v) = patch.description {
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set(content::description.eq(v))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update description failed: {}", e)))?;
+    }
+    if let Some(ref v) = patch.metadata_json {
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set(content::metadata_json.eq(v))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update metadata failed: {}", e)))?;
+    }
+    Ok(())
+}
+
 /// Upsert a content row with a DHT anchor hash. Used by the post-commit
 /// signal handler in rea_projection to project ContentCommitted signals
 /// from the lamad DNA into local SQL.
@@ -748,6 +815,16 @@ pub struct ContentProjectionPatch {
 /// Anchor invariant: `dht_anchor_hash` is always set to the value passed,
 /// even on the update branch, so re-projection after entry-update
 /// (post update_content zome fn) advances the anchor to the new ActionHash.
+///
+/// HEAD-election rule (author-only auto-declare, Plan C3): every `ContentCommitted`
+/// also advances `declared_head_action_hash` to the committed action. In the
+/// single-author model the author's latest commit IS the declared HEAD, and this
+/// path fires ONLY for own-conductor-witnessed commits (the authoring conductor
+/// emits `ContentCommitted` only for locally-authored commits), so writing the
+/// notary-declared HEAD here is authorized by construction. Thus both
+/// `dht_anchor_hash` AND `declared_head_action_hash` are set to the passed action.
+/// The reconcile leg's verified-stamp entrypoint is [`stamp_declared_head`]; the
+/// HEAD is NEVER written from CRDT/gossip input.
 pub fn upsert_with_anchor(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
@@ -780,69 +857,16 @@ pub fn upsert_with_anchor(
         )
         .set((
             content::dht_anchor_hash.eq(dht_anchor_hash),
+            // HEAD-election rule: an own-conductor-witnessed commit advances the
+            // notary-declared HEAD to the committed action (see the invariant doc
+            // above). Author-only auto-declare — set alongside the anchor.
+            content::declared_head_action_hash.eq(dht_anchor_hash),
             content::updated_at.eq(sql::<Text>("CURRENT_TIMESTAMP")),
         ))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Update anchor failed: {}", e)))?;
 
-        if let Some(ref v) = patch.blob_cid {
-            diesel::update(
-                content::table
-                    .filter(content::h_app_id.eq(&ctx.h_app_id))
-                    .filter(content::id.eq(id)),
-            )
-            .set((
-                content::blob_cid.eq(v),
-                // Mirror to legacy blob_hash column so reads keyed on
-                // blob_hash (SSR fetch shim, list/get views) see the new
-                // content address. They're semantically the same SHA256
-                // per the Phase 0 refactor (substrate-rea-replication-fix
-                // Addendum 5).
-                content::blob_hash.eq(v),
-            ))
-            .execute(conn)
-            .map_err(|e| StorageError::Internal(format!("Update blob_cid failed: {}", e)))?;
-        }
-        if let Some(v) = patch.content_size_bytes {
-            diesel::update(
-                content::table
-                    .filter(content::h_app_id.eq(&ctx.h_app_id))
-                    .filter(content::id.eq(id)),
-            )
-            .set(content::content_size_bytes.eq(v))
-            .execute(conn)
-            .map_err(|e| StorageError::Internal(format!("Update size failed: {}", e)))?;
-        }
-        if let Some(ref v) = patch.title {
-            diesel::update(
-                content::table
-                    .filter(content::h_app_id.eq(&ctx.h_app_id))
-                    .filter(content::id.eq(id)),
-            )
-            .set(content::title.eq(v))
-            .execute(conn)
-            .map_err(|e| StorageError::Internal(format!("Update title failed: {}", e)))?;
-        }
-        if let Some(ref v) = patch.description {
-            diesel::update(
-                content::table
-                    .filter(content::h_app_id.eq(&ctx.h_app_id))
-                    .filter(content::id.eq(id)),
-            )
-            .set(content::description.eq(v))
-            .execute(conn)
-            .map_err(|e| StorageError::Internal(format!("Update description failed: {}", e)))?;
-        }
-        if let Some(ref v) = patch.metadata_json {
-            diesel::update(
-                content::table
-                    .filter(content::h_app_id.eq(&ctx.h_app_id))
-                    .filter(content::id.eq(id)),
-            )
-            .set(content::metadata_json.eq(v))
-            .execute(conn)
-            .map_err(|e| StorageError::Internal(format!("Update metadata failed: {}", e)))?;
-        }
+        apply_content_patch_fields(conn, ctx, id, &patch)?;
     } else {
         // Defensive insert path. Seeded content normally exists in SQL
         // before its first DHT projection; this branch handles content
@@ -879,18 +903,84 @@ pub fn upsert_with_anchor(
             .execute(conn)
             .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
 
-        // Set anchor on the just-inserted row.
+        // Set anchor + notary-declared HEAD on the just-inserted row (author-only
+        // auto-declare — this defensive insert path is still an own-conductor
+        // ContentCommitted projection, so the HEAD election applies).
         diesel::update(
             content::table
                 .filter(content::h_app_id.eq(&ctx.h_app_id))
                 .filter(content::id.eq(id)),
         )
-        .set(content::dht_anchor_hash.eq(dht_anchor_hash))
+        .set((
+            content::dht_anchor_hash.eq(dht_anchor_hash),
+            content::declared_head_action_hash.eq(dht_anchor_hash),
+        ))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Set anchor on insert failed: {}", e)))?;
     }
 
     Ok(())
+}
+
+/// Stamp the notary-declared HEAD onto an EXISTING content row — the reconcile
+/// leg's conductor-VERIFIED stamp entrypoint (HEAD-election projection, Plan C3).
+///
+/// Behaviour:
+/// - EXISTING-row only: returns `Ok(false)` when no row exists for `id` (NO insert
+///   — the reconcile leg never fabricates content; a missing row means there is
+///   nothing to stamp).
+/// - On an existing row: sets BOTH `declared_head_action_hash` AND `dht_anchor_hash`
+///   to `head_action_hash`. A verified stamp is a green write — it advances the
+///   notary anchor, so green-overwrites-amber precedence holds for the value fields
+///   supplied in `patch` (same per-field semantics as [`upsert_with_anchor`], via
+///   the shared [`apply_content_patch_fields`] — `blob_cid` mirrors to `blob_hash`).
+/// - Bumps `updated_at`.
+/// - Idempotent: re-stamping the same head with a no-change patch is a cheap
+///   UPDATE that still returns `Ok(true)` (no no-op detection needed).
+///
+/// This is a conductor-VERIFIED path (the caller resolves the head via the
+/// conductor before stamping) — it MUST NEVER be called from CRDT/gossip input,
+/// which would launder un-witnessed peer state into the notary-authority HEAD.
+pub fn stamp_declared_head(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    head_action_hash: &str,
+    patch: Option<ContentProjectionPatch>,
+) -> Result<bool, StorageError> {
+    use diesel::dsl::sql;
+    use diesel::sql_types::Text;
+
+    let existing = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::id.eq(id))
+        .select(diesel::dsl::count_star())
+        .first::<i64>(conn)
+        .map(|c| c > 0)
+        .unwrap_or(false);
+
+    if !existing {
+        return Ok(false);
+    }
+
+    diesel::update(
+        content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq(id)),
+    )
+    .set((
+        content::declared_head_action_hash.eq(head_action_hash),
+        content::dht_anchor_hash.eq(head_action_hash),
+        content::updated_at.eq(sql::<Text>("CURRENT_TIMESTAMP")),
+    ))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Stamp declared head failed: {}", e)))?;
+
+    if let Some(patch) = patch {
+        apply_content_patch_fields(conn, ctx, id, &patch)?;
+    }
+
+    Ok(true)
 }
 
 // ============================================================================
@@ -976,6 +1066,65 @@ pub fn content_reaches_for_ids(
         .filter(content::id.eq_any(ids))
         .select((content::id, content::reach))
         .load(conn)
+}
+
+/// Reach tiers admitted into a CROSS-PEER content inventory — the broadcast
+/// family only.
+///
+/// This is the SAME rule as `crate::sync::projector::reach_is_distribution_safe`
+/// (`community` | `public` | `commons`): the content-anchor inventory advertised
+/// over `/elohim/view-federation/1.0.0` is a cross-peer surface, so a scoped-tier
+/// row (`private`/`self`/`intimate`/`trusted`/`familiar`) — or any UNKNOWN reach
+/// value — must NEVER leak into it. The three literals are duplicated here rather
+/// than imported from `sync::projector` deliberately: `db::content_diesel` is a
+/// leaf persistence module and taking a dependency UP on the `sync` layer would
+/// invert the module graph (a module-layer smell). The rule's canonical home is
+/// `reach_is_distribution_safe`; this co-located mirror is guarded by the
+/// `content_anchor_inventory_excludes_scoped_reach` test below.
+const DISTRIBUTION_SAFE_REACH: [&str; 3] = ["community", "public", "commons"];
+
+/// `(id, dht_anchor_hash)` pairs for the CROSS-PEER content-anchor inventory
+/// (notary-authority Leg 4 — the cross-peer reconcile arm).
+///
+/// Returns only rows that are BOTH:
+/// - **anchored** (`dht_anchor_hash IS NOT NULL`) — an un-anchored bulk-seed row
+///   carries no notary provenance to advertise; and
+/// - **distribution-safe reach** (`community`/`public`/`commons`, per
+///   [`DISTRIBUTION_SAFE_REACH`]) — scoped tiers must never enter a cross-peer
+///   surface. This reach filter is a REQUIREMENT, not an optimization.
+///
+/// Ordered by `id` ascending (deterministic), capped at `cap` (LIMIT).
+///
+/// **Discovery-only (the notary invariant).** A peer consuming this inventory
+/// learns WHICH content ids have a DHT anchor somewhere; the anchor VALUE it
+/// writes into its own projection comes EXCLUSIVELY from its OWN conductor
+/// (`content_store::resolve_content_head`), never from the advertised pair. Peer
+/// bytes are never laundered into notary provenance — the same P1 discipline as
+/// `rea_commitments::inventory_for_reconcile`.
+pub fn list_content_anchor_inventory(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    cap: i64,
+) -> Result<Vec<(String, String)>, StorageError> {
+    let rows: Vec<(String, Option<String>)> = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::dht_anchor_hash.is_not_null())
+        .filter(content::reach.eq_any(DISTRIBUTION_SAFE_REACH))
+        .order(content::id.asc())
+        .limit(cap)
+        .select((content::id, content::dht_anchor_hash))
+        .load(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!("content anchor inventory load failed: {e}"))
+        })?;
+
+    // `IS NOT NULL` guarantees `Some`; `filter_map` discards defensively rather
+    // than unwrap. An empty-string anchor (`""`, distinct from NULL) is admitted
+    // as-is — the consumer's diff treats an empty peer anchor as non-divergence.
+    Ok(rows
+        .into_iter()
+        .filter_map(|(id, anchor)| anchor.map(|a| (id, a)))
+        .collect())
 }
 
 /// Get content count for an app
@@ -1211,6 +1360,7 @@ mod tests {
                 dht_anchor_hash TEXT,
                 p2p_published_at TEXT,
                 crdt_converged_at TEXT,
+                declared_head_action_hash TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
@@ -1421,6 +1571,93 @@ mod tests {
         assert!(content_reaches_for_ids(&mut conn, &ctx, &[])
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn content_anchor_inventory_excludes_scoped_reach() {
+        // Notary-authority Leg 4: the cross-peer content-anchor inventory must
+        // advertise ONLY anchored, distribution-safe (community/public/commons)
+        // rows. Two exclusions are REQUIREMENTS, not optimizations:
+        //   - un-anchored rows (no notary provenance to advertise); and
+        //   - scoped-tier rows (must never leak into a cross-peer surface).
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        let mk = |id: &str, reach: &str, anchor: Option<&str>| CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: reach.to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+            dht_anchor_hash: anchor.map(str::to_string),
+        };
+
+        // Distribution-safe + anchored → INCLUDED.
+        create_content(
+            &mut conn,
+            &ctx,
+            mk("c:public", "public", Some("anc-public")),
+        )
+        .unwrap();
+        create_content(
+            &mut conn,
+            &ctx,
+            mk("c:commons", "commons", Some("anc-commons")),
+        )
+        .unwrap();
+        create_content(
+            &mut conn,
+            &ctx,
+            mk("c:community", "community", Some("anc-community")),
+        )
+        .unwrap();
+        // Distribution-safe but UN-anchored → EXCLUDED (no provenance).
+        create_content(&mut conn, &ctx, mk("c:public-noanchor", "public", None)).unwrap();
+        // Scoped-tier reach, even though anchored → EXCLUDED (must not leak).
+        create_content(
+            &mut conn,
+            &ctx,
+            mk("c:private", "private", Some("anc-private")),
+        )
+        .unwrap();
+        create_content(&mut conn, &ctx, mk("c:self", "self", Some("anc-self"))).unwrap();
+        create_content(
+            &mut conn,
+            &ctx,
+            mk("c:trusted", "trusted", Some("anc-trusted")),
+        )
+        .unwrap();
+
+        let inv = list_content_anchor_inventory(&mut conn, &ctx, i64::MAX).unwrap();
+        let ids: Vec<&str> = inv.iter().map(|(id, _)| id.as_str()).collect();
+
+        // Exactly the three anchored distribution-safe rows, id-ascending.
+        assert_eq!(
+            ids,
+            vec!["c:commons", "c:community", "c:public"],
+            "only anchored distribution-safe rows, ordered by id asc"
+        );
+        // Anchor value carried through verbatim (discovery pair).
+        let map: std::collections::HashMap<String, String> = inv.into_iter().collect();
+        assert_eq!(map.get("c:public").map(String::as_str), Some("anc-public"));
+        // Scoped-tier ids must NEVER appear in a cross-peer inventory.
+        assert!(!map.contains_key("c:private"));
+        assert!(!map.contains_key("c:self"));
+        assert!(!map.contains_key("c:trusted"));
+        // Un-anchored distribution-safe id is excluded (no provenance).
+        assert!(!map.contains_key("c:public-noanchor"));
+
+        // Cap is respected (LIMIT).
+        let capped = list_content_anchor_inventory(&mut conn, &ctx, 2).unwrap();
+        assert_eq!(capped.len(), 2, "cap limits the returned rows");
     }
 
     #[test]
@@ -2375,6 +2612,180 @@ mod tests {
             row.dht_anchor_hash.as_deref(),
             Some("bafy-notarized-anchor"),
             "existing notarized anchor preserved"
+        );
+    }
+
+    /// A base plain-content input (no anchor, no provenance) for HEAD-election tests.
+    fn mk_plain(id: &str) -> CreateContentInput {
+        CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "commons".to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+            dht_anchor_hash: None,
+        }
+    }
+
+    /// HEAD-election (i): `upsert_with_anchor` (the own-conductor `ContentCommitted`
+    /// projection) now advances `declared_head_action_hash` to the committed action
+    /// alongside `dht_anchor_hash` — author-only auto-declare.
+    #[test]
+    fn upsert_with_anchor_sets_declared_head() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        create_content(&mut conn, &ctx, mk_plain("cid-head")).unwrap();
+        let pre = get_content(&mut conn, &ctx, "cid-head", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert!(
+            pre.declared_head_action_hash.is_none(),
+            "no declared head before the first own-conductor projection"
+        );
+
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "cid-head",
+            ContentProjectionPatch {
+                title: Some("Head v2".to_string()),
+                ..Default::default()
+            },
+            "uhCkk-head-action-1",
+        )
+        .unwrap();
+
+        let row = get_content(&mut conn, &ctx, "cid-head", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-head-action-1"));
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-head-action-1"),
+            "upsert_with_anchor must advance declared_head_action_hash to the committed action"
+        );
+        assert_eq!(row.title, "Head v2", "patch value field still applied");
+    }
+
+    /// HEAD-election (ii): `stamp_declared_head` stamps an EXISTING row (both hashes)
+    /// and returns `Ok(false)` (no insert) for a missing row; re-stamp is idempotent.
+    #[test]
+    fn stamp_declared_head_stamps_existing_and_false_for_missing() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        // Missing row → Ok(false), no fabrication.
+        let missing = stamp_declared_head(&mut conn, &ctx, "cid-absent", "uhCkk-x", None).unwrap();
+        assert!(
+            !missing,
+            "stamp on a missing row must return Ok(false) and NOT insert"
+        );
+        assert!(
+            get_content(&mut conn, &ctx, "cid-absent", MinTrust::Invisible)
+                .unwrap()
+                .is_none(),
+            "stamp must never fabricate a row"
+        );
+
+        // Existing row → Ok(true), both hashes set to the verified head.
+        create_content(&mut conn, &ctx, mk_plain("cid-present")).unwrap();
+        let stamped =
+            stamp_declared_head(&mut conn, &ctx, "cid-present", "uhCkk-head-9", None).unwrap();
+        assert!(stamped, "stamp on an existing row must return Ok(true)");
+
+        let row = get_content(&mut conn, &ctx, "cid-present", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-head-9")
+        );
+        assert_eq!(
+            row.dht_anchor_hash.as_deref(),
+            Some("uhCkk-head-9"),
+            "a verified stamp is a green write — it advances the notary anchor too"
+        );
+
+        // Idempotent re-stamp still returns Ok(true).
+        let restamped =
+            stamp_declared_head(&mut conn, &ctx, "cid-present", "uhCkk-head-9", None).unwrap();
+        assert!(restamped, "idempotent re-stamp returns Ok(true)");
+    }
+
+    /// HEAD-election (iii): a verified `stamp_declared_head` carrying a patch
+    /// overwrites an amber row's value fields (green-over-amber preserved) and
+    /// promotes the row to notarized.
+    #[test]
+    fn stamp_declared_head_overwrites_amber_value_fields() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let id = "epr:amber-then-stamped";
+
+        // Amber row: converged blob_hash, no anchor, no declared head.
+        create_content(&mut conn, &ctx, mk_bundle(id)).unwrap();
+        update_content(
+            &mut conn,
+            &ctx,
+            UpdateContentInput {
+                id: id.to_string(),
+                blob_hash: Some("sha256-amberbundle".to_string()),
+                crdt_converged_at: Some(chrono::Utc::now().to_rfc3339()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let pre = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(pre.blob_hash.as_deref(), Some("sha256-amberbundle"));
+        assert!(pre.dht_anchor_hash.is_none(), "amber row is not notarized");
+        assert!(pre.declared_head_action_hash.is_none());
+
+        // Verified stamp carries a green blob_cid — green overwrites amber value fields.
+        let stamped = stamp_declared_head(
+            &mut conn,
+            &ctx,
+            id,
+            "uhCkk-verified-head",
+            Some(ContentProjectionPatch {
+                blob_cid: Some("sha256-greenbundle".to_string()),
+                ..Default::default()
+            }),
+        )
+        .unwrap();
+        assert!(stamped);
+
+        let row = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.blob_hash.as_deref(),
+            Some("sha256-greenbundle"),
+            "verified (green) stamp overwrites the amber blob_hash value field"
+        );
+        assert_eq!(row.blob_cid.as_deref(), Some("sha256-greenbundle"));
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-verified-head")
+        );
+        assert_eq!(
+            row.dht_anchor_hash.as_deref(),
+            Some("uhCkk-verified-head"),
+            "stamp promotes the row to notarized (green)"
+        );
+        assert!(
+            row.crdt_converged_at.is_some(),
+            "amber marker is harmless residue — never cleared by the stamp"
         );
     }
 }
