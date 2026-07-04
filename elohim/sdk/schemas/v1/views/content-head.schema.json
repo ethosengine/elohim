@@ -1,0 +1,39 @@
+{
+  "$id": "epr:schema:view:content-head",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContentHeadView",
+  "description": "The notary-declared HEAD of a content id's version DAG (HEAD-election, Plan C3 / notary-authority Leg 3). Returned by GET/POST /db/content/{id}/head. Source of truth: DHT (Notarized HEAD election, Category A). Projected from the content row's notary markers; the surface exists only for a row carrying a notary answer (a declared head OR a DHT anchor).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contentId", "headActionHash", "declared", "trust"],
+  "properties": {
+    "contentId": {
+      "type": "string",
+      "description": "The content id whose HEAD this is."
+    },
+    "headActionHash": {
+      "type": "string",
+      "description": "The action hash the notary holds as this id's current HEAD. Prefers the explicitly-declared HEAD; falls back to the DHT anchor when no explicit declaration is stamped."
+    },
+    "declared": {
+      "type": "boolean",
+      "description": "true iff an explicit declared HEAD was set (an author moved the HEAD via the declare authority); false when the answer is the DHT-anchor fallback (the single-author implicit head)."
+    },
+    "dhtAnchorHash": {
+      "type": ["string", "null"],
+      "description": "The DHT anchor for the resolved row when notarized; null when the HEAD answer rests only on a declared head with no anchor yet."
+    },
+    "trust": {
+      "type": "string",
+      "description": "REQ-F10 trust legibility label — same vocabulary as ContentView.trust: 'notarized' (green/DHT-notarized) | 'published' (peer-attested) | 'unconfirmed' (amber/CRDT-converged-only or all-null). Never an authority/attribution source."
+    },
+    "blobHash": {
+      "type": ["string", "null"],
+      "description": "The serving blob hash of the resolved row (browser bundle), if any."
+    },
+    "updatedAt": {
+      "type": ["string", "null"],
+      "description": "When the resolved row was last written (mirrors ContentView.updatedAt)."
+    }
+  }
+}

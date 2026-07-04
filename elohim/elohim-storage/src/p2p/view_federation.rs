@@ -44,11 +44,20 @@ use crate::views::{
 /// The `total` field reports the true row count when truncated.
 pub const PROJECTION_INVENTORY_CAP: i64 = 2000;
 
-/// The only projection table the v1 reconciliation stream serves an inventory
-/// for. The `ViewKind::ProjectionInventory { table }` discriminator is the seam
-/// for `agreements` / `economic_events` later; an unknown table yields an empty
+/// The REA-commitment projection table (v1 reconciliation stream). The
+/// `ViewKind::ProjectionInventory { table }` discriminator is the seam for
+/// `agreements` / `economic_events` later; an unknown table yields an empty
 /// inventory (honest: "I hold nothing for a table I don't know").
 pub const PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS: &str = "rea_commitments";
+
+/// The CONTENT projection table (notary-authority Leg 4 — cross-peer
+/// content-anchor reconcile). Serves the `(id, dhtAnchorHash)` inventory of
+/// this peer's anchored, distribution-safe content rows (see
+/// `db::content_diesel::list_content_anchor_inventory`) so a peer that missed a
+/// `ContentCommitted` signal can discover WHICH ids to re-resolve against its
+/// OWN conductor. Discovery-only: the advertised anchor is never written into a
+/// consumer's projection.
+pub const PROJECTION_INVENTORY_TABLE_CONTENT: &str = "content";
 
 /// Protocol identifier for federated view-slice fetch.
 pub const VIEW_FEDERATION_PROTOCOL_ID: &str = "/elohim/view-federation/1.0.0";
@@ -311,10 +320,11 @@ pub async fn build_response_slice(
 
 /// Build the `(payload_json, freshness)` for a `ProjectionInventory` request.
 ///
-/// Reads the local projection for `table` (v1: `rea_commitments` only) capped
-/// at [`PROJECTION_INVENTORY_CAP`], newest first. `Live` when the pool is
-/// present (local SQL is present truth); `Offline` with an empty inventory when
-/// `pool` is `None` (test/conductor-less contexts) or the table is unknown.
+/// Reads the local projection for `table` capped at [`PROJECTION_INVENTORY_CAP`].
+/// v1 tables: `rea_commitments` (newest-first) and `content` (id-ascending,
+/// notary-authority Leg 4). `Live` when the pool is present (local SQL is present
+/// truth); `Offline` with an empty inventory when `pool` is `None`
+/// (test/conductor-less contexts) or the table is unknown.
 fn build_inventory_payload(
     pool: Option<&crate::db::DbPool>,
     table: &str,
@@ -331,8 +341,11 @@ fn build_inventory_payload(
         )
     };
 
-    // v1: only rea_commitments. The discriminator is the seam for other tables.
-    if table != PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS {
+    // Known tables only. The discriminator is the seam for other tables; an
+    // unknown table yields an honest empty inventory.
+    if table != PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS
+        && table != PROJECTION_INVENTORY_TABLE_CONTENT
+    {
         return empty();
     }
     let Some(p) = pool else {
@@ -342,6 +355,69 @@ fn build_inventory_payload(
         return empty();
     };
     let app_ctx = crate::db::AppContext::default_lamad();
+
+    // Content table (notary-authority Leg 4) — anchored, distribution-safe rows.
+    if table == PROJECTION_INVENTORY_TABLE_CONTENT {
+        return match crate::db::content_diesel::list_content_anchor_inventory(
+            &mut conn,
+            &app_ctx,
+            PROJECTION_INVENTORY_CAP,
+        ) {
+            Ok(rows) => {
+                // `list_content_anchor_inventory` returns pairs only (no separate
+                // count), so `total` reports what we ACTUALLY serve. When the row
+                // set fills the cap the inventory may be truncated — surface it as
+                // a WARN so a cap is never silent (the requester otherwise cannot
+                // tell a full-cap page from an exact-cap corpus).
+                let truncated = rows.len() as i64 >= PROJECTION_INVENTORY_CAP;
+                let total = rows.len();
+                let entries = rows
+                    .into_iter()
+                    .map(|(id, dht_anchor_hash)| ProjectionInventoryEntry {
+                        id,
+                        dht_anchor_hash,
+                    })
+                    .collect();
+                let payload = ProjectionInventoryPayload {
+                    table: table.to_string(),
+                    total,
+                    entries,
+                };
+                if truncated {
+                    tracing::warn!(
+                        target: "elohim_storage::view_federation",
+                        table = %table,
+                        cap = PROJECTION_INVENTORY_CAP,
+                        served = payload.entries.len(),
+                        "ProjectionInventory: content inventory truncated at cap \
+                         (advertising the first cap ids by id-asc; true count exceeds cap)"
+                    );
+                }
+                tracing::info!(
+                    target: "elohim_storage::view_federation",
+                    table = %table,
+                    entries = payload.entries.len(),
+                    total,
+                    "ProjectionInventory: serving local inventory"
+                );
+                (
+                    serde_json::to_value(payload).unwrap_or(serde_json::Value::Null),
+                    FreshnessState::Live,
+                )
+            }
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::view_federation",
+                    table = %table,
+                    error = %e,
+                    "ProjectionInventory: local inventory query failed; returning empty"
+                );
+                empty()
+            }
+        };
+    }
+
+    // rea_commitments (byte-identical to the pre-Leg-4 path).
     match crate::db::rea_commitments::inventory_for_reconcile(
         &mut conn,
         &app_ctx,
@@ -518,5 +594,74 @@ mod tests {
         );
         let err = result.unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn content_inventory_empty_and_offline_without_pool() {
+        // Poolless/conductor-less context: the content table is KNOWN, but with
+        // no pool the responder must return an honest empty inventory (Offline),
+        // never a fabricated one.
+        let (val, state) = build_inventory_payload(None, PROJECTION_INVENTORY_TABLE_CONTENT);
+        assert_eq!(state, FreshnessState::Offline);
+        let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
+        assert_eq!(payload.table, "content");
+        assert_eq!(payload.total, 0);
+        assert!(payload.entries.is_empty());
+    }
+
+    #[test]
+    fn unknown_table_still_empty_after_content_added() {
+        // Adding the `content` table must not make an UNKNOWN table serve rows.
+        let (val, state) = build_inventory_payload(None, "agreements");
+        assert_eq!(state, FreshnessState::Offline);
+        let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
+        assert_eq!(payload.table, "agreements");
+        assert!(payload.entries.is_empty());
+    }
+
+    #[test]
+    fn content_inventory_served_from_pool_filters_scoped_and_unanchored() {
+        // Responder path for the content table (mirrors the rea_commitments
+        // serve contract): a real pool serves ONLY anchored, distribution-safe
+        // rows, Live. Scoped-tier and un-anchored rows must not appear on the
+        // cross-peer wire.
+        use crate::db::content_diesel::{create_content, CreateContentInput};
+        let pool = crate::test_util::test_pool();
+        let ctx = crate::db::AppContext::default_lamad();
+        {
+            let mut conn = pool.get().expect("pool conn");
+            let mk = |id: &str, reach: &str, anchor: Option<&str>| CreateContentInput {
+                id: id.to_string(),
+                title: id.to_string(),
+                description: None,
+                content_type: "concept".to_string(),
+                content_format: "markdown".to_string(),
+                blob_hash: None,
+                blob_cid: None,
+                content_size_bytes: None,
+                metadata_json: None,
+                reach: reach.to_string(),
+                created_by: None,
+                tags: vec![],
+                content_body: None,
+                dht_anchor_hash: anchor.map(str::to_string),
+            };
+            create_content(&mut conn, &ctx, mk("wf:public", "public", Some("anc-1"))).unwrap();
+            create_content(&mut conn, &ctx, mk("wf:private", "private", Some("anc-2"))).unwrap();
+            create_content(&mut conn, &ctx, mk("wf:noanchor", "commons", None)).unwrap();
+        }
+
+        let (val, state) = build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_CONTENT);
+        assert_eq!(state, FreshnessState::Live);
+        let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
+        assert_eq!(payload.table, "content");
+        let ids: Vec<&str> = payload.entries.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["wf:public"],
+            "only the anchored distribution-safe row is served"
+        );
+        assert_eq!(payload.entries[0].dht_anchor_hash, "anc-1");
+        assert_eq!(payload.total, 1);
     }
 }

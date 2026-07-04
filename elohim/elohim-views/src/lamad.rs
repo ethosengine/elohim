@@ -47,6 +47,40 @@ pub struct ContentView {
     pub trust: String,
 }
 
+/// The notary-declared HEAD of a content id's version DAG (HEAD-election, Plan
+/// C3 / notary-authority Leg 3 — the HTTP surface over `content_store`'s
+/// resolve/declare coordinators).
+///
+/// Source of truth: DHT (Notarized HEAD election, Category A). Projected from
+/// the `content` row's notary markers; the surface exists only for a row that
+/// carries a notary answer (a declared head OR a DHT anchor) — a row with
+/// neither has no HEAD and the handler 404s rather than returning this view.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ContentHeadView {
+    /// The content id whose HEAD this is (wire: `contentId`).
+    pub content_id: String,
+    /// The action hash the notary holds as this id's current HEAD. Prefers the
+    /// explicitly-declared HEAD; falls back to the DHT anchor when no explicit
+    /// declaration has been stamped (wire: `headActionHash`).
+    pub head_action_hash: String,
+    /// `true` iff an explicit `declared_head_action_hash` was set (an author
+    /// moved the HEAD via the declare authority); `false` when the answer is the
+    /// DHT-anchor fallback (the single-author implicit head).
+    pub declared: bool,
+    /// The DHT anchor for the resolved row, when notarized. `None` when the HEAD
+    /// answer rests only on a declared head with no anchor yet.
+    pub dht_anchor_hash: Option<String>,
+    /// REQ-F10 trust legibility label — same vocabulary as `ContentView.trust`
+    /// (`notarized` | `published` | `unconfirmed`). Never an authority source.
+    pub trust: String,
+    /// The serving blob hash of the resolved row, if any (browser bundle).
+    pub blob_hash: Option<String>,
+    /// When the resolved row was last written (mirrors `ContentView.updatedAt`).
+    pub updated_at: Option<String>,
+}
+
 /// One node in a content relationship graph.
 ///
 /// Wire shape for `content-graph.schema.json` `$defs/ContentGraphNode`. Carries

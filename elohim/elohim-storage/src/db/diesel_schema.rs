@@ -86,6 +86,7 @@ diesel::table! {
         p2p_published_at -> Nullable<Text>,
         server_blob_hash -> Nullable<Text>,
         crdt_converged_at -> Nullable<Text>,
+        declared_head_action_hash -> Nullable<Text>,
     }
 }
 

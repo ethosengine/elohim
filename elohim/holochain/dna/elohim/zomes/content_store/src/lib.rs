@@ -2544,6 +2544,288 @@ pub fn update_content(input: UpdateContentInput) -> ExternResult<ContentOutput> 
     })
 }
 
+// =============================================================================
+// Content HEAD Authority (notary-authority Leg 1, Plan C1 coordinator-only)
+// =============================================================================
+//
+// The Update chain IS the version DAG: Holochain Update actions natively carry
+// `original_action_address` (a Supersedes edge). "The author" = the author of
+// the root Create. HEAD election is AUTHOR-FILTERED — a non-author's update or
+// link refresh must NOT win, closing the LWW vulnerability (VERDICT L2 #3)
+// where any agent's `update_content` could hijack `get_content_by_id`'s
+// newest-link recency race.
+
+/// Notarized version-DAG head of a content id.
+///
+/// `supersedes` = the head action's `original_action_address` when it is an
+/// Update, `None` for the root Create. `declared_at` = the head action's DHT
+/// timestamp. `author` = the root Create's author (the sole declarer).
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ContentHeadOutput {
+    pub content_id: String,
+    pub head_action_hash: ActionHash,
+    pub entry_hash: EntryHash,
+    pub author: AgentPubKey,
+    pub declared_at: Timestamp,
+    pub supersedes: Option<ActionHash>,
+    pub content: Content,
+}
+
+/// Input for `declare_content_head`. `head_action_hash: None` re-affirms the
+/// current head (idempotent, no commit); `Some(target)` re-declares `target`
+/// as the head (republish per §5.6 REQ-F13 when it is not already the head).
+///
+/// `head_action_hash` is typed [`holo_hash::ActionHashB64`] (NOT bare
+/// `ActionHash`) so the field is string-wire-safe: the storage facade sends it
+/// as a canonical base64 String, and `ActionHashB64`'s `#[serde(transparent)]`
+/// deserialize accepts BOTH the base64 string form AND the raw-byte form under
+/// rmp_serde — a bare `ActionHash` expects bytes only and would fail to decode
+/// the facade's String on the explicit-republish path. Converted to `ActionHash`
+/// internally.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DeclareContentHeadInput {
+    pub id: String,
+    pub head_action_hash: Option<holo_hash::ActionHashB64>,
+}
+
+/// Walk an action's Update lineage down to the root Create and return its
+/// author. Every update chains from the prior head, so any chain member
+/// resolves to the same root author. `None` if a link in the chain is not
+/// retrievable from the local DHT view.
+fn resolve_root_author(mut action_hash: ActionHash) -> ExternResult<Option<AgentPubKey>> {
+    loop {
+        let record = match get(action_hash.clone(), GetOptions::default())? {
+            Some(r) => r,
+            None => return Ok(None),
+        };
+        match record.action() {
+            Action::Update(update) => action_hash = update.original_action_address.clone(),
+            other => return Ok(Some(other.author().clone())),
+        }
+    }
+}
+
+/// Gather the retrievable IdToContent link-target records for an id plus the
+/// root author. Shared by `resolve_content_head` (HEAD election) and
+/// `declare_content_head` (author gate + chain-membership check). Gossip-
+/// missing targets are skipped, not errors — the caller degrades to the
+/// newest retrievable author-authored record. `None` when nothing is
+/// retrievable yet.
+fn gather_content_chain(id: &str) -> ExternResult<Option<(AgentPubKey, Vec<Record>)>> {
+    let anchor = StringAnchor::new("content_id", id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
+    let links = get_links(query, GetStrategy::default())?;
+    if links.is_empty() {
+        return Ok(None);
+    }
+    let mut records: Vec<Record> = Vec::new();
+    for link in &links {
+        let action_hash = match ActionHash::try_from(link.target.clone()) {
+            Ok(h) => h,
+            Err(_) => continue,
+        };
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    if records.is_empty() {
+        return Ok(None);
+    }
+    let root_author = match resolve_root_author(records[0].action_hashed().hash.clone())? {
+        Some(a) => a,
+        None => return Ok(None),
+    };
+    Ok(Some((root_author, records)))
+}
+
+/// Build a `ContentHeadOutput` from an elected head record.
+fn build_content_head_output(content_id: &str, record: &Record) -> ExternResult<ContentHeadOutput> {
+    let head_action_hash = record.action_hashed().hash.clone();
+    let author = record.action().author().clone();
+    let declared_at = record.action().timestamp();
+    let supersedes = match record.action() {
+        Action::Update(u) => Some(u.original_action_address.clone()),
+        _ => None,
+    };
+    let entry_hash = record
+        .action()
+        .entry_hash()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "resolve_content_head: head action carries no entry hash".to_string()
+        )))?
+        .clone();
+    let content: Content = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "resolve_content_head: head record carries no Content entry".to_string()
+        )))?;
+    Ok(ContentHeadOutput {
+        content_id: content_id.to_string(),
+        head_action_hash,
+        entry_hash,
+        author,
+        declared_at,
+        supersedes,
+        content,
+    })
+}
+
+/// Resolve the author-filtered HEAD of a content id's version DAG.
+///
+/// Root author = author of the Create at the base of the update chain. HEAD =
+/// the newest (by action timestamp) linked record the ROOT author authored —
+/// a non-author's update or link refresh is excluded, so recency alone cannot
+/// hijack the head. Degrades to the newest RETRIEVABLE author-authored record
+/// when the newest target has not gossiped in yet; `None` if the id is unknown
+/// or nothing is retrievable.
+#[hdk_extern]
+pub fn resolve_content_head(id: String) -> ExternResult<Option<ContentHeadOutput>> {
+    let (root_author, records) = match gather_content_chain(&id)? {
+        Some(x) => x,
+        None => return Ok(None),
+    };
+    let head = records
+        .into_iter()
+        .filter(|r| *r.action().author() == root_author)
+        .max_by_key(|r| r.action().timestamp());
+    match head {
+        Some(record) => Ok(Some(build_content_head_output(&id, &record)?)),
+        None => Ok(None),
+    }
+}
+
+/// Declare (notarize) the HEAD of a content id's version DAG. Author-gated:
+/// only the root Create's author may move or re-affirm the head.
+///
+/// - `head_action_hash: None` → re-affirm the current head unchanged (no
+///   commit); still emits `ContentHeadDeclared` (an idempotent declaration is
+///   still a declaration).
+/// - `Some(target)` where `target` is already the head → idempotent re-affirm.
+/// - `Some(target)` otherwise → REPUBLISH (§5.6 REQ-F13): write `target`'s
+///   Content as an Update superseding the current head, refresh the IdToContent
+///   link exactly as `update_content` does, and emit `ContentHeadDeclared`.
+///
+/// The author gate returns a Guest error containing the literal substring
+/// `"not the author"` (the HTTP layer maps it to 403); a `target` outside this
+/// id's chain returns one containing `"not in the version chain"`.
+#[hdk_extern]
+pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<ContentHeadOutput> {
+    // AUTHOR GATE FIRST — resolve the current chain, then reject non-authors.
+    let (root_author, records) = gather_content_chain(&input.id)?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_content_head: no content found for id '{}'",
+            input.id
+        )))
+    })?;
+    let me = agent_info()?.agent_initial_pubkey;
+    if me != root_author {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_content_head: agent {me:?} is not the author of content '{}' (author {root_author:?})",
+            input.id
+        ))));
+    }
+
+    // Current head = newest author-authored record (same election as resolve).
+    let current_head = records
+        .iter()
+        .filter(|r| *r.action().author() == root_author)
+        .max_by_key(|r| r.action().timestamp())
+        .cloned()
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "declare_content_head: no author-authored head for id '{}'",
+                input.id
+            )))
+        })?;
+    let current_head_action = current_head.action_hashed().hash.clone();
+
+    // Convert the wire-safe base64 hash to a native ActionHash for the chain-
+    // membership gate below. `ActionHash::from(ActionHashB64)` is the inner-hash
+    // unwrap (holo_hash `derive_more::Into`).
+    let target = match input.head_action_hash.map(ActionHash::from) {
+        // Re-affirm: current head unchanged, no new commit — still a declaration.
+        None => {
+            let out = build_content_head_output(&input.id, &current_head)?;
+            emit_signal(ProjectionSignal::ContentHeadDeclared {
+                content_id: out.content_id.clone(),
+                head_action_hash: out.head_action_hash.clone(),
+                entry_hash: out.entry_hash.clone(),
+                author: out.author.clone(),
+            })?;
+            return Ok(out);
+        }
+        Some(t) => t,
+    };
+
+    // Chain-membership gate: target must be one of this id's authored versions.
+    let is_member = records
+        .iter()
+        .filter(|r| *r.action().author() == root_author)
+        .any(|r| r.action_hashed().hash == target);
+    if !is_member {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_content_head: action {target:?} is not in the version chain of content '{}'",
+            input.id
+        ))));
+    }
+
+    // Target already head: idempotent declaration, no new commit.
+    if target == current_head_action {
+        let out = build_content_head_output(&input.id, &current_head)?;
+        emit_signal(ProjectionSignal::ContentHeadDeclared {
+            content_id: out.content_id.clone(),
+            head_action_hash: out.head_action_hash.clone(),
+            entry_hash: out.entry_hash.clone(),
+            author: out.author.clone(),
+        })?;
+        return Ok(out);
+    }
+
+    // REPUBLISH: re-declaring an older version as a new head. Write the target's
+    // Content verbatim (byte-identical to that version) as an Update superseding
+    // the current head; do NOT re-run prepare/validate — the entry is already
+    // prepared and we must preserve its exact bytes.
+    let target_record = get(target.clone(), GetOptions::default())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_content_head: target action {target:?} not retrievable"
+        )))
+    })?;
+    let target_content: Content = target_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "declare_content_head: target record carries no Content entry".to_string(),
+            ))
+        })?;
+
+    let new_action_hash = update_entry(
+        current_head_action,
+        &EntryTypes::Content(target_content.clone()),
+    )?;
+    // Refresh the id anchor → action link so subsequent resolves/updates find
+    // the new head (same pattern as update_content step 6).
+    create_id_to_content_link(&input.id, &new_action_hash)?;
+
+    let new_record = get(new_action_hash, GetOptions::default())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "declare_content_head: new head not retrievable after commit".to_string(),
+        ))
+    })?;
+    let out = build_content_head_output(&input.id, &new_record)?;
+    emit_signal(ProjectionSignal::ContentHeadDeclared {
+        content_id: out.content_id.clone(),
+        head_action_hash: out.head_action_hash.clone(),
+        entry_hash: out.entry_hash.clone(),
+        author: out.author.clone(),
+    })?;
+    Ok(out)
+}
+
 /// Bulk create content entries (for import operations)
 /// DEPRECATED: Use submit_import_batch() for large imports to avoid conductor thread exhaustion
 #[hdk_extern]
@@ -10393,6 +10675,17 @@ pub enum ProjectionSignal {
         action_hash: ActionHash,
         entry_hash: EntryHash,
         content: Content,
+        author: AgentPubKey,
+    },
+    /// Content HEAD was declared by the author (notary-authority Leg 1).
+    /// Emitted from `declare_content_head` — the version DAG's head moved
+    /// (republish) or was re-affirmed (idempotent). Coordinator-local
+    /// emission: the republish path also fires `ContentCommitted` from
+    /// post_commit, but only `declare_content_head` knows the declare intent.
+    ContentHeadDeclared {
+        content_id: String,
+        head_action_hash: ActionHash,
+        entry_hash: EntryHash,
         author: AgentPubKey,
     },
     /// Manifest entry was created or updated (Phase 3 P3.2).

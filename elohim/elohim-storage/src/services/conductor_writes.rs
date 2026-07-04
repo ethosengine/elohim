@@ -44,6 +44,8 @@ use std::sync::Arc;
 
 use crate::error::StorageError;
 use crate::hc_client::HcClient;
+use crate::rea_projection::ContentEntry;
+use crate::signals::HoloHashB64;
 
 /// Zome name hosting REA commitment + content coordinator functions.
 /// Lives in the `lamad` role of the elohim hApp (see
@@ -178,6 +180,102 @@ pub async fn get_rea_commitment(
                 "conductor_writes: decode ReaCommitmentOutput: {e}"
             ))
         })?;
+    Ok(out)
+}
+
+/// Wire mirror of the `content_store::{resolve_content_head, declare_content_head}`
+/// coordinator output — the notary-declared HEAD of a content id's version DAG plus
+/// the resolved head `Content` entry (HEAD-election, Plan C3 / notary-authority Leg 2).
+///
+/// Hash fields are typed [`HoloHashB64`] (accepts BOTH the raw-39-byte msgpack form the
+/// conductor emits AND a base64 string), matching the signal-mirror convention — a
+/// plain `String` mirror would silently drop the raw-byte wire form. `content` reuses
+/// the [`ContentEntry`] mirror the signal path already carries.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ContentHeadWire {
+    pub content_id: String,
+    pub head_action_hash: HoloHashB64,
+    #[serde(default)]
+    pub entry_hash: Option<HoloHashB64>,
+    #[serde(default)]
+    pub author: Option<HoloHashB64>,
+    /// Holochain `Timestamp` — i64 microseconds since the Unix epoch.
+    pub declared_at: i64,
+    /// The prior HEAD this declaration supersedes, if any.
+    #[serde(default)]
+    pub supersedes: Option<HoloHashB64>,
+    pub content: ContentEntry,
+}
+
+/// Caller-input wire shape for the `content_store::declare_content_head` coordinator:
+/// declare (or advance) the notary HEAD for a content `id`. `head_action_hash = None`
+/// asks the coordinator to resolve the author's latest committed action as the HEAD
+/// (single-author auto-declare); `Some(_)` pins an explicit action.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DeclareContentHeadInput {
+    pub id: String,
+    pub head_action_hash: Option<String>,
+}
+
+/// Resolve the notary-declared HEAD for a content `id` from THIS conductor's DHT view
+/// via the `content_store::resolve_content_head` coordinator (lamad role). `Ok(None)`
+/// when no HEAD is declared on this conductor's view.
+///
+/// This is the read half the HEAD-election reconcile leg uses before stamping the
+/// local projection: peers supply discovery (which ids exist), but the head content
+/// comes EXCLUSIVELY from this own-conductor DHT notary view — peer bytes are never
+/// written into the projection (the same P1 discipline as [`get_rea_commitment`]).
+pub async fn call_resolve_content_head(
+    hc: &Arc<HcClient>,
+    id: &str,
+) -> Result<Option<ContentHeadWire>, StorageError> {
+    let payload = rmp_serde::to_vec_named(&id.to_string()).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode resolve_content_head id: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "resolve_content_head", payload)
+        .await?;
+    let out: Option<ContentHeadWire> = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode ContentHeadWire (resolve): {e}"
+        ))
+    })?;
+    Ok(out)
+}
+
+/// Declare (or advance) the notary HEAD for a content `id` via the
+/// `content_store::declare_content_head` coordinator (lamad role). `head_action_hash =
+/// None` lets the coordinator resolve the author's latest committed action as the HEAD
+/// (single-author auto-declare); `Some(_)` pins an explicit action. Returns the
+/// resulting [`ContentHeadWire`].
+///
+/// Error strings are preserved verbatim (the underlying `call_zome` error propagates
+/// unmapped via `?`) so callers can match on the coordinator's "not the author"
+/// substring — only the authoring agent may declare its own content's HEAD.
+pub async fn call_declare_content_head(
+    hc: &Arc<HcClient>,
+    id: &str,
+    head_action_hash: Option<String>,
+) -> Result<ContentHeadWire, StorageError> {
+    let input = DeclareContentHeadInput {
+        id: id.to_string(),
+        head_action_hash,
+    };
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode DeclareContentHeadInput: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "declare_content_head", payload)
+        .await?;
+    let out: ContentHeadWire = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode ContentHeadWire (declare): {e}"
+        ))
+    })?;
     Ok(out)
 }
 

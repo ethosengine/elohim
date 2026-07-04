@@ -136,6 +136,18 @@ fn projected_fields(content: &Content) -> Vec<(&'static str, FieldVal)> {
             fields.push(("contentSizeBytes", FieldVal::I(size as i64)));
         }
     }
+    // `headActionHash` — an OBSERVABILITY/HINT scalar for peers (Plan C2,
+    // scalar variant): converges what the author's node last DECLARED as this
+    // content id's version-DAG head. Same absent-not-empty rule as the serving
+    // fields (an empty put would erase a peer's real hint via LWW). It is a
+    // HINT only, never an authority signal: any peer can put any bytes in a
+    // CRDT doc, so consumers must never treat the converged value as
+    // notarization — see the REQ-N5 guard on `reverse_project_content_doc`.
+    if let Some(h) = &content.declared_head_action_hash {
+        if !h.is_empty() {
+            fields.push(("headActionHash", FieldVal::S(h.clone())));
+        }
+    }
     fields
 }
 
@@ -352,6 +364,22 @@ pub async fn backfill_content_docs(
 /// instead of freezing on their first heal (A3 precedence: green > amber);
 /// (3) **namespace** — writes under `default_lamad` (the serving scope), never
 /// the doc's `"elohim"` sync namespace (REQ-F5).
+///
+/// # REQ-N5 — the converged `headActionHash` doc field is NEVER consumed into SQL
+///
+/// The doc also carries a `headActionHash` scalar (the author's declared
+/// version-DAG head, projected by `projected_fields`). **Do not read it here.
+/// Do not add a heal for it. Ever.** Notarization provenance —
+/// `dht_anchor_hash` and `declared_head_action_hash` — is written ONLY by
+/// conductor-verified paths (the `ContentCommitted` projection /
+/// `upsert_with_anchor` / the declared-head stamp in `content_diesel`). The
+/// converged doc value is unauthenticated peer input: any peer can put any
+/// bytes into a CRDT doc, so consuming it into either column would launder
+/// gossip into notarization provenance — an amber-tier hint silently promoted
+/// to authority. This function heals `blobHash` ONLY (amber, `crdt_converged_at`
+/// marker). If you are about to plumb another doc field into a SQL write,
+/// stop: route it through a conductor-verified path instead.
+/// Guard test: `converged_head_hint_is_never_stamped`.
 pub async fn reverse_project_content_doc(
     sync: &SyncManager,
     pool: &DbPool,
@@ -503,6 +531,7 @@ mod tests {
             p2p_published_at: None,
             server_blob_hash: None,
             crdt_converged_at: None,
+            declared_head_action_hash: None,
         }
     }
 
@@ -1184,6 +1213,181 @@ mod tests {
         assert!(
             super::backfill_enabled(Some("unrecognized")),
             "default-on posture: only an explicit off-value disables"
+        );
+    }
+
+    /// The declared-head hint scalar follows the absent-not-empty rule exactly
+    /// like blobHash: a set `declared_head_action_hash` projects as
+    /// `headActionHash`; None (and empty-string) project as ABSENCE — an empty
+    /// put would erase a peer's real hint via LWW.
+    #[tokio::test]
+    async fn head_action_hash_projected_when_set_absent_when_none() {
+        let (sync, _temp) = test_sync_manager().await;
+
+        // None → absent from the doc entirely.
+        let none = sample_content("head-none", "t");
+        super::project_content_doc(&sync, &none).await.unwrap();
+        assert!(
+            sync.get_doc_field("elohim", "node:head-none", "headActionHash")
+                .await
+                .is_err(),
+            "unset declared head must be ABSENT from the doc, not projected as \"\""
+        );
+
+        // Some(non-empty) → projected.
+        let mut set = sample_content("head-set", "t");
+        set.declared_head_action_hash = Some("uhCkk-head-1".to_string());
+        super::project_content_doc(&sync, &set).await.unwrap();
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:head-set", "headActionHash")
+                .await
+                .unwrap(),
+            "uhCkk-head-1"
+        );
+
+        // Some("") behaves like None (absent-not-empty).
+        let mut empty = sample_content("head-empty", "t");
+        empty.declared_head_action_hash = Some(String::new());
+        super::project_content_doc(&sync, &empty).await.unwrap();
+        assert!(
+            sync.get_doc_field("elohim", "node:head-empty", "headActionHash")
+                .await
+                .is_err(),
+            "empty declared head must be ABSENT from the doc"
+        );
+    }
+
+    /// doc_matches idempotency covers the new scalar: an unchanged declared
+    /// head is a no-op skip (no history inflation), an ADVANCED declared head
+    /// forces a re-projection and the new value converges into the doc.
+    #[tokio::test]
+    async fn changed_declared_head_forces_reprojection() {
+        let (sync, _temp) = test_sync_manager().await;
+        let mut content = sample_content("head-chg", "t");
+        content.declared_head_action_hash = Some("uhCkk-head-1".to_string());
+
+        assert!(super::project_content_doc(&sync, &content).await.unwrap());
+        let heads1 = sync.get_heads("elohim", "node:head-chg").await.unwrap();
+
+        // Unchanged declared head → idempotent skip, no change appended.
+        assert!(
+            !super::project_content_doc(&sync, &content).await.unwrap(),
+            "unchanged declared head must be a skip"
+        );
+        assert_eq!(
+            heads1,
+            sync.get_heads("elohim", "node:head-chg").await.unwrap(),
+            "the skip must not append a change"
+        );
+
+        // The author declares a new head → must re-project.
+        content.declared_head_action_hash = Some("uhCkk-head-2".to_string());
+        assert!(
+            super::project_content_doc(&sync, &content).await.unwrap(),
+            "a changed declared head must re-project"
+        );
+        assert_ne!(
+            heads1,
+            sync.get_heads("elohim", "node:head-chg").await.unwrap(),
+            "a changed declared head must append a change"
+        );
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:head-chg", "headActionHash")
+                .await
+                .unwrap(),
+            "uhCkk-head-2"
+        );
+    }
+
+    /// REQ-N5 laundering guard: a converged doc carrying `headActionHash` NEVER
+    /// stamps `dht_anchor_hash` or `declared_head_action_hash` on the SQL row.
+    /// The reverse projection heals `blobHash` ONLY (amber-marked) — anchors
+    /// are written exclusively by conductor-verified paths, and consuming the
+    /// doc's head hint here would launder unauthenticated peer input into
+    /// notarization provenance.
+    #[tokio::test]
+    async fn converged_head_hint_is_never_stamped() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+
+        // Local row: blob_hash NULL (healable), no anchor, no declared head.
+        {
+            let mut conn = pool.get().unwrap();
+            content_diesel::create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: "head-launder".to_string(),
+                    title: "t".to_string(),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash: None,
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: Some("b".to_string()),
+                    dht_anchor_hash: None,
+                },
+            )
+            .unwrap();
+        }
+
+        // A peer's converged doc carries BOTH a real blobHash and a head hint —
+        // exactly what an adversarial (or merely divergent) peer could gossip.
+        let mut peer = sample_content("head-launder", "t");
+        peer.blob_hash = Some("sha256-converged".to_string());
+        peer.declared_head_action_hash = Some("uhCkk-peer-declared-head".to_string());
+        super::project_content_doc(&sync, &peer).await.unwrap();
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:head-launder", "headActionHash")
+                .await
+                .unwrap(),
+            "uhCkk-peer-declared-head",
+            "precondition: the hint IS present in the converged doc"
+        );
+
+        // The heal runs (blobHash converges into SQL)…
+        assert!(
+            super::reverse_project_content_doc(&sync, &pool, "node:head-launder")
+                .await
+                .unwrap()
+        );
+
+        // …but the head hint is NEVER laundered into notarization provenance.
+        let mut conn = pool.get().unwrap();
+        let row = content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "head-launder",
+            content_diesel::MinTrust::Invisible,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            row.blob_hash.as_deref(),
+            Some("sha256-converged"),
+            "the blobHash heal itself must still land"
+        );
+        assert!(
+            row.crdt_converged_at.is_some(),
+            "the heal is amber-stamped as ever"
+        );
+        assert!(
+            row.dht_anchor_hash.is_none(),
+            "REQ-N5: a converged doc must never stamp dht_anchor_hash"
+        );
+        assert!(
+            row.declared_head_action_hash.is_none(),
+            "REQ-N5: the converged headActionHash hint must never be consumed \
+             into declared_head_action_hash"
         );
     }
 }

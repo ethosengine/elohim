@@ -31,4 +31,14 @@ server_blob_hash: string | null,
  * Classification: C (Operational serving marker — NEVER a notarized field, by design;
  * it must not launder converged state into authority/attribution provenance).
  */
-crdt_converged_at: string | null, };
+crdt_converged_at: string | null, 
+/**
+ * The notary-declared HEAD action for this content id's version DAG (HEAD-election
+ * projection, Plan C3). Written ONLY by own-conductor-witnessed commits
+ * (`ContentCommitted`/`ContentHeadDeclared` signal arms — local authorship implied) and
+ * conductor-verified reconcile stamps (`content_diesel::stamp_declared_head`); NEVER from
+ * CRDT/gossip input. In the single-author model the author's latest commit IS the declared
+ * head, so `upsert_with_anchor` advances this alongside `dht_anchor_hash`. NULL = no
+ * declared head yet. Classification: A (projection of the notary-declared HEAD action).
+ */
+declared_head_action_hash: string | null, };

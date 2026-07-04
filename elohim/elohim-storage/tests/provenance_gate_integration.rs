@@ -35,6 +35,7 @@ fn test_conn() -> SqliteConnection {
             p2p_published_at TEXT,
             server_blob_hash TEXT,
             crdt_converged_at TEXT,
+            declared_head_action_hash TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )

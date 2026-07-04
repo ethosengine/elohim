@@ -36,6 +36,24 @@
 //! - **v1 scope: `rea_commitments` only.** The table discriminator on
 //!   `ProjectionInventory` is the seam for agreements / economic_events; this
 //!   sweep asks only for `rea_commitments`.
+//!
+//! ## The content arm (notary-authority Leg 4)
+//!
+//! Alongside the REA sweep, [`run_content_sweep`] runs the SAME pattern for the
+//! `content` projection — the cross-peer content-anchor reconcile arm that flips
+//! scenario 2: a peer (e.g. `elohim.host`) reaches `trust="notarized"` for
+//! content whose DHT anchor exists on an authoring conductor but whose
+//! `ContentCommitted` signal it never saw (`post_commit` fires only on the
+//! authoring conductor). It shares the cadence (called from [`run_sweep`] on the
+//! same `PROJECTION_RECONCILE_SECS` tick) and the shared `GapTracker` rails, but
+//! keeps its OWN tracker — the id space is disjoint from REA. Its heal
+//! entrypoint is the conductor-VERIFIED [`content_diesel::stamp_declared_head`];
+//! the anchor value comes EXCLUSIVELY from the node's own
+//! `content_store::resolve_content_head`, never from the peer-advertised pair.
+//! Its `divergent_anchor` folds into the shared `/p2p/status` counter (the one
+//! cross-arm health signal); its heal/miss detail is log-observable, because
+//! extending the ts-rs-exported [`ProjectionReconcileStatus`] with content
+//! fields would change the `p2p-status` wire shape (owned elsewhere).
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -47,7 +65,9 @@ use ts_rs::TS;
 use crate::db::DbPool;
 use crate::hc_client::HcClient;
 use crate::p2p::reconcile_rails::GapTracker;
-use crate::p2p::view_federation::PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS;
+use crate::p2p::view_federation::{
+    PROJECTION_INVENTORY_TABLE_CONTENT, PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
+};
 use crate::p2p::P2PHandle;
 use crate::views::{ProjectionInventoryPayload, ViewFederationRequest, ViewKind};
 
@@ -315,8 +335,20 @@ pub async fn run_sweep(
 
     tracker.update_caught_up();
     let counts = tracker.counts();
+
+    // Content-anchor reconcile arm (notary-authority Leg 4) — same tick, same
+    // shared rails, its OWN GapTracker (disjoint id space). Runs after the REA
+    // arm. Its divergent-anchor count folds into the shared `/p2p/status`
+    // `divergent_anchor` counter (the one cross-arm health signal); the rest of
+    // its detail is log-observable (see module docs).
+    let content = run_content_sweep(p2p, hc, pool).await;
+
     state
-        .publish_sweep(counts, peers_asked, divergent_anchor)
+        .publish_sweep(
+            counts,
+            peers_asked,
+            divergent_anchor + content.divergent_anchor,
+        )
         .await;
 
     tracing::info!(
@@ -371,6 +403,354 @@ fn heal_one(
     Ok(())
 }
 
+// ============================================================================
+// Content-anchor reconcile arm (notary-authority Leg 4)
+// ============================================================================
+
+/// Cross-arm health numbers the content sweep hands back to [`run_sweep`].
+///
+/// Only `divergent_anchor` folds into the shared [`ProjectionReconcileStatus`]
+/// (the one cross-arm counter the status surface already carries). The rest is
+/// log-observable — extending the ts-rs-exported status struct with content
+/// fields would change the `p2p-status` wire shape (owned elsewhere).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ContentSweepOutcome {
+    /// Advertised ids present locally with an anchor that disagreed with a
+    /// non-empty peer anchor (own conductor decides who is right).
+    pub divergent_anchor: usize,
+    /// Gaps stamped from the own conductor this sweep.
+    pub healed: usize,
+    /// Gaps the own conductor could not resolve yet (`resolve_content_head`
+    /// returned `None`) — retried on the NEXT sweep via a fresh inventory diff.
+    pub conductor_missing: usize,
+    /// Peers that answered a content inventory request this sweep.
+    pub peers_asked: usize,
+}
+
+/// How ONE advertised content id classifies against the local projection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ContentGap {
+    /// Not present locally — SKIP. Absence is the shard/acquisition plane's job;
+    /// the content reconcile NEVER fabricates a row (`stamp_declared_head` is
+    /// existing-row-only by construction).
+    AbsentLocal,
+    /// Present but un-anchored (`dht_anchor_hash` NULL — not in the local
+    /// anchored set). Heal: the own conductor stamps the notary anchor. This is
+    /// scenario 2 — the bulk-seeded row that never saw its `ContentCommitted`.
+    AnchorGap,
+    /// Present + anchored, but the local anchor disagrees with a NON-EMPTY peer
+    /// anchor. Verify-gap: the own conductor decides who is right (we re-stamp
+    /// OUR conductor's head; we never adopt the peer's value). Counts as a
+    /// divergence.
+    Divergent,
+    /// Anchors agree, or the peer advertised no anchor — nothing to do.
+    InSync,
+}
+
+/// Pure diff for ONE advertised content id (the notary invariant, Leg 4).
+///
+/// `present` is reach-agnostic local presence (`content_ids_present`);
+/// `local_anchors` is the local anchored + distribution-safe set
+/// (`list_content_anchor_inventory`); `peer_anchor` is the anchor a peer
+/// advertised for the id (`None`/empty ⇒ the peer is itself un-anchored, which
+/// is never divergence evidence).
+fn classify_content_gap(
+    id: &str,
+    present: &std::collections::HashSet<String>,
+    local_anchors: &std::collections::HashMap<String, String>,
+    peer_anchor: Option<&str>,
+) -> ContentGap {
+    if !present.contains(id) {
+        return ContentGap::AbsentLocal;
+    }
+    match local_anchors.get(id) {
+        None => ContentGap::AnchorGap,
+        Some(local) => match peer_anchor {
+            Some(pa) if !pa.is_empty() && pa != local.as_str() => ContentGap::Divergent,
+            _ => ContentGap::InSync,
+        },
+    }
+}
+
+/// Run one reconciliation sweep over the `content` projection (Leg 4).
+///
+/// 1. Build the local anchored+distribution-safe inventory (`id → anchor`).
+/// 2. Ask every connected peer for its `ProjectionInventory { content }`.
+/// 3. One `content_ids_present` query resolves reach-agnostic local presence for
+///    every advertised id.
+/// 4. Diff each advertised `(id, peer_anchor)` via [`classify_content_gap`]:
+///    absent → SKIP; un-anchored → anchor-gap; anchor-divergent → verify-gap +
+///    divergence count. Anchor-gap ∪ divergent ids feed a per-sweep
+///    [`GapTracker`] on the shared rails.
+/// 5. For each gap, `content_store::resolve_content_head(id)` on the OWN
+///    conductor: `Some(head)` → mirror the head content into a
+///    [`ContentProjectionPatch`] and [`stamp_declared_head`] (verified stamp);
+///    `None` → `mark_failed`, retried next sweep. A heal logs WARN naming the id
+///    and the discovering peer.
+///
+/// **Re-detect semantics.** The tracker is rebuilt each sweep, so its per-sweep
+/// `MAX_RETRIES` never permanently drops a gap: a divergence or anchor-gap that
+/// persists in SQL is recomputed from the inventory diff on the NEXT sweep and
+/// re-enqueued afresh. `MAX_RETRIES` only bounds within-sweep churn (and this
+/// arm attempts each gap once per sweep, so it is effectively a floor).
+pub async fn run_content_sweep(
+    p2p: &P2PHandle,
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+) -> ContentSweepOutcome {
+    let app_ctx = crate::db::AppContext::default_lamad();
+
+    // (1) Local anchored inventory: id → anchor. Only anchored + distribution-
+    // safe rows (the same set this node advertises). Absent / un-anchored rows
+    // are resolved via presence below.
+    let local_anchors: std::collections::HashMap<String, String> = {
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(error = %e, "projection-reconcile[content]: db conn failed; skipping sweep");
+                return ContentSweepOutcome::default();
+            }
+        };
+        match crate::db::content_diesel::list_content_anchor_inventory(
+            &mut conn,
+            &app_ctx,
+            i64::MAX,
+        ) {
+            Ok(v) => v.into_iter().collect(),
+            Err(e) => {
+                tracing::warn!(error = %e, "projection-reconcile[content]: local inventory failed; skipping sweep");
+                return ContentSweepOutcome::default();
+            }
+        }
+    };
+    let local_anchored = local_anchors.len();
+
+    // (2) Ask connected peers for their content inventory. Collect all entries
+    // first, then diff once presence is known.
+    let peers = p2p.list_peers().await;
+    let mut peers_asked = 0usize;
+    let mut ids_discovered = 0usize;
+    // id → first peer that advertised it (for the heal WARN).
+    let mut discovered_by: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    // id → first NON-EMPTY advertised anchor (for divergence diffing).
+    let mut advertised_anchor: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+
+    for peer in &peers {
+        let peer_id = match peer.peer_id.parse::<libp2p::PeerId>() {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+        let request = ViewFederationRequest {
+            view_kind: ViewKind::ProjectionInventory {
+                table: PROJECTION_INVENTORY_TABLE_CONTENT.to_string(),
+            },
+            agent_cid: p2p.agent_pubkey().to_string(),
+            request_id: uuid::Uuid::new_v4().to_string(),
+        };
+        let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
+            Ok(r) => r,
+            Err(_) => continue, // peer offline/timeout — discovery is best-effort
+        };
+        peers_asked += 1;
+
+        let payload: ProjectionInventoryPayload = match serde_json::from_value(
+            resp.slice.payload.0.clone(),
+        ) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::projection_reconcile",
+                    peer = %peer.peer_id,
+                    error = %e,
+                    "projection-reconcile[content]: peer inventory payload undecodable; skipping peer"
+                );
+                continue;
+            }
+        };
+
+        tracing::info!(
+            target: "elohim_storage::projection_reconcile",
+            peer = %peer.peer_id,
+            entries = payload.entries.len(),
+            peer_total = payload.total,
+            "projection-reconcile[content]: peer inventory received"
+        );
+
+        ids_discovered += payload.entries.len();
+        for entry in &payload.entries {
+            discovered_by
+                .entry(entry.id.clone())
+                .or_insert_with(|| peer.peer_id.clone());
+            if !entry.dht_anchor_hash.is_empty() {
+                advertised_anchor
+                    .entry(entry.id.clone())
+                    .or_insert_with(|| entry.dht_anchor_hash.clone());
+            }
+        }
+    }
+
+    // (3) One presence query for the whole advertised union (reach-agnostic).
+    let advertised_ids: Vec<String> = discovered_by.keys().cloned().collect();
+    let present: std::collections::HashSet<String> = {
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(error = %e, "projection-reconcile[content]: db conn failed for presence; skipping heal");
+                return ContentSweepOutcome {
+                    peers_asked,
+                    ..Default::default()
+                };
+            }
+        };
+        // Chunk under SQLite's bound-variable limit (SQLITE_MAX_VARIABLE_NUMBER,
+        // ~999 on older builds) — `content_ids_present`'s own doc requires callers
+        // to chunk large id sets (content_diesel.rs:996). A >limit federation
+        // inventory would otherwise error the WHOLE presence query and silently
+        // drop the sweep into a no-heal tick. Merge per-chunk results.
+        const PRESENCE_CHUNK: usize = 500;
+        let mut acc = std::collections::HashSet::new();
+        for chunk in advertised_ids.chunks(PRESENCE_CHUNK) {
+            match crate::db::content_diesel::content_ids_present(&mut conn, &app_ctx, chunk) {
+                Ok(s) => acc.extend(s),
+                Err(e) => {
+                    tracing::warn!(error = %e, "projection-reconcile[content]: presence query failed; skipping heal");
+                    return ContentSweepOutcome {
+                        peers_asked,
+                        ..Default::default()
+                    };
+                }
+            }
+        }
+        acc
+    };
+
+    // (4) Classify → gap set (anchor-gap ∪ divergent). Absent + in-sync are dropped.
+    let mut gap_ids: Vec<String> = Vec::new();
+    let mut divergent_anchor = 0usize;
+    for id in &advertised_ids {
+        match classify_content_gap(
+            id,
+            &present,
+            &local_anchors,
+            advertised_anchor.get(id).map(String::as_str),
+        ) {
+            ContentGap::AbsentLocal | ContentGap::InSync => {}
+            ContentGap::AnchorGap => gap_ids.push(id.clone()),
+            ContentGap::Divergent => {
+                divergent_anchor += 1;
+                gap_ids.push(id.clone());
+            }
+        }
+    }
+
+    // Feed the gap set through a fresh per-sweep tracker on the shared rails
+    // (empty local set → every gap id becomes pending, under MAX_RETRIES).
+    let mut tracker = GapTracker::new(MAX_RETRIES);
+    tracker.discover(gap_ids);
+
+    // (5) Heal each gap from the OWN conductor (verified stamp).
+    let mut healed = 0usize;
+    let mut conductor_missing = 0usize;
+    for id in tracker.pending_ids() {
+        match crate::services::conductor_writes::call_resolve_content_head(hc, &id).await {
+            Ok(Some(head)) => match heal_content_one(&head, pool, &app_ctx) {
+                Ok(true) => {
+                    tracker.mark_completed(&id);
+                    healed += 1;
+                    let peer = discovered_by
+                        .get(&id)
+                        .cloned()
+                        .unwrap_or_else(|| "unknown".to_string());
+                    tracing::warn!(
+                        target: "elohim_storage::projection_reconcile",
+                        content_id = %id,
+                        discovered_via_peer = %peer,
+                        "projection-reconcile[content]: HEALED content anchor from own conductor (peer discovery)"
+                    );
+                }
+                Ok(false) => {
+                    // Row vanished between presence check and stamp (rare race).
+                    // Nothing to stamp — resolved, not a conductor miss.
+                    tracker.mark_completed(&id);
+                    tracing::debug!(content_id = %id, "projection-reconcile[content]: stamp found no local row; nothing to do");
+                }
+                Err(e) => {
+                    tracing::warn!(content_id = %id, error = %e, "projection-reconcile[content]: stamp failed; retry next sweep");
+                    tracker.mark_failed(&id);
+                }
+            },
+            Ok(None) => {
+                // Conductor can't see it yet (catch-up) — retry on the NEXT
+                // sweep via a fresh inventory diff, never an immediate re-queue.
+                conductor_missing += 1;
+                tracing::debug!(content_id = %id, "projection-reconcile[content]: own conductor returned None; retry next sweep");
+                tracker.mark_failed(&id);
+            }
+            Err(e) => {
+                tracing::warn!(content_id = %id, error = %e, "projection-reconcile[content]: conductor resolve failed; retry next sweep");
+                tracker.mark_failed(&id);
+            }
+        }
+    }
+
+    tracing::info!(
+        target: "elohim_storage::projection_reconcile",
+        peers_asked,
+        ids_discovered,
+        healed,
+        conductor_missing,
+        divergent_anchor,
+        local_anchored,
+        "projection-reconcile[content]: content sweep complete"
+    );
+
+    ContentSweepOutcome {
+        divergent_anchor,
+        healed,
+        conductor_missing,
+        peers_asked,
+    }
+}
+
+/// Project ONE conductor-resolved content HEAD into local SQL via the VERIFIED
+/// stamp path. Row content comes exclusively from the own conductor's resolved
+/// [`ContentHeadWire`]; the field mapping mirrors the `ContentCommitted` signal
+/// arm (`rea_projection.rs`). Returns `stamp_declared_head`'s bool (false ⇒ no
+/// local row to stamp).
+fn heal_content_one(
+    head: &crate::services::conductor_writes::ContentHeadWire,
+    pool: &DbPool,
+    app_ctx: &crate::db::AppContext,
+) -> Result<bool, crate::error::StorageError> {
+    let c = &head.content;
+    // u64 → i32 saturating cast — identical to the ContentCommitted arm.
+    let size_i32 = c
+        .content_size_bytes
+        .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
+    let patch = crate::db::content_diesel::ContentProjectionPatch {
+        blob_cid: c.blob_cid.clone(),
+        content_size_bytes: size_i32,
+        title: Some(c.title.clone()),
+        description: Some(c.description.clone()),
+        content_type: Some(c.content_type.clone()),
+        content_format: Some(c.content_format.clone()),
+        reach: Some(c.reach.clone()),
+        metadata_json: Some(c.metadata_json.clone()),
+    };
+    let mut conn = pool
+        .get()
+        .map_err(|e| crate::error::StorageError::Internal(format!("pool: {e}")))?;
+    crate::db::content_diesel::stamp_declared_head(
+        &mut conn,
+        app_ctx,
+        &c.id,
+        head.head_action_hash.as_str(),
+        Some(patch),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -423,5 +803,49 @@ mod tests {
         assert_eq!(s2.sweeps, 2);
         assert_eq!(s2.completed, 1);
         assert_eq!(s2.divergent_anchor, 0);
+    }
+
+    #[test]
+    fn content_gap_classification_absent_null_divergent() {
+        use std::collections::{HashMap, HashSet};
+
+        // present: b (un-anchored), c (anchored=X), d (anchored=X). a is absent.
+        let present: HashSet<String> = ["b", "c", "d"].iter().map(|s| s.to_string()).collect();
+        // local anchored set (list_content_anchor_inventory): only c and d.
+        let mut local_anchors: HashMap<String, String> = HashMap::new();
+        local_anchors.insert("c".into(), "anchor-X".into());
+        local_anchors.insert("d".into(), "anchor-X".into());
+
+        // (a) advertised but absent locally → SKIP.
+        assert_eq!(
+            classify_content_gap("a", &present, &local_anchors, Some("anchor-Z")),
+            ContentGap::AbsentLocal
+        );
+        // (b) present but un-anchored (not in local_anchors) → anchor-gap.
+        assert_eq!(
+            classify_content_gap("b", &present, &local_anchors, Some("anchor-Y")),
+            ContentGap::AnchorGap
+        );
+        // (c) present + anchored, peer anchor disagrees → divergent.
+        assert_eq!(
+            classify_content_gap("c", &present, &local_anchors, Some("anchor-Y")),
+            ContentGap::Divergent
+        );
+        // (d) present + anchored, peer anchor agrees → in sync.
+        assert_eq!(
+            classify_content_gap("d", &present, &local_anchors, Some("anchor-X")),
+            ContentGap::InSync
+        );
+        // (c) present + anchored, peer advertised EMPTY anchor → NOT divergence
+        // (an un-anchored peer is not evidence our anchor is wrong).
+        assert_eq!(
+            classify_content_gap("c", &present, &local_anchors, Some("")),
+            ContentGap::InSync
+        );
+        // (c) present + anchored, peer advertised NO anchor → in sync.
+        assert_eq!(
+            classify_content_gap("c", &present, &local_anchors, None),
+            ContentGap::InSync
+        );
     }
 }

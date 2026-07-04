@@ -1,0 +1,20 @@
+-- Add declared_head_action_hash column to content — the notary-declared HEAD action
+-- for a content item's version DAG (HEAD-election projection, Plan C3 / notary-authority Leg 2).
+--
+-- Records which committed ActionHash the notary has declared to be the HEAD of this content
+-- id's version DAG (single-author model: the author's latest commit IS the declared head).
+-- Written ONLY by:
+--   (a) own-conductor-witnessed commits — the ContentCommitted / ContentHeadDeclared signal
+--       arms. The authoring conductor emits those signals only for locally-authored commits,
+--       so local authorship is implied by the signal itself.
+--   (b) conductor-VERIFIED reconcile stamps — content_diesel::stamp_declared_head, the
+--       reconcile leg's verified-stamp entrypoint (the caller resolves the head via the
+--       conductor before stamping).
+-- NEVER written from CRDT/gossip input — that would launder un-witnessed peer state into the
+-- notary-authority HEAD (the same laundering guard crdt_converged_at carries for the amber tier).
+--
+-- Nullable: absent = no declared head yet (the normal state for a seeded row before its first
+-- own-conductor commit or verified reconcile stamp).
+--
+-- Source of truth: DHT (projection of the notary-declared HEAD action)
+ALTER TABLE content ADD COLUMN declared_head_action_hash TEXT;
