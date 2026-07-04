@@ -24,7 +24,7 @@
 #   6. Session contract: (a) move reds toward green with proof, (b) file new reds
 #      as runnable checks, (c) one-line delta here. Nothing else is a deliverable.
 version: 1
-updated: 2026-07-02
+updated: 2026-07-04
 vision: >
   A p2p backplane for a socially resilient, reach-gated substrate — a human-scale,
   capture-resistant foundation for communication that can scale to global
@@ -115,6 +115,23 @@ nodes:
     checks:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
     evidence: >
+      DELTA 2026-07-04 (shift notary-authority-land, dev@068c917cf): Phase C
+      core LANDED and measured — 2 of 3 scenarios STABLE-GREEN across three
+      consecutive fresh-trigger edge builds (#1153/#1154/#1155): the HEAD
+      authority surface is live (GET /db/content/{id}/head 200 notarized view;
+      unauthenticated non-author move refused 401; DNA declare/resolve with
+      author-filtered election, coordinator-only hot-swap verified applied on
+      both genesis peers; sweettest declare_head_notarizes_and_supersedes green
+      in DNA #1350) and the baseline holds. Scenario 2 (elohim.host
+      trust=notarized) is the SOLE remaining red: the cross-peer anchor
+      propagation mechanism is PROVEN LIVE on matthew (Loki: "HEALED content
+      anchor from own conductor (peer discovery)" x3 for the landing EPR; 300+
+      anchors healed mesh-wide after the view-federation 1MiB payload +
+      self-truncation fix) — adam's stamp is blocked by node-level outbound
+      view-federation degradation (F-T19 Timeouts to ~11 peers outside its
+      post-boot window; leads + morning verification path in
+      genesis/data/timeline/backlog/view-federation-request-flakiness-mesh-wide.md
+      and the notary-authority-land sprint result). Prior red decode preserved:
       RED WRITTEN + verified failing live 2026-07-03 (against alpha federation):
       3 scenarios — baseline green (alpha-A serves trust=notarized with
       dhtAnchorHash, proving the check is non-vacuous; Phase A/B trust field
