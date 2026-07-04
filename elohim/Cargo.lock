@@ -1005,6 +1005,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-chrome-asset"
+version = "0.1.0"
+dependencies = [
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "elohim-compute"
 version = "0.1.0"
 dependencies = [
@@ -1047,6 +1054,8 @@ dependencies = [
  "async-trait",
  "deno_core",
  "deno_error",
+ "elohim-chrome-asset",
+ "getrandom 0.3.4",
  "serde",
  "serde_json",
  "sha2 0.10.9",

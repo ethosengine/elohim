@@ -91,19 +91,29 @@ function notImplemented(name) {
 // Named exports. ESM linking requires every `import { X } from "crypto"` in the
 // bundle to find a matching named export, so these must EXIST even when the
 // render path never reads them:
-//  - createPrivateKey / createPublicKey / webcrypto: named-imported by the bundle
-//    (proven via static grep) but not on the landing render path -> loud stubs.
+//  - createPrivateKey / createPublicKey: named-imported by the bundle (proven via
+//    static grep) but not on the landing render path -> loud stubs.
 //  - createHash: real (see above); also named for `import { createHash }`.
-//  - randomBytes / randomUUID: common framework members exported as loud stubs so
-//    a `import { randomUUID } from "crypto"` links and fails clearly ON CALL.
+//  - randomBytes: a loud stub (Node Buffer-returning API; the render path uses the
+//    WebCrypto getRandomValues global instead) so `import { randomBytes }` links
+//    and fails clearly ON CALL rather than silently.
+//  - randomUUID / webcrypto: REAL, sourced from the WebCrypto global. `webcrypto`
+//    IS `globalThis.crypto` (installed at init by node_webcrypto.js), so the
+//    module's `webcrypto` export and the global are ONE object (one source of
+//    truth); `randomUUID` delegates to that same object's real, OS-entropy-backed
+//    randomUUID.
 const createPrivateKey = notImplemented("createPrivateKey");
 const createPublicKey = notImplemented("createPublicKey");
 const randomBytes = notImplemented("randomBytes");
-const randomUUID = notImplemented("randomUUID");
-// bare deno_core exposes no Web Crypto global; expose whatever the isolate has
-// (typically undefined) rather than fabricate one. The named export must exist
-// for linking regardless of whether the render path reads it.
+// The WebCrypto global installed at isolate init by node_webcrypto.js. It exists
+// before any bundle module (this one included) evaluates, so this binding is the
+// real object, not undefined.
 const webcrypto = (typeof globalThis !== "undefined" ? globalThis.crypto : undefined);
+// Node exposes crypto.randomUUID(); delegate to the single WebCrypto object so
+// there is one implementation (and one entropy source) behind every surface.
+function randomUUID(options) {
+  return webcrypto.randomUUID(options);
+}
 
 export {
   createHash,

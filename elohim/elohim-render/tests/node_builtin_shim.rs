@@ -37,9 +37,9 @@ async fn unimplemented_crypto_member_throws_named_error() {
     let err = rt
         .render_via_module(&fixture("crypto-unimplemented.mjs"), "/x")
         .await
-        .expect_err("randomUUID stub must throw when called");
+        .expect_err("randomBytes stub must throw when called");
     let msg = format!("{err}");
-    assert!(msg.contains("randomUUID"), "error names the member: {msg}");
+    assert!(msg.contains("randomBytes"), "error names the member: {msg}");
     assert!(
         msg.contains("not implemented"),
         "error is a clear not-implemented message: {msg}"
@@ -248,6 +248,12 @@ async fn renders_deployed_bundle_without_node_builtin_wall() {
                 out.html.len()
             );
             eprintln!("html head: {}", &out.html[..out.html.len().min(600)]);
+            // Opt-in full-HTML dump for inspecting the first real render (inert by
+            // default). `ELOHIM_RENDER_DUMP_HTML=/path cargo test ... -- --ignored`.
+            if let Ok(path) = std::env::var("ELOHIM_RENDER_DUMP_HTML") {
+                std::fs::write(&path, &out.html).expect("dump html");
+                eprintln!("wrote rendered HTML to {path}");
+            }
         }
         Err(e) => {
             let msg = format!("{e}");
