@@ -48,6 +48,22 @@ function extractRustConstArray(source, constName) {
 }
 
 /**
+ * Resolves a manifest block that may be an inline object or a JSON $ref pointer.
+ * When the block has a "$ref" key (the modular-manifest pattern — e.g. lamad's
+ * `"attestations": { "$ref": "./manifest/attestations.json" }`), reads and parses
+ * the referenced JSON relative to the manifest file's directory. Returns the
+ * resolved object (or {} if absent). Mirrors resolveRefBlock in codegen-rs.mjs so
+ * the checker reads the same kinds the generator emits.
+ */
+async function resolveRefBlock(block, manifestPath) {
+  if (block && typeof block === 'object' && block['$ref']) {
+    const refPath = resolve(dirname(manifestPath), block['$ref']);
+    return JSON.parse(await readFile(refPath, 'utf8'));
+  }
+  return block || {};
+}
+
+/**
  * Check that ATTESTATION_KINDS and GOVERNANCE_ACTION_KINDS in generated_attestation_kinds.rs
  * exactly match the union of keys declared in pillar manifests' attestations / governance-actions
  * sections, and vice versa.
@@ -102,10 +118,12 @@ async function checkAttestationKindsParity() {
       failures++;
       continue;
     }
-    for (const key of Object.keys(manifest.attestations ?? {})) {
+    const attestations = await resolveRefBlock(manifest['attestations'], manifestPath);
+    for (const key of Object.keys(attestations)) {
       manifestAttestationKinds.add(key);
     }
-    for (const key of Object.keys(manifest['governance-actions'] ?? {})) {
+    const govActions = await resolveRefBlock(manifest['governance-actions'], manifestPath);
+    for (const key of Object.keys(govActions)) {
       manifestGovernanceActionKinds.add(key);
     }
   }
