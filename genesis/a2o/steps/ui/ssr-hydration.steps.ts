@@ -222,6 +222,40 @@ Then(
   }
 );
 
+/**
+ * Assert the raw HTML body carries a client bundle script — the hashed Angular
+ * entry point (`main-<hash>.js`) that boots the app in the browser.
+ *
+ * This is the load-bearing guard against the 2026-07-04 blank-landing regression
+ * (doorway fix c00fc7647): the EPR router diverts `/` into the V8 SSR engine,
+ * whose output is rendered against a minimal document template that carries NO
+ * client bundles. A render that "succeeds" but activates no route component
+ * produced an empty `<router-outlet>` shell — no server-rendered content AND no
+ * client script — so it could never hydrate: a permanent blank page. A hydratable
+ * landing surface ALWAYS carries this script, whether it is the projected SPA
+ * bundle fallback (the safe serve an empty render now sheds to) or a real SSR
+ * render composed with the index shell.
+ *
+ * Example: Then the raw HTTP response body carries a client bundle script
+ */
+Then('the raw HTTP response body carries a client bundle script', function (this: E2EWorld) {
+  const capture = storedCapture(this);
+  // Hashed Angular entry point: <script src="main-<hash>.js" ...>. Accept both a
+  // root-relative and base-relative src, and a modulepreloaded chunk, so a
+  // future esbuild layout change does not falsely fail this delivery guard.
+  const hasEntryScript = /<script[^>]+src="[^"]*\bmain-[^"]*\.js"/i.test(capture.body);
+  const hasModulePreload = /<link[^>]+rel="modulepreload"[^>]+href="[^"]*\bchunk-[^"]*\.js"/i.test(
+    capture.body
+  );
+  assert.ok(
+    hasEntryScript || hasModulePreload,
+    'Expected a client bundle script (main-<hash>.js) in the response body — the landing ' +
+      'surface must be hydratable. Its absence is the blank-landing regression: an empty SSR ' +
+      'shell that carries no client bundles and can never boot the app.\n' +
+      `Body preview (first 500 chars): ${capture.body.slice(0, 500)}`
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Assertion: concept page visible after hydration
 // ---------------------------------------------------------------------------
