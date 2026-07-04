@@ -20,8 +20,20 @@ brit / other domain adapters
 ## Crates
 
 - `eprfs-core` — pure model + traits. No git, no FUSE, no storage HTTP client.
+- `eprfs-host` — host filesystem capability profiles for Linux, macOS, Windows, portable directories, and peer-managed projections.
 - `eprfs-local` — materializes projection manifests into ordinary filesystem trees.
 - `eprfs-storage` — storage-facing adapter scaffolding and test doubles for `elohim-storage` integration.
+
+## Host Profiles
+
+`eprfs` must be able to collapse a projection onto many host filesystems without
+making the host the source of truth. `eprfs-host` models what the target surface
+can preserve: native symlinks, executable bits, case sensitivity, xattrs, atomic
+rename, and whether the directory is peer-managed.
+
+Peer-managed projection directories are the Elohim-native analogue to familiar
+sync-folder clients: they expose normal files where possible and sidecar markers
+where the host cannot preserve projection semantics.
 
 ## Projection Source Identity
 

@@ -31,11 +31,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "eprfs-host"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "eprfs-local"
 version = "0.1.0"
 dependencies = [
  "bytes",
  "eprfs-core",
+ "eprfs-host",
  "eprfs-storage",
  "serde_json",
  "tokio",

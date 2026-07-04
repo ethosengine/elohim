@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "eprfs-core",
+    "eprfs-host",
     "eprfs-local",
     "eprfs-storage",
 ]

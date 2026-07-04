@@ -6,15 +6,24 @@ use eprfs_core::{
     BlobPresence, EntryKind, EprfsError, EprfsStorage, FetchPolicy, MaterializationPolicy,
     ProjectionEntry, ProjectionManifest, Result,
 };
+use eprfs_host::{Capability, HostProfile, SymlinkMode};
 
 /// Writes an EPR projection manifest into an ordinary local directory.
 pub struct LocalMaterializer<S> {
     storage: S,
+    host: HostProfile,
 }
 
 impl<S> LocalMaterializer<S> {
     pub fn new(storage: S) -> Self {
-        Self { storage }
+        Self {
+            storage,
+            host: HostProfile::current_platform(),
+        }
+    }
+
+    pub fn with_host_profile(storage: S, host: HostProfile) -> Self {
+        Self { storage, host }
     }
 }
 
@@ -65,8 +74,7 @@ where
                             .storage
                             .fetch_blob(blob, FetchPolicy::LocalOnly)
                             .await?;
-                        write_symlink(&path, &handle.bytes).await?;
-                        report.symlinks_written += 1;
+                        self.write_link(&path, &handle.bytes, report).await?;
                     }
                     BlobPresence::Remote | BlobPresence::Unknown => match policy {
                         MaterializationPolicy::FetchMissing => {
@@ -74,8 +82,7 @@ where
                                 .storage
                                 .fetch_blob(blob, FetchPolicy::FetchIfMissing)
                                 .await?;
-                            write_symlink(&path, &handle.bytes).await?;
-                            report.symlinks_written += 1;
+                            self.write_link(&path, &handle.bytes, report).await?;
                             report.files_fetched += 1;
                         }
                         MaterializationPolicy::Sparse => {
@@ -107,7 +114,9 @@ where
                             .fetch_blob(blob, FetchPolicy::LocalOnly)
                             .await?;
                         write_file(&path, &handle.bytes).await?;
-                        apply_executable_bit(&path, entry.executable).await?;
+                        if self.host.executable_bits == Capability::Supported {
+                            apply_executable_bit(&path, entry.executable).await?;
+                        }
                         report.files_written += 1;
                     }
                     BlobPresence::Remote | BlobPresence::Unknown => match policy {
@@ -117,7 +126,9 @@ where
                                 .fetch_blob(blob, FetchPolicy::FetchIfMissing)
                                 .await?;
                             write_file(&path, &handle.bytes).await?;
-                            apply_executable_bit(&path, entry.executable).await?;
+                            if self.host.executable_bits == Capability::Supported {
+                                apply_executable_bit(&path, entry.executable).await?;
+                            }
                             report.files_written += 1;
                             report.files_fetched += 1;
                         }
@@ -142,6 +153,33 @@ where
 
         Ok(())
     }
+
+    async fn write_link(
+        &self,
+        path: &Path,
+        target: &[u8],
+        report: &mut MaterializationReport,
+    ) -> Result<()> {
+        match self.host.symlinks {
+            SymlinkMode::Native => {
+                write_symlink(path, target).await?;
+                report.symlinks_written += 1;
+            }
+            SymlinkMode::Marker => {
+                write_link_marker(path, target).await?;
+                report.link_markers_written += 1;
+            }
+            SymlinkMode::Unsupported => {
+                return Err(EprfsError::Storage(format!(
+                    "host profile {} does not support symlink materialization for {}",
+                    self.host.name,
+                    path.display()
+                )));
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -149,6 +187,7 @@ pub struct MaterializationReport {
     pub directories: usize,
     pub files_written: usize,
     pub symlinks_written: usize,
+    pub link_markers_written: usize,
     pub files_fetched: usize,
     pub skipped_sparse: usize,
 }
@@ -172,6 +211,27 @@ async fn write_file(path: &Path, bytes: &[u8]) -> Result<()> {
             path: path.to_path_buf(),
             source,
         })
+}
+
+async fn write_link_marker(path: &Path, target: &[u8]) -> Result<()> {
+    if target.is_empty() {
+        return Err(EprfsError::InvalidProjectionManifest(format!(
+            "symlink target is empty for {}",
+            path.display()
+        )));
+    }
+
+    let marker = link_marker_path(path);
+    write_file(
+        &marker,
+        format!(
+            "eprfs-link\npath={}\ntarget={}\n",
+            path.display(),
+            String::from_utf8_lossy(target)
+        )
+        .as_bytes(),
+    )
+    .await
 }
 
 #[cfg(unix)]
@@ -254,6 +314,14 @@ fn sparse_marker_path(path: &Path) -> PathBuf {
         .and_then(|value| value.to_str())
         .unwrap_or("entry");
     path.with_file_name(format!("{file_name}.eprfs-remote"))
+}
+
+fn link_marker_path(path: &Path) -> PathBuf {
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("entry");
+    path.with_file_name(format!("{file_name}.eprfs-link"))
 }
 
 #[cfg(test)]
@@ -350,6 +418,65 @@ mod tests {
         assert_eq!(
             tokio::fs::read_link(target.join("current")).await.unwrap(),
             PathBuf::from("actual.txt")
+        );
+
+        let _ = tokio::fs::remove_dir_all(&target).await;
+    }
+
+    #[tokio::test]
+    async fn materializes_symlink_marker_for_peer_managed_directory() {
+        let storage = MemoryStorage::default();
+        storage
+            .insert_blob(
+                BlobCid::from("target-blob"),
+                Bytes::from_static(b"actual.txt"),
+            )
+            .await;
+
+        let manifest = ProjectionManifest {
+            root: ProjectionRoot {
+                id: ProjectionId::new("test"),
+                root: "epr:test".into(),
+            },
+            entries: vec![ProjectionEntry {
+                path: ProjectionPath::new("current").unwrap(),
+                kind: EntryKind::Symlink,
+                source: None,
+                epr: None,
+                blob: Some("target-blob".into()),
+                size_bytes: Some(10),
+                executable: false,
+                status: ProjectionStatus::Unknown,
+                metadata: serde_json::Value::Null,
+            }],
+            metadata: serde_json::Value::Null,
+        };
+
+        let target = std::env::temp_dir().join(format!(
+            "eprfs-local-peer-managed-test-{}",
+            std::process::id()
+        ));
+        let _ = tokio::fs::remove_dir_all(&target).await;
+
+        let materializer = LocalMaterializer::with_host_profile(
+            storage,
+            HostProfile::peer_managed_directory("test"),
+        );
+        let report = materializer
+            .materialize(&manifest, &target, MaterializationPolicy::LocalOnly)
+            .await
+            .unwrap();
+
+        assert_eq!(report.symlinks_written, 0);
+        assert_eq!(report.link_markers_written, 1);
+        assert_eq!(
+            tokio::fs::read_to_string(target.join("current.eprfs-link"))
+                .await
+                .unwrap(),
+            format!(
+                "eprfs-link\npath={}\ntarget=actual.txt\n",
+                target.join("current").display()
+            )
         );
 
         let _ = tokio::fs::remove_dir_all(&target).await;

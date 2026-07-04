@@ -9,6 +9,7 @@ description = "Local filesystem materialization for EPR-governed projections"
 
 [dependencies]
 eprfs-core = { path = "../eprfs-core" }
+eprfs-host = { path = "../eprfs-host" }
 tokio = { workspace = true, features = ["fs"] }
 
 [dev-dependencies]
