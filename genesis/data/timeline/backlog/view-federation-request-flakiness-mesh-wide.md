@@ -28,8 +28,18 @@ UnexpectedEof class was root-caused and fixed (256KB `MAX_PAYLOAD` exceeded by
 the content inventory — responder killed its own reply). BUT matthew's
 pre-deploy logs (14:00–14:24Z) also show frequent `F-T19: outbound
 view-federation request failed` **Timeout** entries to *other* peers —
-a standing, mesh-wide request-response flakiness that predates the content
-sweep and is unexplained by the payload fix.
+a standing, mesh-wide request-response flakiness unexplained by the payload fix.
+PROVENANCE CORRECTION (19:45Z): all observed F-T19 evidence dates from AFTER the
+content arm first deployed (~13:4xZ) — whether this flakiness pre-dates the
+content sweep's added request volume is OPEN, not established. Check historical
+Loki (before 2026-07-04) before treating it as pre-existing. Also observed on
+adam (18:47–19:27Z): outbound view-federation Timeouts to ~11 distinct peers
+continuously, while a brief post-boot window succeeds (3/11 at 18:48) — the
+request timeout is already 30s, so these links are effectively dead from adam's
+side, not marginal. Related lead: adam's content heal-sweep is gated on the
+lamad bridge (13-minute late connect on adam), which pushes the sweep's first
+asks past the healthy boot window — decoupling discovery (no conductor needed)
+from heal (conductor needed) would let discovery use the boot window.
 
 ## Why it matters
 
