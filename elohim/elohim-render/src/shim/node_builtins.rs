@@ -42,6 +42,10 @@
 //!   APIs; a correct minimal implementation avoids an eval-time throw.
 //! - `events.setMaxListeners` — a listener-cap raise; a no-op is semantically
 //!   safe for a single-shot SSR render.
+//! - `buffer.Buffer` — re-exports the REAL global `Buffer` (a `Uint8Array`
+//!   subclass) installed at init by `node_buffer_ext` (see
+//!   [`crate::shim::node_buffer`]), so the module and global surfaces share one
+//!   constructor.
 //!
 //! Everything else stays a loud stub. Extend deliberately, one member at a time,
 //! as a render path proves it needs the member — never speculatively fabricate a
@@ -106,6 +110,10 @@ struct BuiltinSurface {
 /// export — the honest signal to add it.
 const BUILTIN_SURFACE: &[BuiltinSurface] = &[
     BuiltinSurface {
+        // `Buffer` is NOT a loud stub: it re-exports the REAL global `Buffer` (a
+        // Uint8Array subclass) installed at init by `node_buffer_ext` (see
+        // [`crate::shim::node_buffer`] and `real_member`), so `import { Buffer }
+        // from "buffer"` and the global `Buffer` are the same constructor.
         name: "buffer",
         named: &["Buffer"],
         cjs_primary: None,
@@ -169,8 +177,18 @@ const BUILTIN_SURFACE: &[BuiltinSurface] = &[
         cjs_primary: None,
     },
     BuiltinSurface {
+        // The Node stream base classes the bundle EXTENDS at module-eval time
+        // (`class Receiver extends require("stream").Writable`, etc. in `ws`,
+        // multiformats, libp2p). Like `events.EventEmitter`, a loud-stub function
+        // is a legal `extends` target -- the class DEFINITION evaluates fine and
+        // only `new`-ing it (connection time, never during a single-shot SSR
+        // render) throws. Verified: the bundle has NO eval-time `new Writable()` /
+        // `new Readable()` / etc., so loud stubs are safe here. Stream helper
+        // functions (`pipeline`/`finished`/...) are deliberately NOT listed: they
+        // are require-destructured (CJS, no link requirement) and read as
+        // `undefined` unless called -- honest absence over a speculative stub.
         name: "stream",
-        named: &["Duplex"],
+        named: &["Duplex", "Readable", "Writable", "Transform", "PassThrough"],
         cjs_primary: None,
     },
     BuiltinSurface {
@@ -252,6 +270,13 @@ fn real_member(builtin: &str, member: &str) -> Option<&'static str> {
         // Raising the listener cap is a no-op for a single-shot SSR render.
         // Real (not loud) because it is frequently called at eval time.
         ("events", "setMaxListeners") => Some("function setMaxListeners() { return undefined; }"),
+        // `import { Buffer } from "buffer"` (and `require("buffer").Buffer`)
+        // resolve to the REAL global `Buffer` (a Uint8Array subclass) installed at
+        // init by `node_buffer_ext`. One source of truth with the global, so
+        // `x instanceof Buffer` is coherent across the module and global surfaces.
+        // The global exists before any builtin module body evaluates (extension
+        // `js` runs at isolate init), so this read is always defined.
+        ("buffer", "Buffer") => Some("globalThis.Buffer"),
         _ => None,
     }
 }
