@@ -68,6 +68,7 @@ where
                             .fetch_blob(blob, FetchPolicy::LocalOnly)
                             .await?;
                         write_file(&path, &handle.bytes).await?;
+                        apply_executable_bit(&path, entry.executable).await?;
                         report.files_written += 1;
                     }
                     BlobPresence::Remote | BlobPresence::Unknown => match policy {
@@ -77,6 +78,7 @@ where
                                 .fetch_blob(blob, FetchPolicy::FetchIfMissing)
                                 .await?;
                             write_file(&path, &handle.bytes).await?;
+                            apply_executable_bit(&path, entry.executable).await?;
                             report.files_written += 1;
                             report.files_fetched += 1;
                         }
@@ -130,6 +132,35 @@ async fn write_file(path: &Path, bytes: &[u8]) -> Result<()> {
             path: path.to_path_buf(),
             source,
         })
+}
+
+#[cfg(unix)]
+async fn apply_executable_bit(path: &Path, executable: bool) -> Result<()> {
+    if !executable {
+        return Ok(());
+    }
+
+    use std::os::unix::fs::PermissionsExt;
+
+    let metadata = tokio::fs::metadata(path)
+        .await
+        .map_err(|source| EprfsError::Io {
+            path: path.to_path_buf(),
+            source,
+        })?;
+    let mut permissions = metadata.permissions();
+    permissions.set_mode(permissions.mode() | 0o111);
+    tokio::fs::set_permissions(path, permissions)
+        .await
+        .map_err(|source| EprfsError::Io {
+            path: path.to_path_buf(),
+            source,
+        })
+}
+
+#[cfg(not(unix))]
+async fn apply_executable_bit(_path: &Path, _executable: bool) -> Result<()> {
+    Ok(())
 }
 
 async fn write_sparse_marker(path: &Path, cid: &str) -> Result<()> {
