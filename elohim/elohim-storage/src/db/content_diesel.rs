@@ -1093,7 +1093,17 @@ const DISTRIBUTION_SAFE_REACH: [&str; 3] = ["community", "public", "commons"];
 ///   [`DISTRIBUTION_SAFE_REACH`]) — scoped tiers must never enter a cross-peer
 ///   surface. This reach filter is a REQUIREMENT, not an optimization.
 ///
-/// Ordered by `id` ascending (deterministic), capped at `cap` (LIMIT).
+/// Ordered by `updated_at` DESCENDING, with `id` ascending as a deterministic
+/// tiebreak; capped at `cap` (LIMIT). The ordering makes truncation — whether by
+/// this `cap`, by the projection-inventory entry cap, or by the responder's
+/// byte-budget trim — surface the **reconcile hot set first**: the
+/// most-recently-updated anchors are the ones a peer is most likely still
+/// missing. Precisely: a stamped (updated) row is exactly the row that just
+/// LEFT the requester's gap set after a prior heal, so the advertised tail is
+/// only ever needed for rows the requester still lacks — the stable tail
+/// converges over later sweeps once its rows stop being gaps. (`updated_at` is
+/// bumped by every anchor/HEAD stamp — see `upsert_with_anchor` /
+/// `stamp_declared_head` — so "recently updated" tracks "recently (re)anchored".)
 ///
 /// **Discovery-only (the notary invariant).** A peer consuming this inventory
 /// learns WHICH content ids have a DHT anchor somewhere; the anchor VALUE it
@@ -1110,7 +1120,7 @@ pub fn list_content_anchor_inventory(
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::dht_anchor_hash.is_not_null())
         .filter(content::reach.eq_any(DISTRIBUTION_SAFE_REACH))
-        .order(content::id.asc())
+        .order((content::updated_at.desc(), content::id.asc()))
         .limit(cap)
         .select((content::id, content::dht_anchor_hash))
         .load(conn)
@@ -1600,7 +1610,20 @@ mod tests {
             dht_anchor_hash: anchor.map(str::to_string),
         };
 
-        // Distribution-safe + anchored → INCLUDED.
+        // Set a distinct `updated_at` on each row so the `updated_at DESC`
+        // ordering is deterministic. `create_content` stamps `datetime('now')`
+        // on every row (indistinguishable at test speed), so we overwrite here.
+        let stamp = |conn: &mut SqliteConnection, id: &str, ts: &str| {
+            diesel::update(content::table.filter(content::id.eq(id)))
+                .set(content::updated_at.eq(ts))
+                .execute(conn)
+                .unwrap();
+        };
+
+        // Distribution-safe + anchored → INCLUDED. Distinct updated_at values
+        // chosen so the hot set (most-recently-updated) is `c:public`, then
+        // `c:community`, then `c:commons` — NOT their id-ascending order, so the
+        // test would fail if the ORDER BY silently reverted to id-asc.
         create_content(
             &mut conn,
             &ctx,
@@ -1619,7 +1642,10 @@ mod tests {
             mk("c:community", "community", Some("anc-community")),
         )
         .unwrap();
-        // Distribution-safe but UN-anchored → EXCLUDED (no provenance).
+        stamp(&mut conn, "c:public", "2026-01-03T00:00:00Z"); // newest
+        stamp(&mut conn, "c:community", "2026-01-02T00:00:00Z");
+        stamp(&mut conn, "c:commons", "2026-01-01T00:00:00Z"); // oldest
+                                                               // Distribution-safe but UN-anchored → EXCLUDED (no provenance).
         create_content(&mut conn, &ctx, mk("c:public-noanchor", "public", None)).unwrap();
         // Scoped-tier reach, even though anchored → EXCLUDED (must not leak).
         create_content(
@@ -1639,11 +1665,12 @@ mod tests {
         let inv = list_content_anchor_inventory(&mut conn, &ctx, i64::MAX).unwrap();
         let ids: Vec<&str> = inv.iter().map(|(id, _)| id.as_str()).collect();
 
-        // Exactly the three anchored distribution-safe rows, id-ascending.
+        // Exactly the three anchored distribution-safe rows, ordered updated_at
+        // DESC (hot set first) — the reconcile-hot ordering, not id-asc.
         assert_eq!(
             ids,
-            vec!["c:commons", "c:community", "c:public"],
-            "only anchored distribution-safe rows, ordered by id asc"
+            vec!["c:public", "c:community", "c:commons"],
+            "only anchored distribution-safe rows, ordered by updated_at desc (hot set first)"
         );
         // Anchor value carried through verbatim (discovery pair).
         let map: std::collections::HashMap<String, String> = inv.into_iter().collect();
@@ -1655,9 +1682,58 @@ mod tests {
         // Un-anchored distribution-safe id is excluded (no provenance).
         assert!(!map.contains_key("c:public-noanchor"));
 
-        // Cap is respected (LIMIT).
+        // Cap is respected (LIMIT) AND truncation surfaces the hot set: capping
+        // at 2 keeps the two most-recently-updated rows, drops the cold tail.
         let capped = list_content_anchor_inventory(&mut conn, &ctx, 2).unwrap();
-        assert_eq!(capped.len(), 2, "cap limits the returned rows");
+        let capped_ids: Vec<&str> = capped.iter().map(|(id, _)| id.as_str()).collect();
+        assert_eq!(
+            capped_ids,
+            vec!["c:public", "c:community"],
+            "cap limits the rows AND surfaces the hot set (drops the coldest tail)"
+        );
+    }
+
+    #[test]
+    fn content_anchor_inventory_tiebreaks_by_id_when_updated_at_equal() {
+        // When updated_at ties, the `id` ASC tiebreak makes the order
+        // deterministic (no arbitrary row shuffling under truncation).
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        let mk = |id: &str| CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "commons".to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+            dht_anchor_hash: Some(format!("anc-{id}")),
+        };
+        create_content(&mut conn, &ctx, mk("c:zeta")).unwrap();
+        create_content(&mut conn, &ctx, mk("c:alpha")).unwrap();
+        create_content(&mut conn, &ctx, mk("c:mid")).unwrap();
+        // Identical updated_at across all three → the id-asc tiebreak decides.
+        for id in ["c:zeta", "c:alpha", "c:mid"] {
+            diesel::update(content::table.filter(content::id.eq(id)))
+                .set(content::updated_at.eq("2026-02-01T00:00:00Z"))
+                .execute(&mut conn)
+                .unwrap();
+        }
+
+        let inv = list_content_anchor_inventory(&mut conn, &ctx, i64::MAX).unwrap();
+        let ids: Vec<&str> = inv.iter().map(|(id, _)| id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["c:alpha", "c:mid", "c:zeta"],
+            "equal updated_at falls back to id ascending"
+        );
     }
 
     #[test]

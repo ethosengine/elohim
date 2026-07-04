@@ -13,16 +13,18 @@
 //!
 //! Length-prefixed (4-byte big-endian `u32`) MessagePack via `rmp_serde` —
 //! identical shape to [`super::blob_protocol`]. The cap is
-//! [`MAX_PAYLOAD`] (256 KiB) and is enforced both at length-prefix-read time
+//! [`MAX_PAYLOAD`] (1 MiB) and is enforced both at length-prefix-read time
 //! (rejecting an oversized claim before any allocation) and at
 //! serialized-frame-write time (rejecting an oversized payload before
 //! sending it).
 //!
 //! ## Size limits
 //!
-//! 256 KiB is generous for the two slice kinds the protocol carries today:
+//! 1 MiB comfortably exceeds every legitimate slice the protocol carries today:
 //! - `ViewKind::Cluster`: ~2 devices × ~1 KiB metadata each (typical).
 //! - `ViewKind::PeerTopology`: a small set of household reciprocation edges.
+//! - `ViewKind::ProjectionInventory`: the largest — the content inventory at
+//!   [`PROJECTION_INVENTORY_CAP`] (2000) entries serializes to ≈400 KiB.
 //!
 //! It is also small enough to bound memory from a malicious peer claiming a
 //! multi-MB length prefix.
@@ -38,9 +40,13 @@ use crate::views::{
     ViewFederationRequest, ViewFederationResponse, ViewKind, ViewSlice,
 };
 
-/// v1 cap on entries returned in a single `ProjectionInventory` slice. At
-/// ~80 bytes/entry MessagePack, 2000 entries ≈ 160 KiB, comfortably under
-/// [`MAX_PAYLOAD`] (256 KiB) with room for the slice envelope + signature.
+/// v1 cap on entries returned in a single `ProjectionInventory` slice. A content
+/// entry is `(id, dhtAnchorHash)` — with MessagePack named fields (`id`, up to
+/// ~60 chars; the 13-char `dhtAnchorHash` key + a 53-char anchor) it runs
+/// ~170–200 bytes/entry, so 2000 entries ≈ 340–400 KiB. That fits under
+/// [`MAX_PAYLOAD`] (1 MiB) with room for the slice envelope + base64 signature;
+/// [`fit_inventory_to_budget`] is the belt-and-suspenders guard that keeps the
+/// serialized frame under the codec bound even if entries grow wider.
 /// The `total` field reports the true row count when truncated.
 pub const PROJECTION_INVENTORY_CAP: i64 = 2000;
 
@@ -62,12 +68,25 @@ pub const PROJECTION_INVENTORY_TABLE_CONTENT: &str = "content";
 /// Protocol identifier for federated view-slice fetch.
 pub const VIEW_FEDERATION_PROTOCOL_ID: &str = "/elohim/view-federation/1.0.0";
 
-/// Hard cap on a single request OR response payload — 256 KiB.
+/// Hard cap on a single request OR response payload — 1 MiB.
 ///
-/// Sized for cluster + peer-topology slices today; intentionally not config
-/// because the protocol is uniform across peers. If a future slice kind needs
-/// more headroom, bump this constant in lockstep with the responder side.
-pub const MAX_PAYLOAD: usize = 256 * 1024;
+/// This bound is a **pre-allocation DoS guard** (a malicious peer must not be
+/// able to make us allocate a multi-MB body buffer from a length prefix alone),
+/// so it MUST comfortably exceed the largest *legitimate* payload the protocol
+/// emits. The largest is the content `ProjectionInventory` at
+/// [`PROJECTION_INVENTORY_CAP`] (2000) entries ≈ 400 KiB; 1 MiB gives bounded
+/// headroom above that while still shutting down the allocation-amplification
+/// attack. It is intentionally not config because the protocol is uniform across
+/// peers. The responder additionally never emits a frame it would itself reject
+/// (see [`fit_inventory_to_budget`]).
+///
+/// MIXED-VERSION NOTE: an old-reader (256 KiB) peer that has not yet taken this
+/// bump rejects any >256 KiB frame the same way it does today — no worse during
+/// the deploy window (the pre-bump responder already couldn't *write* such a
+/// frame, so the id-cap kept it under 256 KiB). The fleet converges to the 1 MiB
+/// bound as peers update; the byte-budget trim below keeps every emitted frame
+/// self-consistent with THIS peer's codec regardless.
+pub const MAX_PAYLOAD: usize = 1024 * 1024;
 
 /// Marker type for the federation protocol — implements `AsRef<str>` so
 /// `request_response::Behaviour::with_codec` can advertise the protocol ID.
@@ -318,13 +337,74 @@ pub async fn build_response_slice(
     })
 }
 
+/// Fixed headroom reserved for everything in the serialized frame that is NOT the
+/// inventory entries: the `ProjectionInventoryPayload` map wrapper (`table` +
+/// `total`), the `ViewSlice` envelope (peer_id, view_kind, freshness, ~88-byte
+/// base64 signature) and the `ViewFederationResponse` envelope (view_kind,
+/// agent_cid, request_id), plus MessagePack map keys. 8 KiB dwarfs what any of
+/// these need even with long peer/agent ids — deliberately generous so the
+/// payload budget is a safe UNDER-estimate of the room the entries may occupy.
+const INVENTORY_ENVELOPE_RESERVE: usize = 8 * 1024;
+
+/// Byte budget for the serialized inventory *payload* alone — [`MAX_PAYLOAD`]
+/// minus the envelope reserve. A payload trimmed to this budget guarantees the
+/// full `ViewFederationResponse` frame stays under the codec's write bound.
+const INVENTORY_PAYLOAD_BUDGET: usize = MAX_PAYLOAD - INVENTORY_ENVELOPE_RESERVE;
+
+/// MessagePack-serialized byte length of an inventory payload — the same
+/// named-field encoding the codec puts on the wire (the payload rides the frame
+/// as a `JsonVal` map with these exact keys), so this is a faithful,
+/// envelope-free proxy for the payload's contribution to the frame.
+fn inventory_payload_len(payload: &ProjectionInventoryPayload) -> usize {
+    rmp_serde::to_vec_named(payload)
+        .map(|v| v.len())
+        .unwrap_or(usize::MAX)
+}
+
+/// Responder self-protection: trim trailing entries from `payload` until its
+/// serialized size fits within `budget`, returning the number of entries dropped
+/// (0 if it already fit).
+///
+/// The invariant this upholds: **the responder must NEVER emit a payload its own
+/// codec's `write_response` will reject.** The id-cap ([`PROJECTION_INVENTORY_CAP`])
+/// bounds the row COUNT; this bounds the serialized BYTE size, which id width can
+/// still push over [`MAX_PAYLOAD`] independent of the count (the scenario-2
+/// blocker: 2000 content entries serialized to ~340–400 KiB > the old 256 KiB
+/// bound and the responder's own write rejected mid-frame, so the requester saw
+/// `Io(UnexpectedEof)`). Entries arrive hot-set-first (the content query orders
+/// `updated_at DESC` — the most-recently-changed anchors, the reconcile hot set —
+/// see `db::content_diesel::list_content_anchor_inventory`), so a dropped tail is
+/// the coldest, least-urgent rows; the tail converges over later sweeps.
+///
+/// Strategy: compute-from-average with re-measurement. Each pass estimates the
+/// fitting count from the current per-entry average and re-measures. While over
+/// budget, `floor(budget/avg) < entries.len()`, so every pass strictly shrinks
+/// the set — it converges in a handful of iterations without an O(n) per-entry
+/// serialize. `total` is left at the pre-trim value so `total > entries.len()`
+/// surfaces the drop to the requester (same signal as the id-cap truncation).
+fn fit_inventory_to_budget(payload: &mut ProjectionInventoryPayload, budget: usize) -> usize {
+    let original = payload.entries.len();
+    let mut len = inventory_payload_len(payload);
+    while len > budget && !payload.entries.is_empty() {
+        let n = payload.entries.len();
+        let avg = (len / n).max(1);
+        // floor(budget/avg) < n whenever len > budget → strict progress each pass.
+        let keep = (budget / avg).min(n - 1);
+        payload.entries.truncate(keep);
+        len = inventory_payload_len(payload);
+    }
+    original - payload.entries.len()
+}
+
 /// Build the `(payload_json, freshness)` for a `ProjectionInventory` request.
 ///
 /// Reads the local projection for `table` capped at [`PROJECTION_INVENTORY_CAP`].
-/// v1 tables: `rea_commitments` (newest-first) and `content` (id-ascending,
-/// notary-authority Leg 4). `Live` when the pool is present (local SQL is present
-/// truth); `Offline` with an empty inventory when `pool` is `None`
-/// (test/conductor-less contexts) or the table is unknown.
+/// v1 tables: `rea_commitments` (newest-first) and `content` (updated_at-desc —
+/// hot set first — notary-authority Leg 4). Every built payload is passed through
+/// [`fit_inventory_to_budget`] before it is returned, so the responder NEVER
+/// emits a frame its own codec's `write_response` would reject. `Live` when the
+/// pool is present (local SQL is present truth); `Offline` with an empty inventory
+/// when `pool` is `None` (test/conductor-less contexts) or the table is unknown.
 fn build_inventory_payload(
     pool: Option<&crate::db::DbPool>,
     table: &str,
@@ -369,7 +449,7 @@ fn build_inventory_payload(
                 // set fills the cap the inventory may be truncated — surface it as
                 // a WARN so a cap is never silent (the requester otherwise cannot
                 // tell a full-cap page from an exact-cap corpus).
-                let truncated = rows.len() as i64 >= PROJECTION_INVENTORY_CAP;
+                let cap_truncated = rows.len() as i64 >= PROJECTION_INVENTORY_CAP;
                 let total = rows.len();
                 let entries = rows
                     .into_iter()
@@ -378,19 +458,36 @@ fn build_inventory_payload(
                         dht_anchor_hash,
                     })
                     .collect();
-                let payload = ProjectionInventoryPayload {
+                let mut payload = ProjectionInventoryPayload {
                     table: table.to_string(),
                     total,
                     entries,
                 };
-                if truncated {
+                // Responder self-protection: NEVER emit a frame our own
+                // `write_response` would reject. The id-cap above bounds the row
+                // COUNT; this bounds the serialized BYTE size (id width can push
+                // 2000 rows over MAX_PAYLOAD — the scenario-2 EOF blocker). Trims
+                // the cold tail first (rows arrive updated_at-desc, hot set first).
+                let byte_dropped = fit_inventory_to_budget(&mut payload, INVENTORY_PAYLOAD_BUDGET);
+                if cap_truncated {
                     tracing::warn!(
                         target: "elohim_storage::view_federation",
                         table = %table,
                         cap = PROJECTION_INVENTORY_CAP,
                         served = payload.entries.len(),
                         "ProjectionInventory: content inventory truncated at cap \
-                         (advertising the first cap ids by id-asc; true count exceeds cap)"
+                         (advertising the hot set first by updated_at-desc; true count exceeds cap)"
+                    );
+                }
+                if byte_dropped > 0 {
+                    tracing::warn!(
+                        target: "elohim_storage::view_federation",
+                        table = %table,
+                        budget = INVENTORY_PAYLOAD_BUDGET,
+                        dropped = byte_dropped,
+                        served = payload.entries.len(),
+                        "ProjectionInventory: content inventory trimmed to byte budget \
+                         (dropped the cold tail so the serialized frame stays under MAX_PAYLOAD)"
                     );
                 }
                 tracing::info!(
@@ -417,7 +514,7 @@ fn build_inventory_payload(
         };
     }
 
-    // rea_commitments (byte-identical to the pre-Leg-4 path).
+    // rea_commitments (the pre-Leg-4 path, plus the shared byte-budget guard).
     match crate::db::rea_commitments::inventory_for_reconcile(
         &mut conn,
         &app_ctx,
@@ -431,11 +528,26 @@ fn build_inventory_payload(
                     dht_anchor_hash,
                 })
                 .collect();
-            let payload = ProjectionInventoryPayload {
+            let mut payload = ProjectionInventoryPayload {
                 table: table.to_string(),
                 total,
                 entries,
             };
+            // Responder self-protection (same invariant as the content path):
+            // never emit a frame our own codec would reject. A no-op unless a
+            // wide rea inventory approaches MAX_PAYLOAD.
+            let byte_dropped = fit_inventory_to_budget(&mut payload, INVENTORY_PAYLOAD_BUDGET);
+            if byte_dropped > 0 {
+                tracing::warn!(
+                    target: "elohim_storage::view_federation",
+                    table = %table,
+                    budget = INVENTORY_PAYLOAD_BUDGET,
+                    dropped = byte_dropped,
+                    served = payload.entries.len(),
+                    "ProjectionInventory: rea inventory trimmed to byte budget \
+                     (dropped the tail so the serialized frame stays under MAX_PAYLOAD)"
+                );
+            }
             // INFO: the serve side of the discovery exchange. Paired with the
             // asker's "peer inventory received" line this makes an empty
             // exchange attributable (served 0 vs response lost vs undecodable).
@@ -663,5 +775,116 @@ mod tests {
         );
         assert_eq!(payload.entries[0].dht_anchor_hash, "anc-1");
         assert_eq!(payload.total, 1);
+    }
+
+    /// A realistic content entry: ~68-char id + 53-char anchor. Mirrors the live
+    /// commons corpus that triggered the scenario-2 EOF (2088 anchored rows).
+    fn realistic_entry(i: usize) -> ProjectionInventoryEntry {
+        ProjectionInventoryEntry {
+            id: format!("epr:commons:lamad/atomic-concept/really-long-content-slug-{i:010}"),
+            // 53-char anchor (`uhCEk` + 48 base64-ish chars), like a real ActionHash.
+            dht_anchor_hash: format!("uhCEk{}", "A".repeat(48)),
+        }
+    }
+
+    #[test]
+    fn full_cap_inventory_exceeds_old_bound_but_fits_new() {
+        // Byte-math proof of the fix: 2000 realistic content entries serialize to
+        // MORE than the OLD 256 KiB bound (the responder's own write rejected →
+        // requester Io(UnexpectedEof)) yet comfortably UNDER the new 1 MiB
+        // MAX_PAYLOAD. This is the exact regression the raise addresses.
+        let entries: Vec<ProjectionInventoryEntry> = (0..PROJECTION_INVENTORY_CAP as usize)
+            .map(realistic_entry)
+            .collect();
+        let payload = ProjectionInventoryPayload {
+            table: PROJECTION_INVENTORY_TABLE_CONTENT.to_string(),
+            total: entries.len(),
+            entries,
+        };
+        let serialized = inventory_payload_len(&payload);
+        assert!(
+            serialized > 256 * 1024,
+            "2000-entry content inventory ({serialized} B) must exceed the OLD 256 KiB bound"
+        );
+        assert!(
+            serialized < MAX_PAYLOAD,
+            "2000-entry content inventory ({serialized} B) must fit the new 1 MiB MAX_PAYLOAD"
+        );
+        // And with the envelope reserve it still fits the payload budget → no trim
+        // fires in the healthy path; the raise alone resolves the blocker.
+        assert!(serialized <= INVENTORY_PAYLOAD_BUDGET);
+    }
+
+    #[test]
+    fn over_budget_inventory_is_trimmed_to_fit_and_reports_drop() {
+        // Responder self-protection: an over-budget entry set must produce a
+        // FITTING frame and report a non-zero drop (the count the WARN emits).
+        let entries: Vec<ProjectionInventoryEntry> = (0..PROJECTION_INVENTORY_CAP as usize)
+            .map(realistic_entry)
+            .collect();
+        let original = entries.len();
+        let mut payload = ProjectionInventoryPayload {
+            table: PROJECTION_INVENTORY_TABLE_CONTENT.to_string(),
+            total: original,
+            entries,
+        };
+
+        // A deliberately small budget forces the trim regardless of MAX_PAYLOAD.
+        let budget = 64 * 1024;
+        assert!(
+            inventory_payload_len(&payload) > budget,
+            "fixture must start over the test budget"
+        );
+
+        let dropped = fit_inventory_to_budget(&mut payload, budget);
+
+        // The WARN path guard: a positive drop count is exactly what the responder
+        // logs (`dropped = byte_dropped`), so proving `dropped > 0` proves the WARN
+        // branch is taken for an over-budget set.
+        assert!(dropped > 0, "an over-budget set must drop trailing entries");
+        assert_eq!(
+            dropped,
+            original - payload.entries.len(),
+            "reported drop count matches the entries removed"
+        );
+        assert!(
+            !payload.entries.is_empty(),
+            "a fittable set must not be emptied"
+        );
+        // The self-protection invariant: the trimmed payload now fits the budget.
+        assert!(
+            inventory_payload_len(&payload) <= budget,
+            "trimmed payload must fit the byte budget"
+        );
+        // `total` still reports the pre-trim count so `total > entries.len()`
+        // surfaces the byte-drop to the requester.
+        assert_eq!(payload.total, original);
+        assert!(payload.total > payload.entries.len());
+    }
+
+    #[test]
+    fn within_budget_inventory_is_untouched() {
+        // Under budget → no trim, no drop, entries preserved verbatim.
+        let mut payload = ProjectionInventoryPayload {
+            table: PROJECTION_INVENTORY_TABLE_CONTENT.to_string(),
+            total: 3,
+            entries: vec![
+                ProjectionInventoryEntry {
+                    id: "epr:a".to_string(),
+                    dht_anchor_hash: "anc-a".to_string(),
+                },
+                ProjectionInventoryEntry {
+                    id: "epr:b".to_string(),
+                    dht_anchor_hash: "anc-b".to_string(),
+                },
+                ProjectionInventoryEntry {
+                    id: "epr:c".to_string(),
+                    dht_anchor_hash: "anc-c".to_string(),
+                },
+            ],
+        };
+        let dropped = fit_inventory_to_budget(&mut payload, INVENTORY_PAYLOAD_BUDGET);
+        assert_eq!(dropped, 0, "a small payload under budget is never trimmed");
+        assert_eq!(payload.entries.len(), 3);
     }
 }
