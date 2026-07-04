@@ -1,4 +1,7 @@
-use std::path::{Component, Path, PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Component, Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -115,4 +118,87 @@ pub struct ProjectionManifest {
     pub root: ProjectionRoot,
     pub entries: Vec<ProjectionEntry>,
     pub metadata: Value,
+}
+
+impl ProjectionManifest {
+    /// Validate projection invariants that must hold across all domain adapters.
+    pub fn validate(&self) -> Result<()> {
+        let mut paths = HashSet::with_capacity(self.entries.len());
+
+        for entry in &self.entries {
+            if !paths.insert(entry.path.clone()) {
+                return Err(EprfsError::InvalidProjectionManifest(format!(
+                    "duplicate projection path: {}",
+                    entry.path.as_path().display()
+                )));
+            }
+
+            match entry.kind {
+                EntryKind::Directory if entry.blob.is_some() => {
+                    return Err(EprfsError::InvalidProjectionManifest(format!(
+                        "directory path has blob: {}",
+                        entry.path.as_path().display()
+                    )));
+                }
+                EntryKind::File | EntryKind::Symlink if entry.blob.is_none() => {
+                    return Err(EprfsError::MissingBlob(entry.path.as_path().to_path_buf()));
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_duplicate_projection_paths() {
+        let path = ProjectionPath::new("README.md").unwrap();
+        let manifest = ProjectionManifest {
+            root: ProjectionRoot {
+                id: ProjectionId::new("test"),
+                root: EprRef::new("epr:test"),
+            },
+            entries: vec![
+                ProjectionEntry::file(path.clone(), BlobCid::new("blob:one")),
+                ProjectionEntry::file(path, BlobCid::new("blob:two")),
+            ],
+            metadata: Value::Null,
+        };
+
+        assert!(matches!(
+            manifest.validate(),
+            Err(EprfsError::InvalidProjectionManifest(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_blobless_symlink() {
+        let manifest = ProjectionManifest {
+            root: ProjectionRoot {
+                id: ProjectionId::new("test"),
+                root: EprRef::new("epr:test"),
+            },
+            entries: vec![ProjectionEntry {
+                path: ProjectionPath::new("current").unwrap(),
+                kind: EntryKind::Symlink,
+                epr: None,
+                blob: None,
+                size_bytes: None,
+                executable: false,
+                status: ProjectionStatus::Unknown,
+                metadata: Value::Null,
+            }],
+            metadata: Value::Null,
+        };
+
+        assert!(matches!(
+            manifest.validate(),
+            Err(EprfsError::MissingBlob(path)) if path == PathBuf::from("current")
+        ));
+    }
 }

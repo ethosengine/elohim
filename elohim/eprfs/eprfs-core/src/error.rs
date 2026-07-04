@@ -9,6 +9,9 @@ pub enum EprfsError {
     #[error("invalid projection path: {0}")]
     InvalidProjectionPath(String),
 
+    #[error("invalid projection manifest: {0}")]
+    InvalidProjectionManifest(String),
+
     #[error("EPR record not found: {0:?}")]
     EprNotFound(EprRef),
 
@@ -18,7 +21,7 @@ pub enum EprfsError {
     #[error("blob is not local and fetch was not requested: {0:?}")]
     BlobNotLocal(BlobCid),
 
-    #[error("projection entry is missing blob for file path: {0:?}")]
+    #[error("projection entry is missing blob for path: {0:?}")]
     MissingBlob(PathBuf),
 
     #[error("filesystem I/O error at {path:?}: {source}")]
