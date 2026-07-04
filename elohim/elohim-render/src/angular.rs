@@ -224,6 +224,16 @@ impl Renderer for AngularRenderer {
                 if (typeof Deno !== 'undefined' && Deno.core && Deno.core.setUnhandledPromiseRejectionHandler) {{
                     Deno.core.setUnhandledPromiseRejectionHandler(() => true);
                 }}
+                // Eagerly evaluate the crypto shim BEFORE the bundle graph. The
+                // bundle bundles `ws` (CommonJS), which reaches for a synchronous
+                // `require("crypto")` at module-init; the module shim's require
+                // serves that from the global the crypto shim registers on eval
+                // (src/shim/node_crypto.js). The bundle's own static crypto import
+                // evaluates LATER in the graph than `ws`, so without this pre-warm
+                // the require would fire before crypto registers. `node:crypto`
+                // resolves to the SAME `elohim-builtin:crypto` module instance the
+                // bundle imports, so this is a one-time pre-eval, not a duplicate.
+                await import('node:crypto');
                 const mod = await import({bundle_lit});
                 const html = await mod.renderApplication(mod.default, {{ url: {url_lit} }});
                 return html;
