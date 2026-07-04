@@ -10,10 +10,10 @@ description = "Local filesystem materialization for EPR-governed projections"
 [dependencies]
 eprfs-core = { path = "../eprfs-core" }
 eprfs-host = { path = "../eprfs-host" }
+serde_json.workspace = true
 tokio = { workspace = true, features = ["fs"] }
 
 [dev-dependencies]
 bytes.workspace = true
 eprfs-storage = { path = "../eprfs-storage" }
-serde_json.workspace = true
 tokio.workspace = true

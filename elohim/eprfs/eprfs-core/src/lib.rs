@@ -6,12 +6,17 @@
 
 pub mod address;
 pub mod attestation;
+pub mod awareness;
 pub mod error;
 pub mod projection;
 pub mod storage;
 
 pub use address::{BlobCid, EprRef, ProjectionId};
 pub use attestation::{AttestationDraft, AttestationKind};
+pub use awareness::{
+    BytePresence, EprCard, EprResiliency, LocalOverlayStatus, PeerVisibility, ProjectionAwareness,
+    ProjectionAwarenessProvider, ProjectionEntryAwareness, VerificationStatus,
+};
 pub use error::{EprfsError, Result};
 pub use projection::{
     EntryKind, MaterializationPolicy, ProjectionEntry, ProjectionManifest, ProjectionPath,

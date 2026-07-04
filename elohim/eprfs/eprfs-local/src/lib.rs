@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use eprfs_core::{
     BlobPresence, EntryKind, EprfsError, EprfsStorage, FetchPolicy, MaterializationPolicy,
-    ProjectionEntry, ProjectionManifest, Result,
+    ProjectionAwareness, ProjectionEntry, ProjectionManifest, Result,
 };
 use eprfs_host::{Capability, HostProfile, SymlinkMode};
 
@@ -47,6 +47,26 @@ where
         }
 
         Ok(report)
+    }
+
+    pub async fn write_awareness(
+        &self,
+        target: impl AsRef<Path>,
+        awareness: &ProjectionAwareness,
+    ) -> Result<()> {
+        let target = target.as_ref();
+        let status_dir = target.join(".eprfs").join("status");
+        create_dir_all(&status_dir).await?;
+
+        let root = serde_json::to_vec_pretty(awareness)?;
+        write_file(&status_dir.join("projection.json"), &root).await?;
+
+        let mut entries = Vec::new();
+        for entry in &awareness.entries {
+            serde_json::to_writer(&mut entries, entry)?;
+            entries.push(b'\n');
+        }
+        write_file(&status_dir.join("entries.jsonl"), &entries).await
     }
 
     async fn materialize_entry(
@@ -328,8 +348,9 @@ fn link_marker_path(path: &Path) -> PathBuf {
 mod tests {
     use bytes::Bytes;
     use eprfs_core::{
-        BlobCid, EntryKind, ProjectionEntry, ProjectionId, ProjectionPath, ProjectionRoot,
-        ProjectionStatus,
+        BlobCid, BytePresence, EntryKind, EprCard, EprRef, EprResiliency, LocalOverlayStatus,
+        PeerVisibility, ProjectionAwareness, ProjectionEntry, ProjectionEntryAwareness,
+        ProjectionId, ProjectionPath, ProjectionRoot, ProjectionStatus, VerificationStatus,
     };
     use eprfs_storage::MemoryStorage;
 
@@ -478,6 +499,62 @@ mod tests {
                 target.join("current").display()
             )
         );
+
+        let _ = tokio::fs::remove_dir_all(&target).await;
+    }
+
+    #[tokio::test]
+    async fn writes_projection_awareness_sidecars() {
+        let storage = MemoryStorage::default();
+        let target =
+            std::env::temp_dir().join(format!("eprfs-awareness-test-{}", std::process::id()));
+        let _ = tokio::fs::remove_dir_all(&target).await;
+
+        let awareness = ProjectionAwareness {
+            projection: ProjectionId::new("projection:test"),
+            root: EprCard {
+                subject: EprRef::new("epr:root"),
+                projection: Some(ProjectionId::new("projection:test")),
+                title: Some("Test Projection".into()),
+                source: None,
+                byte_presence: BytePresence::Local,
+                resiliency: EprResiliency::unknown(),
+                peer_visibility: PeerVisibility::unknown(),
+                verification: VerificationStatus::Unknown,
+                local_overlay: LocalOverlayStatus::Clean,
+                metadata: serde_json::Value::Null,
+            },
+            entries: vec![ProjectionEntryAwareness {
+                path: ProjectionPath::new("README.md").unwrap(),
+                subject: None,
+                blob: Some(BlobCid::new("blob:readme")),
+                byte_presence: BytePresence::Pinned,
+                resiliency: EprResiliency::unknown(),
+                peer_visibility: PeerVisibility::unknown(),
+                verification: VerificationStatus::Verified,
+                local_overlay: LocalOverlayStatus::Clean,
+                metadata: serde_json::Value::Null,
+            }],
+            metadata: serde_json::Value::Null,
+        };
+
+        let materializer = LocalMaterializer::new(storage);
+        materializer
+            .write_awareness(&target, &awareness)
+            .await
+            .unwrap();
+
+        let projection = tokio::fs::read_to_string(target.join(".eprfs/status/projection.json"))
+            .await
+            .unwrap();
+        let entries = tokio::fs::read_to_string(target.join(".eprfs/status/entries.jsonl"))
+            .await
+            .unwrap();
+
+        assert!(projection.contains("\"projection\": \"projection:test\""));
+        assert!(projection.contains("\"bytePresence\": \"local\""));
+        assert!(entries.contains("\"path\":\"README.md\""));
+        assert!(entries.contains("\"bytePresence\":\"pinned\""));
 
         let _ = tokio::fs::remove_dir_all(&target).await;
     }
