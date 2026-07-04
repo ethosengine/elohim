@@ -22,6 +22,7 @@ brit / other domain adapters
 - `eprfs-core` — pure model + traits. No git, no FUSE, no storage HTTP client.
 - `eprfs-host` — host filesystem capability profiles for Linux, macOS, Windows, portable directories, and peer-managed projections.
 - `eprfs-local` — materializes projection manifests into ordinary filesystem trees.
+- `eprfs-meta` — parses authored `.epr-meta` files and resolves what EPR meta/head coupling applies to a projected path.
 - `eprfs-storage` — storage-facing adapter scaffolding and test doubles for `elohim-storage` integration.
 
 ## Host Profiles
@@ -46,6 +47,25 @@ Projection entries may carry a domain-neutral source identity:
 
 Domain adapters decide the namespace and source id. For example, `brit` uses
 git object ids, but `eprfs-core` only validates the projection shape.
+
+## EPR Meta Head Coupling
+
+`.epr-meta` is the authored source form for EPR meta around a path or subtree.
+`eprfs` treats it as the seed of a broader head-coupling model, not merely as
+directory-local governance.
+
+An EPR meta record can carry:
+
+- `story` — knowledge/story context for the path or resource.
+- `value` — value or REA context.
+- `governance` — who/policy/rules/validators for the path or subtree.
+- `place` — place or locality context.
+- `attestations` — attestations that stand around the subject.
+- `claims` — claims made by or about the subject.
+
+`eprfs-meta` resolves the `.epr-meta` ancestor cascade into `EprMetaResolution`,
+answering "what EPR head/meta applies to this file?" Governance is one leg in
+that answer, alongside story, value, place, attestations, and claims.
 
 ## EPR Cards and Projection Awareness
 

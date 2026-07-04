@@ -4,6 +4,7 @@ members = [
     "eprfs-core",
     "eprfs-host",
     "eprfs-local",
+    "eprfs-meta",
     "eprfs-storage",
 ]
 
@@ -19,5 +20,6 @@ async-trait = "0.1"
 bytes = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+serde_yaml = "0.9"
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

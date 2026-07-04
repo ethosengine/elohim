@@ -8,6 +8,7 @@ pub mod address;
 pub mod attestation;
 pub mod awareness;
 pub mod error;
+pub mod meta;
 pub mod projection;
 pub mod storage;
 
@@ -18,6 +19,11 @@ pub use awareness::{
     ProjectionAwarenessProvider, ProjectionEntryAwareness, VerificationStatus,
 };
 pub use error::{EprfsError, Result};
+pub use meta::{
+    EprHeadCoupling, EprMetaGovernance, EprMetaRecord, EprMetaResolution, EprMetaSource,
+    EprMetaSubject, GovernanceBinding, GovernancePolicyBinding, GovernanceRule,
+    GovernanceRuleClass, GovernanceRulePredicate, GovernanceScope, GovernanceValidator,
+};
 pub use projection::{
     EntryKind, MaterializationPolicy, ProjectionEntry, ProjectionManifest, ProjectionPath,
     ProjectionRoot, ProjectionSource, ProjectionSourceKind, ProjectionStatus,

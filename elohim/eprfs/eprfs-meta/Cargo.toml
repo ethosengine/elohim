@@ -1,0 +1,18 @@
+[package]
+name = "eprfs-meta"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Parser and resolver for .epr-meta authored EPR meta coupling"
+
+[dependencies]
+eprfs-core = { path = "../eprfs-core" }
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
