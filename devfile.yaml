@@ -70,6 +70,12 @@ components:
         # Claude and general config
         - name: CLAUDE_CONFIG_DIR
           value: /projects/.claude-config
+        # Codex CLI — relocate its entire state dir (config.toml, auth.json,
+        # sessions, MCP cache) onto the persistent /projects PVC so sign-in
+        # survives workspace restarts. Codex honors CODEX_HOME for all state,
+        # so no ~/.codex symlink is needed (unlike CLAUDE_CONFIG_DIR).
+        - name: CODEX_HOME
+          value: /projects/.codex-config
         - name: USER
           value: user
         - name: RUST_BACKTRACE
