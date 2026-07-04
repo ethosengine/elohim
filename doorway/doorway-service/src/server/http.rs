@@ -2830,6 +2830,11 @@ enum SsrFallbackReason {
     /// The render-failure circuit breaker is OPEN — SSR was skipped BEFORE any
     /// render was attempted (no doomed-render tax during a systemic outage).
     ErrorBackoff,
+    /// The render SUCCEEDED but activated NO route component — an empty
+    /// `<router-outlet>` shell that can never hydrate (see
+    /// `render_output_is_empty`). Shed to the fallback bundle exactly like a
+    /// render error, so the client bundles the fallback carries can boot the app.
+    EmptyRender,
 }
 
 impl SsrFallbackReason {
@@ -2841,6 +2846,7 @@ impl SsrFallbackReason {
             SsrFallbackReason::RendererAbsent => "renderer-absent",
             SsrFallbackReason::RenderError(_) => "render-error",
             SsrFallbackReason::ErrorBackoff => "error-backoff",
+            SsrFallbackReason::EmptyRender => "empty-render",
         }
     }
 }
@@ -2868,6 +2874,71 @@ fn epr_should_serve_ssr(dispo: &Disposition, renderer_present: bool) -> bool {
     matches!(dispo, Disposition::SsrRoute { .. }) && renderer_present
 }
 
+/// Detect a "successful but empty" Angular SSR render: the render returned HTML,
+/// but no route component was activated, so the `<router-outlet>` has no element
+/// sibling after it — only comment/whitespace nodes before `</app-root>`.
+///
+/// WHY an empty render MUST shed to the fallback bundle: the SSR document
+/// template (`SSR_DOCUMENT`) carries NO client bundles by construction. An SSR
+/// render is meant to be progressively enhanced by the client bundles that the
+/// *fallback* SPA index ships. An empty shell (outlet with no activated
+/// component) can therefore never hydrate — there is no server-rendered content
+/// to enhance AND no client script to bootstrap the app — so serving or caching
+/// it is a permanent blank page. Treating it exactly like a render error routes
+/// the request to `SsrFallback::ProjectedEpr` (or the Registry CSR shell), which
+/// DOES carry the client bundles and boots the app normally: the safe serve. A
+/// HEALTHY render places the activated route component as an element sibling
+/// immediately after the outlet (`</router-outlet><app-home …>…</app-home>`); an
+/// empty one has only comment nodes.
+///
+/// Semantics: returns `true` iff the document contains at least one
+/// `<router-outlet` AND no router-outlet in it is followed by an element sibling.
+/// A document with NO `<router-outlet` returns `false` — we cannot judge a
+/// non-router document (e.g. a raw error page) and must not gate it. Dependency-
+/// free string scanning; Angular emits lowercase tag names.
+fn render_output_is_empty(html: &str) -> bool {
+    let mut found_outlet = false;
+    let mut search_from = 0usize;
+    while let Some(rel) = html[search_from..].find("<router-outlet") {
+        found_outlet = true;
+        let outlet_start = search_from + rel;
+        // Advance past this outlet's close tag. Angular emits
+        // `<router-outlet …></router-outlet>` (an empty element — the activated
+        // component is a SIBLING, never a child). If a close tag is somehow
+        // absent, treat the remainder of the document as "after the outlet".
+        let after_close = match html[outlet_start..].find("</router-outlet>") {
+            Some(close_rel) => outlet_start + close_rel + "</router-outlet>".len(),
+            None => html.len(),
+        };
+        // Strip comment nodes (`<!-- … -->`, including the empty `<!---->`) and
+        // whitespace repeatedly, to reach the next real sibling node.
+        let mut rest = html[after_close..].trim_start();
+        while let Some(stripped) = rest.strip_prefix("<!--") {
+            match stripped.find("-->") {
+                Some(end) => rest = stripped[end + "-->".len()..].trim_start(),
+                // An unterminated comment eats the rest of the document — no
+                // element sibling can follow.
+                None => {
+                    rest = "";
+                    break;
+                }
+            }
+        }
+        // An element sibling opens with `<` immediately followed by an ASCII
+        // letter (an opening tag). A closing tag (`</…`), a comment, or text does
+        // not — those mean no activated component followed this outlet.
+        let bytes = rest.as_bytes();
+        let activated = bytes.first() == Some(&b'<')
+            && matches!(bytes.get(1), Some(b) if b.is_ascii_alphabetic());
+        if activated {
+            // At least one outlet has an activated component → not an empty shell.
+            return false;
+        }
+        search_from = after_close;
+    }
+    found_outlet
+}
+
 /// Produce the fallback response for `serve_ssr_route`. Consumes `req` (the
 /// legacy `forward_to_storage` fallbacks need it) and `fallback` (owned so the
 /// `ProjectedEpr` variant can move its `EprProjectionView` into the proxy).
@@ -2891,6 +2962,10 @@ async fn ssr_fallback_response(
             }
             SsrFallbackReason::ErrorBackoff => ssr_spa_shell_fallback_with_skip_reason(
                 Some("error-backoff"),
+                Some(chrome_context_json),
+            ),
+            SsrFallbackReason::EmptyRender => ssr_spa_shell_fallback_with_skip_reason(
+                Some("empty-render"),
                 Some(chrome_context_json),
             ),
             SsrFallbackReason::RenderError(err) => {
@@ -3119,9 +3194,6 @@ async fn serve_ssr_route(
         };
         return match renderer.render(ctx).await {
             Ok(mut out) => {
-                // A successful render closes the failure breaker (resets the
-                // consecutive-error count).
-                state.ssr_render_breaker.record_success();
                 // Stamp the correlation token onto the trace so the header + Loki
                 // line join browser ↔ doorway ↔ peer.
                 if let Some(obs) = observation_id {
@@ -3129,7 +3201,8 @@ async fn serve_ssr_route(
                 }
                 // The render-trace signal: terminal classification + per-peer
                 // latency. Shipped to Loki (info) and the feed-forward seam for
-                // compute-commitment tuning.
+                // compute-commitment tuning. Emitted BEFORE the empty-shell check
+                // so observability sees every render, empty or not.
                 tracing::info!(
                     target: "doorway::ssr::trace",
                     path = %path,
@@ -3140,6 +3213,48 @@ async fn serve_ssr_route(
                     "SSR render trace"
                 );
                 state.render_trace_stats.record(&out.trace);
+
+                // A render can "succeed" yet activate NO route component (a caught
+                // bootstrap error inside the app) — an empty <router-outlet> shell.
+                // The SSR document template carries no client bundles, so that
+                // shell can never hydrate: serving or caching it is a permanent
+                // blank page. Treat it exactly like a render error — record a
+                // breaker failure, do NOT record success, do NOT cache, and shed to
+                // the fallback bundle (which DOES carry the client bundles). See
+                // `render_output_is_empty`.
+                if render_output_is_empty(&out.html) {
+                    // Record the failure; a `true` return is the trip transition —
+                    // emit ONE warn when the breaker OPENS (mirrors the Err arm).
+                    if state.ssr_render_breaker.record_failure() {
+                        tracing::warn!(
+                            target: "doorway::ssr",
+                            path = %path,
+                            threshold = crate::render::breaker::FAILURE_THRESHOLD,
+                            cooldown_ms = crate::render::breaker::COOLDOWN_MS,
+                            "SSR render breaker OPEN — skipping SSR for the cooldown window \
+                             (subsequent skips are silent)"
+                        );
+                    }
+                    tracing::warn!(
+                        target: "doorway::ssr",
+                        path = %path,
+                        "SSR render produced an empty app shell (no activated route component) — SSR fallback"
+                    );
+                    return ssr_fallback_response(
+                        state,
+                        req,
+                        path,
+                        &endpoint,
+                        &chrome_context_json,
+                        fallback,
+                        SsrFallbackReason::EmptyRender,
+                    )
+                    .await;
+                }
+
+                // A successful, non-empty render closes the failure breaker
+                // (resets the consecutive-error count).
+                state.ssr_render_breaker.record_success();
                 let trace = out.trace;
                 let html = out.html;
                 // Cache the UN-injected render; the chrome island is
@@ -5710,7 +5825,7 @@ mod dispatch_classification_tests {
     //! `stream_proxy` / future manifest path families to elohim-storage's
     //! manifest must NOT require a doorway code change to make them routable.
 
-    use super::{classify_dispatch, epr_should_serve_ssr, Disposition};
+    use super::{classify_dispatch, epr_should_serve_ssr, render_output_is_empty, Disposition};
     use crate::services::RouteRegistry;
     use doorway_client::HttpMethod;
     use hyper::Method;
@@ -5899,6 +6014,69 @@ mod dispatch_classification_tests {
         assert!(!epr_should_serve_ssr(&proxy, true));
         assert!(!epr_should_serve_ssr(&Disposition::RegistryUnhandled, true));
         assert!(!epr_should_serve_ssr(&Disposition::NotFound, true));
+    }
+
+    #[test]
+    fn render_output_is_empty_flags_production_empty_shell() {
+        // The exact structure of the 2026-07-04 blank landing page: a render that
+        // "succeeded" but activated no route component — the <router-outlet> is
+        // followed only by comment nodes before </app-root>.
+        let empty = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head>\
+            <body><!--nghm--><app-root ng-version=\"19.2.19\" ngh=\"0\">\
+            <a href=\"#main-content\" class=\"skip-link\">Skip to main content</a>\
+            <!----><router-outlet _ngcontent-ng-c2521897509=\"\"></router-outlet><!----></app-root>\
+            <script id=\"ng-state\" type=\"application/json\">{}</script></body></html>";
+        assert!(
+            render_output_is_empty(empty),
+            "an outlet with no element sibling (only comment nodes) must read as empty"
+        );
+    }
+
+    #[test]
+    fn render_output_is_empty_false_for_activated_route() {
+        // A healthy Angular SSR render places the activated route component as an
+        // element sibling immediately after the outlet.
+        let healthy =
+            "<app-root><router-outlet></router-outlet><app-home>content</app-home></app-root>";
+        assert!(
+            !render_output_is_empty(healthy),
+            "an outlet followed by an element sibling is an activated (healthy) render"
+        );
+    }
+
+    #[test]
+    fn render_output_is_empty_false_when_no_router_outlet() {
+        // A document with no <router-outlet cannot be judged — never gate it (a
+        // raw error page or non-Angular response must serve as-is).
+        let no_outlet = "<!DOCTYPE html><html><body><h1>Some other page</h1></body></html>";
+        assert!(
+            !render_output_is_empty(no_outlet),
+            "a document with no router-outlet must not be gated"
+        );
+    }
+
+    #[test]
+    fn render_output_is_empty_true_for_only_comments_and_whitespace() {
+        // Comment nodes (including the empty <!---->) and whitespace after the
+        // outlet are stripped: they are not an activated component.
+        let only_comments =
+            "<app-root><router-outlet></router-outlet>\n  <!----> <!-- ng --> \n</app-root>";
+        assert!(
+            render_output_is_empty(only_comments),
+            "an outlet followed only by comments/whitespace must read as empty"
+        );
+    }
+
+    #[test]
+    fn render_output_is_empty_false_for_outlet_with_attributes() {
+        // The real outlet carries _ngcontent attributes; the sibling element
+        // carries them too. Attribute forms must not defeat sibling detection.
+        let activated = "<router-outlet _ngcontent-ng-c123=\"\"></router-outlet>\
+            <elohim-landing _ngcontent-ng-c123=\"\">x</elohim-landing>";
+        assert!(
+            !render_output_is_empty(activated),
+            "attribute-bearing outlet + element sibling is an activated render"
+        );
     }
 }
 
