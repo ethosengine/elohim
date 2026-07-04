@@ -4,8 +4,10 @@
   "jenkinsPath": "elohim/holochain/Jenkinsfile",
   "manualOnly": false,
   "triggersGenesis": true,
-  "dependsOn": ["elohim-holochain"],
-  "description": "Edge services — doorway gateway, storage, conductor, edge image",
+  "dependsOn": [
+    "elohim-holochain"
+  ],
+  "description": "Edge services \u2014 doorway gateway, storage, conductor, edge image",
   "steps": {
     "cargo-build-doorway": {
       "description": "Build doorway gateway container image (Rust binary compiled inside Docker)",
@@ -15,12 +17,23 @@
           "doorway/doorway-service/Cargo.toml",
           "doorway/doorway-service/Cargo.lock",
           "doorway/doorway-service/Dockerfile",
-          "doorway/doorway-client/**"
+          "crates/doorway-client/**",
+          "elohim/elohim-render/**",
+          "elohim/elohim-views/**",
+          "elohim/elohim-cache-core/**",
+          "elohim/elohim-compute/**",
+          "elohim/elohim-agent/**",
+          "elohim/elohim-peer-fabric/**",
+          "elohim/Cargo.lock"
         ],
-        "buildProcess": ["elohim/holochain/Jenkinsfile"]
+        "buildProcess": [
+          "elohim/holochain/Jenkinsfile"
+        ]
       },
       "outputs": {
-        "artifacts": ["doorway-binary"],
+        "artifacts": [
+          "doorway-binary"
+        ],
         "verify": null
       },
       "depends": [],
@@ -39,12 +52,26 @@
           "elohim/elohim-storage/Cargo.toml",
           "elohim/elohim-storage/Cargo.lock",
           "elohim/elohim-storage/Dockerfile",
-          "elohim/sdk/**"
+          "elohim/sdk/**",
+          "elohim/epr/**",
+          "elohim/elohim-views/**",
+          "elohim/elohim-facings/**",
+          "elohim/elohim-peer-fabric/**",
+          "elohim/elohim-render/**",
+          "elohim/elohim-chrome-asset/**",
+          "elohim/constitution/**",
+          "crates/**",
+          "bridges/**",
+          "elohim/Cargo.lock"
         ],
-        "buildProcess": ["elohim/holochain/Jenkinsfile"]
+        "buildProcess": [
+          "elohim/holochain/Jenkinsfile"
+        ]
       },
       "outputs": {
-        "artifacts": ["storage-binary"],
+        "artifacts": [
+          "storage-binary"
+        ],
         "verify": null
       },
       "depends": [],
@@ -60,13 +87,21 @@
           "elohim/holochain/edgenode/**",
           "elohim/holochain/*.yaml"
         ],
-        "buildProcess": ["elohim/holochain/Jenkinsfile"]
+        "buildProcess": [
+          "elohim/holochain/Jenkinsfile"
+        ]
       },
       "outputs": {
-        "artifacts": ["edge-image"],
+        "artifacts": [
+          "edge-image"
+        ],
         "verify": null
       },
-      "depends": ["cargo-build-doorway", "cargo-build-storage", "elohim-holochain:build-happ"],
+      "depends": [
+        "cargo-build-doorway",
+        "cargo-build-storage",
+        "elohim-holochain:build-happ"
+      ],
       "executor": {
         "stage": "Build Edge Node Image",
         "function": null
@@ -82,20 +117,24 @@
           "genesis/orchestrator/environments/**",
           "genesis/orchestrator/data/**"
         ],
-        "buildProcess": ["elohim/holochain/Jenkinsfile"]
+        "buildProcess": [
+          "elohim/holochain/Jenkinsfile"
+        ]
       },
       "outputs": {
         "artifacts": [],
         "verify": null
       },
-      "depends": ["build-edge-image"],
+      "depends": [
+        "build-edge-image"
+      ],
       "executor": {
         "stage": "Deploy Edge Node - Alpha",
         "function": null
       }
     },
     "dataplane-validation": {
-      "description": "Advisory @dataplane cucumber suite against deployed alpha (scripts/ci/run-dataplane-validation.sh), producing the per-concern sprint-report the agentic-developer loop measures against. Declared with no build/deploy dependency and no artifacts — the Jenkinsfile stage's own `when { branch 'dev' || ... }` already runs it on every dev-branch pipeline execution regardless of what triggered that execution; this entry's only job is making sure the PIPELINE ITSELF gets triggered when only the a2o test surface changes (2026-07-03: an a2o-only push was silently skipped end-to-end because no elohim-edge step declared these paths as sources — the suite went unmeasured, not merely unchanged).",
+      "description": "Advisory @dataplane cucumber suite against deployed alpha (scripts/ci/run-dataplane-validation.sh), producing the per-concern sprint-report the agentic-developer loop measures against. Declared with no build/deploy dependency and no artifacts \u2014 the Jenkinsfile stage's own `when { branch 'dev' || ... }` already runs it on every dev-branch pipeline execution regardless of what triggered that execution; this entry's only job is making sure the PIPELINE ITSELF gets triggered when only the a2o test surface changes (2026-07-03: an a2o-only push was silently skipped end-to-end because no elohim-edge step declared these paths as sources \u2014 the suite went unmeasured, not merely unchanged).",
       "inputs": {
         "sources": [
           "genesis/a2o/steps/**",
@@ -103,7 +142,9 @@
           "genesis/a2o/features/resilience/**",
           "scripts/ci/run-dataplane-validation.sh"
         ],
-        "buildProcess": ["elohim/holochain/Jenkinsfile"]
+        "buildProcess": [
+          "elohim/holochain/Jenkinsfile"
+        ]
       },
       "outputs": {
         "artifacts": [],
@@ -118,14 +159,28 @@
   },
   "gate": {
     "projects": {
-      "doorway": { "dir": "doorway/doorway-service", "steps": ["cargo-build-doorway"] },
-      "elohim-storage": { "dir": "elohim/elohim-storage", "steps": ["cargo-build-storage"] }
+      "doorway": {
+        "dir": "doorway/doorway-service",
+        "steps": [
+          "cargo-build-doorway"
+        ]
+      },
+      "elohim-storage": {
+        "dir": "elohim/elohim-storage",
+        "steps": [
+          "cargo-build-storage"
+        ]
+      }
     }
   },
   "deployment": {
     "targets": {
-      "alpha": { "healthCheck": "https://doorway-alpha.elohim.host/health" },
-      "staging": { "healthCheck": "https://doorway-staging.elohim.host/health" }
+      "alpha": {
+        "healthCheck": "https://doorway-alpha.elohim.host/health"
+      },
+      "staging": {
+        "healthCheck": "https://doorway-staging.elohim.host/health"
+      }
     }
   }
 }
