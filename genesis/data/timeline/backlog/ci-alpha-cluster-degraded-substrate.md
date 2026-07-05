@@ -10,14 +10,16 @@ author: "ci-failure-triage"
 status: "backlog"
 priority: "high"
 ci_status: blocked
-fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4, 79748fd505af, ab55feadd29c, 8a0ee37aaa17, 39f396758ede, 9f60eb44561d, 43ba8b15ffeb, 63dd3437bede, 2e09854ec226, 1eda1f5d27e0, b4303a6d852e, 2d1b82ad175f, 1714722d9dab, 63ecdda7a81e, e9b60b28964c, 5d74b506f389]
+fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4, 79748fd505af, ab55feadd29c, 8a0ee37aaa17, 39f396758ede, 9f60eb44561d, 43ba8b15ffeb, 63dd3437bede, 2e09854ec226, 1eda1f5d27e0, b4303a6d852e, 2d1b82ad175f, 1714722d9dab, 63ecdda7a81e, e9b60b28964c, 5d74b506f389, dc60d64b875f, ccdacb3bdf10]
 jobs: [elohim, elohim-edge, elohim-genesis]
 relatedNodeIds: []
-tags: [ci, infra, alpha-cluster-6peer, shem, substrate-degraded, reduced-scope, host-green-not-ci-green, museum-trap-1, requires-env, per-peer-rollout]
+tags: [ci, infra, alpha-cluster-6peer, shem, substrate-degraded, reduced-scope, host-green-not-ci-green, museum-trap-1, requires-env, per-peer-rollout, cache-db-pool-saturation, lamad-deep-link]
 cites:
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1100/
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1111/
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1113/
+  - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1250/
+  - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1253/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1504/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1518/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1522/
@@ -26,6 +28,7 @@ cites:
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1053/
   - genesis/manifests/cluster-state.yaml
   - genesis/a2o/features/resilience/household-reciprocity.feature
+  - genesis/a2o/features/lamad/deep-link-delivery.feature
   - genesis/a2o/steps/resilience.steps.ts
   - genesis/a2o/steps/lamad/deep-link-delivery.steps.ts
   - genesis/a2o/steps/common.steps.ts
@@ -407,3 +410,78 @@ stabilizes OR the tags hold the scenarios out of the degraded run.
   these fingerprints should disappear on the first edge wave after the manifest
   bump lands; if a peer still fails post-bump, that residue is a NEW concern,
   not this one.
+
+- **2026-07-05 extension — a NEW degradation mechanism on the same
+  operator-owned substrate (2 fingerprints, elohim-genesis #1250–#1253),
+  triaged from dispatcher-supplied telemetry and independently verified
+  against the build logs.**
+
+  ```
+  dc60d64b875f  AssertionError [ERR_ASSERTION]: Expected the lamad path overview to render
+                (data-testid="path-overview"); URL is "https://alpha.elohim.host/lamad/path/
+                foundations-christian-technology"                     (genesis 1250–1253)
+  ccdacb3bdf10  AssertionError [ERR_ASSERTION]: Expected the lamad step navigator to render
+                (data-testid="path-navigator"); URL is "https://alpha.elohim.host/lamad/path/
+                foundations-christian-technology/step/2"               (genesis 1250–1253)
+  ```
+
+  Dispatcher-supplied telemetry claimed the shem-side conductor
+  `elohim-adam-alpha-0` (shem bootstrap anchor + doorway-B's primary storage
+  backend) had its Holochain Cache-DB read connection pool saturated
+  (sustained ~1612%, spiking to 6437%), causing app-port websocket auth
+  timeouts, `CellDisabled` cells, and storage bridge-reconnect loops. **This
+  triage independently confirmed the shape (not the exact percentages —
+  those are Loki/Grafana-side, out of Jenkins-log reach) directly in genesis
+  #1253's build log**: `/auth/me` on adam times out ("pod may be
+  unreachable; skipping"); `call_zome` requests against adam's identities
+  time out at 60000ms; `propagation.custody-convergence` reports a
+  custody-blob commitment "missing on: adam after 300s"; `adam: heal GET
+  /blob/… → 000000` (unreachable) with "0 serve-blob event(s)";
+  `projection.adam.projector — status/projector unavailable (000)`; and
+  `federation.doorways — GET /api/v1/federation/doorways → 000`. Note the
+  build's own `Probe Substrate` stage reported `shem: AVAILABLE` / "Full
+  topology available" — that probe checks the **shem** resource only
+  (`cluster-state.yaml`), not **alpha-cluster-6peer**, which is the resource
+  actually degraded here; the two are independent probes/resources by
+  design, so a shem-available run can still run straight into a degraded
+  alpha-cluster-6peer backend, which is exactly what happened.
+
+  **Verdict: infra (same root class as this whole entry) — NOT a code
+  regression in the lamad renderers.** The lamad path-overview /
+  step-navigator components legitimately can't render because the epr-spa
+  can't sync content from `adam-alpha`'s degraded storage/conductor.
+
+  **Root cause is the ALREADY-DOCUMENTED "tagging seam" gap above, not a new
+  pattern**: `genesis/a2o/features/lamad/deep-link-delivery.feature` (steps
+  are `genesis/a2o/steps/lamad/deep-link-delivery.steps.ts`) declares only
+  `@requires:doorway` at the feature level (line 1) — and per
+  `genesis/a2o/CLAUDE.md`, `@requires:doorway` is explicitly a **fixture
+  precondition, not a substrate-scope tag** ("Caps NOT in cluster-state
+  (`@requires:doorway`, `@requires:seeded-content`) are fixture
+  preconditions … ignored by the scope reconciler"). So these deep-link
+  scenarios run unconditionally against whatever alpha backend is live,
+  exactly the gap named in "The tagging seam" section above (which already
+  cites "the cross-pillar resource viewer renders deep-link scenarios —
+  `@requires: doorway` only" as an example). No new root-cause class to
+  declare; this is a fresh occurrence of the same known gap, with a
+  different specific degradation mechanism (Cache-DB pool saturation on one
+  conductor) than June's OOM CrashLoop — worth keeping for future
+  correlation, not a reason to fork a new entry.
+
+  **Current decision**: `status: blocked` for both fingerprints (no
+  `triaged_at_build` — nothing landed; substrate is operator-owned and the
+  bounded fix — per-scenario `@requires:alpha-cluster-6peer` tagging of
+  `deep-link-delivery.feature`'s scenarios — was already named and
+  deliberately deferred as an operator/story-authoring `/shift` Objective in
+  "The tagging seam" section above, since `deep-link-delivery.feature` has
+  many `@browser-only` scenarios that normally pass fine against alpha and
+  blanket-tagging the whole feature would over-hold them). They disappear on
+  a green streak the moment `adam-alpha`'s Cache-DB pool recovers, or when
+  the tagging `/shift` lands.
+
+  **Cross-reference**: the sibling fingerprint dispatched alongside these two
+  (`5dba80d982e1`, "No Playwright device found") is a **separate, unrelated
+  concern** — a genuine a2o step-definition bug (inconsistent hard-fail vs.
+  graceful-pending guard), bounded-fixed in this same triage pass. See
+  `genesis/data/timeline/backlog/a2o-playwright-device-hardfail-topology.md`.
+  It does not belong in this entry's fingerprint list.
