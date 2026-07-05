@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Pre-commit hook: the harness-agnostic .epr-meta compose-gate over STAGED files.
+#
+# This is the move that makes "collaboration through the protocol" literally true: it governs
+# EVERY author's commit — Codex, Gemini, a human, or Claude driving `git` via Bash — with the SAME
+# pure rule engine (.claude/scripts/_lib/epr_meta.py) that governs Claude's own Write/Edit at
+# author-time. No agent drives another; the shared substrate governs all equally.
+#
+# Bypass THIS gate only:  EPR_META_ACK=1 git commit …   (acknowledges ask-class; deny still blocks)
+# Bypass ALL hooks:       git commit --no-verify        (or HUSKY=0 git commit)
+#
+# Honor HUSKY=0 — core.hooksPath points at .husky/ directly, so the husky shim that normally
+# handles this is not in the call path (identical to .husky/pre-push:23-25).
+[ "${HUSKY-}" = "0" ] && exit 0
+
+# Fail-open if python3 is absent (degraded shell) — same posture as pre-push's python-guarded blocks.
+# The gate itself is also fail-open (an internal error exits 0), so a governance bug never bricks a
+# commit; the worst case is an ungoverned commit, never a blocked author.
+if command -v python3 >/dev/null 2>&1; then
+  python3 .claude/scripts/epr-meta-git-gate.py --staged || exit 1
+fi
+exit 0
