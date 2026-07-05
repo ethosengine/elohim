@@ -1,0 +1,237 @@
+{
+  "src/app/account/components/security-signin-pane/security-signin-pane.component.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/app/app.component.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/app.config.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/components/home/home.component.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/app/components/theme-toggle/theme-toggle.component.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/debug/lenses/logging-lens.component.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/doorway/services/doorway-admin.service.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/elohim/components/content-delivery/content-delivery.component.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/elohim/components/elohim-navigator/elohim-navigator.component.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/app/elohim/components/epr-link/epr-link.component.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/elohim/components/spatial-map/spatial-map.component.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/elohim/interceptors/api-base-url.interceptor.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/elohim/services/affinity-tracking.service.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/elohim/services/agent.service.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "src/app/elohim/services/data-loader.service.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/app/elohim/services/diagnostic-collector.service.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/elohim/services/epr-nav.service.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/elohim/services/governance-signal.service.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/elohim/services/health-check.service.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/elohim/services/holochain-client.service.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "src/app/elohim/services/session-nav-stack.service.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/elohim/services/sla-monitor.service.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/imagodei/components/agency-badge/agency-badge.component.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/imagodei/components/login/login.component.ts": {
+    "no-restricted-syntax": {
+      "count": 9
+    }
+  },
+  "src/app/imagodei/components/profile/profile.component.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/imagodei/components/profile/sections/profile-doorways-section/profile-doorways-section.component.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/imagodei/components/profile/sections/profile-header/profile-header.component.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/imagodei/components/profile/sections/profile-network-section/profile-network-section.component.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/imagodei/services/agency.service.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/imagodei/services/auth.service.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/imagodei/services/browser-session-token.store.ts": {
+    "no-restricted-syntax": {
+      "count": 23
+    }
+  },
+  "src/app/imagodei/services/doorway-registry.service.ts": {
+    "no-restricted-syntax": {
+      "count": 11
+    }
+  },
+  "src/app/imagodei/services/providers/oauth-auth.provider.ts": {
+    "no-restricted-syntax": {
+      "count": 18
+    }
+  },
+  "src/app/imagodei/services/providers/password-auth.provider.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/app/imagodei/services/session-human.service.ts": {
+    "no-restricted-syntax": {
+      "count": 14
+    }
+  },
+  "src/app/imagodei/services/tauri-auth.service.ts": {
+    "no-restricted-syntax": {
+      "count": 28
+    }
+  },
+  "src/app/qahal/components/opinion-cluster/opinion-cluster.component.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/services/debug-mode.service.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/app/services/dom-interaction.service.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/services/theme.service.ts": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "src/app/shefa/components/compute-needs/compute-needs.component.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/shefa/components/resource-explorer/resource-explorer.component.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/shefa/components/shefa-dashboard/shefa-dashboard.component.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/shefa/components/shefa-layout/shefa-layout.component.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/shefa/components/transaction-import/transaction-review.component.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/shefa/services/device-stewardship.service.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/shefa/services/plaid-integration.service.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  }
+}
