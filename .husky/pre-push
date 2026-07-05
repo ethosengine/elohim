@@ -236,6 +236,23 @@ if echo "$CHANGED" | grep -qE "genesis/data/account-packages/|genesis/data/human
   echo "[pre-push] account-packages validation ✓"
 fi
 
+# ── eprfs native workspace gate (excluded from the monorepo workspace) ──────
+#
+# elohim/eprfs is its OWN native Rust workspace (excluded in elohim/Cargo.toml, like elohim-storage),
+# so the manifest-driven graph-walker / run_gate machinery does not cover it. Gate it as a standalone
+# block (NOT routed through run_gate — avoids the Unknown-project abort) when its sources change.
+# Native build: RUSTFLAGS="" (the WASM getrandom flag breaks the link) + a /tmp CARGO_TARGET_DIR (the
+# /projects cargo-pool slot trips the invoked.timestamp ENOENT on this toolchain). Pure-cargo, fast,
+# PVC-exempt by omission.
+if echo "$CHANGED" | grep -qE "^elohim/eprfs/"; then
+  echo "[pre-push] Gating eprfs workspace (fmt + clippy -D + build + test)..."
+  ( cd elohim/eprfs \
+    && CARGO_TARGET_DIR=/tmp/eprfs-gate-target RUSTFLAGS="" cargo fmt --check \
+    && CARGO_TARGET_DIR=/tmp/eprfs-gate-target RUSTFLAGS="" cargo clippy --workspace --all-targets -- -D warnings \
+    && CARGO_TARGET_DIR=/tmp/eprfs-gate-target RUSTFLAGS="" cargo test --workspace ) || exit 1
+  echo "[pre-push] eprfs gate ✓"
+fi
+
 # ── .ci-ignore freshness (projected from the .epr-meta ci-trigger cascade) ──
 #
 # When any .epr-meta or the generated .ci-ignore changes, ensure .ci-ignore is
