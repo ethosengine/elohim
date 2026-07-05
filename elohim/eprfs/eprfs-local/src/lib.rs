@@ -106,7 +106,7 @@ where
                             report.files_fetched += 1;
                         }
                         MaterializationPolicy::Sparse => {
-                            write_sparse_marker(&path, blob.as_str()).await?;
+                            write_sparse_marker(&path, &blob.to_string()).await?;
                             report.skipped_sparse += 1;
                         }
                         MaterializationPolicy::LocalOnly => {
@@ -115,7 +115,7 @@ where
                     },
                     BlobPresence::Missing => match policy {
                         MaterializationPolicy::Sparse => {
-                            write_sparse_marker(&path, blob.as_str()).await?;
+                            write_sparse_marker(&path, &blob.to_string()).await?;
                             report.skipped_sparse += 1;
                         }
                         _ => return Err(EprfsError::BlobNotFound(blob.clone())),
@@ -153,7 +153,7 @@ where
                             report.files_fetched += 1;
                         }
                         MaterializationPolicy::Sparse => {
-                            write_sparse_marker(&path, blob.as_str()).await?;
+                            write_sparse_marker(&path, &blob.to_string()).await?;
                             report.skipped_sparse += 1;
                         }
                         MaterializationPolicy::LocalOnly => {
@@ -162,7 +162,7 @@ where
                     },
                     BlobPresence::Missing => match policy {
                         MaterializationPolicy::Sparse => {
-                            write_sparse_marker(&path, blob.as_str()).await?;
+                            write_sparse_marker(&path, &blob.to_string()).await?;
                             report.skipped_sparse += 1;
                         }
                         _ => return Err(EprfsError::BlobNotFound(blob.clone())),
@@ -360,7 +360,7 @@ mod tests {
     async fn materializes_local_file() {
         let storage = MemoryStorage::default();
         storage
-            .insert_blob(BlobCid::from("bafk-test"), Bytes::from_static(b"hello"))
+            .insert_blob(BlobCid::compute(b"bafk-test"), Bytes::from_static(b"hello"))
             .await;
 
         let manifest = ProjectionManifest {
@@ -370,7 +370,7 @@ mod tests {
             },
             entries: vec![ProjectionEntry::file(
                 ProjectionPath::new("README.md").unwrap(),
-                "bafk-test".into(),
+                BlobCid::compute(b"bafk-test"),
             )],
             metadata: serde_json::Value::Null,
         };
@@ -401,7 +401,7 @@ mod tests {
         let storage = MemoryStorage::default();
         storage
             .insert_blob(
-                BlobCid::from("target-blob"),
+                BlobCid::compute(b"target-blob"),
                 Bytes::from_static(b"actual.txt"),
             )
             .await;
@@ -416,7 +416,7 @@ mod tests {
                 kind: EntryKind::Symlink,
                 source: None,
                 epr: None,
-                blob: Some("target-blob".into()),
+                blob: Some(BlobCid::compute(b"target-blob")),
                 size_bytes: Some(10),
                 executable: false,
                 status: ProjectionStatus::Unknown,
@@ -449,7 +449,7 @@ mod tests {
         let storage = MemoryStorage::default();
         storage
             .insert_blob(
-                BlobCid::from("target-blob"),
+                BlobCid::compute(b"target-blob"),
                 Bytes::from_static(b"actual.txt"),
             )
             .await;
@@ -464,7 +464,7 @@ mod tests {
                 kind: EntryKind::Symlink,
                 source: None,
                 epr: None,
-                blob: Some("target-blob".into()),
+                blob: Some(BlobCid::compute(b"target-blob")),
                 size_bytes: Some(10),
                 executable: false,
                 status: ProjectionStatus::Unknown,
@@ -527,7 +527,7 @@ mod tests {
             entries: vec![ProjectionEntryAwareness {
                 path: ProjectionPath::new("README.md").unwrap(),
                 subject: None,
-                blob: Some(BlobCid::new("blob:readme")),
+                blob: Some(BlobCid::compute(b"blob:readme")),
                 byte_presence: BytePresence::Pinned,
                 resiliency: EprResiliency::unknown(),
                 peer_visibility: PeerVisibility::unknown(),

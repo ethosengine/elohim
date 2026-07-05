@@ -80,7 +80,7 @@ impl EprfsStorage for MemoryStorage {
     }
 
     async fn put_blob(&self, bytes: Bytes) -> Result<BlobCid> {
-        let cid = BlobCid::new(format!("memory-{}", self.blobs.read().await.len() + 1));
+        let cid = BlobCid::compute(&bytes);
         self.blobs.write().await.insert(cid.clone(), bytes);
         Ok(cid)
     }

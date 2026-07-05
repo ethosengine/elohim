@@ -232,8 +232,8 @@ mod tests {
                 root: EprRef::new("epr:test"),
             },
             entries: vec![
-                ProjectionEntry::file(path.clone(), BlobCid::new("blob:one")),
-                ProjectionEntry::file(path, BlobCid::new("blob:two")),
+                ProjectionEntry::file(path.clone(), BlobCid::compute(b"blob:one")),
+                ProjectionEntry::file(path, BlobCid::compute(b"blob:two")),
             ],
             metadata: Value::Null,
         };
@@ -267,7 +267,7 @@ mod tests {
 
         assert!(matches!(
             manifest.validate(),
-            Err(EprfsError::MissingBlob(path)) if path == PathBuf::from("current")
+            Err(EprfsError::MissingBlob(path)) if path == Path::new("current")
         ));
     }
 
@@ -287,7 +287,7 @@ mod tests {
                     "abc123",
                 )),
                 epr: None,
-                blob: Some(BlobCid::new("blob:vendor")),
+                blob: Some(BlobCid::compute(b"blob:vendor")),
                 size_bytes: None,
                 executable: false,
                 status: ProjectionStatus::Unknown,
@@ -318,7 +318,7 @@ mod tests {
                     "abc123",
                 )),
                 epr: None,
-                blob: Some(BlobCid::new("blob:readme")),
+                blob: Some(BlobCid::compute(b"blob:readme")),
                 size_bytes: None,
                 executable: false,
                 status: ProjectionStatus::Unknown,
