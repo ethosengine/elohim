@@ -74,6 +74,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     if (this.scrollListener) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser -- scrollListener only ever set inside setupParallaxScrolling, which is only reached after ngOnInit's isBrowser early return
       window.removeEventListener('scroll', this.scrollListener);
     }
     if (this.intersectionObserver) {
@@ -95,10 +96,12 @@ export class HomeComponent implements OnInit, OnDestroy {
       }
     };
 
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser -- reached only after ngOnInit's isBrowser early return
     window.addEventListener('scroll', this.scrollListener, { passive: true });
   }
 
   private updateParallaxElements() {
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser -- only invoked from the browser-only scroll listener set up behind ngOnInit's isBrowser guard
     const scrolled = window.scrollY;
 
     // Update CSS custom property for parallax background
@@ -129,6 +132,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       rootMargin: '0px 0px -50px 0px',
     };
 
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser -- reached only after ngOnInit's isBrowser early return
     this.intersectionObserver = new IntersectionObserver(entries => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {

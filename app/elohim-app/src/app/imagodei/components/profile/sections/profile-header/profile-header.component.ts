@@ -33,6 +33,7 @@ export class ProfileHeaderComponent {
     const did = this.did();
     if (!did) return;
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       await navigator.clipboard.writeText(did);
       this.didCopied = true;
       setTimeout(() => (this.didCopied = false), 2000);

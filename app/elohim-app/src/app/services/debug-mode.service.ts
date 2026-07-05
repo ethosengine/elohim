@@ -19,6 +19,7 @@ export class DebugModeService {
 
   enable(): void {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       localStorage.setItem(KEY, 'on');
     } catch {
       /* storage unavailable */
@@ -28,6 +29,7 @@ export class DebugModeService {
 
   disable(): void {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       localStorage.removeItem(KEY);
     } catch {
       /* storage unavailable */
@@ -37,6 +39,7 @@ export class DebugModeService {
 
   private readSticky(): boolean {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       return localStorage.getItem(KEY) === 'on';
     } catch {
       return false;

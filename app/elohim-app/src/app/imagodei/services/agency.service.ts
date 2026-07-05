@@ -212,6 +212,7 @@ export class AgencyService {
     // For MVP, check for node operator flag in localStorage
     // In production, this will query the conductor for hosted agents
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       const nodeConfig = localStorage.getItem('elohim_node_operator_config');
       if (nodeConfig) {
         const config = JSON.parse(nodeConfig) as Record<string, unknown>;

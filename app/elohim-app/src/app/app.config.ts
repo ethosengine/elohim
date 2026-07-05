@@ -77,7 +77,9 @@ import { EconomicEventsApiService } from './shefa/services/economic-events-api.s
  * the value is passed through as an optional fallback and does not block boot.
  */
 function resolveDoorwayUrl(configured: string | undefined): string {
+  // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard
     return window.location.origin;
   }
   return configured ?? 'http://localhost:8888';

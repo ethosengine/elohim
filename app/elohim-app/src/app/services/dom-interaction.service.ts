@@ -26,7 +26,9 @@ export class DomInteractionService {
       const scrollIndicator = elementRef.nativeElement.querySelector('.scroll-indicator');
       if (scrollIndicator) {
         this.renderer.listen(scrollIndicator, 'click', () => {
+          // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside a renderer.listen('click', ...) callback body, only invoked on a genuine click event — no DOM event dispatch occurs during SSR, so this never executes server-side
           window.scrollTo({
+            // eslint-disable-next-line no-restricted-syntax -- SSR-safe: same click-callback body as above, never invoked during SSR
             top: window.innerHeight,
             behavior: 'smooth',
           });

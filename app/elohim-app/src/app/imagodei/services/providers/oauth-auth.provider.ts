@@ -118,6 +118,7 @@ export class OAuthAuthProvider implements AuthProvider {
    */
   initiateLogin(doorwayUrl: string, returnUrl?: string, loginHint?: string): void {
     const state = this.generateState();
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
     const redirectUri = returnUrl ?? `${globalThis.location.origin}/auth/callback`;
 
     // Store state for verification on callback
@@ -127,6 +128,7 @@ export class OAuthAuthProvider implements AuthProvider {
       redirectUri,
       timestamp: Date.now(),
     };
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
     sessionStorage.setItem(OAUTH_STATE_KEY, JSON.stringify(oauthState));
 
     // Build authorization URL (snake_case per OAuth 2.0 RFC 6749)
@@ -146,6 +148,7 @@ export class OAuthAuthProvider implements AuthProvider {
     this.isFlowInProgress.set(true);
 
     // Redirect browser to doorway's authorize endpoint
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
     globalThis.location.href = authorizeUrl;
   }
 
@@ -159,6 +162,7 @@ export class OAuthAuthProvider implements AuthProvider {
    */
   async handleCallback(code: string, state: string): Promise<AuthResult> {
     // Retrieve and verify stored state
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
     const storedStateJson = sessionStorage.getItem(OAUTH_STATE_KEY);
     if (!storedStateJson) {
       return {
@@ -172,6 +176,7 @@ export class OAuthAuthProvider implements AuthProvider {
     try {
       storedState = JSON.parse(storedStateJson);
     } catch {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
       sessionStorage.removeItem(OAUTH_STATE_KEY);
       return {
         success: false,
@@ -182,6 +187,7 @@ export class OAuthAuthProvider implements AuthProvider {
 
     // Verify state matches (CSRF protection)
     if (storedState.state !== state) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
       sessionStorage.removeItem(OAUTH_STATE_KEY);
       return {
         success: false,
@@ -193,6 +199,7 @@ export class OAuthAuthProvider implements AuthProvider {
     // Check if state is expired (10 minutes)
     const stateAge = Date.now() - storedState.timestamp;
     if (stateAge > 10 * 60 * 1000) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
       sessionStorage.removeItem(OAUTH_STATE_KEY);
       return {
         success: false,
@@ -210,6 +217,7 @@ export class OAuthAuthProvider implements AuthProvider {
 
     // Clear stored state on success or permanent failure
     if (result.success || result.code !== 'NETWORK_ERROR') {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
       sessionStorage.removeItem(OAUTH_STATE_KEY);
     }
 
@@ -231,6 +239,7 @@ export class OAuthAuthProvider implements AuthProvider {
     const body = {
       grant_type: 'authorization_code',
       code,
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
       redirect_uri: redirectUri ?? `${globalThis.location.origin}/auth/callback`,
       client_id: 'elohim-app',
     };
@@ -264,6 +273,7 @@ export class OAuthAuthProvider implements AuthProvider {
    */
   storeReturnUrl(url: string): void {
     if (url && url !== '/') {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
       sessionStorage.setItem(OAUTH_RETURN_URL_KEY, url);
     }
   }
@@ -273,8 +283,10 @@ export class OAuthAuthProvider implements AuthProvider {
    * Returns null if no return URL was stored.
    */
   consumeReturnUrl(): string | null {
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
     const url = sessionStorage.getItem(OAUTH_RETURN_URL_KEY);
     if (url) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
       sessionStorage.removeItem(OAUTH_RETURN_URL_KEY);
     }
     return url;
@@ -285,7 +297,9 @@ export class OAuthAuthProvider implements AuthProvider {
    */
   // eslint-disable-next-line @typescript-eslint/require-await -- Interface requires Promise<void> but no async work needed
   async logout(): Promise<void> {
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
     sessionStorage.removeItem(OAUTH_STATE_KEY);
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
     sessionStorage.removeItem(OAUTH_RETURN_URL_KEY);
     this.isFlowInProgress.set(false);
   }
@@ -342,6 +356,7 @@ export class OAuthAuthProvider implements AuthProvider {
    * Call this on app init to detect OAuth redirects.
    */
   hasPendingCallback(): boolean {
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
     const url = new URL(globalThis.location.href);
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
@@ -349,6 +364,7 @@ export class OAuthAuthProvider implements AuthProvider {
     if (!code || !state) return false;
 
     // Also check we have stored state
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
     const storedState = sessionStorage.getItem(OAUTH_STATE_KEY);
     return storedState !== null;
   }
@@ -357,6 +373,7 @@ export class OAuthAuthProvider implements AuthProvider {
    * Get callback parameters from current URL.
    */
   getCallbackParams(): { code: string; state: string } | null {
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
     const url = new URL(globalThis.location.href);
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
@@ -375,6 +392,7 @@ export class OAuthAuthProvider implements AuthProvider {
    * Clear callback parameters from URL without navigation.
    */
   clearCallbackParams(): void {
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
     const url = new URL(globalThis.location.href);
     url.searchParams.delete('code');
     url.searchParams.delete('state');

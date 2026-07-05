@@ -525,6 +525,7 @@ export class AuthService {
     }
 
     // Eclipse Che: the admin-proxy is exposed via the hc-dev endpoint
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof-equivalent guard, optional chaining short-circuits to undefined when globalThis.location is absent server-side (falls back to '' via ?? ''), and the sole caller restoreSession() also wraps it in try/catch
     const hostname = globalThis.location?.hostname ?? '';
     if (hostname.includes('.devspaces.') || hostname.includes('.code.ethosengine.com')) {
       return `https://${hostname.replace(/-angular-dev\./, '-hc-dev.')}`;

@@ -44,6 +44,7 @@ export class LoggingLensComponent implements OnInit {
     this.logger.setMinLevel(level);
     this.current.set(level);
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       localStorage.setItem(LEVEL_KEY, level);
     } catch {
       /* unavailable */
@@ -59,6 +60,7 @@ export class LoggingLensComponent implements OnInit {
 
   private readSaved(): LogLevel | null {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       const v = localStorage.getItem(LEVEL_KEY);
       return (ANGULAR_LEVELS as string[]).includes(v ?? '') ? (v as LogLevel) : null;
     } catch {

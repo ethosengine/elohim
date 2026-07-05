@@ -1,5 +1,14 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, Input, computed, inject, isDevMode } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  Input,
+  PLATFORM_ID,
+  computed,
+  inject,
+  isDevMode,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router, NavigationEnd } from '@angular/router';
 import { EprNavService } from '../../services/epr-nav.service';
@@ -204,6 +213,9 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   /** EPR-aware navigation — routes cross-bundle paths (e.g. /lamad) via handoff+assign */
   private readonly eprNav = inject(EprNavService);
 
+  /** SSR guard — `document` is undefined in the V8 SSR render runtime */
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+
   constructor(
     private readonly sessionHumanService: SessionHumanService,
     private readonly router: Router,
@@ -291,15 +303,21 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
         this.closeAllTrays();
       });
 
-    // Close trays on click outside
-    document.addEventListener('click', this.handleOutsideClick.bind(this));
+    // Close trays on click outside — browser-only DOM API, undefined in the SSR runtime
+    if (this.isBrowser) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
+      document.addEventListener('click', this.handleOutsideClick.bind(this));
+    }
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
     this.runningContext.stopPeriodicDetection();
-    document.removeEventListener('click', this.handleOutsideClick.bind(this));
+    if (this.isBrowser) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
+      document.removeEventListener('click', this.handleOutsideClick.bind(this));
+    }
   }
 
   // =========================================================================
@@ -613,6 +631,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   async copyToClipboard(value: string, fieldName: string): Promise<void> {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       await navigator.clipboard.writeText(value);
       this.copiedField = fieldName;
       setTimeout(() => {

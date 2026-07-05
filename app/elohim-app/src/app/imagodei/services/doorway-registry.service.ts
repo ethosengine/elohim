@@ -60,7 +60,9 @@ const MAX_CONCURRENT_HEALTH_CHECKS = 5;
  * Detect if running in Eclipse Che environment
  */
 function isEclipseChe(): boolean {
+  // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof globalThis guard; only called from restoreSelection() after its typeof localStorage SSR guard
   if (typeof globalThis === 'undefined' || !globalThis.location) return false;
+  // eslint-disable-next-line no-restricted-syntax -- SSR-safe: reached only after the truthy globalThis.location check above
   const hostname = globalThis.location.hostname;
   return hostname.includes('.code.ethosengine.com') || hostname.includes('.devspaces.');
 }
@@ -69,7 +71,9 @@ function isEclipseChe(): boolean {
  * Get the Che hc-dev endpoint URL for doorway access
  */
 function getCheHcDevUrl(): string {
+  // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof globalThis guard; only called from restoreSelection() after its typeof localStorage SSR guard
   if (typeof globalThis === 'undefined' || !globalThis.location) return '';
+  // eslint-disable-next-line no-restricted-syntax -- SSR-safe: reached only after the truthy globalThis.location check above
   const hostname = globalThis.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
   return `https://${hostname}`;
 }
@@ -300,6 +304,7 @@ export class DoorwayRegistryService {
    */
   clearSelection(): void {
     this.selectedSignal.set(null);
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only tauri-auth logout surface, never SSR-rendered
     localStorage.removeItem(DOORWAY_URL_KEY);
   }
 
@@ -465,6 +470,7 @@ export class DoorwayRegistryService {
       fetchedAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + CACHE_TTL_MS).toISOString(),
     };
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: only invoked from loadDoorways(), triggered by explicit profile-component action, never SSR bootstrap-reachable
     localStorage.setItem(DOORWAY_CACHE_KEY, JSON.stringify(cache));
   }
 
@@ -473,6 +479,7 @@ export class DoorwayRegistryService {
    */
   private getCached(): DoorwayInfo[] | null {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: only invoked from loadDoorways(), triggered by explicit profile-component action, never SSR bootstrap-reachable
       const raw = localStorage.getItem(DOORWAY_CACHE_KEY);
       if (!raw) return null;
 
@@ -484,6 +491,7 @@ export class DoorwayRegistryService {
       }
 
       // Expired, remove cache
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: only invoked from loadDoorways(), triggered by explicit profile-component action, never SSR bootstrap-reachable
       localStorage.removeItem(DOORWAY_CACHE_KEY);
       return null;
     } catch {
@@ -499,6 +507,7 @@ export class DoorwayRegistryService {
    * Persist selection to localStorage.
    */
   private persistSelection(selection: DoorwaySelection): void {
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: only invoked from selectDoorway()/selectDoorwayByUrl(), triggered by explicit user action in register/profile/login components, never SSR bootstrap-reachable
     localStorage.setItem(DOORWAY_URL_KEY, JSON.stringify(selection));
   }
 
@@ -521,6 +530,7 @@ export class DoorwayRegistryService {
     }
 
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by typeof localStorage check at top of restoreSelection()
       const raw = localStorage.getItem(DOORWAY_URL_KEY);
       if (!raw) return;
 
@@ -528,6 +538,7 @@ export class DoorwayRegistryService {
       this.selectedSignal.set(selection);
     } catch {
       // Invalid stored data, clear it
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by typeof localStorage check at top of restoreSelection()
       localStorage.removeItem(DOORWAY_URL_KEY);
     }
   }

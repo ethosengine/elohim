@@ -45,6 +45,7 @@ export class ProfileNetworkSectionComponent {
 
   async copyToClipboard(value: string): Promise<void> {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- inside try/catch SSR fallback; only invoked from a template (click) handler on a deep profile section, never during SSR bootstrap
       await navigator.clipboard.writeText(value);
     } catch {
       // Clipboard API not available

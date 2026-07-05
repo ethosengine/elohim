@@ -370,6 +370,7 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
 
     // Handle resize
     this.resizeCanvas();
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only canvas surface under /community/governance/sensemaking (not an SSR-registered EPR route), never SSR-rendered
     window.addEventListener('resize', () => this.resizeCanvas());
 
     // Handle mouse events

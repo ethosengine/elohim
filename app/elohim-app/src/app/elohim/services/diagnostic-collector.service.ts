@@ -57,6 +57,7 @@ export class DiagnosticCollectorService {
       logs,
       environment: {
         platform: isTauri ? 'tauri' : 'browser',
+        // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only diagnostic-report surface, never SSR-rendered (only invoked from gate-feedback-modal's report flow, opt-in via [feedbackType]="'report'")
         userAgent: navigator.userAgent,
         appVersion: '0.1.0',
         storageHealth,

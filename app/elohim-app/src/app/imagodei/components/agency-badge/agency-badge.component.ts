@@ -98,6 +98,7 @@ export class AgencyBadgeComponent {
   async copyToClipboard(value: string, event: Event): Promise<void> {
     event.stopPropagation();
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only (click) template handler, only invoked on explicit user action, never during SSR bootstrap
       await navigator.clipboard.writeText(value);
     } catch {
       // Clipboard write failed silently - not all browsers support this API

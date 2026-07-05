@@ -50,7 +50,9 @@ export class ThemeToggleComponent implements OnInit, OnDestroy {
       // V8 SSR runtime, where this getter is reached synchronously via the
       // template's {{ getIcon() }}. Default to dark server-side; the client
       // re-evaluates on hydration.
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof globalThis.matchMedia guard
       if (typeof globalThis.matchMedia !== 'function') return 'dark';
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by the typeof globalThis.matchMedia check above
       return globalThis.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
     return this.currentTheme;

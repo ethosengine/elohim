@@ -441,9 +441,11 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   private downloadFile(content: string, filename: string, type: string): void {
     const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: only reachable via exportDashboard(), which is only bound to a (click) handler in the template, never invoked during SSR render
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: only reachable via exportDashboard(), which is only bound to a (click) handler in the template, never invoked during SSR render
     document.body.appendChild(link);
     link.click();
     link.remove();

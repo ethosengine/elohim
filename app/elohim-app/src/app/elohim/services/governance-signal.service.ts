@@ -865,6 +865,7 @@ export class GovernanceSignalService {
 
   private loadFromStorage<T>(key: string): T | null {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       const data = localStorage.getItem(key);
       return data ? JSON.parse(data) : null;
     } catch {
@@ -874,6 +875,7 @@ export class GovernanceSignalService {
 
   private saveToStorage<T>(key: string, data: T): void {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       localStorage.setItem(key, JSON.stringify(data));
     } catch (err) {
       this.logger.error('Storage error', err instanceof Error ? err : new Error(String(err)));

@@ -172,7 +172,9 @@ export class DoorwayAdminService {
     this._connectionState.set('connecting');
 
     // Determine WebSocket URL
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only operator-dashboard surface, never SSR-rendered (connect() is only called from doorway-dashboard/stability-lens ngOnInit, deep admin-console routes)
     const wsProtocol = globalThis.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only operator-dashboard surface, never SSR-rendered
     const host = this.baseUrl ? new URL(this.baseUrl).host : globalThis.location.host;
     const wsUrl = `${wsProtocol}//${host}/admin/ws`;
 

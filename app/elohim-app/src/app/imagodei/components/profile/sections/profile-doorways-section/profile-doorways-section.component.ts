@@ -89,6 +89,7 @@ export class ProfileDoorwaysSectionComponent {
         if (res.ok) {
           const data = (await res.json()) as { sessionToken?: string };
           if (data.sessionToken) {
+            // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only profile-doorway-visit surface, never SSR-rendered (visitDoorway is only invoked from a template click handler on the authenticated profile page)
             window.open(
               `${doorwayUrl}/threshold?session_token=${encodeURIComponent(data.sessionToken)}`,
               '_blank',
@@ -102,6 +103,7 @@ export class ProfileDoorwaysSectionComponent {
       }
     }
     // Fallback: open without token (user will need to log in)
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only profile-doorway-visit surface, never SSR-rendered
     window.open(`${doorwayUrl}/threshold`, '_blank', 'noopener');
   }
 

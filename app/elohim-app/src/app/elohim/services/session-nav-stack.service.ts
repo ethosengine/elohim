@@ -63,6 +63,7 @@ export class SessionNavStackService {
 
   private hydrate(): void {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback, catches sessionStorage being undefined and starts empty
       const raw = sessionStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as NavStackEntry[];
@@ -74,6 +75,7 @@ export class SessionNavStackService {
 
   private persist(stack: NavStackEntry[]): void {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback, catches sessionStorage being undefined
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(stack));
     } catch {
       // quota / privacy mode — best-effort persistence

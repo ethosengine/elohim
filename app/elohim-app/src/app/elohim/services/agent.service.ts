@@ -127,10 +127,13 @@ export class AgentService implements OnDestroy {
     const progress: AgentProgress[] = [];
     const agentId = this.getCurrentAgentId();
 
+    // eslint-disable-next-line no-restricted-syntax -- browser-only profile/dashboard analytics surface, never SSR-rendered (only called from lazy-loaded non-SSR routes, never during "/" bootstrap)
     for (let i = 0; i < localStorage.length; i++) {
+      // eslint-disable-next-line no-restricted-syntax -- browser-only profile/dashboard analytics surface, never SSR-rendered
       const key = localStorage.key(i);
       if (key?.startsWith(`lamad-progress-${agentId}-`)) {
         try {
+          // eslint-disable-next-line no-restricted-syntax -- browser-only profile/dashboard analytics surface, never SSR-rendered
           const data = localStorage.getItem(key);
           if (data) {
             progress.push(JSON.parse(data) as AgentProgress);
@@ -561,10 +564,13 @@ export class AgentService implements OnDestroy {
     const frontier: FrontierItem[] = [];
     const agentId = this.getCurrentAgentId();
 
+    // eslint-disable-next-line no-restricted-syntax -- browser-only profile/dashboard analytics surface, never SSR-rendered (only called from lazy-loaded non-SSR routes, never during "/" bootstrap)
     for (let i = 0; i < localStorage.length; i++) {
+      // eslint-disable-next-line no-restricted-syntax -- browser-only profile/dashboard analytics surface, never SSR-rendered
       const key = localStorage.key(i);
       if (key?.startsWith(`lamad-progress-${agentId}-`)) {
         try {
+          // eslint-disable-next-line no-restricted-syntax -- browser-only profile/dashboard analytics surface, never SSR-rendered
           const data = localStorage.getItem(key);
           if (data) {
             const progress = JSON.parse(data) as AgentProgress;

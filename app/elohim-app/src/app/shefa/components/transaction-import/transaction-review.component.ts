@@ -475,6 +475,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
    * Sets up keyboard event listeners
    */
   private setupKeyboardListeners(): void {
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only surface — this component sits behind identityGuard on a deep /shefa transaction-review route, never rendered during SSR bootstrap
     document.addEventListener('keydown', (e: KeyboardEvent) => {
       // Cmd/Ctrl + Enter = Approve
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {

@@ -37,6 +37,7 @@ function resolveBaseUrl(): string {
     return environment.client?.storageUrl ?? environment.holochain?.storageUrl ?? '';
   }
 
+  // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof-equivalent guard, optional chaining short-circuits to undefined when globalThis.location is absent server-side, falling back to '' via ?? ''
   const origin = globalThis.location?.origin ?? '';
   if (!origin) return '';
   if (isCheOrigin(origin) || isLocalDevOrigin(origin)) return '';

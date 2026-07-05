@@ -268,6 +268,7 @@ export class ResourceExplorerComponent implements OnInit {
     this.updateRoute();
 
     // Close sidebar on mobile
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only shefa dashboard surface; navigateToFolder is only invoked from template (click)-driven outputs (folderSelected/navigate/folderClicked), never during SSR bootstrap
     if (window.innerWidth <= 1024) {
       this.sidebarOpen.set(false);
     }

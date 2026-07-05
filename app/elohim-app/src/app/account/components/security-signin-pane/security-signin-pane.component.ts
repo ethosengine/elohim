@@ -62,6 +62,7 @@ export class SecuritySigninPaneComponent {
 
     const target = new URL(host.hostUrl);
 
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only click handler, never SSR-rendered
     const current = new URL(globalThis.location.href);
     for (const key of OAUTH_PASSTHROUGH_PARAMS) {
       const value = current.searchParams.get(key);
@@ -69,8 +70,10 @@ export class SecuritySigninPaneComponent {
     }
 
     target.searchParams.set('session_token', minted);
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only click handler, never SSR-rendered
     target.searchParams.set('doorway_url', globalThis.location.origin);
 
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only click handler, never SSR-rendered
     globalThis.location.href = target.toString();
   }
 }

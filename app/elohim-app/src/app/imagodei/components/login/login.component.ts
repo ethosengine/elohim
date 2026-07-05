@@ -95,6 +95,7 @@ export class LoginComponent implements OnInit, AfterViewInit {
 
     // Pre-fill identifier if one was remembered
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       const stored = localStorage.getItem(AUTH_IDENTIFIER_KEY);
       if (stored) this.identifier = stored;
     } catch {
@@ -113,14 +114,19 @@ export class LoginComponent implements OnInit, AfterViewInit {
     // origin is `'null'` — both surface as ERR_INVALID_URL.
     if (
       typeof window === 'undefined' ||
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (short-circuited by the preceding typeof check)
       !window.location ||
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (short-circuited by the preceding typeof check)
       !window.location.origin ||
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (short-circuited by the preceding typeof check)
       window.location.origin === 'null' ||
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (short-circuited by the preceding typeof check)
       !window.location.protocol.startsWith('http')
     ) {
       return;
     }
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (early return above when window is undefined)
       const resp = await fetch(`${window.location.origin}/auth/me`, { credentials: 'include' });
       if (!resp.ok) return;
       const data = (await resp.json()) as Record<string, unknown>;
@@ -190,8 +196,10 @@ export class LoginComponent implements OnInit, AfterViewInit {
         // Persist or clear remembered identifier
         try {
           if (detail.remember) {
+            // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
             localStorage.setItem(AUTH_IDENTIFIER_KEY, identifier);
           } else {
+            // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
             localStorage.removeItem(AUTH_IDENTIFIER_KEY);
           }
         } catch {
@@ -229,6 +237,7 @@ export class LoginComponent implements OnInit, AfterViewInit {
       }
 
       this.oauthProvider.storeReturnUrl(this.returnUrl);
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered (invoked only from a user click handler)
       const callbackUrl = `${globalThis.location.origin}/auth/callback`;
       this.oauthProvider.initiateLogin(doorwayUrl, callbackUrl);
     } catch (err) {
