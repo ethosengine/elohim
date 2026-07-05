@@ -2731,6 +2731,53 @@ mod epr_dispatch_breaker_tests {
         assert_eq!(EPR_DISPATCH_TIMEOUT_SECS, 10);
         assert!(EPR_DISPATCH_TIMEOUT_SECS < 30);
     }
+
+    fn shell_projection(spa_fallback: bool) -> elohim_views::projection::EprProjectionView {
+        use elohim_views::projection::{EprProjectionView, ProjectionMode};
+        EprProjectionView {
+            commitment_id: "test".into(),
+            epr_id: "elohim-host-landing".into(),
+            doorway_id: "doorway:test".into(),
+            url_path: "/".into(),
+            mode: ProjectionMode::Cached,
+            reach: "commons".into(),
+            base_href: "/".into(),
+            entry_file: "index.html".into(),
+            spa_fallback,
+            redirects_from: vec![],
+            redirect_templates: vec![],
+            route_claims: None,
+            preview_epr_ref: None,
+            gate_hints: vec![],
+            dead_end: false,
+            steward_direct_endpoint: None,
+            seeded_at: "2026-06-06T00:00:00Z".into(),
+            seeded_by: "test".into(),
+        }
+    }
+
+    #[test]
+    fn projected_shell_url_targets_the_apps_entry_file() {
+        // The shell composed into is the app's index.html entry — the same
+        // /apps/{epr}/{entry} surface the CSR fallback serves — NOT the request
+        // sub-path. Base storage_url is trimmed of any trailing slash.
+        let p = shell_projection(true);
+        assert_eq!(
+            projected_shell_url("http://storage:8090/", &p),
+            "http://storage:8090/apps/elohim-host-landing/index.html"
+        );
+    }
+
+    #[test]
+    fn projected_shell_url_propagates_spa_fallback_opt_out() {
+        // Mirrors dispatch_to_projected_epr: an opted-out projection carries
+        // ?spaFallback=0 so storage's convention layer stays consistent.
+        let p = shell_projection(false);
+        assert_eq!(
+            projected_shell_url("http://storage:8090", &p),
+            "http://storage:8090/apps/elohim-host-landing/index.html?spaFallback=0"
+        );
+    }
 }
 
 /// The anon-readable reach set — the doorway's HALF of the substrate's anon
@@ -2980,6 +3027,12 @@ enum SsrFallbackReason {
     /// `render_output_is_empty`). Shed to the fallback bundle exactly like a
     /// render error, so the client bundles the fallback carries can boot the app.
     EmptyRender,
+    /// A non-empty render succeeded, but the bundle-carrying shell it must be
+    /// composed into (see `compose_render_with_shell`) could not be fetched or
+    /// spliced — a render doc carries NO client bundles on its own, so serving it
+    /// raw is a dead-end static page. Shed to the fallback bundle (which DOES
+    /// carry the client bundles) so the page is always hydratable.
+    ShellUnavailable,
 }
 
 impl SsrFallbackReason {
@@ -2992,6 +3045,7 @@ impl SsrFallbackReason {
             SsrFallbackReason::RenderError(_) => "render-error",
             SsrFallbackReason::ErrorBackoff => "error-backoff",
             SsrFallbackReason::EmptyRender => "empty-render",
+            SsrFallbackReason::ShellUnavailable => "shell-unavailable",
         }
     }
 }
@@ -3113,6 +3167,10 @@ async fn ssr_fallback_response(
                 Some("empty-render"),
                 Some(chrome_context_json),
             ),
+            SsrFallbackReason::ShellUnavailable => ssr_spa_shell_fallback_with_skip_reason(
+                Some("shell-unavailable"),
+                Some(chrome_context_json),
+            ),
             SsrFallbackReason::RenderError(err) => {
                 ssr_spa_shell_fallback_with_error(&err, Some(chrome_context_json))
             }
@@ -3142,6 +3200,73 @@ async fn ssr_fallback_response(
             with_ssr_skipped_header(resp, &reason)
         }
     }
+}
+
+/// The projected app's shell document URL — the browser build's entry file
+/// (index.html), which carries the client bundle `<script>`s, `<title>`,
+/// `<base>`, and styles. This is the SAME storage `/apps/{epr}/{entry}` surface
+/// `dispatch_to_projected_epr` serves on a CSR fallback; a successful SSR render
+/// is composed INTO it (see `compose_render_with_shell`) so it can hydrate.
+/// Mirrors `dispatch_to_projected_epr`'s `spaFallback=0` propagation.
+fn projected_shell_url(
+    storage_url: &str,
+    projection: &elohim_views::projection::EprProjectionView,
+) -> String {
+    let base = storage_url.trim_end_matches('/');
+    if projection.spa_fallback {
+        format!(
+            "{}/apps/{}/{}",
+            base, projection.epr_id, projection.entry_file
+        )
+    } else {
+        format!(
+            "{}/apps/{}/{}?spaFallback=0",
+            base, projection.epr_id, projection.entry_file
+        )
+    }
+}
+
+/// Compose a successful (non-empty) SSR render into the projected app's
+/// bundle-carrying shell so the served document can hydrate. The V8 render is
+/// produced against a minimal document template that carries NO client bundles;
+/// the shell (the browser build's index.html — already the CSR-fallback source)
+/// carries the `main-<hash>.js` scripts + `<title>` + `<base>` but an empty
+/// `<app-root>` placeholder. On success returns the composed HTML. Returns `None`
+/// when the shell can't be fetched or composed — the caller then sheds to the
+/// bundle fallback (guaranteed hydratable), never serving a bundle-less render.
+///
+/// Only the `SsrFallback::ProjectedEpr` dispatch (the EPR router — what serves
+/// `/`) can resolve a shell URL; the legacy `Registry` path has no projection and
+/// returns `None` (its CSR-shell fallback already carries bundles). Honors the
+/// same per-upstream breaker + tight timeout the dispatch path uses, so a blocked
+/// peer fast-fails here instead of riding the fetch wall on the render hot path.
+async fn compose_render_with_shell(
+    state: &AppState,
+    fallback: &SsrFallback,
+    rendered_html: &str,
+) -> Option<String> {
+    let SsrFallback::ProjectedEpr(projection) = fallback else {
+        return None;
+    };
+    let storage_url = state.args.storage_url.as_deref()?;
+    if state
+        .upstream_breakers
+        .is_open(storage_url.trim_end_matches('/'))
+    {
+        return None;
+    }
+    let shell_url = projected_shell_url(storage_url, projection);
+    let shell_html = match state
+        .ssr_http_client
+        .get(&shell_url)
+        .timeout(std::time::Duration::from_secs(EPR_DISPATCH_TIMEOUT_SECS))
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => resp.text().await.ok()?,
+        _ => return None,
+    };
+    elohim_render::compose_ssr_with_shell(rendered_html, &shell_html)
 }
 
 /// Serve a `render:"angular-ssr"` route through the V8 SSR engine, gated by the
@@ -3304,13 +3429,37 @@ async fn serve_ssr_route(
         let cache_key = crate::ssr::render_cache_key(&url, &[], "v1");
         if let Some(cached_html) = state.cache.get_rendered(&cache_key) {
             tracing::debug!(target: "doorway::ssr", path = %path, "SSR cache HIT");
-            return ssr_html_response_with_observability(
-                cached_html,
-                "HIT",
-                state.render_capability.as_ref(),
-                None,
-                Some(&chrome_context_json),
-            );
+            // The cache holds the UN-composed render (the shell's bundle hashes
+            // vary per deploy and must never be baked into the render-TTL entry).
+            // Compose it into the bundle-carrying shell at serve time; on failure
+            // shed to the hydratable bundle fallback rather than serve a
+            // bundle-less document.
+            return match compose_render_with_shell(state, &fallback, &cached_html).await {
+                Some(composed) => ssr_html_response_with_observability(
+                    composed,
+                    "HIT",
+                    state.render_capability.as_ref(),
+                    None,
+                    Some(&chrome_context_json),
+                ),
+                None => {
+                    tracing::warn!(
+                        target: "doorway::ssr",
+                        path = %path,
+                        "SSR shell composition unavailable (cache HIT) — serving hydratable bundle fallback"
+                    );
+                    ssr_fallback_response(
+                        state,
+                        req,
+                        path,
+                        &endpoint,
+                        &chrome_context_json,
+                        fallback,
+                        SsrFallbackReason::ShellUnavailable,
+                    )
+                    .await
+                }
+            };
         }
 
         // Build the originating user's credential for the V8 fetch shim
@@ -3402,21 +3551,43 @@ async fn serve_ssr_route(
                 state.ssr_render_breaker.record_success();
                 let trace = out.trace;
                 let html = out.html;
-                // Cache the UN-injected render; the chrome island is
-                // request-specific (slug/auth), spliced at serve time on both
-                // MISS and a later HIT.
+                // Cache the UN-injected, UN-composed render; the chrome island
+                // (slug/auth) AND the bundle-carrying shell (per-deploy bundle
+                // hashes) are both request/deploy-specific and spliced at serve
+                // time on both MISS and a later HIT — never baked into the entry.
                 state.cache.put_rendered(
                     &cache_key,
                     html.clone(),
                     std::time::Duration::from_secs(5 * 60),
                 );
-                ssr_html_response_with_observability(
-                    html,
-                    "MISS",
-                    state.render_capability.as_ref(),
-                    Some(&trace),
-                    Some(&chrome_context_json),
-                )
+                // Compose the render into the bundle-carrying shell so it can
+                // hydrate; on failure shed to the hydratable bundle fallback.
+                match compose_render_with_shell(state, &fallback, &html).await {
+                    Some(composed) => ssr_html_response_with_observability(
+                        composed,
+                        "MISS",
+                        state.render_capability.as_ref(),
+                        Some(&trace),
+                        Some(&chrome_context_json),
+                    ),
+                    None => {
+                        tracing::warn!(
+                            target: "doorway::ssr",
+                            path = %path,
+                            "SSR shell composition unavailable — serving hydratable bundle fallback"
+                        );
+                        ssr_fallback_response(
+                            state,
+                            req,
+                            path,
+                            &endpoint,
+                            &chrome_context_json,
+                            fallback,
+                            SsrFallbackReason::ShellUnavailable,
+                        )
+                        .await
+                    }
+                }
             }
             Err(e) => {
                 let err_str = format!("{e}");

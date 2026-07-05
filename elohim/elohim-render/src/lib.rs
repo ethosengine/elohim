@@ -8,6 +8,7 @@
 pub mod angular;
 pub mod bootstrap;
 pub mod chrome;
+pub mod compose;
 pub mod data_fetcher;
 pub mod error;
 pub mod renderer;
@@ -24,6 +25,7 @@ pub use chrome::{
     enhance_js_hash, enhance_script_path, escape_json_for_script, inject_element, BasePalette,
     ColorScheme, Theme, ThemeTokens, CONTEXT_SCRIPT_ID, ELEMENT_JS, ENHANCE_JS, STABLE_ELEMENT_PATH,
 };
+pub use compose::compose_ssr_with_shell;
 pub use data_fetcher::{DataFetcher, FetchRequest, FetchResponse};
 pub use error::{RenderError, Result};
 pub use renderer::{EchoRenderer, Renderer};
