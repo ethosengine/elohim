@@ -151,6 +151,37 @@ pub async fn call_update_content(
     hc.call_zome(ZOME_NAME, "update_content", payload).await
 }
 
+/// Read content back from THIS conductor's DHT view by logical `id` via the
+/// `content_store::get_content_by_id` coordinator (lamad role). `Ok(None)` when
+/// the entry is not on this conductor's DHT view.
+///
+/// The read half of the reanchor backfill's already-exists recovery:
+/// `create_content` refuses a duplicate id with a Guest error, so we read the
+/// committed entry back to recover its `ActionHash` (the real
+/// `dht_anchor_hash`) and project it. Same own-conductor-DHT-only discipline as
+/// [`get_rea_commitment`] — peer bytes are never written into the projection.
+/// The returned `ContentOutput` is the SAME wire shape (`content_to_wire`) that
+/// `create_content`/`update_content` return, so it feeds the shared
+/// `upsert_with_anchor` projection unchanged.
+pub async fn get_content_by_id(
+    hc: &Arc<HcClient>,
+    id: &str,
+) -> Result<Option<lamad_types::ContentOutput>, StorageError> {
+    let input = lamad_types::QueryByIdInput { id: id.to_string() };
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
+        StorageError::Internal(format!("conductor_writes: encode QueryByIdInput: {e}"))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "get_content_by_id", payload)
+        .await?;
+    let out: Option<lamad_types::ContentOutput> = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode Option<ContentOutput>: {e}"
+        ))
+    })?;
+    Ok(out)
+}
+
 /// Read a notarized REA Commitment back from THIS conductor's DHT view by its
 /// logical `id`, via the `content_store::get_rea_commitment` coordinator
 /// (lamad role). `Ok(None)` when the entry is not on this conductor's DHT view.

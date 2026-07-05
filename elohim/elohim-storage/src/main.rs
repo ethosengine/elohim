@@ -1689,6 +1689,7 @@ async fn async_main(
                                 info!(
                                     candidates = report.candidates,
                                     reanchored = report.reanchored,
+                                    already_anchored = report.already_anchored,
                                     failed = report.failed,
                                     remaining = report.remaining,
                                     "reanchor_backfill: cold-seed recovery sweep done"
