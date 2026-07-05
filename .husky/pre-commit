@@ -13,10 +13,12 @@
 # handles this is not in the call path (identical to .husky/pre-push:23-25).
 [ "${HUSKY-}" = "0" ] && exit 0
 
-# Fail-open if python3 is absent (degraded shell) — same posture as pre-push's python-guarded blocks.
-# The gate itself is also fail-open (an internal error exits 0), so a governance bug never bricks a
-# commit; the worst case is an ungoverned commit, never a blocked author.
-if command -v python3 >/dev/null 2>&1; then
-  python3 .claude/scripts/epr-meta-git-gate.py --staged || exit 1
+# Fail-open if python3 OR the gate script is absent — a degraded shell, or committing on a branch
+# that predates the gate (e.g. a feature branch checked out in another worktree), must NEVER be
+# blocked. The gate itself is also fail-open (an internal error exits 0), so a governance bug never
+# bricks a commit; the worst case is an ungoverned commit, never a blocked author.
+GATE=".claude/scripts/epr-meta-git-gate.py"
+if command -v python3 >/dev/null 2>&1 && [ -f "$GATE" ]; then
+  python3 "$GATE" --staged || exit 1
 fi
 exit 0
