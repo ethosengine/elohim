@@ -2405,6 +2405,36 @@ fn maybe_inject_chrome(
     }
 }
 
+/// Whole-request timeout for an EPR-router dispatch to the cached bundle
+/// (`GET /apps/{epr_id}/{sub_path}`). A healthy dispatch completes in well
+/// under 100ms — this is a browser-facing serve, not a background fetch, so
+/// 30s was a blocking wall for a visitor whenever the configured storage peer
+/// was unreachable (e.g. alpha-b's `storage_url` pointed at a
+/// transport-blocked `adam`). `init_ssr_http_client` already bakes a 10s
+/// client-level default into `state.ssr_http_client` for exactly this
+/// browser-facing budget; this call site was silently overriding that
+/// convention with an explicit 30s per-request timeout. Naming it here makes
+/// the override intentional and matches the existing convention instead of
+/// re-deriving a new number.
+const EPR_DISPATCH_TIMEOUT_SECS: u64 = 10;
+
+/// Fast-fail response for `dispatch_to_projected_epr` when either (a) the
+/// per-upstream circuit breaker is already open for `storage_url`, or (b) a
+/// dispatch's connect/timeout fails outright. Mirrors
+/// `storage_proxy::catching_up_proxy_response`'s status/body/header shape
+/// (503 + `Retry-After` + `{"status":"catching-up","retryAfter":N}`) — that
+/// helper is private to `storage_proxy.rs`, so this is a local mirror rather
+/// than a shared import. Pure (no IO): the seam this fix's unit test exercises.
+fn epr_dispatch_shed_response(retry_after_secs: u64) -> Response<Full<Bytes>> {
+    let body = serde_json::json!({ "status": "catching-up", "retryAfter": retry_after_secs });
+    Response::builder()
+        .status(StatusCode::SERVICE_UNAVAILABLE)
+        .header("content-type", "application/json")
+        .header("Retry-After", retry_after_secs.to_string())
+        .body(Full::new(Bytes::from(body.to_string())))
+        .expect("infallible 503 response")
+}
+
 /// Dispatch a request to a projected EPR (B13).
 ///
 /// MVP scope (§8.1 + §8.2):
@@ -2415,6 +2445,15 @@ fn maybe_inject_chrome(
 /// Sub-path computation:
 /// - Strip the projection's `url_path` prefix from the request path.
 /// - Fall back to `entry_file` when the remainder is empty (bare prefix hit).
+///
+/// Upstream circuit breaker (mirrors `storage_proxy::forward_to_storage`):
+/// keyed by the same base `storage_url` (trimmed, no path suffix) that
+/// `forward_to_storage` uses — so a peer already tripped via the
+/// storage-proxy path shares breaker state with this EPR-bundle dispatch
+/// path, and vice versa. An open breaker sheds immediately, before the
+/// storage GET; a completed dispatch records its outcome (D6: only
+/// connect/timeout/5xx counts as failure — an expected 404 must never open
+/// the breaker).
 async fn dispatch_to_projected_epr(
     state: &AppState,
     request_path: &str,
@@ -2506,10 +2545,31 @@ async fn dispatch_to_projected_epr(
         "EPR router dispatching to cached bundle"
     );
 
+    // Per-upstream breaker (Pillar 2 layer 4): consulted IMMEDIATELY before
+    // send, exactly like `forward_to_storage`, and keyed by the same base
+    // `storage_url` (not the full `/apps/{epr_id}/{sub_path}` bundle path) so
+    // the two dispatch paths share one breaker per storage peer. Circuit-open
+    // sheds WITHOUT calling storage — this is what makes a blocked peer (e.g.
+    // adam on alpha-b) fast-fail here too, instead of riding the full
+    // dispatch timeout on every visitor request.
+    if state.upstream_breakers.is_open(&storage_url) {
+        tracing::warn!(
+            target: "upstream_shed",
+            counter = "doorway_upstream_breaker_open_total",
+            storage_url = %storage_url,
+            epr_id = %projection.epr_id,
+            "EPR router: upstream circuit OPEN — shedding without calling storage (503 + Retry-After)"
+        );
+        crate::metrics::inc_breaker_open();
+        return epr_dispatch_shed_response(
+            crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+        );
+    }
+
     match state
         .ssr_http_client
         .get(&storage_apps_path)
-        .timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(EPR_DISPATCH_TIMEOUT_SECS))
         .send()
         .await
     {
@@ -2528,6 +2588,14 @@ async fn dispatch_to_projected_epr(
                 .map(|s| s.to_string());
             match resp.bytes().await {
                 Ok(body_bytes) => {
+                    // Record-once terminal outcome (D6, mirrors forward_to_storage):
+                    // classify by status — 2xx/4xx (incl. an expected 404 blob/route
+                    // miss) never opens the breaker; only 429/5xx counts as failure.
+                    state.upstream_breakers.record(
+                        &storage_url,
+                        crate::routes::storage_proxy::ProxyOutcome::classify(status.as_u16())
+                            != crate::routes::storage_proxy::ProxyOutcome::Failure,
+                    );
                     // Native runtime chrome: an HTML page served via this proxy is
                     // an EPR-router HTML serve (the landing `/`, a pillar mount),
                     // and must carry the omnibar trust surface — the same island
@@ -2564,6 +2632,11 @@ async fn dispatch_to_projected_epr(
                         error = %e,
                         "EPR router: failed to read storage response body"
                     );
+                    // A response arrived (connect succeeded) but the body stream
+                    // failed mid-read — still a real upstream failure, so it must
+                    // count toward the breaker even though this isn't the
+                    // connect/timeout hang this fix targets.
+                    state.upstream_breakers.record(&storage_url, false);
                     Response::builder()
                         .status(StatusCode::BAD_GATEWAY)
                         .header("content-type", "application/json")
@@ -2573,18 +2646,90 @@ async fn dispatch_to_projected_epr(
             }
         }
         Err(e) => {
+            // Connect/timeout failure — the class this fix targets (a blocked
+            // peer like alpha-b's adam). Record the breaker failure (D6: this
+            // always counts) and shed fast with the same 503 + Retry-After
+            // shape as the breaker-open branch above, instead of the previous
+            // bare 502 (which cost nothing extra to return quickly, but gave
+            // the caller no retry signal after riding the full dispatch
+            // timeout).
             tracing::warn!(
                 epr_id = %projection.epr_id,
                 storage_url = %storage_apps_path,
                 error = %e,
-                "EPR router: storage request failed"
+                "EPR router: storage request failed (connect/timeout) — recording breaker failure and shedding"
             );
-            Response::builder()
-                .status(StatusCode::BAD_GATEWAY)
-                .header("content-type", "application/json")
-                .body(Full::new(Bytes::from(r#"{"error":"storage unreachable"}"#)))
-                .expect("infallible 502 response")
+            state.upstream_breakers.record(&storage_url, false);
+            epr_dispatch_shed_response(
+                crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+            )
         }
+    }
+}
+
+#[cfg(test)]
+mod epr_dispatch_breaker_tests {
+    use super::*;
+
+    // `dispatch_to_projected_epr` itself is async, requires a live `AppState`
+    // (storage_url, ssr_http_client) and an actual upstream to exercise the
+    // send()/bytes() branches — heavy scaffolding for little marginal
+    // coverage over the already-tested `UpstreamBreakers::is_open`/`record`
+    // (see `routes::upstream_health` unit tests: `opens_after_threshold_then_sheds`,
+    // `success_keeps_closed`, `distinct_endpoints_isolated`) and
+    // `ProxyOutcome::classify`'s D6 rule (`routes::storage_proxy` unit test
+    // `proxy_outcome_classifies_failures`). What IS new and pure in this change —
+    // and therefore what these tests cover — is the fast-fail response this
+    // fix returns on both the breaker-open shed and the connect/timeout-error
+    // paths, plus the tightened timeout constant.
+
+    #[tokio::test]
+    async fn shed_response_is_503_with_retry_after_and_catching_up_body() {
+        let resp = epr_dispatch_shed_response(30);
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            resp.headers()
+                .get("Retry-After")
+                .and_then(|v| v.to_str().ok()),
+            Some("30")
+        );
+        assert_eq!(
+            resp.headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok()),
+            Some("application/json")
+        );
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"], "catching-up");
+        assert_eq!(json["retryAfter"], 30);
+    }
+
+    #[tokio::test]
+    async fn shed_response_propagates_the_given_retry_after() {
+        // Distinct from the default test above: proves the value isn't
+        // hardcoded — a caller-supplied cooldown (e.g. an upstream Retry-After
+        // in a future extension) round-trips into both the header and body.
+        let resp = epr_dispatch_shed_response(7);
+        assert_eq!(
+            resp.headers()
+                .get("Retry-After")
+                .and_then(|v| v.to_str().ok()),
+            Some("7")
+        );
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["retryAfter"], 7);
+    }
+
+    #[test]
+    fn dispatch_timeout_is_tightened_well_under_the_old_30s_wall() {
+        // The regression this fix closes: a per-request .timeout() override
+        // silently widened past the 10s browser-facing budget already baked
+        // into `init_ssr_http_client`'s client-level default, back up to a
+        // full 30s wall on every dispatch to an unreachable storage peer.
+        assert_eq!(EPR_DISPATCH_TIMEOUT_SECS, 10);
+        assert!(EPR_DISPATCH_TIMEOUT_SECS < 30);
     }
 }
 
