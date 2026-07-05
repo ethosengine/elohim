@@ -2,7 +2,22 @@
 ((globalThis) => {
   const fmt = (args) => args.map((a) => {
     if (typeof a === "string") return a;
-    try { return JSON.stringify(a); } catch { return String(a); }
+    // Error's `message`/`stack` are non-enumerable own properties, so
+    // JSON.stringify(someError) yields "{}" -- discarding the one thing we
+    // actually want to see. Special-case Error (and error-like values from
+    // another realm, where `instanceof Error` can be false but `.stack`/
+    // `.message` are still strings) before the JSON branch below.
+    const isErrorLike = a instanceof Error ||
+      (a && typeof a === "object" && (typeof a.stack === "string" || typeof a.message === "string"));
+    if (isErrorLike) {
+      return a.stack || `${a.name || "Error"}: ${a.message || ""}`;
+    }
+    try {
+      const s = JSON.stringify(a);
+      // JSON.stringify returns undefined for bare `undefined`/functions/etc;
+      // fall back to String(a) so the value isn't silently dropped.
+      return s === undefined ? String(a) : s;
+    } catch { return String(a); }
   }).join(" ");
 
   globalThis.console = {

@@ -1,5 +1,79 @@
 use elohim_render::runtime::JsRuntime;
 
+/// Minimal hand-rolled `tracing::Subscriber` (no `tracing-subscriber` dep
+/// needed) that captures event *message* field text into a shared buffer,
+/// filtered to a single target. Lets a test assert on the exact string the
+/// `console.*` JS shim hands to `tracing::error!`/`warn!`/`info!`, bypassing
+/// stdout formatting entirely. Spans are unused by the console ops, so span
+/// bookkeeping methods are no-ops with a dummy incrementing id.
+mod capture {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Arc, Mutex};
+    use tracing::field::{Field, Visit};
+    use tracing::span::{Attributes, Id, Record};
+    use tracing::{Event, Metadata, Subscriber};
+
+    pub struct CapturingSubscriber {
+        target: &'static str,
+        messages: Arc<Mutex<Vec<String>>>,
+        next_id: AtomicU64,
+    }
+
+    impl CapturingSubscriber {
+        pub fn new(target: &'static str) -> (Self, Arc<Mutex<Vec<String>>>) {
+            let messages = Arc::new(Mutex::new(Vec::new()));
+            (
+                Self {
+                    target,
+                    messages: messages.clone(),
+                    next_id: AtomicU64::new(0),
+                },
+                messages,
+            )
+        }
+    }
+
+    #[derive(Default)]
+    struct MessageVisitor(Option<String>);
+
+    impl Visit for MessageVisitor {
+        fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+            if field.name() == "message" {
+                self.0 = Some(format!("{value:?}"));
+            }
+        }
+    }
+
+    impl Subscriber for CapturingSubscriber {
+        fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+            metadata.target() == self.target
+        }
+
+        fn new_span(&self, _span: &Attributes<'_>) -> Id {
+            Id::from_u64(self.next_id.fetch_add(1, Ordering::Relaxed) + 1)
+        }
+
+        fn record(&self, _span: &Id, _values: &Record<'_>) {}
+
+        fn record_follows_from(&self, _span: &Id, _follows: &Id) {}
+
+        fn event(&self, event: &Event<'_>) {
+            if event.metadata().target() != self.target {
+                return;
+            }
+            let mut visitor = MessageVisitor::default();
+            event.record(&mut visitor);
+            if let Some(msg) = visitor.0 {
+                self.messages.lock().unwrap().push(msg);
+            }
+        }
+
+        fn enter(&self, _span: &Id) {}
+
+        fn exit(&self, _span: &Id) {}
+    }
+}
+
 #[test]
 fn shim_js_files_are_pure_ascii() {
     let shim_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/shim");
@@ -27,6 +101,65 @@ async fn console_log_does_not_throw() {
     let mut rt = JsRuntime::with_shims();
     let v = rt.eval_string("console.log('hello'); 42").await.unwrap();
     assert_eq!(v, "42");
+}
+
+/// Regression test for the bare `ERROR {}` js_console log line: Angular's SSR
+/// bootstrap catches an in-app error and calls `console.error(someError)`.
+/// The old `fmt` in `src/shim/console.js` ran every non-string arg through
+/// `JSON.stringify`, and `JSON.stringify(new Error(...))` is `"{}"` because
+/// `message`/`stack` are non-enumerable own properties on `Error` -- so the
+/// one thing an operator needs (the actual error text) was discarded before
+/// it ever reached `tracing`. This asserts end-to-end through the real
+/// `op_console_error` -> `tracing::error!(target: "elohim_render::js_console", ...)`
+/// path (see `src/shim/console.rs`), capturing the formatted message via a
+/// custom `tracing::Subscriber` set as the thread-local default for the
+/// duration of the eval (see the `capture` module above).
+///
+/// Confirmed this fails on the old `fmt`: temporarily reverting the
+/// Error-special-case in `console.js` back to the bare `JSON.stringify`
+/// branch reproduces the captured message `"{}"` (see the accompanying PR/
+/// report evidence) -- i.e. this test would fail both the `contains(...)`
+/// and the `!= "{}"` assertions below without the fix.
+#[tokio::test]
+async fn console_error_serializes_error_message_not_empty_object() {
+    let (subscriber, messages) = capture::CapturingSubscriber::new("elohim_render::js_console");
+    let _guard = tracing::subscriber::set_default(subscriber);
+
+    let mut rt = JsRuntime::with_shims();
+    rt.eval_string("console.error(new Error('boom-diagnostic')); 0")
+        .await
+        .unwrap();
+
+    drop(_guard);
+
+    let captured = messages.lock().unwrap();
+    assert_eq!(
+        captured.len(),
+        1,
+        "expected exactly one js_console event, got {:?}",
+        *captured
+    );
+    let msg = &captured[0];
+
+    // The defect this guards against: JSON.stringify(new Error(...)) === "{}",
+    // silently swallowing the error text.
+    assert_ne!(
+        msg, "{}",
+        "console.error(Error) must not collapse to the empty-object literal \
+         (the JSON.stringify(new Error()) trap this test guards against)"
+    );
+    assert!(
+        !msg.is_empty(),
+        "console.error(Error) produced an empty message"
+    );
+    assert!(
+        msg.contains("boom-diagnostic"),
+        "expected the Error's message text in the captured js_console output, got: {msg:?}"
+    );
+    assert!(
+        msg.contains("Error"),
+        "expected the Error's name/tag in the captured js_console output, got: {msg:?}"
+    );
 }
 
 #[tokio::test]
