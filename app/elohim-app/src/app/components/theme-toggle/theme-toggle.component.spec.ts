@@ -41,6 +41,21 @@ describe('ThemeToggleComponent', () => {
     expect(component.getIcon()).toBe('🌙');
   });
 
+  it('getIcon does not throw and defaults to moon when matchMedia is unavailable (SSR)', () => {
+    // The V8 SSR runtime has no `matchMedia`; getIcon() is reached synchronously
+    // via the template during the server render. Simulate its absence and prove
+    // the guard returns a default instead of throwing (the empty-render class).
+    const original = globalThis.matchMedia;
+    (globalThis as unknown as { matchMedia?: unknown }).matchMedia = undefined;
+    try {
+      component.currentTheme = 'device';
+      expect(() => component.getIcon()).not.toThrow();
+      expect(component.getIcon()).toBe('🌙');
+    } finally {
+      globalThis.matchMedia = original;
+    }
+  });
+
   it('should show auto mode indicator when in device mode', () => {
     component.currentTheme = 'device';
     expect(component.isAutoMode()).toBe(true);

@@ -1,4 +1,5 @@
-import { Injectable, Renderer2, RendererFactory2, inject } from '@angular/core';
+import { DOCUMENT, isPlatformBrowser } from '@angular/common';
+import { Injectable, PLATFORM_ID, Renderer2, RendererFactory2, inject } from '@angular/core';
 
 // @coverage: 96.3% (2026-02-24)
 
@@ -17,22 +18,28 @@ export class ThemeService {
   private readonly currentTheme$ = new BehaviorSubject<Theme>('device');
 
   private readonly rendererFactory = inject(RendererFactory2);
+  private readonly doc = inject(DOCUMENT);
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   constructor() {
     this.renderer = this.rendererFactory.createRenderer(null, null);
     this.loadTheme();
 
     // Cross-island/tab sync: Lit's ThemeStore (elohim-core) speaks the same
-    // contract; adopt its changes without re-dispatching (no loops).
-    globalThis.addEventListener('storage', (e: StorageEvent) => {
-      if (e.key === THEME_STORAGE_KEY && this.isValidTheme(e.newValue)) {
-        this.adoptExternal(e.newValue);
-      }
-    });
-    globalThis.addEventListener(THEME_CHANGE_EVENT, (e: Event) => {
-      const theme = (e as CustomEvent<{ theme?: unknown }>).detail?.theme;
-      if (this.isValidTheme(theme)) this.adoptExternal(theme);
-    });
+    // contract; adopt its changes without re-dispatching (no loops). Window
+    // events don't exist in the V8 SSR runtime (no globalThis.addEventListener)
+    // and cross-tab sync is meaningless server-side — browser only.
+    if (this.isBrowser) {
+      globalThis.addEventListener('storage', (e: StorageEvent) => {
+        if (e.key === THEME_STORAGE_KEY && this.isValidTheme(e.newValue)) {
+          this.adoptExternal(e.newValue);
+        }
+      });
+      globalThis.addEventListener(THEME_CHANGE_EVENT, (e: Event) => {
+        const theme = (e as CustomEvent<{ theme?: unknown }>).detail?.theme;
+        if (this.isValidTheme(theme)) this.adoptExternal(theme);
+      });
+    }
   }
 
   /**
@@ -66,7 +73,10 @@ export class ThemeService {
     this.currentTheme$.next(theme);
     this.applyTheme(theme);
     this.saveTheme(theme);
-    globalThis.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme } }));
+    // dispatchEvent / CustomEvent are browser-only (absent in the V8 SSR runtime).
+    if (this.isBrowser) {
+      globalThis.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme } }));
+    }
   }
 
   /**
@@ -77,7 +87,12 @@ export class ThemeService {
    * Twin contract with elohim-core's ThemeStore — change BOTH or NEITHER.
    */
   private applyTheme(theme: Theme): void {
-    for (const target of [document.documentElement, document.body]) {
+    // Use the injected DOCUMENT (platform-server provides one during SSR) rather
+    // than the global `document`, which is undefined in the V8 SSR runtime — the
+    // ReferenceError that emptied the SSR render. Renderer2 is SSR-safe, so this
+    // also themes the server-rendered HTML (html/body carry data-theme).
+    for (const target of [this.doc.documentElement, this.doc.body]) {
+      if (!target) continue;
       this.renderer.removeClass(target, 'theme-light');
       this.renderer.removeClass(target, 'theme-dark');
       this.renderer.removeClass(target, 'theme-device');
@@ -97,6 +112,7 @@ export class ThemeService {
    * - Limited to predefined theme values (light, dark, device)
    */
   private saveTheme(theme: Theme): void {
+    if (!this.isBrowser) return; // no localStorage in the V8 SSR runtime
     try {
       localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch {
@@ -114,6 +130,13 @@ export class ThemeService {
    * - No risk of code injection as value is type-checked
    */
   private loadTheme(): void {
+    if (!this.isBrowser) {
+      // SSR: no localStorage to read a preference from. Apply the default so the
+      // server-rendered HTML carries a theme (no flash for default users); the
+      // browser re-reads the saved preference and adopts it after hydration.
+      this.applyTheme('device');
+      return;
+    }
     try {
       const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
       if (this.isValidTheme(savedTheme)) {
