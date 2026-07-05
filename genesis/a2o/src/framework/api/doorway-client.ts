@@ -492,6 +492,20 @@ export class DoorwayClient {
     return envelope.items;
   }
 
+  /**
+   * DELETE /db/content/{id} → `delete_cascade` (removes the content row and
+   * its relationships). Path-addressed; the handler ignores the request body.
+   *
+   * Used by the content-lifecycle E2E cleanup so a run deletes the
+   * `e2e-<uuid>` content it created instead of leaking a NULL-anchor row on
+   * every scenario. Those leaked rows are what the reanchor backfill
+   * re-selects and re-thrashes on every boot, saturating the target
+   * conductor's Holochain Cache-DB read pool (main-branch CI → adam).
+   */
+  async deleteContent(id: string): Promise<Record<string, unknown>> {
+    return this.delete<Record<string, unknown>>(`/db/content/${encodeURIComponent(id)}`, {});
+  }
+
   // -- Session Handoff (delegated to @elohim/identity) ------------------------
 
   async sessionToken(): Promise<SessionTokenResponse> {

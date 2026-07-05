@@ -56,6 +56,21 @@ async function createContent(
   world.contentIds.set(`content:${title}:id`, id);
   world.contentIds.set(`content:${title}:runTag`, runTag);
   world.contentIds.set(`content:${title}:tags`, JSON.stringify(['e2e', runTag, ...tags]));
+
+  // Delete the e2e-<uuid> content when the scenario ends. Without this,
+  // EVERY content-lifecycle scenario permanently leaks a content row on the
+  // target doorway's primary conductor (main-branch CI targets doorway-B →
+  // adam). Those rows land NULL-anchor and are re-selected + re-thrashed by
+  // the reanchor backfill on every boot, saturating the Holochain Cache-DB
+  // read pool. Mirrors the world.onCleanup pattern in fixture-humans /
+  // seeder step files. Best-effort: a drained/absent row on delete is fine.
+  world.onCleanup(async () => {
+    try {
+      await device.client.deleteContent(id);
+    } catch {
+      // best-effort cleanup
+    }
+  });
 }
 
 When(

@@ -510,6 +510,59 @@ impl ContentService {
         Ok(updated)
     }
 
+    /// Recover and project the DHT anchor for content that is ALREADY committed
+    /// to THIS conductor's DHT view but whose local SQL row is still
+    /// NULL-anchor.
+    ///
+    /// The idempotent-success recovery for the reanchor backfill: when a
+    /// re-author via `create_content` is refused with "… already exists. Use
+    /// update_content …", the entry IS on the DHT — its anchored state is
+    /// already reachable. Read the committed entry back (`get_content_by_id`,
+    /// which recovers the `ActionHash` from the IdToContent link) and project it
+    /// through the SAME `upsert_with_anchor` path a `ContentCommitted` signal
+    /// uses, stamping the REAL `dht_anchor_hash`. The row then leaves the
+    /// NULL-anchor candidate set permanently — ending the per-boot re-thrash
+    /// that saturated adam's Cache-DB read pool.
+    ///
+    /// `Ok(true)` when the anchor was recovered and stamped. `Ok(false)` when
+    /// the conductor unexpectedly has no entry for the id (the "already exists"
+    /// claim could not be corroborated) — the caller keeps the row as a
+    /// retryable failure, never fabricating an anchor.
+    pub async fn project_existing_anchor(
+        &self,
+        hc: &Arc<HcClient>,
+        id: &str,
+    ) -> Result<bool, StorageError> {
+        let Some(output) = conductor_writes::get_content_by_id(hc, id).await? else {
+            return Ok(false);
+        };
+
+        // Mirror the projection the create/update path runs (upsert_with_anchor
+        // with the committed ActionHash), so a recovered anchor is byte-identical
+        // to one stamped by a fresh ContentCommitted signal. Field mapping is
+        // identical to the eager-projection block in `update_via_conductor`.
+        let action_hash_str = format!("{}", output.action_hash);
+        let oc = &output.content;
+        let size_i32 = oc
+            .content_size_bytes
+            .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
+        let patch = ContentProjectionPatch {
+            blob_cid: oc.blob_cid.clone(),
+            content_size_bytes: size_i32,
+            title: Some(oc.title.clone()),
+            description: Some(oc.description.clone()),
+            content_type: Some(oc.content_type.clone()),
+            content_format: Some(oc.content_format.clone()),
+            reach: Some(oc.reach.clone()),
+            metadata_json: Some(oc.metadata_json.clone()),
+        };
+        {
+            let mut conn = self.conn()?;
+            content_diesel::upsert_with_anchor(&mut conn, &self.ctx, id, patch, &action_hash_str)?;
+        }
+        Ok(true)
+    }
+
     /// Delete content by ID
     pub fn delete(&self, id: &str) -> Result<bool, StorageError> {
         let mut conn = self.conn()?;
