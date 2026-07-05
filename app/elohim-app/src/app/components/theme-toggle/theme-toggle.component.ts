@@ -46,7 +46,11 @@ export class ThemeToggleComponent implements OnInit, OnDestroy {
 
   private getEffectiveTheme(): 'light' | 'dark' {
     if (this.currentTheme === 'device') {
-      // Check system preference
+      // System preference (matchMedia) is a browser-only signal — absent in the
+      // V8 SSR runtime, where this getter is reached synchronously via the
+      // template's {{ getIcon() }}. Default to dark server-side; the client
+      // re-evaluates on hydration.
+      if (typeof globalThis.matchMedia !== 'function') return 'dark';
       return globalThis.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
     return this.currentTheme;

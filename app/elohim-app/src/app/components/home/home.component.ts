@@ -1,4 +1,13 @@
-import { Component, OnInit, OnDestroy, ElementRef, Renderer2 } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  ElementRef,
+  PLATFORM_ID,
+  Renderer2,
+  inject,
+} from '@angular/core';
 
 // @coverage: 88.0% (2026-02-24)
 
@@ -37,6 +46,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   private intersectionObserver?: IntersectionObserver;
   private rafId?: number;
   private isScrolling = false;
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   constructor(
     private readonly el: ElementRef,
@@ -47,6 +57,13 @@ export class HomeComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
+    // Parallax scroll listeners, IntersectionObserver, and DOM animations are
+    // browser-only progressive enhancements — `window`/`IntersectionObserver`
+    // don't exist in the V8 SSR runtime, and on the alpha build ConfigService
+    // emits synchronously so this callback runs during the SSR render pass.
+    // Skip it server-side; the static landing content renders regardless and
+    // the enhancements attach on the client after hydration.
+    if (!this.isBrowser) return;
     this.configService.getConfig().subscribe(() => {
       this.setupParallaxScrolling();
       this.setupIntersectionObserver();
