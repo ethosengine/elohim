@@ -173,6 +173,7 @@ export * from './manifests/discovery-resolvers';
 export * from './manifest-payloads/onboarding';
 export * from './manifest-payloads/pillar-projection';
 export * from './manifest-payloads/standing-policy';
+export * from './manifest-payloads/tending-policy';
 export * from './attestation/attestation-content';
 export * from './attestation/attestation-metadata';
 export * from './attestation/governance-action-content';
