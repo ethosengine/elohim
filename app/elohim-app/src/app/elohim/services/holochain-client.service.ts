@@ -132,8 +132,10 @@ export class HolochainClientService {
     let doorwayToken: string | undefined;
     let installedAppId: string | undefined;
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       doorwayToken = localStorage.getItem('elohim-auth-token') ?? undefined;
       // Per-user app ID from login auto-provisioning (multi-conductor)
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       installedAppId = localStorage.getItem('elohim-installed-app-id') ?? undefined;
     } catch {
       // localStorage not available (SSR) — no token
@@ -169,7 +171,9 @@ export class HolochainClientService {
    */
   private isCheEnvironment(): boolean {
     return (
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only surface — only reached via testAdminConnection(), invoked exclusively from shefa-home's user-initiated testConnection() button handler, never during SSR bootstrap
       globalThis.location.hostname.includes('.devspaces.') ||
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only surface — only reached via testAdminConnection(), invoked exclusively from shefa-home's user-initiated testConnection() button handler, never during SSR bootstrap
       globalThis.location.hostname.includes('.code.ethosengine.com')
     );
   }
@@ -185,6 +189,7 @@ export class HolochainClientService {
     // https://<workspace>-<endpoint>.code.ethosengine.com
     // Example: mbd06b-gmail-com-elohim-devspace-angular-dev.code.ethosengine.com
     // We need to replace the endpoint suffix (angular-dev) with (hc-dev)
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only surface — getCheDevProxyUrl() is gated by isCheEnvironment(), reached only via user-initiated testAdminConnection(), never during SSR bootstrap
     const currentUrl = new URL(globalThis.location.href);
 
     // Replace '-angular-dev' suffix with '-hc-dev' in the hostname
@@ -946,6 +951,7 @@ export class HolochainClientService {
         signingKey: this.uint8ArrayToBase64(credentials.signingKey),
       };
 
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       localStorage.setItem(SIGNING_CREDENTIALS_KEY, JSON.stringify(serialized));
     } catch (err) {
       this.logger.warn('Could not store signing credentials', {
@@ -984,6 +990,7 @@ export class HolochainClientService {
    */
   public hasStoredCredentials(): boolean {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       const stored = localStorage.getItem(SIGNING_CREDENTIALS_KEY);
       return stored !== null;
     } catch {

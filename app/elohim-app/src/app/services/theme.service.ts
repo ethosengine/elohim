@@ -30,11 +30,13 @@ export class ThemeService {
     // events don't exist in the V8 SSR runtime (no globalThis.addEventListener)
     // and cross-tab sync is meaningless server-side — browser only.
     if (this.isBrowser) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
       globalThis.addEventListener('storage', (e: StorageEvent) => {
         if (e.key === THEME_STORAGE_KEY && this.isValidTheme(e.newValue)) {
           this.adoptExternal(e.newValue);
         }
       });
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
       globalThis.addEventListener(THEME_CHANGE_EVENT, (e: Event) => {
         const theme = (e as CustomEvent<{ theme?: unknown }>).detail?.theme;
         if (this.isValidTheme(theme)) this.adoptExternal(theme);
@@ -75,6 +77,7 @@ export class ThemeService {
     this.saveTheme(theme);
     // dispatchEvent / CustomEvent are browser-only (absent in the V8 SSR runtime).
     if (this.isBrowser) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
       globalThis.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme } }));
     }
   }
@@ -114,6 +117,7 @@ export class ThemeService {
   private saveTheme(theme: Theme): void {
     if (!this.isBrowser) return; // no localStorage in the V8 SSR runtime
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
       localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch {
       // localStorage write failure is non-critical
@@ -138,6 +142,7 @@ export class ThemeService {
       return;
     }
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
       const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
       if (this.isValidTheme(savedTheme)) {
         this.setTheme(savedTheme);

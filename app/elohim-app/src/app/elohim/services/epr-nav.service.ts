@@ -21,6 +21,7 @@ export class EprNavService {
   private readonly routeCtx = inject(ProtocolRouteContextService);
 
   /** Test seam — defaults to a full browser navigation. */
+  // eslint-disable-next-line no-restricted-syntax -- field-initializer arrow body, not evaluated until browser call (assign() is only invoked from navigate()'s cross-bundle branch, never during SSR bootstrap)
   assign: (href: string) => void = href => globalThis.location.assign(href);
 
   ownsPath(path: string): boolean {
@@ -62,6 +63,7 @@ export class EprNavService {
     this.navStack.record({
       url: this.router.url,
       cid: this.routeCtx.cid() ?? '',
+      // eslint-disable-next-line no-restricted-syntax -- browser-only cross-bundle navigation handoff; recordHandoff() is only invoked from user-triggered link interception/navigate(), never during SSR bootstrap
       label: document.title,
     });
   }

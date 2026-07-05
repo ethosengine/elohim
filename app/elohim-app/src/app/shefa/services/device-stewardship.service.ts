@@ -150,6 +150,7 @@ export class DeviceStewardshipService {
       status: 'connected',
       lastSeen: new Date().toISOString(),
       isCurrentDevice: true,
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only shefa dashboard surface — reached only via device-stewardship.component ngOnInit on a deep /shefa route, never during SSR bootstrap
       platform: detectPlatform(navigator.userAgent),
       doorwayUrl: identity.conductorUrl ?? undefined,
     };
@@ -208,6 +209,7 @@ export class DeviceStewardshipService {
    * Generate a display name for the current device.
    */
   private getCurrentDeviceName(): string {
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only shefa dashboard surface — reached only via device-stewardship.component ngOnInit on a deep /shefa route, never during SSR bootstrap
     const platform = detectPlatform(navigator.userAgent);
     const labels: Record<string, string> = {
       'desktop-macos': 'Mac',

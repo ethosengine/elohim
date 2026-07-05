@@ -284,6 +284,7 @@ export class EprLinkComponent implements OnInit, OnDestroy {
         this.about.emit(epr);
         break;
       case 'copy':
+        // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only user-interaction handler (context-menu click), never invoked during SSR render
         void navigator.clipboard?.writeText(epr).catch(() => {
           // Clipboard write can reject (permissions / insecure context); no-op.
         });

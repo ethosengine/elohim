@@ -263,6 +263,7 @@ export class AffinityTrackingService implements OnDestroy {
   private loadFromStorage(): HumanAffinity {
     const storageKey = this.getStorageKey();
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       const stored = localStorage.getItem(storageKey);
       if (stored) {
         const parsed = JSON.parse(stored) as Record<string, unknown>;
@@ -295,6 +296,7 @@ export class AffinityTrackingService implements OnDestroy {
   private saveToStorage(affinity: HumanAffinity): void {
     const storageKey = this.getStorageKey();
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       localStorage.setItem(storageKey, JSON.stringify(affinity));
     } catch {
       // localStorage write failure is non-critical

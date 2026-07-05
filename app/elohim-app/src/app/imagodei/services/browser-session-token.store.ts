@@ -56,24 +56,30 @@ export class BrowserSessionTokenStore implements SessionTokenStore {
       return this.memory.get();
     }
 
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (!token) {
       return null;
     }
 
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     const expiresAt = parseExpiryDate(localStorage.getItem(AUTH_EXPIRY_KEY));
 
     return {
       token,
       // StoredSession requires strings; '' marks an absent value
       // (AuthService maps '' back to null when hydrating AuthState).
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
       humanId: localStorage.getItem(AUTH_HUMAN_ID_KEY) ?? '',
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
       agentPubKey: localStorage.getItem(AUTH_AGENT_PUB_KEY_KEY) ?? '',
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
       identifier: localStorage.getItem(AUTH_IDENTIFIER_KEY) ?? '',
       // Missing/unparseable expiry reads as 0 (already expired) — same
       // outcome as the pre-migration isTokenExpiringSoon(null) path:
       // the session is not restorable.
       expiresAt: expiresAt ? Math.floor(expiresAt.getTime() / 1000) : 0,
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
       installedAppId: localStorage.getItem(AUTH_INSTALLED_APP_ID_KEY) ?? undefined,
     };
   }
@@ -84,18 +90,24 @@ export class BrowserSessionTokenStore implements SessionTokenStore {
       return;
     }
 
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     localStorage.setItem(AUTH_TOKEN_KEY, session.token);
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     localStorage.setItem(AUTH_EXPIRY_KEY, String(session.expiresAt));
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     localStorage.setItem(AUTH_IDENTIFIER_KEY, session.identifier);
     // Matches the legacy persistAuth contract: absent values leave any
     // existing entries untouched (they are only replaced, never blanked).
     if (session.humanId) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
       localStorage.setItem(AUTH_HUMAN_ID_KEY, session.humanId);
     }
     if (session.agentPubKey) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
       localStorage.setItem(AUTH_AGENT_PUB_KEY_KEY, session.agentPubKey);
     }
     if (session.installedAppId) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
       localStorage.setItem(AUTH_INSTALLED_APP_ID_KEY, session.installedAppId);
     }
     // doorwayId/doorwayUrl are intentionally NOT persisted — no localStorage
@@ -110,14 +122,23 @@ export class BrowserSessionTokenStore implements SessionTokenStore {
     }
 
     // Exactly the legacy clearPersistedAuth() key set.
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     localStorage.removeItem(AUTH_TOKEN_KEY);
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     localStorage.removeItem(AUTH_PROVIDER_KEY);
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     localStorage.removeItem(AUTH_EXPIRY_KEY);
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     localStorage.removeItem(AUTH_IDENTIFIER_KEY);
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     localStorage.removeItem(AUTH_HUMAN_ID_KEY);
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     localStorage.removeItem(AUTH_AGENT_PUB_KEY_KEY);
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     localStorage.removeItem(AUTH_INSTALLED_APP_ID_KEY);
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     localStorage.removeItem(SIGNING_CREDENTIALS_KEY);
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     localStorage.removeItem(DOORWAY_CACHE_KEY);
   }
 
@@ -130,6 +151,7 @@ export class BrowserSessionTokenStore implements SessionTokenStore {
     if (!this.isBrowser) {
       return this.memoryProvider;
     }
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     return localStorage.getItem(AUTH_PROVIDER_KEY) as AuthProviderType | null;
   }
 
@@ -138,6 +160,7 @@ export class BrowserSessionTokenStore implements SessionTokenStore {
       this.memoryProvider = provider;
       return;
     }
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser
     localStorage.setItem(AUTH_PROVIDER_KEY, provider);
   }
 }

@@ -532,6 +532,7 @@ export class SlaMonitorService implements OnDestroy {
   private persistToStorage(): void {
     try {
       const data = JSON.stringify(this.activeSlas$.value);
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       localStorage.setItem(this.STORAGE_KEY, data);
     } catch {
       // localStorage write failure is non-critical
@@ -540,6 +541,7 @@ export class SlaMonitorService implements OnDestroy {
 
   private loadActiveSlasFromStorage(): void {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       const data = localStorage.getItem(this.STORAGE_KEY);
       if (data) {
         const items = JSON.parse(data) as SlaItem[];

@@ -307,8 +307,10 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
   }
 
   geolocate(): void {
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only (click)="geolocate()" handler, never invoked during SSR render (no DOM events fire server-side)
     if (this.mapError() || !navigator.geolocation) return;
 
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only (click)="geolocate()" handler, never invoked during SSR render (no DOM events fire server-side)
     navigator.geolocation.getCurrentPosition(
       pos => {
         const { latitude, longitude } = pos.coords;

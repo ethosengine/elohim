@@ -219,6 +219,7 @@ export class ShefaLayoutComponent {
   }
 
   onNavItemClicked(): void {
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: only reachable via the (navItemClicked) output, itself emitted only from a user (click) in shefa-sidenav, never invoked during SSR render
     if (window.innerWidth <= 1024) {
       this.sidebarOpen.set(false);
     }

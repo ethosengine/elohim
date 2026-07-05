@@ -50,7 +50,9 @@ export class PasswordAuthProvider implements AuthProvider {
    */
   private isCheEnvironment(): boolean {
     return (
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only login surface, only reached via user-triggered login/register/refresh calls, never SSR-rendered
       globalThis.location.hostname.includes('.devspaces.') ||
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only login surface, only reached via user-triggered login/register/refresh calls, never SSR-rendered
       globalThis.location.hostname.includes('.code.ethosengine.com')
     );
   }
@@ -64,6 +66,7 @@ export class PasswordAuthProvider implements AuthProvider {
 
     // Replace current endpoint suffix with hc-dev
     // e.g., ...-angular-dev.code.ethosengine.com -> ...-hc-dev.code.ethosengine.com
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only login surface, only reached via user-triggered login/register/refresh calls, never SSR-rendered
     const hostname = globalThis.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
     return `https://${hostname}`;
   }

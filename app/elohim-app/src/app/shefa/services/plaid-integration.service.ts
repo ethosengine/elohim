@@ -147,6 +147,7 @@ export class PlaidIntegrationService {
       return {
         token: linkToken,
         userId: stewardId,
+        // eslint-disable-next-line no-restricted-syntax -- browser-only oauth surface, never SSR-rendered (Plaid Link OAuth flow is user-initiated, not called during SSR bootstrap)
         redirectUrl: `${globalThis.location.origin}/shefa/plaid-callback`,
       };
     } catch (error) {
@@ -570,6 +571,7 @@ export class PlaidIntegrationService {
    */
   private getKeyMaterial(): string {
     // This is a placeholder - in production should use steward's actual key
+    // eslint-disable-next-line no-restricted-syntax -- browser-only oauth token-encryption surface, never SSR-rendered (only reached via the user-initiated Plaid Link flow)
     return sessionStorage.getItem('encryption_key_material') ?? 'default-key-material';
   }
 

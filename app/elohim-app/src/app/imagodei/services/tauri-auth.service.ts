@@ -246,12 +246,12 @@ export class TauriAuthService {
    * Set up Tauri event listeners for OAuth callbacks.
    */
   private async setupEventListeners(): Promise<void> {
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (!window.__TAURI__?.event) {
       return;
     }
 
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     const { listen } = window.__TAURI__.event;
 
     // Listen for OAuth callback from deep link
@@ -270,11 +270,11 @@ export class TauriAuthService {
     });
 
     // Drain any OAuth callbacks that arrived before Angular was ready (cold-start)
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (window.__TAURI__?.core) {
       try {
         const pending =
-          // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+          // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
           await window.__TAURI__.core.invoke<OAuthCallbackPayload[]>('get_pending_deep_links');
         for (const payload of pending) {
           await this.handleOAuthCallback(payload);
@@ -454,7 +454,7 @@ export class TauriAuthService {
    * @returns true on success, false on failure
    */
   async confirmStewardship(password: string): Promise<boolean> {
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (!window.__TAURI__?.core) {
       this.graduationStatus.set('error');
       this.graduationError.set(TAURI_IPC_UNAVAILABLE);
@@ -465,7 +465,7 @@ export class TauriAuthService {
     this.graduationError.set('');
 
     try {
-      // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+      // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
       await window.__TAURI__.core.invoke('doorway_confirm_stewardship', { password });
 
       // Update auth state — identity is now local
@@ -496,7 +496,7 @@ export class TauriAuthService {
     isSteward: boolean;
     error?: string;
   }> {
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (!window.__TAURI__?.core) {
       return {
         success: false,
@@ -507,7 +507,7 @@ export class TauriAuthService {
     }
 
     try {
-      // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+      // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
       const result = await window.__TAURI__.core.invoke<DoorwayLoginResult>('doorway_login', {
         url: doorwayUrl,
         identifier,
@@ -550,13 +550,13 @@ export class TauriAuthService {
     isSteward: boolean;
     error?: string;
   }> {
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (!window.__TAURI__?.core) {
       return { success: false, isSteward: false, error: TAURI_IPC_UNAVAILABLE };
     }
 
     try {
-      // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+      // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
       const result = await window.__TAURI__.core.invoke<DoorwayUnlockResult>('doorway_unlock', {
         password,
       });
@@ -593,13 +593,13 @@ export class TauriAuthService {
    * Get doorway status from Tauri (reads doorway.json store).
    */
   async getDoorwayStatus(): Promise<DoorwayStatus | null> {
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (!window.__TAURI__?.core) {
       return null;
     }
 
     try {
-      // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+      // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
       return await window.__TAURI__.core.invoke<DoorwayStatus>('doorway_status');
     } catch {
       return null;
@@ -633,10 +633,10 @@ export class TauriAuthService {
     }
 
     // Clear Rust doorway.json credentials (bootstrap URLs, agent key, etc.)
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (window.__TAURI__?.core) {
       try {
-        // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+        // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
         await window.__TAURI__.core.invoke('doorway_logout');
       } catch (err) {
         if (err instanceof Error) {
@@ -666,13 +666,13 @@ export class TauriAuthService {
    * List all saved accounts from doorway.json.
    */
   async listAccounts(): Promise<AccountSummary[]> {
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (!window.__TAURI__?.core) {
       return [];
     }
 
     try {
-      // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+      // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
       return await window.__TAURI__.core.invoke<AccountSummary[]>('doorway_list_accounts');
     } catch {
       return [];
@@ -683,12 +683,12 @@ export class TauriAuthService {
    * Switch active account by humanId. Requires app restart.
    */
   async switchAccount(humanId: string): Promise<{ needsRestart: boolean }> {
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (!window.__TAURI__?.core) {
       return { needsRestart: false };
     }
 
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     return await window.__TAURI__.core.invoke<{ needsRestart: boolean }>('doorway_switch_account', {
       humanId,
     });
@@ -703,10 +703,10 @@ export class TauriAuthService {
    * Does NOT clear identity data. User can unlock with password.
    */
   async lock(): Promise<void> {
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (window.__TAURI__?.core) {
       try {
-        // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+        // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
         await window.__TAURI__.core.invoke('doorway_lock');
       } catch (err) {
         if (err instanceof Error) {
@@ -725,10 +725,10 @@ export class TauriAuthService {
    * Remove a specific account by humanId.
    */
   async removeAccount(humanId: string): Promise<void> {
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (!window.__TAURI__?.core) return;
 
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     await window.__TAURI__.core.invoke('doorway_remove_account', { humanId });
   }
 
@@ -736,10 +736,10 @@ export class TauriAuthService {
    * Reset all accounts — clears all identity data.
    */
   async resetAll(): Promise<void> {
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (!window.__TAURI__?.core) return;
 
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     await window.__TAURI__.core.invoke('doorway_reset');
 
     this.currentSession.set(null);
@@ -753,13 +753,13 @@ export class TauriAuthService {
    * Deregister identity from doorway (revoke + remove locally).
    */
   async deregister(password: string): Promise<{ success: boolean; error?: string }> {
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (!window.__TAURI__?.core) {
       return { success: false, error: TAURI_IPC_UNAVAILABLE };
     }
 
     try {
-      // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+      // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
       await window.__TAURI__.core.invoke('doorway_deregister', { password });
       return { success: true };
     } catch (err) {
@@ -774,10 +774,10 @@ export class TauriAuthService {
    * Emergency wipe — delete all local data and exit app.
    */
   async emergencyWipe(): Promise<void> {
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     if (!window.__TAURI__?.core) return;
 
-    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    // eslint-disable-next-line unicorn/prefer-global-this, no-restricted-syntax -- Tauri API is on window; SSR-safe: browser-only tauri surface, never SSR-rendered
     await window.__TAURI__.core.invoke('doorway_emergency_wipe');
   }
 }

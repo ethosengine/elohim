@@ -792,6 +792,7 @@ export class DataLoaderService {
             .setMetadata(idbKey, localProgress)
             .then(() => {
               try {
+                // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback; getAgentProgress is only reached via AgentService flows (profile/shefa/presence), never during SSR bootstrap of the SSR-rendered routes
                 localStorage.removeItem(lsKey);
               } catch {
                 /* ignore */
@@ -815,6 +816,7 @@ export class DataLoaderService {
 
     // Always write to localStorage as fallback
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback; saveAgentProgress is only reached via AgentService flows (profile/shefa/presence), never during SSR bootstrap of the SSR-rendered routes
       localStorage.setItem(lsKey, JSON.stringify(progress));
     } catch {
       // Silently ignore localStorage quota errors
@@ -834,6 +836,7 @@ export class DataLoaderService {
    */
   getLocalProgress(agentId: string, pathId: string): AgentProgress | null {
     const key = `lamad-progress-${agentId}-${pathId}`;
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: reached only via AgentService.getProgressForPath from profile/shefa/presence flows, never during SSR bootstrap of the SSR-rendered routes
     const data = localStorage.getItem(key);
     if (data) {
       try {

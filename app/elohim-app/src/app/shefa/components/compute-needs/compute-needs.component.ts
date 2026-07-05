@@ -100,6 +100,7 @@ export class ComputeNeedsComponent implements OnInit, OnDestroy {
 
     // If there's an order URL, open it
     if (rec.orderUrl) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only surface, never SSR-rendered (onOrderNode is only invoked from a template click handler on the "order node" button)
       window.open(rec.orderUrl, '_blank');
     }
   }

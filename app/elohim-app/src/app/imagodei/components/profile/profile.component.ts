@@ -400,6 +400,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
     if (migration) {
       const blob = new Blob([JSON.stringify(migration, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: only reachable via exportData(), bound only to the profile card's (exportData) user-triggered event, never invoked during SSR render
       const a = document.createElement('a');
       a.href = url;
       a.download = `elohim-identity-export.json`;

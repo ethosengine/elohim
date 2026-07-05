@@ -358,6 +358,7 @@ export class HealthCheckService implements OnDestroy {
 
     try {
       // Use Navigator.onLine as quick check
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only surface, never SSR-rendered — checkNetwork is only reachable via refresh(), only called inside the constructor's afterNextRender callback, which Angular skips entirely during SSR
       const isOnline = navigator.onLine;
 
       // Use Promise.resolve to satisfy require-await rule

@@ -134,8 +134,10 @@ export class AppComponent implements OnInit, OnDestroy {
   private registerEprProtocolHandler(): void {
     try {
       if ('registerProtocolHandler' in navigator) {
+        // eslint-disable-next-line no-restricted-syntax -- inside try/catch SSR fallback (navigator being undefined in the V8 SSR runtime is caught below and silently ignored)
         navigator.registerProtocolHandler(
           'web+epr',
+          // eslint-disable-next-line no-restricted-syntax -- inside try/catch SSR fallback, only reached in-browser (navigator.registerProtocolHandler check above already gates this line)
           `${globalThis.location.origin}/resolve?uri=%s`
         );
       }

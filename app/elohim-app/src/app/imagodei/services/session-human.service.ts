@@ -204,6 +204,7 @@ export class SessionHumanService {
     if (!session) return null;
     const key = `lamad-session-${session.sessionId}-progress-${pathId}`;
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       const stored = localStorage.getItem(key);
       if (stored) return JSON.parse(stored) as SessionPathProgress;
     } catch {
@@ -217,6 +218,7 @@ export class SessionHumanService {
     if (!session) return;
     const key = `lamad-session-${session.sessionId}-progress-${progress.pathId}`;
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       localStorage.setItem(key, JSON.stringify(progress));
     } catch {
       // quota exceeded — substrate projections are the durable record
@@ -229,10 +231,13 @@ export class SessionHumanService {
     if (!session) return [];
     const prefix = `lamad-session-${session.sessionId}-progress-`;
     const progress: SessionPathProgress[] = [];
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only session/profile surface, never SSR-rendered (only reached via ProfileService, injected outside the SSR-critical route tree)
     for (let i = 0; i < localStorage.length; i++) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only session/profile surface, never SSR-rendered
       const key = localStorage.key(i);
       if (key?.startsWith(prefix)) {
         try {
+          // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
           const data = localStorage.getItem(key);
           if (data) progress.push(JSON.parse(data) as SessionPathProgress);
         } catch {
@@ -266,10 +271,12 @@ export class SessionHumanService {
   dismissUpgradePrompt(promptId: string): void {
     try {
       const key = 'lamad-dismissed-prompts';
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       const stored = localStorage.getItem(key);
       const dismissed: string[] = stored ? (JSON.parse(stored) as string[]) : [];
       if (!dismissed.includes(promptId)) {
         dismissed.push(promptId);
+        // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
         localStorage.setItem(key, JSON.stringify(dismissed));
       }
     } catch {
@@ -279,6 +286,7 @@ export class SessionHumanService {
 
   getDismissedPromptIds(): string[] {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       const stored = localStorage.getItem('lamad-dismissed-prompts');
       return stored ? (JSON.parse(stored) as string[]) : [];
     } catch {
@@ -396,6 +404,7 @@ export class SessionHumanService {
     const affinityKey = this.getAffinityStorageKey();
     let affinity: Record<string, number> = {};
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       const stored = localStorage.getItem(affinityKey);
       if (stored) {
         const parsed = JSON.parse(stored) as Record<string, unknown>;
@@ -433,12 +442,15 @@ export class SessionHumanService {
     if (!session) return;
     const prefix = `lamad-session-${session.sessionId}`;
     const keysToRemove: string[] = [];
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only session/profile surface, never SSR-rendered (only reached via user-triggered SessionMigrationService.migrate())
     for (let i = 0; i < localStorage.length; i++) {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only session/profile surface, never SSR-rendered
       const key = localStorage.key(i);
       if (key?.startsWith(prefix) || key === this.STORAGE_KEY) {
         keysToRemove.push(key);
       }
     }
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only session/profile surface, never SSR-rendered
     keysToRemove.forEach(key => localStorage.removeItem(key));
     this.sessionSubject.next(null);
   }
@@ -533,6 +545,7 @@ export class SessionHumanService {
 
   private loadSession(): SessionHuman | null {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (stored) return JSON.parse(stored) as SessionHuman;
     } catch (err) {
@@ -545,6 +558,7 @@ export class SessionHumanService {
 
   private saveSession(session: SessionHuman): void {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(session));
     } catch {
       // quota exceeded — session-identity is small; this is unlikely
