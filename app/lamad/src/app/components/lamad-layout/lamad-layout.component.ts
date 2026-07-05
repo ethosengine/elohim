@@ -16,10 +16,12 @@ import { DataLoaderService } from '../../services/data-loader.service';
 
 import { RendererInitializerService } from '../../renderers/renderer-initializer.service';
 
+import { SyncProgressComponent } from '../sync-progress/sync-progress.component';
+
 @Component({
   selector: 'app-lamad-layout',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, FormsModule],
+  imports: [CommonModule, RouterOutlet, FormsModule, SyncProgressComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './lamad-layout.component.html',
   styleUrls: ['./lamad-layout.component.css'],

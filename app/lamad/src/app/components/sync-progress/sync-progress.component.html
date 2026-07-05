@@ -1,0 +1,21 @@
+<div
+  *ngIf="display() as p"
+  class="sync-progress"
+  [class.sync-progress--waiting]="p.phase === 'waiting'"
+  [class.sync-progress--syncing]="p.phase === 'syncing'"
+  [class.sync-progress--unreachable]="p.phase === 'unreachable'"
+  role="status"
+  aria-live="polite"
+  [attr.aria-label]="p.label"
+  data-testid="lamad-sync-progress"
+>
+  <div class="sync-progress__track" [attr.aria-hidden]="true">
+    <div
+      class="sync-progress__fill"
+      [class.sync-progress__fill--indeterminate]="p.percent === null && p.phase !== 'unreachable'"
+      [style.width.%]="p.percent ?? 100"
+      data-testid="lamad-sync-progress-fill"
+    ></div>
+  </div>
+  <span class="sync-progress__label" data-testid="lamad-sync-progress-label">{{ p.label }}</span>
+</div>
