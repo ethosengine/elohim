@@ -7,6 +7,9 @@
     [identityRoutes]="navigatorIdentityRoutes"
     (navigate)="onNavigatorNavigate($event)"
   >
+    <!-- Live sync convergence strip (non-blocking; self-hides when caught up) -->
+    <app-sync-progress></app-sync-progress>
+
     <!-- Loading State -->
     <div *ngIf="!isReady" class="loading-state">
       <div class="spinner"></div>

@@ -1,0 +1,70 @@
+/* Compact, non-blocking sync strip. Consumes the bundle's --elohim-* token layer
+   (never defines new tokens — see app/lamad/CLAUDE.md § bundle rails); every color
+   has a sane light fallback so it degrades before the token layer binds. */
+
+.sync-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  color: var(--elohim-fg-muted, #556074);
+  background: var(--elohim-surface-2, rgba(0, 0, 0, 0.035));
+  border-bottom: 1px solid var(--elohim-border, rgba(0, 0, 0, 0.08));
+}
+
+.sync-progress__track {
+  position: relative;
+  flex: 0 0 120px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--elohim-border, rgba(0, 0, 0, 0.1));
+  overflow: hidden;
+}
+
+.sync-progress__fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--elohim-accent, #4a90d9);
+  transition: width 0.4s ease;
+}
+
+.sync-progress--waiting .sync-progress__fill {
+  background: var(--elohim-fg-muted, #8892a6);
+}
+
+.sync-progress--unreachable .sync-progress__fill {
+  width: 100%;
+  background: var(--elohim-danger, #d9534f);
+}
+
+/* Unknown total: a moving sliver instead of a false fixed percentage. */
+.sync-progress__fill--indeterminate {
+  width: 40% !important;
+  animation: sync-progress-indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes sync-progress-indeterminate {
+  0% {
+    margin-left: -40%;
+  }
+  100% {
+    margin-left: 100%;
+  }
+}
+
+.sync-progress__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync-progress__fill {
+    transition: none;
+  }
+  .sync-progress__fill--indeterminate {
+    animation: none;
+  }
+}
