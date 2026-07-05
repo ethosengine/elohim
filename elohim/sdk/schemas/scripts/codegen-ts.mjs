@@ -292,6 +292,37 @@ async function loadRefMap(baseDir) {
     }
   }
 
+  // Load manifest (singular) schemas — app-manifest.schema.json, manifest-epr.schema.json,
+  // and the constitutional-floor schemas (standing-policy-floor, tending-policy-floor) T7
+  // bundles via include_str! for integrity-zome validation. Distinct from `manifests/`
+  // (plural, operator-published federation-manifest projections) above. Cross-dir $ref
+  // needed for e.g. manifest-payloads/tending-policy.schema.json → floor:
+  // "$ref": "epr:schema:manifest:tending-policy-floor" (bare $id form, no filesystem path
+  // ever exists for it — omitting this block leaves the $ref unresolved and
+  // json-schema-to-typescript's compiler then tries to open it as a literal filename,
+  // producing ENOENT: no such file or directory, open 'epr:schema:manifest:tending-policy-floor').
+  const manifestSingularDir = join(baseDir, 'manifest');
+  let manifestSingularFiles;
+  try {
+    manifestSingularFiles = (await readdir(manifestSingularDir)).filter((f) =>
+      f.endsWith('.schema.json'),
+    );
+  } catch {
+    manifestSingularFiles = [];
+  }
+  for (const file of manifestSingularFiles) {
+    const schema = JSON.parse(await readFile(join(manifestSingularDir, file), 'utf8'));
+    refMap.set(`../manifest/${file}`, schema);
+    refMap.set(`manifest/${file}`, schema);
+    // Same-dir bare-filename and "./" forms (manifest-epr.schema.json refs its floor
+    // siblings as "standing-policy-floor.schema.json" / "tending-policy-floor.schema.json").
+    refMap.set(file, schema);
+    refMap.set(`./${file}`, schema);
+    if (schema.$id) {
+      refMap.set(schema.$id, schema);
+    }
+  }
+
   // Load attestation schemas (cross-schema $ref between content/metadata/proof-evidence
   // and from subtypes/ back up to enums/ via ../../enums/).
   const attestationDir = join(baseDir, 'attestation');
