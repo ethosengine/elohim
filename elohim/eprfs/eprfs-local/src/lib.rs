@@ -8,6 +8,9 @@ use eprfs_core::{
 };
 use eprfs_host::{Capability, HostProfile, SymlinkMode};
 
+mod verify;
+pub use verify::{has_drift, verify_projection, EntryDrift};
+
 /// Writes an EPR projection manifest into an ordinary local directory.
 pub struct LocalMaterializer<S> {
     storage: S,

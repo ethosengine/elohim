@@ -242,6 +242,7 @@ dependencies = [
  "eprfs-host",
  "eprfs-storage",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 
