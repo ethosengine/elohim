@@ -73,6 +73,17 @@ fn render_claude(agent: &CanonicalAgent) -> Vec<u8> {
         // any frontmatter beyond the known set).
         if let Some(scalar) = value.as_str() {
             out.push_str(&format!("{key}: {scalar}\n"));
+        } else {
+            // Non-scalar frontmatter (list/map): serialize best-effort so no data is
+            // lost. NOTE: authored block/flow STYLE may not round-trip byte-for-byte
+            // (a later wave handles style-preserving YAML — see backlog). Data-preserving
+            // is strictly better than the previous silent drop.
+            let mut single = serde_yaml::Mapping::new();
+            single.insert(serde_yaml::Value::String(key.clone()), value.clone());
+            if let Ok(rendered) = serde_yaml::to_string(&single) {
+                out.push_str(rendered.trim_end());
+                out.push('\n');
+            }
         }
     }
     out.push_str("---\n\n");
@@ -142,6 +153,27 @@ mod tests {
         assert!(out.contains("\ntools: Task, Bash\n"));
         assert!(out.contains("\nmodel: sonnet\n"));
         assert!(out.contains("\n---\n\nYou are the reviewer."));
+        // Lock the fixed key order (name, description, tools, model, color) with an
+        // exact-string comparison so a future silent reorder fails loudly instead of
+        // slipping past the substring checks above.
+        assert_eq!(
+            out,
+            "---\nname: code-reviewer\ndescription: Reviews the diff.\ntools: Task, Bash\nmodel: sonnet\ncolor: red\n---\n\nYou are the reviewer.\n"
+        );
+    }
+
+    #[test]
+    fn claude_render_preserves_non_scalar_extra_frontmatter() {
+        let agent = CanonicalAgent::parse(
+            "---\nname: code-reviewer\ndescription: Reviews the diff.\ntools: Task, Bash\nmodel: sonnet\ncolor: red\ncapabilities:\n  - read\n  - write\n---\n\nYou are the reviewer.\n",
+        )
+        .unwrap();
+        let out = String::from_utf8(ProjectionBinding::claude_agent().render(&agent)).unwrap();
+        // Non-scalar (list) extra frontmatter must survive into the render — a prior
+        // version silently dropped anything that wasn't a scalar string.
+        assert!(out.contains("capabilities:"));
+        assert!(out.contains("read"));
+        assert!(out.contains("write"));
     }
 
     #[test]
@@ -160,5 +192,15 @@ mod tests {
     #[test]
     fn normalize_trims_trailing_ws_and_forces_single_final_newline() {
         assert_eq!(normalize(b"a  \nb\n\n\n"), "a\nb\n");
+    }
+
+    #[test]
+    fn normalize_is_idempotent() {
+        assert_eq!(normalize(normalize(b"a  \nb\n\n\n").as_bytes()), "a\nb\n");
+    }
+
+    #[test]
+    fn normalize_preserves_interior_blank_lines() {
+        assert_eq!(normalize(b"a\n\nb\n"), "a\n\nb\n");
     }
 }
