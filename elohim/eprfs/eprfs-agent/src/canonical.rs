@@ -71,7 +71,8 @@ impl CanonicalAgent {
     }
 
     /// Deterministic bytes for the fingerprint: slug, description, tools (in
-    /// authored order), model, color, then body — never path-derived.
+    /// authored order), model, color, extra (key-sorted), then body — never
+    /// path-derived.
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut out = String::new();
         out.push_str("slug:");
@@ -86,6 +87,15 @@ impl CanonicalAgent {
         out.push_str(self.model.as_deref().unwrap_or(""));
         out.push_str("\ncolor:");
         out.push_str(self.color.as_deref().unwrap_or(""));
+        out.push_str("\nextra:");
+        // `extra` is a BTreeMap, so iteration order is already key-sorted —
+        // deterministic without an explicit sort step.
+        for (key, value) in &self.extra {
+            out.push('\n');
+            out.push_str(key);
+            out.push('=');
+            out.push_str(serde_yaml::to_string(value).unwrap_or_default().trim());
+        }
         out.push_str("\nbody:\n");
         out.push_str(&self.body);
         out.into_bytes()
@@ -158,10 +168,19 @@ mod tests {
         let different_body = CanonicalAgent::parse(SAMPLE_DIFFERENT_BODY).unwrap();
         assert_ne!(agent.cid(), different_body.cid());
 
-        // (b) a description-only change also produces a different cid.
+        // (c) a description-only change also produces a different cid.
         const SAMPLE_DIFFERENT_DESCRIPTION: &str = "---\nname: code-reviewer\ndescription: A completely different description.\ntools: Task, Bash, Grep\nmodel: sonnet\ncolor: red\n---\n\nYou are the Code Review Specialist.\n";
         let different_description = CanonicalAgent::parse(SAMPLE_DIFFERENT_DESCRIPTION).unwrap();
         assert_ne!(agent.cid(), different_description.cid());
+    }
+
+    #[test]
+    fn cid_changes_with_extra_frontmatter() {
+        const SAMPLE_EXTRA_FOO: &str = "---\nname: code-reviewer\ndescription: Reviews the diff.\ntools: Task, Bash, Grep\nmodel: sonnet\ncolor: red\ncustom_field: foo\n---\n\nYou are the Code Review Specialist.\n";
+        const SAMPLE_EXTRA_BAR: &str = "---\nname: code-reviewer\ndescription: Reviews the diff.\ntools: Task, Bash, Grep\nmodel: sonnet\ncolor: red\ncustom_field: bar\n---\n\nYou are the Code Review Specialist.\n";
+        let foo = CanonicalAgent::parse(SAMPLE_EXTRA_FOO).unwrap();
+        let bar = CanonicalAgent::parse(SAMPLE_EXTRA_BAR).unwrap();
+        assert_ne!(foo.cid(), bar.cid());
     }
 
     #[test]

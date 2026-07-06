@@ -21,6 +21,7 @@ pub async fn project<S: EprfsStorage>(
     for agent in agents {
         for binding in bindings {
             let bytes = binding.render(agent);
+            let size = bytes.len() as u64;
             let blob = storage.put_blob(Bytes::from(bytes)).await?;
             let path = ProjectionPath::new(binding.target_path(&agent.slug))?;
 
@@ -34,7 +35,7 @@ pub async fn project<S: EprfsStorage>(
                 )),
                 epr: None,
                 blob: Some(blob),
-                size_bytes: None,
+                size_bytes: Some(size),
                 executable: false,
                 status: ProjectionStatus::Unknown,
                 metadata: serde_json::Value::Null,
@@ -101,5 +102,14 @@ mod tests {
             .find(|e| e.path.as_path().starts_with(".codex"))
             .unwrap();
         assert_ne!(claude.blob, codex.blob);
+        // size_bytes reflects the actual rendered length for both surfaces.
+        assert_eq!(
+            claude.size_bytes,
+            Some(ProjectionBinding::claude_agent().render(&sample()).len() as u64)
+        );
+        assert_eq!(
+            codex.size_bytes,
+            Some(ProjectionBinding::codex_agent().render(&sample()).len() as u64)
+        );
     }
 }

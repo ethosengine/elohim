@@ -10,8 +10,6 @@ pub enum AgentProjectionError {
     Yaml(#[from] serde_yaml::Error),
     #[error("capability is missing required frontmatter field: {0}")]
     MissingField(&'static str),
-    #[error("unknown projection runtime: {0}")]
-    UnknownRuntime(String),
     #[error(transparent)]
     Eprfs(#[from] eprfs_core::EprfsError),
 }

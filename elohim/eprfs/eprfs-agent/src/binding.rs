@@ -80,9 +80,21 @@ fn render_claude(agent: &CanonicalAgent) -> Vec<u8> {
             // is strictly better than the previous silent drop.
             let mut single = serde_yaml::Mapping::new();
             single.insert(serde_yaml::Value::String(key.clone()), value.clone());
-            if let Ok(rendered) = serde_yaml::to_string(&single) {
-                out.push_str(rendered.trim_end());
-                out.push('\n');
+            match serde_yaml::to_string(&single) {
+                Ok(rendered) => {
+                    out.push_str(rendered.trim_end());
+                    out.push('\n');
+                }
+                Err(err) => {
+                    // Best-effort in release (the field is dropped rather than
+                    // panicking), but a serde_yaml serialize failure here is
+                    // unexpected — surface it loudly in debug builds instead of
+                    // silently swallowing the data loss.
+                    debug_assert!(
+                        false,
+                        "serde_yaml::to_string failed for extra key {key:?}: {err}"
+                    );
+                }
             }
         }
     }
