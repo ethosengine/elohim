@@ -1247,9 +1247,10 @@ diesel::table! {
 
 diesel::table! {
     peer_inventory_cursor (peer_id) {
-        peer_id       -> Text,
-        last_sequence -> BigInt,
-        last_updated  -> Text,
+        peer_id           -> Text,
+        last_sequence     -> BigInt,
+        last_updated      -> Text,
+        last_content_hash -> Nullable<Text>,
     }
 }
 

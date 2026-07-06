@@ -11,24 +11,109 @@
 //!   to the snapshot's sequence.
 //! - Deltas check `sequence == stored_max + 1`. Gaps queue a snapshot-request.
 //!   Replays drop silently.
+//!
+//! ## Snapshot idempotency (convergence under WAN loss/reorder)
+//!
+//! `apply_snapshot` dedups on a CONTENT fingerprint stored on the cursor
+//! (`last_content_hash`): a snapshot whose blob set equals the last-applied set
+//! is a cheap no-op ([`SnapshotApplyOutcome::Deduplicated`]) and the caller skips
+//! commitment re-scoring. This collapses gossipsub re-delivery storms and
+//! redundant periodic re-snapshots (the publisher bumps `sequence` every tick
+//! even when content is unchanged) back toward the design cadence, without
+//! weakening the accept-regardless-of-sequence attack-recovery path — a genuinely
+//! different snapshot at any sequence has a different fingerprint and still
+//! applies.
 
 use crate::db::diesel_schema::{peer_blob_inventory, peer_inventory_cursor};
 use crate::db::models::{NewPeerBlobInventoryRow, NewPeerInventoryCursorRow, PeerBlobInventoryRow};
 use crate::error::StorageError;
 use diesel::prelude::*;
 
-/// Apply a full snapshot for a peer. Replaces all existing entries for this
-/// peer with the new set; entries not in the new set are deleted.
-/// Snapshots are accepted regardless of sequence.
+/// Apply a full snapshot for a peer, idempotently.
+///
+/// When the incoming blob set is byte-identical to the last set already applied
+/// for this peer (compared via a content fingerprint stored on the cursor), the
+/// snapshot carries no new information: it is a cheap no-op — no delete+reinsert,
+/// and, via [`SnapshotApplyOutcome::Deduplicated`], the caller skips commitment
+/// re-scoring. Otherwise the peer's entries are fully replaced (entries not in
+/// the new set are deleted) and the fingerprint is recorded.
+///
+/// **Convergence contract.** Under WAN loss/reorder, gossipsub re-floods the same
+/// snapshot many times (IHAVE/IWANT gap recovery + relay fan-in) and the publisher
+/// re-emits an unchanged inventory every tick with a fresh `sequence`. Both
+/// collapse to no-ops here, keeping a full-arc sink flat instead of pegging a core
+/// re-applying every echo. See migration
+/// `2026-07-06-120000_peer_inventory_cursor_content_hash`.
+///
+/// **Sequence semantics preserved.** Dedup keys on CONTENT, never on
+/// `(peer_id, sequence)`: a genuinely different recovery snapshot at ANY sequence
+/// (including a repeated one — the "accepted regardless of sequence" attack-recovery
+/// path) has a different fingerprint and still applies.
 pub fn apply_snapshot(
     conn: &mut SqliteConnection,
     peer_id: &str,
     hashes: &[String],
     sequence: i64,
     snapshot_at: &str,
-) -> Result<(), StorageError> {
-    conn.transaction(|conn| {
-        // Delete all existing entries for this peer.
+) -> Result<SnapshotApplyOutcome, StorageError> {
+    let content_hash = content_fingerprint(hashes);
+
+    conn.transaction::<SnapshotApplyOutcome, diesel::result::Error, _>(|conn| {
+        // Read the current cursor: sequence high-watermark, the freshness clock
+        // (last_updated), and the fingerprint of the last-applied set.
+        let existing: Option<(i64, String, Option<String>)> = peer_inventory_cursor::table
+            .filter(peer_inventory_cursor::peer_id.eq(peer_id))
+            .select((
+                peer_inventory_cursor::last_sequence,
+                peer_inventory_cursor::last_updated,
+                peer_inventory_cursor::last_content_hash,
+            ))
+            .first::<(i64, String, Option<String>)>(conn)
+            .optional()?;
+
+        // ── Idempotent fast-path ────────────────────────────────────────────
+        if let Some((last_seq, ref last_updated, Some(ref last_hash))) = existing {
+            if *last_hash == content_hash {
+                // Identical inventory already applied. Skip the O(N) set churn
+                // and (via the outcome) the caller's per-hash commitment scoring.
+                let need_seq_advance = sequence > last_seq;
+                let need_refresh =
+                    secs_between(last_updated, snapshot_at) >= DEDUP_FRESHNESS_REFRESH_SECS;
+
+                if need_refresh {
+                    // Cheap, rate-limited freshness touch so lookup_hosts() keeps
+                    // returning a still-announced STATIC inventory — one indexed
+                    // UPDATE, no set churn, at most once per refresh interval even
+                    // under a re-delivery storm.
+                    diesel::update(
+                        peer_blob_inventory::table.filter(peer_blob_inventory::peer_id.eq(peer_id)),
+                    )
+                    .set(peer_blob_inventory::last_seen_at.eq(snapshot_at))
+                    .execute(conn)?;
+                }
+
+                if need_seq_advance || need_refresh {
+                    // Keep the delta high-watermark contiguous with the publisher's
+                    // shared snapshot/delta counter so a following in-order delta is
+                    // not misread as a gap; never move the watermark backward on a
+                    // reordered echo. Advance the freshness clock ONLY when we
+                    // actually refreshed, so the rate-limit measures from the last
+                    // real touch.
+                    let new_seq = sequence.max(last_seq);
+                    let clock: &str = if need_refresh {
+                        snapshot_at
+                    } else {
+                        last_updated
+                    };
+                    upsert_cursor(conn, peer_id, new_seq, clock, Some(&content_hash))?;
+                }
+
+                return Ok(SnapshotApplyOutcome::Deduplicated);
+            }
+        }
+
+        // ── Content changed (or first snapshot / delta-advanced cursor) ─────
+        // Full replace. Delete all existing entries for this peer.
         diesel::delete(peer_blob_inventory::table.filter(peer_blob_inventory::peer_id.eq(peer_id)))
             .execute(conn)?;
 
@@ -51,12 +136,48 @@ pub fn apply_snapshot(
                 .execute(conn)?;
         }
 
-        // Update cursor. Snapshots always advance the cursor to their sequence.
-        upsert_cursor(conn, peer_id, sequence, snapshot_at)?;
+        // Update cursor and record the fingerprint of the applied set. Snapshots
+        // always advance the cursor to their sequence (accept-regardless-of-sequence).
+        upsert_cursor(conn, peer_id, sequence, snapshot_at, Some(&content_hash))?;
 
-        Ok::<(), diesel::result::Error>(())
+        Ok(SnapshotApplyOutcome::Applied)
     })
     .map_err(|e| StorageError::Database(format!("apply_snapshot: {e}")))
+}
+
+/// Order-independent content fingerprint of a peer's advertised blob set.
+/// SHA-256 over the sorted, de-duplicated, length-prefixed hashes — hex. Two
+/// snapshots advertising the same set (in any order) share a fingerprint; an
+/// empty set has a stable fingerprint (so re-echoed empty snapshots also dedup).
+fn content_fingerprint(hashes: &[String]) -> String {
+    use sha2::{Digest, Sha256};
+    let mut sorted: Vec<&str> = hashes.iter().map(|s| s.as_str()).collect();
+    sorted.sort_unstable();
+    sorted.dedup();
+    let mut hasher = Sha256::new();
+    hasher.update((sorted.len() as u64).to_le_bytes());
+    for h in sorted {
+        // Length-prefix each element so set boundaries are unambiguous
+        // (["ab","c"] and ["a","bc"] must not collide).
+        hasher.update((h.len() as u64).to_le_bytes());
+        hasher.update(h.as_bytes());
+    }
+    hex::encode(hasher.finalize())
+}
+
+/// Whole seconds from `earlier_iso` to `later_iso` (both `%Y-%m-%dT%H:%M:%SZ`).
+/// On any parse failure returns `i64::MAX` — fail toward a freshness refresh,
+/// never toward silently letting rows go stale.
+fn secs_between(earlier_iso: &str, later_iso: &str) -> i64 {
+    use chrono::NaiveDateTime;
+    const FMT: &str = "%Y-%m-%dT%H:%M:%SZ";
+    match (
+        NaiveDateTime::parse_from_str(earlier_iso, FMT),
+        NaiveDateTime::parse_from_str(later_iso, FMT),
+    ) {
+        (Ok(a), Ok(b)) => (b - a).num_seconds(),
+        _ => i64::MAX,
+    }
 }
 
 /// Apply a delta for a peer.
@@ -113,7 +234,11 @@ pub fn apply_delta(
                     )
                     .execute(conn)?;
                 }
-                upsert_cursor(conn, peer_id, sequence, emitted_at)?;
+                // A delta mutates the set, so any snapshot fingerprint recorded on
+                // the cursor is now stale — clear it (None) so the next snapshot
+                // re-applies and re-establishes the fingerprint rather than being
+                // wrongly deduped against a pre-delta set.
+                upsert_cursor(conn, peer_id, sequence, emitted_at, None)?;
                 Ok(DeltaApplyOutcome::Applied)
             }
         }
@@ -323,6 +448,23 @@ pub fn set_transport_affinity(
     updated.map_err(|e| StorageError::Database(format!("set_transport_affinity: {e}")))
 }
 
+/// Outcome of `apply_snapshot`. The caller uses this to skip the expensive
+/// commitment re-scoring (`score_and_enqueue_snapshot`) on a deduplicated echo.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnapshotApplyOutcome {
+    /// Content changed (or first snapshot): the peer's entries were replaced.
+    Applied,
+    /// Byte-identical to the last-applied set: no set churn, no re-score needed.
+    Deduplicated,
+}
+
+/// How stale the freshness clock may get before a deduplicated snapshot triggers
+/// a cheap `last_seen_at` touch. Kept well under the inventory freshness window
+/// (default 600s) so a still-announced static inventory never falls out of
+/// `lookup_hosts`, while a re-delivery storm touches rows at most once per this
+/// interval instead of per message.
+const DEDUP_FRESHNESS_REFRESH_SECS: i64 = 30;
+
 /// Outcome of `apply_delta`. Used by the caller to decide whether to request
 /// a snapshot from the source peer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -337,11 +479,13 @@ fn upsert_cursor(
     peer_id: &str,
     sequence: i64,
     last_updated: &str,
+    last_content_hash: Option<&str>,
 ) -> Result<(), diesel::result::Error> {
     let row = NewPeerInventoryCursorRow {
         peer_id: peer_id.to_string(),
         last_sequence: sequence,
         last_updated: last_updated.to_string(),
+        last_content_hash: last_content_hash.map(|s| s.to_string()),
     };
     diesel::replace_into(peer_inventory_cursor::table)
         .values(&row)
@@ -408,6 +552,324 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].peer_id, "peer_A");
         assert_eq!(rows[0].sequence, 2);
+    }
+
+    // ── Snapshot idempotency (convergence under WAN re-delivery) ─────────────
+
+    #[test]
+    fn content_fingerprint_is_order_independent() {
+        // Same set, any order → same fingerprint.
+        assert_eq!(
+            content_fingerprint(&["a".into(), "b".into()]),
+            content_fingerprint(&["b".into(), "a".into()]),
+        );
+        // Different set → different fingerprint.
+        assert_ne!(
+            content_fingerprint(&["a".into(), "b".into()]),
+            content_fingerprint(&["a".into(), "c".into()]),
+        );
+        // Length-prefixing guards against set-boundary collisions.
+        assert_ne!(
+            content_fingerprint(&["ab".into(), "c".into()]),
+            content_fingerprint(&["a".into(), "bc".into()]),
+        );
+    }
+
+    #[test]
+    fn snapshot_identical_content_is_deduplicated() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        // First snapshot applies.
+        assert_eq!(
+            apply_snapshot(
+                &mut conn,
+                "peer_I",
+                &["h1".into(), "h2".into()],
+                1,
+                "2026-05-02T00:00:00Z"
+            )
+            .unwrap(),
+            SnapshotApplyOutcome::Applied
+        );
+        // The publisher bumps `sequence` every tick even with unchanged content —
+        // an identical set at a NEW sequence must dedup (not re-apply).
+        assert_eq!(
+            apply_snapshot(
+                &mut conn,
+                "peer_I",
+                &["h1".into(), "h2".into()],
+                2,
+                "2026-05-02T00:00:10Z"
+            )
+            .unwrap(),
+            SnapshotApplyOutcome::Deduplicated
+        );
+
+        // No duplicate rows; the set is intact.
+        assert_eq!(
+            lookup_hosts(&mut conn, "h1", "2026-05-01T00:00:00Z")
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            lookup_hosts(&mut conn, "h2", "2026-05-01T00:00:00Z")
+                .unwrap()
+                .len(),
+            1
+        );
+        // Cursor sequence still advanced (delta-ordering stays contiguous).
+        assert_eq!(read_cursor_sequence(&mut conn, "peer_I").unwrap(), Some(2));
+    }
+
+    #[test]
+    fn snapshot_reordered_identical_content_is_deduplicated() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        apply_snapshot(
+            &mut conn,
+            "peer_O",
+            &["h1".into(), "h2".into()],
+            1,
+            "2026-05-02T00:00:00Z",
+        )
+        .unwrap();
+        // Same set, reordered on the wire → still a no-op.
+        assert_eq!(
+            apply_snapshot(
+                &mut conn,
+                "peer_O",
+                &["h2".into(), "h1".into()],
+                2,
+                "2026-05-02T00:00:10Z"
+            )
+            .unwrap(),
+            SnapshotApplyOutcome::Deduplicated
+        );
+    }
+
+    #[test]
+    fn snapshot_different_content_same_sequence_still_applies() {
+        // Preserves the deliberate "accepted regardless of sequence" attack-recovery
+        // path: a genuinely different recovery snapshot at a REPEATED sequence must
+        // still apply, because dedup keys on content, not (peer_id, sequence).
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        apply_snapshot(
+            &mut conn,
+            "peer_S",
+            &["h1".into(), "h2".into()],
+            5,
+            "2026-05-02T00:00:00Z",
+        )
+        .unwrap();
+        assert_eq!(
+            apply_snapshot(
+                &mut conn,
+                "peer_S",
+                &["h3".into(), "h4".into()],
+                5,
+                "2026-05-02T00:00:10Z"
+            )
+            .unwrap(),
+            SnapshotApplyOutcome::Applied
+        );
+
+        assert!(lookup_hosts(&mut conn, "h1", "2026-05-01T00:00:00Z")
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            lookup_hosts(&mut conn, "h3", "2026-05-01T00:00:00Z")
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn snapshot_dedup_advances_cursor_for_delta_ordering() {
+        // A deduplicated snapshot must still advance the watermark, or a following
+        // in-order delta is misread as a gap and triggers a needless snapshot-request.
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        apply_snapshot(
+            &mut conn,
+            "peer_DO",
+            &["h1".into()],
+            1,
+            "2026-05-02T00:00:00Z",
+        )
+        .unwrap();
+        assert_eq!(
+            apply_snapshot(
+                &mut conn,
+                "peer_DO",
+                &["h1".into()],
+                2,
+                "2026-05-02T00:00:10Z"
+            )
+            .unwrap(),
+            SnapshotApplyOutcome::Deduplicated
+        );
+        // Delta at sequence 3 is contiguous with the deduped snapshot@2 → Applied,
+        // not Gap. Without the watermark advance the cursor would be stuck at 1.
+        let outcome = apply_delta(
+            &mut conn,
+            "peer_DO",
+            &["h2".into()],
+            &[],
+            3,
+            "2026-05-02T00:00:20Z",
+        )
+        .unwrap();
+        assert_eq!(outcome, DeltaApplyOutcome::Applied);
+        assert_eq!(
+            lookup_hosts(&mut conn, "h2", "2026-05-01T00:00:00Z")
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn snapshot_dedup_refreshes_freshness_after_interval() {
+        // A static inventory that only re-snapshots must not fall out of the
+        // freshness window: a dedup beyond the refresh interval touches last_seen_at.
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        apply_snapshot(
+            &mut conn,
+            "peer_F1",
+            &["h1".into()],
+            1,
+            "2026-05-02T00:00:00Z",
+        )
+        .unwrap();
+        // 60s later (> DEDUP_FRESHNESS_REFRESH_SECS=30) → dedup + refresh.
+        assert_eq!(
+            apply_snapshot(
+                &mut conn,
+                "peer_F1",
+                &["h1".into()],
+                2,
+                "2026-05-02T00:01:00Z"
+            )
+            .unwrap(),
+            SnapshotApplyOutcome::Deduplicated
+        );
+
+        // With a fresh_after between the two timestamps, the row is only returned
+        // if last_seen_at was refreshed to the second snapshot's time.
+        let rows = lookup_hosts(&mut conn, "h1", "2026-05-02T00:00:30Z").unwrap();
+        assert_eq!(
+            rows.len(),
+            1,
+            "refreshed row must survive the freshness filter"
+        );
+        assert_eq!(rows[0].last_seen_at, "2026-05-02T00:01:00Z");
+    }
+
+    #[test]
+    fn snapshot_dedup_rate_limits_freshness_touch() {
+        // Under a storm the freshness touch is rate-limited: a dedup WITHIN the
+        // refresh interval leaves last_seen_at untouched (no per-message row rewrite).
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        apply_snapshot(
+            &mut conn,
+            "peer_F2",
+            &["h1".into()],
+            1,
+            "2026-05-02T00:00:00Z",
+        )
+        .unwrap();
+        // Refresh at 00:01:00 (60s > 30).
+        apply_snapshot(
+            &mut conn,
+            "peer_F2",
+            &["h1".into()],
+            2,
+            "2026-05-02T00:01:00Z",
+        )
+        .unwrap();
+        // 10s after the last refresh (< 30) → dedup, NO refresh.
+        assert_eq!(
+            apply_snapshot(
+                &mut conn,
+                "peer_F2",
+                &["h1".into()],
+                3,
+                "2026-05-02T00:01:10Z"
+            )
+            .unwrap(),
+            SnapshotApplyOutcome::Deduplicated
+        );
+
+        let rows = lookup_hosts(&mut conn, "h1", "2026-05-01T00:00:00Z").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            rows[0].last_seen_at, "2026-05-02T00:01:00Z",
+            "within-interval dedup must not rewrite last_seen_at"
+        );
+        // Sequence still advances even when freshness is not refreshed.
+        assert_eq!(read_cursor_sequence(&mut conn, "peer_F2").unwrap(), Some(3));
+    }
+
+    #[test]
+    fn snapshot_after_delta_reapplies_not_deduped() {
+        // A delta clears the snapshot fingerprint, so the next snapshot re-applies
+        // (re-establishing the fingerprint) rather than wrongly deduping against a
+        // pre-delta set.
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        apply_snapshot(
+            &mut conn,
+            "peer_AD",
+            &["h1".into()],
+            1,
+            "2026-05-02T00:00:00Z",
+        )
+        .unwrap();
+        apply_delta(
+            &mut conn,
+            "peer_AD",
+            &["h2".into()],
+            &[],
+            2,
+            "2026-05-02T00:00:10Z",
+        )
+        .unwrap();
+        // Snapshot reflecting the post-delta set must Apply (fingerprint was cleared).
+        assert_eq!(
+            apply_snapshot(
+                &mut conn,
+                "peer_AD",
+                &["h1".into(), "h2".into()],
+                3,
+                "2026-05-02T00:00:20Z"
+            )
+            .unwrap(),
+            SnapshotApplyOutcome::Applied
+        );
+        // And an identical one after it dedups.
+        assert_eq!(
+            apply_snapshot(
+                &mut conn,
+                "peer_AD",
+                &["h1".into(), "h2".into()],
+                4,
+                "2026-05-02T00:00:30Z"
+            )
+            .unwrap(),
+            SnapshotApplyOutcome::Deduplicated
+        );
     }
 
     #[test]

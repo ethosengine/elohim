@@ -6001,13 +6001,17 @@ impl P2PNode {
                                                 snapshot.sequence as i64,
                                                 &when,
                                             ) {
-                                                Ok(()) => {
+                                                Ok(crate::db::peer_blob_inventory::SnapshotApplyOutcome::Applied) => {
                                                     // INFO (was DEBUG): on alpha, gossipsub
                                                     // inventory publish fails after pod
                                                     // restarts, so the presence/absence of
                                                     // this line is the primary signal for
                                                     // diagnosing a heal 404 — it tells us
                                                     // whether a peer's inventory ever landed.
+                                                    // Emitted only on a genuine content change
+                                                    // now, so it no longer floods under a
+                                                    // re-delivery storm while staying the
+                                                    // "new inventory landed" diagnostic.
                                                     info!(
                                                         target: "elohim_storage::inventory",
                                                         from = %propagation_source,
@@ -6027,6 +6031,23 @@ impl P2PNode {
                                                         &snapshot.peer_id,
                                                         &snapshot.hints,
                                                         &hashes_str,
+                                                    );
+                                                }
+                                                Ok(crate::db::peer_blob_inventory::SnapshotApplyOutcome::Deduplicated) => {
+                                                    // Byte-identical re-echo: a WAN gossipsub
+                                                    // re-delivery, or a redundant periodic
+                                                    // re-snapshot of unchanged inventory.
+                                                    // Carries no new information — skip the
+                                                    // per-hash commitment re-score (the CPU
+                                                    // sink that pegged a full-arc sink) and
+                                                    // stay at DEBUG so the storm no longer
+                                                    // floods stdout at tens of lines/sec.
+                                                    debug!(
+                                                        target: "elohim_storage::inventory",
+                                                        from = %propagation_source,
+                                                        peer_id = %snapshot.peer_id,
+                                                        sequence = snapshot.sequence,
+                                                        "Inventory snapshot deduplicated (identical content)"
                                                     );
                                                 }
                                                 Err(e) => warn!(

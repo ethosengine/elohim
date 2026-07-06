@@ -3236,6 +3236,10 @@ pub struct PeerInventoryCursorRow {
     pub peer_id: String,
     pub last_sequence: i64,
     pub last_updated: String,
+    /// SHA-256 fingerprint (hex) of the last-applied snapshot's blob set for this
+    /// peer. Drives receive-side snapshot idempotency. `None` = no fingerprint
+    /// recorded yet (fresh peer, or a cursor last advanced by a delta).
+    pub last_content_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -3244,6 +3248,7 @@ pub struct NewPeerInventoryCursorRow {
     pub peer_id: String,
     pub last_sequence: i64,
     pub last_updated: String,
+    pub last_content_hash: Option<String>,
 }
 
 // ============================================================================
