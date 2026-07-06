@@ -259,6 +259,7 @@ fi
 # Native build: RUSTFLAGS="" (the WASM getrandom flag breaks the link) + a /tmp CARGO_TARGET_DIR (the
 # /projects cargo-pool slot trips the invoked.timestamp ENOENT on this toolchain). Pure-cargo, fast,
 # PVC-exempt by omission.
+# eprfs-agent dry-run (not part of this gate): cargo run -p eprfs-agent --example project_agents -- <repo-root>
 if echo "$CHANGED" | grep -qE "^elohim/eprfs/"; then
   echo "[pre-push] Gating eprfs workspace (fmt + clippy -D + build + test)..."
   ( cd elohim/eprfs \
