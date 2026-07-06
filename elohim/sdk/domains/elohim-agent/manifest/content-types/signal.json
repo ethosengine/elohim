@@ -1,0 +1,28 @@
+{
+  "description": "An interpreted lifecycle, event, or counter state used to inform governance and projection decisions.",
+  "metadataSchema": { "$ref": "./schemas/signal-metadata.schema.json" },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "DERIVED_FROM": ["event", "counter"],
+        "GOVERNS": ["policy"]
+      }
+    },
+    "value": {
+      "onContribute": {
+        "action": "produce",
+        "resourceConformsTo": "agentic-signal",
+        "recognition": "capability-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "community",
+      "minimumReach": "private",
+      "governanceModel": "steward-consent",
+      "signalTypes": ["lifecycle-event-observed", "policy-violation-detected"]
+    },
+    "claims": [
+      { "asserts": "capability-usable", "contradictedBy": "policy-violation", "validityHorizon": "P30D", "leg": "governance" }
+    ]
+  }
+}

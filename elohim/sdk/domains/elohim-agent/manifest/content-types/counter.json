@@ -1,0 +1,28 @@
+{
+  "description": "A durable measurement definition for accumulating lifecycle or capability evidence.",
+  "metadataSchema": { "$ref": "./schemas/counter-metadata.schema.json" },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "MEASURES": ["event"],
+        "DERIVED_FROM": ["signal"]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "agentic-measurement",
+        "recognition": "capability-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "community",
+      "minimumReach": "private",
+      "governanceModel": "steward-consent",
+      "signalTypes": ["lifecycle-event-observed"]
+    },
+    "claims": [
+      { "asserts": "capability-usable", "contradictedBy": "projection-drift", "validityHorizon": "P90D", "leg": "knowledge" }
+    ]
+  }
+}

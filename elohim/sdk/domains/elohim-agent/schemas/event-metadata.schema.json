@@ -1,0 +1,16 @@
+{
+  "$id": "elohim-agent:schema:metadata:event",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EventMetadata",
+  "description": "Metadata for an observed lifecycle occurrence.",
+  "type": "object",
+  "required": ["id", "version", "description", "eventType", "subjectRef"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "eventType": { "type": "string", "minLength": 1 },
+    "subjectRef": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": true
+}

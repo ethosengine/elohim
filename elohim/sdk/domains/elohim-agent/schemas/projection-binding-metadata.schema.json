@@ -1,0 +1,20 @@
+{
+  "$id": "elohim-agent:schema:metadata:projection-binding",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProjectionBindingMetadata",
+  "description": "Metadata for a runtime projection binding.",
+  "type": "object",
+  "required": ["id", "version", "description", "runtime", "targetPattern", "sourceType"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "runtime": { "type": "string", "minLength": 1 },
+    "targetPattern": { "type": "string", "minLength": 1 },
+    "sourceType": {
+      "type": "string",
+      "enum": ["skill", "agent", "agent-spec", "hook", "policy", "validator"]
+    }
+  },
+  "additionalProperties": true
+}

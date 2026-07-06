@@ -1,0 +1,23 @@
+{
+  "$id": "elohim-agent:schema:metadata:skill",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SkillMetadata",
+  "description": "Metadata for a reusable agentic workflow definition.",
+  "type": "object",
+  "required": ["id", "version", "description", "triggerDescription"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "triggerDescription": { "type": "string", "minLength": 1 },
+    "runtimeTargets": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "assetRefs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "additionalProperties": true
+}

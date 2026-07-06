@@ -1,0 +1,28 @@
+{
+  "description": "An observed lifecycle occurrence that can feed counters, hooks, and interpreted signals.",
+  "metadataSchema": { "$ref": "./schemas/event-metadata.schema.json" },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "DERIVED_FROM": ["signal"],
+        "MEASURES": ["counter"]
+      }
+    },
+    "value": {
+      "onContribute": {
+        "action": "produce",
+        "resourceConformsTo": "agentic-lifecycle",
+        "recognition": "capability-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "community",
+      "minimumReach": "private",
+      "governanceModel": "steward-consent",
+      "signalTypes": ["lifecycle-event-observed"]
+    },
+    "claims": [
+      { "asserts": "capability-usable", "contradictedBy": "policy-violation", "validityHorizon": "P30D", "leg": "knowledge" }
+    ]
+  }
+}

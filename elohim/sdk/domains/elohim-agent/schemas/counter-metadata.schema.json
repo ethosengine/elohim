@@ -1,0 +1,16 @@
+{
+  "$id": "elohim-agent:schema:metadata:counter",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CounterMetadata",
+  "description": "Metadata for a durable measurement definition.",
+  "type": "object",
+  "required": ["id", "version", "description", "counterType", "unit"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "counterType": { "type": "string", "minLength": 1 },
+    "unit": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": true
+}
