@@ -1,0 +1,25 @@
+-- Add last_content_hash to peer_inventory_cursor — a fingerprint (SHA-256, hex)
+-- of the last-applied BlobInventorySnapshot's blob set for this peer.
+--
+-- Enables receive-side snapshot IDEMPOTENCY. An incoming snapshot whose content
+-- fingerprint equals last_content_hash carries no new information and is applied
+-- as a cheap no-op (no delete+reinsert, and — via the Deduplicated outcome — no
+-- commitment re-scoring at the call site) instead of a full re-apply. This is
+-- the convergence guarantee that collapses the WAN-loss gossipsub re-delivery
+-- storm (measured ~53–150 identical snapshot-applies/sec on a full-arc sink)
+-- back toward the ~0.1/sec design cadence.
+--
+-- Keyed on CONTENT, not (peer_id, sequence): inventory_broadcaster bumps
+-- `sequence` every 60s tick even when its blob set is unchanged, and gossipsub
+-- re-floods the SAME sequence many times under IHAVE/IWANT gap recovery — only a
+-- content fingerprint collapses both. It also PRESERVES the deliberate
+-- "snapshots accepted regardless of sequence" attack-recovery path: a genuinely
+-- different recovery snapshot at any sequence has a different fingerprint and
+-- still applies.
+--
+-- Nullable: absent = no fingerprint recorded yet (fresh peer, or a cursor last
+-- advanced by a delta — the next snapshot re-establishes the fingerprint).
+--
+-- Source of truth: libp2p gossipsub 'elohim/inventory/blob' (Category C
+-- operational projection, rebuildable from gossip replay).
+ALTER TABLE peer_inventory_cursor ADD COLUMN last_content_hash TEXT;

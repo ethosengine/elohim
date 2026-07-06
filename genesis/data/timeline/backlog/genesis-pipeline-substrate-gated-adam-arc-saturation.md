@@ -9,7 +9,10 @@ corrected_by: live-ops investigation 2026-07-06 (kubectl + source trace on /home
 domain: dataplane / p2p-protocol
 pipelines: [elohim-genesis]
 requires_env: alpha-cluster-6peer
-needs: fix (receive-side idempotency) + brainstorm (gossipsub amplifier)
+needs: P0 receive-side idempotency IMPLEMENTED (awaiting edge deploy + drain-verify) · amplifier → [[inventory-gossip-amplifier-three-layer-idempotency]]
+cites:
+  - inventory-gossip-amplifier-three-layer-idempotency
+  - genesis-scenario-code-leads-seeder-upsert-and-authz
 ---
 
 ## ⚠️ CORRECTION — the overnight conclusion in the first draft of this file was WRONG
@@ -52,18 +55,39 @@ node doing exactly its job.
 
 ## The fix (code — elohim-storage, ships via edge pipeline; NOT a live patch)
 
-Owned by the live-ops session (kubectl + /home/matthew/elohim checkout). Do not duplicate
-from other checkouts.
-
-1. **Surgical / high-leverage — receive-side idempotency.** At `p2p/mod.rs:~5702` +
-   `db/peer_blob_inventory::apply_snapshot`: before apply + `score_and_enqueue_snapshot`,
-   drop snapshots whose `(peer_id, sequence, content-hash)` was already applied. Preserves
-   the deliberate "accept regardless of sequence for attack-recovery" for genuinely
-   new/different snapshots; a byte-identical re-echo becomes a cheap no-op instead of a full
-   re-score. Kills the CPU bleed regardless of what amplifies.
-2. **Deeper — the ~1000× gossipsub amplifier.** Why is gossipsub re-delivering at that rate
-   (message-id dedup window, mesh degree, re-publish-on-receipt)? Protocol-design question →
-   `/brainstorm`, needs peer-side logs + mesh introspection.
+1. **Surgical / high-leverage — receive-side idempotency. ✅ IMPLEMENTED 2026-07-06**
+   (`shift/adam-p2p-instability-sprint`, on `feat/frontend-eyes-sprint`, commit-only — the
+   integrator/live-ops reconcile the push). `apply_snapshot` now returns
+   `SnapshotApplyOutcome::{Applied,Deduplicated}` and dedups on a **content fingerprint**
+   (SHA-256 of the sorted blob set) persisted on `peer_inventory_cursor.last_content_hash`
+   (migration `2026-07-06-120000_peer_inventory_cursor_content_hash`). A byte-identical
+   snapshot is a no-op: no delete+reinsert, and the call site (`p2p/mod.rs`, the
+   `INVENTORY_TOPIC` arm) skips `score_and_enqueue_snapshot` (the CPU sink) and downgrades
+   the flooding INFO log to DEBUG. Keyed on CONTENT, not `(peer_id, sequence)` — the
+   publisher bumps `sequence` every tick even when content is unchanged, and this preserves
+   the deliberate accept-regardless-of-sequence attack-recovery path (a genuinely different
+   snapshot at any sequence still applies). Restart-safe (the fingerprint persists on the
+   PVC SQLite → a cold-reloaded node no-ops the re-flood immediately, breaking the
+   SIGKILL→reload→storm loop). A rate-limited (`DEDUP_FRESHNESS_REFRESH_SECS = 30`) cheap
+   `last_seen_at` touch keeps a static inventory inside the freshness window without O(rows)
+   writes per storm message.
+   - **Files:** `elohim/elohim-storage/src/db/peer_blob_inventory.rs` (logic + 12 unit tests),
+     `.../db/diesel_schema.rs`, `.../db/models.rs`, `.../p2p/mod.rs` (call site),
+     `.../migrations/2026-07-06-120000_.../`.
+   - **Verified locally:** `cargo test --lib peer_blob_inventory` → 21 passed / 0 failed;
+     `rustfmt` clean on the touched file. Tests cover: identical/reordered dedup, different
+     content at the same sequence still applies (attack-recovery), dedup advances the delta
+     watermark (no false gap), rate-limited freshness refresh, and snapshot-after-delta
+     re-apply.
+   - **Deploy + drain-verify (next):** ships via the edge pipeline (elohim-storage image),
+     NOT a live patch. After deploy, watch the Loki apply-rate collapse from ~53/sec toward
+     the ~0.1/sec design cadence, adam CPU off the ~5.9-core peg, restarts stop climbing, and
+     `curl https://alpha.elohim.host/` → 200.
+2. **Deeper — the ~500× amplifier.** Split out to
+   [[inventory-gossip-amplifier-three-layer-idempotency]] with the live evidence: the
+   gap-recovery request loop is ruled out (`SnapshotRequest` is a Stage-1 no-op), leaving
+   publish-side re-flood by the large-inventory seed pair as the leading hypothesis. That doc
+   frames the three-layer idempotency architecture (receive ✅ / publish / gossip-message-id).
 
 ## Live stopgap (optional; does NOT fix — just stops making it worse)
 
