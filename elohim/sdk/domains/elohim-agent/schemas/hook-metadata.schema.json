@@ -1,0 +1,21 @@
+{
+  "$id": "elohim-agent:schema:metadata:hook",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HookMetadata",
+  "description": "Metadata for a lifecycle binding.",
+  "type": "object",
+  "required": ["id", "version", "description", "phase", "matcher", "authorityClass"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "phase": { "type": "string", "minLength": 1 },
+    "matcher": { "type": "string", "minLength": 1 },
+    "authorityClass": {
+      "type": "string",
+      "enum": ["advisory", "local-write", "governed-write", "network-write"]
+    },
+    "validatorRef": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": true
+}

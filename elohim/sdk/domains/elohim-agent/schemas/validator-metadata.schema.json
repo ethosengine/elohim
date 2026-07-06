@@ -1,0 +1,17 @@
+{
+  "$id": "elohim-agent:schema:metadata:validator",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ValidatorMetadata",
+  "description": "Metadata for a deterministic embeddable rule contract.",
+  "type": "object",
+  "required": ["id", "version", "description", "validatorType", "fuelDefault"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "validatorType": { "type": "string", "minLength": 1 },
+    "fuelDefault": { "type": "integer", "minimum": 0 },
+    "inputShapeRef": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": true
+}

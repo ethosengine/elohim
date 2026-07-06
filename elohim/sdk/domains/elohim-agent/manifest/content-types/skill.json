@@ -1,0 +1,28 @@
+{
+  "description": "A reusable workflow definition that can be selected by an agent or projected into a runtime-specific skill surface.",
+  "metadataSchema": { "$ref": "./schemas/skill-metadata.schema.json" },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "PROJECTS": ["projection-binding"],
+        "GOVERNS": ["policy"]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "agentic-capability",
+        "recognition": "capability-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "community",
+      "minimumReach": "private",
+      "governanceModel": "steward-consent",
+      "signalTypes": ["capability-used", "projection-drift-detected", "policy-violation-detected"]
+    },
+    "claims": [
+      { "asserts": "capability-usable", "contradictedBy": "projection-drift", "validityHorizon": "P90D", "leg": "value" }
+    ]
+  }
+}

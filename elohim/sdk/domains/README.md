@@ -13,6 +13,7 @@ MUST see. Apps compose domain vocabulary into human experiences.
 | shefa | Economy | elohim (content_store) | Economic events, stewardship, resources |
 | qahal | Social + Governance | mishpat | Collectives, proposals, governance |
 | avodah | Work | elohim (content_store) | Services, flow planning, insurance |
+| elohim-agent | Agentic Capability | generic EPR Manifest/Agent atoms | Skills, agents, hooks, policies, validators, projections |
 
 ## Domain Artifacts
 

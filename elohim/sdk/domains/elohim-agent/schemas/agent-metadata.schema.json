@@ -1,0 +1,23 @@
+{
+  "$id": "elohim-agent:schema:metadata:agent",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentMetadata",
+  "description": "Metadata for an executable role and persona contract.",
+  "type": "object",
+  "required": ["id", "version", "description", "role"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "role": { "type": "string", "minLength": 1 },
+    "modelHints": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "capabilityRefs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "additionalProperties": true
+}

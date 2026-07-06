@@ -1,0 +1,27 @@
+{
+  "description": "A reusable governance rule that can bind skills, agents, hooks, validators, and projection surfaces.",
+  "metadataSchema": { "$ref": "./schemas/policy-metadata.schema.json" },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "GOVERNS": ["skill", "agent", "agent-spec", "hook", "signal", "counter", "validator", "projection-binding"]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "governance-rule",
+        "recognition": "policy-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "community",
+      "minimumReach": "private",
+      "governanceModel": "steward-consent",
+      "signalTypes": ["policy-violation-detected"]
+    },
+    "claims": [
+      { "asserts": "capability-usable", "contradictedBy": "policy-violation", "validityHorizon": "P180D", "leg": "governance" }
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "description": "A standing instruction surface such as CLAUDE.md or AGENTS.md, represented canonically before projection to a runtime file.",
+  "metadataSchema": { "$ref": "./schemas/agent-spec-metadata.schema.json" },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "INSTRUCTS": ["agent"],
+        "USES": ["skill"],
+        "PROJECTS": ["projection-binding"]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "instruction-surface",
+        "recognition": "capability-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "community",
+      "minimumReach": "private",
+      "governanceModel": "steward-consent",
+      "signalTypes": ["capability-used", "projection-drift-detected"]
+    },
+    "claims": [
+      { "asserts": "capability-usable", "contradictedBy": "projection-drift", "validityHorizon": "P180D", "leg": "knowledge" }
+    ]
+  }
+}

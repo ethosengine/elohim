@@ -1,0 +1,27 @@
+{
+  "description": "A deterministic embeddable rule contract used by hooks, policies, and projection checks.",
+  "metadataSchema": { "$ref": "./schemas/validator-metadata.schema.json" },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "VALIDATES": ["skill", "agent", "agent-spec", "hook", "policy", "projection-binding"]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "validator-fuel",
+        "recognition": "capability-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "community",
+      "minimumReach": "private",
+      "governanceModel": "steward-consent",
+      "signalTypes": ["validation-executed", "policy-violation-detected"]
+    },
+    "claims": [
+      { "asserts": "validator-deterministic", "contradictedBy": "policy-violation", "validityHorizon": "P180D", "leg": "governance" }
+    ]
+  }
+}

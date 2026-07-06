@@ -1,0 +1,124 @@
+{
+  "id": "manifest-elohim-agent",
+  "name": "elohim-agent",
+  "version": "1.0.0",
+  "description": "Agentic capability vocabulary for interpreting generic Manifest and Agent atoms as skills, agents, hooks, policies, validators, counters, signals, and runtime projection bindings.",
+  "vocabulary": {
+    "contentTypes": {
+      "skill": { "$ref": "./manifest/content-types/skill.json" },
+      "agent": { "$ref": "./manifest/content-types/agent.json" },
+      "agent-spec": { "$ref": "./manifest/content-types/agent-spec.json" },
+      "hook": { "$ref": "./manifest/content-types/hook.json" },
+      "event": { "$ref": "./manifest/content-types/event.json" },
+      "signal": { "$ref": "./manifest/content-types/signal.json" },
+      "counter": { "$ref": "./manifest/content-types/counter.json" },
+      "policy": { "$ref": "./manifest/content-types/policy.json" },
+      "validator": { "$ref": "./manifest/content-types/validator.json" },
+      "projection-binding": { "$ref": "./manifest/content-types/projection-binding.json" }
+    },
+    "contentFormats": {
+      "agent-manifest-json": {
+        "description": "JSON serialization for agentic capability app-manifest artifacts.",
+        "mimeTypes": ["application/json"],
+        "extensions": ["json"],
+        "aliases": ["elohim-agent"]
+      }
+    },
+    "relationships": {
+      "USES": {
+        "description": "An agent or agent spec uses a declared capability.",
+        "sourceTypes": ["agent", "agent-spec"],
+        "targetTypes": ["skill"]
+      },
+      "INSTRUCTS": {
+        "description": "A standing instruction surface instructs an executable agent role.",
+        "sourceTypes": ["agent-spec"],
+        "targetTypes": ["agent"]
+      },
+      "GOVERNS": {
+        "description": "A policy governs an agentic artifact.",
+        "sourceTypes": ["policy"],
+        "targetTypes": ["skill", "agent", "agent-spec", "hook", "event", "signal", "counter", "validator", "projection-binding"]
+      },
+      "VALIDATES": {
+        "description": "A validator checks a hook, policy, projection binding, or artifact payload.",
+        "sourceTypes": ["validator"],
+        "targetTypes": ["skill", "agent", "agent-spec", "hook", "policy", "projection-binding"]
+      },
+      "BINDS": {
+        "description": "A hook binds lifecycle phases and matchers to validation or policy surfaces.",
+        "sourceTypes": ["hook"],
+        "targetTypes": ["event", "validator", "policy"]
+      },
+      "DERIVED_FROM": {
+        "description": "A signal is interpreted from events or counter state.",
+        "sourceTypes": ["signal"],
+        "targetTypes": ["event", "counter"]
+      },
+      "MEASURES": {
+        "description": "A counter measures lifecycle occurrences.",
+        "sourceTypes": ["counter"],
+        "targetTypes": ["event"]
+      },
+      "PROJECTS": {
+        "description": "A projection binding maps canonical artifacts to runtime surfaces.",
+        "sourceTypes": ["projection-binding"],
+        "targetTypes": ["skill", "agent", "agent-spec", "hook", "policy", "validator"]
+      }
+    },
+    "signals": {
+      "capability-used": {
+        "description": "An agentic capability was selected or used by an execution surface.",
+        "substrateSignal": "compute",
+        "economicAction": "use",
+        "resourceType": "agentic-capability"
+      },
+      "lifecycle-event-observed": {
+        "description": "A lifecycle occurrence relevant to hooks, policies, counters, or signals was observed.",
+        "substrateSignal": "time",
+        "economicAction": "use",
+        "resourceType": "agentic-lifecycle"
+      },
+      "validation-executed": {
+        "description": "A deterministic validator contract was evaluated.",
+        "substrateSignal": "compute",
+        "economicAction": "use",
+        "resourceType": "validator-fuel"
+      },
+      "projection-drift-detected": {
+        "description": "A projected runtime surface diverged from its canonical agentic capability source.",
+        "substrateSignal": "compute",
+        "economicAction": "consume",
+        "resourceType": "projection-integrity"
+      },
+      "policy-violation-detected": {
+        "description": "Observed behavior or projected configuration violated a declared policy.",
+        "substrateSignal": "compute",
+        "economicAction": "consume",
+        "resourceType": "policy-integrity"
+      }
+    },
+    "observations": {
+      "capability-usable": {
+        "description": "The declared capability can be selected, interpreted, or projected by an execution surface.",
+        "instrument": "outcome-correlation",
+        "polarity": "positive"
+      },
+      "projection-drift": {
+        "description": "A runtime projection differs from the canonical agentic capability artifact.",
+        "instrument": "outcome-divergence",
+        "polarity": "negative"
+      },
+      "policy-violation": {
+        "description": "Behavior, configuration, or binding violates a declared governance rule.",
+        "instrument": "community-report",
+        "polarity": "negative"
+      },
+      "validator-deterministic": {
+        "description": "A validator yields deterministic results for its declared input shape and fuel bound.",
+        "instrument": "retention-check",
+        "polarity": "positive"
+      }
+    }
+  }
+}
