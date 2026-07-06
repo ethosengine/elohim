@@ -215,4 +215,20 @@ mod tests {
     fn normalize_preserves_interior_blank_lines() {
         assert_eq!(normalize(b"a\n\nb\n"), "a\n\nb\n");
     }
+
+    #[test]
+    fn claude_render_round_trips_colon_laden_description_byte_perfect() {
+        // The real-corpus `description:` shape (embedded `: ` colon-space prose)
+        // must survive parse -> render_claude byte-for-byte under `normalize`.
+        // This extends the T6 lossless-migration guarantee to the live corpus
+        // shape, not just the colon-free hermetic fixture.
+        const REAL: &str = "---\nname: code-reviewer\ndescription: Reviews the diff. Examples: <example>Context: User did X. user: 'go' assistant: 'ok'</example>\ntools: Task, Bash\nmodel: sonnet\ncolor: red\n---\n\nYou are the reviewer.\n";
+        let agent = CanonicalAgent::parse(REAL).unwrap();
+        let out = ProjectionBinding::claude_agent().render(&agent);
+        assert_eq!(
+            normalize(&out),
+            normalize(REAL.as_bytes()),
+            "colon-laden description must round-trip losslessly to the .claude surface"
+        );
+    }
 }

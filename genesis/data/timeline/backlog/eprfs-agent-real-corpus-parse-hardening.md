@@ -3,13 +3,13 @@ id: "backlog-eprfs-agent-real-corpus-parse-hardening"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "eprfs-agent parses 0 of 23 live .claude/agents files — harden CanonicalAgent::parse for real frontmatter (gates real-corpus onboarding)"
+title: "eprfs-agent real-corpus parse-hardening — LANDED (23/23 parse); residual: style-preserving byte-perfect round-trip for nested mcpServers frontmatter"
 slug: "eprfs-agent-real-corpus-parse-hardening"
 written: "2026-07-06"
-author: "eprfs-agent capability-projection V2 plan (Task 7 dry-run discovery, Task 8 backlog capture)"
-status: "backlog"
-priority: "high"
-ci_status: blocked
+author: "eprfs-agent capability-projection V2 plan (Task 7 dry-run discovery, Task 8 backlog capture); parse-hardening landed 2026-07-06 on integ/eprfs-agent"
+status: "partially-resolved"
+priority: "medium"
+ci_status: in-progress
 jobs: [elohim]
 tags: [eprfs, eprfs-agent, yaml, frontmatter, parse, round-trip, real-corpus, style-preserving]
 cites:
@@ -19,6 +19,52 @@ cites:
   - elohim/eprfs/eprfs-agent/tests/fixtures/code-reviewer.md
   - .claude/agents/
 ---
+
+## Resolution — parse-hardening LANDED (2026-07-06, `integ/eprfs-agent`)
+
+Design option **(a)** was implemented in `elohim/eprfs/eprfs-agent/src/canonical.rs`: a
+`parse_frontmatter` helper tries strict `serde_yaml` first (so well-formed frontmatter keeps its
+exact prior semantics), and only on a YAML error lifts the reserved free-text `description` field
+**line-wise** (`lift_top_level_scalar` — verbatim to end-of-line), then re-parses the structured
+remainder (which still carries nested blocks like `mcpServers:`). `render_claude` already emits
+`description: {value}` verbatim, so the round-trip contract holds with no render change.
+
+**Evidence (locally verified, native env `RUSTFLAGS="" CARGO_TARGET_DIR=/tmp/eprfs-gate-target`):**
+- Dry-run over the live tree (`cargo run -p eprfs-agent --example project_agents -- ../..`):
+  **`parsed 23 agent capabilities`** — was 0/23, now **23/23**.
+- Full eprfs workspace gate GREEN: `fmt` clean · `clippy --workspace --all-targets -D warnings`
+  clean · `cargo test --workspace` = **45 passed / 0 failed** (was 38; +6 unit +1 integration,
+  incl. the adversarial-review hardening regressions below).
+- New regressions: `parses_real_corpus_colon_laden_description`,
+  `lifts_description_without_disturbing_nested_extra`,
+  `strict_parse_error_survives_when_description_is_not_the_cause` (guards the fallback never masks a
+  genuinely-structural YAML error), `claude_render_round_trips_colon_laden_description_byte_perfect`,
+  and integration `live_shape_colon_laden_description_round_trips_and_is_drift_clean`
+  (new fixture `tests/fixtures/code-reviewer-live-shape.md`). The T6 acceptance stays green.
+
+**Adversarial-review hardening (folded into the same change).** A 3-lens review surfaced a latent
+silent-corruption defect in the fallback: `lift_top_level_scalar` deleted only the single physical
+`description:` line, so a future description hand-wrapped across two physical lines (or a `description: |`
+block scalar reached under an unrelated strict error) would orphan its indented continuation onto the
+preceding `name:` key — YAML-folding it into a corrupt `slug` (e.g. `x three`) and returning `Ok`
+(worse than the pre-fix clean error). Fixed: the lift now REFUSES (surfaces the strict error) when the
+value is a block-scalar header (`is_block_scalar_header`) or an indented continuation line follows.
+Regressions: `refuses_to_lift_a_wrapped_multiline_description`,
+`valid_block_scalar_description_still_parses_via_strict_path`. Not corpus-triggered today (all 23
+descriptions are single physical lines) but a real defect in the new code path.
+
+## Remaining (the folded-in style-preservation residual — why this is `partially-resolved`)
+
+The dry-run reports **`23 entries; 8 drifted`**. The 8 are exactly the agents that carry a nested
+`mcpServers:` block. Their **data** round-trips (mcpServers survives into `extra`), but authored
+block **style** does not: the author indents sequence items 2 spaces (`  - jenkins:` … 6-space
+nested mapping), while `serde_yaml`'s emitter writes `- ` at column 0 with 4-space nesting — a pure
+indentation delta, not data loss. The 15 pure-scalar agents round-trip **byte-perfect**
+(drift-clean). Closing this residual to 23/23 byte-perfect requires preserving and re-emitting the
+raw authored block for non-scalar `extra` fields (a style-preserving YAML pass), which changes the
+`extra` representation and is a larger, separate change than the parse fix — kept here per the
+original "fold into the same wave, don't open a separate item" intent. **Priority lowered high→medium:
+the blocker (0% onboardable) is cleared; this is a fidelity nit, not a gate.**
 
 ## What
 
@@ -56,7 +102,7 @@ the same humans/conventions and likely shares this risk class).
 
 ## Design options
 
-- **(a) RECOMMENDED** — parse reserved free-text scalar fields (`description`, and any other field
+- **(a) RECOMMENDED — ✅ IMPLEMENTED 2026-07-06** (see Resolution above) — parse reserved free-text scalar fields (`description`, and any other field
   known to carry unconstrained prose) line-wise: take the raw value verbatim to end-of-line (or to
   the next top-level key at column 0) instead of handing that span to a YAML value parser, then run
   `serde_yaml` only over the remaining structured/`extra` frontmatter. Render already emits
