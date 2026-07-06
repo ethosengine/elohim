@@ -285,6 +285,23 @@ if echo "$CHANGED" | grep -qE "(^|/)\.epr-meta$|^\.ci-ignore$"; then
   fi
 fi
 
+# ── .epr-meta compose-gate (author-time rule evaluation over the push range) ──
+#
+# The commit-time gate (.husky/pre-commit) is the primary; this is the backstop for commits made
+# with --no-verify at commit time but pushed normally. Same pure engine (_lib/epr_meta.py) over the
+# push range instead of the staged set. Pure-python (~ms), so it is PVC-EXEMPT BY OMISSION: never in
+# HEAVY_GATES, never routed through run_gate/drop_project, never deferrable. Fail-open if python3 OR
+# the gate script is absent (a branch predating the gate must never be blocked).
+if command -v python3 >/dev/null 2>&1 && [ -f .claude/scripts/epr-meta-git-gate.py ]; then
+  RANGE_BASE=$(git merge-base origin/dev HEAD 2>/dev/null || echo "HEAD~1")
+  if ! python3 .claude/scripts/epr-meta-git-gate.py --range "${RANGE_BASE}..HEAD"; then
+    echo "[pre-push] ERROR: .epr-meta compose-gate rejected a change in this push range."
+    echo "  Acknowledge (ask-class): EPR_META_ACK=1 git push   |   bypass all: git push --no-verify"
+    exit 1
+  fi
+  echo "[pre-push] .epr-meta compose-gate ✓"
+fi
+
 # ── Project Detection (manifest-driven) ──────────────────────────
 #
 # Try graph walker first — reads build-manifest.json files and matches
