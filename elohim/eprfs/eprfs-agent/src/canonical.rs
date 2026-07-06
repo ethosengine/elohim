@@ -34,6 +34,10 @@ struct RawFrontmatter {
 
 impl CanonicalAgent {
     pub fn parse(source: &str) -> Result<CanonicalAgent> {
+        // Normalize line endings up front so a CRLF-fenced source (`---\r\n…`) is not
+        // misclassified as MissingFrontmatter; a no-op for LF input.
+        let source = source.replace("\r\n", "\n");
+        let source = source.as_str();
         // Frontmatter is fenced by a leading `---\n` and a closing `\n---`.
         let rest = source
             .strip_prefix("---\n")
@@ -75,6 +79,8 @@ impl CanonicalAgent {
         out.push_str("\ndescription:");
         out.push_str(&self.description);
         out.push_str("\ntools:");
+        // Assumes tool names are comma-free identifiers — a tool name containing a comma
+        // would be ambiguous under this join (indistinguishable from two separate tools).
         out.push_str(&self.tools.join(","));
         out.push_str("\nmodel:");
         out.push_str(self.model.as_deref().unwrap_or(""));
@@ -139,5 +145,54 @@ mod tests {
             CanonicalAgent::parse("no frontmatter here"),
             Err(AgentProjectionError::MissingFrontmatter)
         ));
+    }
+
+    #[test]
+    fn cid_reflects_canonical_bytes_and_changes_with_content() {
+        // (a) cid() is not a constant — it's exactly BlobCid::compute over canonical_bytes().
+        let agent = CanonicalAgent::parse(SAMPLE).unwrap();
+        assert_eq!(agent.cid(), BlobCid::compute(&agent.canonical_bytes()));
+
+        // (b) a body-only change produces a different cid.
+        const SAMPLE_DIFFERENT_BODY: &str = "---\nname: code-reviewer\ndescription: Reviews the diff.\ntools: Task, Bash, Grep\nmodel: sonnet\ncolor: red\n---\n\nYou are a totally different specialist.\n";
+        let different_body = CanonicalAgent::parse(SAMPLE_DIFFERENT_BODY).unwrap();
+        assert_ne!(agent.cid(), different_body.cid());
+
+        // (b) a description-only change also produces a different cid.
+        const SAMPLE_DIFFERENT_DESCRIPTION: &str = "---\nname: code-reviewer\ndescription: A completely different description.\ntools: Task, Bash, Grep\nmodel: sonnet\ncolor: red\n---\n\nYou are the Code Review Specialist.\n";
+        let different_description = CanonicalAgent::parse(SAMPLE_DIFFERENT_DESCRIPTION).unwrap();
+        assert_ne!(agent.cid(), different_description.cid());
+    }
+
+    #[test]
+    fn parses_tools_as_yaml_block_list() {
+        const SAMPLE_LIST: &str = "---\nname: code-reviewer\ndescription: Reviews the diff.\ntools:\n  - Task\n  - Bash\nmodel: sonnet\ncolor: red\n---\n\nBody text.\n";
+        let agent = CanonicalAgent::parse(SAMPLE_LIST).unwrap();
+        assert_eq!(agent.tools, vec!["Task", "Bash"]);
+    }
+
+    #[test]
+    fn parses_tools_as_yaml_inline_list() {
+        const SAMPLE_INLINE_LIST: &str = "---\nname: code-reviewer\ndescription: Reviews the diff.\ntools: [Task, Bash]\nmodel: sonnet\ncolor: red\n---\n\nBody text.\n";
+        let agent = CanonicalAgent::parse(SAMPLE_INLINE_LIST).unwrap();
+        assert_eq!(agent.tools, vec!["Task", "Bash"]);
+    }
+
+    #[test]
+    fn extra_frontmatter_fields_are_preserved_losslessly() {
+        const SAMPLE_WITH_EXTRA: &str = "---\nname: code-reviewer\ndescription: Reviews the diff.\ntools: Task, Bash\nmodel: sonnet\ncolor: red\ncustom_field: foo\n---\n\nBody text.\n";
+        let agent = CanonicalAgent::parse(SAMPLE_WITH_EXTRA).unwrap();
+        assert_eq!(
+            agent.extra.get("custom_field").and_then(|v| v.as_str()),
+            Some("foo")
+        );
+    }
+
+    #[test]
+    fn parses_crlf_fenced_frontmatter_identically_to_lf() {
+        let crlf_sample = SAMPLE.replace('\n', "\r\n");
+        let crlf_agent = CanonicalAgent::parse(&crlf_sample).unwrap();
+        let lf_agent = CanonicalAgent::parse(SAMPLE).unwrap();
+        assert_eq!(crlf_agent, lf_agent);
     }
 }
