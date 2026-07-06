@@ -8,7 +8,9 @@
 pub mod binding;
 pub mod canonical;
 pub mod error;
+pub mod project;
 
 pub use binding::{normalize, FrontmatterDialect, ProjectionBinding};
 pub use canonical::CanonicalAgent;
 pub use error::{AgentProjectionError, Result};
+pub use project::project;
