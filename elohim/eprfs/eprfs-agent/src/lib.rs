@@ -5,6 +5,8 @@
 //! domain-neutral. A capability is authored once (markdown + normalized
 //! frontmatter); each runtime is a projection, never a source.
 
+pub mod canonical;
 pub mod error;
 
+pub use canonical::CanonicalAgent;
 pub use error::{AgentProjectionError, Result};
