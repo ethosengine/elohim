@@ -10,7 +10,9 @@
           "doorway/doorway-app/src/**",
           "doorway/doorway-app/angular.json",
           "doorway/doorway-app/tsconfig*.json",
-          "doorway/doorway-app/package.json"
+          "doorway/doorway-app/package.json",
+          "pnpm-lock.yaml",
+          "package.json"
         ],
         "buildProcess": []
       },
