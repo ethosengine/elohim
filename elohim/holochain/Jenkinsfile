@@ -472,6 +472,7 @@ def computeStorageUrls(String targetEnv, List allHumans) {
 def cleanupOrphanedHumans(List allHumans) {
     def namespaces = ['elohim-alpha', 'elohim-staging', 'elohim-prod']
     def activeResources = allHumans.collect { "${it.namespace}/${it.resourcePrefix}" } as Set
+    def undrained = []   // orphans found but NOT scaled to 0 — RBAC drift, must not phantom-green
 
     namespaces.each { ns ->
         def existing = sh(
@@ -483,10 +484,26 @@ def cleanupOrphanedHumans(List allHumans) {
             existing.split(/\s+/).each { stsName ->
                 if (!activeResources.contains("${ns}/${stsName}")) {
                     echo "Scaling orphaned StatefulSet to 0: ${ns}/${stsName}"
-                    sh "kubectl scale statefulset/${stsName} -n ${ns} --replicas=0 || true"
+                    // Capture the exit status instead of masking with `|| true`. A Forbidden here
+                    // (jenkins-deployer missing statefulsets/scale) previously phantom-greened the
+                    // deploy while suspended personas kept running and churned the DHT. Non-blocking
+                    // by design: surface as UNSTABLE, do NOT hard-fail — a hard-fail must wait until
+                    // the RBAC grant lands, else every edge deploy breaks while any persona is
+                    // suspended. See genesis/data/timeline/backlog/ci-rbac-jenkins-deployer.md (recurrence 4).
+                    def rc = sh(script: "kubectl scale statefulset/${stsName} -n ${ns} --replicas=0", returnStatus: true)
+                    if (rc != 0) { undrained << "${ns}/${stsName}" }
                 }
             }
         }
+    }
+
+    if (undrained) {
+        echo "⚠️  RBAC DRIFT: could not scale ${undrained.size()} orphaned StatefulSet(s) to 0: ${undrained.join(', ')}. " +
+             "Cause: jenkins-deployer lacks statefulsets/scale patch. These suspended personas keep running " +
+             "on a stale image and churn the DHT. Operator: grant statefulsets/scale, then drop this guard; " +
+             "interim manual: kubectl scale statefulset/<name> -n <ns> --replicas=0. " +
+             "Tracking: genesis/data/timeline/backlog/ci-rbac-jenkins-deployer.md"
+        unstable("RBAC drift: ${undrained.size()} orphaned StatefulSet(s) not scaled to 0 (jenkins-deployer missing statefulsets/scale)")
     }
 }
 
@@ -780,7 +797,32 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
             error "kubectl apply failed for ${humanConfig.resourcePrefix}:\n${applyOutput}"
         }
     }
-    sh "kubectl rollout restart statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace}"
+    // Genesis-peer surge guard. The genesis pair (adam+matthew, genesisPeer:true)
+    // anchor the DHT's full authority arc; a rollout restart of a full-arc anchor
+    // triggers a re-gossip / re-validation surge across the whole corpus — the
+    // sustained conductor read-pool saturation class
+    // (adam-genesis-anchor-sustained-saturation-post-storm). Image tags are
+    // per-commit (dev-<branch>-<gitHash>), so a REAL storage/DNA change makes
+    // `kubectl apply` report the StatefulSet "configured" (or takes the
+    // delete+reapply path), and the restart below still proceeds — e.g. the
+    // storm-heal storage roll lands on adam normally. Only when apply reports the
+    // StatefulSet UNCHANGED (a doorway-only / no-op deploy) is the explicit
+    // restart a gratuitous bounce; skip it for genesis peers so we don't induce
+    // the surge. Non-genesis (reduced-arc) peers always restart — surge is cheap.
+    // (Shell grep, not Groovy =~, to avoid the CPS Matcher-serialization gotcha.)
+    def ssUnchanged = false
+    if (applyCode == 0) {
+        def grepCode = sh(
+            script: "grep -Eq 'statefulset\\.apps/${humanConfig.resourcePrefix}[[:space:]]+unchanged' ${applyLog}",
+            returnStatus: true,
+        )
+        ssUnchanged = (grepCode == 0)
+    }
+    if (humanConfig.genesisPeer == true && ssUnchanged) {
+        echo "Skipping conductor rollout restart for genesis peer ${humanConfig.resourcePrefix}: StatefulSet unchanged (no image/config change) — avoiding a gratuitous full-arc re-gossip surge."
+    } else {
+        sh "kubectl rollout restart statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace}"
+    }
     sh "kubectl rollout status statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace} --timeout=600s"
 
     def componentName = humanConfig.resourcePrefix.replace('elohim-', '')

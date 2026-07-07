@@ -54,23 +54,22 @@ else
     HASH_FIELD="blobHash"
 fi
 
-# A3 deploy-producer AMBER marker (browser leg only). blobHash is a DNA-notarized
-# field (storage's patch_needs_conductor=true). On a doorway whose storage backend
-# has NO conductor bridge, that PATCH 503s and the SPA mount 404s — the live
-# elohim.host per-host stranding class. `?deployTier=amber` tells storage to record
-# blobHash diesel-direct at the amber tier (crdt_converged_at stamped, NEVER
-# dht_anchor_hash; no-clobber so a later green blobHash always wins) so
-# lookup_slug_blob_hash (MinTrust::Amber) resolves and the mount serves 200. It
-# rides THIS PATCH, which is already admin-gated (X-API-Key) at the doorway — no
-# new surface. It MUST be a query param, not a header: the doorway proxy
-# (forward_to_storage) preserves the query string but forwards only an allowlist
-# of headers, so an X-Deploy-Tier header would be dropped before reaching storage.
-# Server leg keeps the canonical URL (serverBlobHash is already diesel-direct; the
-# marker would be a no-op there).
+# Single notarized head. The blobHash PATCH is a DNA-notarized write
+# (storage's patch_needs_conductor=true). The head is authored ONCE: this PATCH
+# is routed through a doorway to a storage backend that has a live conductor
+# bridge; the CONDUCTOR authors the DHT entry and the peer network (the
+# Holochain DHT) WITNESSES it by validating + gossiping + anchoring. The doorway
+# is only the gateway — never the witness. The Jenkinsfile fails this PATCH over
+# across doorways until one reaches a live bridge, then stops; the single
+# witnessed head gossips to every peer. A backend with NO conductor bridge 503s
+# here, and that is CORRECT: that host does not author, it converges the head
+# later via run_content_sweep. There is NO `?deployTier=amber` escape hatch
+# anymore — a per-host diesel-direct write minted an un-witnessed head that could
+# never green and diverged across backends. (The byte upload below still runs per
+# host: blob BYTES are content-addressed and do not auto-replicate yet, so
+# seeding them on each serving peer is legitimate load-spread, not a divergent
+# write.)
 PATCH_PATH="/db/content/${SLUG}"
-if [ "$KIND" = "browser" ]; then
-    PATCH_PATH="${PATCH_PATH}?deployTier=amber"
-fi
 
 # One PUT + (optional) PATCH+verify attempt. Returns non-zero on ANY failure
 # WITHOUT exiting the script: stage_once is invoked in an `if` condition, so
@@ -125,19 +124,22 @@ stage_once() {
         fi
         echo "  ✓ verified ${SLUG} ${HASH_FIELD} = ${SPA_HASH}"
     else
-        echo "  ⊘ WARN: skipping PATCH+verify for ${SLUG} — no admin credential available"
-        echo "    content row retains seed-time ${HASH_FIELD}"
-        echo "    blob bytes uploaded and content-addressable via PUT /blob/${SPA_HASH}"
+        echo "  ⊘ [${SLUG}] byte-seed only (DO_PATCH!=1) — no head PATCH from this call."
+        echo "    The single notarized head is authored once via a conductor-bridged"
+        echo "    doorway; this peer converges it via run_content_sweep. Blob bytes"
+        echo "    uploaded and content-addressable via PUT /blob/${SPA_HASH}."
     fi
     return 0
 }
 
-# Bounded retry (Part A, 2026-06-27). elohim.host's storage backend is the adam
-# peer, which 503s transiently during cluster churn; a single attempt turned
-# every transient blip into a swallowed-UNSTABLE STALE host (the per-host
-# deploy-lag class). Retry with linear backoff. Only a PERSISTENT failure exits
-# non-zero — which the Jenkinsfile's per-(host,slug) catchError converts into a
-# NAMED junit failure (Part B) instead of a buried UNSTABLE.
+# Bounded retry with linear backoff. A conductor-bridged backend can 503
+# transiently during cluster churn (the notarized PATCH round-trips the
+# conductor); retry rather than surrender on a blip. A PERSISTENT non-zero exit
+# is meaningful: for a byte-seed (DO_PATCH!=1) it means the blob upload failed;
+# for an author attempt (DO_PATCH=1) it means THIS doorway could not author (no
+# live conductor bridge / persistent 503), and the Jenkinsfile fails the head
+# author over to the next doorway. The deploy is only UNSTABLE if NO doorway
+# in the fabric can author the single head.
 attempt=1
 while true; do
     if stage_once; then
