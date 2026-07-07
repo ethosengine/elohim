@@ -5297,29 +5297,16 @@ impl HttpServer {
                 ))
             }
             Method::PATCH => {
-                // Deploy-producer AMBER marker (A3). Honored ONLY on this PATCH
-                // surface, which is the already-admin-gated (X-API-Key at the
-                // doorway boundary) seed/deploy path — this adds NO new
-                // unauthenticated surface, it only changes the behaviour of the
-                // existing notarized-field PATCH when no conductor is present.
-                // When set AND the `(true, None)` branch is hit (a notarized
-                // field is touched but there is no conductor bridge to
-                // re-notarize), the deploy producer writes `blob_hash`
-                // diesel-direct at the amber tier instead of 503-ing. Accept
-                // either `?deployTier=amber` or `X-Deploy-Tier: amber`. Read
-                // BEFORE the body consumes `req`.
-                let amber_marker = req
-                    .uri()
-                    .query()
-                    .map(|q| q.split('&').any(|kv| kv == "deployTier=amber"))
-                    .unwrap_or(false)
-                    || req
-                        .headers()
-                        .get("X-Deploy-Tier")
-                        .and_then(|v| v.to_str().ok())
-                        .map(|v| v.eq_ignore_ascii_case("amber"))
-                        .unwrap_or(false);
-
+                // Single notarized head. A notarized-field PATCH (blob_hash or
+                // reach) is authored ONCE through the conductor so the Holochain
+                // DHT witnesses the claim from this head — in context with the
+                // rest of the network — and gossips it to every peer. There is
+                // NO per-host "amber" write escape hatch: a diesel-direct
+                // per-peer write would mint an un-witnessed head (green can never
+                // be derived for it, since green == DHT-anchored) that diverges
+                // across backends. That was the retired `deployTier=amber` /
+                // `X-Deploy-Tier: amber` class — the deploy now fails over to a
+                // conductor-bridged doorway instead of writing amber locally.
                 let body = req
                     .collect()
                     .await
@@ -5353,28 +5340,17 @@ impl HttpServer {
                             .update_via_conductor(&hc, content_id, view)
                             .await
                     }
-                    (true, None) if amber_marker && view.blob_hash.is_some() => {
-                        // A3 deploy-producer amber write. No conductor bridge to
-                        // re-notarize, but the admin-gated deploy carried the
-                        // amber marker AND a blob_hash: record the serving
-                        // `blob_hash` diesel-direct at the amber tier
-                        // (crdt_converged_at stamped, NEVER dht_anchor_hash,
-                        // NEVER p2p_published_at). Content is not in
-                        // `is_integrity_kind`, so this authors no DHT entry and
-                        // the reconcile controller does not revert it. No-clobber
-                        // precedence in the db layer means a later notarized
-                        // (green) blob_hash always wins. This un-404s the live
-                        // elohim.host SPA mount when the conductor is absent:
-                        // lookup_slug_blob_hash (MinTrust::Amber) now resolves.
-                        // Scoped to `blob_hash.is_some()` so a marker on a
-                        // reach-only PATCH still 503s (reach stays conductor-only).
-                        services.content.update_amber(content_id, view)
-                    }
                     (true, None) => {
                         // A notarized change (blob_hash/reach) needs the
-                        // conductor to re-author the entry. A diesel-only write
-                        // here would be silently reverted by the reconciliation
-                        // controller (DHT wins), so fail loud instead.
+                        // conductor to author ONE witnessed head that gossips to
+                        // every peer. With no conductor bridge on this backend,
+                        // fail loud so the deploy fails over to a bridged
+                        // doorway. A diesel-direct write here would mint an
+                        // un-witnessed per-peer head that never greens and
+                        // diverges across backends (the retired amber write); the
+                        // DHT would also revert a diesel-only notarized field.
+                        // This peer converges the head later via run_content_sweep
+                        // once its own conductor is reachable.
                         return Ok(response::service_unavailable(
                             "Conductor bridge unavailable; cannot re-notarize content change",
                         ));
@@ -10786,6 +10762,23 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
             Route::get("/api/v1/status/projector")
                 .handler("projector_status")
                 .cache_ttl(5)
+                .build(),
+        )
+        // Node-local P2P sync status (operational, Cat-C). The learner-facing
+        // sync-progress strip (lamad SyncStatusService) GETs this THROUGH the
+        // doorway; declaring it here lets the RouteRegistry proxy it to the
+        // serving node's storage (single-target, as always) so the strip shows
+        // the real sync state. Without this declaration the doorway had no public
+        // /p2p/status route, so the request fell through to the SPA shell (HTML),
+        // the client's JSON parse failed, and the strip false-flagged
+        // "unreachable" on every load in a healthy mesh. Explicit dispatch arm
+        // exists above (GET /p2p/status -> handle_p2p_status). Legitimately
+        // doorway-resident node-local operational state (like arc-policy /
+        // projector) — NOT another agent's private state.
+        .route(
+            Route::get("/p2p/status")
+                .handler("p2p_status")
+                .cache_ttl(2)
                 .build(),
         )
         // =====================================================================

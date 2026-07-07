@@ -221,10 +221,12 @@ def publishE2EReports(String environment) {
 }
 
 def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map outcomes) {
-    // Uploads one OR MORE pillar-EPR browser bundles. Each bundle is a
-    // {distDir, slug} pair: the dist contents get zipped + uploaded as a
-    // content-addressed blob, then (when an admin key is present) PATCHed
-    // onto that bundle's content row via /db/content/{slug}.
+    // Byte-seed one OR MORE pillar-EPR browser bundles onto ONE backend. Each
+    // bundle is a {distDir, slug} pair: the dist contents get zipped and PUT as
+    // a content-addressed blob (/admin/seed/blob). The notarized head is NOT
+    // written here — authorHeadOnce PATCHes it exactly once via a live conductor
+    // bridge, and it gossips to every peer. Blob BYTES don't auto-replicate P2P
+    // yet, so seeding them per backend is legitimate load-spread.
     //
     // Pillar-EPR decomposition (Task B21): each pillar projects its own
     // bundle onto its own content row. The previous "one blob, two slugs"
@@ -244,19 +246,10 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map 
     // blobHash; the seed-sqlite step does not overwrite the deploy-time
     // value written here.
     //
-    // When adminKey is empty, the PATCH+verify step is skipped (with a
-    // WARN log) and the content rows retain whatever blobHash the seed
-    // wrote. The blob bytes are still uploaded via the unauthenticated
-    // PUT path, so older deploy mechanisms that don't depend on runtime
-    // PATCH continue to function. See:
+    // adminKey is passed for the PUT's X-API-Key (gated / non-DEV_MODE backends
+    // require it to seed bytes). This helper never PATCHes the head. See:
     //   genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md
     //   genesis/docs/handoffs/2026-05-23-followup-2-k8s-handoff-summary.md
-    //
-    // Regression seatbelt (PATCH path only): after each PATCH, GET the
-    // row and assert blobHash matches the SHA just written. set -euo
-    // pipefail + curl -fSs (no || echo swallow) means any 4xx/5xx FAILS
-    // the build — surfacing silent CI/storage drift as a red build
-    // instead of a stuck production surface.
     //
     // index.html: SSR-mode dists (elohim-app, Angular 19) emit
     // index.csr.html only; materialize to index.html since storage's
@@ -265,7 +258,11 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map 
     // the inline heredoc pushed the CPS method past the JVM 64KB
     // MethodTooLargeException limit — builds #1519/#1520 died at Jenkinsfile
     // compile, zero stages ran). Keep helpers heredoc-free.
-    def doPatch = (adminKey != null && adminKey.trim() != '') ? '1' : '0'
+    // Byte-seed pass ONLY (PUT /admin/seed/blob). The notarized head is authored
+    // exactly once by authorHeadOnce (failover to a live conductor bridge); this
+    // helper never PATCHes the head, so DO_PATCH stays 0. adminKey is still passed
+    // for the PUT's X-API-Key (gated / non-DEV_MODE backends require it).
+    def doPatch = '0'
     def host = doorwayEprUrl.replaceFirst(/^https?:\/\//, '')
     for (bundle in bundles) {
         def kind = bundle.kind ?: 'browser'
@@ -274,25 +271,18 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map 
         // not interchangeable map keys in Groovy.
         def outcomeKey = "${host}|${bundle.slug}|${kind}".toString()
         echo "stageSpaBlobs: host='${host}' distDir='${bundle.distDir}' slug='${bundle.slug}'"
-        // Per-bundle isolation (App #1560 regression). One bundle's blob/PATCH
-        // failure must NOT skip the remaining bundles on this host OR the
-        // remaining hosts. In #1560 the new elohim-host-landing-ssr PATCH 404'd
-        // on alpha (its content row was never seeded) and — under a single
-        // loop-wide catchError around the whole host list — aborted before the
-        // elohim.host iteration ran, stranding elohim.host on the stale 8a2c65e
-        // bundle for days while alpha advanced to 580b88d. Catching per (host,
-        // slug) keeps every still-publishable bundle landing; the failed slug
-        // alone goes UNSTABLE (orchestrator treats UNSTABLE as success). This is
-        // the PRIMARY isolation point — the caller's catchError is now a backstop.
-        //
-        // Visibility (Part B, 2026-06-27): a swallowed-UNSTABLE leg was
-        // INVISIBLE — a transient adam (elohim.host backend) 503 stranded the
-        // host silently for days. stage-spa-blob.sh now retries (Part A); only a
-        // PERSISTENT failure exits 1 here. We record per-(host,slug) outcomes so
-        // emitAppDeployJunit names the stale host as a junit failure instead of
-        // a buried UNSTABLE. Mirrors the edge emitDeployJunit outcome gate.
+        // Per-(host,bundle) isolation for the BYTE-SEED pass. Blob BYTES are
+        // content-addressed and do not auto-replicate P2P yet, so each serving
+        // backend must carry them (legitimate load-spread — NOT a divergent
+        // write; the head is authored once and gossips). One backend's byte
+        // upload failing must NOT skip the remaining bundles/hosts: catch per
+        // (host,slug) so every still-seedable backend lands, the failed one goes
+        // UNSTABLE (orchestrator treats UNSTABLE as success), and
+        // emitAppDeployJunit NAMES it (Part B, 2026-06-27) instead of a buried
+        // UNSTABLE. The notarized head is NOT authored here — authorHeadOnce does
+        // that exactly once, via a live conductor bridge.
         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE',
-                   message: "deploy ${host} ${bundle.slug} (${kind}): SPA-blob stage failed after retries — host left STALE; see junit testcase") {
+                   message: "seed ${host} ${bundle.slug} (${kind}): blob byte upload failed after retries; see junit testcase") {
             withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=${doPatch}"]) {
                 sh "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '${bundle.distDir}' '${bundle.slug}' '${doorwayEprUrl}' '${kind}'"
             }
@@ -301,6 +291,40 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map 
             outcomes[outcomeKey] = true
         }
     }
+}
+
+// Author the single notarized head for ONE bundle, exactly once. The blobHash
+// PATCH is a DNA-notarized write (patch_needs_conductor=true): the doorway
+// routes it to a storage backend whose CONDUCTOR authors the DHT entry — the
+// peer network (Holochain DHT) is the witness, the doorway is only the gateway.
+// A backend with no live conductor bridge 503s (the script exits non-zero); we
+// fail the PATCH over across doorways until one authors it, then STOP. The single
+// witnessed head gossips to every peer (run_content_sweep), so the other
+// backends converge WITHOUT any per-host head write. Returns the authoring host,
+// or null if NO doorway in the fabric could witness the head. Own top-level def
+// = own CPS method; no heredoc (CPS 64KB limit — bash lives in stage-spa-blob.sh).
+def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map outcomes) {
+    def kind = bundle.kind ?: 'browser'
+    def authorKey = "author|${bundle.slug}|${kind}".toString()
+    for (int i = 0; i < doorwayEprUrls.size(); i++) {
+        def doorwayEprUrl = doorwayEprUrls[i]
+        def host = doorwayEprUrl.replaceFirst(/^https?:\/\//, '')
+        def rc = 1
+        // returnStatus (not throw): a 503 here is EXPECTED on a bridgeless
+        // backend and means "try the next doorway", not "fail the build".
+        withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=1"]) {
+            rc = sh(returnStatus: true,
+                    script: "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '${bundle.distDir}' '${bundle.slug}' '${doorwayEprUrl}' '${kind}'")
+        }
+        if (rc == 0) {
+            echo "authorHeadOnce: ${bundle.slug} (${kind}) — head authored via ${host}'s conductor bridge; DHT witnesses it, converges to all peers"
+            outcomes[authorKey] = host
+            return host
+        }
+        echo "authorHeadOnce: ${host} could not author ${bundle.slug} (${kind}) (no live conductor bridge / persistent 503) — failing over to next doorway"
+    }
+    echo "authorHeadOnce: NO doorway could author ${bundle.slug} (${kind}) — no live conductor bridge in the fabric to witness the head"
+    return null
 }
 
 def verifyEprMounts(String doorwayUrl, List<String> mounts) {
@@ -343,9 +367,12 @@ def resolveDoorwayEprUrls() {
     // jenkins namespace got curl exit 6 — see App #1457.
     //
     // Alpha cluster has TWO storage backends — matthew (alpha.elohim.host) +
-    // adam (elohim.host) — and each must carry the SPA blob bytes + blobHash
-    // itself: the blob does not auto-replicate P2P and the blobHash PATCH is
-    // a per-storage write. Seeding one left apex /apps/* at 404.
+    // adam (elohim.host). Each must carry the SPA blob BYTES (bytes don't
+    // auto-replicate P2P yet — legitimate per-host load-spread), but the
+    // notarized blobHash HEAD is authored ONCE via a live conductor bridge and
+    // gossips to every peer (authorHeadOnce) — NOT a per-storage write (that
+    // minted divergent, un-witnessed heads). This list is both the byte-seed set
+    // and the failover order for the single head author.
     // STORAGE_URL env still overrides for ad-hoc or in-cluster targeting.
     def branch = env.BRANCH_NAME ?: 'dev'
     def defaults
@@ -397,40 +424,56 @@ def resolveStorageAdminKey() {
 }
 
 def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey) {
-    // Two pillar-EPR bundles, two content rows (Task B21). Deploy-seed is
-    // post-build and transient-prone (doorway 503 during cluster churn); the
-    // orchestrator runs this pipeline wait-for-result at Level 0, so a
-    // FAILURE here would abort the whole dependency graph. catchError ->
+    // Two-phase deploy of the pillar-EPR bundles (Task B21). Deploy-seed is
+    // post-build and transient-prone (conductor/doorway 503 during cluster
+    // churn); the orchestrator runs this pipeline wait-for-result at Level 0, so
+    // a hard FAILURE here aborts the whole dependency graph. catchError ->
     // UNSTABLE keeps the chain alive (the orchestrator treats UNSTABLE as
-    // success). The credential-missing guard stays a hard error upstream.
+    // success). The credential-missing guard stays a hard error upstream
+    // (resolveStorageAdminKey).
     //
-    // BACKSTOP ONLY. Per-(host,slug) isolation now lives INSIDE stageSpaBlobs
-    // (App #1560 fix). Do NOT rely on this outer catchError for isolation: it
-    // wraps the entire host loop, so on its own a single slug's failure aborts
-    // the loop before later hosts run (that was the #1560 bug). Keep the inner
-    // per-bundle catchError; this one only guards non-sh throws.
+    //   Phase 1 (byte-seed, per host): PUT the content-addressed blob bytes onto
+    //     EVERY serving backend — bytes don't auto-replicate P2P yet, so this is
+    //     legitimate load-spread, not a divergent write.
+    //   Phase 2 (author head, ONCE): PATCH the notarized head exactly once, via
+    //     the first doorway that reaches a live conductor bridge. The conductor
+    //     authors the DHT entry, the peer network witnesses it, and it gossips to
+    //     every peer (run_content_sweep) — so the other backends converge WITHOUT
+    //     a per-host head write. This replaces the retired per-host `amber` PATCH
+    //     that minted divergent, un-witnessed heads (the per-host stranding class).
     def bundles = [
         [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
         [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/server",  slug: "elohim-host-landing", kind: "server"],
         [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
     ]
-    // Per-(host,slug) deploy outcomes → junit (Part B, 2026-06-27). UNSTABLE on
-    // a swallowed leg was invisible (the orchestrator treats UNSTABLE as
-    // success), so a stale host went unnoticed for days. emitAppDeployJunit
-    // turns a persistently-failed leg into a NAMED test failure (host + stale
-    // state) that surfaces in the test-report tab and getTestResults, while the
-    // build stays UNSTABLE (graph survives). Mirrors edge emitDeployJunit.
     def outcomes = [:]
+
+    // Phase 1 — byte-seed every backend. Per-(host,slug) isolation lives INSIDE
+    // stageSpaBlobs; this outer catchError is a backstop for non-sh throws only.
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
         for (int i = 0; i < doorwayEprUrls.size(); i++) {
             stageSpaBlobs(doorwayEprUrls[i], bundles, adminKey, outcomes)
         }
     }
+
+    // Phase 2 — author each bundle's head EXACTLY once (failover to a live
+    // bridge). authorHeadOnce swallows a bridgeless 503 to try the next doorway;
+    // a bundle whose head NO doorway could witness is NAMED UNSTABLE by
+    // emitAppDeployJunit. Unlike the retired per-host PATCH, we never write an
+    // un-witnessed local head as a fallback.
+    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        for (bundle in bundles) {
+            authorHeadOnce(doorwayEprUrls, bundle, adminKey, outcomes)
+        }
+    }
+
     emitAppDeployJunit((env.BRANCH_NAME ?: 'dev'), doorwayEprUrls, bundles, outcomes)
-    // End-to-end serving seatbelt: probe the EPR-routed mounts a human
-    // actually visits (verifyEprMounts). Skipped on STORAGE_URL override
-    // runs — a raw storage backend has no EPR router to probe. UNSTABLE per
-    // the same dependency-chain rationale as the staging loop.
+
+    // End-to-end serving seatbelt: probe the EPR-routed mounts a human actually
+    // visits. Each host serves 200 via its own converged head OR via doorway
+    // failover during the convergence window. Skipped on STORAGE_URL override (a
+    // raw storage backend has no EPR router). UNSTABLE per the dependency-chain
+    // rule.
     if (!env.STORAGE_URL) {
         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
             for (int i = 0; i < doorwayEprUrls.size(); i++) {
@@ -452,13 +495,24 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey) {
 def emitAppDeployJunit(String envName, List<String> doorwayEprUrls, List<Map> bundles, Map outcomes) {
     def safeEnv = (envName ?: 'dev').replaceAll('[^A-Za-z0-9._-]', '-')
     def cases = []
+    // Byte-seed legs: one per (host, bundle). Passed => the blob bytes landed on
+    // that backend (outcome recorded true inside stageSpaBlobs on clean return).
     doorwayEprUrls.each { url ->
         def host = url.replaceFirst(/^https?:\/\//, '')
         bundles.each { b ->
             def kind = b.kind ?: 'browser'
-            cases << [name: "${host} ${b.slug} (${kind})".toString(),
+            cases << [name: "seed ${host} ${b.slug} (${kind})".toString(),
+                      kind: 'seed',
                       passed: outcomes["${host}|${b.slug}|${kind}".toString()] == true]
         }
+    }
+    // Author legs: one per bundle. Passed => some doorway's conductor witnessed
+    // the single head (outcomes["author|slug|kind"] holds the authoring host).
+    bundles.each { b ->
+        def kind = b.kind ?: 'browser'
+        cases << [name: "author ${b.slug} (${kind})".toString(),
+                  kind: 'author',
+                  passed: outcomes["author|${b.slug}|${kind}".toString()] != null]
     }
     def failed = cases.count { !it.passed }
     def lines = cases.collect { c ->
@@ -466,9 +520,14 @@ def emitAppDeployJunit(String envName, List<String> doorwayEprUrls, List<Map> bu
         if (c.passed) {
             "  <testcase ${attrs}/>"
         } else {
-            def msg = "SPA-blob deploy leg '${c.name}' failed after retries (PUT /admin/seed/blob or PATCH+verify db/content): this host is serving a STALE bundle. elohim.host's backend is the adam storage peer — a transient 503 during cluster churn is the usual cause (now retried in stage-spa-blob.sh); a persistent failure means the host backend is down. Re-run the App pipeline, or check the host storage /health."
+            def msg
+            if (c.kind == 'author') {
+                msg = "Head author '${c.name}' failed: NO doorway in the fabric reached a live conductor bridge to author (witness) this bundle's single notarized head. The head cannot green or converge until a conductor bridge is live. Check the alpha peers' conductor health (storage /health, conductor app-WS)."
+            } else {
+                msg = "Blob byte-seed '${c.name}' failed after retries (PUT /admin/seed/blob): this backend did not receive the bundle bytes. A transient 503 during cluster churn is the usual cause (now retried in stage-spa-blob.sh); a persistent failure means the backend is down. Re-run the App pipeline, or check the host storage /health."
+            }
             msg = msg.replace('&', '&amp;').replace('<', '&lt;').replace('"', '&quot;')
-            "  <testcase ${attrs}><failure message=\"${msg}\" type=\"spa-blob-stale\"/></testcase>"
+            "  <testcase ${attrs}><failure message=\"${msg}\" type=\"spa-blob-${c.kind}\"/></testcase>"
         }
     }
     def xml = [
@@ -482,10 +541,10 @@ def emitAppDeployJunit(String envName, List<String> doorwayEprUrls, List<Map> bu
     archiveArtifacts(artifacts: reportFile, allowEmptyArchive: true)
     junit(testResults: reportFile, allowEmptyResults: true)
     def passed = cases.size() - failed
-    echo "App SPA-blob deploy for ${safeEnv}: ${passed}/${cases.size()} (host,bundle) legs landed"
+    echo "App SPA-blob deploy for ${safeEnv}: ${passed}/${cases.size()} legs landed (byte-seed per host + one witnessed head author per bundle)"
     if (failed > 0) {
-        def stale = cases.findAll { !it.passed }.collect { it.name }.join('; ')
-        echo "App deploy partial failure: ${failed}/${cases.size()} legs STALE — ${stale}. Build UNSTABLE (test shape); orchestrator proceeds. Named host(s) are serving stale bundles."
+        def failedNames = cases.findAll { !it.passed }.collect { it.name }.join('; ')
+        echo "App deploy partial failure: ${failed}/${cases.size()} legs failed — ${failedNames}. Build UNSTABLE (test shape); orchestrator proceeds. A failed 'author' leg means the single head was never witnessed; a failed 'seed' leg means a backend lacks the bytes."
     }
 }
 

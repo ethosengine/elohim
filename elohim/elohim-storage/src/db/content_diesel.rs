@@ -2584,15 +2584,17 @@ mod tests {
             .and_then(|c| c.content.blob_hash.filter(|h| !h.is_empty()))
     }
 
-    /// A3 proof (RED before A3): a seeded SPA-bundle row with no blob_hash and no
-    /// conductor bridge 404s at the slug lookup today. The deploy-producer amber
-    /// write (marker set, `(true, None)` branch) records `blob_hash` +
-    /// `crdt_converged_at` diesel-direct, NEVER `dht_anchor_hash`. The row then
-    /// resolves through the SAME query `lookup_slug_blob_hash` runs
-    /// (MinTrust::Amber) — so the SPA mount serves 200. Authority reads (Green)
-    /// still exclude it (amber is never authoritative).
+    /// Amber serving floor: a row at the amber tier (blob_hash + crdt_converged_at
+    /// stamped, NEVER dht_anchor_hash) resolves through the SAME query
+    /// `lookup_slug_blob_hash` runs (MinTrust::Amber) — so the SPA mount serves
+    /// 200 during the convergence window. Amber rows now arise ONLY from the
+    /// DocStore reverse-projection drift-heal (`reverse_project_content_doc`),
+    /// never from a deploy write (the per-host `deployTier=amber` write was
+    /// retired in favor of one conductor-authored head). Authority reads (Green)
+    /// still exclude the row — amber is a provisional, un-witnessed signal, never
+    /// authoritative.
     #[test]
-    fn amber_patch_no_conductor_serves_200() {
+    fn amber_tier_row_serves_at_amber_floor() {
         let mut conn = setup_test_db();
         let ctx = AppContext::new("lamad");
         let id = "epr:elohim-host-landing";
@@ -2606,8 +2608,9 @@ mod tests {
             "pre-amber: no provenance marker → slug lookup 404s"
         );
 
-        // The amber write — exactly what ContentService::update_amber does: set
-        // blob_hash + stamp crdt_converged_at, never dht_anchor_hash.
+        // An amber-tier write at the db layer — what the drift-heal
+        // (reverse_project_content_doc) emits: set blob_hash + stamp
+        // crdt_converged_at, never dht_anchor_hash.
         let amber = UpdateContentInput {
             id: id.to_string(),
             blob_hash: Some("sha256-amberbundle".to_string()),
