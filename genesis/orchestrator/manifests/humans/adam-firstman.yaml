@@ -257,6 +257,13 @@ spec:
               value: "true"
             - name: ENABLE_CONTENT_DB
               value: "true"
+            # Storage r2d2 read pool over content.db (elohim-storage init_pool;
+            # compiled default 10). matthew runs 20 (deployments.json
+            # edgenodeDbPoolSize) for read contention; adam — the HEAVIER
+            # doorway-B (elohim.host) backend — was on the unset default 10.
+            # Match matthew (2026-07-07, adam read-saturation relief).
+            - name: STORAGE_DB_POOL_SIZE
+              value: "20"
             - name: IMPORT_CHUNK_SIZE
               value: "50"
             - name: IMPORT_CHUNK_DELAY_MS
@@ -303,20 +310,29 @@ spec:
               containerPort: 9876
               protocol: TCP
           # Cooperative memory pool — conductor + storage share one cgroup.
-          # Sized to match matthew (device-family-node-base): adam is the
+          # Sized ABOVE matthew (device-family-node-base baseline): adam is the
           # shem-side member of the genesis pair (deployments.json adam.
-          # $genesisPeerComment) AND, as of 2026-05-27, the storage backend
-          # behind doorway-B (elohim.host). Both roles together make adam
-          # symmetric with matthew on the on-prem side, so the two genesis
-          # peers carry comparable load: each services one doorway's reads
-          # plus its share of P2P gossip + DHT validation.
+          # $genesisPeerComment) AND, since 2026-05-27, the storage backend
+          # behind doorway-B (elohim.host) AND the primary /account/import seed
+          # target — three concurrent read-heavy roles vs matthew's single doorway.
+          # $cpuBumpComment (2026-07-07): cpu limit 3000m→8000m, request 1000m→1500m.
+          # ROOT CAUSE: adam's conductor SQLite read pool = max(2*cpus, 8); at the
+          # old 3000m limit it detected 3 cores → floored at 8 readers, which
+          # sustained-saturated (Util 650-3300%; EPR router failed over off adam
+          # for hours — backlog adam-genesis-anchor-sustained-saturation-post-storm).
+          # 8000m → 8 detected cores → max_readers=16 (2x the pool) + doorway-B
+          # request-serving headroom. The 2026-06-15 matthew bump to 4000m/pool-20
+          # never propagated here (adam uses THIS explicit manifest, not the
+          # template) — this closes that drift and then some. Keep limit >4000m to
+          # hold max_readers above the 8 floor; restore toward the archetype floor
+          # once the anchor read-load is measured settled.
           resources:
             requests:
               memory: "2Gi"
-              cpu: "1000m"
+              cpu: "1500m"
             limits:
               memory: "8Gi"
-              cpu: "3000m"
+              cpu: "8000m"
           volumeMounts:
             - name: holochain-data
               mountPath: /var/local/lib/holochain
