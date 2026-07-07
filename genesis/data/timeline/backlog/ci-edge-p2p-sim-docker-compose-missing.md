@@ -10,11 +10,13 @@ author: "ci-failure-triage"
 status: "backlog"
 priority: "low"
 ci_status: blocked
-fingerprints: [e40490941083]
+fingerprints: [e40490941083, 6df5f3ebbb1a]
 jobs: [elohim-edge]
 relatedNodeIds: []
-tags: [ci, elohim-edge, p2p-simulation, docker-compose, nerdctl, buildkit, daemonless-runtime, host-green-not-ci-green, advisory-stage, misleading-fingerprint-label]
+tags: [ci, elohim-edge, p2p-simulation, docker-compose, nerdctl, buildkit, daemonless-runtime, host-green-not-ci-green, advisory-stage, misleading-fingerprint-label, fp-remint-across-shifts]
 cites:
+  - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1162/
+  - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1161/
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1069/
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1068/
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1067/
@@ -54,6 +56,33 @@ an intermittent flake. (The ledger shows `seen: 1, first_build: 1069, last_build
 1069` for fp `e40490941083` because the harvester fingerprinted it under the
 *deploy*-path line label below, which collides/coarsens differently across builds;
 the recurrence is real and visible in the raw logs.)
+
+**Second-shift recurrence — 2026-07-07, builds #1161 and #1162 (new fp
+`6df5f3ebbb1a`).** Verified by direct log search: #1162 line 16637 and #1161 line
+16645 BOTH carry `./simulate.sh: line 44: docker-compose: command not found` under
+the `(P2P Simulation Test)` stage — byte-identical to the #1067–#1069 signature, ~1
+month and a distinct shift later. Two facts settle the correct reading and refute the
+dispatch's "fresh env exposure — CI image dropped docker-compose at #1162" hypothesis:
+
+1. **#1161 had the identical failure.** The stage ran (`+ ./simulate.sh test`, line
+   16642) and died the same way (line 16645). So there is no #1161→#1162 regression;
+   "#1161 was green" is only the harvester declining to mint `6df5f3ebbb1a` at #1161
+   — the exact fp-instability this entry already documented (§"The misleading
+   fingerprint label"). This is museum trap #1 (a fp-flip read as a regression);
+   resisted.
+2. **The stage ran via `FORCE_BUILD`, not a p2p/sim changeset.** #1162's triggering
+   commit `84aea07a7` touches `elohim/holochain/Jenkinsfile`, root `Jenkinsfile`,
+   `scripts/ci/stage-spa-blob.sh`, and three `elohim/elohim-storage/src/*` files —
+   **none** under the stage's changeset gate (`elohim/elohim-storage/src/p2p/**` or
+   `steward/node/simulation/**`). The gate opened via `FORCE_BUILD`. So the #1161↔#1162
+   variation is *which builds open the advisory gate*, not a runtime that lost a
+   binary. "docker-compose no longer present" is refuted by prior evidence: it was
+   never present in this daemonless runtime — absent as far back as #1067, before an
+   image change could have removed it.
+
+Two distinct shifts now (June 13 #1067–#1069; July 7 #1161–#1162). Museum-row
+promotion threshold is ≥3 distinct shifts — still **held at 2**, so this stays a
+backlog entry, not a museum trap. Re-mint on the third shift graduates it.
 
 ## Verdict
 
@@ -173,5 +202,12 @@ disappearance.
   migration). **No `triaged_at_build` stamp** (nothing landed). Recurrence is expected
   every run the sim changeset gate opens, until a path lands — that is the honest
   advisory-UNSTABLE signal, not a re-fire bug.
+- **2026-07-07 re-encounter:** new fp `6df5f3ebbb1a` (elohim-edge #1162, sim-stage
+  cause line) folded into this concern and set `status: blocked` with `backlog`
+  pointer — same daemonless-runtime blocker, no tree change, no `triaged_at_build`
+  (nothing landed). Confirmed the same signature in #1161 and #1162 and that the stage
+  ran via `FORCE_BUILD` (not a p2p/sim changeset), refuting the "image dropped
+  docker-compose" hypothesis. The unblock paths are unchanged and still operator- or
+  verification-gated; nothing became bounded, so the entry holds at `blocked`/low.
 - Sentinel ceiling note (anonymous MCP): confirmation requires an operator-chosen path
   + a build, which the sentinel cannot trigger.
