@@ -25,7 +25,9 @@
           "genesis/a2o/features/**",
           "genesis/docs/content/elohim-protocol/**",
           "genesis/graphos/**",
-          "genesis/orchestrator/manifests/elohim-storybook/**"
+          "genesis/orchestrator/manifests/elohim-storybook/**",
+          "pnpm-lock.yaml",
+          "package.json"
         ],
         "buildProcess": ["app/elohim-library/Jenkinsfile"]
       },

@@ -21,7 +21,10 @@
           "app/lamad/**",
           "elohim/sdk/**",
           "VERSION",
-          "scripts/ci/stage-spa-blob.sh"
+          "scripts/ci/stage-spa-blob.sh",
+          "app/elohim-app/build-manifest.json",
+          "pnpm-lock.yaml",
+          "package.json"
         ],
         "buildProcess": ["Jenkinsfile"]
       },

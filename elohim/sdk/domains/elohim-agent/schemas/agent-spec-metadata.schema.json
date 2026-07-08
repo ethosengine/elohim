@@ -1,0 +1,23 @@
+{
+  "$id": "elohim-agent:schema:metadata:agent-spec",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentSpecMetadata",
+  "description": "Metadata for a standing instruction surface.",
+  "type": "object",
+  "required": ["id", "version", "description", "scope", "appliesTo"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "scope": {
+      "type": "string",
+      "enum": ["global", "workspace", "repository", "directory", "file"]
+    },
+    "appliesTo": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,19 @@
+{
+  "$id": "elohim-agent:schema:metadata:policy",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PolicyMetadata",
+  "description": "Metadata for a reusable governance rule.",
+  "type": "object",
+  "required": ["id", "version", "description", "bindingClass", "status"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "bindingClass": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "active", "deprecated", "revoked"]
+    }
+  },
+  "additionalProperties": true
+}

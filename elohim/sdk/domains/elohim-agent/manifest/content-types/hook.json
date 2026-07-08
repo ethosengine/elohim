@@ -1,0 +1,27 @@
+{
+  "description": "A lifecycle binding that connects a phase and matcher to policy or validation authority.",
+  "metadataSchema": { "$ref": "./schemas/hook-metadata.schema.json" },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "BINDS": ["event", "validator", "policy"]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "lifecycle-binding",
+        "recognition": "capability-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "community",
+      "minimumReach": "private",
+      "governanceModel": "steward-consent",
+      "signalTypes": ["lifecycle-event-observed", "validation-executed", "policy-violation-detected"]
+    },
+    "claims": [
+      { "asserts": "capability-usable", "contradictedBy": "policy-violation", "validityHorizon": "P90D", "leg": "governance" }
+    ]
+  }
+}

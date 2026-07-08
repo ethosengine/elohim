@@ -576,8 +576,8 @@ mod tests {
     /// Uses the exact column set from the Diesel schema so inserts via
     /// `create_contributor_presence` work without the full migration suite.
     fn setup_test_db() -> SqliteConnection {
-        let mut conn = SqliteConnection::establish(":memory:")
-            .expect("Failed to create in-memory SQLite");
+        let mut conn =
+            SqliteConnection::establish(":memory:").expect("Failed to create in-memory SQLite");
 
         diesel::sql_query(
             r#"CREATE TABLE contributor_presences (
@@ -674,16 +674,10 @@ mod tests {
             vec!["content-a".into(), "y".into()],
         );
         // (d) no-match — ["other"]
-        let _p_d = insert_presence(
-            &mut conn,
-            &ctx,
-            "p-d",
-            "Author D",
-            vec!["other".into()],
-        );
+        let _p_d = insert_presence(&mut conn, &ctx, "p-d", "Author D", vec!["other".into()]);
 
-        let results = get_presences_for_content(&mut conn, &ctx, "content-a")
-            .expect("query failed");
+        let results =
+            get_presences_for_content(&mut conn, &ctx, "content-a").expect("query failed");
 
         let ids: Vec<&str> = results.iter().map(|p| p.id.as_str()).collect();
 

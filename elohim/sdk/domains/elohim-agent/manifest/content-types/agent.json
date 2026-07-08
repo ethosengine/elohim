@@ -1,0 +1,29 @@
+{
+  "description": "An executable role and persona contract for an agentic worker or assistant surface.",
+  "metadataSchema": { "$ref": "./schemas/agent-metadata.schema.json" },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "USES": ["skill"],
+        "GOVERNS": ["policy"],
+        "PROJECTS": ["projection-binding"]
+      }
+    },
+    "value": {
+      "onContribute": {
+        "action": "produce",
+        "resourceConformsTo": "agentic-work",
+        "recognition": "capability-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "community",
+      "minimumReach": "private",
+      "governanceModel": "steward-consent",
+      "signalTypes": ["capability-used", "policy-violation-detected"]
+    },
+    "claims": [
+      { "asserts": "capability-usable", "contradictedBy": "policy-violation", "validityHorizon": "P90D", "leg": "governance" }
+    ]
+  }
+}

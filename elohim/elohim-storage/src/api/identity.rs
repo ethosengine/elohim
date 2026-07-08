@@ -316,8 +316,7 @@ async fn get_profile_lens(
     // it is set only by bespoke portal handlers (not this general-proxy route), so
     // feeding it to the id-keyed consent read would collapse every doorway viewer to
     // the commons floor. Anonymous (no session) → None → commons floor.
-    let viewer_human_id: Option<String> =
-        crate::api::account::extract_agent_cid(req, &mut conn)?;
+    let viewer_human_id: Option<String> = crate::api::account::extract_agent_cid(req, &mut conn)?;
 
     let view = crate::services::viewer_lens_facing::build_profile_lens_view(
         &mut conn,

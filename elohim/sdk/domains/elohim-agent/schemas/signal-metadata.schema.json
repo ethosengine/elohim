@@ -1,0 +1,20 @@
+{
+  "$id": "elohim-agent:schema:metadata:signal",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SignalMetadata",
+  "description": "Metadata for an interpreted event or counter state.",
+  "type": "object",
+  "required": ["id", "version", "description", "signalType", "sourceRefs"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "signalType": { "type": "string", "minLength": 1 },
+    "sourceRefs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    }
+  },
+  "additionalProperties": true
+}
