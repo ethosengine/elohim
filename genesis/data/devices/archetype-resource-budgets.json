@@ -1,0 +1,37 @@
+{
+  "$comment": "Machine-readable k8s resource-budget FLOOR per deviceArchetype — the contract that was missing when adam under-provisioned silently (backlog archetype-resource-conformance-validation-gap.md). Each human's EFFECTIVE conductor resources (template humans: deployments.json edgenode* fields; explicit-manifest humans e.g. adam: the resources block in their manifest YAML) MUST be >= its archetype floor here. A human MAY exceed the floor for its role (e.g. adam, the genesis anchor + doorway-B backend + seed target, runs cpu limit 8000m vs the family-node-base 4000m floor). validate-deployments.ts enforces this (wired into .husky/pre-push). WHEN YOU BUMP an archetype's baseline sizing, bump the floor here in the same commit — the gate then flags any human left behind (which is exactly the adam/matthew 2026-06-15 propagation drift this closes). Floors seeded 2026-07-07 from the reconciled post-shem-relief baselines: non-family remote fixtures restore to 1000m CPU limit, while family-node anchors remain higher. Physical hardware specs live in devices.json / device-archetypes-design.md; this file is the k8s-budget projection of those, pending the design doc's not-yet-built 'operational envelope derivation'.",
+  "schemaVersion": 1,
+  "budgets": {
+    "device-family-node-base": {
+      "cpuRequest": "1500m",
+      "cpuLimit": "4000m",
+      "memoryRequest": "2Gi",
+      "memoryLimit": "8Gi",
+      "note": "Genesis-pair anchor + doorway backend baseline (matthew). Anchors that also back a heavy doorway + seed traffic (adam) size ABOVE this floor; conductor db read pool = max(2*cpus,8) so >4000m limit lifts max_readers above the 8 floor."
+    },
+    "device-recycled-laptop": {
+      "cpuRequest": "250m",
+      "cpuLimit": "1000m",
+      "memoryRequest": "768Mi",
+      "memoryLimit": "3Gi"
+    },
+    "device-chromebook-edu": {
+      "cpuRequest": "250m",
+      "cpuLimit": "1000m",
+      "memoryRequest": "2Gi",
+      "memoryLimit": "6Gi"
+    },
+    "device-home-nuc": {
+      "cpuRequest": "250m",
+      "cpuLimit": "1000m",
+      "memoryRequest": "768Mi",
+      "memoryLimit": "3Gi"
+    },
+    "device-raspberry-pi-4": {
+      "cpuRequest": "250m",
+      "cpuLimit": "1000m",
+      "memoryRequest": "768Mi",
+      "memoryLimit": "3Gi"
+    }
+  }
+}

@@ -240,6 +240,22 @@ if echo "$CHANGED" | grep -qE "genesis/data/devices/"; then
   echo "[pre-push] device archetype validation ✓"
 fi
 
+# ── Deployment ↔ Archetype Resource-Conformance Validation ───────
+#
+# When deployments.json, a per-human manifest, the archetype budget floor, or
+# the validator itself changes, run validate:deployments — cross-refs (humanId,
+# deviceArchetype) AND resource conformance: every consolidated human's effective
+# conductor resources meet its deviceArchetype floor (archetype-resource-budgets.json),
+# and explicit-manifest humans (adam) match their declared edgenode* budget.
+# Closes the drift that silently under-provisioned adam vs its family-node-base
+# archetype-mate (backlog archetype-resource-conformance-validation-gap) — the
+# validator existed but was never gated (seeder-validate-deployments-stale-validator).
+if echo "$CHANGED" | grep -qE "genesis/orchestrator/data/deployments\.json|genesis/orchestrator/manifests/humans/|genesis/data/devices/archetype-resource-budgets\.json|genesis/seeder/src/validate-deployments\.ts"; then
+  echo "[pre-push] Validating deployments ↔ archetype resource conformance..."
+  (cd genesis/seeder && pnpm run validate:deployments) || exit 1
+  echo "[pre-push] deployments resource-conformance ✓"
+fi
+
 # ── Account Package Schema Validation ────────────────────────────
 #
 # When account packages or their source data change, validate the
