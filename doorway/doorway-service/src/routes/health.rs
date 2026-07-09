@@ -63,6 +63,9 @@ pub struct HealthResponse {
     /// P2P network status (from elohim-storage sidecar)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub p2p: Option<P2PHealth>,
+    /// Backing-aware DHT-participation identity (Tier C — peer-discovery spec).
+    #[serde(rename = "dhtBacking")]
+    pub dht_backing: DhtBacking,
     /// Whether zome discovery has completed (zome_configs populated)
     #[serde(rename = "discoveryComplete")]
     pub discovery_complete: bool,
@@ -88,6 +91,56 @@ pub struct P2PHealth {
     /// Count of anchors that diverged during reconcile (from projectionReconcile).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub divergent_anchor: Option<usize>,
+}
+
+/// Backing-aware DHT-participation identity (Tier C — peer-discovery
+/// fractal-federation spec, 2026-07-09 §6).
+///
+/// "Green" trust is DHT-membership-blind without the discovery *backing*: two
+/// doorways serving identical DNA hashes read identical yet sit on partitioned
+/// DHTs when their bootstrap table or signal relay differs (the adam/matthew
+/// diagnosis — identical hashes, different backing). The endpoint URL alone
+/// would LIE (two endpoints on one shared backing are coherent), so this block
+/// reports the *backing* the doorway can honestly see: the bootstrap store
+/// backend + shared table id, and the signal relay id. Correlate with storage
+/// `/health` `dhtParticipation.dnaHashes` for the full `dnaHash + backing`
+/// identity.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DhtBacking {
+    /// Kitsune bootstrap endpoint (necessary but insufficient — two endpoints
+    /// on ONE shared table are coherent, so URL alone cannot prove partition).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bootstrap_url: Option<String>,
+    /// Bootstrap store backend as the LIVE store reports it: `"mongo"` = shared
+    /// table (genesis-pair islanding healed — F-BOOTSTRAP); `"mem"` = per-pod,
+    /// unshared (a partition signal). `None` when bootstrap is disabled here.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bootstrap_backend: Option<&'static str>,
+    /// Shared bootstrap table id (mongo DB name, e.g. `elohim-bootstrap`),
+    /// surfaced only when the backend is `"mongo"`. Two doorways sharing this
+    /// table discover each other's peers.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bootstrap_table: Option<String>,
+    /// WebRTC signal relay URL — the relay id. Two doorways with different
+    /// `signalUrl` complete WebRTC on SEPARATE relays, so peers that DISCOVER
+    /// each other still cannot handshake → partitioned (spec §2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signal_url: Option<String>,
+    /// Whether the signal relay has a shared backend. FALSE today: the SBD
+    /// relay is a per-pod in-memory service with no shared store (spec §2 —
+    /// the current partition point), so relay identity is the URL alone.
+    pub signal_shared: bool,
+}
+
+/// Read the shared bootstrap-table id (mongo DB name) once. This mirrors the
+/// value `BootstrapStore::new` selected the mongo backend against at startup;
+/// cached in a `OnceLock` to keep the env read off the `/health` hot path.
+fn bootstrap_table_id() -> Option<&'static str> {
+    static TABLE_ID: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    TABLE_ID
+        .get_or_init(|| std::env::var("BOOTSTRAP_MONGODB_DB").ok())
+        .as_deref()
 }
 
 /// Cache status for backwards compatibility
@@ -202,6 +255,23 @@ fn build_health_response(state: &AppState) -> HealthResponse {
         .ok()
         .and_then(|guard| guard.clone());
 
+    // Backing-aware DHT-participation identity (Tier C). `bootstrap_backend` is
+    // read from the LIVE store (authoritative shared-vs-per-pod signal); the
+    // table id is surfaced only when that backend is the shared mongo store.
+    let bootstrap_backend = state.bootstrap.as_ref().map(|b| b.k2().backend_name());
+    let dht_backing = DhtBacking {
+        bootstrap_url: args.bootstrap_url.clone(),
+        bootstrap_backend,
+        bootstrap_table: match bootstrap_backend {
+            Some("mongo") => bootstrap_table_id().map(str::to_string),
+            _ => None,
+        },
+        signal_url: args.signal_url.clone(),
+        // The SBD signal relay is a per-pod in-memory service (spec §2) — no
+        // shared backend exists today, so relay identity is the URL alone.
+        signal_shared: false,
+    };
+
     HealthResponse {
         healthy: true, // Service is running
         status,
@@ -231,6 +301,7 @@ fn build_health_response(state: &AppState) -> HealthResponse {
             writer: args.projection_writer,
         },
         p2p,
+        dht_backing,
         discovery_complete: *state.discovery_ready.borrow(),
         error,
     }
@@ -313,6 +384,27 @@ mod tests {
             "uptime should be seconds since start, got {}",
             response.uptime
         );
+    }
+
+    #[test]
+    fn dht_backing_reports_signal_unshared_and_omits_absent_urls() {
+        // Tier C: default args carry no bootstrap_url/signal_url and test_state
+        // wires no bootstrap store — the backing block must still be present,
+        // honestly reporting the signal relay as unshared (per-pod SBD relay).
+        let state = test_state();
+        let response = build_health_response(&state);
+        let json = serde_json::to_value(&response).unwrap();
+        let backing = &json["dhtBacking"];
+        assert!(backing.is_object(), "dhtBacking must always be present");
+        assert_eq!(
+            backing["signalShared"],
+            serde_json::json!(false),
+            "signal relay has no shared backend today (spec §2)"
+        );
+        // Absent optional backing facts are omitted, never fabricated.
+        assert!(backing.get("bootstrapUrl").is_none());
+        assert!(backing.get("signalUrl").is_none());
+        assert!(backing.get("bootstrapTable").is_none());
     }
 
     #[test]
