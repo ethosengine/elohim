@@ -428,6 +428,55 @@ Then(
 );
 
 /**
+ * Assert the federation converges on ONE canonical head: the notarized head anchor
+ * (dhtAnchorHash) must be present AND identical across the two named peers.
+ *
+ * This is the notary's core invariant, strictly stronger than per-peer trust="notarized":
+ * two peers can each be green over DIFFERENT heads (divergent dhtAnchorHash + blobHash — each
+ * having independently authored/notarized its own bundle), which is a false-green. Convergence
+ * means ONE canonical head, elected by earned authority and adopted by every peer. A missing
+ * anchor on either peer, or two differing anchors, is an honest red until cross-peer head
+ * election/adoption lands (verified adoption — author/community signature checked against the
+ * DHT-notary witness, never a blind copy of a peer's asserted value).
+ */
+Then(
+  'EPR {string} resolves the same canonical head across peers {string} and {string}',
+  async function (this: E2EWorld, eprId: string, peerA: string, peerB: string) {
+    const readAnchor = async (peerName: string): Promise<string> => {
+      const url = getPeerUrl(this, peerName);
+      const { status, text } = await getRaw(`${url}/db/content/${encodeURIComponent(eprId)}`);
+      assert.strictEqual(
+        status,
+        200,
+        `EPR "${eprId}" on ${peerName}: GET /db/content returned HTTP ${status} (body: ${text.slice(0, 120)}) ` +
+          `— the peer cannot serve the content view, so no canonical head can be compared.`
+      );
+      let anchor: unknown;
+      try {
+        anchor = (JSON.parse(text) as Record<string, unknown>)['dhtAnchorHash'];
+      } catch {
+        anchor = undefined;
+      }
+      assert.ok(
+        typeof anchor === 'string' && anchor.length > 0,
+        `EPR "${eprId}" on ${peerName}: dhtAnchorHash is ${JSON.stringify(anchor)} — no canonical head ` +
+          `notarized on this peer, so the federation cannot have converged on one it shares.`
+      );
+      return anchor;
+    };
+    const anchorA = await readAnchor(peerA);
+    const anchorB = await readAnchor(peerB);
+    assert.strictEqual(
+      anchorA,
+      anchorB,
+      `EPR "${eprId}": canonical head DIVERGES — ${peerA} dhtAnchorHash ${anchorA} != ${peerB} ${anchorB}. ` +
+        `Both peers are notarized over DIFFERENT heads (false-green): no single earned canonical head has been ` +
+        `elected and adopted across the federation.`
+    );
+  }
+);
+
+/**
  * Assert that the notary HEAD-authority surface exists AND refuses a non-author's move.
  *
  * The declared HEAD (declare_content_head, Plan C1/C3) is the notary's authority answer —
