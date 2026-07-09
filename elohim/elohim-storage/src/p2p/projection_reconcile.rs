@@ -80,6 +80,19 @@ use crate::views::{ProjectionInventoryPayload, ViewFederationRequest, ViewKind};
 /// read-pool ceiling). Do not raise without weighing conductor saturation.
 const WITNESS_MAX_PER_TICK: i64 = 200;
 
+/// Per-item spacing inside a witness sweep (each item is a conductor round-trip).
+const WITNESS_ITEM_DELAY: Duration = Duration::from_millis(25);
+
+/// Wall-clock budget for one witness sweep. `HcClient::call_zome` awaits with no
+/// timeout of its own, so a hung/stuck conductor call would otherwise hold the
+/// heal leg's single-flight guard forever (the RAII `HealFlag` covers panic and
+/// cancellation, but not an infinite await). Bounding the whole sweep releases
+/// the guard normally on the worst case and resumes next tick (the sweep is
+/// idempotent). Derivation: `WITNESS_MAX_PER_TICK` (200) × `WITNESS_ITEM_DELAY`
+/// (25ms) = 5s of spacing, plus generous conductor-latency headroom for 200
+/// round-trips on a healthy node.
+const WITNESS_SWEEP_BUDGET: Duration = Duration::from_secs(120);
+
 /// Per-sweep retry budget for conductor-can't-see-it gaps. A gap that the
 /// conductor still can't resolve after this many sweeps drops out (it is almost
 /// certainly an id this DHT view legitimately does not carry — a foreign-app or
@@ -357,18 +370,21 @@ async fn witness_bootstrap(hc: &Arc<HcClient>, pool: &DbPool, provide_state: &Pr
     );
     let cfg = crate::services::reanchor_backfill::ReanchorConfig {
         max_per_sweep: WITNESS_MAX_PER_TICK,
-        item_delay: Duration::from_millis(25),
+        item_delay: WITNESS_ITEM_DELAY,
     };
-    match crate::services::reanchor_backfill::run_once(
+    // Wall-clock bound (see WITNESS_SWEEP_BUDGET): on elapse the run_once future
+    // is dropped, cancelling any in-flight (possibly hung) conductor call, so the
+    // heal leg's single-flight guard always releases. The sweep is idempotent and
+    // resumes next tick.
+    let sweep = crate::services::reanchor_backfill::run_once(
         pool,
         &content_service,
         hc,
         provide_state,
         &cfg,
-    )
-    .await
-    {
-        Ok(report) if report.candidates > 0 => {
+    );
+    match tokio::time::timeout(WITNESS_SWEEP_BUDGET, sweep).await {
+        Ok(Ok(report)) if report.candidates > 0 => {
             crate::metrics::add_content_witness_authored(report.reanchored as u64);
             tracing::info!(
                 target: "elohim_storage::projection_reconcile",
@@ -381,14 +397,23 @@ async fn witness_bootstrap(hc: &Arc<HcClient>, pool: &DbPool, provide_state: &Pr
                 "projection-reconcile[witness]: authored notarized heads for un-witnessed seeded content"
             );
         }
-        Ok(_) => {
+        Ok(Ok(_)) => {
             // No un-witnessed rows — the seeded corpus is fully witnessed.
         }
-        Err(e) => {
+        Ok(Err(e)) => {
             tracing::warn!(
                 target: "elohim_storage::projection_reconcile",
                 error = %e,
                 "projection-reconcile[witness]: sweep failed (non-fatal, retried next tick)"
+            );
+        }
+        Err(_elapsed) => {
+            tracing::warn!(
+                target: "elohim_storage::projection_reconcile",
+                budget_secs = WITNESS_SWEEP_BUDGET.as_secs(),
+                "projection-reconcile[witness]: sweep exceeded wall-clock budget \
+                 (likely a slow/saturated conductor) — abandoned, single-flight guard \
+                 released, resumes next tick"
             );
         }
     }
@@ -1056,6 +1081,21 @@ mod tests {
             WITNESS_MAX_PER_TICK <= 500,
             "must stay small enough to pace a multi-thousand-row corpus across ticks"
         );
+    }
+
+    #[test]
+    fn witness_sweep_budget_exceeds_paced_floor() {
+        // The wall-clock budget must exceed the unavoidable per-item spacing floor
+        // (cap × delay) with headroom for the conductor round-trips, so a HEALTHY
+        // sweep never trips the timeout — the budget only fires on a hung/saturated
+        // conductor, releasing the single-flight guard instead of holding it forever.
+        let paced_floor = WITNESS_ITEM_DELAY * (WITNESS_MAX_PER_TICK as u32);
+        assert!(
+            WITNESS_SWEEP_BUDGET > paced_floor,
+            "budget {WITNESS_SWEEP_BUDGET:?} must exceed the paced floor {paced_floor:?}"
+        );
+        // And it must be a real bound (not effectively infinite).
+        assert!(WITNESS_SWEEP_BUDGET <= Duration::from_secs(600));
     }
 
     #[test]
