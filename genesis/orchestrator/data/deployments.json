@@ -17,7 +17,13 @@
       ],
       "genesisPeer": true,
       "$genesisPeerComment": "Adam + Matthew form the genesis pair WHEN shem is available: each ingests content directly during seeding so the payload settles across two peers in parallel. Adam is remote-only (nodeTypes:['remote'], pinned to shem), so the seeder now HOLDS adam from the genesis set whenever the remote pool is down (ELOHIM_REMOTE_COMPUTE_STATUS=unavailable / cluster-state.yaml shem:false) and matthew (household) carries genesis alone. The gate is at CONSUMPTION (genesis/Jenkinsfile runContentSeedStage substrate-aware filter), so this static genesisPeer:true stays correct-when-shem-is-up and no longer drifts as shem comes and goes (feedback_shem_down_peers_are_held).",
-      "$resumedComment": "shem returned 2026-05-18 (decommissioned 2026-05-04 PSU failure; 40 GiB openebs-hostpath PVC was unrecoverable). Re-enabling on fresh PVC \u2014 original seeded chain is lost, so seed will bootstrap a new agent key. Genesis pair (adam+matthew) reactivates without pipeline edit; pipeline tolerates 1..N genesis peers."
+      "$resumedComment": "shem returned 2026-05-18 (decommissioned 2026-05-04 PSU failure; 40 GiB openebs-hostpath PVC was unrecoverable). Re-enabling on fresh PVC \u2014 original seeded chain is lost, so seed will bootstrap a new agent key. Genesis pair (adam+matthew) reactivates without pipeline edit; pipeline tolerates 1..N genesis peers.",
+      "$resourceBudgetComment": "adam uses the explicit manifest (adam-firstman.yaml), so these edgenode* fields are RENDER-INERT (that manifest hardcodes resources — no placeholders to sed). They exist to make adam's conductor resource budget VISIBLE in the same source of truth as every template human, and to give validate-deployments.ts a declared budget to (a) floor-check against archetype-resource-budgets.json and (b) assert MATCHES the manifest's hardcoded resources. Keep in lockstep with adam-firstman.yaml's elohim-node resources block. 2026-07-07: cpu 1500m/8000m + pool 20 (genesis anchor + doorway-B + seed target — above the 4000m family-node-base floor; conductor db read pool = max(2*cpus,8), so 8000m lifts max_readers to 16).",
+      "edgenodeMemoryRequest": "2Gi",
+      "edgenodeMemoryLimit": "8Gi",
+      "edgenodeCpuRequest": "1500m",
+      "edgenodeCpuLimit": "8000m",
+      "edgenodeDbPoolSize": "20"
     },
     {
       "name": "matthew",

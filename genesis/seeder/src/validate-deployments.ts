@@ -22,6 +22,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { parseAllDocuments } from "yaml";
 
 // =============================================================================
 // Constants — sources of truth for deployment vocabulary
@@ -87,6 +88,10 @@ const DEPLOYMENTS_PATH = resolve(
 );
 const HUMANS_PATH = resolve(REPO_ROOT, "genesis/data/humans/humans.json");
 const DEVICES_PATH = resolve(REPO_ROOT, "genesis/data/devices/devices.json");
+const ARCHETYPE_BUDGETS_PATH = resolve(
+  REPO_ROOT,
+  "genesis/data/devices/archetype-resource-budgets.json",
+);
 
 function loadJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, "utf-8")) as T;
@@ -262,6 +267,176 @@ export function validateRecord(
 }
 
 // =============================================================================
+// Resource-budget conformance (archetype ↔ deployment ↔ manifest)
+// =============================================================================
+//
+// Closes the drift that silently under-provisioned adam vs its family-node-base
+// archetype-mate matthew (backlog archetype-resource-conformance-validation-gap):
+// matthew's 2026-06-15 CPU/pool bump moved deployments.json but never reached
+// adam's separate explicit manifest, and NOTHING compared them. Three checks:
+//   1. every consolidated human declares all four edgenode* budget fields;
+//   2. declared resources are >= the deviceArchetype floor (below = drift);
+//   3. explicit-manifest humans' manifest resources MATCH the declared budget.
+
+export interface ArchetypeBudget {
+  cpuRequest: string;
+  cpuLimit: string;
+  memoryRequest: string;
+  memoryLimit: string;
+  note?: string;
+}
+
+interface BudgetsJson {
+  $comment?: string;
+  schemaVersion: number;
+  budgets: Record<string, ArchetypeBudget>;
+}
+
+/** CPU quantity → millicores. "1500m"→1500, "2"→2000. */
+export function cpuToMillicores(v: string): number {
+  const s = v.trim();
+  if (s.endsWith("m")) return parseInt(s.slice(0, -1), 10);
+  return Math.round(parseFloat(s) * 1000);
+}
+
+/** Memory quantity → mebibytes. "2Gi"→2048, "768Mi"→768, bare bytes→/1Mi. */
+export function memToMi(v: string): number {
+  const m = v.trim().match(/^(\d+(?:\.\d+)?)(Ki|Mi|Gi|Ti)?$/);
+  if (!m) return NaN;
+  const n = parseFloat(m[1]);
+  switch (m[2]) {
+    case "Ti":
+      return n * 1024 * 1024;
+    case "Gi":
+      return n * 1024;
+    case "Mi":
+      return n;
+    case "Ki":
+      return n / 1024;
+    default:
+      return n / (1024 * 1024); // bare bytes
+  }
+}
+
+interface EffectiveResources {
+  cpuRequest?: string;
+  cpuLimit?: string;
+  memoryRequest?: string;
+  memoryLimit?: string;
+}
+
+/**
+ * Parse the elohim-node container's resources from an explicit manifest YAML
+ * (multi-doc k8s). Returns null if the StatefulSet / container / resources
+ * can't be found. Lets the validator assert an explicit-manifest human's
+ * hardcoded resources match the budget declared in its deployments.json record
+ * — the adam two-copy-drift guard.
+ */
+export function extractManifestResources(
+  manifestAbsPath: string,
+): EffectiveResources | null {
+  if (!existsSync(manifestAbsPath)) return null;
+  const docs = parseAllDocuments(readFileSync(manifestAbsPath, "utf-8"));
+  for (const doc of docs) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const obj = doc.toJS() as any;
+    if (!obj || obj.kind !== "StatefulSet") continue;
+    const containers = obj?.spec?.template?.spec?.containers;
+    if (!Array.isArray(containers)) continue;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = containers.find((x: any) => x?.name === "elohim-node");
+    const r = c?.resources;
+    if (!r) continue;
+    return {
+      cpuRequest: r.requests?.cpu,
+      cpuLimit: r.limits?.cpu,
+      memoryRequest: r.requests?.memory,
+      memoryLimit: r.limits?.memory,
+    };
+  }
+  return null;
+}
+
+// [budget-key, deployment-record field, converter, human-readable label]
+const BUDGET_DIMS = [
+  ["cpuRequest", "edgenodeCpuRequest", cpuToMillicores, "CPU request"],
+  ["cpuLimit", "edgenodeCpuLimit", cpuToMillicores, "CPU limit"],
+  ["memoryRequest", "edgenodeMemoryRequest", memToMi, "memory request"],
+  ["memoryLimit", "edgenodeMemoryLimit", memToMi, "memory limit"],
+] as const;
+
+/**
+ * Resource-budget conformance for one consolidated record. See section header.
+ */
+export function validateResourceBudget(
+  record: DeploymentRecord,
+  budgets: Record<string, ArchetypeBudget>,
+): string[] {
+  const errors: string[] = [];
+  const tag = record.name ? `[${record.name}]` : "[?]";
+  if (record.pattern !== "consolidated") return errors; // legacy sized elsewhere
+
+  // (1) consolidated humans must declare all four edgenode* budget fields —
+  //     this is the single source of truth the archetype floor is checked
+  //     against (adam's record now mirrors its explicit manifest).
+  for (const [, field] of BUDGET_DIMS) {
+    if (!record[field]) {
+      errors.push(
+        `${tag} consolidated human must declare ${field} (resource-budget source of truth)`,
+      );
+    }
+  }
+
+  // (2) declared resources must meet the deviceArchetype floor.
+  const budget = budgets[record.deviceArchetype];
+  if (!budget) {
+    errors.push(
+      `${tag} deviceArchetype "${record.deviceArchetype}" has no entry in archetype-resource-budgets.json — declare its k8s resource floor`,
+    );
+  } else {
+    for (const [bkey, field, conv, label] of BUDGET_DIMS) {
+      const declared = record[field];
+      if (!declared) continue; // already flagged in (1)
+      const have = conv(declared);
+      const floor = conv(budget[bkey]);
+      if (Number.isNaN(have)) {
+        errors.push(`${tag} ${field} "${declared}" is not a valid k8s quantity`);
+      } else if (have < floor) {
+        errors.push(
+          `${tag} ${label} ${declared} is BELOW the ${record.deviceArchetype} floor ${budget[bkey]} (archetype-resource-budgets.json) — under-provisioning drift`,
+        );
+      }
+    }
+  }
+
+  // (3) explicit-manifest humans: the manifest's hardcoded resources must MATCH
+  //     the declared edgenode* budget (keeps the two copies from drifting —
+  //     the exact adam failure). Template humans render FROM the record, so
+  //     there is no second copy to check.
+  if (record.manifest) {
+    const mres = extractManifestResources(resolve(REPO_ROOT, record.manifest));
+    if (mres === null) {
+      errors.push(
+        `${tag} explicit manifest ${record.manifest} — could not extract elohim-node resources to verify against the declared budget`,
+      );
+    } else {
+      for (const [bkey, field, conv, label] of BUDGET_DIMS) {
+        const declared = record[field];
+        const inManifest = mres[bkey];
+        if (!declared || !inManifest) continue;
+        if (conv(declared) !== conv(inManifest)) {
+          errors.push(
+            `${tag} manifest ${label} (${inManifest}) does not match declared ${field} (${declared}) — explicit-manifest budget drift; keep ${record.manifest} in lockstep with the record`,
+          );
+        }
+      }
+    }
+  }
+
+  return errors;
+}
+
+// =============================================================================
 // Entry point
 // =============================================================================
 
@@ -269,6 +444,7 @@ async function main(): Promise<void> {
   const deployments = loadJson<DeploymentsJson>(DEPLOYMENTS_PATH);
   const humans = loadJson<HumansJson>(HUMANS_PATH);
   const devices = loadJson<DevicesJson>(DEVICES_PATH);
+  const budgetsJson = loadJson<BudgetsJson>(ARCHETYPE_BUDGETS_PATH);
 
   const knownHumanIds = new Set(humans.humans.map((h) => h.id));
   const knownDeviceIds = new Set(devices.devices.map((d) => d.id));
@@ -278,6 +454,7 @@ async function main(): Promise<void> {
   // Per-record validation
   for (const record of deployments.humans) {
     errors.push(...validateRecord(record, knownHumanIds, knownDeviceIds));
+    errors.push(...validateResourceBudget(record, budgetsJson.budgets));
   }
 
   // Directory-level: duplicate humanIds

@@ -47,14 +47,15 @@ so a lockfile change is exactly a change they depend on. This is a change-detect
 ## Fix
 
 Add `pnpm-lock.yaml` (and root `package.json`) to the `inputs.sources` of the
-install/build step in each pnpm-consumer manifest:
-- `app/elohim-library/build-manifest.json` → `build-storybook.inputs.sources` (pipeline `elohim-storybook`).
-- `app/elohim-app/build-manifest.json` → `build-angular.inputs.sources` (pipeline `elohim`).
-- `doorway/doorway-app/build-manifest.json` → `build-doorway-app.inputs.sources` — doorway-app is its **own** pipeline (`elohim-doorway-app`), NOT the edge manifest. (2026-07-06 pipeline-shakeout re-grounding corrected the original third bullet, which wrongly named `elohim/holochain`.)
-- **Edge caveat (separate concern, not a glob edit):** the edge manifest (`elohim/holochain`) has no doorway-app step — its doorway-app `pnpm install --frozen-lockfile` runs *embedded* in `elohim/holochain/Jenkinsfile:1320-1362`, unmodeled as a manifest step, so a root-lockfile change can't change-detect it via graph-walker. Do NOT bolt `pnpm-lock.yaml` onto a Rust step; model it as a manifest step or let `elohim-doorway-app` own the doorway-app build — a separate decision.
+install/build step. **Corrected targets (2026-07-06 pipeline-shakeout re-grounding —
+the original third bullet was wrong):**
+- `app/elohim-app/build-manifest.json` → `steps.build-angular.inputs.sources` (pipeline `elohim`).
+- `app/elohim-library/build-manifest.json` → `steps.build-storybook.inputs.sources` (pipeline `elohim-storybook`).
+- `doorway/doorway-app/build-manifest.json` → `steps.build-doorway-app.inputs.sources` — doorway-app is its **own** pipeline (`elohim-doorway-app`), NOT the edge manifest.
+- **Edge caveat (thornier — capture, don't force):** the `elohim/holochain` (edge) manifest has NO doorway-app step; its steps are all Rust (`cargo-build-*`, `build-edge-image`, `deploy-manifests`, `dataplane-validation`). The doorway-app `pnpm install --frozen-lockfile` runs *embedded inside the edge Jenkinsfile* (`elohim/holochain/Jenkinsfile:1320-1362`), unmodeled as a manifest step — so a root-lockfile change cannot change-detect that embedded build via graph-walker. Do NOT bolt `pnpm-lock.yaml` onto a Rust step (that mis-attributes the dependency). The real fix for edge's embedded doorway-app build is to either model it as a manifest step with its own sources, or let the `elohim-doorway-app` pipeline own it — a separate decision, not this bullet.
 
 Editing each manifest also self-triggers its pipeline (each manifest lists its own
-`build-manifest.json` in sources), so the fix landing re-validates each.
+`build-manifest.json` in sources), so the fix landing re-validates all three.
 
 ## Interim mitigation (this shift)
 
@@ -64,29 +65,6 @@ trigger / this fix. The durable fix above removes the need for the manual tag ne
 
 ## Status
 
-`ci_status: in-progress` (updated 2026-06-29) — the durable manifest-glob fix **LANDED for
-app + storybook** this commit:
-- `app/elohim-app/build-manifest.json` `build-angular.inputs.sources` += `pnpm-lock.yaml`,
-  `package.json`, **and `app/elohim-app/build-manifest.json`** — the app manifest did NOT
-  list its own manifest in sources, so it was not genuinely self-triggering (the app
-  pipeline fired here only because the co-edited library manifest matches build-angular's
-  `app/elohim-library/**` glob). That self-trigger gap is now closed too, matching
-  storybook's already-correct self-reference.
-- `app/elohim-library/build-manifest.json` `build-storybook.inputs.sources` +=
-  `pnpm-lock.yaml`, `package.json`.
-
-**doorway-app glob LANDED (2026-07-07 pipeline-shakeout).** The "edge" residual named in the
-2026-06-29 update was a mis-attribution: the third pnpm consumer is the doorway admin app, which
-has its **own** pipeline + manifest (`elohim-doorway-app` / `doorway/doorway-app/build-manifest.json`),
-NOT the edge manifest. That manifest's `build-doorway-app.inputs.sources` now carries
-`pnpm-lock.yaml` + `package.json` (this commit), so all three *modeled* pnpm consumers
-(app, storybook, doorway-app) change-detect on a root-lockfile change.
-
-**One residual remains, re-scoped:** edge's OWN doorway-app build is *embedded* in
-`elohim/holochain/Jenkinsfile:1320-1362` (not a manifest step), so graph-walker cannot
-change-detect it from a root-lockfile-only change. That is a separate modeling decision (model it
-as a manifest step, or let `elohim-doorway-app` own the doorway-app build), tracked here but not a
-glob edit. This item stays `wip` until that embedded build is modeled.
-
-Confirms by disappearance: a future root-`pnpm-lock.yaml`-only change should now dispatch
-app+storybook+doorway-app without a force-tag (edge's embedded build remains the known gap).
+`ci_status: in-progress` — mitigation landed; the manifest-glob fix is the durable close.
+Confirms by disappearance: a future root-`pnpm-lock.yaml`-only change should dispatch
+edge+app+storybook without a force-tag.

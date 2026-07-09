@@ -10,16 +10,20 @@ author: "ci-failure-triage"
 status: "backlog"
 priority: "high"
 ci_status: blocked
-fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4, 79748fd505af, ab55feadd29c, 8a0ee37aaa17, 39f396758ede, 9f60eb44561d, 43ba8b15ffeb, 63dd3437bede, 2e09854ec226, 1eda1f5d27e0, b4303a6d852e, 2d1b82ad175f, 1714722d9dab, 63ecdda7a81e, e9b60b28964c, 5d74b506f389, dc60d64b875f, ccdacb3bdf10]
+fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4, 79748fd505af, ab55feadd29c, 8a0ee37aaa17, 39f396758ede, 9f60eb44561d, 43ba8b15ffeb, 63dd3437bede, 2e09854ec226, 1eda1f5d27e0, b4303a6d852e, 2d1b82ad175f, 1714722d9dab, 63ecdda7a81e, e9b60b28964c, 5d74b506f389, dc60d64b875f, ccdacb3bdf10, db7030259d93]
 jobs: [elohim, elohim-edge, elohim-genesis]
 relatedNodeIds: []
-tags: [ci, infra, alpha-cluster-6peer, shem, substrate-degraded, reduced-scope, host-green-not-ci-green, museum-trap-1, requires-env, per-peer-rollout, cache-db-pool-saturation, lamad-deep-link]
+tags: [ci, infra, alpha-cluster-6peer, shem, substrate-degraded, reduced-scope, host-green-not-ci-green, museum-trap-1, requires-env, per-peer-rollout, cache-db-pool-saturation, lamad-deep-link, seed-substrate, call-zome-saturation, storm-heal-landed]
 cites:
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1100/
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1111/
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1113/
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1250/
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1253/
+  - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1262/
+  - genesis/data/timeline/backlog/genesis-pipeline-substrate-gated-adam-arc-saturation.md
+  - elohim/elohim-storage/src/db/peer_blob_inventory.rs
+  - elohim/elohim-storage/src/p2p/mod.rs
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1504/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1518/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1522/
@@ -485,3 +489,85 @@ stabilizes OR the tags hold the scenarios out of the degraded run.
   graceful-pending guard), bounded-fixed in this same triage pass. See
   `genesis/data/timeline/backlog/a2o-playwright-device-hardfail-topology.md`.
   It does not belong in this entry's fingerprint list.
+
+- **2026-07-06 extension — the Seed Substrate WRITE-path facet (1 fingerprint,
+  elohim-genesis #1262) AND the first LANDED code mover for the adam-conductor
+  mechanism — three fingerprints re-dispositioned blocked → triaged.**
+
+  ```
+  db7030259d93  red build, stage:Seed Substrate   (genesis 1262, build result UNSTABLE)
+  ```
+
+  Verified directly in #1262's build log. The `Seed Substrate` stage (log line
+  2240) is the **write-path** mirror of the 2026-07-05 lamad-render read-path
+  facets: the HTTP direct-ingest phase SUCCEEDED (`✅ human-adam-firstman: 4164
+  content`, matthew seeded, `imported=4 failed=0` per peer) and the upstream
+  `Verify Target Health` gate PASSED (the SPA host served — so this is NOT the
+  exit-124 availability-gate facet #6/#9f60eb44561d), but **every
+  conductor-`call_zome` sub-step timed out at 60000ms**, exactly the adam
+  app-port saturation signature:
+
+  ```
+  Seed Accounts:            2 failed — Matthew, Jessica "Request timed out in 60000 ms: call_zome"
+  Seed Conductor Identities: partial — 1 exists, 2 failed  → [Pipeline] unstable (line 2758)
+  Seed Agent Peer Bindings:  TOTAL failure — 0 of 6 humans → [Pipeline] unstable (line 2864)
+  Household formation:       exited 1                       → [Pipeline] unstable (line 2914)
+  content-provide-rows / downstream: ERROR: script returned exit code 1 (lines 3058/3115/3198…)
+  ```
+
+  The storage HTTP surface (`/auth/me`, direct blob ingest) answers fine on adam
+  while the conductor **app-port websocket** (`call_zome` — needed to create
+  accounts, conductor identities, peer bindings, households) is starved. That is
+  the exact shape the storm doc predicts: adam pegged on ~150 non-idempotent
+  `Inventory snapshot applied`/sec → `/health` starved → app-port `call_zome`
+  auth times out → `CellDisabled`. Each sub-step is `catchError`-wrapped and
+  degrades the build to UNSTABLE (loud-but-tolerant), never FAILURE — the
+  intended signal, not a code regression.
+
+  **Verdict: infra (same root class) — NOT a code regression in the seeder or
+  the pipeline.** No novel root cause; this is the write-path facet of the
+  documented adam inventory-snapshot storm. Root-cause doc:
+  `genesis/data/timeline/backlog/genesis-pipeline-substrate-gated-adam-arc-saturation.md`
+  (adam ~150 snapshot-applies/sec, ~1000× amplification, non-idempotent
+  `apply_snapshot`).
+
+  **What changed since the 2026-07-05 (blocked, no-mover) entry: the storm-heal
+  code mover has now LANDED.** `b1ef627ed` "fix(storage): receive-side snapshot
+  idempotency" (HEAD on `feat/frontend-eyes-sprint`) makes `apply_snapshot`
+  dedup on a SHA-256 content fingerprint persisted on
+  `peer_inventory_cursor.last_content_hash` — a byte-identical re-flooded
+  snapshot becomes a no-op that skips `score_and_enqueue_snapshot` (the CPU
+  sink). Locally verified (`cargo test --lib peer_blob_inventory` → 21 passed);
+  touches `elohim/elohim-storage/src/db/peer_blob_inventory.rs` +
+  `.../src/p2p/mod.rs`. Per dispatcher, it **deployed via the edge pipeline this
+  session** (dev f79ab5a40); awaiting drain-verify (Loki apply-rate collapse
+  toward the ~0.1/sec design cadence + adam CPU off the peg).
+
+  **Disposition — three adam-conductor-mechanism fingerprints set `triaged`**
+  (this is the *only* mechanism in this umbrella with a landed tree mover; the
+  fix collapses the CPU storm that starves BOTH the conductor `call_zome` write
+  path AND the epr-spa blob-sync read path):
+  - `db7030259d93` (Seed Substrate, write path) — `triaged_at_build: 1262`.
+  - `dc60d64b875f` (lamad path-overview render, read path) — `triaged_at_build: 1256`.
+  - `ccdacb3bdf10` (lamad step-navigator render, read path) — `triaged_at_build: 1253`.
+
+  The sweep confirms by disappearance (genesis green streak ≥3 with no
+  recurrence) once the deploy drains adam's storm. `last_build >
+  triaged_at_build` on any of the three later means the fix did not take → the
+  harvester reopens it (expected if the next genesis run predates full drain;
+  the ≥3 streak guards against a single premature re-capture decomposing early).
+  No `decompose_on_confirm` on any of them — this backlog file is shared by 24+
+  fingerprints across still-blocked mechanisms, so on disappearance the harvester
+  deletes only the individual ledger line and reports this shared entry for
+  graduate-then-decompose review (it must NOT auto-delete the whole umbrella).
+
+  **The rest of the umbrella stays `blocked` (unchanged) — different movers:**
+  the household-peer OOM edge-deploy facets (`43ba8b15ffeb` et al.) are healed by
+  the 2026-06-10 memory-archetype bump (operator-landed, awaiting its own
+  disappearance), the browser-E2E facets by the `@requires:alpha-cluster-6peer`
+  tagging `/shift`, and the SPA-503 availability-gate facets (`79748fd505af`,
+  `9f60eb44561d`) by substrate return. Concern-level `ci_status` stays `blocked`
+  because those operator-gated mechanisms dominate; the storm-heal facets are the
+  in-flight exception documented here. No museum edit — this remains the
+  already-cited availability-≠-regression / museum-trap-1 mirror, not a novel
+  trap.

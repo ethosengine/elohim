@@ -39,13 +39,14 @@
 //!
 //! ## The content arm (notary-authority Leg 4)
 //!
-//! Alongside the REA sweep, [`run_content_sweep`] runs the SAME pattern for the
-//! `content` projection — the cross-peer content-anchor reconcile arm that flips
-//! scenario 2: a peer (e.g. `elohim.host`) reaches `trust="notarized"` for
-//! content whose DHT anchor exists on an authoring conductor but whose
-//! `ContentCommitted` signal it never saw (`post_commit` fires only on the
-//! authoring conductor). It shares the cadence (called from [`run_sweep`] on the
-//! same `PROJECTION_RECONCILE_SECS` tick) and the shared `GapTracker` rails, but
+//! Alongside the REA arm, the `content` arm ([`discover_content`] +
+//! [`heal_content`]) runs the SAME pattern for the `content` projection — the
+//! cross-peer content-anchor reconcile arm that flips scenario 2: a peer (e.g.
+//! `elohim.host`) reaches `trust="notarized"` for content whose DHT anchor exists
+//! on an authoring conductor but whose `ContentCommitted` signal it never saw
+//! (`post_commit` fires only on the authoring conductor). It shares the cadence
+//! (both arms run from [`run_discovery`]/[`run_heal`] on the same
+//! `PROJECTION_RECONCILE_SECS` tick) and the shared `GapTracker` rails, but
 //! keeps its OWN tracker — the id space is disjoint from REA. Its heal
 //! entrypoint is the conductor-VERIFIED [`content_diesel::stamp_declared_head`];
 //! the anchor value comes EXCLUSIVELY from the node's own
@@ -69,7 +70,28 @@ use crate::p2p::view_federation::{
     PROJECTION_INVENTORY_TABLE_CONTENT, PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
 };
 use crate::p2p::P2PHandle;
+use crate::services::provide_loop_status::ProvideLoopState;
 use crate::views::{ProjectionInventoryPayload, ViewFederationRequest, ViewKind};
+
+/// Per-tick cap for the sweep-driven witness-bootstrap authoring step (GAP 1.5).
+/// Keeps conductor load bounded on a large seeded corpus: a ~6k un-witnessed
+/// corpus greens over ~30 ticks rather than storming a saturated conductor in a
+/// single sweep (the F-T19 evidence — adam's conductor already sits at its
+/// read-pool ceiling). Do not raise without weighing conductor saturation.
+const WITNESS_MAX_PER_TICK: i64 = 200;
+
+/// Per-item spacing inside a witness sweep (each item is a conductor round-trip).
+const WITNESS_ITEM_DELAY: Duration = Duration::from_millis(25);
+
+/// Wall-clock budget for one witness sweep. `HcClient::call_zome` awaits with no
+/// timeout of its own, so a hung/stuck conductor call would otherwise hold the
+/// heal leg's single-flight guard forever (the RAII `HealFlag` covers panic and
+/// cancellation, but not an infinite await). Bounding the whole sweep releases
+/// the guard normally on the worst case and resumes next tick (the sweep is
+/// idempotent). Derivation: `WITNESS_MAX_PER_TICK` (200) × `WITNESS_ITEM_DELAY`
+/// (25ms) = 5s of spacing, plus generous conductor-latency headroom for 200
+/// round-trips on a healthy node.
+const WITNESS_SWEEP_BUDGET: Duration = Duration::from_secs(120);
 
 /// Per-sweep retry budget for conductor-can't-see-it gaps. A gap that the
 /// conductor still can't resolve after this many sweeps drops out (it is almost
@@ -158,24 +180,251 @@ impl ProjectionReconcileState {
     }
 }
 
-/// Run one reconciliation sweep over the `rea_commitments` projection.
+/// Discovery-side output for the REA arm: the gap set (as a per-sweep
+/// [`GapTracker`]) plus the observability numbers, carried to the heal leg.
+/// Discovery needs no conductor, so it runs every tick even before the lamad
+/// bridge lands.
+pub struct ReaDiscovery {
+    tracker: GapTracker,
+    discovered_by: std::collections::HashMap<String, String>,
+    peers_asked: usize,
+    ids_discovered: usize,
+    divergent_anchor: usize,
+    local_total: usize,
+}
+
+impl ReaDiscovery {
+    /// Empty discovery (db unavailable this tick) — the heal leg has nothing to do.
+    fn empty() -> Self {
+        Self {
+            tracker: GapTracker::new(MAX_RETRIES),
+            discovered_by: std::collections::HashMap::new(),
+            peers_asked: 0,
+            ids_discovered: 0,
+            divergent_anchor: 0,
+            local_total: 0,
+        }
+    }
+}
+
+/// The discovery-side plan both reconcile arms produce, consumed by the heal leg.
+pub struct SweepPlan {
+    rea: ReaDiscovery,
+    content: ContentDiscovery,
+}
+
+/// What the per-tick heal scheduler should do, given whether the lamad bridge is
+/// up and whether a heal leg is already running. Keeps the single-flight decision
+/// pure and unit-testable, off the `main.rs` boot loop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HealAction {
+    /// Bridge up and no heal in flight — spawn the heal leg for this tick's plan.
+    Spawn,
+    /// A heal leg from an earlier tick is still running — skip (never two
+    /// concurrent heal legs). Discovery already ran this tick.
+    SkipInFlight,
+    /// The lamad bridge has not connected yet — the conductor-dependent heal is
+    /// deferred. Discovery already ran this tick.
+    SkipNoBridge,
+}
+
+/// Decide the per-tick heal action. Bridge-absence takes precedence over the
+/// single-flight guard: with no conductor there is nothing to spawn regardless.
+pub fn heal_decision(bridge_up: bool, heal_in_flight: bool) -> HealAction {
+    if !bridge_up {
+        HealAction::SkipNoBridge
+    } else if heal_in_flight {
+        HealAction::SkipInFlight
+    } else {
+        HealAction::Spawn
+    }
+}
+
+/// One discovery pass over BOTH reconcile arms (REA + content). Conductor-free:
+/// this is the per-tick outbound view-federation ask that must fire from boot,
+/// independent of the lamad bridge. Returns the [`SweepPlan`] the heal leg
+/// consumes; the heal leg is scheduled separately (single-flight) so a multi-hour
+/// heal never starves this cadence.
+pub async fn run_discovery(p2p: &P2PHandle, pool: &DbPool) -> SweepPlan {
+    let rea = discover_rea(p2p, pool).await;
+    let content = discover_content(p2p, pool).await;
+
+    tracing::info!(
+        target: "elohim_storage::projection_reconcile",
+        rea_peers_asked = rea.peers_asked,
+        rea_ids_discovered = rea.ids_discovered,
+        rea_gaps = rea.tracker.counts().pending,
+        rea_divergent_anchor = rea.divergent_anchor,
+        rea_local_total = rea.local_total,
+        content_peers_asked = content.peers_asked,
+        content_ids_discovered = content.ids_discovered,
+        content_gaps = content.tracker.counts().pending,
+        content_divergent_anchor = content.divergent_anchor,
+        content_local_anchored = content.local_anchored,
+        "projection-reconcile: discovery complete (heal scheduled separately)"
+    );
+
+    SweepPlan { rea, content }
+}
+
+/// One heal pass over BOTH arms, consuming a [`SweepPlan`] from [`run_discovery`].
+/// Requires the lamad bridge (`hc`); the caller only invokes this once the bridge
+/// is up and no other heal is in flight (see [`heal_decision`]). Publishes the
+/// sweep status snapshot. Row content comes EXCLUSIVELY from the own conductor;
+/// both upsert paths are idempotent, so a heal is safe under duplicate delivery.
 ///
-/// 1. Build the local `(id → anchor)` inventory.
-/// 2. Ask every connected peer for its `ProjectionInventory { rea_commitments }`.
-/// 3. Diff: an id missing locally, OR present with a different anchor, is a gap
-///    (the per-sweep `GapTracker` enqueues missing ids; anchor-divergence is
-///    forced in via an explicit re-enqueue).
-/// 4. For each gap, read the OWN conductor's `get_rea_commitment(id)`; on `Some`
-///    upsert through the shared mapping and `mark_completed`, on `None`
-///    `mark_failed` (retried next sweep).
-/// 5. Publish counts to `state`. A heal logs WARN naming the id and the peer
-///    that discovered it (a visible mutual-aid event).
-pub async fn run_sweep(
-    p2p: &P2PHandle,
+/// The content arm also runs the sweep-driven [`witness_bootstrap`] step (GAP
+/// 1.5): it authors a notarized head for local rows born un-witnessed
+/// (bulk-seeded, `dht_anchor_hash` NULL) so they can green. It rides this leg's
+/// single-flight guard + OnceLock conductor gate — never running bridge-absent
+/// or concurrently — and publishes its progress to `provide_state`.
+pub async fn run_heal(
+    plan: SweepPlan,
     hc: &Arc<HcClient>,
     pool: &DbPool,
     state: &ProjectionReconcileState,
+    provide_state: &ProvideLoopState,
 ) {
+    let SweepPlan { rea, content } = plan;
+    let ReaDiscovery {
+        mut tracker,
+        discovered_by,
+        peers_asked,
+        ids_discovered,
+        divergent_anchor: rea_divergent,
+        local_total,
+    } = rea;
+    let counts = heal_rea(&mut tracker, &discovered_by, hc, pool).await;
+
+    let ContentDiscovery {
+        tracker: mut content_tracker,
+        discovered_by: content_discovered_by,
+        divergent_anchor: content_divergent,
+        peers_asked: content_peers_asked,
+        ids_discovered: content_ids_discovered,
+        local_anchored,
+    } = content;
+    let (content_healed, content_missing) =
+        heal_content(&mut content_tracker, &content_discovered_by, hc, pool).await;
+
+    // GAP 1.5: green the un-witnessed seeded corpus. Composed onto (not forked
+    // from) the content arm — same conductor gate + single-flight guard.
+    witness_bootstrap(hc, pool, provide_state).await;
+
+    // Publish mirrors the pre-decoupling contract: REA counts + peers_asked, with
+    // the divergent-anchor counter folding in BOTH arms (the one cross-arm signal).
+    state
+        .publish_sweep(counts, peers_asked, rea_divergent + content_divergent)
+        .await;
+
+    tracing::info!(
+        target: "elohim_storage::projection_reconcile",
+        peers_asked,
+        ids_discovered,
+        healed = counts.completed,
+        conductor_missing = counts.failed,
+        divergent_anchor = rea_divergent,
+        local_total,
+        caught_up = counts.caught_up,
+        content_peers_asked,
+        content_ids_discovered,
+        content_healed,
+        content_missing,
+        content_divergent_anchor = content_divergent,
+        content_local_anchored = local_anchored,
+        "projection-reconcile: heal complete"
+    );
+}
+
+/// Witness-bootstrap (GAP 1.5): author a notarized head through the conductor for
+/// local content rows born un-witnessed — bulk-seeded diesel-direct rows with
+/// `dht_anchor_hash IS NULL` and no conductor record, which can otherwise never
+/// reach `trust=green`.
+///
+/// Composes the proven [`reanchor_backfill::run_once`] mechanism rather than
+/// forking a new authoring path (the backlog's "compose, don't fork"):
+/// - **Once-per-id guard.** `run_once` authors via `create_content`, which the
+///   `content_store` zome REFUSES for a duplicate id; the already-exists branch
+///   recovers and stamps the EXISTING anchor instead of minting a second head.
+///   So a re-run over an already-witnessed row stamps (not authors), and a
+///   transient/bridge error stays a retryable failure — never a fabricated or
+///   duplicate head. (The classifier is [`reanchor_backfill::decide_outcome`].)
+/// - **Eligibility.** Honors the existing heal/stamp path's reach filter
+///   (`CORE_REACH_LEVELS`) — un-widened; non-canonical reach is skipped, not
+///   authored.
+/// - **Pacing.** Bounded to [`WITNESS_MAX_PER_TICK`] rows per tick with a
+///   per-item delay, so a large corpus greens over many ticks. No concurrency.
+///
+/// Runs only inside [`run_heal`], so the OnceLock conductor gate + single-flight
+/// guard already guarantee it never fires bridge-absent or concurrently.
+async fn witness_bootstrap(hc: &Arc<HcClient>, pool: &DbPool, provide_state: &ProvideLoopState) {
+    // A lamad-scoped ContentService drives the canonical re-anchor path
+    // (`update_via_conductor` null-anchor branch). The EventBus is a throwaway:
+    // the only event this path emits is `ContentUpdated` (cache invalidation);
+    // re-anchoring is a projection write, and content bytes are unchanged, so a
+    // dropped invalidation only defers a trust-label refresh to the next read.
+    let content_service = crate::services::ContentService::new(
+        pool.clone(),
+        crate::db::AppContext::default_lamad(),
+        Arc::new(crate::services::events::EventBus::new()),
+    );
+    let cfg = crate::services::reanchor_backfill::ReanchorConfig {
+        max_per_sweep: WITNESS_MAX_PER_TICK,
+        item_delay: WITNESS_ITEM_DELAY,
+    };
+    // Wall-clock bound (see WITNESS_SWEEP_BUDGET): on elapse the run_once future
+    // is dropped, cancelling any in-flight (possibly hung) conductor call, so the
+    // heal leg's single-flight guard always releases. The sweep is idempotent and
+    // resumes next tick.
+    let sweep = crate::services::reanchor_backfill::run_once(
+        pool,
+        &content_service,
+        hc,
+        provide_state,
+        &cfg,
+    );
+    match tokio::time::timeout(WITNESS_SWEEP_BUDGET, sweep).await {
+        Ok(Ok(report)) if report.candidates > 0 => {
+            crate::metrics::add_content_witness_authored(report.reanchored as u64);
+            tracing::info!(
+                target: "elohim_storage::projection_reconcile",
+                candidates = report.candidates,
+                authored = report.reanchored,
+                already_witnessed = report.already_anchored,
+                skipped = report.skipped,
+                failed = report.failed,
+                remaining = report.remaining,
+                "projection-reconcile[witness]: authored notarized heads for un-witnessed seeded content"
+            );
+        }
+        Ok(Ok(_)) => {
+            // No un-witnessed rows — the seeded corpus is fully witnessed.
+        }
+        Ok(Err(e)) => {
+            tracing::warn!(
+                target: "elohim_storage::projection_reconcile",
+                error = %e,
+                "projection-reconcile[witness]: sweep failed (non-fatal, retried next tick)"
+            );
+        }
+        Err(_elapsed) => {
+            tracing::warn!(
+                target: "elohim_storage::projection_reconcile",
+                budget_secs = WITNESS_SWEEP_BUDGET.as_secs(),
+                "projection-reconcile[witness]: sweep exceeded wall-clock budget \
+                 (likely a slow/saturated conductor) — abandoned, single-flight guard \
+                 released, resumes next tick"
+            );
+        }
+    }
+}
+
+/// Discovery phase of the REA-commitment reconcile (steps 1–3): build the local
+/// `(id → anchor)` inventory, ask every connected peer for its
+/// `ProjectionInventory { rea_commitments }`, and diff into a per-sweep
+/// [`GapTracker`] (an id missing locally, OR present with a different anchor, is a
+/// gap). No conductor call happens here — [`heal_rea`] owns that.
+async fn discover_rea(p2p: &P2PHandle, pool: &DbPool) -> ReaDiscovery {
     let app_ctx = crate::db::AppContext::default_lamad();
 
     // (1) Local inventory: id → anchor (anchor "" when un-anchored).
@@ -184,14 +433,14 @@ pub async fn run_sweep(
             Ok(c) => c,
             Err(e) => {
                 tracing::warn!(error = %e, "projection-reconcile: db conn failed; skipping sweep");
-                return;
+                return ReaDiscovery::empty();
             }
         };
         match crate::db::rea_commitments::inventory_for_reconcile(&mut conn, &app_ctx, i64::MAX) {
             Ok(v) => v,
             Err(e) => {
                 tracing::warn!(error = %e, "projection-reconcile: local inventory failed; skipping sweep");
-                return;
+                return ReaDiscovery::empty();
             }
         }
     };
@@ -295,6 +544,31 @@ pub async fn run_sweep(
     let all_discovered: Vec<String> = discovered_by.keys().cloned().collect();
     tracker.discover(all_discovered);
 
+    ReaDiscovery {
+        tracker,
+        discovered_by,
+        peers_asked,
+        ids_discovered,
+        divergent_anchor,
+        local_total,
+    }
+}
+
+/// Heal phase of the REA-commitment reconcile (step 4): for each discovered gap,
+/// read the OWN conductor's `get_rea_commitment(id)` and upsert through the shared
+/// mapping (`mark_completed`), or `mark_failed` (retried next sweep) when the
+/// conductor can't see it. Runs only once the lamad bridge is up; may span many
+/// discovery ticks on a saturated conductor, so it is scheduled single-flight OFF
+/// the discovery ticker (see `main.rs`). A heal logs WARN naming the id and the
+/// peer that discovered it (a visible mutual-aid event).
+async fn heal_rea(
+    tracker: &mut GapTracker,
+    discovered_by: &std::collections::HashMap<String, String>,
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+) -> crate::p2p::reconcile_rails::GapCounts {
+    let app_ctx = crate::db::AppContext::default_lamad();
+
     // (3+4) Heal each gap from the OWN conductor.
     let gap_ids = tracker.pending_ids();
     for id in gap_ids {
@@ -334,34 +608,7 @@ pub async fn run_sweep(
     }
 
     tracker.update_caught_up();
-    let counts = tracker.counts();
-
-    // Content-anchor reconcile arm (notary-authority Leg 4) — same tick, same
-    // shared rails, its OWN GapTracker (disjoint id space). Runs after the REA
-    // arm. Its divergent-anchor count folds into the shared `/p2p/status`
-    // `divergent_anchor` counter (the one cross-arm health signal); the rest of
-    // its detail is log-observable (see module docs).
-    let content = run_content_sweep(p2p, hc, pool).await;
-
-    state
-        .publish_sweep(
-            counts,
-            peers_asked,
-            divergent_anchor + content.divergent_anchor,
-        )
-        .await;
-
-    tracing::info!(
-        target: "elohim_storage::projection_reconcile",
-        peers_asked,
-        ids_discovered,
-        healed = counts.completed,
-        conductor_missing = counts.failed,
-        divergent_anchor,
-        local_total,
-        caught_up = counts.caught_up,
-        "projection-reconcile: sweep complete"
-    );
+    tracker.counts()
 }
 
 /// Project one conductor-read Commitment into local SQL via the SHARED mapping.
@@ -407,24 +654,36 @@ fn heal_one(
 // Content-anchor reconcile arm (notary-authority Leg 4)
 // ============================================================================
 
-/// Cross-arm health numbers the content sweep hands back to [`run_sweep`].
-///
-/// Only `divergent_anchor` folds into the shared [`ProjectionReconcileStatus`]
-/// (the one cross-arm counter the status surface already carries). The rest is
-/// log-observable — extending the ts-rs-exported status struct with content
-/// fields would change the `p2p-status` wire shape (owned elsewhere).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct ContentSweepOutcome {
-    /// Advertised ids present locally with an anchor that disagreed with a
-    /// non-empty peer anchor (own conductor decides who is right).
-    pub divergent_anchor: usize,
-    /// Gaps stamped from the own conductor this sweep.
-    pub healed: usize,
-    /// Gaps the own conductor could not resolve yet (`resolve_content_head`
-    /// returned `None`) — retried on the NEXT sweep via a fresh inventory diff.
-    pub conductor_missing: usize,
-    /// Peers that answered a content inventory request this sweep.
-    pub peers_asked: usize,
+/// Discovery-side output for the content arm (notary-authority Leg 4): the gap
+/// set (as a per-sweep [`GapTracker`]) + observability numbers, carried to the
+/// heal leg. Mirrors [`ReaDiscovery`]. Only `divergent_anchor` folds into the
+/// shared [`ProjectionReconcileStatus`] (the one cross-arm counter the status
+/// surface carries); the rest is log-observable — extending the ts-rs-exported
+/// status struct with content fields would change the `p2p-status` wire shape
+/// (owned elsewhere).
+pub struct ContentDiscovery {
+    tracker: GapTracker,
+    discovered_by: std::collections::HashMap<String, String>,
+    divergent_anchor: usize,
+    peers_asked: usize,
+    ids_discovered: usize,
+    local_anchored: usize,
+}
+
+impl ContentDiscovery {
+    /// Empty discovery (db unavailable this tick) — the heal leg has nothing to
+    /// do. `peers_asked` records how many peers answered before the db failure so
+    /// the discovery log stays honest.
+    fn empty(peers_asked: usize) -> Self {
+        Self {
+            tracker: GapTracker::new(MAX_RETRIES),
+            discovered_by: std::collections::HashMap::new(),
+            divergent_anchor: 0,
+            peers_asked,
+            ids_discovered: 0,
+            local_anchored: 0,
+        }
+    }
 }
 
 /// How ONE advertised content id classifies against the local projection.
@@ -472,7 +731,8 @@ fn classify_content_gap(
     }
 }
 
-/// Run one reconciliation sweep over the `content` projection (Leg 4).
+/// Discovery phase of the `content` reconcile (Leg 4, steps 1–4). No conductor
+/// call happens here — [`heal_content`] owns step 5.
 ///
 /// 1. Build the local anchored+distribution-safe inventory (`id → anchor`).
 /// 2. Ask every connected peer for its `ProjectionInventory { content }`.
@@ -482,22 +742,13 @@ fn classify_content_gap(
 ///    absent → SKIP; un-anchored → anchor-gap; anchor-divergent → verify-gap +
 ///    divergence count. Anchor-gap ∪ divergent ids feed a per-sweep
 ///    [`GapTracker`] on the shared rails.
-/// 5. For each gap, `content_store::resolve_content_head(id)` on the OWN
-///    conductor: `Some(head)` → mirror the head content into a
-///    [`ContentProjectionPatch`] and [`stamp_declared_head`] (verified stamp);
-///    `None` → `mark_failed`, retried next sweep. A heal logs WARN naming the id
-///    and the discovering peer.
 ///
 /// **Re-detect semantics.** The tracker is rebuilt each sweep, so its per-sweep
 /// `MAX_RETRIES` never permanently drops a gap: a divergence or anchor-gap that
 /// persists in SQL is recomputed from the inventory diff on the NEXT sweep and
-/// re-enqueued afresh. `MAX_RETRIES` only bounds within-sweep churn (and this
-/// arm attempts each gap once per sweep, so it is effectively a floor).
-pub async fn run_content_sweep(
-    p2p: &P2PHandle,
-    hc: &Arc<HcClient>,
-    pool: &DbPool,
-) -> ContentSweepOutcome {
+/// re-enqueued afresh. `MAX_RETRIES` only bounds within-sweep churn (and the heal
+/// leg attempts each gap once per sweep, so it is effectively a floor).
+async fn discover_content(p2p: &P2PHandle, pool: &DbPool) -> ContentDiscovery {
     let app_ctx = crate::db::AppContext::default_lamad();
 
     // (1) Local anchored inventory: id → anchor. Only anchored + distribution-
@@ -508,7 +759,7 @@ pub async fn run_content_sweep(
             Ok(c) => c,
             Err(e) => {
                 tracing::warn!(error = %e, "projection-reconcile[content]: db conn failed; skipping sweep");
-                return ContentSweepOutcome::default();
+                return ContentDiscovery::empty(0);
             }
         };
         match crate::db::content_diesel::list_content_anchor_inventory(
@@ -519,7 +770,7 @@ pub async fn run_content_sweep(
             Ok(v) => v.into_iter().collect(),
             Err(e) => {
                 tracing::warn!(error = %e, "projection-reconcile[content]: local inventory failed; skipping sweep");
-                return ContentSweepOutcome::default();
+                return ContentDiscovery::empty(0);
             }
         }
     };
@@ -598,10 +849,7 @@ pub async fn run_content_sweep(
             Ok(c) => c,
             Err(e) => {
                 tracing::warn!(error = %e, "projection-reconcile[content]: db conn failed for presence; skipping heal");
-                return ContentSweepOutcome {
-                    peers_asked,
-                    ..Default::default()
-                };
+                return ContentDiscovery::empty(peers_asked);
             }
         };
         // Chunk under SQLite's bound-variable limit (SQLITE_MAX_VARIABLE_NUMBER,
@@ -616,10 +864,7 @@ pub async fn run_content_sweep(
                 Ok(s) => acc.extend(s),
                 Err(e) => {
                     tracing::warn!(error = %e, "projection-reconcile[content]: presence query failed; skipping heal");
-                    return ContentSweepOutcome {
-                        peers_asked,
-                        ..Default::default()
-                    };
+                    return ContentDiscovery::empty(peers_asked);
                 }
             }
         }
@@ -649,6 +894,31 @@ pub async fn run_content_sweep(
     // (empty local set → every gap id becomes pending, under MAX_RETRIES).
     let mut tracker = GapTracker::new(MAX_RETRIES);
     tracker.discover(gap_ids);
+
+    ContentDiscovery {
+        tracker,
+        discovered_by,
+        divergent_anchor,
+        peers_asked,
+        ids_discovered,
+        local_anchored,
+    }
+}
+
+/// Heal phase of the `content` reconcile (Leg 4, step 5): for each discovered
+/// gap, `content_store::resolve_content_head(id)` on the OWN conductor →
+/// [`stamp_declared_head`] (verified stamp); `None` → `mark_failed`, retried next
+/// sweep. Returns `(healed, conductor_missing)`. Runs only once the lamad bridge
+/// is up; scheduled single-flight OFF the discovery ticker (see `main.rs`).
+/// `stamp_declared_head` is existing-row-only and idempotent, so a heal is safe
+/// under duplicate delivery. A heal logs WARN naming the id and discovering peer.
+async fn heal_content(
+    tracker: &mut GapTracker,
+    discovered_by: &std::collections::HashMap<String, String>,
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+) -> (usize, usize) {
+    let app_ctx = crate::db::AppContext::default_lamad();
 
     // (5) Heal each gap from the OWN conductor (verified stamp).
     let mut healed = 0usize;
@@ -695,23 +965,7 @@ pub async fn run_content_sweep(
         }
     }
 
-    tracing::info!(
-        target: "elohim_storage::projection_reconcile",
-        peers_asked,
-        ids_discovered,
-        healed,
-        conductor_missing,
-        divergent_anchor,
-        local_anchored,
-        "projection-reconcile[content]: content sweep complete"
-    );
-
-    ContentSweepOutcome {
-        divergent_anchor,
-        healed,
-        conductor_missing,
-        peers_asked,
-    }
+    (healed, conductor_missing)
 }
 
 /// Project ONE conductor-resolved content HEAD into local SQL via the VERIFIED
@@ -803,6 +1057,87 @@ mod tests {
         assert_eq!(s2.sweeps, 2);
         assert_eq!(s2.completed, 1);
         assert_eq!(s2.divergent_anchor, 0);
+    }
+
+    #[test]
+    fn heal_decision_covers_bridge_and_single_flight() {
+        // Bridge up, nothing running → spawn the heal leg this tick.
+        assert_eq!(heal_decision(true, false), HealAction::Spawn);
+        // Bridge up, a heal already in flight → skip (single-flight; discovery ran).
+        assert_eq!(heal_decision(true, true), HealAction::SkipInFlight);
+        // Bridge down → defer heal regardless of the in-flight flag (nothing to
+        // spawn without a conductor); discovery still ran.
+        assert_eq!(heal_decision(false, false), HealAction::SkipNoBridge);
+        assert_eq!(heal_decision(false, true), HealAction::SkipNoBridge);
+    }
+
+    #[test]
+    fn witness_per_tick_cap_is_bounded_for_pacing() {
+        // (d) per-tick cap: bounded so a large un-witnessed corpus (live alpha
+        // shows thousands of rows) greens over many ticks instead of storming a
+        // saturated conductor in one sweep.
+        assert!(WITNESS_MAX_PER_TICK > 0, "must author some per tick");
+        assert!(
+            WITNESS_MAX_PER_TICK <= 500,
+            "must stay small enough to pace a multi-thousand-row corpus across ticks"
+        );
+    }
+
+    #[test]
+    fn witness_sweep_budget_exceeds_paced_floor() {
+        // The wall-clock budget must exceed the unavoidable per-item spacing floor
+        // (cap × delay) with headroom for the conductor round-trips, so a HEALTHY
+        // sweep never trips the timeout — the budget only fires on a hung/saturated
+        // conductor, releasing the single-flight guard instead of holding it forever.
+        let paced_floor = WITNESS_ITEM_DELAY * (WITNESS_MAX_PER_TICK as u32);
+        assert!(
+            WITNESS_SWEEP_BUDGET > paced_floor,
+            "budget {WITNESS_SWEEP_BUDGET:?} must exceed the paced floor {paced_floor:?}"
+        );
+        // And it must be a real bound (not effectively infinite).
+        assert!(WITNESS_SWEEP_BUDGET <= Duration::from_secs(600));
+    }
+
+    #[test]
+    fn witness_guard_is_the_reanchor_once_per_id_classifier() {
+        // The witness step's once-per-id guard IS `reanchor_backfill::decide_outcome`
+        // (composed, not forked). Assert the three cases the task calls out, so the
+        // guarantee is legible at the composition site.
+        use crate::error::StorageError;
+        use crate::services::reanchor_backfill::{
+            decide_outcome, is_already_anchored_error, RowOutcome,
+        };
+
+        // (a) A candidate whose head the conductor already holds: create_content is
+        // refused ("already exists") and the existing anchor is recovered+stamped →
+        // AlreadyAnchored (stamped, NOT a second authored head).
+        let already: Result<(), StorageError> = Err(StorageError::Conductor(
+            "Zome call failed: Guest(\"Content with id 'seed-1' already exists. \
+             Use update_content to modify existing entries.\")"
+                .to_string(),
+        ));
+        assert!(is_already_anchored_error(already.as_ref().unwrap_err()));
+        assert_eq!(
+            decide_outcome(&already, Some(&Ok(true))),
+            RowOutcome::AlreadyAnchored
+        );
+
+        // (b) Definitive not-found → authored exactly once (Reanchored). On the
+        // NEXT tick the conductor holds it, so create is refused → AlreadyAnchored
+        // (authored zero the second time — idempotent).
+        let authored: Result<(), StorageError> = Ok(());
+        assert_eq!(decide_outcome(&authored, None), RowOutcome::Reanchored);
+        assert_eq!(
+            decide_outcome(&already, Some(&Ok(true))),
+            RowOutcome::AlreadyAnchored
+        );
+
+        // (c) Transient/bridge error → Failed (skipped, retried next tick; never a
+        // fabricated or duplicate head).
+        let transient: Result<(), StorageError> =
+            Err(StorageError::Conductor("read plane down".into()));
+        assert!(!is_already_anchored_error(transient.as_ref().unwrap_err()));
+        assert_eq!(decide_outcome(&transient, None), RowOutcome::Failed);
     }
 
     #[test]

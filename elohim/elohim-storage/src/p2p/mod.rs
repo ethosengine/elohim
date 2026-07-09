@@ -5125,6 +5125,7 @@ impl P2PNode {
                     request_id,
                     response,
                 } => {
+                    crate::metrics::inc_view_federation_outbound("ok");
                     if let Some(respond) = self
                         .pending_view_federations
                         .lock()
@@ -5224,6 +5225,9 @@ impl P2PNode {
                     error,
                 },
             ) => {
+                crate::metrics::inc_view_federation_outbound(
+                    view_federation_outbound_result_label(&error),
+                );
                 warn!(
                     target: "elohim_storage::view_federation",
                     peer = %peer,
@@ -5266,6 +5270,7 @@ impl P2PNode {
             behaviour::ElohimStorageBehaviourEvent::ViewFederation(
                 request_response::Event::ResponseSent { peer, request_id },
             ) => {
+                crate::metrics::inc_view_federation_inbound_served();
                 debug!(
                     target: "elohim_storage::view_federation",
                     peer = %peer,
@@ -7741,6 +7746,54 @@ pub(crate) fn bootstrap_needing_redial(
             None => true,
         })
         .collect()
+}
+
+/// Prometheus `result` label for a view-federation outbound failure. Mirrors the
+/// blob-protocol classification strings; the `io` label collapses the payload
+/// variant (matches the `elohim_view_federation_outbound_total` label set).
+pub(crate) fn view_federation_outbound_result_label(
+    error: &libp2p::request_response::OutboundFailure,
+) -> &'static str {
+    use libp2p::request_response::OutboundFailure;
+    match error {
+        OutboundFailure::Timeout => "timeout",
+        OutboundFailure::ConnectionClosed => "connection_closed",
+        OutboundFailure::DialFailure => "dial_failure",
+        OutboundFailure::UnsupportedProtocols => "unsupported_protocols",
+        OutboundFailure::Io(_) => "io",
+    }
+}
+
+#[cfg(test)]
+mod view_federation_metric_tests {
+    use super::view_federation_outbound_result_label;
+    use libp2p::request_response::OutboundFailure;
+
+    #[test]
+    fn outbound_result_labels_cover_every_variant() {
+        assert_eq!(
+            view_federation_outbound_result_label(&OutboundFailure::Timeout),
+            "timeout"
+        );
+        assert_eq!(
+            view_federation_outbound_result_label(&OutboundFailure::ConnectionClosed),
+            "connection_closed"
+        );
+        assert_eq!(
+            view_federation_outbound_result_label(&OutboundFailure::DialFailure),
+            "dial_failure"
+        );
+        assert_eq!(
+            view_federation_outbound_result_label(&OutboundFailure::UnsupportedProtocols),
+            "unsupported_protocols"
+        );
+        assert_eq!(
+            view_federation_outbound_result_label(&OutboundFailure::Io(std::io::Error::from(
+                std::io::ErrorKind::UnexpectedEof
+            ))),
+            "io"
+        );
+    }
 }
 
 #[cfg(test)]

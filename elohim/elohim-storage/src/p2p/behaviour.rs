@@ -426,16 +426,22 @@ impl ElohimStorageBehaviour {
         );
 
         // F-T18: View federation protocol — explicit-peer fetch of signed
-        // cluster + peer-topology slices on behalf of an agent. Tighter
-        // 3-second timeout than the general `config.request_timeout` because
-        // view slices are small (≤ 256 KiB cap) and must respond fast enough
-        // for the F-T21 aggregator's deadline budget. The dispatcher and
-        // responder handler land in F-T19/F-T20.
+        // cluster + peer-topology slices on behalf of an agent.
+        //
+        // Layering constraint: the transport budget is deliberately generous
+        // (the general `config.request_timeout`, like every other behaviour),
+        // and the CALLERS own the effective deadline — reconcile sweeps pass
+        // `PEER_TIMEOUT` (10s) to `view_federate`, the HTTP aggregator passes
+        // `ELOHIM_FEDERATION_TIMEOUT_MS` (3s). A short transport-level timeout
+        // here would fire BEFORE those caller budgets and tear the stream while
+        // a marginal-but-alive responder is still building/signing the slice
+        // (the F-T20 "failed to send" race), so the transport must not be the
+        // one that gives up first. See `view_federation_request_timeout`.
         let view_federation = RequestResponse::with_codec(
             ViewFederationCodec,
             [(ViewFederationProtocol, ProtocolSupport::Full)],
             request_response::Config::default()
-                .with_request_timeout(std::time::Duration::from_secs(3)),
+                .with_request_timeout(view_federation_request_timeout(&config)),
         );
 
         // mDNS for local discovery
@@ -563,5 +569,43 @@ impl ElohimStorageBehaviour {
             ping,
             gossipsub,
         }
+    }
+}
+
+/// Transport-level request timeout for the view-federation behaviour.
+///
+/// This MUST track the general `config.request_timeout` — the view-federation
+/// callers (reconcile sweep 10s, HTTP aggregator 3s) own the effective deadline,
+/// and the transport must not give up before them. Any future desire for a
+/// view-federation-specific timeout goes HERE (and must reckon with the
+/// stream-tear race documented at the construction site) rather than a hardcoded
+/// literal at the call.
+pub(crate) fn view_federation_request_timeout(config: &P2PConfig) -> std::time::Duration {
+    config.request_timeout
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn view_federation_timeout_tracks_general_and_is_not_the_old_3s_pin() {
+        let config = P2PConfig::default();
+        // Layering: the transport budget equals the general request timeout…
+        assert_eq!(
+            view_federation_request_timeout(&config),
+            config.request_timeout
+        );
+        // …and is decisively NOT the retired 3-second pin that fired before the
+        // caller budgets and tore marginal-but-alive responders' streams.
+        assert_ne!(
+            view_federation_request_timeout(&config),
+            std::time::Duration::from_secs(3)
+        );
+        // Default general timeout is 30s (mod.rs P2PConfig::default).
+        assert_eq!(
+            view_federation_request_timeout(&config),
+            std::time::Duration::from_secs(30)
+        );
     }
 }

@@ -7,7 +7,7 @@ title: "Bulk-seed must carry the witness — author ONE notarized content head t
 slug: "bulk-seed-witness-bootstrap-single-head"
 written: "2026-07-07"
 author: "frontend-eyes-sprint (amber single-head arc)"
-status: "proposed"
+status: "in-progress"
 priority: "high"
 area: "substrate/content-ingest-notarization"
 domain: "operator"
@@ -84,6 +84,27 @@ Compose with the DRAFT decouple spec (`2026-07-01-crdt-authoritative-content-sta
    `project_inventory_exchange_not_byte_replication`), heads on the DHT witness plane.
 4. Versions remain a declared-HEAD DAG (`project_versioned_entity_head_is_declared_dependency`)
    — single-head-per-author never forbids a legitimate collective-edit branch.
+
+## Landed (2026-07-09, feat/frontend-eyes-sprint — code-complete, awaiting live verification)
+
+Both legs of "The fix" are implemented, independently reviewed, and committed:
+
+- **Value plane (fix shape #2)** — `c130e46d1`: `spawn_content_projection_listener` no longer
+  ignores `ContentBulkCreated`; ids route through `project_content_doc_reconcile`
+  (offer-not-fight — a partial re-seed can never regress a peer-converged doc value), chunked
+  200/chunk, spawned off the listener loop (single-flight) so a ~3.4k-id seed cannot lag the
+  broadcast channel into dropped events.
+- **Witness plane (fix shape #1, sweep-driven variant)** — `b7e010214`: the reconcile heal leg
+  runs a bounded `witness_bootstrap` step composing the existing
+  `reanchor_backfill::run_once` mechanism — NULL-anchor rows are authored once through the
+  conductor (author-first-idempotent: duplicate refusal recovers the existing head; never a
+  second head), capped 200 rows/tick + 25ms spacing. Heals the pre-existing seeded corpus, not
+  just new seeds. Counter: `elohim_content_witness_authored_total`.
+- Supporting reliability work (same arc): `4389bb8a4` (discovery/heal decouple + view-federation
+  timeout layering + per-protocol /metrics), `fd22cc9b2` (panic-safe heal single-flight flag).
+
+Remaining for DoD: live-GREEN verification on alpha after deploy (seeded corpus greens on the
+authoring node, converges to peers) and the a2o scenario below.
 
 ## Definition of done
 

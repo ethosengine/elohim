@@ -11,7 +11,7 @@ status: "backlog"
 priority: "medium"
 deprecation_status: blocked
 severity: medium
-fingerprints: ["f55c7497fbcb", "e68f63b8dbf3", "ab7c8b27e94f", "afcf8ef8608a", "a6604ecc351d", "2c2c16622939", "8cc10bf8a03b", "e77871f96415"]
+fingerprints: ["f55c7497fbcb", "e68f63b8dbf3", "ab7c8b27e94f", "afcf8ef8608a", "a6604ecc351d", "2c2c16622939", "8cc10bf8a03b", "e77871f96415", "83fcd27c645c", "98afab72f197", "30de7ef1fec4"]
 relatedNodeIds: []
 tags: [deprecation, rust, cargo, serde_yaml, yaml, dependency-replacement]
 cites:
@@ -25,6 +25,8 @@ cites:
   - elohim/holochain/tests/manifest-hygiene/tests/manifest_hygiene.rs
   - steward/node/src/pod/decider.rs
   - elohim/constitution/Cargo.toml
+  - genesis/data/timeline/backlog/eprfs-address-reuse-brit-cid-codec.md
+  - .claude/hooks/deprecation-sentinel.py
 ---
 
 ## What is deprecated
@@ -145,6 +147,51 @@ chain — `cargo tree -i` confirms `serde_yaml ← constitution ← {eae, elohim
 ← gate-client}`). No new usage, no scope change. Folded into this entry's
 fingerprint list; no new investigation warranted. Decision unchanged: blocked on
 the operator-initiated dependency sprint.
+
+**2026-07-06 re-encounter (re-confirmed blocked; +3 fingerprints; sentinel Guard F added).**
+Three more captures, all the SAME archived-serde_yaml concern (`83fcd27c645c`,
+`98afab72f197`, `30de7ef1fec4`). `98afab72f197` is the true-positive cargo
+`Downloaded serde_yaml v0.9.34+deprecated` line from the parent triage's
+throwaway probe build — it confirms `0.9.34+deprecated` is the live published
+crate; being UNQUOTED it is (correctly) NOT swept by Guard F, only folded into
+this concern. The other two:
+
+1. **`83fcd27c645c` — a NEW greenfield direct dependent.** Captured from a scope
+   grep of `/tmp/eprfs-integ/elohim/eprfs/Cargo.lock` (the **eprfs** workspace,
+   v0.1.0, staged during integration, destined to land at `elohim/eprfs/` —
+   tracked precursor: `eprfs-address-reuse-brit-cid-codec.md`). eprfs is *not yet*
+   in the elohim tree, so it is NOT a committable fix surface from a background
+   run, but it declares `serde_yaml` fresh: `[workspace.dependencies] serde_yaml =
+   "0.9"`, consumed by `eprfs-meta/Cargo.toml:14` and `eprfs-agent/Cargo.toml:14`
+   (`serde_yaml.workspace = true`). This is a greenfield workspace *inheriting the
+   EOL debt into new code before it lands* — the strictly better move than
+   swapping later is for eprfs to adopt the chosen successor from the start. **When
+   the operator dependency sprint runs, add eprfs to its scope** (or pre-empt it in
+   the eprfs integration, whichever lands first).
+
+2. **`30de7ef1fec4` — a self-capture of the triage's own scope grep.** A `grep -n`
+   of the eprfs Cargo.lock re-emitted `561-version = "0.9.34+deprecated"`; the
+   line-number prefix minted a fresh fingerprint. This is the SAME structural
+   false-positive class as the 2026-06-14 `e77871f96415` self-capture — and it is
+   NOT suppressible by fp-dedupe, because every distinct `grep -n`/context prefix
+   (`561-`, `560:`, …) hashes to a new fingerprint. This class cost **two** agent
+   dispatches on 2026-07-06 (the parent scope grep → `83fcd27c645c`; this triage's
+   scope grep → `30de7ef1fec4`).
+
+**Structural fix landed (this run): sentinel Guard F.** Added
+`.claude/hooks/deprecation-sentinel.py` Guard F — a line matching
+`version\s*=\s*"[^"]*\+deprecated"` (a Cargo lock/manifest quoted version literal
+carrying a `+deprecated` crates.io build-metadata suffix) is registry metadata,
+not a live toolchain warning, and is skipped before fingerprinting. Zero
+true-positive risk: a genuine build/compile deprecation is emitted UNQUOTED and
+prose-shaped (`Compiling serde_yaml v0.9.34+deprecated` — still capturable, and
+already suppressed via the stable fp `8cc10bf8a03b`), never as a `version = "…"`
+assignment. Verified by a unit test over `_is_echo_line`/`classify`/`fingerprint`
+(all self-capture prefix variants suppressed; unquoted build line, real source
+`use of deprecated`, and `#[deprecated]` diff-adds all still captured; fp
+attribution byte-confirmed). This layers with the fingerprint dedupe (belt +
+suspenders). Decision unchanged: **blocked** on the operator-initiated dependency
+sprint.
 
 ## Verification
 

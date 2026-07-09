@@ -184,6 +184,25 @@ ECHO_COMMIT_SUBJECT_RE = re.compile(
 #   deprecation is always sourced from a named path or a toolchain prefix.
 ECHO_EPHEMERAL_SOURCE_RE = re.compile(r"<(?:string|stdin)>:\d+:")
 
+# Guard F — Cargo lock/manifest version-metadata self-capture:
+#   A crates.io semver BUILD-METADATA suffix like `+deprecated` (a maintainer's
+#   in-band end-of-life signal, e.g. `serde_yaml 0.9.34+deprecated`) lives in
+#   Cargo.lock / Cargo.toml as a QUOTED version literal: `version =
+#   "0.9.34+deprecated"`. Any scope-pass grep of a lockfile for that crate
+#   re-emits the line — and `grep -n`/context prefixes (`561-`, `560:`) mint a
+#   FRESH fingerprint each time, so fp-dedupe can never collapse the class (same
+#   structural problem as Guards B/D). It is REGISTRY METADATA, not a live
+#   in-flight toolchain deprecation warning: a genuine build/compile deprecation
+#   is emitted UNQUOTED and prose-shaped (`Compiling serde_yaml
+#   v0.9.34+deprecated`, `use of deprecated …`) and stays capturable — never as a
+#   `version = "…"` assignment. Zero true-positive risk. (Two triage dispatches on
+#   2026-07-06 — 83fcd27c645c from an eprfs Cargo.lock scope grep and 30de7ef1fec4
+#   from the triage's own scope grep — were this class; the serde_yaml
+#   archived-crate concern is already canonicalized+blocked.)
+ECHO_LOCKFILE_VERSION_META_RE = re.compile(
+    r'version\s*=\s*"[^"]*\+deprecated"', re.IGNORECASE
+)
+
 # Command-level gates for echo classes B and C: if the command itself is a pure
 # git history read (git log / git show without a -p / --patch flag) or reads
 # directly from the history / planning / SDD prose trees, ALL lines from that
@@ -209,7 +228,7 @@ def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool
     Called after classify() returns non-None to prevent false echo entries
     from being fingerprinted and appended to the ledger.
 
-    The five guards:
+    The six guards:
       A) Line sourced from the ledger file (self-capture via recursive grep).
       B) Line sourced from the history/museum prose tree.
       C) Line that is git commit-message text (log oneline entry, or any
@@ -219,6 +238,9 @@ def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool
          agent's own ephemeral `python3 -c`/stdin script, never a real file.
       E) Agentic tooling-source echo — `.claude/` paths or review-finding
          markers in the line (our own governance tooling narrating findings).
+      F) Cargo lock/manifest version-metadata (`version = "…+deprecated"`) —
+         a crates.io semver build-metadata suffix, registry metadata not a live
+         toolchain warning; `grep -n` prefixes defeat fp-dedupe.
     """
     # Guard A — ledger self-capture
     if ECHO_LEDGER_PATH.search(line):
@@ -227,6 +249,12 @@ def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool
     # Guard D — ephemeral-script self-capture (<string>:N: / <stdin>:N:).
     # Placed early: cheapest deterministic skip, no command-flag dependency.
     if ECHO_EPHEMERAL_SOURCE_RE.search(line):
+        return True
+
+    # Guard F — Cargo lock/manifest version-metadata self-capture
+    # (`version = "…+deprecated"`): registry metadata, not a live warning.
+    # Deterministic, no command-flag dependency — like Guard D.
+    if ECHO_LOCKFILE_VERSION_META_RE.search(line):
         return True
 
     # Guard E — agentic tooling-source echo (.claude/ paths, review-finding

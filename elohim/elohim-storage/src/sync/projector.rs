@@ -151,6 +151,69 @@ fn projected_fields(content: &Content) -> Vec<(&'static str, FieldVal)> {
     fields
 }
 
+/// The version-DAG key for a content row's current serving version (Plan C2).
+/// A "version" is addressed by its serving bytes: the blob's content hash IS the
+/// `versionCid`. Two peers that authored DISTINCT bytes for the same id therefore
+/// hold DISTINCT version keys — so both versions COEXIST in the grow-only
+/// `versions` map (never an LWW clobber), and HEAD-election (Plan C3) picks which
+/// is canonical. Absent/empty `blobHash` ⇒ no serving version to record yet.
+fn head_version_cid(content: &Content) -> Option<String> {
+    content
+        .blob_hash
+        .as_deref()
+        .filter(|b| !b.is_empty())
+        .map(str::to_string)
+}
+
+/// Read a top-level string scalar from a doc, or None.
+fn root_str(doc: &Automerge, key: &str) -> Option<String> {
+    match doc.get(automerge::ROOT, key) {
+        Ok(Some((Value::Scalar(s), _))) => match s.as_ref() {
+            ScalarValue::Str(smol) => Some(smol.to_string()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Resolve the head version's blobHash from a projected doc:
+/// `head → versions[head] → blobHash`, falling back to the flat ROOT `blobHash`
+/// for docs written by a pre-C2 peer (the dual-write compat leg). Returns None if
+/// neither is present. This is the C2 READER half — consumed by the serving /
+/// HEAD-election path (Plan C3), which is not yet wired, so it is dead outside
+/// tests today.
+#[allow(dead_code)]
+pub(crate) fn read_head_blob_hash(doc: &Automerge) -> Option<String> {
+    if let Some(head) = root_str(doc, "head") {
+        if let Ok(Some((Value::Object(automerge::ObjType::Map), versions_id))) =
+            doc.get(automerge::ROOT, "versions")
+        {
+            if let Ok(Some((Value::Scalar(s), _))) = doc.get(&versions_id, &head) {
+                if let ScalarValue::Str(smol) = s.as_ref() {
+                    return Some(smol.to_string());
+                }
+            }
+        }
+    }
+    // Fallback: flat ROOT blobHash (pre-C2 dual-write leg).
+    root_str(doc, "blobHash")
+}
+
+/// Whether the doc's version-DAG already records `version_cid` as head with its
+/// entry present in the grow-only `versions` map — the C2 idempotency leg, so a
+/// re-projection of an unchanged head appends no change.
+fn version_dag_current(doc: &Automerge, version_cid: &str) -> bool {
+    if root_str(doc, "head").as_deref() != Some(version_cid) {
+        return false;
+    }
+    match doc.get(automerge::ROOT, "versions") {
+        Ok(Some((Value::Object(automerge::ObjType::Map), versions_id))) => {
+            matches!(doc.get(&versions_id, version_cid), Ok(Some(_)))
+        }
+        _ => false,
+    }
+}
+
 /// True when the doc ALREADY carries exactly the projected field set — the
 /// idempotency guard. A missing field, a changed value, or a scalar-type
 /// mismatch each mean "needs (re)projection". A freshly-created empty doc has no
@@ -195,7 +258,15 @@ pub async fn project_content_doc(
         .get_or_create_doc(PROJECTION_NAMESPACE, &doc_id)
         .await?;
     let fields = projected_fields(content);
-    if doc_matches(&doc, &fields) {
+    let head_vcid = head_version_cid(content);
+    // Idempotency now spans BOTH legs: the flat field set AND the version-DAG head
+    // (a doc whose flat fields match but whose grow-only `versions`/`head` is not
+    // yet current must still (re)project to record the version).
+    let dag_current = match &head_vcid {
+        Some(vcid) => version_dag_current(&doc, vcid),
+        None => true, // no serving version yet ⇒ no version-DAG obligation
+    };
+    if doc_matches(&doc, &fields) && dag_current {
         return Ok(false);
     }
     doc.transact::<_, _, automerge::AutomergeError>(|tx| {
@@ -204,6 +275,18 @@ pub async fn project_content_doc(
                 FieldVal::S(s) => tx.put(automerge::ROOT, *key, s.as_str())?,
                 FieldVal::I(i) => tx.put(automerge::ROOT, *key, *i)?,
             }
+        }
+        // Version-DAG leg (Plan C2): record this serving version in the grow-only
+        // `versions` map keyed by its content-address, and move `head` to it. The
+        // flat ROOT `blobHash` above is the dual-write compat leg for pre-C2 peers;
+        // grow-only means a divergent peer version is ADDED, never overwriting.
+        if let Some(vcid) = &head_vcid {
+            let versions_id = match tx.get(automerge::ROOT, "versions")? {
+                Some((Value::Object(automerge::ObjType::Map), id)) => id,
+                _ => tx.put_object(automerge::ROOT, "versions", automerge::ObjType::Map)?,
+            };
+            tx.put(&versions_id, vcid.as_str(), vcid.as_str())?;
+            tx.put(automerge::ROOT, "head", vcid.as_str())?;
         }
         Ok(())
     })
@@ -432,18 +515,110 @@ async fn load_content_row(pool: &DbPool, id: &str) -> Result<Option<Content>, St
     content_diesel::get_content(&mut conn, &ctx, id, content_diesel::MinTrust::Invisible)
 }
 
+/// Chunk size for bulk-event projection paging — mirrors the back-fill's page
+/// size so a multi-thousand-id seed yields to the runtime at the same cadence
+/// (a full seed can carry ~3.4k ids in a single `ContentBulkCreated`).
+const BULK_PROJECTION_CHUNK: usize = 200;
+
+/// Outcome of projecting one `ContentBulkCreated` batch. `skipped` counts the
+/// idempotent no-ops (already-projected rows), which is the normal fate of a
+/// partial re-seed's already-present ids — not an error.
+#[derive(Debug, Default, Clone, Copy)]
+struct BulkProjectionStats {
+    projected: u64,
+    skipped: u64,
+    failed: u64,
+}
+
+/// Project a `ContentBulkCreated` batch of content ids into the sync DocStore.
+///
+/// Chunked + yielding so a large seed never starves the live write path or the
+/// 60s sync timer (same pacing discipline as `backfill_content_docs`).
+///
+/// RECONCILE, NOT ASSERT: this uses `project_content_doc_reconcile` (offer-not-
+/// fight), NOT the assertive `project_content_doc` — for the same reason the
+/// corpus back-fill does. A `ContentBulkCreated` event re-delivers a stale local
+/// row: on a re-seed of already-existing content, `bulk_create` skips the row but
+/// still lists its id, so the row this handler loads may be causally OLDER than a
+/// value the fleet already converged (peer N's doc for X = fresh B2 while N's SQL
+/// row still holds B1). An assertive write would overwrite the converged B2 back
+/// to the stale B1 at seed scale — a fleet-wide regression. Reconcile fills only
+/// ABSENT/empty doc fields and never contests a present non-empty value, so a
+/// genuinely-new row (empty doc) is filled exactly as an assert would, while a
+/// converged doc is left intact.
+///
+/// TRAP the caller must not "optimise" away: `ids` covers the WHOLE input batch
+/// while the event's `count` counts only the newly-inserted rows, so on a partial
+/// re-seed `ids.len() != count` and already-projected ids are re-delivered here.
+/// That is safe and expected — reconcile is idempotent (fills nothing when the doc
+/// already carries the values), so a re-delivered id is a `skipped` no-op, never a
+/// duplicate, a regression, or an error. The fail-closed reach gate lives inside
+/// `project_content_doc_reconcile`, so non-broadcast rows in the batch are silently
+/// declined there and land in `skipped`.
+async fn project_content_bulk(
+    sync: &SyncManager,
+    pool: &DbPool,
+    ids: &[String],
+) -> BulkProjectionStats {
+    let mut stats = BulkProjectionStats::default();
+    for chunk in ids.chunks(BULK_PROJECTION_CHUNK) {
+        for id in chunk {
+            match load_content_row(pool, id).await {
+                Ok(Some(content)) => match project_content_doc_reconcile(sync, &content).await {
+                    Ok(true) => stats.projected += 1,
+                    Ok(false) => stats.skipped += 1,
+                    Err(e) => {
+                        stats.failed += 1;
+                        tracing::error!(%id, error = %e, "projector: bulk doc projection failed");
+                    }
+                },
+                // A row named in the batch that no longer exists (deleted between
+                // emit and projection) is a benign skip, not a failure.
+                Ok(None) => {
+                    stats.skipped += 1;
+                    tracing::warn!(%id, "projector: bulk content row vanished");
+                }
+                Err(e) => {
+                    stats.failed += 1;
+                    tracing::error!(%id, error = %e, "projector: bulk load failed");
+                }
+            }
+        }
+        // Yield between pages so a 3k-id seed never monopolises the runtime.
+        tokio::task::yield_now().await;
+    }
+    stats
+}
+
 /// Spawn the content-projection listener.
 ///
 /// A second `EventBus` subscriber (mirrors `spawn_logging_listener`) that
-/// projects each `ContentCreated`/`ContentUpdated` into its Automerge doc.
-/// `ContentBulkCreated` is intentionally ignored (the write path already pauses
-/// p2p sync for bulk; back-fill is a separate gated migration).
+/// projects each content write into its Automerge doc:
+/// `ContentCreated`/`ContentUpdated` project the single named row inline;
+/// `ContentBulkCreated` is handed to a SEPARATE spawned task. The separation is
+/// load-bearing: a bulk seed can carry ~3.4k ids, and projecting them inline would
+/// block this loop from draining the bounded broadcast channel (capacity 1024) —
+/// concurrent `ContentCreated`s would overflow it and surface as `RecvError::Lagged`,
+/// permanently dropping those events for this subscriber. The spawned bulk task
+/// returns the loop to `recv()` immediately. A single-flight `Mutex` serialises
+/// overlapping bulk tasks (bulk events are rare; the lock is a courtesy against
+/// DocStore thrash, not a correctness requirement — reconcile-mode is idempotent).
+///
+/// Bulk projection uses reconcile semantics (`project_content_doc_reconcile`), so a
+/// re-seed re-delivering a stale local row can never regress a value the fleet
+/// already converged, and the `ContentBulkCreated` partial-re-seed trap (its `ids`
+/// cover the whole input batch, not just the `count` newly-inserted rows) is a
+/// no-op skip. Projection writes only the sled DocStore (the value plane); it never
+/// stamps notary/anchor provenance — `dht_anchor_hash` is written exclusively by the
+/// conductor-verified path (`upsert_with_anchor`).
 pub fn spawn_content_projection_listener(
     events: Arc<EventBus>,
     sync: Arc<SyncManager>,
     pool: DbPool,
 ) -> tokio::task::JoinHandle<()> {
     let mut rx = events.subscribe();
+    // Serialises overlapping bulk-projection tasks — see the doc comment.
+    let bulk_guard = Arc::new(tokio::sync::Mutex::new(()));
     tokio::spawn(async move {
         loop {
             match rx.recv().await {
@@ -461,7 +636,25 @@ pub fn spawn_content_projection_listener(
                         Err(e) => tracing::error!(%id, error = %e, "projector: load failed"),
                     }
                 }
-                // Ignore everything else (incl. ContentBulkCreated — see docs).
+                Ok(StorageEvent::ContentBulkCreated { ids, .. }) => {
+                    // Spawn onto its own task so a large batch never blocks the
+                    // listener draining the broadcast channel (see doc comment).
+                    let sync = Arc::clone(&sync);
+                    let pool = pool.clone();
+                    let guard = Arc::clone(&bulk_guard);
+                    tokio::spawn(async move {
+                        let _lock = guard.lock().await;
+                        let stats = project_content_bulk(&sync, &pool, &ids).await;
+                        tracing::debug!(
+                            ids = ids.len(),
+                            projected = stats.projected,
+                            skipped = stats.skipped,
+                            failed = stats.failed,
+                            "projector: bulk content projected to sync DocStore"
+                        );
+                    });
+                }
+                // Ignore everything else (non-content events).
                 Ok(_) => {}
                 Err(RecvError::Lagged(n)) => {
                     tracing::warn!(skipped = n, "projector: event bus lagged");
@@ -602,6 +795,95 @@ mod tests {
         assert_eq!(
             heads1, heads2,
             "idempotent re-projection must not append a change"
+        );
+    }
+
+    /// Plan C2 proof — distinct serving versions of the SAME content id COEXIST in
+    /// the grow-only version-DAG (never an LWW clobber); head moves to the latest,
+    /// the notary HINT (headActionHash) is carried, and the flat ROOT blobHash
+    /// dual-writes head's bytes for pre-C2 readers. This coexistence is what lets
+    /// HEAD-election (C3) choose a canonical head ACROSS divergent authorings
+    /// instead of last-writer-wins (the elohim-host-landing divergence class).
+    #[tokio::test]
+    async fn distinct_versions_coexist_head_notary_set() {
+        use automerge::ReadDoc;
+        let (sync, _temp) = test_sync_manager().await;
+        let mut content = sample_content("vdag-1", "v1");
+
+        content.blob_hash = Some("sha256-aaa".to_string());
+        content.declared_head_action_hash = Some("uhCkkAAA".to_string());
+        assert!(super::project_content_doc(&sync, &content).await.unwrap());
+
+        content.blob_hash = Some("sha256-bbb".to_string());
+        content.declared_head_action_hash = Some("uhCkkBBB".to_string());
+        assert!(super::project_content_doc(&sync, &content).await.unwrap());
+
+        let doc = sync
+            .get_or_create_doc(
+                super::PROJECTION_NAMESPACE,
+                &super::content_doc_id("vdag-1"),
+            )
+            .await
+            .unwrap();
+
+        // Both versions coexist in the grow-only map (A is NOT clobbered by B).
+        let versions_id = match doc.get(automerge::ROOT, "versions").unwrap() {
+            Some((automerge::Value::Object(automerge::ObjType::Map), id)) => id,
+            _ => panic!("versions map must exist after C2 projection"),
+        };
+        assert!(
+            doc.get(&versions_id, "sha256-aaa").unwrap().is_some(),
+            "version A must remain — the version-DAG is grow-only, not LWW"
+        );
+        assert!(
+            doc.get(&versions_id, "sha256-bbb").unwrap().is_some(),
+            "version B must be present"
+        );
+        // Head selects the latest version; the reader resolves its blobHash.
+        assert_eq!(super::root_str(&doc, "head").as_deref(), Some("sha256-bbb"));
+        assert_eq!(
+            super::read_head_blob_hash(&doc).as_deref(),
+            Some("sha256-bbb")
+        );
+        // Dual-write compat: flat ROOT blobHash mirrors head's bytes.
+        assert_eq!(
+            super::root_str(&doc, "blobHash").as_deref(),
+            Some("sha256-bbb")
+        );
+        // Notary HINT carried alongside (never authority — see the REQ-N5 guard).
+        assert_eq!(
+            super::root_str(&doc, "headActionHash").as_deref(),
+            Some("uhCkkBBB")
+        );
+    }
+
+    /// The C2 reader falls back to the flat ROOT blobHash for a doc written by a
+    /// pre-C2 peer (no `versions` map / `head`) — the dual-write compat leg that
+    /// keeps convergence working across the mixed-version window.
+    #[tokio::test]
+    async fn read_head_blob_hash_falls_back_to_root_for_pre_c2_doc() {
+        use automerge::transaction::Transactable;
+        let (sync, _temp) = test_sync_manager().await;
+        let doc_id = super::content_doc_id("pre-c2");
+        let mut doc = sync
+            .get_or_create_doc(super::PROJECTION_NAMESPACE, &doc_id)
+            .await
+            .unwrap();
+        doc.transact::<_, _, automerge::AutomergeError>(|tx| {
+            tx.put(automerge::ROOT, "blobHash", "sha256-legacy")?;
+            Ok(())
+        })
+        .unwrap();
+        sync.apply_changes(super::PROJECTION_NAMESPACE, &doc_id, vec![doc.save()])
+            .await
+            .unwrap();
+        let doc = sync
+            .get_or_create_doc(super::PROJECTION_NAMESPACE, &doc_id)
+            .await
+            .unwrap();
+        assert_eq!(
+            super::read_head_blob_hash(&doc).as_deref(),
+            Some("sha256-legacy")
         );
     }
 
@@ -1389,5 +1671,250 @@ mod tests {
             "REQ-N5: the converged headActionHash hint must never be consumed \
              into declared_head_action_hash"
         );
+    }
+
+    /// Seed N content rows and return their ids (helper for the bulk-event tests).
+    fn seed_rows(pool: &crate::db::DbPool, prefix: &str, n: usize) -> Vec<String> {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let ctx = AppContext::default_lamad();
+        let mut conn = pool.get().unwrap();
+        let mut ids = Vec::with_capacity(n);
+        for i in 0..n {
+            let id = format!("{prefix}-{i}");
+            content_diesel::create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: id.clone(),
+                    title: format!("row {i}"),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash: Some(format!("sha256-{prefix}-{i}")),
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: Some("body".to_string()),
+                    dht_anchor_hash: None,
+                },
+            )
+            .unwrap();
+            ids.push(id);
+        }
+        ids
+    }
+
+    /// (a) A `ContentBulkCreated` batch projects every distribution-safe id in the
+    /// batch into the DocStore — the ignore is closed, bulk-seeded rows now enter
+    /// the CRDT plane.
+    #[tokio::test]
+    async fn bulk_created_projects_all_ids_into_docstore() {
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ids = seed_rows(&pool, "bulk", 5);
+
+        let stats = super::project_content_bulk(&sync, &pool, &ids).await;
+        assert_eq!(stats.projected, 5, "every seeded id projects");
+        assert_eq!(stats.skipped, 0);
+        assert_eq!(stats.failed, 0);
+        assert_eq!(sync.count_documents("elohim").await.unwrap(), 5);
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:bulk-0", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-bulk-0",
+            "the seeded blobHash converged into the sync doc"
+        );
+    }
+
+    /// (b) Re-delivering the SAME `ContentBulkCreated` event yields a single
+    /// effect: the second pass projects nothing and appends no Automerge change
+    /// (mirrors `backfill_projects_all_rows_and_is_idempotent`).
+    #[tokio::test]
+    async fn bulk_created_is_idempotent_on_redelivery() {
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ids = seed_rows(&pool, "redeliver", 3);
+
+        let s1 = super::project_content_bulk(&sync, &pool, &ids).await;
+        assert_eq!(s1.projected, 3);
+        let heads1 = sync.get_heads("elohim", "node:redeliver-0").await.unwrap();
+
+        // Same event delivered twice — the write path may re-emit on a retry.
+        let s2 = super::project_content_bulk(&sync, &pool, &ids).await;
+        assert_eq!(s2.projected, 0, "re-delivery must project nothing");
+        assert_eq!(s2.skipped, 3, "every id is an idempotent skip");
+        assert_eq!(s2.failed, 0);
+        let heads2 = sync.get_heads("elohim", "node:redeliver-0").await.unwrap();
+        assert_eq!(heads1, heads2, "re-delivery must not append a change");
+        assert_eq!(sync.count_documents("elohim").await.unwrap(), 3);
+    }
+
+    /// (c) The partial-re-seed TRAP: `ids` covers the whole input batch while
+    /// `count` counts only newly-inserted rows, so a batch re-delivers an
+    /// already-projected id alongside never-projected ones. Only the missing ones
+    /// project; the already-present id is an idempotent skip, and the batch never
+    /// errors.
+    #[tokio::test]
+    async fn bulk_created_partial_reseed_projects_only_missing() {
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ids = seed_rows(&pool, "partial", 3);
+
+        // partial-0 was projected on an earlier pass (already in the DocStore).
+        let pre = super::project_content_bulk(&sync, &pool, &ids[..1]).await;
+        assert_eq!(pre.projected, 1);
+
+        // A partial re-seed emits the WHOLE batch though only 2 ids are new.
+        let stats = super::project_content_bulk(&sync, &pool, &ids).await;
+        assert_eq!(
+            stats.projected, 2,
+            "only the two never-projected ids project"
+        );
+        assert_eq!(stats.skipped, 1, "the already-projected id is a skip");
+        assert_eq!(stats.failed, 0, "the partial-re-seed trap must not error");
+        assert_eq!(sync.count_documents("elohim").await.unwrap(), 3);
+    }
+
+    /// Finding-1 regression: bulk projection uses offer-not-fight reconcile
+    /// semantics so a re-seed re-delivering a STALE local row can never regress a
+    /// value the fleet already converged. Pre-converge the doc to a fresher peer
+    /// value (B2); the local SQL row still holds the stale B1; deliver the id via
+    /// the bulk path; the converged B2 must survive untouched. (With the assertive
+    /// path this test would fail — the doc would be rewritten back to B1.)
+    #[tokio::test]
+    async fn bulk_created_reconcile_never_regresses_converged_value() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+
+        // Local SQL row holds the STALE hash B1. Its body matches sample_content
+        // so blobHash is the ONLY field that could differ from the converged doc.
+        {
+            let mut conn = pool.get().unwrap();
+            content_diesel::create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: "regress-x".to_string(),
+                    title: "t".to_string(),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash: Some("sha256-B1".to_string()),
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: Some("hello".to_string()),
+                    dht_anchor_hash: None,
+                },
+            )
+            .unwrap();
+        }
+
+        // Pre-converge the doc to the FRESHER peer value B2 via the assertive event
+        // path (what a healthy peer's sync round would have delivered).
+        let mut fresher = sample_content("regress-x", "t");
+        fresher.blob_hash = Some("sha256-B2".to_string());
+        super::project_content_doc(&sync, &fresher).await.unwrap();
+        let heads_converged = sync.get_heads("elohim", "node:regress-x").await.unwrap();
+
+        // A re-seed re-delivers the id though the SQL row is the stale B1.
+        let stats = super::project_content_bulk(&sync, &pool, &["regress-x".to_string()]).await;
+        assert_eq!(
+            stats.projected, 0,
+            "reconcile must not write against a fully-converged doc"
+        );
+        assert_eq!(stats.skipped, 1);
+        assert_eq!(stats.failed, 0);
+
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:regress-x", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-B2",
+            "the converged value must NOT be regressed to the stale SQL row's B1"
+        );
+        assert_eq!(
+            sync.get_heads("elohim", "node:regress-x").await.unwrap(),
+            heads_converged,
+            "the declined reconcile must append no change"
+        );
+    }
+
+    /// Listener-level convergence + non-starvation: drive a multi-chunk
+    /// `ContentBulkCreated` (250 ids → two chunks, exercises the chunk+yield loop)
+    /// through the REAL `EventBus` + spawned listener, concurrently with a single
+    /// `ContentCreated`. Because bulk projection runs on its own task, the listener
+    /// keeps draining the channel, so BOTH the whole bulk batch and the concurrent
+    /// single event converge — nothing is lost.
+    #[tokio::test]
+    async fn listener_converges_multichunk_bulk_and_concurrent_single() {
+        use crate::services::events::{EventBus, StorageEvent};
+        use std::time::Duration;
+
+        let events = Arc::new(EventBus::new());
+        let (sync, _temp) = test_sync_manager().await;
+        let sync = Arc::new(sync);
+        let pool = crate::test_util::test_pool();
+
+        // 250 rows for the bulk batch (>200 → two chunks) + 1 for the single event.
+        let bulk_ids = seed_rows(&pool, "big", 250);
+        let _ = seed_rows(&pool, "solo", 1);
+
+        // `subscribe()` runs synchronously inside spawn_content_projection_listener,
+        // so the receiver exists before we emit — no subscribe/emit race, no loss.
+        let handle = super::spawn_content_projection_listener(
+            Arc::clone(&events),
+            Arc::clone(&sync),
+            pool.clone(),
+        );
+
+        events.emit(StorageEvent::ContentBulkCreated {
+            count: bulk_ids.len(),
+            ids: bulk_ids.clone(),
+        });
+        events.emit(StorageEvent::ContentCreated {
+            id: "solo-0".to_string(),
+            title: "t".to_string(),
+            content_type: None,
+        });
+
+        // Poll for convergence of all 251 docs (bounded so a hang fails, not spins).
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
+        loop {
+            if sync.count_documents("elohim").await.unwrap() == 251 {
+                break;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "listener did not converge all 251 docs (got {})",
+                sync.count_documents("elohim").await.unwrap()
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+
+        // The concurrent single event converged too — proof the bulk task never
+        // starved the listener's drain of the broadcast channel.
+        assert!(
+            !sync
+                .get_heads("elohim", "node:solo-0")
+                .await
+                .unwrap()
+                .is_empty(),
+            "the concurrent ContentCreated must have projected"
+        );
+        handle.abort();
     }
 }
