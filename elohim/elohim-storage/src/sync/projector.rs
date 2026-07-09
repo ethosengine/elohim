@@ -151,6 +151,69 @@ fn projected_fields(content: &Content) -> Vec<(&'static str, FieldVal)> {
     fields
 }
 
+/// The version-DAG key for a content row's current serving version (Plan C2).
+/// A "version" is addressed by its serving bytes: the blob's content hash IS the
+/// `versionCid`. Two peers that authored DISTINCT bytes for the same id therefore
+/// hold DISTINCT version keys — so both versions COEXIST in the grow-only
+/// `versions` map (never an LWW clobber), and HEAD-election (Plan C3) picks which
+/// is canonical. Absent/empty `blobHash` ⇒ no serving version to record yet.
+fn head_version_cid(content: &Content) -> Option<String> {
+    content
+        .blob_hash
+        .as_deref()
+        .filter(|b| !b.is_empty())
+        .map(str::to_string)
+}
+
+/// Read a top-level string scalar from a doc, or None.
+fn root_str(doc: &Automerge, key: &str) -> Option<String> {
+    match doc.get(automerge::ROOT, key) {
+        Ok(Some((Value::Scalar(s), _))) => match s.as_ref() {
+            ScalarValue::Str(smol) => Some(smol.to_string()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Resolve the head version's blobHash from a projected doc:
+/// `head → versions[head] → blobHash`, falling back to the flat ROOT `blobHash`
+/// for docs written by a pre-C2 peer (the dual-write compat leg). Returns None if
+/// neither is present. This is the C2 READER half — consumed by the serving /
+/// HEAD-election path (Plan C3), which is not yet wired, so it is dead outside
+/// tests today.
+#[allow(dead_code)]
+pub(crate) fn read_head_blob_hash(doc: &Automerge) -> Option<String> {
+    if let Some(head) = root_str(doc, "head") {
+        if let Ok(Some((Value::Object(automerge::ObjType::Map), versions_id))) =
+            doc.get(automerge::ROOT, "versions")
+        {
+            if let Ok(Some((Value::Scalar(s), _))) = doc.get(&versions_id, &head) {
+                if let ScalarValue::Str(smol) = s.as_ref() {
+                    return Some(smol.to_string());
+                }
+            }
+        }
+    }
+    // Fallback: flat ROOT blobHash (pre-C2 dual-write leg).
+    root_str(doc, "blobHash")
+}
+
+/// Whether the doc's version-DAG already records `version_cid` as head with its
+/// entry present in the grow-only `versions` map — the C2 idempotency leg, so a
+/// re-projection of an unchanged head appends no change.
+fn version_dag_current(doc: &Automerge, version_cid: &str) -> bool {
+    if root_str(doc, "head").as_deref() != Some(version_cid) {
+        return false;
+    }
+    match doc.get(automerge::ROOT, "versions") {
+        Ok(Some((Value::Object(automerge::ObjType::Map), versions_id))) => {
+            matches!(doc.get(&versions_id, version_cid), Ok(Some(_)))
+        }
+        _ => false,
+    }
+}
+
 /// True when the doc ALREADY carries exactly the projected field set — the
 /// idempotency guard. A missing field, a changed value, or a scalar-type
 /// mismatch each mean "needs (re)projection". A freshly-created empty doc has no
@@ -195,7 +258,15 @@ pub async fn project_content_doc(
         .get_or_create_doc(PROJECTION_NAMESPACE, &doc_id)
         .await?;
     let fields = projected_fields(content);
-    if doc_matches(&doc, &fields) {
+    let head_vcid = head_version_cid(content);
+    // Idempotency now spans BOTH legs: the flat field set AND the version-DAG head
+    // (a doc whose flat fields match but whose grow-only `versions`/`head` is not
+    // yet current must still (re)project to record the version).
+    let dag_current = match &head_vcid {
+        Some(vcid) => version_dag_current(&doc, vcid),
+        None => true, // no serving version yet ⇒ no version-DAG obligation
+    };
+    if doc_matches(&doc, &fields) && dag_current {
         return Ok(false);
     }
     doc.transact::<_, _, automerge::AutomergeError>(|tx| {
@@ -204,6 +275,18 @@ pub async fn project_content_doc(
                 FieldVal::S(s) => tx.put(automerge::ROOT, *key, s.as_str())?,
                 FieldVal::I(i) => tx.put(automerge::ROOT, *key, *i)?,
             }
+        }
+        // Version-DAG leg (Plan C2): record this serving version in the grow-only
+        // `versions` map keyed by its content-address, and move `head` to it. The
+        // flat ROOT `blobHash` above is the dual-write compat leg for pre-C2 peers;
+        // grow-only means a divergent peer version is ADDED, never overwriting.
+        if let Some(vcid) = &head_vcid {
+            let versions_id = match tx.get(automerge::ROOT, "versions")? {
+                Some((Value::Object(automerge::ObjType::Map), id)) => id,
+                _ => tx.put_object(automerge::ROOT, "versions", automerge::ObjType::Map)?,
+            };
+            tx.put(&versions_id, vcid.as_str(), vcid.as_str())?;
+            tx.put(automerge::ROOT, "head", vcid.as_str())?;
         }
         Ok(())
     })
@@ -712,6 +795,95 @@ mod tests {
         assert_eq!(
             heads1, heads2,
             "idempotent re-projection must not append a change"
+        );
+    }
+
+    /// Plan C2 proof — distinct serving versions of the SAME content id COEXIST in
+    /// the grow-only version-DAG (never an LWW clobber); head moves to the latest,
+    /// the notary HINT (headActionHash) is carried, and the flat ROOT blobHash
+    /// dual-writes head's bytes for pre-C2 readers. This coexistence is what lets
+    /// HEAD-election (C3) choose a canonical head ACROSS divergent authorings
+    /// instead of last-writer-wins (the elohim-host-landing divergence class).
+    #[tokio::test]
+    async fn distinct_versions_coexist_head_notary_set() {
+        use automerge::ReadDoc;
+        let (sync, _temp) = test_sync_manager().await;
+        let mut content = sample_content("vdag-1", "v1");
+
+        content.blob_hash = Some("sha256-aaa".to_string());
+        content.declared_head_action_hash = Some("uhCkkAAA".to_string());
+        assert!(super::project_content_doc(&sync, &content).await.unwrap());
+
+        content.blob_hash = Some("sha256-bbb".to_string());
+        content.declared_head_action_hash = Some("uhCkkBBB".to_string());
+        assert!(super::project_content_doc(&sync, &content).await.unwrap());
+
+        let doc = sync
+            .get_or_create_doc(
+                super::PROJECTION_NAMESPACE,
+                &super::content_doc_id("vdag-1"),
+            )
+            .await
+            .unwrap();
+
+        // Both versions coexist in the grow-only map (A is NOT clobbered by B).
+        let versions_id = match doc.get(automerge::ROOT, "versions").unwrap() {
+            Some((automerge::Value::Object(automerge::ObjType::Map), id)) => id,
+            _ => panic!("versions map must exist after C2 projection"),
+        };
+        assert!(
+            doc.get(&versions_id, "sha256-aaa").unwrap().is_some(),
+            "version A must remain — the version-DAG is grow-only, not LWW"
+        );
+        assert!(
+            doc.get(&versions_id, "sha256-bbb").unwrap().is_some(),
+            "version B must be present"
+        );
+        // Head selects the latest version; the reader resolves its blobHash.
+        assert_eq!(super::root_str(&doc, "head").as_deref(), Some("sha256-bbb"));
+        assert_eq!(
+            super::read_head_blob_hash(&doc).as_deref(),
+            Some("sha256-bbb")
+        );
+        // Dual-write compat: flat ROOT blobHash mirrors head's bytes.
+        assert_eq!(
+            super::root_str(&doc, "blobHash").as_deref(),
+            Some("sha256-bbb")
+        );
+        // Notary HINT carried alongside (never authority — see the REQ-N5 guard).
+        assert_eq!(
+            super::root_str(&doc, "headActionHash").as_deref(),
+            Some("uhCkkBBB")
+        );
+    }
+
+    /// The C2 reader falls back to the flat ROOT blobHash for a doc written by a
+    /// pre-C2 peer (no `versions` map / `head`) — the dual-write compat leg that
+    /// keeps convergence working across the mixed-version window.
+    #[tokio::test]
+    async fn read_head_blob_hash_falls_back_to_root_for_pre_c2_doc() {
+        use automerge::transaction::Transactable;
+        let (sync, _temp) = test_sync_manager().await;
+        let doc_id = super::content_doc_id("pre-c2");
+        let mut doc = sync
+            .get_or_create_doc(super::PROJECTION_NAMESPACE, &doc_id)
+            .await
+            .unwrap();
+        doc.transact::<_, _, automerge::AutomergeError>(|tx| {
+            tx.put(automerge::ROOT, "blobHash", "sha256-legacy")?;
+            Ok(())
+        })
+        .unwrap();
+        sync.apply_changes(super::PROJECTION_NAMESPACE, &doc_id, vec![doc.save()])
+            .await
+            .unwrap();
+        let doc = sync
+            .get_or_create_doc(super::PROJECTION_NAMESPACE, &doc_id)
+            .await
+            .unwrap();
+        assert_eq!(
+            super::read_head_blob_hash(&doc).as_deref(),
+            Some("sha256-legacy")
         );
     }
 
