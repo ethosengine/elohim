@@ -432,18 +432,110 @@ async fn load_content_row(pool: &DbPool, id: &str) -> Result<Option<Content>, St
     content_diesel::get_content(&mut conn, &ctx, id, content_diesel::MinTrust::Invisible)
 }
 
+/// Chunk size for bulk-event projection paging — mirrors the back-fill's page
+/// size so a multi-thousand-id seed yields to the runtime at the same cadence
+/// (a full seed can carry ~3.4k ids in a single `ContentBulkCreated`).
+const BULK_PROJECTION_CHUNK: usize = 200;
+
+/// Outcome of projecting one `ContentBulkCreated` batch. `skipped` counts the
+/// idempotent no-ops (already-projected rows), which is the normal fate of a
+/// partial re-seed's already-present ids — not an error.
+#[derive(Debug, Default, Clone, Copy)]
+struct BulkProjectionStats {
+    projected: u64,
+    skipped: u64,
+    failed: u64,
+}
+
+/// Project a `ContentBulkCreated` batch of content ids into the sync DocStore.
+///
+/// Chunked + yielding so a large seed never starves the live write path or the
+/// 60s sync timer (same pacing discipline as `backfill_content_docs`).
+///
+/// RECONCILE, NOT ASSERT: this uses `project_content_doc_reconcile` (offer-not-
+/// fight), NOT the assertive `project_content_doc` — for the same reason the
+/// corpus back-fill does. A `ContentBulkCreated` event re-delivers a stale local
+/// row: on a re-seed of already-existing content, `bulk_create` skips the row but
+/// still lists its id, so the row this handler loads may be causally OLDER than a
+/// value the fleet already converged (peer N's doc for X = fresh B2 while N's SQL
+/// row still holds B1). An assertive write would overwrite the converged B2 back
+/// to the stale B1 at seed scale — a fleet-wide regression. Reconcile fills only
+/// ABSENT/empty doc fields and never contests a present non-empty value, so a
+/// genuinely-new row (empty doc) is filled exactly as an assert would, while a
+/// converged doc is left intact.
+///
+/// TRAP the caller must not "optimise" away: `ids` covers the WHOLE input batch
+/// while the event's `count` counts only the newly-inserted rows, so on a partial
+/// re-seed `ids.len() != count` and already-projected ids are re-delivered here.
+/// That is safe and expected — reconcile is idempotent (fills nothing when the doc
+/// already carries the values), so a re-delivered id is a `skipped` no-op, never a
+/// duplicate, a regression, or an error. The fail-closed reach gate lives inside
+/// `project_content_doc_reconcile`, so non-broadcast rows in the batch are silently
+/// declined there and land in `skipped`.
+async fn project_content_bulk(
+    sync: &SyncManager,
+    pool: &DbPool,
+    ids: &[String],
+) -> BulkProjectionStats {
+    let mut stats = BulkProjectionStats::default();
+    for chunk in ids.chunks(BULK_PROJECTION_CHUNK) {
+        for id in chunk {
+            match load_content_row(pool, id).await {
+                Ok(Some(content)) => match project_content_doc_reconcile(sync, &content).await {
+                    Ok(true) => stats.projected += 1,
+                    Ok(false) => stats.skipped += 1,
+                    Err(e) => {
+                        stats.failed += 1;
+                        tracing::error!(%id, error = %e, "projector: bulk doc projection failed");
+                    }
+                },
+                // A row named in the batch that no longer exists (deleted between
+                // emit and projection) is a benign skip, not a failure.
+                Ok(None) => {
+                    stats.skipped += 1;
+                    tracing::warn!(%id, "projector: bulk content row vanished");
+                }
+                Err(e) => {
+                    stats.failed += 1;
+                    tracing::error!(%id, error = %e, "projector: bulk load failed");
+                }
+            }
+        }
+        // Yield between pages so a 3k-id seed never monopolises the runtime.
+        tokio::task::yield_now().await;
+    }
+    stats
+}
+
 /// Spawn the content-projection listener.
 ///
 /// A second `EventBus` subscriber (mirrors `spawn_logging_listener`) that
-/// projects each `ContentCreated`/`ContentUpdated` into its Automerge doc.
-/// `ContentBulkCreated` is intentionally ignored (the write path already pauses
-/// p2p sync for bulk; back-fill is a separate gated migration).
+/// projects each content write into its Automerge doc:
+/// `ContentCreated`/`ContentUpdated` project the single named row inline;
+/// `ContentBulkCreated` is handed to a SEPARATE spawned task. The separation is
+/// load-bearing: a bulk seed can carry ~3.4k ids, and projecting them inline would
+/// block this loop from draining the bounded broadcast channel (capacity 1024) —
+/// concurrent `ContentCreated`s would overflow it and surface as `RecvError::Lagged`,
+/// permanently dropping those events for this subscriber. The spawned bulk task
+/// returns the loop to `recv()` immediately. A single-flight `Mutex` serialises
+/// overlapping bulk tasks (bulk events are rare; the lock is a courtesy against
+/// DocStore thrash, not a correctness requirement — reconcile-mode is idempotent).
+///
+/// Bulk projection uses reconcile semantics (`project_content_doc_reconcile`), so a
+/// re-seed re-delivering a stale local row can never regress a value the fleet
+/// already converged, and the `ContentBulkCreated` partial-re-seed trap (its `ids`
+/// cover the whole input batch, not just the `count` newly-inserted rows) is a
+/// no-op skip. Projection writes only the sled DocStore (the value plane); it never
+/// stamps notary/anchor provenance — `dht_anchor_hash` is written exclusively by the
+/// conductor-verified path (`upsert_with_anchor`).
 pub fn spawn_content_projection_listener(
     events: Arc<EventBus>,
     sync: Arc<SyncManager>,
     pool: DbPool,
 ) -> tokio::task::JoinHandle<()> {
     let mut rx = events.subscribe();
+    // Serialises overlapping bulk-projection tasks — see the doc comment.
+    let bulk_guard = Arc::new(tokio::sync::Mutex::new(()));
     tokio::spawn(async move {
         loop {
             match rx.recv().await {
@@ -461,7 +553,25 @@ pub fn spawn_content_projection_listener(
                         Err(e) => tracing::error!(%id, error = %e, "projector: load failed"),
                     }
                 }
-                // Ignore everything else (incl. ContentBulkCreated — see docs).
+                Ok(StorageEvent::ContentBulkCreated { ids, .. }) => {
+                    // Spawn onto its own task so a large batch never blocks the
+                    // listener draining the broadcast channel (see doc comment).
+                    let sync = Arc::clone(&sync);
+                    let pool = pool.clone();
+                    let guard = Arc::clone(&bulk_guard);
+                    tokio::spawn(async move {
+                        let _lock = guard.lock().await;
+                        let stats = project_content_bulk(&sync, &pool, &ids).await;
+                        tracing::debug!(
+                            ids = ids.len(),
+                            projected = stats.projected,
+                            skipped = stats.skipped,
+                            failed = stats.failed,
+                            "projector: bulk content projected to sync DocStore"
+                        );
+                    });
+                }
+                // Ignore everything else (non-content events).
                 Ok(_) => {}
                 Err(RecvError::Lagged(n)) => {
                     tracing::warn!(skipped = n, "projector: event bus lagged");
@@ -1389,5 +1499,250 @@ mod tests {
             "REQ-N5: the converged headActionHash hint must never be consumed \
              into declared_head_action_hash"
         );
+    }
+
+    /// Seed N content rows and return their ids (helper for the bulk-event tests).
+    fn seed_rows(pool: &crate::db::DbPool, prefix: &str, n: usize) -> Vec<String> {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let ctx = AppContext::default_lamad();
+        let mut conn = pool.get().unwrap();
+        let mut ids = Vec::with_capacity(n);
+        for i in 0..n {
+            let id = format!("{prefix}-{i}");
+            content_diesel::create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: id.clone(),
+                    title: format!("row {i}"),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash: Some(format!("sha256-{prefix}-{i}")),
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: Some("body".to_string()),
+                    dht_anchor_hash: None,
+                },
+            )
+            .unwrap();
+            ids.push(id);
+        }
+        ids
+    }
+
+    /// (a) A `ContentBulkCreated` batch projects every distribution-safe id in the
+    /// batch into the DocStore — the ignore is closed, bulk-seeded rows now enter
+    /// the CRDT plane.
+    #[tokio::test]
+    async fn bulk_created_projects_all_ids_into_docstore() {
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ids = seed_rows(&pool, "bulk", 5);
+
+        let stats = super::project_content_bulk(&sync, &pool, &ids).await;
+        assert_eq!(stats.projected, 5, "every seeded id projects");
+        assert_eq!(stats.skipped, 0);
+        assert_eq!(stats.failed, 0);
+        assert_eq!(sync.count_documents("elohim").await.unwrap(), 5);
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:bulk-0", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-bulk-0",
+            "the seeded blobHash converged into the sync doc"
+        );
+    }
+
+    /// (b) Re-delivering the SAME `ContentBulkCreated` event yields a single
+    /// effect: the second pass projects nothing and appends no Automerge change
+    /// (mirrors `backfill_projects_all_rows_and_is_idempotent`).
+    #[tokio::test]
+    async fn bulk_created_is_idempotent_on_redelivery() {
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ids = seed_rows(&pool, "redeliver", 3);
+
+        let s1 = super::project_content_bulk(&sync, &pool, &ids).await;
+        assert_eq!(s1.projected, 3);
+        let heads1 = sync.get_heads("elohim", "node:redeliver-0").await.unwrap();
+
+        // Same event delivered twice — the write path may re-emit on a retry.
+        let s2 = super::project_content_bulk(&sync, &pool, &ids).await;
+        assert_eq!(s2.projected, 0, "re-delivery must project nothing");
+        assert_eq!(s2.skipped, 3, "every id is an idempotent skip");
+        assert_eq!(s2.failed, 0);
+        let heads2 = sync.get_heads("elohim", "node:redeliver-0").await.unwrap();
+        assert_eq!(heads1, heads2, "re-delivery must not append a change");
+        assert_eq!(sync.count_documents("elohim").await.unwrap(), 3);
+    }
+
+    /// (c) The partial-re-seed TRAP: `ids` covers the whole input batch while
+    /// `count` counts only newly-inserted rows, so a batch re-delivers an
+    /// already-projected id alongside never-projected ones. Only the missing ones
+    /// project; the already-present id is an idempotent skip, and the batch never
+    /// errors.
+    #[tokio::test]
+    async fn bulk_created_partial_reseed_projects_only_missing() {
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ids = seed_rows(&pool, "partial", 3);
+
+        // partial-0 was projected on an earlier pass (already in the DocStore).
+        let pre = super::project_content_bulk(&sync, &pool, &ids[..1]).await;
+        assert_eq!(pre.projected, 1);
+
+        // A partial re-seed emits the WHOLE batch though only 2 ids are new.
+        let stats = super::project_content_bulk(&sync, &pool, &ids).await;
+        assert_eq!(
+            stats.projected, 2,
+            "only the two never-projected ids project"
+        );
+        assert_eq!(stats.skipped, 1, "the already-projected id is a skip");
+        assert_eq!(stats.failed, 0, "the partial-re-seed trap must not error");
+        assert_eq!(sync.count_documents("elohim").await.unwrap(), 3);
+    }
+
+    /// Finding-1 regression: bulk projection uses offer-not-fight reconcile
+    /// semantics so a re-seed re-delivering a STALE local row can never regress a
+    /// value the fleet already converged. Pre-converge the doc to a fresher peer
+    /// value (B2); the local SQL row still holds the stale B1; deliver the id via
+    /// the bulk path; the converged B2 must survive untouched. (With the assertive
+    /// path this test would fail — the doc would be rewritten back to B1.)
+    #[tokio::test]
+    async fn bulk_created_reconcile_never_regresses_converged_value() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+
+        // Local SQL row holds the STALE hash B1. Its body matches sample_content
+        // so blobHash is the ONLY field that could differ from the converged doc.
+        {
+            let mut conn = pool.get().unwrap();
+            content_diesel::create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: "regress-x".to_string(),
+                    title: "t".to_string(),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash: Some("sha256-B1".to_string()),
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: Some("hello".to_string()),
+                    dht_anchor_hash: None,
+                },
+            )
+            .unwrap();
+        }
+
+        // Pre-converge the doc to the FRESHER peer value B2 via the assertive event
+        // path (what a healthy peer's sync round would have delivered).
+        let mut fresher = sample_content("regress-x", "t");
+        fresher.blob_hash = Some("sha256-B2".to_string());
+        super::project_content_doc(&sync, &fresher).await.unwrap();
+        let heads_converged = sync.get_heads("elohim", "node:regress-x").await.unwrap();
+
+        // A re-seed re-delivers the id though the SQL row is the stale B1.
+        let stats = super::project_content_bulk(&sync, &pool, &["regress-x".to_string()]).await;
+        assert_eq!(
+            stats.projected, 0,
+            "reconcile must not write against a fully-converged doc"
+        );
+        assert_eq!(stats.skipped, 1);
+        assert_eq!(stats.failed, 0);
+
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:regress-x", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-B2",
+            "the converged value must NOT be regressed to the stale SQL row's B1"
+        );
+        assert_eq!(
+            sync.get_heads("elohim", "node:regress-x").await.unwrap(),
+            heads_converged,
+            "the declined reconcile must append no change"
+        );
+    }
+
+    /// Listener-level convergence + non-starvation: drive a multi-chunk
+    /// `ContentBulkCreated` (250 ids → two chunks, exercises the chunk+yield loop)
+    /// through the REAL `EventBus` + spawned listener, concurrently with a single
+    /// `ContentCreated`. Because bulk projection runs on its own task, the listener
+    /// keeps draining the channel, so BOTH the whole bulk batch and the concurrent
+    /// single event converge — nothing is lost.
+    #[tokio::test]
+    async fn listener_converges_multichunk_bulk_and_concurrent_single() {
+        use crate::services::events::{EventBus, StorageEvent};
+        use std::time::Duration;
+
+        let events = Arc::new(EventBus::new());
+        let (sync, _temp) = test_sync_manager().await;
+        let sync = Arc::new(sync);
+        let pool = crate::test_util::test_pool();
+
+        // 250 rows for the bulk batch (>200 → two chunks) + 1 for the single event.
+        let bulk_ids = seed_rows(&pool, "big", 250);
+        let _ = seed_rows(&pool, "solo", 1);
+
+        // `subscribe()` runs synchronously inside spawn_content_projection_listener,
+        // so the receiver exists before we emit — no subscribe/emit race, no loss.
+        let handle = super::spawn_content_projection_listener(
+            Arc::clone(&events),
+            Arc::clone(&sync),
+            pool.clone(),
+        );
+
+        events.emit(StorageEvent::ContentBulkCreated {
+            count: bulk_ids.len(),
+            ids: bulk_ids.clone(),
+        });
+        events.emit(StorageEvent::ContentCreated {
+            id: "solo-0".to_string(),
+            title: "t".to_string(),
+            content_type: None,
+        });
+
+        // Poll for convergence of all 251 docs (bounded so a hang fails, not spins).
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
+        loop {
+            if sync.count_documents("elohim").await.unwrap() == 251 {
+                break;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "listener did not converge all 251 docs (got {})",
+                sync.count_documents("elohim").await.unwrap()
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+
+        // The concurrent single event converged too — proof the bulk task never
+        // starved the listener's drain of the broadcast channel.
+        assert!(
+            !sync
+                .get_heads("elohim", "node:solo-0")
+                .await
+                .unwrap()
+                .is_empty(),
+            "the concurrent ContentCreated must have projected"
+        );
+        handle.abort();
     }
 }
