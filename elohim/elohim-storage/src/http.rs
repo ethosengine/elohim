@@ -1697,6 +1697,47 @@ impl HttpServer {
             body["conductor"] = serde_json::json!({
                 "mode": if self.embedded_conductor { "embedded" } else { "external" },
             });
+
+            // Backing-aware DHT-participation identity (Tier C — peer-discovery
+            // fractal-federation spec, 2026-07-09 §6). This node self-reports the
+            // part of its DHT identity that storage can honestly observe: the
+            // per-role DNA hash as its own cell sees it (canonical `uhC0k…`).
+            //
+            // HONESTY GAP (documented, not fabricated): the DNA hash ALONE does
+            // NOT prove co-membership — two nodes with identical DNA hashes can
+            // sit on partitioned DHTs when their discovery *backing* (kitsune
+            // bootstrap table + signal relay) differs (the adam/matthew
+            // diagnosis). That backing lives in the CONDUCTOR's kitsune plane,
+            // NOT storage's libp2p mesh, so it is not visible from here. The
+            // doorway `/health` `dhtBacking` block is the honest home for the
+            // backing; read `dnaHashes` together with it for the full identity.
+            let mut dna_hashes = serde_json::Map::new();
+            if let Some(reg) = self.hc_registry.as_ref() {
+                if let Some(hc) = reg.infrastructure.as_ref() {
+                    dna_hashes.insert(
+                        "infrastructure".to_string(),
+                        serde_json::json!(hc.cell_id().dna_hash().to_string()),
+                    );
+                }
+                if let Some(hc) = reg.imagodei.as_ref() {
+                    dna_hashes.insert(
+                        "imagodei".to_string(),
+                        serde_json::json!(hc.cell_id().dna_hash().to_string()),
+                    );
+                }
+                if let Some(hc) = reg.lamad_client() {
+                    dna_hashes.insert(
+                        "lamad".to_string(),
+                        serde_json::json!(hc.cell_id().dna_hash().to_string()),
+                    );
+                }
+            }
+            body["dhtParticipation"] = serde_json::json!({
+                "dnaHashes": dna_hashes,
+                // The discovery backing is NOT observable from storage's plane.
+                "backingVisible": false,
+                "backingSource": "doorway /health dhtBacking",
+            });
         }
 
         // debug level: resource details
