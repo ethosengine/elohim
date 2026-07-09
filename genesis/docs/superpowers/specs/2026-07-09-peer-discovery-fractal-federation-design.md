@@ -44,11 +44,27 @@ Two lessons the diagnosis burns in:
 
 ## 3. The three planes (the recursive composition)
 
+**The organizing axis — ruleset from below (deterministic floor), affirmation from above (elohim ceiling).** This single dual runs through everything here:
+
+- **The floor GOVERNS; it is deterministic and set from below.** The always-enforced ruleset is DHT-notarized EPRs the peers agreed — mechanical, runs without judgment, and *capture-proof because no authority can lower it.* It is the anti-**capture** guarantee (un-lowerable, bottom-up).
+- **The ceiling AFFIRMS; it is judgment and set from above by plural elohim.** It can only raise/affirm — bless, hold coherence-in-tension, extend grace, carry non-zero-sum wisdom across domains — *never dictate the floor.* This is the correction to "sovereign-above": **affirmation ≠ governance.** The councils bless; they do not legislate the ground. It is the anti-**fragmentation** guarantee (plural, witnessed, revocable).
+- **Override lives in the gap between them.** An actor is free *within* the middle, but **cannot breach the floor** (doing so forfeits the `validated` trust-mark, §3.1) and **cannot manufacture the ceiling** (only earned affirmation grants the higher trust-marks). Freedom in the middle, physics at both ends. Floor keeps power from concentrating; ceiling keeps wisdom from siloing — the two failure modes (capture, fragmentation), each answered by one end of the axis.
+
+
+
 | Plane | Who | What discovery means here | Anti-corruption *physics* |
 |---|---|---|---|
 | **Ground** — Holochain DHT | humans | local, source-chain-signed, human-scale participation | **physics-of-participation**: it cannot scale → cannot accumulate → the reach that flows *out* is high-trust *by construction* (real, present, cares — Sybil-resistance by human-scale friction, not proof-of-work) |
 | **Aggregation / council** | elohim (plural) | attenuated signal summarized *up* the holarchy; coherence held across domains | **physics-of-plurality-revocability-legibility**: authority is a revocable delegation *from below*, checked by peer elohim, witnessed (El Roi) |
 | **Bridge** — doorways | web2 ↔ p2p | a transitional gateway from where-the-world-is (web2) to the resilient p2p substrate | **interchangeable convenience**: a doorway that *gates* participation is a capture smell ([[project_hub_optional_floor]]) |
+
+### 3.1 The bridge plane gains agency — but the ruleset comes from below (doorway moderation)
+
+The near-term signal heal (doorways holding bootstrap + signal) means **doorways gain real agency**: they route, they hold discovery, they can moderate. That agency is honest, not denied. The anti-capture physics that keeps it from becoming bridge-capture:
+
+- **The ruleset is not the doorway operator's to author.** A doorway moderates fediverse-style *in form*, but **the actual rule-set is the EPRs the Holochain DHT peers agreed upon** — community-authored, DHT-notarized content, not an admin's config. The doorway *applies* a ruleset it did not *originate*; the authority is the ground's, projected through the bridge. Trust/authority still comes from the human foundation below the network, always.
+- **Override is free, but carries a natural consequence — not a punishment.** A doorway *can* override from above (impose its own rules — nothing forces it). The consequence is not censorship or a ban; it is that the doorway **forfeits the right to route "Elohim Protocol validated" content.** The `validated` trust-mark was earned by routing the community's agreed ruleset; break from it and the mark simply does not attach. This is [[feedback-justice-mishpat-not-punishment-guard|Mishpat]] — restored-capability / natural consequence, never punishment: the doorway keeps both its freedom and its consequence.
+- **Why this is capture-resistant.** The "validated" designation is a **reach/trust-mark a doorway EARNS by routing the community's ruleset**, not a permission it is granted or an asset it can seize. It cannot be captured — only earned or forfeited. The same physics recursed onto the bridge plane: agency real, legitimacy bottom-up, override permitted-but-unvalidated. (This is why the bridge is "interchangeable convenience" *and* an agent: interchangeable because a doorway that forfeits the mark is simply routed-around; an agent because within the mark it moderates on the ground's behalf.)
 
 The **immutable-blockchain-constitution** was the *prior conception* of the aggregation plane — governing power without a corruptible sovereign via *trustlessness* (code-is-law, immutable, no human in the loop). It is superseded here: trustless is inhuman (no context, no mercy, no [[feedback-justice-mishpat-not-punishment-guard|Mishpat]]) and does not remove capture, only relocates it to whoever writes/forks the code. The council plane is the evolved answer: **living legitimacy from below** (witnessed + revocable + plural) instead of **frozen law from above**. It trades tamper-*proof* (rigid, inhuman) for tamper-*evident and self-correcting* (humane): not "no one can ever change it," but "no one can change it *unseen*, and the ground can *undo* it."
 
