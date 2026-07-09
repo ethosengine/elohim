@@ -3413,8 +3413,17 @@ async fn async_main(
                                             let heal_state = state.clone();
                                             let flag = heal_inflight.clone();
                                             tokio::spawn(async move {
+                                                // RAII release: the guard's Drop
+                                                // clears the single-flight flag on
+                                                // normal exit, panic-unwind, AND
+                                                // task cancellation. A manual store
+                                                // after the `.await` would leak the
+                                                // flag (stick `true` for the process
+                                                // lifetime) if run_heal panicked at
+                                                // any await — silently freezing every
+                                                // future heal tick fleet-wide.
+                                                let _guard = HealFlag(flag);
                                                 run_heal(plan, &hc, &heal_pool, &heal_state).await;
-                                                flag.store(false, Ordering::Release);
                                             });
                                         }
                                     }
@@ -3592,4 +3601,58 @@ async fn async_main(
     }
 
     Ok(())
+}
+
+/// RAII single-flight release for the projection-reconcile heal leg. Dropping it
+/// stores `false` into the shared in-flight flag, so the slot is released on
+/// normal completion, panic-unwind, AND task cancellation. A manual store after
+/// the heal `.await` would leak the flag (stick `true` for the process lifetime)
+/// if the heal panicked at any await — silently freezing every future heal tick.
+struct HealFlag(std::sync::Arc<std::sync::atomic::AtomicBool>);
+
+impl Drop for HealFlag {
+    fn drop(&mut self) {
+        self.0.store(false, std::sync::atomic::Ordering::Release);
+    }
+}
+
+#[cfg(test)]
+mod heal_flag_tests {
+    use super::HealFlag;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    #[test]
+    fn drop_releases_flag() {
+        let flag = Arc::new(AtomicBool::new(true));
+        {
+            let _guard = HealFlag(flag.clone());
+            assert!(
+                flag.load(Ordering::Acquire),
+                "flag stays true while the guard is alive"
+            );
+        }
+        assert!(
+            !flag.load(Ordering::Acquire),
+            "dropping the guard must release the single-flight flag"
+        );
+    }
+
+    #[tokio::test]
+    async fn panic_in_task_still_releases_flag() {
+        let flag = Arc::new(AtomicBool::new(true));
+        let task_flag = flag.clone();
+        let handle = tokio::spawn(async move {
+            let _guard = HealFlag(task_flag);
+            // Panic while holding the guard (stands in for a run_heal panic at an
+            // await) — unwind must still run Drop and release the flag.
+            panic!("simulated run_heal panic at await");
+        });
+        let joined = handle.await;
+        assert!(joined.is_err(), "task should have panicked (JoinError)");
+        assert!(
+            !flag.load(Ordering::Acquire),
+            "panic-unwind must release the single-flight flag via Drop"
+        );
+    }
 }
