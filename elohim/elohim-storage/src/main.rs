@@ -3308,13 +3308,70 @@ async fn async_main(
                 info!("projection-reconcile: disabled (PROJECTION_RECONCILE_SECS=0)");
             }
             (secs, Some(handle), Some(pool)) => {
+                use std::sync::atomic::AtomicBool;
+                use std::sync::{Arc as StdArc, OnceLock};
+                type LamadCell = StdArc<OnceLock<StdArc<elohim_storage::hc_client::HcClient>>>;
+
                 let state = projection_reconcile_state.clone();
                 let mut reconcile_shutdown = shutdown_tx.subscribe();
-                let late_inputs_for_task = late_inputs.clone();
+
+                // Shared conductor slot. The heal leg reads it per-tick; DISCOVERY
+                // never waits on it. The lamad bridge is acquired OFF the ticker's
+                // critical path so the conductor-free discovery asks (view-federate,
+                // inventory) fire from boot+30s — not 7.5–15.6 min later once the
+                // bridge finally connects.
+                let hc_cell: LamadCell = StdArc::new(OnceLock::new());
+                if let Some(hc) = lamad_hc_boot {
+                    // Fast path: boot-connect already landed lamad — seed the slot.
+                    let _ = hc_cell.set(hc);
+                } else if let Some(inputs) = late_inputs {
+                    // Late path: acquire off-ticker with forever-retry.
+                    let cell = hc_cell.clone();
+                    let acq_shutdown = shutdown_tx.subscribe();
+                    tokio::spawn(async move {
+                        info!(
+                            "projection-reconcile: lamad bridge not up at boot — acquiring \
+                             off-ticker (discovery runs meanwhile, heal enables once it lands)"
+                        );
+                        match elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
+                            &inputs,
+                            "lamad",
+                            acq_shutdown,
+                        )
+                        .await
+                        {
+                            Some(hc) => {
+                                let _ = cell.set(hc);
+                                info!("projection-reconcile: lamad bridge connected (late) — heal leg enabled");
+                            }
+                            None => {
+                                // Only None on shutdown.
+                                tracing::debug!("projection-reconcile: shutdown while awaiting lamad late connect");
+                            }
+                        }
+                    });
+                } else {
+                    info!(
+                        "projection-reconcile: no admin-url for lamad late connect — \
+                         heal leg disabled (discovery still runs)"
+                    );
+                }
+
+                // Single-flight guard: at most ONE heal leg runs at a time. A
+                // multi-hour heal on a saturated conductor must never block the
+                // next discovery tick, so the heal is spawned separately and this
+                // flag skips a fresh spawn while one is still in flight.
+                let heal_inflight = StdArc::new(AtomicBool::new(false));
+
                 tokio::spawn(async move {
+                    use elohim_storage::p2p::projection_reconcile::{
+                        heal_decision, run_discovery, run_heal, HealAction,
+                    };
+                    use std::sync::atomic::Ordering;
                     use tokio::time::{interval, Duration, MissedTickBehavior};
-                    // Boot settle: let peers connect + conductor finish init
-                    // before the first sweep (other boot tasks behave likewise).
+
+                    // Boot settle: let peers connect before the first ask (other
+                    // boot tasks behave likewise). Does NOT wait for lamad.
                     tokio::select! {
                         _ = tokio::time::sleep(Duration::from_secs(30)) => {}
                         _ = reconcile_shutdown.recv() => {
@@ -3323,54 +3380,57 @@ async fn async_main(
                         }
                     }
 
-                    // Acquire the lamad bridge. Fast path: boot-connect already
-                    // landed it. Late path: boot-connect None-stamped it, so we
-                    // retry forever (capped backoff) — the heal sweep is exactly
-                    // as good once it lands late as if it had landed at boot.
-                    let hc = match lamad_hc_boot {
-                        Some(hc) => hc,
-                        None => match late_inputs_for_task {
-                            Some(inputs) => {
-                                info!(
-                                    "projection-reconcile: lamad bridge not up at boot — \
-                                     awaiting late connect (heal sweep starts once it lands)"
-                                );
-                                match elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
-                                    &inputs,
-                                    "lamad",
-                                    reconcile_shutdown.resubscribe(),
-                                )
-                                .await
-                                {
-                                    Some(hc) => {
-                                        info!("projection-reconcile: lamad bridge connected (late) — heal sweep enabled");
-                                        hc
-                                    }
-                                    None => {
-                                        // Only None on shutdown.
-                                        tracing::debug!("projection-reconcile: shutdown while awaiting lamad late connect");
-                                        return;
-                                    }
-                                }
-                            }
-                            None => {
-                                info!(
-                                    "projection-reconcile: disabled (no admin-url for lamad late connect)"
-                                );
-                                return;
-                            }
-                        },
-                    };
-
                     let mut ticker = interval(Duration::from_secs(secs));
                     ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
                     loop {
                         tokio::select! {
                             _ = ticker.tick() => {
-                                elohim_storage::p2p::projection_reconcile::run_sweep(
-                                    &handle, &hc, &pool, &state,
-                                )
-                                .await;
+                                // Discovery is conductor-free and bounded (peer
+                                // asks capped by PEER_TIMEOUT) — runs EVERY tick.
+                                let plan = run_discovery(&handle, &pool).await;
+
+                                let bridge_up = hc_cell.get().is_some();
+                                let in_flight = heal_inflight.load(Ordering::Acquire);
+                                match heal_decision(bridge_up, in_flight) {
+                                    HealAction::Spawn => {
+                                        // Claim the single-flight slot (CAS is the
+                                        // authoritative guard; the load above only
+                                        // shapes the log branch).
+                                        if heal_inflight
+                                            .compare_exchange(
+                                                false,
+                                                true,
+                                                Ordering::AcqRel,
+                                                Ordering::Acquire,
+                                            )
+                                            .is_ok()
+                                        {
+                                            let hc = hc_cell
+                                                .get()
+                                                .expect("bridge_up implies Some")
+                                                .clone();
+                                            let heal_pool = pool.clone();
+                                            let heal_state = state.clone();
+                                            let flag = heal_inflight.clone();
+                                            tokio::spawn(async move {
+                                                run_heal(plan, &hc, &heal_pool, &heal_state).await;
+                                                flag.store(false, Ordering::Release);
+                                            });
+                                        }
+                                    }
+                                    HealAction::SkipInFlight => {
+                                        tracing::info!(
+                                            "projection-reconcile: heal leg still in flight — \
+                                             discovery ran, heal skipped this tick"
+                                        );
+                                    }
+                                    HealAction::SkipNoBridge => {
+                                        tracing::info!(
+                                            "projection-reconcile: lamad bridge not up — \
+                                             discovery ran, heal deferred"
+                                        );
+                                    }
+                                }
                             }
                             _ = reconcile_shutdown.recv() => {
                                 tracing::debug!("projection-reconcile: shutdown signal received, exiting");
@@ -3381,7 +3441,8 @@ async fn async_main(
                 });
                 info!(
                     interval_secs = secs,
-                    "projection-reconcile stream started (boot sweep +30s, then periodic, shutdown-aware; lamad bridge acquired in-task with forever-retry)"
+                    "projection-reconcile stream started (discovery from boot+30s every tick, \
+                     lamad bridge acquired off-ticker, heal spawned single-flight)"
                 );
             }
             _ => {

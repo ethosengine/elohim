@@ -15,7 +15,9 @@
 //! Plan: `genesis/docs/superpowers/plans/2026-06-17-design-decision-toolkit-plan.md`
 
 use lazy_static::lazy_static;
-use prometheus::{Encoder, IntCounterVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder};
+use prometheus::{
+    Encoder, IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder,
+};
 use std::sync::Once;
 
 lazy_static! {
@@ -193,6 +195,31 @@ lazy_static! {
         &["column", "expected", "got"],
     )
     .unwrap();
+
+    // ── View-federation outcome attribution (the notary-authority spine) ──
+
+    /// Outbound view-federation request outcomes at the resolution site. Before
+    /// this counter the ONLY per-request signal was a Loki WARN (F-T19), which
+    /// 502-storms — the timeout-vs-transport split (the whole failure diagnosis)
+    /// was unobservable in Prometheus. label: result = "ok" | "timeout" |
+    /// "connection_closed" | "dial_failure" | "unsupported_protocols" | "io".
+    pub static ref VIEW_FEDERATION_OUTBOUND: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_view_federation_outbound_total",
+            "View-federation outbound request outcomes by result (ok vs failure variant).",
+        ),
+        &["result"],
+    )
+    .unwrap();
+
+    /// Inbound view-federation requests answered with a signed slice (the
+    /// responder-side served count — pairs with the outbound counter to read the
+    /// ask/serve balance across the fleet).
+    pub static ref VIEW_FEDERATION_INBOUND_SERVED: IntCounter = IntCounter::new(
+        "elohim_view_federation_inbound_served_total",
+        "View-federation inbound requests answered with a signed slice (ResponseSent).",
+    )
+    .unwrap();
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -221,6 +248,8 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_FREE_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_USED_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_STEWARDED_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_OUTBOUND.clone()));
+        let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_INBOUND_SERVED.clone()));
     });
 }
 
@@ -316,6 +345,18 @@ pub fn inc_identity_namespace_violation(column: &str, got: &str) {
         .inc();
 }
 
+/// Record one outbound view-federation outcome. `result` is the outcome label
+/// ("ok" | "timeout" | "connection_closed" | "dial_failure" |
+/// "unsupported_protocols" | "io"), produced at the resolution site.
+pub fn inc_view_federation_outbound(result: &str) {
+    VIEW_FEDERATION_OUTBOUND.with_label_values(&[result]).inc();
+}
+
+/// Record one inbound view-federation request answered with a signed slice.
+pub fn inc_view_federation_inbound_served() {
+    VIEW_FEDERATION_INBOUND_SERVED.inc();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -334,6 +375,18 @@ mod tests {
             ("64m-256m", 1, 158_265_344),
         ]);
         inc_identity_namespace_violation("rea_commitments.provider", "libp2p");
+        // Exercise every outbound outcome label + the inbound served counter.
+        for result in [
+            "ok",
+            "timeout",
+            "connection_closed",
+            "dial_failure",
+            "unsupported_protocols",
+            "io",
+        ] {
+            inc_view_federation_outbound(result);
+        }
+        inc_view_federation_inbound_served();
 
         let text = gather_text();
         assert!(
@@ -349,5 +402,19 @@ mod tests {
         assert!(text.contains("proc=\"holochain\""), "{text}");
         assert!(text.contains("kind=\"anon\""));
         assert!(text.contains("bucket=\"1m-8m\""), "{text}");
+        // View-federation outcome attribution — every failure variant + ok +
+        // the inbound served counter must render.
+        assert!(
+            text.contains("elohim_view_federation_outbound_total"),
+            "view-federation outbound counter missing:\n{text}"
+        );
+        assert!(text.contains("result=\"timeout\""), "{text}");
+        assert!(text.contains("result=\"ok\""), "{text}");
+        assert!(text.contains("result=\"connection_closed\""), "{text}");
+        assert!(text.contains("result=\"io\""), "{text}");
+        assert!(
+            text.contains("elohim_view_federation_inbound_served_total"),
+            "view-federation inbound served counter missing:\n{text}"
+        );
     }
 }
