@@ -70,7 +70,15 @@ use crate::p2p::view_federation::{
     PROJECTION_INVENTORY_TABLE_CONTENT, PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
 };
 use crate::p2p::P2PHandle;
+use crate::services::provide_loop_status::ProvideLoopState;
 use crate::views::{ProjectionInventoryPayload, ViewFederationRequest, ViewKind};
+
+/// Per-tick cap for the sweep-driven witness-bootstrap authoring step (GAP 1.5).
+/// Keeps conductor load bounded on a large seeded corpus: a ~6k un-witnessed
+/// corpus greens over ~30 ticks rather than storming a saturated conductor in a
+/// single sweep (the F-T19 evidence — adam's conductor already sits at its
+/// read-pool ceiling). Do not raise without weighing conductor saturation.
+const WITNESS_MAX_PER_TICK: i64 = 200;
 
 /// Per-sweep retry budget for conductor-can't-see-it gaps. A gap that the
 /// conductor still can't resolve after this many sweeps drops out (it is almost
@@ -251,11 +259,18 @@ pub async fn run_discovery(p2p: &P2PHandle, pool: &DbPool) -> SweepPlan {
 /// is up and no other heal is in flight (see [`heal_decision`]). Publishes the
 /// sweep status snapshot. Row content comes EXCLUSIVELY from the own conductor;
 /// both upsert paths are idempotent, so a heal is safe under duplicate delivery.
+///
+/// The content arm also runs the sweep-driven [`witness_bootstrap`] step (GAP
+/// 1.5): it authors a notarized head for local rows born un-witnessed
+/// (bulk-seeded, `dht_anchor_hash` NULL) so they can green. It rides this leg's
+/// single-flight guard + OnceLock conductor gate — never running bridge-absent
+/// or concurrently — and publishes its progress to `provide_state`.
 pub async fn run_heal(
     plan: SweepPlan,
     hc: &Arc<HcClient>,
     pool: &DbPool,
     state: &ProjectionReconcileState,
+    provide_state: &ProvideLoopState,
 ) {
     let SweepPlan { rea, content } = plan;
     let ReaDiscovery {
@@ -278,6 +293,10 @@ pub async fn run_heal(
     } = content;
     let (content_healed, content_missing) =
         heal_content(&mut content_tracker, &content_discovered_by, hc, pool).await;
+
+    // GAP 1.5: green the un-witnessed seeded corpus. Composed onto (not forked
+    // from) the content arm — same conductor gate + single-flight guard.
+    witness_bootstrap(hc, pool, provide_state).await;
 
     // Publish mirrors the pre-decoupling contract: REA counts + peers_asked, with
     // the divergent-anchor counter folding in BOTH arms (the one cross-arm signal).
@@ -302,6 +321,77 @@ pub async fn run_heal(
         content_local_anchored = local_anchored,
         "projection-reconcile: heal complete"
     );
+}
+
+/// Witness-bootstrap (GAP 1.5): author a notarized head through the conductor for
+/// local content rows born un-witnessed — bulk-seeded diesel-direct rows with
+/// `dht_anchor_hash IS NULL` and no conductor record, which can otherwise never
+/// reach `trust=green`.
+///
+/// Composes the proven [`reanchor_backfill::run_once`] mechanism rather than
+/// forking a new authoring path (the backlog's "compose, don't fork"):
+/// - **Once-per-id guard.** `run_once` authors via `create_content`, which the
+///   `content_store` zome REFUSES for a duplicate id; the already-exists branch
+///   recovers and stamps the EXISTING anchor instead of minting a second head.
+///   So a re-run over an already-witnessed row stamps (not authors), and a
+///   transient/bridge error stays a retryable failure — never a fabricated or
+///   duplicate head. (The classifier is [`reanchor_backfill::decide_outcome`].)
+/// - **Eligibility.** Honors the existing heal/stamp path's reach filter
+///   (`CORE_REACH_LEVELS`) — un-widened; non-canonical reach is skipped, not
+///   authored.
+/// - **Pacing.** Bounded to [`WITNESS_MAX_PER_TICK`] rows per tick with a
+///   per-item delay, so a large corpus greens over many ticks. No concurrency.
+///
+/// Runs only inside [`run_heal`], so the OnceLock conductor gate + single-flight
+/// guard already guarantee it never fires bridge-absent or concurrently.
+async fn witness_bootstrap(hc: &Arc<HcClient>, pool: &DbPool, provide_state: &ProvideLoopState) {
+    // A lamad-scoped ContentService drives the canonical re-anchor path
+    // (`update_via_conductor` null-anchor branch). The EventBus is a throwaway:
+    // the only event this path emits is `ContentUpdated` (cache invalidation);
+    // re-anchoring is a projection write, and content bytes are unchanged, so a
+    // dropped invalidation only defers a trust-label refresh to the next read.
+    let content_service = crate::services::ContentService::new(
+        pool.clone(),
+        crate::db::AppContext::default_lamad(),
+        Arc::new(crate::services::events::EventBus::new()),
+    );
+    let cfg = crate::services::reanchor_backfill::ReanchorConfig {
+        max_per_sweep: WITNESS_MAX_PER_TICK,
+        item_delay: Duration::from_millis(25),
+    };
+    match crate::services::reanchor_backfill::run_once(
+        pool,
+        &content_service,
+        hc,
+        provide_state,
+        &cfg,
+    )
+    .await
+    {
+        Ok(report) if report.candidates > 0 => {
+            crate::metrics::add_content_witness_authored(report.reanchored as u64);
+            tracing::info!(
+                target: "elohim_storage::projection_reconcile",
+                candidates = report.candidates,
+                authored = report.reanchored,
+                already_witnessed = report.already_anchored,
+                skipped = report.skipped,
+                failed = report.failed,
+                remaining = report.remaining,
+                "projection-reconcile[witness]: authored notarized heads for un-witnessed seeded content"
+            );
+        }
+        Ok(_) => {
+            // No un-witnessed rows — the seeded corpus is fully witnessed.
+        }
+        Err(e) => {
+            tracing::warn!(
+                target: "elohim_storage::projection_reconcile",
+                error = %e,
+                "projection-reconcile[witness]: sweep failed (non-fatal, retried next tick)"
+            );
+        }
+    }
 }
 
 /// Discovery phase of the REA-commitment reconcile (steps 1–3): build the local
@@ -954,6 +1044,60 @@ mod tests {
         // spawn without a conductor); discovery still ran.
         assert_eq!(heal_decision(false, false), HealAction::SkipNoBridge);
         assert_eq!(heal_decision(false, true), HealAction::SkipNoBridge);
+    }
+
+    #[test]
+    fn witness_per_tick_cap_is_bounded_for_pacing() {
+        // (d) per-tick cap: bounded so a large un-witnessed corpus (live alpha
+        // shows thousands of rows) greens over many ticks instead of storming a
+        // saturated conductor in one sweep.
+        assert!(WITNESS_MAX_PER_TICK > 0, "must author some per tick");
+        assert!(
+            WITNESS_MAX_PER_TICK <= 500,
+            "must stay small enough to pace a multi-thousand-row corpus across ticks"
+        );
+    }
+
+    #[test]
+    fn witness_guard_is_the_reanchor_once_per_id_classifier() {
+        // The witness step's once-per-id guard IS `reanchor_backfill::decide_outcome`
+        // (composed, not forked). Assert the three cases the task calls out, so the
+        // guarantee is legible at the composition site.
+        use crate::error::StorageError;
+        use crate::services::reanchor_backfill::{
+            decide_outcome, is_already_anchored_error, RowOutcome,
+        };
+
+        // (a) A candidate whose head the conductor already holds: create_content is
+        // refused ("already exists") and the existing anchor is recovered+stamped →
+        // AlreadyAnchored (stamped, NOT a second authored head).
+        let already: Result<(), StorageError> = Err(StorageError::Conductor(
+            "Zome call failed: Guest(\"Content with id 'seed-1' already exists. \
+             Use update_content to modify existing entries.\")"
+                .to_string(),
+        ));
+        assert!(is_already_anchored_error(already.as_ref().unwrap_err()));
+        assert_eq!(
+            decide_outcome(&already, Some(&Ok(true))),
+            RowOutcome::AlreadyAnchored
+        );
+
+        // (b) Definitive not-found → authored exactly once (Reanchored). On the
+        // NEXT tick the conductor holds it, so create is refused → AlreadyAnchored
+        // (authored zero the second time — idempotent).
+        let authored: Result<(), StorageError> = Ok(());
+        assert_eq!(decide_outcome(&authored, None), RowOutcome::Reanchored);
+        assert_eq!(
+            decide_outcome(&already, Some(&Ok(true))),
+            RowOutcome::AlreadyAnchored
+        );
+
+        // (c) Transient/bridge error → Failed (skipped, retried next tick; never a
+        // fabricated or duplicate head).
+        let transient: Result<(), StorageError> =
+            Err(StorageError::Conductor("read plane down".into()));
+        assert!(!is_already_anchored_error(transient.as_ref().unwrap_err()));
+        assert_eq!(decide_outcome(&transient, None), RowOutcome::Failed);
     }
 
     #[test]

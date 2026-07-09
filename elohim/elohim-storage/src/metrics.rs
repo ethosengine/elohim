@@ -220,6 +220,17 @@ lazy_static! {
         "View-federation inbound requests answered with a signed slice (ResponseSent).",
     )
     .unwrap();
+
+    /// Content heads freshly authored through the conductor by the sweep-driven
+    /// witness-bootstrap step — bulk-seeded rows born un-witnessed
+    /// (`dht_anchor_hash` NULL) that now carry a notarized head. Counts fresh
+    /// authorings only (already-committed rows recovered via the idempotent
+    /// already-exists path are NOT re-authored and are not counted here).
+    pub static ref CONTENT_WITNESS_AUTHORED: IntCounter = IntCounter::new(
+        "elohim_content_witness_authored_total",
+        "Content heads authored through the conductor by the witness-bootstrap sweep.",
+    )
+    .unwrap();
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -250,6 +261,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_STEWARDED_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_OUTBOUND.clone()));
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_INBOUND_SERVED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_AUTHORED.clone()));
     });
 }
 
@@ -357,6 +369,11 @@ pub fn inc_view_federation_inbound_served() {
     VIEW_FEDERATION_INBOUND_SERVED.inc();
 }
 
+/// Record `n` content heads freshly authored by the witness-bootstrap sweep.
+pub fn add_content_witness_authored(n: u64) {
+    CONTENT_WITNESS_AUTHORED.inc_by(n);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -387,6 +404,7 @@ mod tests {
             inc_view_federation_outbound(result);
         }
         inc_view_federation_inbound_served();
+        add_content_witness_authored(3);
 
         let text = gather_text();
         assert!(
@@ -415,6 +433,10 @@ mod tests {
         assert!(
             text.contains("elohim_view_federation_inbound_served_total"),
             "view-federation inbound served counter missing:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_content_witness_authored_total"),
+            "content witness-authored counter missing:\n{text}"
         );
     }
 }

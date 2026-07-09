@@ -3313,6 +3313,9 @@ async fn async_main(
                 type LamadCell = StdArc<OnceLock<StdArc<elohim_storage::hc_client::HcClient>>>;
 
                 let state = projection_reconcile_state.clone();
+                // Witness-bootstrap (GAP 1.5) publishes its sweep progress to the
+                // provide-loop status surface, same as the one-shot boot pass.
+                let provide_for_reconcile = provide_loop_state.clone();
                 let mut reconcile_shutdown = shutdown_tx.subscribe();
 
                 // Shared conductor slot. The heal leg reads it per-tick; DISCOVERY
@@ -3411,6 +3414,7 @@ async fn async_main(
                                                 .clone();
                                             let heal_pool = pool.clone();
                                             let heal_state = state.clone();
+                                            let heal_provide = provide_for_reconcile.clone();
                                             let flag = heal_inflight.clone();
                                             tokio::spawn(async move {
                                                 // RAII release: the guard's Drop
@@ -3423,7 +3427,14 @@ async fn async_main(
                                                 // any await — silently freezing every
                                                 // future heal tick fleet-wide.
                                                 let _guard = HealFlag(flag);
-                                                run_heal(plan, &hc, &heal_pool, &heal_state).await;
+                                                run_heal(
+                                                    plan,
+                                                    &hc,
+                                                    &heal_pool,
+                                                    &heal_state,
+                                                    &heal_provide,
+                                                )
+                                                .await;
                                             });
                                         }
                                     }
