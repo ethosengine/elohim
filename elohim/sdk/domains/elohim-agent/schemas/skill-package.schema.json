@@ -1,0 +1,77 @@
+{
+  "$id": "elohim-agent:schema:package:skill",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SkillPackage",
+  "description": "Canonical Elohim-native package for a reusable agentic skill, with runtime projections treated as generated surfaces.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "instructions", "projections"],
+  "properties": {
+    "apiVersion": { "const": "elohim-agent/v1alpha1" },
+    "kind": { "const": "SkillPackage" },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "version",
+        "description",
+        "triggerDescription",
+        "runtimeTargets",
+        "sourceRuntime",
+        "assetRefs"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "triggerDescription": { "type": "string", "minLength": 1 },
+        "runtimeTargets": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["claude", "codex"] }
+        },
+        "sourceRuntime": { "enum": ["claude", "codex", "elohim-agent"] },
+        "assetRefs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": true
+    },
+    "instructions": {
+      "type": "object",
+      "required": ["format", "body"],
+      "properties": {
+        "format": { "const": "markdown" },
+        "body": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "projections": {
+      "type": "object",
+      "required": ["claude", "codex"],
+      "properties": {
+        "claude": { "$ref": "#/$defs/projection" },
+        "codex": { "$ref": "#/$defs/projection" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "projection": {
+      "type": "object",
+      "required": ["path", "frontmatter"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "frontmatter": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "frontmatterRaw": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
