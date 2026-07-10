@@ -463,7 +463,11 @@ impl AppState {
         };
         let signal = if args.signal_enabled {
             let max_clients = args.signal_max_clients.unwrap_or(DEFAULT_MAX_CLIENTS);
-            Some(Arc::new(SignalStore::new(max_clients)))
+            let relay_id = args
+                .doorway_id
+                .clone()
+                .unwrap_or_else(|| args.node_id.to_string());
+            Some(Arc::new(SignalStore::new(max_clients, None, relay_id)))
         } else {
             None
         };
@@ -569,7 +573,15 @@ impl AppState {
         };
         let signal = if args.signal_enabled {
             let max_clients = args.signal_max_clients.unwrap_or(DEFAULT_MAX_CLIENTS);
-            Some(Arc::new(SignalStore::new(max_clients)))
+            let relay_id = args
+                .doorway_id
+                .clone()
+                .unwrap_or_else(|| args.node_id.to_string());
+            Some(Arc::new(SignalStore::new(
+                max_clients,
+                mongo.as_ref(),
+                relay_id,
+            )))
         } else {
             None
         };
@@ -684,7 +696,15 @@ impl AppState {
         };
         let signal = if args.signal_enabled {
             let max_clients = args.signal_max_clients.unwrap_or(DEFAULT_MAX_CLIENTS);
-            Some(Arc::new(SignalStore::new(max_clients)))
+            let relay_id = args
+                .doorway_id
+                .clone()
+                .unwrap_or_else(|| args.node_id.to_string());
+            Some(Arc::new(SignalStore::new(
+                max_clients,
+                mongo.as_ref(),
+                relay_id,
+            )))
         } else {
             None
         };
@@ -801,7 +821,15 @@ impl AppState {
         };
         let signal = if args.signal_enabled {
             let max_clients = args.signal_max_clients.unwrap_or(DEFAULT_MAX_CLIENTS);
-            Some(Arc::new(SignalStore::new(max_clients)))
+            let relay_id = args
+                .doorway_id
+                .clone()
+                .unwrap_or_else(|| args.node_id.to_string());
+            Some(Arc::new(SignalStore::new(
+                max_clients,
+                Some(&mongo),
+                relay_id,
+            )))
         } else {
             None
         };
@@ -1703,7 +1731,13 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
             "Signal service enabled at /signal/{{pubkey}} (max {} clients)",
             max
         );
-        let _ = signal_store; // suppress unused warning
+        // Cross-relay signal-bus consumer (D2): deliver frames sibling relays
+        // published for dests connected here. No-op on a mem bus (lone pod).
+        signal::spawn_bus_consumer(Arc::clone(signal_store));
+        info!(
+            "Signal bus consumer started (backend: {})",
+            signal_store.bus().backend_name()
+        );
     }
 
     // Start cache cleanup task
