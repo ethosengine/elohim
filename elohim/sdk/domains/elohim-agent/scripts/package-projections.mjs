@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
@@ -391,11 +392,38 @@ function projectCodex(pkg) {
   return projectMarkdownSurface(pkg, 'codex');
 }
 
+// Generated Claude frontmatter for a package-master (FLIPPED) skill/agent.
+// Origin is preserved (metadata.sourceRuntime stays 'claude' — "born from
+// Claude"); authority is flipped (metadata.master: 'package'). The governance
+// eprRef rides along as a backref line so the generated `.claude` surface still
+// points home to its package governance anchor. Mirrors codexFrontmatter's
+// lowering of package metadata into a runtime frontmatter dialect.
+function claudeFrontmatterFromPackage(pkg) {
+  const { name, description, sourceRuntime, master, governance } = pkg.metadata;
+  const metadata = { sourceRuntime, master };
+  if (governance?.eprRef) metadata.governance = governance.eprRef;
+  return { name, description, metadata };
+}
+
 function projectMarkdownSurface(pkg, runtime) {
   const projection = pkg.projections[runtime];
-  const frontmatter = projection.frontmatterRaw
-    ? `${projection.frontmatterRaw}\n`
-    : stringifyYaml(projection.frontmatter);
+  // Per-runtime "compiler backend" seam: each runtime lowers package metadata
+  // into its own frontmatter dialect. The DEFAULT backend is identity /
+  // passthrough — a Claude-sourced package keeps its human-authored frontmatter
+  // verbatim (frontmatterRaw) so import(source) round-trips byte-identically and
+  // the fidelity gate stays green. A package that has FLIPPED to package-master
+  // (metadata.master === 'package') no longer has an authoritative `.claude`
+  // source, so its Claude frontmatter is GENERATED from package metadata instead
+  // of read from stale frontmatterRaw — the same generation codexFrontmatter
+  // already does for the codex backend.
+  let frontmatter;
+  if (runtime === 'claude' && pkg.metadata.master === 'package') {
+    frontmatter = stringifyYaml(claudeFrontmatterFromPackage(pkg));
+  } else if (projection.frontmatterRaw) {
+    frontmatter = `${projection.frontmatterRaw}\n`;
+  } else {
+    frontmatter = stringifyYaml(projection.frontmatter);
+  }
   return `---\n${frontmatter}---\n${pkg.instructions.body}`;
 }
 
@@ -419,11 +447,27 @@ function formatYamlScalar(value) {
   return JSON.stringify(value);
 }
 
-async function loadSourcePackages() {
+// Authority marker: a `.claude` source is NOT re-imported as a Claude-sourced
+// package when the PACKAGE is already the authoritative master for it. Two
+// distinct cases, one predicate:
+//  - native packages (metadata.sourceRuntime === 'elohim-agent'): born in the
+//    package; `.claude` is a pure projection with no human-authored master.
+//  - FLIPPED packages (metadata.master === 'package'): born FROM Claude
+//    (metadata.sourceRuntime stays 'claude' — origin preserved) but authority
+//    has moved to the package. Re-importing from the generated `.claude` would
+//    overwrite the master, so it must be skipped. The generated `.claude`
+//    frontmatter of a flipped skill carries `master: package`, making this
+//    detectable at the source surface itself.
+function isPackageAuthoritative(frontmatter) {
+  const meta = frontmatter?.metadata ?? {};
+  return meta.sourceRuntime === 'elohim-agent' || meta.master === 'package';
+}
+
+async function loadSourcePackages({ skillDir = SKILL_SOURCE_DIR, agentDir = AGENT_SOURCE_DIR } = {}) {
   const sourcePackages = [];
   let skillDirs = [];
   try {
-    skillDirs = (await readdir(SKILL_SOURCE_DIR, { withFileTypes: true }))
+    skillDirs = (await readdir(skillDir, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
       .sort();
@@ -431,11 +475,11 @@ async function loadSourcePackages() {
     if (error?.code !== 'ENOENT') throw error;
   }
   for (const dir of skillDirs) {
-    const path = resolve(SKILL_SOURCE_DIR, dir, 'SKILL.md');
+    const path = resolve(skillDir, dir, 'SKILL.md');
     const raw = await readIfExists(path);
     if (raw) {
       const parsed = parseMarkdownSurface(path, raw);
-      if (parsed.frontmatter.metadata?.sourceRuntime !== 'elohim-agent') {
+      if (!isPackageAuthoritative(parsed.frontmatter)) {
         sourcePackages.push(skillPackageFromClaude(path, parsed));
       }
     }
@@ -443,14 +487,17 @@ async function loadSourcePackages() {
 
   let agentFiles = [];
   try {
-    agentFiles = (await readdir(AGENT_SOURCE_DIR)).filter((name) => name.endsWith('.md')).sort();
+    agentFiles = (await readdir(agentDir)).filter((name) => name.endsWith('.md')).sort();
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error;
   }
   for (const file of agentFiles) {
-    const path = resolve(AGENT_SOURCE_DIR, file);
+    const path = resolve(agentDir, file);
     const raw = await readFile(path, 'utf8');
-    sourcePackages.push(agentPackageFromClaude(path, parseMarkdownSurface(path, raw)));
+    const parsed = parseMarkdownSurface(path, raw);
+    if (!isPackageAuthoritative(parsed.frontmatter)) {
+      sourcePackages.push(agentPackageFromClaude(path, parsed));
+    }
   }
 
   return sourcePackages;
@@ -674,8 +721,15 @@ function verifyImportedSourceCoverage(sourcePackages, packageFixtures) {
     assert(fixtureIds.has(id), `imported package exists for ${id}`);
   }
   for (const pkg of packageFixtures) {
-    if (pkg.metadata.sourceRuntime !== 'claude') {
-      pass(`native package does not require Claude source: ${pkg.kind}:${pkg.metadata.id}`);
+    // Package-first packages do not require a re-importable Claude source:
+    //  - native (sourceRuntime !== 'claude'), and
+    //  - FLIPPED (master === 'package') — origin stays 'claude' but authority
+    //    is the package, and loadSourcePackages deliberately skips re-importing
+    //    its generated `.claude`, so it is absent from sourceIds by design.
+    // Its freshness is proved package-first via project(package) === `.claude`
+    // (verifyRuntimeProjectionIfPresent), NOT the human-source fidelity gate.
+    if (pkg.metadata.sourceRuntime !== 'claude' || pkg.metadata.master === 'package') {
+      pass(`package-first; does not require re-importable Claude source: ${pkg.kind}:${pkg.metadata.id}`);
       continue;
     }
     assert(sourceIds.has(`${pkg.kind}:${pkg.metadata.id}`), `Claude-sourced package still has Claude source ${pkg.kind}:${pkg.metadata.id}`);
@@ -727,10 +781,154 @@ async function runVerify() {
   }
 }
 
+// ── Synthetic self-test for the package-master flip machinery ──
+// Proves the three flip behaviours against SYNTHETIC fixtures only. It never
+// reads or writes the real `.claude` / `.codex` / `.epr-meta` tree: the
+// filesystem leg builds a throwaway `.claude/skills` tree under the OS temp
+// dir; the projector/verify legs run purely in memory. Uses the same
+// assert/pass/fail harness, so a broken invariant fails this command too.
+async function runSelfTest() {
+  const sandbox = await mkdtemp(resolve(tmpdir(), 'epr-flip-selftest-'));
+  try {
+    const body = '# Synthetic Flip\n\nSynthetic skill body for the flip self-test.\n';
+    const eprRef = 'epr:elohim-agent/skills/synthetic-flip';
+    const description = 'Synthetic flipped skill for the package-master self-test.';
+
+    // (a) loadSourcePackages skips a flipped `.claude` source, still imports a
+    //     normal one. Build a throwaway `.claude/skills` tree in the sandbox.
+    const tmpSkills = resolve(sandbox, '.claude/skills');
+    const tmpAgents = resolve(sandbox, '.claude/agents');
+    await mkdir(tmpAgents, { recursive: true });
+    await mkdir(resolve(tmpSkills, 'synthetic-flip'), { recursive: true });
+    await mkdir(resolve(tmpSkills, 'synthetic-normal'), { recursive: true });
+    await writeFile(
+      resolve(tmpSkills, 'synthetic-flip/SKILL.md'),
+      `---\nname: synthetic-flip\ndescription: ${description}\nmetadata:\n  sourceRuntime: claude\n  master: package\n---\n${body}`,
+      'utf8',
+    );
+    await writeFile(
+      resolve(tmpSkills, 'synthetic-normal/SKILL.md'),
+      `---\nname: synthetic-normal\ndescription: A normal claude skill.\n---\n${body}`,
+      'utf8',
+    );
+    const imported = await loadSourcePackages({ skillDir: tmpSkills, agentDir: tmpAgents });
+    const importedIds = new Set(imported.map((pkg) => `${pkg.kind}:${pkg.metadata.id}`));
+    assert(
+      importedIds.has('SkillPackage:synthetic-normal'),
+      'selftest(a): loadSourcePackages imports a normal claude skill',
+    );
+    assert(
+      !importedIds.has('SkillPackage:synthetic-flip'),
+      'selftest(a): loadSourcePackages SKIPS a flipped (master: package) claude skill',
+    );
+
+    // (b) The projector GENERATES the flipped `.claude` frontmatter from package
+    //     metadata (not stale frontmatterRaw), and non-flipped stays passthrough.
+    const staleMarker = 'STALE-HUMAN-AUTHORED-DO-NOT-EMIT';
+    const flippedPkg = {
+      apiVersion: 'elohim-agent/v1alpha1',
+      kind: 'SkillPackage',
+      metadata: {
+        id: 'synthetic-flip',
+        name: 'synthetic-flip',
+        version: '1.0.0',
+        description,
+        triggerDescription: description,
+        runtimeTargets: ['claude', 'codex'],
+        sourceRuntime: 'claude', // origin preserved — born from Claude
+        master: 'package', // authority flipped to package-first
+        assetRefs: [],
+        governance: governanceFor('skills', 'synthetic-flip'),
+      },
+      instructions: { format: 'markdown', body },
+      projections: {
+        claude: {
+          path: '.claude/skills/synthetic-flip/SKILL.md',
+          frontmatter: { name: 'synthetic-flip', description },
+          // A deliberately-stale human-authored frontmatter that MUST be ignored
+          // now that the package is master.
+          frontmatterRaw: `name: synthetic-flip\ndescription: ${staleMarker}`,
+        },
+        codex: {
+          path: '.codex/skills/synthetic-flip/SKILL.md',
+          frontmatter: codexFrontmatter({
+            name: 'synthetic-flip',
+            description,
+            packageKind: 'SkillPackage',
+            sourcePath: '.claude/skills/synthetic-flip/SKILL.md',
+            sourceRuntime: 'claude',
+            governance: governanceFor('skills', 'synthetic-flip'),
+          }),
+        },
+      },
+    };
+    const flippedClaude = projectClaude(flippedPkg);
+    assert(
+      flippedClaude.includes('master: package'),
+      'selftest(b): generated flipped .claude carries metadata.master: package',
+    );
+    assert(
+      flippedClaude.includes('sourceRuntime: claude'),
+      'selftest(b): generated flipped .claude preserves metadata.sourceRuntime: claude',
+    );
+    assert(
+      flippedClaude.includes(eprRef),
+      'selftest(b): generated flipped .claude carries the governance eprRef backref',
+    );
+    assert(
+      flippedClaude.includes(body),
+      'selftest(b): generated flipped .claude preserves the instruction body',
+    );
+    assert(
+      !flippedClaude.includes(staleMarker),
+      'selftest(b): flipped .claude IGNORES stale frontmatterRaw (generated, not passthrough)',
+    );
+
+    const normalBody = '# Normal\n\nnormal body\n';
+    const normalRawFm = 'name: synthetic-normal\ndescription: A normal claude skill.';
+    const normalPkg = {
+      kind: 'SkillPackage',
+      metadata: { id: 'synthetic-normal', sourceRuntime: 'claude' },
+      instructions: { format: 'markdown', body: normalBody },
+      projections: {
+        claude: { path: '.claude/skills/synthetic-normal/SKILL.md', frontmatterRaw: normalRawFm },
+        codex: { path: '.codex/skills/synthetic-normal/SKILL.md', frontmatter: {} },
+      },
+    };
+    assert(
+      projectClaude(normalPkg) === `---\n${normalRawFm}\n---\n${normalBody}`,
+      'selftest(b): non-flipped .claude uses verbatim frontmatterRaw passthrough (fidelity preserved)',
+    );
+
+    // (c) verifyImportedSourceCoverage treats a flipped package as package-first:
+    //     absent from imported sources (skipped) must NOT raise a coverage
+    //     failure. Failure-count delta of 0 is the proof.
+    const normalCoverage = {
+      kind: 'SkillPackage',
+      metadata: { id: 'synthetic-normal', sourceRuntime: 'claude' },
+    };
+    const flippedCoverage = {
+      kind: 'SkillPackage',
+      metadata: { id: 'synthetic-flip', sourceRuntime: 'claude', master: 'package' },
+    };
+    const failuresBefore = failures;
+    verifyImportedSourceCoverage([normalCoverage], [normalCoverage, flippedCoverage]);
+    assert(
+      failures === failuresBefore,
+      'selftest(c): verifyImportedSourceCoverage takes package-first path for a flipped package (no source-coverage failure)',
+    );
+  } finally {
+    await rm(sandbox, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   switch (command) {
     case 'init':
       await initLayout();
+      break;
+    case 'selftest':
+      await runSelfTest();
       break;
     case 'import':
       await runImport({ writeProjections: WRITE_FIXTURES });
@@ -746,7 +944,7 @@ async function main() {
       await runVerify();
       break;
     default:
-      fail(`unknown command: ${command} (expected init, import, project, verify)`);
+      fail(`unknown command: ${command} (expected init, import, project, verify, selftest)`);
   }
 
   if (failures > 0) {
