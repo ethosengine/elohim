@@ -13,6 +13,7 @@
 
 use anyhow::Result;
 use holo_hash::{ActionHash, ActionHashB64, AgentPubKey};
+use holochain::sweettest::{await_consistency, SweetConductor};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
@@ -101,6 +102,15 @@ struct UpdateContentInput {
 struct DeclareContentHeadInput {
     pub id: String,
     pub head_action_hash: Option<String>,
+}
+
+/// Mirrors `content_store::DeclareCanonicalHeadInput` (notary-authority Model B,
+/// cross-root convergence). `head_action_hash` is REQUIRED and passed as the
+/// canonical base64 String form (matches the storage-facade wire shape).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DeclareCanonicalHeadInput {
+    pub id: String,
+    pub head_action_hash: String,
 }
 
 /// Mirrors the fields of `content_store::ContentHeadOutput` these tests assert.
@@ -421,6 +431,171 @@ async fn declare_head_notarizes_and_supersedes() -> Result<()> {
     // It supersedes the prior author-authored head (A's update).
     assert_eq!(redeclared.supersedes, Some(a_update_action.clone()));
     assert_eq!(redeclared.author, a1);
+
+    Ok(())
+}
+
+/// Notary-authority Model B (Tier-1 steward-declared binding): the CROSS-ROOT
+/// canonical-head selector converges genuinely-INDEPENDENT roots.
+///
+/// This is the `elohim-host-landing` case: two agents author the SAME id as
+/// SEPARATE roots (different root authors, no supersedes edge between them), so
+/// the author-filtered election in `resolve_content_head` structurally lets each
+/// peer resolve its OWN root — divergence by construction, which the author- and
+/// chain-membership-gated `declare_content_head` cannot heal.
+///
+/// Proves, across two conductors on one DHT:
+///   a. Two independent roots for id "landing-x" (authored before gossip so
+///      each `create_content` sees an empty local view and both succeed).
+///   b. `declare_canonical_content_head` names agent B's root (the OTHER root,
+///      authored by a different agent) as canonical — a CROSS-ROOT declaration
+///      the author gate would refuse.
+///   c. After the canonical link gossips, BOTH agents' `resolve_content_head`
+///      return the SAME canonical head (== B's root, authored by a2) —
+///      convergence.
+///   d. An UNDECLARED id still resolves root-author-newest (behavior unchanged).
+#[tokio::test(flavor = "multi_thread")]
+async fn declare_canonical_head_converges_independent_roots() -> Result<()> {
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
+    let seed = network_seed(DNA);
+    // a1 is the bootstrap steward (progenitor_pubkey in DNA properties).
+    let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
+    let app1 = c1
+        .setup_app_for_agent("lamad-app", a1.clone(), &[dna_file.clone()])
+        .await?;
+    let app2 = c2
+        .setup_app_for_agent("lamad-app", a2.clone(), &[dna_file])
+        .await?;
+    let cell1 = app1.cells().first().unwrap().clone();
+    let cell2 = app2.cells().first().unwrap().clone();
+    let zome1 = cell1.zome("content_store");
+    let zome2 = cell2.zome("content_store");
+
+    // --- (a) Two INDEPENDENT roots for one id. Authored BEFORE peer-info
+    // exchange, so each conductor's `content_exists_by_id` sees an empty local
+    // DHT view and both creates succeed — reproducing the deploy-time double
+    // authoring (adam's f41d / matthew's 6af9) deterministically.
+    let root_a: ContentOutput = c1
+        .call(&zome1, "create_content", test_content("landing-x"))
+        .await;
+    let root_a_action = root_a.action_hash.clone();
+
+    let root_b: ContentOutput = c2
+        .call(&zome2, "create_content", test_content("landing-x"))
+        .await;
+    let root_b_action = root_b.action_hash.clone();
+    assert_ne!(
+        root_a_action, root_b_action,
+        "the two independent roots must be distinct actions"
+    );
+
+    // Control id: single-author create + update on c1 (undeclared canonical).
+    let _solo: ContentOutput = c1
+        .call(&zome1, "create_content", test_content("solo-y"))
+        .await;
+    let solo_updated: ContentOutput = c1
+        .call(
+            &zome1,
+            "update_content",
+            UpdateContentInput {
+                id: "solo-y".to_string(),
+                title: Some("Solo revision".to_string()),
+            },
+        )
+        .await;
+    let solo_update_action = solo_updated.action_hash.clone();
+
+    // --- Exchange peer info, then await DHT consistency so BOTH roots (and the
+    // control id) gossip to both conductors.
+    tokio::time::timeout(Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&c1, &c2]).await {
+            sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
+    await_consistency(60, [&cell1, &cell2])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout after independent roots: {e}"))?;
+
+    // Both agents can now resolve SOME head for the id (both roots gossiped).
+    let pre_a: Option<ContentHeadOutput> = c1
+        .call(&zome1, "resolve_content_head", "landing-x".to_string())
+        .await;
+    assert!(pre_a.is_some(), "c1 must resolve a head pre-declaration");
+
+    // --- (b) a1 (root A's author) declares agent B's root as canonical. This is
+    // CROSS-ROOT: the target's author is a2, not the declarer — an act the
+    // author-gated `declare_content_head` structurally cannot perform.
+    assert_ne!(a1, a2, "the two agents must be distinct");
+    let declared: ContentHeadOutput = c1
+        .call(
+            &zome1,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: "landing-x".to_string(),
+                head_action_hash: ActionHashB64::from(root_b_action.clone()).to_string(),
+            },
+        )
+        .await;
+    assert_eq!(
+        declared.head_action_hash, root_b_action,
+        "declared canonical head is agent B's root"
+    );
+    assert_eq!(
+        declared.author, a2,
+        "canonical head is authored by the OTHER agent (cross-root)"
+    );
+
+    // Let the canonical-head link gossip to c2.
+    await_consistency(60, [&cell1, &cell2])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout after canonical declare: {e}"))?;
+
+    // --- (c) BOTH conductors resolve the SAME canonical head (== B's root).
+    // Poll c2 until the canonical link has gossiped in and overrides its
+    // own-root election.
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let head_c2: ContentHeadOutput = loop {
+        let h: Option<ContentHeadOutput> = c2
+            .call(&zome2, "resolve_content_head", "landing-x".to_string())
+            .await;
+        if let Some(h) = h {
+            if h.head_action_hash == root_b_action {
+                break h;
+            }
+        }
+        if Instant::now() >= deadline {
+            panic!("canonical head did not converge on c2 within 30s");
+        }
+        sleep(Duration::from_millis(100)).await;
+    };
+    assert_eq!(head_c2.author, a2, "c2 resolves the canonical author (a2)");
+
+    let head_c1: Option<ContentHeadOutput> = c1
+        .call(&zome1, "resolve_content_head", "landing-x".to_string())
+        .await;
+    let head_c1 = head_c1.expect("c1 must resolve the canonical head");
+    assert_eq!(
+        head_c1.head_action_hash, head_c2.head_action_hash,
+        "CONVERGENCE: both peers resolve the identical canonical head"
+    );
+    assert_eq!(head_c1.head_action_hash, root_b_action);
+
+    // --- (d) The UNDECLARED control id still resolves root-author-newest — the
+    // canonical override falls through cleanly to the unchanged election.
+    let solo_head: Option<ContentHeadOutput> = c1
+        .call(&zome1, "resolve_content_head", "solo-y".to_string())
+        .await;
+    let solo_head = solo_head.expect("undeclared id must still resolve a head");
+    assert_eq!(
+        solo_head.head_action_hash, solo_update_action,
+        "undeclared id resolves the root author's newest version (unchanged)"
+    );
+    assert_eq!(
+        solo_head.author, a1,
+        "undeclared head author is the root author"
+    );
 
     Ok(())
 }

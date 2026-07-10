@@ -2588,6 +2588,26 @@ pub struct DeclareContentHeadInput {
     pub head_action_hash: Option<holo_hash::ActionHashB64>,
 }
 
+/// Input for [`declare_canonical_content_head`] — the CROSS-ROOT canonical-head
+/// selector (notary-authority convergence, Model B / Tier-1).
+///
+/// Unlike [`DeclareContentHeadInput`] (single-author, chain-membership-gated),
+/// `head_action_hash` here may name ANY retrievable Content action for the id —
+/// including a version authored under a DIFFERENT root by a DIFFERENT agent.
+/// This is the machinery that converges genuinely-independent roots (e.g.
+/// `elohim-host-landing`: adam's `f41d` and matthew's `6af9`, no supersedes
+/// edge between them) onto ONE head every federation peer resolves.
+///
+/// `head_action_hash` is typed [`holo_hash::ActionHashB64`] for the same
+/// string-wire-safety reason as `DeclareContentHeadInput` (accepts base64 and
+/// raw-byte forms under rmp_serde; converted to `ActionHash` internally). It is
+/// REQUIRED — a cross-root declaration always names its explicit target.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DeclareCanonicalHeadInput {
+    pub id: String,
+    pub head_action_hash: holo_hash::ActionHashB64,
+}
+
 /// Walk an action's Update lineage down to the root Create and return its
 /// author. Every update chains from the prior head, so any chain member
 /// resolves to the same root author. `None` if a link in the chain is not
@@ -2639,6 +2659,79 @@ fn gather_content_chain(id: &str) -> ExternResult<Option<(AgentPubKey, Vec<Recor
     Ok(Some((root_author, records)))
 }
 
+/// Anchor namespace for CROSS-ROOT canonical-head declarations. Distinct from
+/// the `"content_id"` namespace `gather_content_chain` walks, so a canonical
+/// declaration NEVER collides with (or pollutes) the per-root version chain:
+/// `hash(anchor("canonical_head", id))` is a different base than
+/// `hash(anchor("content_id", id))`, and the two link sets never intersect.
+const CANONICAL_HEAD_ANCHOR: &str = "canonical_head";
+
+/// Create the DHT link that names `target` as the canonical cross-root head of
+/// `id`. Reuses `LinkTypes::IdToContent` from the `canonical_head` anchor
+/// (integrity `validate` returns `Valid` for every `RegisterCreateLink`, and no
+/// base/target type gate exists on `IdToContent`) — so this stays
+/// COORDINATOR-ONLY: no new link/entry type, no DNA-hash change, hot-swappable
+/// via `update_coordinators`. The link gossips to every peer; its DHT timestamp
+/// gives newest-declaration-wins semantics in `gather_canonical_head_record`.
+fn create_canonical_head_link(id: &str, target: &ActionHash) -> ExternResult<()> {
+    let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    create_link(anchor_hash, target.clone(), LinkTypes::IdToContent, ())?;
+    Ok(())
+}
+
+/// Resolve the declared canonical cross-root head record for `id`, if one has
+/// been declared AND its target Content is retrievable in the local DHT view.
+///
+/// Newest canonical declaration wins (by link creation timestamp), so a steward
+/// may re-declare/correct the canonical head. Returns `None` when no canonical
+/// head is declared OR the newest declaration's target has not gossiped in yet —
+/// the caller then degrades to the root-author election (eventual convergence:
+/// once the target gossips, every peer resolves the same canonical record).
+fn gather_canonical_head_record(id: &str) -> ExternResult<Option<Record>> {
+    let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
+    let mut links = get_links(query, GetStrategy::default())?;
+    if links.is_empty() {
+        return Ok(None);
+    }
+    // Newest declaration wins.
+    links.sort_by_key(|l| l.timestamp);
+    for link in links.iter().rev() {
+        let action_hash = match ActionHash::try_from(link.target.clone()) {
+            Ok(h) => h,
+            Err(_) => continue,
+        };
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            return Ok(Some(record));
+        }
+    }
+    Ok(None)
+}
+
+/// DEV-TIME SCAFFOLD — the earned-authority governance seam for WHO may declare
+/// a cross-root canonical head.
+///
+/// In the live network this is a socially-derived, attestation-gated grant that
+/// Elohim agents TEND (notary-authority.feature): reach earned up the tiers,
+/// promoted to canonical at the commons threshold — NEVER first-writer-wins,
+/// never a standing role granted by fiat. Until that substrate is wired we are
+/// devs in god-mode building the model, so this gate is OPEN: any agent may
+/// declare. It is a LABELED stand-in that must dissolve into earned-reach
+/// promotion, not calcify.
+///
+/// Replacement seam (operator decision — surfaced in the build report): the
+/// near-term step is a STEWARD ALLOWLIST (progenitor/steward agent keys read
+/// from a DNA property or coordinator const), hot-swappable via
+/// `update_coordinators` with no DNA-hash change; the long-term is the Plan C5
+/// reach-cohort edit-membership + author/community signature. Both slot in HERE
+/// by tightening this one function — no other call site changes.
+fn authorize_canonical_head_declarer(_declarer: &AgentPubKey) -> ExternResult<()> {
+    // god-mode OPEN. Replace with the earned-authority grant check.
+    Ok(())
+}
+
 /// Build a `ContentHeadOutput` from an elected head record.
 fn build_content_head_output(content_id: &str, record: &Record) -> ExternResult<ContentHeadOutput> {
     let head_action_hash = record.action_hashed().hash.clone();
@@ -2683,6 +2776,15 @@ fn build_content_head_output(content_id: &str, record: &Record) -> ExternResult<
 /// or nothing is retrievable.
 #[hdk_extern]
 pub fn resolve_content_head(id: String) -> ExternResult<Option<ContentHeadOutput>> {
+    // CROSS-ROOT canonical override (notary-authority convergence, Model B).
+    // A declared canonical head wins over the per-root election, so every peer
+    // that has gossiped the canonical link — regardless of which root its own
+    // IdToContent points at — resolves the SAME head. When undeclared (or the
+    // canonical target has not gossiped in yet), fall through to the unchanged
+    // root-author-newest election below: preserves prior behavior exactly.
+    if let Some(record) = gather_canonical_head_record(&id)? {
+        return Ok(Some(build_content_head_output(&id, &record)?));
+    }
     let (root_author, records) = match gather_content_chain(&id)? {
         Some(x) => x,
         None => return Ok(None),
@@ -2817,6 +2919,78 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
         ))
     })?;
     let out = build_content_head_output(&input.id, &new_record)?;
+    emit_signal(ProjectionSignal::ContentHeadDeclared {
+        content_id: out.content_id.clone(),
+        head_action_hash: out.head_action_hash.clone(),
+        entry_hash: out.entry_hash.clone(),
+        author: out.author.clone(),
+    })?;
+    Ok(out)
+}
+
+/// Declare the CROSS-ROOT canonical head of a content id (notary-authority
+/// convergence, Model B / Tier-1 steward-declared binding).
+///
+/// This is the head-election kernel the author-gated [`declare_content_head`]
+/// cannot serve: it names ANY retrievable Content action — including one
+/// authored under a DIFFERENT root by a DIFFERENT agent — as the id's canonical
+/// head, so genuinely-independent roots (e.g. `elohim-host-landing`: adam's
+/// `f41d` vs matthew's `6af9`, no supersedes edge) CONVERGE. It does NOT
+/// republish or write a new Content Update; it records a coordinator-only
+/// canonical-head LINK (reusing `IdToContent` from the `canonical_head` anchor —
+/// no new link/entry type, no DNA-hash change) that `resolve_content_head`
+/// honors over the per-root election, and emits the existing
+/// `ContentHeadDeclared` signal so the storage `stamp_declared_head` projection
+/// (and the reconcile heal loop) converge every peer's local row.
+///
+/// Authority is gated by [`authorize_canonical_head_declarer`] — a labeled
+/// DEV-TIME SCAFFOLD (god-mode open today) that is the earned-authority seam,
+/// NOT first-writer-wins. See that fn's doc for the replacement path.
+///
+/// Errors (Guest): unauthorized declarer; unknown id (no content exists);
+/// target action not retrievable; or target action carries no Content entry.
+#[hdk_extern]
+pub fn declare_canonical_content_head(
+    input: DeclareCanonicalHeadInput,
+) -> ExternResult<ContentHeadOutput> {
+    // AUTHORITY GATE FIRST (scaffold; earned-authority seam).
+    let me = agent_info()?.agent_initial_pubkey;
+    authorize_canonical_head_declarer(&me)?;
+
+    // The id must exist as content (guards typos / declaring a phantom id).
+    if gather_content_chain(&input.id)?.is_none() {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_canonical_content_head: no content found for id '{}'",
+            input.id
+        ))));
+    }
+
+    // Resolve + validate the cross-root target: must be a retrievable Content
+    // record. `ActionHash::from(ActionHashB64)` is the inner-hash unwrap.
+    let target = ActionHash::from(input.head_action_hash);
+    let target_record = get(target.clone(), GetOptions::default())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_canonical_content_head: target action {target:?} is not retrievable"
+        )))
+    })?;
+    // Confirm it carries a Content entry (build_content_head_output would also
+    // catch this, but we validate up front for a clearer error).
+    let _content: Content = target_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "declare_canonical_content_head: target action {target:?} carries no Content entry"
+            )))
+        })?;
+
+    // Record the canonical-head link (coordinator-only, gossips to all peers).
+    create_canonical_head_link(&input.id, &target)?;
+
+    let out = build_content_head_output(&input.id, &target_record)?;
+    // Reuse the existing declared-head projection signal — storage's
+    // `stamp_declared_head` path stamps the canonical head + blob on every peer.
     emit_signal(ProjectionSignal::ContentHeadDeclared {
         content_id: out.content_id.clone(),
         head_action_hash: out.head_action_hash.clone(),
