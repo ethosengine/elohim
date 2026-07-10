@@ -11,12 +11,14 @@ authors.workspace = true
 repository.workspace = true
 description = "Maps the elohim capability-package tree into an eprfs ProjectionManifest"
 
-[dependencies]
-eprfs-core = { path = "../../../../eprfs/eprfs-core" }
-serde_json.workspace = true
+[[bin]]
+name = "eprfs-agent"
+path = "src/main.rs"
 
-[dev-dependencies]
+[dependencies]
 bytes.workspace = true
+eprfs-core = { path = "../../../../eprfs/eprfs-core" }
 eprfs-local = { path = "../../../../eprfs/eprfs-local" }
 eprfs-storage = { path = "../../../../eprfs/eprfs-storage" }
-tokio = { workspace = true, features = ["fs"] }
+serde_json.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "fs"] }
