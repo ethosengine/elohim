@@ -7,6 +7,7 @@
 pub mod address;
 pub mod attestation;
 pub mod awareness;
+pub mod composition;
 pub mod error;
 pub mod meta;
 pub mod projection;
@@ -18,6 +19,7 @@ pub use awareness::{
     BytePresence, EprCard, EprResiliency, LocalOverlayStatus, PeerVisibility, ProjectionAwareness,
     ProjectionAwarenessProvider, ProjectionEntryAwareness, VerificationStatus,
 };
+pub use composition::{CompositionGraph, CompositionNode, DerivationEdge, DerivationKind};
 pub use error::{EprfsError, Result};
 pub use meta::{
     EprHeadCoupling, EprMetaGovernance, EprMetaRecord, EprMetaResolution, EprMetaSource,

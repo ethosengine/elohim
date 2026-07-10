@@ -8,12 +8,12 @@
 //! Content addressing is single-sourced through [`eprfs_core::BlobCid::compute`]
 //! (CIDv1 / dag-cbor / sha2-256) — this crate never re-implements a CID.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use eprfs_core::{
-    BlobCid, EntryKind, EprRef, EprfsError, ProjectionEntry, ProjectionId, ProjectionManifest,
-    ProjectionPath, ProjectionRoot, ProjectionSource, ProjectionSourceKind, ProjectionStatus,
-    Result,
+    BlobCid, CompositionGraph, CompositionNode, DerivationEdge, EntryKind, EprRef, EprfsError,
+    ProjectionEntry, ProjectionId, ProjectionManifest, ProjectionPath, ProjectionRoot,
+    ProjectionSource, ProjectionSourceKind, ProjectionStatus, Result,
 };
 use serde_json::{json, Value};
 
@@ -55,72 +55,121 @@ pub fn blobs_for_tree(root: &Path) -> Result<Vec<(BlobCid, Vec<u8>)>> {
     Ok(blobs)
 }
 
-/// Emit a static, content-addressed "composition graph" for every elohim
-/// skill/agent package under `package_root/{skills,agents}/*.json` — the CID
-/// edge from the native package to its projected Claude/Codex artifacts, plus
-/// who composed it. This is the verifiable "how was every skill composed"
-/// artifact: every CID in the output is [`BlobCid::compute`] over real bytes,
-/// never a re-implemented hash.
+/// How a kind's projection fixtures are laid out under the projections-root
+/// mirror. This is the ONLY per-kind projection knowledge in the producer;
+/// everything else is generic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProjectionLayout {
+    /// `<projRoot>/<runtime>/<dir>/<id>/<leaf>` — a per-id directory holding the
+    /// projected file (skills -> `SKILL.md`, agentdocs -> the doc's own name).
+    NestedById,
+    /// `<projRoot>/<runtime>/<dir>/<leaf>` — the projected file sits flat in the
+    /// kind dir (agents -> `<id>.md`, hooks -> `<id>.py`).
+    Flat,
+}
+
+/// One row of the kind-agnostic compose table. Adding a future artifact kind is
+/// exactly one row here — the walk, node/edge emission, and CID logic below are
+/// all generic. `dir` names both the package sub-dir under `package_root` AND the
+/// projection sub-dir under the projections-root mirror.
+struct ComposeKind {
+    /// Package sub-dir AND projection sub-dir (e.g. `skills`, `agents`, `hooks`,
+    /// `agentdocs`).
+    dir: &'static str,
+    /// Fallback kind label used for the node source id (`<Kind>:<id>`) and node
+    /// metadata when a package JSON omits its own top-level `kind`.
+    default_kind: &'static str,
+    layout: ProjectionLayout,
+}
+
+/// The compose table — the single place the producer learns about artifact
+/// kinds. Skills/agents each project into Claude + Codex (2 edges); hooks and
+/// agentdocs project a single file (1 edge). The exact number of runtimes is NOT
+/// hardcoded here: it's read from each package's declared `projections` map, so a
+/// kind that grows a new runtime target needs no code change.
+const COMPOSE_KINDS: &[ComposeKind] = &[
+    ComposeKind {
+        dir: "skills",
+        default_kind: "SkillPackage",
+        layout: ProjectionLayout::NestedById,
+    },
+    ComposeKind {
+        dir: "agents",
+        default_kind: "AgentPackage",
+        layout: ProjectionLayout::Flat,
+    },
+    ComposeKind {
+        dir: "hooks",
+        default_kind: "HookPackage",
+        layout: ProjectionLayout::Flat,
+    },
+    ComposeKind {
+        dir: "agentdocs",
+        default_kind: "AgentDocPackage",
+        layout: ProjectionLayout::NestedById,
+    },
+];
+
+/// Build a content-addressed [`CompositionGraph`] over every elohim capability
+/// package under `package_root/{skills,agents,hooks,agentdocs}/*.json` — the
+/// verifiable "how was every artifact composed" derivation graph. Every CID in
+/// the output is [`BlobCid::compute`] over real bytes; this producer never
+/// re-implements a hash.
 ///
-/// `projections_root`, when given, is the root of the projection tree (e.g.
-/// `.epr-meta/elohim/projections`) — a skill's Claude projection is expected
-/// at `<projections_root>/claude/skills/<id>/SKILL.md`, an agent's at
-/// `<projections_root>/claude/agents/<id>.md` (and the `codex/` mirror of
-/// each). A missing projection file yields `null`, not an error — projection
-/// coverage is a fact the graph reports, not a precondition it enforces.
-/// When `projections_root` is `None`, every node's `projections.claude` and
-/// `projections.codex` are `null`.
+/// For each package JSON the graph gets:
+/// - a **package node** (cid = the package bytes; source =
+///   `elohim-agent`/`Content`/`<Kind>:<id>`; metadata = `master`,
+///   `sourceRuntime`, `composedBy`, `id`, `kind`),
+/// - a **projection node** per projected artifact that exists on disk, and
+/// - a **`Projection` derivation edge** package -> projection, attributed to
+///   `composed_by`.
 ///
-/// `composed_by` is stamped onto every node's `composedBy` field verbatim —
-/// the model/agent that authored the package, supplied by the caller.
+/// The set of projected runtimes is read from each package's declared
+/// `projections` map; the per-kind fixture LAYOUT (nested-by-id vs flat) comes
+/// from [`COMPOSE_KINDS`]. A projection whose fixture is absent is simply
+/// omitted — coverage is a fact the graph reports, not a precondition. When
+/// `projections_root` is `None`, only package nodes are emitted.
 ///
-/// Nodes are sorted by `(kind, id)` for a deterministic, diffable artifact.
+/// The kinds are walked in [`COMPOSE_KINDS`] order, packages in sorted filename
+/// order, and runtimes in sorted key order, so the output is deterministic and
+/// diffable. The returned graph satisfies [`CompositionGraph::validate`].
 pub fn compose_graph_from_package_tree(
     package_root: &Path,
     projections_root: Option<&Path>,
     composed_by: &str,
-) -> Result<Value> {
-    let mut nodes = collect_compose_nodes(
-        package_root,
-        projections_root,
-        composed_by,
-        "SkillPackage",
-        "skills",
-        true,
-    )?;
-    nodes.extend(collect_compose_nodes(
-        package_root,
-        projections_root,
-        composed_by,
-        "AgentPackage",
-        "agents",
-        false,
-    )?);
-
-    nodes.sort_by(|(a_key, _), (b_key, _)| a_key.cmp(b_key));
-
-    Ok(json!({
+) -> Result<CompositionGraph> {
+    let mut graph = CompositionGraph::new().with_metadata(json!({
         "generatedBy": "eprfs-agent compose-graph",
         "composedBy": composed_by,
-        "nodes": nodes.into_iter().map(|(_, node)| node).collect::<Vec<_>>(),
-    }))
+    }));
+
+    for spec in COMPOSE_KINDS {
+        collect_compose_kind(
+            &mut graph,
+            spec,
+            package_root,
+            projections_root,
+            composed_by,
+        )?;
+    }
+
+    // Fail loudly rather than hand back a structurally-invalid graph.
+    graph.validate()?;
+    Ok(graph)
 }
 
-/// Walk `package_root/<dir_name>/*.json`, emitting one compose-graph node per
-/// package file. `is_skill` selects the projection path shape (skill ->
-/// `<id>/SKILL.md` directory, agent -> `<id>.md` file).
-fn collect_compose_nodes(
+/// Walk `package_root/<spec.dir>/*.json`, appending a package node plus its
+/// projection nodes and `Projection` edges to `graph`.
+fn collect_compose_kind(
+    graph: &mut CompositionGraph,
+    spec: &ComposeKind,
     package_root: &Path,
     projections_root: Option<&Path>,
     composed_by: &str,
-    kind: &str,
-    dir_name: &str,
-    is_skill: bool,
-) -> Result<Vec<((String, String), Value)>> {
-    let dir = package_root.join(dir_name);
-    let mut out = Vec::new();
+) -> Result<()> {
+    let dir = package_root.join(spec.dir);
     if !dir.exists() {
-        return Ok(out);
+        return Ok(());
     }
 
     for child in sorted_children(&dir)? {
@@ -132,75 +181,134 @@ fn collect_compose_nodes(
         let package_cid = BlobCid::compute(&bytes);
         let package: Value = serde_json::from_slice(&bytes)?;
 
+        let kind = package
+            .get("kind")
+            .and_then(Value::as_str)
+            .unwrap_or(spec.default_kind)
+            .to_string();
+
         let metadata = package.get("metadata").cloned().unwrap_or(Value::Null);
-        let id = metadata
-            .get("id")
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .unwrap_or_default();
-        let source_runtime = metadata
-            .get("sourceRuntime")
-            .and_then(Value::as_str)
-            .map(str::to_string);
-        let master = metadata
-            .get("master")
-            .and_then(Value::as_str)
-            .map(str::to_string);
+        let id = meta_str(&metadata, "id").unwrap_or_default();
+        let source_runtime = meta_str(&metadata, "sourceRuntime");
+        let master = meta_str(&metadata, "master");
+        // The package's own author credit, falling back to the caller's --composed-by.
+        let node_composed_by = meta_str(&metadata, "composedBy").unwrap_or(composed_by.to_string());
 
-        let (claude_cid, codex_cid) = match projections_root {
-            Some(root) => (
-                projection_cid(root, "claude", &id, is_skill)?,
-                projection_cid(root, "codex", &id, is_skill)?,
+        // Package node: cid over the package bytes, domain-neutral source identity.
+        graph.add_node(CompositionNode::new(
+            package_cid.clone(),
+            ProjectionSource::new(
+                NAMESPACE,
+                ProjectionSourceKind::Content,
+                format!("{kind}:{id}"),
             ),
-            None => (None, None),
+            json!({
+                "role": "package",
+                "kind": kind,
+                "id": id,
+                "master": master,
+                "sourceRuntime": source_runtime,
+                "composedBy": node_composed_by,
+            }),
+        ));
+
+        // One projection node + edge per declared runtime whose fixture exists.
+        let Some(root) = projections_root else {
+            continue;
         };
+        for runtime in declared_runtimes(&package) {
+            let Some(declared) = declared_projection_path(&package, &runtime) else {
+                continue;
+            };
+            let Some(leaf) = Path::new(&declared).file_name() else {
+                continue;
+            };
+            let mirror = mirror_projection_path(root, &runtime, spec, &id, leaf);
+            if !mirror.exists() {
+                continue;
+            }
 
-        let node = json!({
-            "kind": kind,
-            "id": id,
-            "sourceRuntime": source_runtime,
-            "master": master,
-            "packageCid": package_cid.to_string(),
-            "projections": {
-                "claude": claude_cid,
-                "codex": codex_cid,
-            },
-            "composedBy": composed_by,
-        });
+            let proj_bytes = read_bytes(&mirror)?;
+            let proj_cid = BlobCid::compute(&proj_bytes);
 
-        out.push(((kind.to_string(), id), node));
+            graph.add_node(CompositionNode::new(
+                proj_cid.clone(),
+                ProjectionSource::new(
+                    NAMESPACE,
+                    ProjectionSourceKind::Content,
+                    format!("{id}@{runtime}"),
+                ),
+                json!({
+                    "role": "projection",
+                    "kind": kind,
+                    "id": id,
+                    "runtime": runtime,
+                    "path": mirror.to_string_lossy(),
+                    "declaredPath": declared,
+                }),
+            ));
+
+            graph.add_edge(DerivationEdge::projection(
+                package_cid.clone(),
+                proj_cid,
+                composed_by,
+                json!({ "runtime": runtime }),
+            ));
+        }
     }
 
-    Ok(out)
+    Ok(())
 }
 
-/// The content-address of a single projected artifact, or `None` when the
-/// file doesn't exist — absence is a reportable fact, not a failure.
-fn projection_cid(
+/// Read a string field from a package's `metadata` bag.
+fn meta_str(metadata: &Value, key: &str) -> Option<String> {
+    metadata
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+/// The projection runtime keys a package declares, sorted for deterministic
+/// output. Empty when the package declares no `projections` map.
+fn declared_runtimes(package: &Value) -> Vec<String> {
+    let mut runtimes: Vec<String> = package
+        .get("projections")
+        .and_then(Value::as_object)
+        .map(|map| map.keys().cloned().collect())
+        .unwrap_or_default();
+    runtimes.sort();
+    runtimes
+}
+
+/// The repo-relative runtime path a package declares for `runtime` (e.g.
+/// `.claude/skills/<id>/SKILL.md`). The mirror fixture's leaf filename is derived
+/// from this, so a kind whose leaf name is doc-specific (agentdocs: `CLAUDE.md`)
+/// needs no special case.
+fn declared_projection_path(package: &Value, runtime: &str) -> Option<String> {
+    package
+        .get("projections")
+        .and_then(|p| p.get(runtime))
+        .and_then(|entry| entry.get("path"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+/// Build the projections-root MIRROR path for one projected artifact. The leaf
+/// filename comes from the package's declared runtime path; the LAYOUT (whether
+/// an `<id>` directory segment is inserted) is the kind's only per-kind
+/// projection knowledge.
+fn mirror_projection_path(
     projections_root: &Path,
     runtime: &str,
+    spec: &ComposeKind,
     id: &str,
-    is_skill: bool,
-) -> Result<Option<String>> {
-    let path = if is_skill {
-        projections_root
-            .join(runtime)
-            .join("skills")
-            .join(id)
-            .join("SKILL.md")
-    } else {
-        projections_root
-            .join(runtime)
-            .join("agents")
-            .join(format!("{id}.md"))
-    };
-
-    if !path.exists() {
-        return Ok(None);
+    leaf: &std::ffi::OsStr,
+) -> PathBuf {
+    let base = projections_root.join(runtime).join(spec.dir);
+    match spec.layout {
+        ProjectionLayout::NestedById => base.join(id).join(leaf),
+        ProjectionLayout::Flat => base.join(leaf),
     }
-
-    let bytes = read_bytes(&path)?;
-    Ok(Some(BlobCid::compute(&bytes).to_string()))
 }
 
 /// Sorted directory listing — the single source of deterministic ordering shared
@@ -414,6 +522,93 @@ mod tests {
         let mut out = Vec::new();
         walk_files(root, root, &mut out);
         out
+    }
+
+    #[test]
+    fn compose_graph_is_kind_agnostic_over_the_package_tree() {
+        let tree = TempTree::new();
+        let pkg_root = tree.root.join("packages");
+        let proj_root = tree.root.join("projections");
+
+        // Helper: write a package JSON + (optionally) its projection fixtures.
+        let write = |rel: &str, bytes: &[u8]| {
+            let p = pkg_root.join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(&p, bytes).unwrap();
+        };
+        let write_proj = |rel: &str, bytes: &[u8]| {
+            let p = proj_root.join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(&p, bytes).unwrap();
+        };
+
+        // A skill: claude + codex projections (nested-by-id, SKILL.md leaf).
+        write(
+            "skills/alpha.json",
+            br#"{"kind":"SkillPackage","metadata":{"id":"alpha","master":"package","sourceRuntime":"claude","composedBy":"claude-opus-4-8"},"projections":{"claude":{"path":".claude/skills/alpha/SKILL.md"},"codex":{"path":".codex/skills/alpha/SKILL.md"}}}"#,
+        );
+        write_proj("claude/skills/alpha/SKILL.md", b"# alpha claude\n");
+        write_proj("codex/skills/alpha/SKILL.md", b"# alpha codex\n");
+
+        // A hook: single claude projection (flat, .py leaf).
+        write(
+            "hooks/beta.json",
+            br#"{"kind":"HookPackage","metadata":{"id":"beta","master":"package"},"projections":{"claude":{"path":".claude/hooks/beta.py"}}}"#,
+        );
+        write_proj("claude/hooks/beta.py", b"print('beta')\n");
+
+        // An agentdoc: single claude projection whose leaf is the doc's own name
+        // (nested-by-id) — the declared path is an arbitrary repo path.
+        write(
+            "agentdocs/gamma.json",
+            br#"{"kind":"AgentDocPackage","metadata":{"id":"gamma","master":"package"},"projections":{"claude":{"path":"some/where/CLAUDE.md"}}}"#,
+        );
+        write_proj("claude/agentdocs/gamma/CLAUDE.md", b"# gamma gospel\n");
+
+        let graph = compose_graph_from_package_tree(&pkg_root, Some(&proj_root), "claude-opus-4-8")
+            .unwrap();
+
+        assert!(graph.validate().is_ok(), "graph must satisfy invariants");
+
+        // 3 package nodes + 4 projection nodes (2 skill + 1 hook + 1 agentdoc).
+        assert_eq!(graph.nodes.len(), 7, "3 packages + 4 projections");
+        // 4 Projection edges (2 skill + 1 hook + 1 agentdoc).
+        assert_eq!(graph.edges.len(), 4, "one edge per existing projection");
+
+        // Every edge's source is a package node cid, derived a projection cid,
+        // and the package's cid is the canonical CID of its bytes.
+        let alpha_bytes = fs::read(pkg_root.join("skills/alpha.json")).unwrap();
+        let alpha_cid = BlobCid::compute(&alpha_bytes);
+        let alpha_edges = graph.edges.iter().filter(|e| e.source == alpha_cid).count();
+        assert_eq!(alpha_edges, 2, "alpha skill has claude + codex edges");
+
+        // The package node carries master/composedBy in metadata.
+        let alpha_node = graph
+            .nodes
+            .iter()
+            .find(|n| n.cid == alpha_cid)
+            .expect("alpha package node present");
+        assert_eq!(alpha_node.metadata["master"], "package");
+        assert_eq!(alpha_node.metadata["composedBy"], "claude-opus-4-8");
+        assert_eq!(alpha_node.source.namespace, NAMESPACE);
+        assert_eq!(alpha_node.source.id, "SkillPackage:alpha");
+    }
+
+    #[test]
+    fn compose_graph_without_projections_root_is_package_only() {
+        let tree = TempTree::new();
+        let pkg_root = tree.root.join("packages");
+        fs::create_dir_all(pkg_root.join("skills")).unwrap();
+        fs::write(
+            pkg_root.join("skills/alpha.json"),
+            br#"{"kind":"SkillPackage","metadata":{"id":"alpha"},"projections":{"claude":{"path":".claude/skills/alpha/SKILL.md"}}}"#,
+        )
+        .unwrap();
+
+        let graph = compose_graph_from_package_tree(&pkg_root, None, "x").unwrap();
+        assert_eq!(graph.nodes.len(), 1, "package node only");
+        assert!(graph.edges.is_empty(), "no projections => no edges");
+        assert!(graph.validate().is_ok());
     }
 
     #[tokio::test]

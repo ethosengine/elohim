@@ -12,6 +12,9 @@ pub enum EprfsError {
     #[error("invalid projection manifest: {0}")]
     InvalidProjectionManifest(String),
 
+    #[error("invalid composition graph: {0}")]
+    InvalidCompositionGraph(String),
+
     #[error("EPR record not found: {0:?}")]
     EprNotFound(EprRef),
 
