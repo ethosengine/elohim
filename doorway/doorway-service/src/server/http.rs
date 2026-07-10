@@ -300,6 +300,11 @@ pub struct AppState {
     /// (admission_exempt) so /health stays answerable while shedding.
     pub inbound_semaphore: Arc<tokio::sync::Semaphore>,
 
+    /// Read-admission pool (GET/HEAD) — separate from `inbound_semaphore`
+    /// (writes) so a write burst can't starve projection reads (genesis #1272
+    /// `/epr/*` shed). Sized from DOORWAY_MAX_INFLIGHT_READ at boot (main.rs).
+    pub read_semaphore: Arc<tokio::sync::Semaphore>,
+
     /// ONE pooled HTTP client for the storage proxy (connect 3s / request 12s).
     /// Replaces per-request `reqwest::Client::new()` in forward_to_storage.
     pub storage_proxy_client: Arc<reqwest::Client>,
@@ -332,6 +337,9 @@ const DOORWAY_ADMISSION_RETRY_AFTER_SECS: u64 = 2;
 /// and a lib cannot import a const from the bin. main.rs `use`s these.
 pub const DEFAULT_MAX_INFLIGHT: usize = 256;
 pub const MIN_MAX_INFLIGHT: usize = 8;
+/// Read-admission ceiling default — larger than the write pool: reads are cheap
+/// projection serves and must not shed while a write burst fills the write pool.
+pub const DEFAULT_MAX_INFLIGHT_READ: usize = 512;
 
 /// Build the ONE pooled client the storage proxy uses for forward_to_storage /
 /// forward_blob_to_storage. Replaces the per-request `reqwest::Client::new()`
@@ -550,6 +558,7 @@ impl AppState {
                 std::collections::HashMap::new(),
             )),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
+            read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
             upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
             membrane_cfg: crate::server::membrane::edge_guard_config(),
@@ -664,6 +673,7 @@ impl AppState {
                 std::collections::HashMap::new(),
             )),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
+            read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
             upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
             membrane_cfg: crate::server::membrane::edge_guard_config(),
@@ -793,6 +803,7 @@ impl AppState {
                 std::collections::HashMap::new(),
             )),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
+            read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
             upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
             membrane_cfg: crate::server::membrane::edge_guard_config(),
@@ -925,6 +936,7 @@ impl AppState {
                 std::collections::HashMap::new(),
             )),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
+            read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
             upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
             membrane_cfg: crate::server::membrane::edge_guard_config(),
@@ -3725,7 +3737,16 @@ async fn handle_request(
     let _admit = if admission_exempt(&path, is_upgrade) {
         None
     } else {
-        match Arc::clone(&state.inbound_semaphore).try_acquire_owned() {
+        // Reads (GET/HEAD) draw from a separate, larger pool than writes so a
+        // write burst (proxied seed storm) can't starve cheap projection reads —
+        // the `/epr/*` read-path shed in genesis #1272 E2E.
+        let is_read = method == hyper::Method::GET || method == hyper::Method::HEAD;
+        let sem = if is_read {
+            &state.read_semaphore
+        } else {
+            &state.inbound_semaphore
+        };
+        match Arc::clone(sem).try_acquire_owned() {
             Ok(permit) => Some(permit),
             Err(_) => {
                 // Admission saturation is otherwise invisible to status-code
@@ -3735,7 +3756,8 @@ async fn handle_request(
                     target: "admission_busy",
                     counter = "doorway_admission_shed_total",
                     path = %path,
-                    available = state.inbound_semaphore.available_permits(),
+                    pool = if is_read { "read" } else { "write" },
+                    available = sem.available_permits(),
                     "inbound admission at ceiling — shedding (503 + Retry-After)"
                 );
                 crate::metrics::inc_admission_shed();

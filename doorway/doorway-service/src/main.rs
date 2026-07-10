@@ -29,7 +29,7 @@ use doorway::{
 // DEFAULT_MAX_INFLIGHT / MIN_MAX_INFLIGHT have their single home in the lib
 // (server::http) because the AppState ctors reference them and a lib cannot
 // import a const from this bin. We `use` them here for inbound_max().
-use doorway::server::http::{DEFAULT_MAX_INFLIGHT, MIN_MAX_INFLIGHT};
+use doorway::server::http::{DEFAULT_MAX_INFLIGHT, DEFAULT_MAX_INFLIGHT_READ, MIN_MAX_INFLIGHT};
 
 /// Number of tokio worker threads to run, regardless of the cgroup CPU limit.
 ///
@@ -68,6 +68,17 @@ fn inbound_max() -> usize {
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
         .unwrap_or(DEFAULT_MAX_INFLIGHT)
+        .max(MIN_MAX_INFLIGHT)
+}
+
+/// Read-admission ceiling (Pillar 2, read pool): max concurrent in-flight
+/// GET/HEAD requests before the doorway sheds. Separate from `inbound_max()`
+/// (writes) so a write burst can't starve reads. Same floor for anti-deadlock.
+fn inbound_max_read() -> usize {
+    std::env::var("DOORWAY_MAX_INFLIGHT_READ")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(DEFAULT_MAX_INFLIGHT_READ)
         .max(MIN_MAX_INFLIGHT)
 }
 
@@ -667,10 +678,14 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     // storage_proxy_client + upstream_breakers are already ctor-set to identical
     // defaults — not reassigned here.
     state.inbound_semaphore = Arc::new(tokio::sync::Semaphore::new(inbound_max()));
+    // Read pool: separate ceiling so a write burst can't starve reads (genesis
+    // #1272 /epr/* shed). Ctor set a default; override with the env-derived value.
+    state.read_semaphore = Arc::new(tokio::sync::Semaphore::new(inbound_max_read()));
     // Expose the ceiling on /metrics + as the AdmissionView maxInflight source.
     doorway::metrics::set_inbound_max(inbound_max());
     info!(
         max_inflight = inbound_max(),
+        max_inflight_read = inbound_max_read(),
         "inbound admission ceiling set"
     );
 
@@ -1554,5 +1569,24 @@ mod inbound_max_tests {
         std::env::set_var("DOORWAY_MAX_INFLIGHT", "512");
         assert_eq!(inbound_max(), 512, "honored above floor");
         std::env::remove_var("DOORWAY_MAX_INFLIGHT");
+    }
+
+    #[test]
+    fn inbound_max_read_floors_and_defaults() {
+        std::env::remove_var("DOORWAY_MAX_INFLIGHT_READ");
+        assert_eq!(
+            inbound_max_read(),
+            DEFAULT_MAX_INFLIGHT_READ,
+            "unset => read default (larger than write pool)"
+        );
+        assert!(
+            DEFAULT_MAX_INFLIGHT_READ > DEFAULT_MAX_INFLIGHT,
+            "reads get a larger floor than writes"
+        );
+        std::env::set_var("DOORWAY_MAX_INFLIGHT_READ", "0");
+        assert_eq!(inbound_max_read(), MIN_MAX_INFLIGHT, "0 clamped to floor");
+        std::env::set_var("DOORWAY_MAX_INFLIGHT_READ", "1024");
+        assert_eq!(inbound_max_read(), 1024, "honored above floor");
+        std::env::remove_var("DOORWAY_MAX_INFLIGHT_READ");
     }
 }
