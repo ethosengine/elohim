@@ -30,6 +30,8 @@
 //! - `MediaEnd` for graceful termination
 //! - Session state tracking
 
+pub mod bus;
+pub mod bus_mongo;
 mod cmd;
 pub mod media;
 mod store;
