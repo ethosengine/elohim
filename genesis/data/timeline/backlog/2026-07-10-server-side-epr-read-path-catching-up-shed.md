@@ -3,7 +3,7 @@ id: backlog-server-side-epr-read-path-catching-up-shed
 kind: backlog
 title: server-side /epr read-path sheds 503 catching-up under sustained load (E2E flake + real read degradation)
 created: 2026-07-10
-status: OPEN
+status: IN-PROGRESS
 domain: D-dataplane
 source: genesis #1272 E2E evidence + doorway-client catching-up seeder fix (ec5f0f522) — the read-path twin
 severity: high
@@ -49,3 +49,17 @@ p2p-design-gate entity classification needed, but confirm the shed decision read
 **Acceptance.** Under a seed/E2E burst, GET `/epr/<already-projected-cid>` returns 200 (served from
 projection), never 503; only reads of genuinely-unprojected entities may 503. genesis E2E `/epr/*`
 503 count → 0.
+
+**UPDATE 2026-07-10 — fix landed on branch, pending deploy verification.** Implemented the
+**read/write admission-pool split** (approach: segment the admission ceiling so a write burst
+cannot consume a read's floor — the cleanest of the three options above; no projection-state check
+needed because the shed was purely concurrency-based, not a not-yet-projected signal):
+- storage gate — `58c0f05d7` (`elohim-storage/src/http.rs`: `read_semaphore` 256 vs write 64; `/health`
+  now reports `readSemaphorePermits`).
+- doorway gate — `660fbbeb6` (`doorway-service`: `read_semaphore` `DEFAULT_MAX_INFLIGHT_READ`=512, env
+  `DOORWAY_MAX_INFLIGHT_READ`; mirror of storage).
+
+Reads (GET/HEAD) draw the larger pool; writes keep the tighter one (a shed write is correct
+backpressure — the seeder retries per `ec5f0f522`). Local verification green (cargo check + unit
+tests both crates). Stays open until a deployed genesis run confirms the E2E `/epr/*` 503 count → 0
+(needs the dev merge/deploy — operator integration call).
