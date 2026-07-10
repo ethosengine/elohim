@@ -6,6 +6,7 @@
 //! - `manifest <package-root>`    -> print the `ProjectionManifest` as JSON
 //! - `inspect <package-root>`     -> print entry/blob counts
 //! - `materialize <root> <dest>`  -> round-trip the tree through eprfs onto disk
+//! - `compose-graph <root>`       -> print the composition graph as JSON
 //!
 //! This binary is the "is it actually executable" proof for the adapter: the
 //! library alone cannot be run or installed, only linked against.
@@ -13,7 +14,9 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use elohim_agent_adapter::{blobs_for_tree, manifest_from_package_tree};
+use elohim_agent_adapter::{
+    blobs_for_tree, compose_graph_from_package_tree, manifest_from_package_tree,
+};
 use eprfs_core::{EntryKind, MaterializationPolicy};
 
 fn main() -> ExitCode {
@@ -45,6 +48,15 @@ fn run(args: &[String]) -> Result<(), String> {
             let target = require_path_arg(args, 3, "materialize <package-root> <target-dir>")?;
             cmd_materialize(&root, &target)
         }
+        Some("compose-graph") => {
+            let root = require_path_arg(
+                args,
+                2,
+                "compose-graph <package-root> [--projections-root <dir>] [--composed-by <model>]",
+            )?;
+            let options = ComposeGraphOptions::parse(&args[3..])?;
+            cmd_compose_graph(&root, options)
+        }
         Some(other) => Err(format!("unknown subcommand '{other}'\n\n{}", usage())),
         None => Err(format!("missing subcommand\n\n{}", usage())),
     }
@@ -54,8 +66,53 @@ fn usage() -> String {
     "Usage:\n  \
      eprfs-agent manifest <package-root>\n  \
      eprfs-agent inspect <package-root>\n  \
-     eprfs-agent materialize <package-root> <target-dir>"
+     eprfs-agent materialize <package-root> <target-dir>\n  \
+     eprfs-agent compose-graph <package-root> [--projections-root <dir>] [--composed-by <model>]"
         .to_string()
+}
+
+/// Parsed `--flag value` pairs for `compose-graph`, beyond the required
+/// positional `<package-root>`.
+struct ComposeGraphOptions {
+    projections_root: Option<PathBuf>,
+    composed_by: String,
+}
+
+impl ComposeGraphOptions {
+    /// Default `composed_by` when the operator omits `--composed-by` — the
+    /// graph still names a "who", never a silent gap.
+    const DEFAULT_COMPOSED_BY: &'static str = "unknown";
+
+    fn parse(rest: &[String]) -> Result<Self, String> {
+        let mut projections_root = None;
+        let mut composed_by = Self::DEFAULT_COMPOSED_BY.to_string();
+
+        let mut i = 0;
+        while i < rest.len() {
+            match rest[i].as_str() {
+                "--projections-root" => {
+                    let value = rest
+                        .get(i + 1)
+                        .ok_or_else(|| "missing value for --projections-root".to_string())?;
+                    projections_root = Some(PathBuf::from(value));
+                    i += 2;
+                }
+                "--composed-by" => {
+                    let value = rest
+                        .get(i + 1)
+                        .ok_or_else(|| "missing value for --composed-by".to_string())?;
+                    composed_by = value.clone();
+                    i += 2;
+                }
+                other => return Err(format!("unrecognized flag '{other}'\n\n{}", usage())),
+            }
+        }
+
+        Ok(Self {
+            projections_root,
+            composed_by,
+        })
+    }
 }
 
 fn require_path_arg(args: &[String], index: usize, usage_line: &str) -> Result<PathBuf, String> {
@@ -98,6 +155,26 @@ fn cmd_inspect(root: &Path) -> Result<(), String> {
     println!("directories: {directories}");
     println!("files: {files}");
     println!("blobs: {}", blobs.len());
+    Ok(())
+}
+
+fn cmd_compose_graph(root: &Path, options: ComposeGraphOptions) -> Result<(), String> {
+    let graph = compose_graph_from_package_tree(
+        root,
+        options.projections_root.as_deref(),
+        &options.composed_by,
+    )
+    .map_err(|source| {
+        format!(
+            "failed to build composition graph for {}: {source}",
+            root.display()
+        )
+    })?;
+
+    let json = serde_json::to_string_pretty(&graph)
+        .map_err(|source| format!("failed to serialize composition graph: {source}"))?;
+
+    println!("{json}");
     Ok(())
 }
 

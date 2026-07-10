@@ -15,7 +15,7 @@ use eprfs_core::{
     ProjectionPath, ProjectionRoot, ProjectionSource, ProjectionSourceKind, ProjectionStatus,
     Result,
 };
-use serde_json::Value;
+use serde_json::{json, Value};
 
 /// Namespace stamped on every projection source this adapter emits.
 const NAMESPACE: &str = "elohim-agent";
@@ -53,6 +53,154 @@ pub fn blobs_for_tree(root: &Path) -> Result<Vec<(BlobCid, Vec<u8>)>> {
     let mut blobs = Vec::new();
     collect_blobs(root, &mut blobs)?;
     Ok(blobs)
+}
+
+/// Emit a static, content-addressed "composition graph" for every elohim
+/// skill/agent package under `package_root/{skills,agents}/*.json` — the CID
+/// edge from the native package to its projected Claude/Codex artifacts, plus
+/// who composed it. This is the verifiable "how was every skill composed"
+/// artifact: every CID in the output is [`BlobCid::compute`] over real bytes,
+/// never a re-implemented hash.
+///
+/// `projections_root`, when given, is the root of the projection tree (e.g.
+/// `.epr-meta/elohim/projections`) — a skill's Claude projection is expected
+/// at `<projections_root>/claude/skills/<id>/SKILL.md`, an agent's at
+/// `<projections_root>/claude/agents/<id>.md` (and the `codex/` mirror of
+/// each). A missing projection file yields `null`, not an error — projection
+/// coverage is a fact the graph reports, not a precondition it enforces.
+/// When `projections_root` is `None`, every node's `projections.claude` and
+/// `projections.codex` are `null`.
+///
+/// `composed_by` is stamped onto every node's `composedBy` field verbatim —
+/// the model/agent that authored the package, supplied by the caller.
+///
+/// Nodes are sorted by `(kind, id)` for a deterministic, diffable artifact.
+pub fn compose_graph_from_package_tree(
+    package_root: &Path,
+    projections_root: Option<&Path>,
+    composed_by: &str,
+) -> Result<Value> {
+    let mut nodes = collect_compose_nodes(
+        package_root,
+        projections_root,
+        composed_by,
+        "SkillPackage",
+        "skills",
+        true,
+    )?;
+    nodes.extend(collect_compose_nodes(
+        package_root,
+        projections_root,
+        composed_by,
+        "AgentPackage",
+        "agents",
+        false,
+    )?);
+
+    nodes.sort_by(|(a_key, _), (b_key, _)| a_key.cmp(b_key));
+
+    Ok(json!({
+        "generatedBy": "eprfs-agent compose-graph",
+        "composedBy": composed_by,
+        "nodes": nodes.into_iter().map(|(_, node)| node).collect::<Vec<_>>(),
+    }))
+}
+
+/// Walk `package_root/<dir_name>/*.json`, emitting one compose-graph node per
+/// package file. `is_skill` selects the projection path shape (skill ->
+/// `<id>/SKILL.md` directory, agent -> `<id>.md` file).
+fn collect_compose_nodes(
+    package_root: &Path,
+    projections_root: Option<&Path>,
+    composed_by: &str,
+    kind: &str,
+    dir_name: &str,
+    is_skill: bool,
+) -> Result<Vec<((String, String), Value)>> {
+    let dir = package_root.join(dir_name);
+    let mut out = Vec::new();
+    if !dir.exists() {
+        return Ok(out);
+    }
+
+    for child in sorted_children(&dir)? {
+        if is_dir(&child)? || child.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+
+        let bytes = read_bytes(&child)?;
+        let package_cid = BlobCid::compute(&bytes);
+        let package: Value = serde_json::from_slice(&bytes)?;
+
+        let metadata = package.get("metadata").cloned().unwrap_or(Value::Null);
+        let id = metadata
+            .get("id")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .unwrap_or_default();
+        let source_runtime = metadata
+            .get("sourceRuntime")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let master = metadata
+            .get("master")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+
+        let (claude_cid, codex_cid) = match projections_root {
+            Some(root) => (
+                projection_cid(root, "claude", &id, is_skill)?,
+                projection_cid(root, "codex", &id, is_skill)?,
+            ),
+            None => (None, None),
+        };
+
+        let node = json!({
+            "kind": kind,
+            "id": id,
+            "sourceRuntime": source_runtime,
+            "master": master,
+            "packageCid": package_cid.to_string(),
+            "projections": {
+                "claude": claude_cid,
+                "codex": codex_cid,
+            },
+            "composedBy": composed_by,
+        });
+
+        out.push(((kind.to_string(), id), node));
+    }
+
+    Ok(out)
+}
+
+/// The content-address of a single projected artifact, or `None` when the
+/// file doesn't exist — absence is a reportable fact, not a failure.
+fn projection_cid(
+    projections_root: &Path,
+    runtime: &str,
+    id: &str,
+    is_skill: bool,
+) -> Result<Option<String>> {
+    let path = if is_skill {
+        projections_root
+            .join(runtime)
+            .join("skills")
+            .join(id)
+            .join("SKILL.md")
+    } else {
+        projections_root
+            .join(runtime)
+            .join("agents")
+            .join(format!("{id}.md"))
+    };
+
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let bytes = read_bytes(&path)?;
+    Ok(Some(BlobCid::compute(&bytes).to_string()))
 }
 
 /// Sorted directory listing — the single source of deterministic ordering shared
