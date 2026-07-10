@@ -79,6 +79,12 @@ export interface ConductorContentResponse {
  * type are set to sensible defaults:
  * - `hAppId`: 'lamad' (the only content DNA today)
  * - `validationStatus`: 'valid' (conductor content is authoritative)
+ * - `trust`: 'unconfirmed' (REQ-F10) — the conductor wire carries no provenance
+ *   markers (no `dht_anchor_hash` / `p2p_published_at`, both "added by storage
+ *   layer"), so by the trust field's own all-null rule this content is
+ *   'unconfirmed' (amber). This is a legibility label only — never an
+ *   authority/attribution signal; an unconfirmed row is
+ *   functional-but-not-notarized.
  *
  * @param raw - Conductor zome response in snake_case wire format
  * @returns ContentView matching the schema-generated contract
@@ -98,6 +104,7 @@ export function normalizeConductorContent(raw: ConductorContentResponse): Conten
     metadata: parseMetadataJson(raw.metadata_json),
     reach: raw.reach as Reach,
     validationStatus: 'valid' as ValidationStatus,
+    trust: 'unconfirmed',
     createdBy: undefined,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,

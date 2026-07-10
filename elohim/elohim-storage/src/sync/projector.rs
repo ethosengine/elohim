@@ -180,9 +180,8 @@ fn root_str(doc: &Automerge, key: &str) -> Option<String> {
 /// `head → versions[head] → blobHash`, falling back to the flat ROOT `blobHash`
 /// for docs written by a pre-C2 peer (the dual-write compat leg). Returns None if
 /// neither is present. This is the C2 READER half — consumed by the serving /
-/// HEAD-election path (Plan C3), which is not yet wired, so it is dead outside
-/// tests today.
-#[allow(dead_code)]
+/// HEAD-election path (Plan C3) via [`crate::sync::SyncManager::declared_head_blob`],
+/// the C3 read side that lets `/apps` serve the notary-declared head's bytes.
 pub(crate) fn read_head_blob_hash(doc: &Automerge) -> Option<String> {
     if let Some(head) = root_str(doc, "head") {
         if let Ok(Some((Value::Object(automerge::ObjType::Map), versions_id))) =
@@ -197,6 +196,19 @@ pub(crate) fn read_head_blob_hash(doc: &Automerge) -> Option<String> {
     }
     // Fallback: flat ROOT blobHash (pre-C2 dual-write leg).
     root_str(doc, "blobHash")
+}
+
+/// Read the doc's `headActionHash` observability/hint scalar (Plan C2) — the
+/// author's DECLARED version-DAG head action, projected by `projected_fields`.
+///
+/// This is the REQ-F4 anti-laundering gate input for the C3 read side
+/// ([`crate::sync::SyncManager::declared_head_blob`]): a serving node honors a
+/// doc's converged head blob ONLY when this hint matches the row's own
+/// `declared_head_action_hash`, proving the doc is projecting THE declared head
+/// rather than a peer's un-elected recency head. Returns `None` when the doc
+/// carries no declared head (pre-C2 / never-declared).
+pub(crate) fn doc_head_action_hash(doc: &Automerge) -> Option<String> {
+    root_str(doc, "headActionHash")
 }
 
 /// Whether the doc's version-DAG already records `version_cid` as head with its
@@ -885,6 +897,86 @@ mod tests {
             super::read_head_blob_hash(&doc).as_deref(),
             Some("sha256-legacy")
         );
+    }
+
+    /// The `headActionHash` observability hint is readable off a projected doc —
+    /// the input to the REQ-F4 anti-laundering gate in the C3 read side.
+    #[tokio::test]
+    async fn doc_head_action_hash_reads_projected_hint() {
+        let (sync, _temp) = test_sync_manager().await;
+        let mut content = sample_content("hint-1", "v1");
+        content.blob_hash = Some("sha256-head".to_string());
+        content.declared_head_action_hash = Some("uhCkkDECLARED".to_string());
+        assert!(super::project_content_doc(&sync, &content).await.unwrap());
+
+        let doc = sync
+            .get_or_create_doc(
+                super::PROJECTION_NAMESPACE,
+                &super::content_doc_id("hint-1"),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            super::doc_head_action_hash(&doc).as_deref(),
+            Some("uhCkkDECLARED")
+        );
+    }
+
+    /// C3 read side (SyncManager::declared_head_blob): when the doc's
+    /// `headActionHash` hint MATCHES the row's declared head, the head blob
+    /// resolves — the serve path can prefer it. (declared-head-present case.)
+    #[tokio::test]
+    async fn declared_head_blob_returns_head_when_hint_matches() {
+        let (sync, _temp) = test_sync_manager().await;
+        let mut content = sample_content("dhb-1", "v1");
+        content.blob_hash = Some("sha256-head".to_string());
+        content.declared_head_action_hash = Some("uhCkkDECLARED".to_string());
+        assert!(super::project_content_doc(&sync, &content).await.unwrap());
+
+        let got = sync
+            .declared_head_blob(
+                super::PROJECTION_NAMESPACE,
+                &super::content_doc_id("dhb-1"),
+                "uhCkkDECLARED",
+            )
+            .await;
+        assert_eq!(got.as_deref(), Some("sha256-head"));
+    }
+
+    /// REQ-F4 / no-laundering gate: a doc head whose `headActionHash` does NOT
+    /// match the row's declared head is NEVER served — the serve path degrades to
+    /// the own row rather than adopting a peer's un-elected recency head.
+    #[tokio::test]
+    async fn declared_head_blob_none_when_hint_mismatches() {
+        let (sync, _temp) = test_sync_manager().await;
+        let mut content = sample_content("dhb-2", "v1");
+        content.blob_hash = Some("sha256-head".to_string());
+        content.declared_head_action_hash = Some("uhCkkPEER".to_string());
+        assert!(super::project_content_doc(&sync, &content).await.unwrap());
+
+        let got = sync
+            .declared_head_blob(
+                super::PROJECTION_NAMESPACE,
+                &super::content_doc_id("dhb-2"),
+                "uhCkkMINE",
+            )
+            .await;
+        assert_eq!(got, None, "mismatched declared-head hint must not launder");
+    }
+
+    /// A never-synced content id has no doc — the read-only resolver returns None
+    /// (and, unlike `get_or_create_doc`, creates nothing).
+    #[tokio::test]
+    async fn declared_head_blob_none_for_missing_doc() {
+        let (sync, _temp) = test_sync_manager().await;
+        let got = sync
+            .declared_head_blob(
+                super::PROJECTION_NAMESPACE,
+                &super::content_doc_id("never-synced"),
+                "uhCkkX",
+            )
+            .await;
+        assert_eq!(got, None);
     }
 
     /// A changed serving-critical field (blobHash) forces a re-projection and the

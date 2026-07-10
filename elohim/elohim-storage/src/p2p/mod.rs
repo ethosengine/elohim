@@ -813,6 +813,15 @@ pub struct P2PStatusInfo {
     /// builder). When present, `active=false` / `selfCidSource="unset"` is the
     /// dark-resilience-card signal: the provide-loop never spawned.
     pub provide_loop: Option<crate::services::provide_loop_status::ProvideLoopStatus>,
+    /// The co-resident iroh node's `NodeId` (64-char hex), when this node runs
+    /// the iroh transport stack alongside libp2p. `None` on a libp2p-only node
+    /// (dual-stack boot is mode-exclusive today), so the field is additive and
+    /// omitted from the wire when absent — an old client reading a new payload
+    /// simply doesn't see it, a new client reading an old payload gets `null`.
+    /// Set at the `main.rs` dual block from `iroh_n.node_id()`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub iroh_node_id: Option<String>,
 }
 
 /// Per-peer detail from libp2p Swarm state.
@@ -1229,6 +1238,7 @@ impl P2PHandle {
             kicks_fired_total: 0,
             placement_gaps_emitted_total: 0,
             provide_loop: None,
+            iroh_node_id: None,
         };
         let (status_tx, status_rx) = watch::channel(initial_status);
         // Keep sender alive so the receiver never sees "sender dropped"
@@ -1770,6 +1780,7 @@ impl P2PNode {
             kicks_fired_total: 0,
             placement_gaps_emitted_total: 0,
             provide_loop: None,
+            iroh_node_id: None,
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
@@ -7097,6 +7108,17 @@ impl P2PNode {
         }
     }
 
+    /// Record the co-resident iroh node's `NodeId` on the status snapshot.
+    ///
+    /// Wired from the `main.rs` dual block once the iroh node exists. Mutates the
+    /// live watch value in place (`send_modify`); `refresh_status` preserves it
+    /// across rebuilds by reading the current value back, so the periodic
+    /// libp2p-only status rebuild never clobbers it back to `None`.
+    pub fn set_iroh_node_id(&self, node_id: String) {
+        self.status_tx
+            .send_modify(|s| s.iroh_node_id = Some(node_id));
+    }
+
     /// Refresh the status snapshot (called from event loop)
     async fn refresh_status(&self) {
         let swarm = self.swarm.read().await;
@@ -7161,6 +7183,9 @@ impl P2PNode {
             None => None,
         };
         let recon = self.reconciliation_metrics();
+        // Preserve the iroh NodeId set once by `set_iroh_node_id` (main.rs dual
+        // block) — the periodic libp2p-only rebuild must not clobber it to None.
+        let iroh_node_id = self.status_tx.borrow().iroh_node_id.clone();
         let status = P2PStatusInfo {
             peer_id: self.peer_id().to_string(),
             listen_addresses,
@@ -7182,6 +7207,7 @@ impl P2PNode {
             kicks_fired_total: recon.kicks_fired_total,
             placement_gaps_emitted_total: recon.placement_gaps_emitted_total,
             provide_loop,
+            iroh_node_id,
         };
         let _ = self.status_tx.send(status);
     }

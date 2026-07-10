@@ -314,6 +314,11 @@ fn p2p_status_view_matches_schema() {
             reanchor_failed: 1,
             reanchor_caught_up: true,
         }),
+        // Dual-stack: exercise the additive irohNodeId serialization against the
+        // schema (64-char hex NodeId).
+        iroh_node_id: Some(
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string(),
+        ),
     };
 
     let json = serde_json::to_value(&status).unwrap();
@@ -343,6 +348,8 @@ fn p2p_status_view_with_null_drain() {
         kicks_fired_total: 0,
         placement_gaps_emitted_total: 0,
         provide_loop: None,
+        // libp2p-only node: irohNodeId omitted from the wire (skip_serializing_if).
+        iroh_node_id: None,
     };
 
     let json = serde_json::to_value(&status).unwrap();

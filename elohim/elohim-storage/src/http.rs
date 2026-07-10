@@ -6079,6 +6079,38 @@ impl HttpServer {
                 .unwrap());
         }
 
+        // C3 read side (Plan C3 / notary-authority): honor the notary-DECLARED
+        // canonical head over "whatever this peer last authored". For a slug/id
+        // (never a bare CID), prefer the declared head's blob when it is a
+        // distinct, LOCALLY-PRESENT blob whose declared-head hint matches the
+        // row — otherwise degrade to the resolved own-row `blob_hash`
+        // (`declared_head_served_blob` never fans out; the own hash still rides
+        // the existing `get_blob_or_heal`/T17 peer-fallback below). Keep the
+        // slug_index coherent so the O(1) fast path serves the same head next
+        // time.
+        let blob_hash = if is_cid {
+            blob_hash
+        } else if let Some(content) = self.lookup_app_content(identifier).await {
+            match self.declared_head_served_blob(&content).await {
+                Some(head_blob) => {
+                    info!(
+                        identifier = %identifier,
+                        own_blob = %blob_hash,
+                        declared_head_blob = %head_blob,
+                        "C3: serving notary-declared head blob over own-row blob"
+                    );
+                    self.slug_index
+                        .write()
+                        .await
+                        .insert(identifier.to_string(), head_blob.clone());
+                    head_blob
+                }
+                None => blob_hash,
+            }
+        } else {
+            blob_hash
+        };
+
         debug!(identifier = %identifier, blob_hash = %blob_hash, "Found blob hash");
 
         // Fetch the ZIP from the blob store, healing from peers on a local miss
@@ -6324,6 +6356,93 @@ impl HttpServer {
         }
 
         Ok(found_hash)
+    }
+
+    /// Resolve the app-bundle content ROW backing an `/apps/{identifier}` request
+    /// — matched by row id OR inner `content_body.slug`, across the app-bundle
+    /// formats, at the Amber serving floor (same query surface as
+    /// `lookup_slug_blob_hash` / `load_slug_index`). Returns the full row so the
+    /// C3 read side can consult its `declared_head_action_hash`.
+    ///
+    /// `None` on: no DB pool, query error, or no matching row (a bare CID
+    /// identifier has no row here and never reaches this helper).
+    async fn lookup_app_content(&self, identifier: &str) -> Option<crate::db::models::Content> {
+        let mut conn = self.get_conn().ok()?;
+        let app_ctx = db::AppContext::default_lamad();
+        const APP_BUNDLE_FORMATS: [&str; 2] = ["html5-app", "spa-bundle"];
+        for fmt in APP_BUNDLE_FORMATS {
+            let query = ContentQuery {
+                content_format: Some(fmt.to_string()),
+                limit: 100,
+                ..Default::default()
+            };
+            let items = db::content_diesel::list_content(
+                &mut conn,
+                &app_ctx,
+                &query,
+                db::content_diesel::MinTrust::Amber,
+            )
+            .ok()?;
+            for item in items {
+                if item.content.id == identifier {
+                    return Some(item.content);
+                }
+                if let Some(ref content_body) = item.content.content_body {
+                    if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body) {
+                        if obj.get("slug").and_then(|v| v.as_str()) == Some(identifier) {
+                            return Some(item.content);
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// C3 read side (Plan C3 / notary-authority): the notary-DECLARED head's blob
+    /// for `content`, IFF it is a DISTINCT, LOCALLY-PRESENT blob whose declared-
+    /// head hint matches the row's `declared_head_action_hash`. `None` ⇒ degrade
+    /// to the row's own `blob_hash` (the current serve behavior).
+    ///
+    /// The serve path prefers the elected canonical head over "whatever this peer
+    /// last authored" (the head-election gap the notary-authority spine names),
+    /// but NEVER fans out: if the declared head's bytes are not already local,
+    /// this returns `None` and the caller serves the own row — the replication
+    /// plane heals absence (doorway single-target doctrine; peer-fallback for the
+    /// served hash still rides the existing `get_blob_or_heal`/T17 sequence).
+    async fn declared_head_served_blob(
+        &self,
+        content: &crate::db::models::Content,
+    ) -> Option<String> {
+        let declared = content
+            .declared_head_action_hash
+            .as_deref()
+            .filter(|h| !h.is_empty())?;
+        let sync = self.sync_manager.as_ref()?;
+        let doc_id = crate::sync::projector::content_doc_id(&content.id);
+        let head_blob = sync
+            .declared_head_blob(
+                crate::sync::projector::PROJECTION_NAMESPACE,
+                &doc_id,
+                declared,
+            )
+            .await?;
+        // Identical to the row's own blob → nothing to prefer.
+        if Some(head_blob.as_str()) == content.blob_hash.as_deref() {
+            return None;
+        }
+        // Local-presence gate — NEVER fan out to fetch a declared head we don't
+        // hold; degrade to the own row and let the replication plane heal.
+        if self
+            .blob_store
+            .exists_by_address(&head_blob)
+            .await
+            .unwrap_or(false)
+        {
+            Some(head_blob)
+        } else {
+            None
+        }
     }
 
     // ========================================================================
@@ -14355,5 +14474,154 @@ mod admission_tests {
         let read_pool = Semaphore::new(super::MAX_CONCURRENT_READS);
         assert!(write_pool.try_acquire().is_err(), "writes shed under burst");
         assert!(read_pool.try_acquire().is_ok(), "reads still admitted");
+    }
+}
+
+// =============================================================================
+// C3 read side — serve-path prefers the notary-DECLARED head blob (Plan C3 /
+// notary-authority). Exercises `declared_head_served_blob` across the three
+// cases the spine names: declared head present+distinct+LOCAL → serve head;
+// no declared head → own row; declared head present but blob NOT local → own
+// row (degrade; never fan out — the replication plane heals absence).
+// =============================================================================
+#[cfg(test)]
+mod c3_serve_head_preference_tests {
+    use super::*;
+    use crate::db::models::Content;
+    use crate::sync::{DocStore, DocStoreConfig, StreamTracker, SyncManager};
+
+    fn content_row(id: &str, own_blob: Option<&str>, declared: Option<&str>) -> Content {
+        Content {
+            id: id.to_string(),
+            h_app_id: "lamad".to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "spa-bundle".to_string(),
+            blob_hash: own_blob.map(str::to_string),
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: Some("{}".to_string()),
+            reach: "commons".to_string(),
+            validation_status: "valid".to_string(),
+            created_by: None,
+            created_at: "2026-07-10T00:00:00Z".to_string(),
+            updated_at: "2026-07-10T00:00:00Z".to_string(),
+            content_body: None,
+            // A verified declared-head stamp mirrors the action into both fields.
+            dht_anchor_hash: declared.map(str::to_string),
+            p2p_published_at: None,
+            server_blob_hash: None,
+            crdt_converged_at: None,
+            declared_head_action_hash: declared.map(str::to_string),
+        }
+    }
+
+    /// Build a SyncManager whose doc for `id` projects `head_blob` as the head
+    /// version with `declared` as the `headActionHash` hint (the shape the REQ-F4
+    /// gate matches against).
+    async fn sync_with_head_doc(
+        id: &str,
+        head_blob: &str,
+        declared: &str,
+    ) -> (Arc<SyncManager>, tempfile::TempDir) {
+        let temp = tempfile::tempdir().unwrap();
+        let doc_store = Arc::new(
+            DocStore::new(DocStoreConfig {
+                db_path: temp.path().join("c3.sled"),
+                ..Default::default()
+            })
+            .await
+            .unwrap(),
+        );
+        let sync = Arc::new(SyncManager::new(doc_store, Arc::new(StreamTracker::new())));
+        let head_content = content_row(id, Some(head_blob), Some(declared));
+        crate::sync::projector::project_content_doc(sync.as_ref(), &head_content)
+            .await
+            .unwrap();
+        (sync, temp)
+    }
+
+    fn well_formed_absent_addr(byte: &str) -> String {
+        format!("sha256-{}", byte.repeat(32))
+    }
+
+    /// (a) Declared head present, distinct from the own row, and its bytes are
+    /// LOCALLY present → the serve path prefers the declared head's blob.
+    #[tokio::test]
+    async fn serves_declared_head_blob_when_present_and_local() {
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let head_hash = blob_store
+            .store(b"DECLARED-HEAD-BUNDLE")
+            .await
+            .unwrap()
+            .hash;
+        let (sync, _t) = sync_with_head_doc("epr-c3-a", &head_hash, "uhCkkDECLARED").await;
+        let server =
+            HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_sync_manager(sync);
+
+        // Own row points at a DIFFERENT (distinct) blob than the declared head.
+        let row = content_row(
+            "epr-c3-a",
+            Some(&well_formed_absent_addr("cd")),
+            Some("uhCkkDECLARED"),
+        );
+        let got = server.declared_head_served_blob(&row).await;
+        assert_eq!(
+            got.as_deref(),
+            Some(head_hash.as_str()),
+            "declared head blob is distinct + local → serve it over the own row"
+        );
+    }
+
+    /// (b) No declared head on the row → nothing to prefer; degrade to own row.
+    #[tokio::test]
+    async fn degrades_to_own_when_no_declared_head() {
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let (sync, _t) =
+            sync_with_head_doc("epr-c3-b", &well_formed_absent_addr("ef"), "uhCkkDECLARED").await;
+        let server =
+            HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_sync_manager(sync);
+
+        let row = content_row("epr-c3-b", Some(&well_formed_absent_addr("cd")), None);
+        assert_eq!(
+            server.declared_head_served_blob(&row).await,
+            None,
+            "no declared head → serve the own row"
+        );
+    }
+
+    /// (c) Declared head present but its bytes are NOT locally held → degrade to
+    /// own row (never fan out; the replication plane heals absence).
+    #[tokio::test]
+    async fn degrades_to_own_when_declared_head_blob_absent_locally() {
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let absent_head = well_formed_absent_addr("ab");
+        let (sync, _t) = sync_with_head_doc("epr-c3-c", &absent_head, "uhCkkDECLARED").await;
+        let server =
+            HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_sync_manager(sync);
+
+        let row = content_row(
+            "epr-c3-c",
+            Some(&well_formed_absent_addr("cd")),
+            Some("uhCkkDECLARED"),
+        );
+        assert_eq!(
+            server.declared_head_served_blob(&row).await,
+            None,
+            "declared head blob absent locally → degrade to own row, do NOT fan out"
+        );
     }
 }

@@ -56,6 +56,7 @@ fn test_status() -> P2PStatusInfo {
         kicks_fired_total: 0,
         placement_gaps_emitted_total: 0,
         provide_loop: None,
+        iroh_node_id: None,
     }
 }
 

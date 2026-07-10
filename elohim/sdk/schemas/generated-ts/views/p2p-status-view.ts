@@ -125,6 +125,10 @@ export interface P2PStatusView {
      */
     reanchorCaughtUp: boolean;
   } | null;
+  /**
+   * The co-resident iroh node's NodeId (64-char hex), when this node runs the iroh transport stack alongside libp2p. Additive/optional — OMITTED from the wire on a libp2p-only node (dual-stack boot is mode-exclusive today). Set at the main.rs dual block from iroh_n.node_id().
+   */
+  irohNodeId?: string;
 }
 /**
  * Identity-driven content replication progress

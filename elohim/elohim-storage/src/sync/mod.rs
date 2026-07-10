@@ -189,6 +189,35 @@ impl SyncManager {
             .ok_or_else(|| StorageError::Sync(format!("field not found or not a string: {field}")))
     }
 
+    /// C3 read side (Plan C3 / notary-authority): resolve the blob hash of the
+    /// notary-DECLARED head for a content doc, honoring REQ-F4 (serve the
+    /// declared head, NEVER a peer's un-elected recency head — the SSL-strip /
+    /// laundering hazard, §7.3).
+    ///
+    /// Returns `Some(blob)` ONLY when the converged doc's `headActionHash` hint
+    /// MATCHES `declared_head_action_hash` (the doc IS projecting the row's
+    /// declared head) AND a non-empty head blob resolves via
+    /// [`projector::read_head_blob_hash`]. `None` degrades the caller to the
+    /// row's own blob (current serve behavior).
+    ///
+    /// READ-ONLY: never creates the doc (unlike `get_or_create_doc`), so a serve
+    /// probe for a never-synced id has no write side-effect.
+    pub async fn declared_head_blob(
+        &self,
+        h_app_id: &str,
+        doc_id: &str,
+        declared_head_action_hash: &str,
+    ) -> Option<String> {
+        let stored = self.doc_store.get(h_app_id, doc_id).await.ok()??;
+        let doc = Automerge::load(&stored.data).ok()?;
+        // REQ-F4 / no-laundering gate: the doc's declared-head hint must match
+        // the row's declared head before we adopt the doc's head blob.
+        if projector::doc_head_action_hash(&doc).as_deref() != Some(declared_head_action_hash) {
+            return None;
+        }
+        projector::read_head_blob_hash(&doc).filter(|b| !b.is_empty())
+    }
+
     /// List documents for an app
     pub async fn list_documents(
         &self,

@@ -2422,6 +2422,10 @@ async fn async_main(
                 ),
             );
             libp2p_n.set_gossip_publisher(dual);
+            // Dual-stack observability: surface the co-resident iroh NodeId on
+            // /p2p/status (the setter mutates the live watch value; the periodic
+            // libp2p status rebuild preserves it — see P2PNode::set_iroh_node_id).
+            libp2p_n.set_iroh_node_id(iroh_n.node_id().to_string());
             info!(
                 "Dual: DualGossipPublisher wired into P2PNode — inventory snapshots now dual-stack"
             );

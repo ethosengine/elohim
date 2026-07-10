@@ -82,4 +82,13 @@ placementGapsEmittedTotal: number,
  * builder). When present, `active=false` / `selfCidSource="unset"` is the
  * dark-resilience-card signal: the provide-loop never spawned.
  */
-provideLoop: ProvideLoopStatus | null, };
+provideLoop: ProvideLoopStatus | null, 
+/**
+ * The co-resident iroh node's `NodeId` (64-char hex), when this node runs
+ * the iroh transport stack alongside libp2p. `None` on a libp2p-only node
+ * (dual-stack boot is mode-exclusive today), so the field is additive and
+ * omitted from the wire when absent — an old client reading a new payload
+ * simply doesn't see it, a new client reading an old payload gets `null`.
+ * Set at the `main.rs` dual block from `iroh_n.node_id()`.
+ */
+irohNodeId?: string, };
