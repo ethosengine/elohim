@@ -2718,7 +2718,15 @@ fn newest_canonical_link(id: &str) -> ExternResult<Option<Link>> {
     if links.is_empty() {
         return Ok(None);
     }
-    links.sort_by_key(|l| l.timestamp);
+    // Deterministic order: (timestamp, create-link action hash). A stable sort on
+    // timestamp ALONE resolves ties by per-peer `get_links` arrival order, so two
+    // peers could read a different "newest" link from an identical set; the
+    // create-link-hash tiebreak makes the choice identical on every peer.
+    links.sort_by(|a, b| {
+        a.timestamp
+            .cmp(&b.timestamp)
+            .then_with(|| a.create_link_hash.cmp(&b.create_link_hash))
+    });
     Ok(links.pop())
 }
 
@@ -2729,34 +2737,232 @@ fn canonical_link_is_earned(link: &Link) -> bool {
     link.tag.0.as_slice() == CANONICAL_TAG_EARNED
 }
 
-/// Resolve the declared canonical cross-root head record for `id`, if one has
-/// been declared AND its target Content is retrievable in the local DHT view.
+/// A canonical-head declaration reduced to the fields that decide which one WINS.
+/// Extracting these makes [`select_canonical_winner`] a PURE, unit-testable
+/// function — the tier + deterministic-ordering rules are exercised without a
+/// conductor.
+struct CanonicalCandidate {
+    /// True iff the declaration carries the EARNED provenance marker.
+    is_earned: bool,
+    /// DHT link creation timestamp (newest-within-tier wins).
+    timestamp: Timestamp,
+    /// The create-link action hash — deterministic tiebreak for equal timestamps.
+    link_hash: ActionHash,
+    /// The declared canonical head target (a Content action).
+    target: ActionHash,
+}
+
+/// Select the single WINNING canonical-head declaration from a candidate set,
+/// tier-aware and partition-deterministic. Two correctness rules live here so
+/// every peer converges on the SAME winner from the SAME link set:
 ///
-/// Newest canonical declaration wins (by link creation timestamp), so a steward
-/// may re-declare/correct the canonical head. Returns `None` when no canonical
-/// head is declared OR the newest declaration's target has not gossiped in yet —
-/// the caller then degrades to the root-author election (eventual convergence:
-/// once the target gossips, every peer resolves the same canonical record).
+///   1. TIER precedence: ANY earned declaration beats ALL staging ones. Timestamp
+///      ordering applies only WITHIN the winning tier — a partitioned/gossip-
+///      lagged peer that wrote a newer STAGING link can NEVER displace an EARNED
+///      head once every peer sees the full set. This guard MUST live at resolve
+///      (here), not just at declare: the declare-time guard reads only the local
+///      view, so a partitioned peer's staging write is not caught there.
+///   2. DETERMINISTIC order: within the winning tier, newest timestamp wins; ties
+///      break on the create-link action hash, so an identical set orders
+///      identically on every peer (a stable timestamp-only sort would resolve ties
+///      by per-peer `get_links` arrival order → permanent divergence).
+///
+/// Returns the winner (the caller resolves ONLY its target), or `None` for an
+/// empty set.
+fn select_canonical_winner(mut candidates: Vec<CanonicalCandidate>) -> Option<CanonicalCandidate> {
+    if candidates.is_empty() {
+        return None;
+    }
+    let earned_present = candidates.iter().any(|c| c.is_earned);
+    candidates.retain(|c| c.is_earned == earned_present);
+    candidates.sort_by(|a, b| {
+        a.timestamp
+            .cmp(&b.timestamp)
+            .then_with(|| a.link_hash.cmp(&b.link_hash))
+    });
+    candidates.pop()
+}
+
+/// Resolve the declared canonical cross-root head record for `id`, if one has
+/// been declared AND the WINNING declaration's target Content is retrievable in
+/// the local DHT view.
+///
+/// The winner is chosen by [`select_canonical_winner`]: ANY earned declaration
+/// beats ALL staging, newest-within-tier wins, and ties break deterministically
+/// on the create-link hash — so every peer resolves the SAME head from the same
+/// link set (partition-safe convergence).
+///
+/// Returns `None` when no canonical head is declared OR the WINNING declaration's
+/// target has not gossiped in yet. In the latter case the caller degrades to the
+/// documented root-author election — we DO NOT fall back to older/lower-tier
+/// declarations. Serving an older declaration would serve a head the declaring
+/// authority has explicitly SUPERSEDED (a steward's correction re-declare), which
+/// a lagging peer must never do once it can see the superseding declaration.
+///
+/// NUANCE (earned tier): if the newest EARNED target is unretrievable but an
+/// OLDER earned target is retrievable, we STILL return `None` (do not serve the
+/// older earned). The newer earned declaration is the authority's current,
+/// visible choice and supersedes the older; degrading to the root-author election
+/// is partition-correct and converges on the newer target once it gossips in.
 fn gather_canonical_head_record(id: &str) -> ExternResult<Option<Record>> {
     let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
-    let mut links = get_links(query, GetStrategy::default())?;
-    if links.is_empty() {
-        return Ok(None);
+    let links = get_links(query, GetStrategy::default())?;
+    let candidates: Vec<CanonicalCandidate> = links
+        .into_iter()
+        .filter_map(|link| {
+            let is_earned = canonical_link_is_earned(&link);
+            let link_hash = link.create_link_hash.clone();
+            let timestamp = link.timestamp;
+            ActionHash::try_from(link.target)
+                .ok()
+                .map(|target| CanonicalCandidate {
+                    is_earned,
+                    timestamp,
+                    link_hash,
+                    target,
+                })
+        })
+        .collect();
+    let winner = match select_canonical_winner(candidates) {
+        Some(w) => w,
+        None => return Ok(None),
+    };
+    // Resolve ONLY the winning declaration's target. If it has not gossiped in
+    // yet, return None so `resolve_content_head` degrades to the root-author
+    // election — never walk to an older/lower-tier declaration (see the
+    // superseded-head nuance in the doc-comment above).
+    match get(winner.target, GetOptions::default())? {
+        Some(record) => Ok(Some(record)),
+        None => Ok(None),
     }
-    // Newest declaration wins.
-    links.sort_by_key(|l| l.timestamp);
-    for link in links.iter().rev() {
-        let action_hash = match ActionHash::try_from(link.target.clone()) {
-            Ok(h) => h,
-            Err(_) => continue,
-        };
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            return Ok(Some(record));
+}
+
+#[cfg(test)]
+mod canonical_head_selector_tests {
+    use super::*;
+    use hdk::prelude::{ActionHash, Timestamp};
+
+    /// Distinct, deterministically-ordered ActionHashes from a single seed byte
+    /// (36 untyped bytes; identical type prefix, so ordering follows the seed).
+    fn ah(seed: u8) -> ActionHash {
+        ActionHash::from_raw_36(vec![seed; 36])
+    }
+
+    fn cand(is_earned: bool, ts: i64, link_seed: u8, target_seed: u8) -> CanonicalCandidate {
+        CanonicalCandidate {
+            is_earned,
+            timestamp: Timestamp::from_micros(ts),
+            link_hash: ah(link_seed),
+            target: ah(target_seed),
         }
     }
-    Ok(None)
+
+    /// Defect 2 (tier-blind resolution): ANY earned declaration beats ALL staging,
+    /// even a staging link with a strictly NEWER timestamp — the partition-heal
+    /// hazard, where a gossip-lagged peer wrote a newer staging link.
+    #[test]
+    fn earned_wins_over_newer_staging() {
+        let earned_target = ah(10);
+        let candidates = vec![
+            cand(true, 100, 1, 10),  // earned, OLDER
+            cand(false, 200, 2, 20), // staging, NEWER
+            cand(false, 300, 3, 30), // staging, NEWEST
+        ];
+        let winner = select_canonical_winner(candidates).expect("a winner exists");
+        assert!(
+            winner.is_earned,
+            "earned tier must win regardless of staging recency"
+        );
+        assert_eq!(winner.target, earned_target);
+    }
+
+    /// Within the earned tier, newest timestamp wins; a newer STAGING link still
+    /// loses to any earned link.
+    #[test]
+    fn newest_earned_wins_within_tier() {
+        let newest_earned = ah(11);
+        let candidates = vec![
+            cand(true, 100, 1, 10),
+            cand(true, 300, 3, 11),  // newest earned
+            cand(true, 200, 2, 12),
+            cand(false, 999, 9, 90), // staging newer than all earned — still loses
+        ];
+        let winner = select_canonical_winner(candidates).expect("winner");
+        assert!(winner.is_earned);
+        assert_eq!(winner.target, newest_earned);
+    }
+
+    /// All-staging set: newest staging wins (scaffold-over-scaffold semantics).
+    #[test]
+    fn newest_staging_wins_when_no_earned() {
+        let newest = ah(30);
+        let candidates = vec![
+            cand(false, 100, 1, 10),
+            cand(false, 300, 3, 30),
+            cand(false, 200, 2, 20),
+        ];
+        let winner = select_canonical_winner(candidates).expect("winner");
+        assert!(!winner.is_earned);
+        assert_eq!(winner.target, newest);
+    }
+
+    /// Defect 4 (timestamp-tie nondeterminism): equal timestamps break on the
+    /// create-link hash, so an identical set — in ANY input order — yields the
+    /// SAME winner on every peer. Asserts order-INDEPENDENCE (the real invariant),
+    /// not a hard-coded direction.
+    #[test]
+    fn equal_timestamps_break_deterministically_on_link_hash() {
+        let mk = || {
+            vec![
+                cand(true, 500, 5, 50),
+                cand(true, 500, 8, 80), // same timestamp, distinct link hash
+            ]
+        };
+        let w1 = select_canonical_winner(mk()).expect("winner");
+        // Reverse the input order — the winner MUST be identical (a stable
+        // timestamp-only sort would flip it with the input / get_links order).
+        let mut reversed = mk();
+        reversed.reverse();
+        let w2 = select_canonical_winner(reversed).expect("winner");
+        assert_eq!(
+            w1.target, w2.target,
+            "tie winner must not depend on get_links arrival order"
+        );
+        assert_eq!(w1.link_hash, w2.link_hash);
+    }
+
+    /// Defect 3 (no fallback to superseded heads): the selector returns exactly
+    /// ONE winner — the newest in the winning tier — so the resolver has no
+    /// older/lower-tier candidate to fall back to when that winner's target is
+    /// unretrievable. A newer EARNED declaration supersedes an older earned one:
+    /// the older earned target is NEVER the selected winner.
+    #[test]
+    fn superseding_earned_is_the_sole_winner() {
+        let superseded = ah(10);
+        let current = ah(11);
+        let candidates = vec![
+            cand(true, 100, 1, 10),  // OLDER earned — the "retracted" head
+            cand(true, 300, 3, 11),  // NEWER earned — the steward's correction
+            cand(false, 400, 4, 40), // even-newer staging — still loses to earned
+        ];
+        let winner = select_canonical_winner(candidates).expect("winner");
+        assert_eq!(
+            winner.target, current,
+            "the newer earned declaration supersedes the older"
+        );
+        assert_ne!(
+            winner.target, superseded,
+            "the superseded (older earned) head is never selected — no fallback path"
+        );
+    }
+
+    /// Empty set → no winner (the resolver returns None → root-author election).
+    #[test]
+    fn empty_set_has_no_winner() {
+        assert!(select_canonical_winner(vec![]).is_none());
+    }
 }
 
 /// DEV-TIME SCAFFOLD — the earned-authority governance seam for WHO may declare
@@ -3004,7 +3210,7 @@ fn declare_canonical_head_inner(
     })?;
     // Confirm it carries a Content entry (build_content_head_output would also
     // catch this, but we validate up front for a clearer error).
-    let _content: Content = target_record
+    let content: Content = target_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
@@ -3013,6 +3219,19 @@ fn declare_canonical_head_inner(
                 "declare_canonical_head: target action {target:?} carries no Content entry"
             )))
         })?;
+
+    // TARGET-ID GATE: the target Content must actually be a version of `id`.
+    // Without this, a declaration could name a retrievable Content authored under
+    // a DIFFERENT id as `id`'s canonical head — silently binding an unrelated
+    // record as the head and diverging every peer that honors it. Applies to BOTH
+    // tiers (this is the shared body). Guest error → the HTTP layer surfaces 4xx.
+    if content.id != id {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_canonical_head: target action {target:?} carries Content id '{}', which does \
+             not match the declared id '{id}'",
+            content.id
+        ))));
+    }
 
     // Record the canonical-head link (coordinator-only, gossips to all peers).
     create_canonical_head_link(id, &target, tag)?;

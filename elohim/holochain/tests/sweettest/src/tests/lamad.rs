@@ -741,3 +741,217 @@ async fn earned_head_guard_and_scaffold_over_scaffold() -> Result<()> {
 
     Ok(())
 }
+
+/// Defect 1 (missing target-id validation): a canonical declaration must refuse a
+/// target whose Content `id` differs from the declared `id`. Without the gate a
+/// declaration could name a retrievable Content authored under a DIFFERENT id as
+/// this id's canonical head, silently binding an unrelated record. The gate lives
+/// in the shared `declare_canonical_head_inner`, so it protects BOTH tiers.
+#[tokio::test(flavor = "multi_thread")]
+async fn declare_canonical_rejects_target_id_mismatch() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    // agent is the bootstrap steward (progenitor) so the EARNED tier is reachable.
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("lamad-app", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().unwrap().clone();
+    let zome = cell.zome("content_store");
+
+    // Two distinct ids, each with its own root.
+    let alpha: ContentOutput = conductor
+        .call(&zome, "create_content", test_content("mismatch-alpha"))
+        .await;
+    let beta: ContentOutput = conductor
+        .call(&zome, "create_content", test_content("mismatch-beta"))
+        .await;
+
+    // STAGING declare for "mismatch-alpha" pointing at BETA's action — refused.
+    let staging_bad: std::result::Result<ContentHeadOutput, _> = conductor
+        .call_fallible(
+            &zome,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: "mismatch-alpha".to_string(),
+                head_action_hash: ActionHashB64::from(beta.action_hash.clone()).to_string(),
+            },
+        )
+        .await;
+    assert!(
+        staging_bad.is_err(),
+        "staging declare with a cross-id target must be refused"
+    );
+    assert!(
+        format!("{:?}", staging_bad.unwrap_err()).contains("does not match the declared id"),
+        "id-mismatch error must name the mismatch"
+    );
+
+    // EARNED declare (progenitor) with the same mismatch — refused by the SAME
+    // gate (both tiers share declare_canonical_head_inner).
+    let earned_bad: std::result::Result<ContentHeadOutput, _> = conductor
+        .call_fallible(
+            &zome,
+            "declare_earned_canonical_head",
+            DeclareCanonicalHeadInput {
+                id: "mismatch-alpha".to_string(),
+                head_action_hash: ActionHashB64::from(beta.action_hash.clone()).to_string(),
+            },
+        )
+        .await;
+    assert!(
+        earned_bad.is_err(),
+        "earned declare with a cross-id target must be refused"
+    );
+    assert!(
+        format!("{:?}", earned_bad.unwrap_err()).contains("does not match the declared id"),
+        "earned tier is protected by the same id-mismatch gate"
+    );
+
+    // Positive control: alpha→alpha (id matches) is accepted.
+    let ok: ContentHeadOutput = conductor
+        .call(
+            &zome,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: "mismatch-alpha".to_string(),
+                head_action_hash: ActionHashB64::from(alpha.action_hash.clone()).to_string(),
+            },
+        )
+        .await;
+    assert_eq!(
+        ok.head_action_hash, alpha.action_hash,
+        "a matching-id declaration succeeds"
+    );
+
+    Ok(())
+}
+
+/// Defect 2 (tier-blind resolution): an EARNED canonical head must win at RESOLVE
+/// over a STAGING declaration with a strictly NEWER timestamp — the partition-heal
+/// hazard. The declare-time earned-head guard is local-only, so a partitioned peer
+/// that has not seen the earned link can write a newer staging link; once the
+/// partition heals every peer must still converge on the EARNED head.
+///
+/// Deterministic partition: both roots + both canonical declarations are made
+/// BEFORE peer-info exchange (each conductor's local view is empty), and the
+/// staging declare is sequenced strictly AFTER the earned one (with a sleep) so
+/// its DHT timestamp is provably newer. A tier-blind newest-wins resolver would
+/// return the staging root here.
+#[tokio::test(flavor = "multi_thread")]
+async fn earned_beats_newer_staging_at_resolve() -> Result<()> {
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
+    let seed = network_seed(DNA);
+    // a1 is the bootstrap steward (progenitor).
+    let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
+    let app1 = c1
+        .setup_app_for_agent("lamad-app", a1.clone(), &[dna_file.clone()])
+        .await?;
+    let app2 = c2
+        .setup_app_for_agent("lamad-app", a2.clone(), &[dna_file])
+        .await?;
+    let cell1 = app1.cells().first().unwrap().clone();
+    let cell2 = app2.cells().first().unwrap().clone();
+    let zome1 = cell1.zome("content_store");
+    let zome2 = cell2.zome("content_store");
+
+    // (a) Two INDEPENDENT roots for one id, authored BEFORE peer exchange (empty
+    // local views → both creates succeed). root_a is a1's; root_b is a2's.
+    let root_a: ContentOutput = c1
+        .call(&zome1, "create_content", test_content("tier-x"))
+        .await;
+    let root_a_action = root_a.action_hash.clone();
+    let root_b: ContentOutput = c2
+        .call(&zome2, "create_content", test_content("tier-x"))
+        .await;
+    let root_b_action = root_b.action_hash.clone();
+    assert_ne!(a1, a2, "the two agents must be distinct");
+
+    // (b) STILL PARTITIONED: a1 declares EARNED → root_a (local, progenitor). Then
+    // strictly LATER a2 declares STAGING → root_b (a2's guard sees no canonical
+    // locally → allowed). The staging link is therefore NEWER than the earned one.
+    let earned: ContentHeadOutput = c1
+        .call(
+            &zome1,
+            "declare_earned_canonical_head",
+            DeclareCanonicalHeadInput {
+                id: "tier-x".to_string(),
+                head_action_hash: ActionHashB64::from(root_a_action.clone()).to_string(),
+            },
+        )
+        .await;
+    assert_eq!(
+        earned.head_action_hash, root_a_action,
+        "earned head is a1's root"
+    );
+    sleep(Duration::from_millis(50)).await; // staging timestamp > earned timestamp
+    let staging: ContentHeadOutput = c2
+        .call(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: "tier-x".to_string(),
+                head_action_hash: ActionHashB64::from(root_b_action.clone()).to_string(),
+            },
+        )
+        .await;
+    assert_eq!(
+        staging.head_action_hash, root_b_action,
+        "the newer staging declare is accepted while partitioned"
+    );
+
+    // (c) Heal the partition: both roots + both canonical links gossip everywhere.
+    tokio::time::timeout(Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&c1, &c2]).await {
+            sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
+    await_consistency(60, [&cell1, &cell2])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
+
+    // (d) TIER-AWARE RESOLUTION: despite the staging link being strictly NEWER,
+    // BOTH peers resolve the EARNED head (root_a, authored a1). Poll c2 until the
+    // earned link has gossiped in and the tier guard engages.
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let head_c2: ContentHeadOutput = loop {
+        let h: Option<ContentHeadOutput> = c2
+            .call(&zome2, "resolve_content_head", "tier-x".to_string())
+            .await;
+        if let Some(h) = h {
+            if h.head_action_hash == root_a_action {
+                break h;
+            }
+        }
+        if Instant::now() >= deadline {
+            let cur: Option<ContentHeadOutput> = c2
+                .call(&zome2, "resolve_content_head", "tier-x".to_string())
+                .await;
+            panic!(
+                "c2 did not converge on the EARNED head within 30s; got {:?}",
+                cur.map(|h| h.head_action_hash)
+            );
+        }
+        sleep(Duration::from_millis(100)).await;
+    };
+    assert_eq!(
+        head_c2.author, a1,
+        "earned head is authored by the progenitor a1"
+    );
+
+    let head_c1: Option<ContentHeadOutput> = c1
+        .call(&zome1, "resolve_content_head", "tier-x".to_string())
+        .await;
+    let head_c1 = head_c1.expect("c1 must resolve the earned head");
+    assert_eq!(
+        head_c1.head_action_hash, root_a_action,
+        "c1 resolves the EARNED head over the newer staging"
+    );
+    assert_eq!(
+        head_c1.head_action_hash, head_c2.head_action_hash,
+        "CONVERGENCE: both peers resolve the earned head despite newer staging"
+    );
+
+    Ok(())
+}
