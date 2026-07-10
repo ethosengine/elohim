@@ -127,9 +127,10 @@ pub struct DhtBacking {
     /// each other still cannot handshake → partitioned (spec §2).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signal_url: Option<String>,
-    /// Whether the signal relay has a shared backend. FALSE today: the SBD
-    /// relay is a per-pod in-memory service with no shared store (spec §2 —
-    /// the current partition point), so relay identity is the URL alone.
+    /// Whether the signal relay has a shared backend. TRUE iff the mongo
+    /// SignalBus is active (selected when BOOTSTRAP_MONGODB_DB is set) —
+    /// sibling relays then bridge frames cross-pod. FALSE = per-pod
+    /// in-memory only, and relay identity is the URL alone (spec §2).
     pub signal_shared: bool,
 }
 
