@@ -10,6 +10,9 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "Maps the elohim capability-package tree into an eprfs ProjectionManifest"
+# Binary consumed via the dev/ci image build (like brit-verify), never as a
+# registry crate — its path deps stay path-only, so it must not publish.
+publish = false
 
 [[bin]]
 name = "eprfs-agent"

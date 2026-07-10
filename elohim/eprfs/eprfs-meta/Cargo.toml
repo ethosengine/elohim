@@ -6,9 +6,10 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "Parser and resolver for .epr-meta authored EPR meta coupling"
+publish = ["elohim"]
 
 [dependencies]
-eprfs-core = { path = "../eprfs-core" }
+eprfs-core = { version = "0.1.0", path = "../eprfs-core", registry = "elohim" }
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true

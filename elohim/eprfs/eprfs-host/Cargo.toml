@@ -6,6 +6,7 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "Host filesystem capability profiles for EPRFS materialization"
+publish = ["elohim"]
 
 [dependencies]
 serde.workspace = true

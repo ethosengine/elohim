@@ -6,14 +6,15 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "Local filesystem materialization for EPR-governed projections"
+publish = ["elohim"]
 
 [dependencies]
-eprfs-core = { path = "../eprfs-core" }
-eprfs-host = { path = "../eprfs-host" }
+eprfs-core = { version = "0.1.0", path = "../eprfs-core", registry = "elohim" }
+eprfs-host = { version = "0.1.0", path = "../eprfs-host", registry = "elohim" }
 serde_json.workspace = true
 tokio = { workspace = true, features = ["fs"] }
 
 [dev-dependencies]
 bytes.workspace = true
-eprfs-storage = { path = "../eprfs-storage" }
+eprfs-storage = { version = "0.1.0", path = "../eprfs-storage", registry = "elohim" }
 tokio.workspace = true
