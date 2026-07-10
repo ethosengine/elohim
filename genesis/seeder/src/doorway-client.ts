@@ -1185,33 +1185,93 @@ export class DoorwayClient {
       }
     }
 
-    let lastError: Error | null = null;
-    for (let attempt = 1; attempt <= this.config.retries; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
+    // Catching-up (projector-backpressure) retry budget — SEPARATE from the
+    // network-error retry below. Under seed load the projector re-enters the
+    // `catching-up` admission state and SHEDS writes with
+    // 503 {"status":"catching-up"} (genesis #1079/#1182/#1191 — the seed itself
+    // backlogs the projector, so the up-front wait-storage-ready gate cannot
+    // prevent a shed the seeding causes). A shed write was REJECTED, not lost —
+    // retry the whole request until the projector drains, respecting
+    // Retry-After. Bounded; on exhaustion the 503 is returned (reconstructed so
+    // the body stays readable) and the caller's own handling runs unchanged.
+    // Mirrors queueImport()'s catching-up loop, hoisted here so EVERY seed path
+    // (stewardship / projections / commitments / operator-bindings) is
+    // resilient, not just /import.
+    const catchingUpMax = 12;
 
-        const response = await fetch(url, {
-          method: options.method || 'GET',
-          headers,
-          body,
-          signal: controller.signal,
-        });
+    for (let catchingUpAttempt = 0; ; catchingUpAttempt++) {
+      let lastError: Error | null = null;
+      let response: Response | null = null;
 
-        clearTimeout(timeoutId);
-        return response;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
+      for (let attempt = 1; attempt <= this.config.retries; attempt++) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        if (attempt < this.config.retries) {
-          // Exponential backoff
-          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          response = await fetch(url, {
+            method: options.method || 'GET',
+            headers,
+            body,
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+          break;
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+
+          if (attempt < this.config.retries) {
+            // Exponential backoff
+            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
         }
       }
-    }
 
-    throw lastError || new Error('Request failed after retries');
+      if (!response) {
+        throw lastError || new Error('Request failed after retries');
+      }
+
+      // Non-503 responses return untouched (body stream unconsumed).
+      if (response.status !== 503) {
+        return response;
+      }
+
+      // 503: inspect the body for the catching-up shed marker. Reading the body
+      // consumes the stream, so we always reconstruct a fresh Response before
+      // handing it back to the caller.
+      const text = await response.text();
+      const isCatchingUp = (() => {
+        try {
+          return (JSON.parse(text) as { status?: string })?.status === 'catching-up';
+        } catch {
+          return false;
+        }
+      })();
+
+      if (isCatchingUp && catchingUpAttempt < catchingUpMax) {
+        const retryAfterRaw = response.headers.get('Retry-After');
+        const retryAfterSecs = retryAfterRaw ? parseInt(retryAfterRaw, 10) : NaN;
+        const delay = Math.min(
+          Number.isFinite(retryAfterSecs) ? retryAfterSecs * 1000 : 5000,
+          15000
+        );
+        console.log(
+          `   ⏳ Projector catching-up (503) on ${options.method || 'GET'} ${path} — ` +
+            `retry ${catchingUpAttempt + 1}/${catchingUpMax} in ${delay / 1000}s`
+        );
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      // Not a catching-up shed, or the budget is exhausted: hand back a
+      // readable 503 so the caller's status/body checks run unchanged.
+      return new Response(text, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      });
+    }
   }
 }
 
