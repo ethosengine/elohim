@@ -1,0 +1,77 @@
+{
+  "$id": "elohim-agent:schema:package:agent-doc",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentDocPackage",
+  "description": "Canonical Elohim-native package for an agent-doc (CLAUDE.md / AGENTS.md) — GOSPEL / managed-memory markdown. The runtime doc file is a byte-identical projection of source.body (frontmatter incl. cite envelopes + body, verbatim); the flip (master: package) moves authority into the package WITHOUT rewriting the doc, so cite-gen remains the sole author of the doc's id:/cites: frontmatter and the fingerprints survive intact.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "source", "projections"],
+  "properties": {
+    "apiVersion": { "const": "elohim-agent/v1alpha1" },
+    "kind": { "const": "AgentDocPackage" },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "version",
+        "description",
+        "sourceRuntime",
+        "runtimeTargets",
+        "assetRefs"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "sourceRuntime": { "enum": ["claude", "codex", "elohim-agent"] },
+        "runtimeTargets": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["claude", "codex"] }
+        },
+        "docPath": { "type": "string", "minLength": 1 },
+        "gospelId": { "type": "string", "minLength": 1 },
+        "composedBy": { "type": "string", "minLength": 1 },
+        "master": { "enum": ["source", "package"] },
+        "assetRefs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": true
+    },
+    "source": {
+      "type": "object",
+      "required": ["language", "path", "body"],
+      "properties": {
+        "language": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "body": { "type": "string", "minLength": 1 },
+        "cid": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "composition": { "type": "string", "minLength": 1 },
+    "projections": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "claude": {
+          "type": "object",
+          "required": ["path"],
+          "properties": { "path": { "type": "string", "minLength": 1 } },
+          "additionalProperties": false
+        },
+        "codex": {
+          "type": "object",
+          "required": ["path"],
+          "properties": { "path": { "type": "string", "minLength": 1 } },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

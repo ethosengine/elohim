@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, relative, resolve } from 'node:path';
+import { basename, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {
@@ -11,6 +11,13 @@ import {
   projectHook,
   verifyHookPackage,
 } from './hook-package.mjs';
+import {
+  AGENT_DOC_KIND,
+  agentDocPackageFromSource,
+  projectAgentDoc,
+  runtimeForDoc,
+  verifyAgentDocPackage,
+} from './agent-doc-packages.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DOMAIN_DIR = resolve(__dirname, '..');
@@ -575,6 +582,10 @@ async function loadSourcePackages({ skillDir = SKILL_SOURCE_DIR, agentDir = AGEN
     sourcePackages.push(pkg);
   }
 
+  for (const pkg of await loadSourceDocs()) {
+    sourcePackages.push(pkg);
+  }
+
   return sourcePackages;
 }
 
@@ -613,11 +624,58 @@ async function loadSourceHooks() {
   return out;
 }
 
+// Agent-doc source loading is OPT-IN and package-driven — mirroring the hook
+// path, and deliberately NOT a bulk readdir of all 142 CLAUDE.mds. Only ADOPTED
+// docs (those with a package under .epr-meta/elohim/packages/agentdocs/) are
+// treated as source packages. This keeps planting scope-contained (plant ONE
+// gospel doc, prove it byte-identical, then the next) AND keeps the
+// imported-source-coverage gate honest — it never demands a package for an
+// un-adopted doc.
+//
+// Authority is read from the PACKAGE (a doc's frontmatter is owned by cite-gen
+// and must never carry an authority marker): a native (sourceRuntime
+// elohim-agent) or FLIPPED (master: package) agent-doc is package-first and is
+// NOT re-imported from source — its freshness is proved package-first via
+// project(package) === the doc file (verifyRuntimeProjectionIfPresent), byte-for-
+// byte, NOT the human-source fidelity gate. An un-flipped adopted doc IS
+// re-imported (source stays master) and guarded by verifySourceFidelity.
+async function loadSourceDocs() {
+  const docPkgDir = resolve(PACKAGE_DIR, 'agentdocs');
+  const files = await listJsonFiles(docPkgDir);
+  if (files.length === 0) return [];
+  const out = [];
+  for (const file of files) {
+    const pkg = await readJson(resolve(docPkgDir, file));
+    if (pkg.kind !== AGENT_DOC_KIND) continue;
+    if (pkg.metadata.sourceRuntime === 'elohim-agent' || pkg.metadata.master === 'package') continue;
+    const srcPath = resolve(REPO_ROOT, pkg.source.path);
+    const raw = await readIfExists(srcPath);
+    if (raw === null) continue;
+    out.push(
+      agentDocPackageFromSource(srcPath, raw, {
+        repoRoot: REPO_ROOT,
+        id: pkg.metadata.id,
+        governance: governanceFor('agentdocs', pkg.metadata.id),
+        composition: pkg.composition,
+        composedBy: pkg.metadata.composedBy,
+      }),
+    );
+  }
+  return out;
+}
+
 function packagePathFor(pkg) {
   if (pkg.kind === HOOK_KIND) return resolve(PACKAGE_DIR, 'hooks', `${pkg.metadata.id}.json`);
+  if (pkg.kind === AGENT_DOC_KIND) return resolve(PACKAGE_DIR, 'agentdocs', `${pkg.metadata.id}.json`);
   return pkg.kind === 'SkillPackage'
     ? resolve(PACKAGE_DIR, 'skills', `${pkg.metadata.id}.json`)
     : resolve(PACKAGE_DIR, 'agents', `${pkg.metadata.id}.json`);
+}
+
+// An agent-doc has a SINGLE projection keyed by its one runtime (claude for
+// CLAUDE.md, codex for AGENTS.md) — never a cross-runtime fork.
+function agentDocRuntime(pkg) {
+  return Object.keys(pkg.projections)[0];
 }
 
 function projectionFixturePathsFor(pkg) {
@@ -626,6 +684,11 @@ function projectionFixturePathsFor(pkg) {
   // Object.keys(...) so they naturally do the right thing for one or two runtimes.
   if (pkg.kind === HOOK_KIND) {
     return { claude: resolve(PROJECTION_DIR, 'claude/hooks', `${pkg.metadata.id}.py`) };
+  }
+  if (pkg.kind === AGENT_DOC_KIND) {
+    const runtime = agentDocRuntime(pkg);
+    const base = basename(pkg.projections[runtime].path);
+    return { [runtime]: resolve(PROJECTION_DIR, runtime, 'agentdocs', pkg.metadata.id, base) };
   }
   return pkg.kind === 'SkillPackage'
     ? {
@@ -642,6 +705,10 @@ function runtimePathsFor(pkg) {
   if (pkg.kind === HOOK_KIND) {
     return { claude: resolve(REPO_ROOT, pkg.projections.claude.path) };
   }
+  if (pkg.kind === AGENT_DOC_KIND) {
+    const runtime = agentDocRuntime(pkg);
+    return { [runtime]: resolve(REPO_ROOT, pkg.projections[runtime].path) };
+  }
   return {
     claude: resolve(REPO_ROOT, pkg.projections.claude.path),
     codex: resolve(REPO_ROOT, pkg.projections.codex.path),
@@ -651,6 +718,9 @@ function runtimePathsFor(pkg) {
 function projectedTextFor(pkg, runtime) {
   // Hooks project VERBATIM (byte-for-byte passthrough) and are runtime-agnostic.
   if (pkg.kind === HOOK_KIND) return projectHook(pkg);
+  // Agent-docs project VERBATIM too — the ENTIRE raw file (frontmatter incl. cite
+  // envelopes + body) emitted unchanged, so the flip never rewrites a gospel doc.
+  if (pkg.kind === AGENT_DOC_KIND) return projectAgentDoc(pkg);
   return runtime === 'claude' ? projectClaude(pkg) : projectCodex(pkg);
 }
 
@@ -683,6 +753,7 @@ async function initLayout() {
   await mkdir(resolve(PACKAGE_DIR, 'skills'), { recursive: true });
   await mkdir(resolve(PACKAGE_DIR, 'agents'), { recursive: true });
   await mkdir(resolve(PACKAGE_DIR, 'hooks'), { recursive: true });
+  await mkdir(resolve(PACKAGE_DIR, 'agentdocs'), { recursive: true });
   await mkdir(resolve(PROJECTION_DIR, 'claude'), { recursive: true });
   await mkdir(resolve(PROJECTION_DIR, 'codex'), { recursive: true });
   try {
@@ -700,13 +771,16 @@ async function loadPackageFixtures() {
   const skillsDir = resolve(PACKAGE_DIR, 'skills');
   const agentsDir = resolve(PACKAGE_DIR, 'agents');
   const hooksDir = resolve(PACKAGE_DIR, 'hooks');
+  const agentDocsDir = resolve(PACKAGE_DIR, 'agentdocs');
   const skillFiles = await listJsonFiles(skillsDir);
   const agentFiles = await listJsonFiles(agentsDir);
   const hookFiles = await listJsonFiles(hooksDir);
+  const agentDocFiles = await listJsonFiles(agentDocsDir);
   return [
     ...(await Promise.all(skillFiles.map((file) => readJson(resolve(skillsDir, file))))),
     ...(await Promise.all(agentFiles.map((file) => readJson(resolve(agentsDir, file))))),
     ...(await Promise.all(hookFiles.map((file) => readJson(resolve(hooksDir, file))))),
+    ...(await Promise.all(agentDocFiles.map((file) => readJson(resolve(agentDocsDir, file))))),
   ];
 }
 
@@ -715,10 +789,14 @@ async function loadValidators() {
   const skillSchema = await readJson(resolve(DOMAIN_DIR, 'schemas/skill-package.schema.json'));
   const agentSchema = await readJson(resolve(DOMAIN_DIR, 'schemas/agent-package.schema.json'));
   const hookSchema = await readJson(resolve(DOMAIN_DIR, 'schemas/hook-package.schema.json'));
+  const agentDocSchema = await readJson(
+    resolve(DOMAIN_DIR, 'schemas/agent-doc-package.schema.json'),
+  );
   return {
     skill: ajv.compile(skillSchema),
     agent: ajv.compile(agentSchema),
     hook: ajv.compile(hookSchema),
+    agentdoc: ajv.compile(agentDocSchema),
   };
 }
 
@@ -728,7 +806,9 @@ async function verifyPackage(pkg, validators, settings) {
       ? validators.skill
       : pkg.kind === HOOK_KIND
         ? validators.hook
-        : validators.agent;
+        : pkg.kind === AGENT_DOC_KIND
+          ? validators.agentdoc
+          : validators.agent;
   assert(
     validate(pkg),
     `${pkg.kind} package ${pkg.metadata.id} validates: ${JSON.stringify(validate.errors)}`,
@@ -759,6 +839,25 @@ async function verifyPackage(pkg, validators, settings) {
     // source.body exactly (strict `===`, transform-free). Claude-only for hooks.
     await verifyProjectionFixture(pkg, 'claude');
     await verifyRuntimeProjectionIfPresent(pkg, 'claude');
+    return;
+  }
+
+  if (pkg.kind === AGENT_DOC_KIND) {
+    // Agent-docs are GOSPEL markdown, not markdown+frontmatter-package: skip
+    // every markdown-package-only assertion (frontmatter description round-trip,
+    // agent tool round-trip, codex governance backref). The agent-doc-specific
+    // gates live in the module. The doc-plant floor is BYTE-IDENTITY — the
+    // projected fixture and the runtime doc must equal source.body EXACTLY
+    // (strict `===`, transform-free, verbatim frontmatter incl. cite envelopes),
+    // proving the flip never rewrote a single byte of the gospel doc.
+    verifyAgentDocPackage(pkg, { assert });
+    assert(
+      Boolean(pkg.metadata.governance?.eprRef),
+      `${pkg.metadata.id} has metadata.governance.eprRef`,
+    );
+    const runtime = agentDocRuntime(pkg);
+    await verifyProjectionFixture(pkg, runtime);
+    await verifyRuntimeProjectionIfPresent(pkg, runtime);
     return;
   }
 
@@ -1187,6 +1286,50 @@ async function runSelfTest() {
     assert(
       !/\ncolor:/.test(flippedAgentCodex),
       'selftest(d): flipped agent .codex omits color (claude-only field)',
+    );
+
+    // (e) Agent-doc plant is BYTE-IDENTITY under the FLIP: import copies the
+    //     ENTIRE raw file (frontmatter incl. a cite envelope + body) verbatim and
+    //     project returns it unchanged, so a gospel CLAUDE.md and its cite
+    //     fingerprint survive byte-for-byte. Proven in memory on a synthetic doc
+    //     carrying a real-shaped `cites:` envelope with a sha256 fingerprint.
+    const docRaw =
+      '---\n' +
+      'id: synthetic-doc-gospel\n' +
+      'cites:\n' +
+      '  - some-target | why it is cited | sha256:deadbeefcafe0001 | path: some/target.md\n' +
+      '---\n\n' +
+      '# Synthetic Doc\n\nGospel body for the agent-doc flip self-test.\n';
+    const docPath = resolve(sandbox, 'synthetic/CLAUDE.md');
+    const importedDoc = agentDocPackageFromSource(docPath, docRaw, {
+      repoRoot: sandbox,
+      id: 'synthetic-doc-gospel',
+      governance: governanceFor('agentdocs', 'synthetic-doc-gospel'),
+      composition: 'composes as a leaf gospel doc; managed verbatim by its package.',
+      composedBy: 'selftest',
+      master: 'package',
+    });
+    assert(
+      projectAgentDoc(importedDoc) === docRaw,
+      'selftest(e): project(import(agent-doc)) === source, byte-for-byte (verbatim frontmatter + cites + body)',
+    );
+    assert(
+      projectAgentDoc(importedDoc).includes('sha256:deadbeefcafe0001'),
+      'selftest(e): the cite envelope fingerprint survives the flip byte-identical',
+    );
+    assert(
+      importedDoc.metadata.gospelId === 'synthetic-doc-gospel' &&
+        importedDoc.metadata.master === 'package',
+      'selftest(e): agent-doc records gospelId + master:package in the PACKAGE (not the doc surface)',
+    );
+    assert(
+      !/(^|\n)\s*master:\s*package\b/.test(docRaw),
+      'selftest(e): the doc surface itself carries NO authority marker (cite-gen owns the frontmatter)',
+    );
+    assert(
+      runtimeForDoc(docPath) === 'claude' &&
+        runtimeForDoc(resolve(sandbox, 'x/AGENTS.md')) === 'codex',
+      'selftest(e): runtime is fixed by basename (CLAUDE.md→claude, AGENTS.md→codex)',
     );
   } finally {
     await rm(sandbox, { recursive: true, force: true });

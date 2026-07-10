@@ -1,0 +1,39 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "AgentDocPackage",
+  "metadata": {
+    "id": "mishpat-domain-gospel",
+    "name": "mishpat-domain-gospel",
+    "version": "1.0.0",
+    "description": "Mishpat (judgment / governance) design domain gospel — the notarized validator layer (governance-actions, attestations, observation kinds) that qahal escalates into. Composes ON the shared protocol substrate it cites.",
+    "sourceRuntime": "claude",
+    "runtimeTargets": [
+      "claude"
+    ],
+    "docPath": "elohim/sdk/domains/mishpat/CLAUDE.md",
+    "gospelId": "mishpat-domain-gospel",
+    "assetRefs": [],
+    "master": "package",
+    "composedBy": "claude-opus-4-8",
+    "governance": {
+      "eprRef": "epr:elohim-agent/agentdocs/mishpat-domain-gospel",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "source": {
+    "language": "markdown",
+    "path": "elohim/sdk/domains/mishpat/CLAUDE.md",
+    "body": "---\nid: mishpat-domain-gospel\ncites:\n  - elohim-protocol-specification | the shared protocol substrate this governance domain validates decisions over — qahal escalates into mishpat judgment | sha256:659b0d47078b298f | path: genesis/docs/content/elohim-protocol/protocol-specification.md\n---\n\n# Mishpat Domain\n\nThe **mishpat (judgment / governance) design domain** — the validation layer: proposals, challenges,\ngate-decisions, deliberation, attestations. Mishpat is the notarized *validator* of community decisions —\nqahal is the app/social governance surface; mishpat is the judgment substrate it escalates into.\n\n## Layer below (what this domain assumes)\n\nMishpat composes ON the shared protocol substrate (the cited `elohim-protocol-specification`) — it adds\ngovernance-actions, attestations, and observation kinds, but does not redesign the substrate. Its\nplans/specs work the layer above; a substrate change drifts this gospel STALE. Vocabulary lives in\n`manifest.json`; the running implementation is the mishpat DNA.\n\n## Owns\n\n- `governance-actions` — the validated decision/challenge/appeal verbs\n- `attestations` — judgment-bearing claims\n- `observation_kinds` — governance observation vocabulary\n\n## See Also\n\n- Domains pattern: `elohim/sdk/domains/CLAUDE.md`\n- Implementation: `elohim/holochain/dna/mishpat/` (under `holochain-integrity-layer-gospel`)\n- Substrate: `elohim-protocol-specification` (the layer below — assumed, not redesigned)\n"
+  },
+  "composition": "A leaf domain-gospel: it composes ON the shared protocol substrate it cites (elohim-protocol-specification) and is composed-under by the mishpat DNA implementation gospel (holochain-integrity-layer-gospel). Managed verbatim by this package — the doc surface stays cite-gen authored; the single sha256 cite envelope into the protocol spec is preserved byte-identical, and a substrate change drifts this gospel STALE (a re-import signal), never a projector rewrite.",
+  "projections": {
+    "claude": {
+      "path": "elohim/sdk/domains/mishpat/CLAUDE.md"
+    }
+  }
+}
