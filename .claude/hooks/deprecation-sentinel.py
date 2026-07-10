@@ -203,6 +203,43 @@ ECHO_LOCKFILE_VERSION_META_RE = re.compile(
     r'version\s*=\s*"[^"]*\+deprecated"', re.IGNORECASE
 )
 
+# Guard G — in-source DEPRECATED section-header / doc-comment self-capture:
+#   A scope-pass grep or cat of the codebase's OWN source surfaces comment
+#   banners and doc-comments that NARRATE a deliberate, migration-retained
+#   deprecation. content_store/src/lib.rs, for example, carries section
+#   headers `// Learning Path Operations (DEPRECATED)` and doc-comments
+#   `/// DEPRECATED: Use create_content with content_type "path" instead.`
+#   above zome fns that INTENTIONALLY return a deprecation error and are
+#   retained by design for reading existing DHT entries during migration
+#   (see elohim/holochain/dna/CLAUDE.md — the DHT is a notary; deprecated
+#   write paths error, read paths stay). These lines are the deprecation-
+#   IMPLEMENTATION surface, not a live in-flight toolchain warning. Any
+#   re-scan re-emits them, and `grep -n` / `-A` context prefixes (plus sed
+#   rewrites that strip the leading `//`, as the capturing pipeline did) mint
+#   a FRESH line-number-bearing fingerprint each run, so fp-dedupe can never
+#   collapse the class — only a structural guard can (same defeat as Guards
+#   B/D/F). Two shapes, both ZERO true-positive because live toolchain
+#   deprecations are lowercase prose (`use of deprecated`, `npm warn
+#   deprecated`, Vitest `DEPRECATED: <prose>`, `DeprecationWarning`) and NEVER
+#   a trailing all-caps `(DEPRECATED)` section label nor a `//`-prefixed
+#   source-comment line:
+#     G1) a trailing all-caps parenthesized section label `(DEPRECATED)$`
+#         — covers `4085  Learning Path Operations (DEPRECATED)` from the
+#         section-header grep, and a cat'd `// Chapter Operations (DEPRECATED)`.
+#     G2) a source line-comment / doc-comment (`//`, `///`, `//!`) that
+#         mentions DEPRECATED — covers a `grep -rn DEPRECATED lib.rs` scope
+#         pass emitting `lib.rs:4164:/// DEPRECATED: Use create_content …`.
+#   Diff hunks (lines starting `+` / `-`) are exempt at the call site — a
+#   commit that ADDS a #[deprecated] attribute or a deprecation doc-comment
+#   must still capture. (Three triage dispatches on 2026-07-10 —
+#   2730dafbdcc2 / e06ddf1806ad / c1065020cbb6 — were this class, from a
+#   content_store section-header scope grep; the fns are intentionally
+#   deprecated-and-retained, so there was no live concern to canonicalize.)
+ECHO_SRC_DEPRECATED_BANNER_RE = re.compile(r"\(DEPRECATED\)\s*$")
+ECHO_SRC_DEPRECATED_COMMENT_RE = re.compile(
+    r"^(?:[^\s:]+:)?\d*[:-]?\s*//[/!]?.*\bDEPRECATED\b", re.IGNORECASE
+)
+
 # Command-level gates for echo classes B and C: if the command itself is a pure
 # git history read (git log / git show without a -p / --patch flag) or reads
 # directly from the history / planning / SDD prose trees, ALL lines from that
@@ -241,6 +278,13 @@ def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool
       F) Cargo lock/manifest version-metadata (`version = "…+deprecated"`) —
          a crates.io semver build-metadata suffix, registry metadata not a live
          toolchain warning; `grep -n` prefixes defeat fp-dedupe.
+      G) In-source DEPRECATED section-header / doc-comment surfaced by a
+         grep/cat of the codebase's own source — a trailing all-caps
+         `(DEPRECATED)` section label or a `//`/`///` comment mentioning
+         DEPRECATED. The deprecation-IMPLEMENTATION surface (deliberate,
+         migration-retained), not a live warning; `grep -n` prefixes defeat
+         fp-dedupe. Diff hunks (+/-) are exempt so a real added annotation
+         still captures.
     """
     # Guard A — ledger self-capture
     if ECHO_LEDGER_PATH.search(line):
@@ -260,6 +304,14 @@ def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool
     # Guard E — agentic tooling-source echo (.claude/ paths, review-finding
     # markers): our own governance tooling talking about deprecations/vulns.
     if ECHO_TOOLING_SOURCE_RE.search(line):
+        return True
+
+    # Guard G — in-source DEPRECATED section-header / doc-comment self-capture.
+    # Exempt diff hunks (+/-) so a commit ADDING a real annotation still captures.
+    if not line.startswith(("+", "-")) and (
+        ECHO_SRC_DEPRECATED_BANNER_RE.search(line)
+        or ECHO_SRC_DEPRECATED_COMMENT_RE.search(line)
+    ):
         return True
 
     # Guard B — history prose (grep output carries file path in the line;
