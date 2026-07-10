@@ -1,0 +1,30 @@
+---
+epr-meta-version: 1
+id: capability-package-governance
+purpose: >
+  Governs the elohim-native capability package tree — the JSON packages under
+  `agents/` and `skills/` that are the canonical source for generated Claude/Codex runtime
+  surfaces (`.claude/{agents,skills}/*`, `.codex/{agents,skills}/*`; see
+  `.claude/skills/elohim-package-authoring/SKILL.md`). Binds the `capability-governance` policy
+  (observation tier — never blocks) so editing a package surfaces the re-import discipline: run
+  `package-projections.mjs verify` (and regenerate when intended) before the runtime projections
+  are trusted again.
+rules:
+  - id: capability-package-governance
+    policy: capability-governance@1
+---
+
+# `.epr-meta/elohim/packages` — capability package governance
+
+Binds `capability-governance@1` from the policy registry (`.claude/epr-meta/policies.yaml`):
+`*.json` writes under this tree are measured against a soft/hard LoC ceiling (observation tier —
+never blocks). The policy's `why` names the real discipline this tree lives by: a package here is
+the source of truth, `.claude/*` and `.codex/*` are its generated projections — after editing a
+package, run:
+
+```
+node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify
+```
+
+and regenerate with `--write-fixtures --write-runtime` when the projections should move. Never
+hand-edit the generated `.claude/`/`.codex/` surfaces directly.

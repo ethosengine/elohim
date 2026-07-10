@@ -62,3 +62,26 @@ policies:
       MEMORY.md index — it is unrecallable, which defeats the only purpose of writing it.
       Add frontmatter: name (slug), title (<= 60 chars), description (ONE line, <= 160
       chars: what the fact is + when it bites), metadata.type (user|feedback|project|reference).
+
+  - id: capability-governance
+    version: 1
+    title: Capability package governance — re-import after editing its projection
+    binding: observation
+    class: measure
+    scope: { write: "*.json" }
+    measure:
+      loc-soft: 200
+      loc-hard: 500
+    status: active
+    established_by: operator-2026-07-10
+    why: >
+      Packages under `.epr-meta/elohim/packages/{agents,skills}` are the canonical source for
+      generated Claude/Codex runtime surfaces (`.claude/{agents,skills}/*`,
+      `.codex/{agents,skills}/*`) — edit the package JSON, then re-run
+      `node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify` (regenerate
+      with `--write-fixtures --write-runtime` when the projections should move) before commit, or
+      the runtime surfaces silently drift from their source of truth. Observation tier: never
+      blocks a package edit — the projection-drift check itself is the real gate (pre-push /
+      verify), this rule only measures. The soft/hard LoC ceiling doubles as a growth signal: a
+      package whose embedded instructions body has outgrown one file should split into a
+      referenced asset or a second package rather than balloon.
