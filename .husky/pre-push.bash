@@ -165,6 +165,48 @@ if [ -z "$CHANGED" ]; then
   exit 0
 fi
 
+# ── Elohim-agent package projection freshness ────────────────────
+#
+# `.epr-meta/elohim/packages/**` is the canonical authoring surface for
+# Elohim-native skills/agents (see the elohim-package-authoring skill);
+# `.claude/skills/**`, `.claude/agents/**`, and `.codex/**` are GENERATED
+# projections of those packages, never hand-edited independently. When any
+# of these paths change in this push range, verify the projections are
+# still fresh relative to their package source — the same class of
+# generated-artifact freshness check as .ci-ignore/schema-codegen below,
+# just for the agent/skill capability surface instead of code/schema.
+#
+# MUST run on the raw (pre-.ci-ignore-filter) $CHANGED and before the filter's
+# early exit: .ci-ignore lists a broad `.claude/` prefix (CI doesn't need to
+# build on agent/skill-only edits), which would otherwise silently drop
+# `.claude/skills/**` / `.claude/agents/**` out of $CHANGED — and, if those
+# were the ONLY paths touched, exit the whole hook at "All changes are
+# .ci-ignore'd" before this check ever ran. Local governance still cares even
+# when CI doesn't build.
+#
+# Pure node (package-projections.mjs verify), no cargo — PVC-pressure-neutral,
+# never routed through run_gate/HEAVY_GATES. Fail-open if node is absent
+# (degraded shell) — same posture as the node-guarded blocks below.
+if echo "$CHANGED" | grep -qE "^\.epr-meta/elohim/|^\.claude/skills/|^\.claude/agents/|^\.codex/"; then
+  if command -v node >/dev/null 2>&1; then
+    echo "[pre-push] Verifying elohim-agent package projections (Claude/Codex) are fresh..."
+    if ! node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify; then
+      echo ""
+      echo "!!============================================================!!"
+      echo "!! ELOHIM-AGENT PACKAGE PROJECTION DRIFT DETECTED"
+      echo "!! .claude/skills, .claude/agents, or .codex is stale relative to"
+      echo "!! its .epr-meta/elohim/packages source (or vice versa)."
+      echo "!! Fix — regenerate the stale side, then stage it, then re-push:"
+      echo "!!   pnpm run elohim-agent:packages:project   (package -> runtime projection)"
+      echo "!!   pnpm run elohim-agent:packages:import    (runtime -> package import)"
+      echo "!!============================================================!!"
+      echo ""
+      exit 1
+    fi
+    echo "[pre-push] elohim-agent package projections ✓"
+  fi
+fi
+
 # ── .ci-ignore filter ─────────────────────────────────────────────
 #
 # Drop files that are listed in repo-root .ci-ignore (CLAUDE.md, .claude/,
@@ -284,16 +326,16 @@ if echo "$CHANGED" | grep -qE "^elohim/eprfs/"; then
   echo "[pre-push] eprfs gate ✓"
 fi
 
-# ── .ci-ignore freshness (projected from the .epr-meta ci-trigger cascade) ──
+# ── .ci-ignore freshness (projected from the .epr-meta manifest ci-trigger cascade) ──
 #
-# When any .epr-meta or the generated .ci-ignore changes, ensure .ci-ignore is
-# fresh relative to the root .epr-meta ci-trigger leg. Fail-open if python3 is
+# When any .epr-meta manifest or the generated .ci-ignore changes, ensure .ci-ignore is
+# fresh relative to the root .epr-meta manifest ci-trigger leg. Fail-open if python3 is
 # absent (degraded shell) — same posture as the node-guarded blocks above.
-if echo "$CHANGED" | grep -qE "(^|/)\.epr-meta$|^\.ci-ignore$"; then
+if echo "$CHANGED" | grep -qE "(^|/)\.epr-meta(/|$)|^\.ci-ignore$"; then
   if command -v python3 >/dev/null 2>&1; then
-    echo "[pre-push] Verifying .ci-ignore is fresh relative to the .epr-meta ci-trigger leg..."
+    echo "[pre-push] Verifying .ci-ignore is fresh relative to the .epr-meta manifest ci-trigger leg..."
     if ! python3 .claude/scripts/ci-ignore-projector.py --verify; then
-      echo "[pre-push] ERROR: .ci-ignore is stale relative to the root .epr-meta."
+      echo "[pre-push] ERROR: .ci-ignore is stale relative to the root .epr-meta manifest."
       echo "  Run: python3 .claude/scripts/ci-ignore-projector.py && git add .ci-ignore"
       exit 1
     fi
