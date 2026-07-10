@@ -198,6 +198,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-agent-adapter"
+version = "0.1.0"
+dependencies = [
+ "eprfs-core",
+ "serde_json",
+]
+
+[[package]]
 name = "eprfs-core"
 version = "0.1.0"
 dependencies = [

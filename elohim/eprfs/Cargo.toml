@@ -6,6 +6,7 @@ members = [
     "eprfs-local",
     "eprfs-meta",
     "eprfs-storage",
+    "../sdk/domains/elohim-agent/adapter",
 ]
 
 [workspace.package]

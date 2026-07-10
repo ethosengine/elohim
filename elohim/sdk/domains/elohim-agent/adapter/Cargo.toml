@@ -1,0 +1,16 @@
+[package]
+name = "elohim-agent-adapter"
+# Out-of-tree member of the eprfs workspace (physically under sdk/, which the
+# elohim/ workspace excludes) — this back-pointer names the workspace root so
+# `.workspace = true` inheritance resolves to eprfs, not the excluding parent.
+workspace = "../../../../eprfs"
+version.workspace = true
+edition = "2021"
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Maps the elohim capability-package tree into an eprfs ProjectionManifest"
+
+[dependencies]
+eprfs-core = { path = "../../../../eprfs/eprfs-core" }
+serde_json.workspace = true
