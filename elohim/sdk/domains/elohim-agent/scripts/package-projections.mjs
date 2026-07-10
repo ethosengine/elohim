@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +11,16 @@ const REPO_ROOT = resolve(DOMAIN_DIR, '../../../..');
 const EPR_META_DIR = resolve(REPO_ROOT, '.epr-meta');
 const PACKAGE_DIR = resolve(EPR_META_DIR, 'elohim/packages');
 const PROJECTION_DIR = resolve(EPR_META_DIR, 'elohim/projections');
+
+// Lodging surface (A2d): the seam where a rogue/non-compliant capability's
+// governance drift is recorded. Mirrors the findings-ledger contract used by
+// .claude/scripts/ci-harvest.py + runtime-harvest.py (deterministic
+// fingerprint, append-only JSONL, small cursor for dedup) — see
+// .claude/data/ci-findings.jsonl / .claude/data/runtime-findings.jsonl for
+// the sibling shapes this one was copied from.
+const GOVERNANCE_LEDGER_REL = '.claude/data/governance-findings.jsonl';
+const GOVERNANCE_LEDGER_PATH = resolve(REPO_ROOT, GOVERNANCE_LEDGER_REL);
+const GOVERNANCE_CURSOR_PATH = resolve(REPO_ROOT, '.claude/data/governance-cursor.json');
 
 const SKILL_SOURCE_DIR = resolve(REPO_ROOT, '.claude/skills');
 const AGENT_SOURCE_DIR = resolve(REPO_ROOT, '.claude/agents');
@@ -184,8 +195,69 @@ function governanceFor(kind, id) {
     eprRef: `epr:elohim-agent/${kind}/${id}`, // offline floor anchor; resolves to earned trust when the substrate is reachable
     policy: 'capability-governance@1',
     gates: ['epr-meta-resolver', 'elohim-agent:packages:verify'],
-    ledger: '.claude/data/governance-findings.jsonl',
+    ledger: GOVERNANCE_LEDGER_REL,
   };
+}
+
+// ── Lodging: dedup-guarded append to the governance-findings ledger ──
+
+function governanceFingerprint(kind, id, assertionClass) {
+  // Stable/deterministic: same drift (same package, same failing assertion
+  // class) always yields the same fingerprint, so it never re-fires once
+  // lodged — the whole point of the cursor dedup.
+  const norm = `${kind}:${id}:${assertionClass}`.toLowerCase();
+  return createHash('sha256').update(norm).digest('hex').slice(0, 12);
+}
+
+async function loadGovernanceCursor() {
+  const raw = await readIfExists(GOVERNANCE_CURSOR_PATH);
+  if (!raw) return { run: 0, known: {} };
+  try {
+    const parsed = JSON.parse(raw);
+    return { run: typeof parsed.run === 'number' ? parsed.run : 0, known: parsed.known ?? {} };
+  } catch {
+    return { run: 0, known: {} };
+  }
+}
+
+async function writeGovernanceCursor(cursor) {
+  await writeJson(GOVERNANCE_CURSOR_PATH, cursor);
+}
+
+async function appendGovernanceLedgerLine(entry) {
+  await mkdir(dirname(GOVERNANCE_LEDGER_PATH), { recursive: true });
+  const existing = (await readIfExists(GOVERNANCE_LEDGER_PATH)) ?? '';
+  await writeFile(GOVERNANCE_LEDGER_PATH, `${existing}${JSON.stringify(entry)}\n`, 'utf8');
+}
+
+async function lodgeGovernanceFinding({ fingerprint, kind, id, detail }) {
+  const cursor = await loadGovernanceCursor();
+  cursor.run += 1;
+  const known = cursor.known[fingerprint];
+  if (known && known.status === 'open') {
+    // Already lodged and still open: bump recurrence bookkeeping only —
+    // never append a duplicate line to the ledger.
+    known.last_run = cursor.run;
+    known.seen = (known.seen ?? 1) + 1;
+    await writeGovernanceCursor(cursor);
+    return { lodged: false, fingerprint };
+  }
+
+  const ts = new Date().toISOString();
+  await appendGovernanceLedgerLine({
+    ts,
+    fp: fingerprint,
+    class: 'governance-non-compliance',
+    kind,
+    id,
+    detail,
+    status: 'open',
+    first_seen: ts,
+    seen: 1,
+  });
+  cursor.known[fingerprint] = { status: 'open', first_run: cursor.run, last_run: cursor.run, seen: 1 };
+  await writeGovernanceCursor(cursor);
+  return { lodged: true, fingerprint };
 }
 
 function skillPackageFromClaude(path, parsed) {
@@ -516,10 +588,21 @@ async function verifyGovernanceBackref(pkg) {
   if (!eprRef) return;
   const paths = projectionFixturePathsFor(pkg);
   const codexFixture = await readIfExists(paths.codex);
+  const ok = typeof codexFixture === 'string' && codexFixture.includes(eprRef);
   assert(
-    typeof codexFixture === 'string' && codexFixture.includes(eprRef),
+    ok,
     `${pkg.metadata.id} governance backref matches package: codex projection fixture contains ${eprRef}`,
   );
+  if (!ok) {
+    await lodgeGovernanceFinding({
+      fingerprint: governanceFingerprint(pkg.kind, pkg.metadata.id, 'governance-backref'),
+      kind: pkg.kind,
+      id: pkg.metadata.id,
+      detail:
+        `governance backref missing/stale: codex projection fixture ` +
+        `${relative(REPO_ROOT, paths.codex)} does not contain expected eprRef ${eprRef}`,
+    });
+  }
 }
 
 async function verifyProjectionFixture(pkg, runtime) {
@@ -568,10 +651,18 @@ async function verifySourceFidelity(sourcePackages) {
     if (pkg.metadata.sourceRuntime !== 'claude') continue;
     const sourcePath = resolve(REPO_ROOT, pkg.projections.claude.path);
     const original = await readFile(sourcePath, 'utf8');
-    assert(
-      projectClaude(pkg) === original,
-      `fidelity: project(import(${pkg.kind}:${pkg.metadata.id})) === source`,
-    );
+    const ok = projectClaude(pkg) === original;
+    assert(ok, `fidelity: project(import(${pkg.kind}:${pkg.metadata.id})) === source`);
+    if (!ok) {
+      await lodgeGovernanceFinding({
+        fingerprint: governanceFingerprint(pkg.kind, pkg.metadata.id, 'fidelity'),
+        kind: pkg.kind,
+        id: pkg.metadata.id,
+        detail:
+          `source fidelity drift: project(import(...)) !== source ` +
+          `(${relative(REPO_ROOT, sourcePath)})`,
+      });
+    }
   }
 }
 
