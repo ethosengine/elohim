@@ -599,3 +599,145 @@ async fn declare_canonical_head_converges_independent_roots() -> Result<()> {
 
     Ok(())
 }
+
+/// Staging-tier marker + earned-head guard (notary-authority safety): the
+/// god-mode-open scaffold declare can only ever set/replace a STAGING canonical
+/// — it can neither clobber nor impersonate an EARNED head. Proves:
+///   b. after a1 (bootstrap steward / progenitor) declares an EARNED canonical
+///      for an id, a scaffold `declare_canonical_content_head` is REFUSED with
+///      "earned head is protected".
+///   c. scaffold-over-scaffold still works (newest STAGING declaration wins).
+///   + the earned tier is progenitor-gated: a non-steward (a2) is refused.
+/// (Cross-root convergence (a) and undeclared-fallthrough (d) are covered by
+/// `declare_canonical_head_converges_independent_roots`.)
+#[tokio::test(flavor = "multi_thread")]
+async fn earned_head_guard_and_scaffold_over_scaffold() -> Result<()> {
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
+    let seed = network_seed(DNA);
+    // a1 is the bootstrap steward (progenitor_pubkey in DNA properties).
+    let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
+    let app1 = c1
+        .setup_app_for_agent("lamad-app", a1.clone(), &[dna_file.clone()])
+        .await?;
+    let app2 = c2
+        .setup_app_for_agent("lamad-app", a2.clone(), &[dna_file])
+        .await?;
+    let cell1 = app1.cells().first().unwrap().clone();
+    let cell2 = app2.cells().first().unwrap().clone();
+    let zome1 = cell1.zome("content_store");
+    let zome2 = cell2.zome("content_store");
+
+    // --- Two independent roots for "guard-c" (authored before gossip), for the
+    // scaffold-over-scaffold case. a2 also authors so a1 can retarget to it.
+    let root_ca: ContentOutput = c1
+        .call(&zome1, "create_content", test_content("guard-c"))
+        .await;
+    let root_ca_action = root_ca.action_hash.clone();
+    let root_cb: ContentOutput = c2
+        .call(&zome2, "create_content", test_content("guard-c"))
+        .await;
+    let root_cb_action = root_cb.action_hash.clone();
+
+    tokio::time::timeout(Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&c1, &c2]).await {
+            sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
+    await_consistency(60, [&cell1, &cell2])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
+
+    // --- (c) scaffold-over-scaffold: a1 declares root_ca STAGING, then root_cb
+    // STAGING — both allowed (current is staging/unmarked, guard falls through).
+    let s1: ContentHeadOutput = c1
+        .call(
+            &zome1,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: "guard-c".to_string(),
+                head_action_hash: ActionHashB64::from(root_ca_action.clone()).to_string(),
+            },
+        )
+        .await;
+    assert_eq!(s1.head_action_hash, root_ca_action);
+    let s2: ContentHeadOutput = c1
+        .call(
+            &zome1,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: "guard-c".to_string(),
+                head_action_hash: ActionHashB64::from(root_cb_action.clone()).to_string(),
+            },
+        )
+        .await;
+    assert_eq!(
+        s2.head_action_hash, root_cb_action,
+        "scaffold-over-scaffold: a newer staging declaration is allowed"
+    );
+
+    // --- Earned tier is PROGENITOR-GATED: a2 (non-steward) is refused. a2
+    // authored root_cb, so it has "guard-c" content locally.
+    let a2_earned: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_earned_canonical_head",
+            DeclareCanonicalHeadInput {
+                id: "guard-c".to_string(),
+                head_action_hash: ActionHashB64::from(root_cb_action.clone()).to_string(),
+            },
+        )
+        .await;
+    assert!(
+        a2_earned.is_err(),
+        "non-steward earned declare must be rejected"
+    );
+    assert!(
+        format!("{:?}", a2_earned.unwrap_err()).contains("bootstrap steward"),
+        "earned gate error must name the bootstrap-steward restriction"
+    );
+
+    // --- (b) earned-head guard: a1 (progenitor) declares an EARNED canonical for
+    // "guard-b" (authored locally by a1), then a scaffold declare is REFUSED.
+    let root_b: ContentOutput = c1
+        .call(&zome1, "create_content", test_content("guard-b"))
+        .await;
+    let root_b_action = root_b.action_hash.clone();
+
+    let earned: ContentHeadOutput = c1
+        .call(
+            &zome1,
+            "declare_earned_canonical_head",
+            DeclareCanonicalHeadInput {
+                id: "guard-b".to_string(),
+                head_action_hash: ActionHashB64::from(root_b_action.clone()).to_string(),
+            },
+        )
+        .await;
+    assert_eq!(
+        earned.head_action_hash, root_b_action,
+        "earned head is a1's root"
+    );
+
+    let refused: std::result::Result<ContentHeadOutput, _> = c1
+        .call_fallible(
+            &zome1,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: "guard-b".to_string(),
+                head_action_hash: ActionHashB64::from(root_b_action.clone()).to_string(),
+            },
+        )
+        .await;
+    assert!(
+        refused.is_err(),
+        "scaffold declare must be refused once an earned canonical exists"
+    );
+    assert!(
+        format!("{:?}", refused.unwrap_err()).contains("earned head is protected"),
+        "guard error must contain the HTTP-mappable 'earned head is protected' substring"
+    );
+
+    Ok(())
+}

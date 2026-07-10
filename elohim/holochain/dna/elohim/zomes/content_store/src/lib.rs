@@ -2666,18 +2666,67 @@ fn gather_content_chain(id: &str) -> ExternResult<Option<(AgentPubKey, Vec<Recor
 /// `hash(anchor("content_id", id))`, and the two link sets never intersect.
 const CANONICAL_HEAD_ANCHOR: &str = "canonical_head";
 
+/// Canonical-head link-tag PROVENANCE markers (coordinator-only — carried in the
+/// reused `IdToContent` link tag, so no new entry/link type and no DNA-hash
+/// change). Two tiers on one trajectory:
+///   - STAGING: a god-mode SCAFFOLD declaration (the open `declare_canonical_
+///     content_head`). Overridable scaffold-over-scaffold; can NEVER clobber or
+///     impersonate an earned head.
+///   - EARNED: an authority declaration (Tier-1 progenitor stand-in today via
+///     `declare_earned_canonical_head`; the future Plan C5 reach-cohort +
+///     signature path replaces the gate, not the marker). Protected from the
+///     open scaffold by the earned-head guard.
+///
+/// FOLLOW-UP (documented, NOT wired here): the amber→green SERVE derivation —
+/// staging canonical => amber, earned => green — reads THIS marker. `resolve_
+/// content_head` intentionally does NOT change its trust output now; it still
+/// returns the head record regardless of tier. The marker is the durable anchor
+/// that derivation will key off. See notary-authority.feature.
+const CANONICAL_TAG_STAGING: &[u8] = b"canonical-head:staging";
+const CANONICAL_TAG_EARNED: &[u8] = b"canonical-head:earned";
+
 /// Create the DHT link that names `target` as the canonical cross-root head of
-/// `id`. Reuses `LinkTypes::IdToContent` from the `canonical_head` anchor
-/// (integrity `validate` returns `Valid` for every `RegisterCreateLink`, and no
-/// base/target type gate exists on `IdToContent`) — so this stays
-/// COORDINATOR-ONLY: no new link/entry type, no DNA-hash change, hot-swappable
-/// via `update_coordinators`. The link gossips to every peer; its DHT timestamp
-/// gives newest-declaration-wins semantics in `gather_canonical_head_record`.
-fn create_canonical_head_link(id: &str, target: &ActionHash) -> ExternResult<()> {
+/// `id`, tagged with its provenance (`tag` = `CANONICAL_TAG_STAGING` or
+/// `CANONICAL_TAG_EARNED`). Reuses `LinkTypes::IdToContent` from the
+/// `canonical_head` anchor (integrity `validate` returns `Valid` for every
+/// `RegisterCreateLink`, and no base/target type gate exists on `IdToContent`) —
+/// so this stays COORDINATOR-ONLY: no new link/entry type, no DNA-hash change,
+/// hot-swappable via `update_coordinators`. The link gossips to every peer; its
+/// DHT timestamp gives newest-declaration-wins semantics in
+/// `gather_canonical_head_record`.
+fn create_canonical_head_link(id: &str, target: &ActionHash, tag: &[u8]) -> ExternResult<()> {
     let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    create_link(anchor_hash, target.clone(), LinkTypes::IdToContent, ())?;
+    create_link(
+        anchor_hash,
+        target.clone(),
+        LinkTypes::IdToContent,
+        LinkTag::new(tag.to_vec()),
+    )?;
     Ok(())
+}
+
+/// The newest canonical-head declaration LINK for `id` (by DHT timestamp),
+/// regardless of whether its target Content is retrievable yet. Used by the
+/// earned-head guard to read the CURRENT canonical's provenance — the guard must
+/// protect an earned head even if its target has not gossiped in locally.
+fn newest_canonical_link(id: &str) -> ExternResult<Option<Link>> {
+    let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
+    let mut links = get_links(query, GetStrategy::default())?;
+    if links.is_empty() {
+        return Ok(None);
+    }
+    links.sort_by_key(|l| l.timestamp);
+    Ok(links.pop())
+}
+
+/// True iff a canonical-head link carries the EARNED provenance marker. An
+/// unmarked/empty or STAGING tag reads as NOT earned (safe default: an unmarked
+/// declaration never gains earned protection, so the scaffold stays flexible).
+fn canonical_link_is_earned(link: &Link) -> bool {
+    link.tag.0.as_slice() == CANONICAL_TAG_EARNED
 }
 
 /// Resolve the declared canonical cross-root head record for `id`, if one has
@@ -2928,8 +2977,60 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
     Ok(out)
 }
 
-/// Declare the CROSS-ROOT canonical head of a content id (notary-authority
-/// convergence, Model B / Tier-1 steward-declared binding).
+/// Shared body for both canonical-head declaration tiers: validate the id +
+/// cross-root target, write the canonical-head link with the given provenance
+/// `tag`, emit the reused `ContentHeadDeclared` signal, and build the output.
+/// Callers own the AUTHORITY decision (which tier / who may declare) and the
+/// earned-head guard BEFORE calling this.
+fn declare_canonical_head_inner(
+    id: &str,
+    head_action_hash: holo_hash::ActionHashB64,
+    tag: &[u8],
+) -> ExternResult<ContentHeadOutput> {
+    // The id must exist as content (guards typos / declaring a phantom id).
+    if gather_content_chain(id)?.is_none() {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_canonical_head: no content found for id '{id}'"
+        ))));
+    }
+
+    // Resolve + validate the cross-root target: must be a retrievable Content
+    // record. `ActionHash::from(ActionHashB64)` is the inner-hash unwrap.
+    let target = ActionHash::from(head_action_hash);
+    let target_record = get(target.clone(), GetOptions::default())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_canonical_head: target action {target:?} is not retrievable"
+        )))
+    })?;
+    // Confirm it carries a Content entry (build_content_head_output would also
+    // catch this, but we validate up front for a clearer error).
+    let _content: Content = target_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "declare_canonical_head: target action {target:?} carries no Content entry"
+            )))
+        })?;
+
+    // Record the canonical-head link (coordinator-only, gossips to all peers).
+    create_canonical_head_link(id, &target, tag)?;
+
+    let out = build_content_head_output(id, &target_record)?;
+    // Reuse the existing declared-head projection signal — storage's
+    // `stamp_declared_head` path stamps the canonical head + blob on every peer.
+    emit_signal(ProjectionSignal::ContentHeadDeclared {
+        content_id: out.content_id.clone(),
+        head_action_hash: out.head_action_hash.clone(),
+        entry_hash: out.entry_hash.clone(),
+        author: out.author.clone(),
+    })?;
+    Ok(out)
+}
+
+/// Declare the CROSS-ROOT canonical head of a content id — the STAGING/scaffold
+/// tier (notary-authority convergence, Model B / Tier-1 steward-declared binding).
 ///
 /// This is the head-election kernel the author-gated [`declare_content_head`]
 /// cannot serve: it names ANY retrievable Content action — including one
@@ -2947,8 +3048,17 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
 /// DEV-TIME SCAFFOLD (god-mode open today) that is the earned-authority seam,
 /// NOT first-writer-wins. See that fn's doc for the replacement path.
 ///
-/// Errors (Guest): unauthorized declarer; unknown id (no content exists);
-/// target action not retrievable; or target action carries no Content entry.
+/// EARNED-HEAD GUARD (partition/impersonation safety): every declaration here is
+/// marked STAGING, and it REFUSES ("earned head is protected") when the id's
+/// current canonical head is EARNED. So pointed at ANY id, the god-mode-open
+/// declare can only ever set/replace a STAGING canonical — it can neither clobber
+/// nor masquerade as an earned/prod head. Scaffold-over-scaffold stays allowed
+/// (newest-wins, for demo iteration). Inert today (no earned heads exist); it is
+/// forward-protection that engages the moment the earned path lands.
+///
+/// Errors (Guest): unauthorized declarer; earned-head protected; unknown id
+/// (no content exists); target action not retrievable; or target action carries
+/// no Content entry.
 #[hdk_extern]
 pub fn declare_canonical_content_head(
     input: DeclareCanonicalHeadInput,
@@ -2957,47 +3067,50 @@ pub fn declare_canonical_content_head(
     let me = agent_info()?.agent_initial_pubkey;
     authorize_canonical_head_declarer(&me)?;
 
-    // The id must exist as content (guards typos / declaring a phantom id).
-    if gather_content_chain(&input.id)?.is_none() {
+    // EARNED-HEAD GUARD: the open scaffold may set/replace a STAGING canonical
+    // but must never override or impersonate an EARNED one. Scaffold-over-
+    // scaffold (current == staging/unmarked) falls through and is allowed.
+    if let Some(current) = newest_canonical_link(&input.id)? {
+        if canonical_link_is_earned(&current) {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "declare_canonical_content_head: earned head is protected for id '{}' — \
+                 the staging scaffold cannot override an earned canonical",
+                input.id
+            ))));
+        }
+    }
+
+    declare_canonical_head_inner(&input.id, input.head_action_hash, CANONICAL_TAG_STAGING)
+}
+
+/// Declare the CROSS-ROOT canonical head of a content id — the EARNED tier.
+///
+/// This writes the EARNED provenance marker that [`declare_canonical_content_head`]'s
+/// guard protects. It is the strict, single-agent forebear of the Plan C5
+/// earned-authority substrate (reach-cohort edit-membership + author/community
+/// signature): the future path replaces the GATE below, not the marker or this
+/// function's contract. Authority is restricted to the DNA bootstrap steward
+/// (progenitor) — the "genesis/deploy designates the canonical head" stand-in
+/// named in notary-authority.feature — so an earned head cannot be moved by an
+/// arbitrary peer even before C5 lands. Coordinator-only (same reused
+/// `IdToContent` link); no guard (earned may override staging or a prior earned,
+/// newest-wins — the progenitor is trusted).
+///
+/// Errors (Guest): caller is not the bootstrap steward; unknown id; target not
+/// retrievable; or target carries no Content entry.
+#[hdk_extern]
+pub fn declare_earned_canonical_head(
+    input: DeclareCanonicalHeadInput,
+) -> ExternResult<ContentHeadOutput> {
+    // EARNED-AUTHORITY GATE (Tier-1 progenitor stand-in for Plan C5).
+    if !am_i_bootstrap_steward()? {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "declare_canonical_content_head: no content found for id '{}'",
+            "declare_earned_canonical_head: earned canonical declaration is restricted to the \
+             bootstrap steward (progenitor) for id '{}'",
             input.id
         ))));
     }
-
-    // Resolve + validate the cross-root target: must be a retrievable Content
-    // record. `ActionHash::from(ActionHashB64)` is the inner-hash unwrap.
-    let target = ActionHash::from(input.head_action_hash);
-    let target_record = get(target.clone(), GetOptions::default())?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "declare_canonical_content_head: target action {target:?} is not retrievable"
-        )))
-    })?;
-    // Confirm it carries a Content entry (build_content_head_output would also
-    // catch this, but we validate up front for a clearer error).
-    let _content: Content = target_record
-        .entry()
-        .to_app_option()
-        .map_err(|e| wasm_error!(e))?
-        .ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "declare_canonical_content_head: target action {target:?} carries no Content entry"
-            )))
-        })?;
-
-    // Record the canonical-head link (coordinator-only, gossips to all peers).
-    create_canonical_head_link(&input.id, &target)?;
-
-    let out = build_content_head_output(&input.id, &target_record)?;
-    // Reuse the existing declared-head projection signal — storage's
-    // `stamp_declared_head` path stamps the canonical head + blob on every peer.
-    emit_signal(ProjectionSignal::ContentHeadDeclared {
-        content_id: out.content_id.clone(),
-        head_action_hash: out.head_action_hash.clone(),
-        entry_hash: out.entry_hash.clone(),
-        author: out.author.clone(),
-    })?;
-    Ok(out)
+    declare_canonical_head_inner(&input.id, input.head_action_hash, CANONICAL_TAG_EARNED)
 }
 
 /// Bulk create content entries (for import operations)
