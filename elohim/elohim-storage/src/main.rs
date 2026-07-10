@@ -483,9 +483,15 @@ async fn async_main(
     // `iroh.key` (via the same `load_or_generate_secret_key`) the iroh boot block
     // loads — idempotent (same file ⇒ same id), and equal to the iroh view-fed
     // service's local agent CID, so the resilience join is consistent.
+    // Dual policy: `self_cid` is derived from the libp2p identity for fleet
+    // continuity (legacy/status fields keep reporting the libp2p PeerId — see
+    // `TransportBackend::Dual` docs). So the libp2p branch handles both
+    // `Libp2p` and `Dual`; only pure `Iroh` derives self_cid from the iroh
+    // NodeId. The iroh NodeId is surfaced ADDITIONALLY on `/p2p/status` in
+    // Dual mode, never as the canonical self_cid.
     let node_transport: Option<Arc<dyn elohim_storage::node_transport::NodeTransport>> = if args
         .enable_p2p
-        && config.transport_backend == elohim_storage::config::TransportBackend::Libp2p
+        && config.transport_backend != elohim_storage::config::TransportBackend::Iroh
     {
         let identity_path = config.storage_dir.join("identity.key");
         // agent_pubkey does not affect peer_id; mirror the P2P node's hint
@@ -1856,12 +1862,12 @@ async fn async_main(
     };
 
     // Initialize P2P node if enabled.
-    // Gated on `transport_backend == Libp2p` so the iroh path can take over
-    // the P2P slot when selected (the two stacks are mutually exclusive at
-    // runtime — see plan).
+    // Built when the backend is anything other than pure `Iroh` — i.e. for
+    // `Libp2p` AND `Dual`. In `Dual` the iroh node is built alongside (below);
+    // the two share one `sync.sled` DocStore and one `DedupLru`.
     #[cfg(feature = "p2p")]
     let mut p2p_node = if args.enable_p2p
-        && config.transport_backend == elohim_storage::config::TransportBackend::Libp2p
+        && config.transport_backend != elohim_storage::config::TransportBackend::Iroh
     {
         let agent_pubkey = args.agent_pubkey.clone().unwrap_or_else(|| {
             // Generate a placeholder agent key if none provided
@@ -2123,7 +2129,7 @@ async fn async_main(
         Option<Arc<elohim_storage::p2p_iroh::IrohBlobStore>>,
         Option<Arc<elohim_storage::sync::SyncManager>>,
     ) = if args.enable_p2p
-        && config.transport_backend == elohim_storage::config::TransportBackend::Iroh
+        && config.transport_backend != elohim_storage::config::TransportBackend::Libp2p
     {
         use elohim_storage::epr_atom_service::EprAtomService;
         use elohim_storage::epr_service::EprService;
@@ -2145,19 +2151,40 @@ async fn async_main(
 
         let iroh_cfg = IrohConfig::from_storage_dir(&config.storage_dir);
 
-        // Sync backend — opens the same `sync.sled` directory the libp2p
-        // path uses (mirrors src/p2p/mod.rs:1472). Mode-exclusive at
-        // runtime so the two paths never contend for the lock.
-        let sync_sled_path = config.storage_dir.join("sync.sled");
-        let doc_store = match DocStore::at_path(&sync_sled_path).await {
-            Ok(store) => Arc::new(store),
-            Err(e) => {
-                error!(error = %e, path = %sync_sled_path.display(), "iroh: failed to open sync DocStore");
-                return Err(Box::new(e));
+        // Sync backend — Automerge doc state is ONE truth (decision 1).
+        //
+        // `sync.sled` takes an exclusive sled lock, so it may be opened exactly
+        // once per process. In `Dual` mode the libp2p `P2PNode` (built above)
+        // already opened it inside `P2PNode::new`; the iroh sync path REUSES
+        // that node's `SyncManager` Arc rather than opening a second lock (which
+        // would fail). In pure `Iroh` mode no libp2p node exists, so the iroh
+        // path opens its own DocStore.
+        #[cfg(feature = "p2p")]
+        let shared_sync_manager: Option<Arc<SyncManager>> =
+            p2p_node.as_ref().map(|n| n.sync_manager().clone());
+        #[cfg(not(feature = "p2p"))]
+        let shared_sync_manager: Option<Arc<SyncManager>> = None;
+
+        let sync_manager = match shared_sync_manager {
+            Some(sm) => {
+                info!(
+                    "iroh: Dual mode — reusing libp2p node's SyncManager (single sync.sled owner)"
+                );
+                sm
+            }
+            None => {
+                let sync_sled_path = config.storage_dir.join("sync.sled");
+                let doc_store = match DocStore::at_path(&sync_sled_path).await {
+                    Ok(store) => Arc::new(store),
+                    Err(e) => {
+                        error!(error = %e, path = %sync_sled_path.display(), "iroh: failed to open sync DocStore");
+                        return Err(Box::new(e));
+                    }
+                };
+                let stream_tracker = Arc::new(StreamTracker::new());
+                Arc::new(SyncManager::new(doc_store, stream_tracker))
             }
         };
-        let stream_tracker = Arc::new(StreamTracker::new());
-        let sync_manager = Arc::new(SyncManager::new(doc_store, stream_tracker));
         // Clone a handle for the content-projection producer (wired below at the
         // services co-scope) BEFORE the Arc is moved into the SyncBackend. This
         // is the iroh-mode equivalent of the libp2p `node.sync_manager()` handle;
@@ -2356,31 +2383,72 @@ async fn async_main(
     #[cfg(not(feature = "p2p-iroh"))]
     let (_iroh_node, _iroh_blob_store_for_http): (Option<()>, Option<()>) = (None, None);
 
-    // Plan 4: Wire DualGossipPublisher into the libp2p P2PNode so inventory snapshots
-    // are published to both transports. Must happen after iroh node creation, before
-    // P2PNode::run(). No-op when either stack is absent.
+    // Dual-stack gossip wiring — publish fan-out + RECEIVE loop.
+    //
+    // Must happen after iroh node creation, before `P2PNode::run()`. This is
+    // the SINGLE construction site for the iroh gossip publisher: ONE
+    // `IrohGossipPublisher` background task (one subscribe-on-demand sender map)
+    // is built here and shared by (a) the node's internal broadcaster via
+    // `set_gossip_publisher` and (b) the services co-scope publisher below (it
+    // reuses `shared_iroh_gossip_publisher`). The old second construction site
+    // at the services scope is gone.
+    //
+    // The iroh RECEIVE loop keeps the `GossipReceiver` the publisher drops, so
+    // the iroh plane actually consumes inbound inventory / identity-binding /
+    // recovery-revocation gossip — dispatched through the same transport-neutral
+    // handler as libp2p. In Dual mode it shares the libp2p node's `DedupLru`
+    // (cross-plane dedup); in pure-iroh mode it uses a fresh cache.
     #[cfg(all(feature = "p2p", feature = "p2p-iroh"))]
-    if let (Some(libp2p_n), Some(iroh_n)) = (p2p_node.as_mut(), _iroh_node.as_ref()) {
-        let libp2p_tx = libp2p_n.handle().command_sender();
-        let libp2p_pub: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> = Arc::new(
-            elohim_storage::p2p::adapters::LibP2PGossipPublisher::new(libp2p_tx),
-        );
+    let shared_iroh_gossip_publisher: Option<
+        Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher>,
+    > = if let Some(iroh_n) = _iroh_node.as_ref() {
         let iroh_pub: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> = Arc::new(
             elohim_storage::p2p_iroh::dual_publish::IrohGossipPublisher::spawn(
                 iroh_n.gossip().clone(),
             ),
         );
-        let dual: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> = Arc::new(
-            elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher::new(
-                Some(libp2p_pub),
-                Some(iroh_pub),
-            ),
+
+        // Dual mode: fan the node's internal broadcaster out to both stacks.
+        if let Some(libp2p_n) = p2p_node.as_mut() {
+            let libp2p_tx = libp2p_n.handle().command_sender();
+            let libp2p_pub: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
+                Arc::new(elohim_storage::p2p::adapters::LibP2PGossipPublisher::new(
+                    libp2p_tx,
+                ));
+            let dual: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> = Arc::new(
+                elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher::new(
+                    Some(libp2p_pub),
+                    Some(iroh_pub.clone()),
+                ),
+            );
+            libp2p_n.set_gossip_publisher(dual);
+            info!(
+                "Dual: DualGossipPublisher wired into P2PNode — inventory snapshots now dual-stack"
+            );
+        }
+
+        // Spawn the iroh gossip receive loop. Shares the libp2p node's DedupLru
+        // in Dual mode (cross-plane dedup); fresh cache in pure-iroh mode.
+        let (dedup, agent_info_tx) = match p2p_node.as_ref() {
+            Some(n) => (n.dedup(), n.agent_info_inbound_tx()),
+            None => (Arc::new(elohim_storage::p2p::dedup::DedupLru::new()), None),
+        };
+        let receive_pool = if args.enable_content_db {
+            db_pool.clone()
+        } else {
+            None
+        };
+        elohim_storage::p2p_iroh::spawn_iroh_gossip_receive(
+            iroh_n.gossip().clone(),
+            receive_pool,
+            dedup,
+            agent_info_tx,
         );
-        libp2p_n.set_gossip_publisher(dual);
-        info!(
-            "Plan 4: DualGossipPublisher wired into P2PNode — inventory snapshots now dual-stack"
-        );
-    }
+
+        Some(iroh_pub)
+    } else {
+        None
+    };
 
     // Start HTTP server for shard API
     let http_addr: SocketAddr = format!("0.0.0.0:{}", config.http_port).parse()?;
@@ -2849,24 +2917,15 @@ async fn async_main(
                     tx,
                 ));
 
-            // Plan 4: wrap in DualGossipPublisher — fans out to iroh when the iroh
-            // node is running, degrades to libp2p-only when it is absent (None).
-            let iroh_publisher_opt: Option<
-                Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher>,
-            > = _iroh_node.as_ref().map(|iroh| {
-                Arc::new(
-                    elohim_storage::p2p_iroh::dual_publish::IrohGossipPublisher::spawn(
-                        iroh.gossip().clone(),
-                    ),
-                )
-                    as Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher>
-            });
-
+            // Wrap in DualGossipPublisher — fans out to iroh when the iroh node
+            // is running, degrades to libp2p-only when it is absent (None).
+            // REUSES the single `shared_iroh_gossip_publisher` built above at the
+            // dual-stack wiring site — no second IrohGossipPublisher task.
             let publisher: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
                 Arc::new(
                     elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher::new(
                         Some(libp2p_publisher),
-                        iroh_publisher_opt,
+                        shared_iroh_gossip_publisher.clone(),
                     ),
                 );
 

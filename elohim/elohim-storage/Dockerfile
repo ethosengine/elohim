@@ -219,8 +219,12 @@ RUN mkdir -p src benches && \
     echo 'pub fn placeholder() {}' > src/lib.rs && \
     echo 'fn main() {}' > benches/graph_traversal.rs
 
-# Build dependencies (this layer gets cached)
-RUN RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
+# Build dependencies (this layer gets cached).
+# Mirror the real build's `--features p2p-iroh` (below) so the iroh / iroh-blobs
+# / iroh-gossip dependency crates land in THIS cached layer instead of
+# recompiling cold in the real-source stage. The placeholder src/ has no
+# p2p_iroh module — the feature only activates the optional dep entries here.
+RUN RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --features p2p-iroh
 
 # Remove placeholder source, binaries, and proc-macro outputs to force rebuild.
 # CRITICAL: build/ and .fingerprint/ contain embed_migrations! output from the
@@ -316,11 +320,16 @@ COPY elohim/sdk /sdk
 # CACHE_BUST is interpolated into the command so BuildKit treats it as a new layer
 # when the value changes (ARG alone is insufficient for BuildKit cache invalidation).
 #
-# STORAGE_FEATURES controls optional cargo features:
-#   default (empty) — lean build, no V8, suitable for all nodes
-#   ssr             — includes elohim-render + V8; for app-serving nodes that
+# `p2p-iroh` is ALWAYS built into the image (not a cargo default feature) so the
+# co-resident dual-stack (`TransportBackend::Dual`, activated at runtime via
+# `ELOHIM_TRANSPORT_BACKEND=dual`) ships. Default features (`p2p`, `graph-native`)
+# stay on, so the image carries both transport stacks; the runtime picks which to
+# run. STORAGE_FEATURES ADDS optional cargo features on top of p2p-iroh:
+#   default (empty) — p2p-iroh only (lean, no V8; suitable for all nodes)
+#   ssr             — p2p-iroh + elohim-render + V8; for app-serving nodes that
 #                     materialize and serve the Angular SSR bundle from the substrate
-# Pass --build-arg STORAGE_FEATURES=ssr to CI/operator to produce the SSR variant.
+# Pass --build-arg STORAGE_FEATURES=ssr to CI/operator to produce the SSR variant
+# (it becomes `--features p2p-iroh,ssr`).
 ARG STORAGE_FEATURES=""
 RUN echo "Building at ${CACHE_BUST}" && \
     RUSTFLAGS='--cfg getrandom_backend="custom"' \
@@ -328,7 +337,7 @@ RUN echo "Building at ${CACHE_BUST}" && \
     GIT_COMMIT_FULL=${GIT_COMMIT_FULL} \
     BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
     RUSTC_VERSION=${RUSTC_VERSION} \
-    cargo build --release ${STORAGE_FEATURES:+--features "$STORAGE_FEATURES"}
+    cargo build --release --features "p2p-iroh${STORAGE_FEATURES:+,$STORAGE_FEATURES}"
 
 # Verify migrations are actually embedded in the binary.
 # If embed_migrations! ran against an empty dir, none of our CREATE TABLE statements appear.

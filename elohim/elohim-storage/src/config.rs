@@ -8,15 +8,36 @@ use std::path::{Path, PathBuf};
 /// `Libp2p` (default) keeps the existing libp2p path. `Iroh` selects the
 /// parallel iroh-based stack — see `crate::p2p_iroh` and the staged-cutover
 /// plan at `genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md`.
+/// `Dual` runs BOTH stacks co-resident in one process (dual-stack is the
+/// design per the complementarity spec, not a transitional state).
 ///
-/// The two stacks are mutually exclusive at runtime; runtime config picks
-/// exactly one. Both compile in if both feature flags are enabled.
+/// Runtime selection:
+/// - `Libp2p` — only the libp2p node is built (default; fleet continuity).
+/// - `Iroh` — only the iroh node is built.
+/// - `Dual` — both nodes are built. They share one on-disk `sync.sled`
+///   DocStore (Automerge doc state is one truth — the iroh sync path reuses
+///   the libp2p node's `SyncManager` Arc rather than opening a second sled
+///   lock) and one in-process `DedupLru` (so a message arriving on both
+///   planes is deduped once). Disk seams are otherwise disjoint by
+///   construction: `identity.key` vs `iroh.key`, `blobs/` vs `blobs_iroh/`,
+///   distinct sockets.
+///
+/// Identity in `Dual` mode: the canonical join key is the Holochain
+/// `agent_cid`. Legacy/status fields keep reporting the libp2p `PeerId`
+/// (fleet continuity — `self_cid` is derived from the libp2p identity, see
+/// the `NodeTransport` seam in `main.rs`); the iroh `NodeId` is INFO-logged
+/// at boot and rides `/p2p/status` as an ADDITIONAL optional field once the
+/// schema-governed view adds it (never as a replacement).
+///
+/// Both compile in only if both feature flags (`p2p` + `p2p-iroh`) are
+/// enabled; `Dual` degrades to whichever single stack is compiled in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum TransportBackend {
     #[default]
     Libp2p,
     Iroh,
+    Dual,
 }
 
 impl std::str::FromStr for TransportBackend {
@@ -26,8 +47,9 @@ impl std::str::FromStr for TransportBackend {
         match s.to_ascii_lowercase().as_str() {
             "libp2p" => Ok(Self::Libp2p),
             "iroh" => Ok(Self::Iroh),
+            "dual" => Ok(Self::Dual),
             other => Err(format!(
-                "invalid transport backend '{other}' (expected 'libp2p' or 'iroh')"
+                "invalid transport backend '{other}' (expected 'libp2p', 'iroh', or 'dual')"
             )),
         }
     }
@@ -38,6 +60,7 @@ impl std::fmt::Display for TransportBackend {
         match self {
             Self::Libp2p => f.write_str("libp2p"),
             Self::Iroh => f.write_str("iroh"),
+            Self::Dual => f.write_str("dual"),
         }
     }
 }

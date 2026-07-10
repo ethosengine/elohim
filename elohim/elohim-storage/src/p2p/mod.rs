@@ -40,6 +40,7 @@ pub mod epr_atom_protocol;
 pub mod epr_protocol;
 pub mod fanout;
 pub mod feedback_signal;
+pub mod gossip_dispatch;
 pub mod identity_binding_gossip;
 pub mod identity_handshake;
 pub mod identity_map;
@@ -311,7 +312,7 @@ pub const RECOVERY_REVOCATION_TOPIC: &str = "recovery.revocation";
 /// Convert microseconds-since-epoch to an ISO-8601 UTC string.
 /// Returns `None` if the timestamp is out of range.
 /// Used by the inventory gossip receive arm (T14).
-fn micros_to_iso(micros: i64) -> Option<String> {
+pub(crate) fn micros_to_iso(micros: i64) -> Option<String> {
     chrono::DateTime::<chrono::Utc>::from_timestamp_micros(micros)
         .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string())
 }
@@ -2005,6 +2006,24 @@ impl P2PNode {
     /// Values are surfaced in `P2PStatusInfo::dedup_unique_len` / `dedup_total_seen`.
     pub fn dedup_stats(&self) -> (usize, usize) {
         self.dedup.stats()
+    }
+
+    /// Clone the node's cross-plane dedup cache Arc.
+    ///
+    /// In `TransportBackend::Dual` mode the iroh gossip receive loop is handed
+    /// this same `Arc<DedupLru>` so a message arriving on both the libp2p and
+    /// iroh planes is deduped once (see `gossip_dispatch`).
+    pub fn dedup(&self) -> Arc<dedup::DedupLru> {
+        self.dedup.clone()
+    }
+
+    /// Clone the inbound `ConductorAgentInfo` sender, if the step-zero agent-info
+    /// gossip feature is wired. In Dual mode the iroh receive loop forwards
+    /// agent-info envelopes into the same bounded channel.
+    pub fn agent_info_inbound_tx(
+        &self,
+    ) -> Option<mpsc::Sender<crate::p2p::conductor_agent_info_gossip::ConductorAgentInfo>> {
+        self.agent_info_inbound_tx.clone()
     }
 
     /// Set the extraction cache for delivery capability queries.
@@ -5721,563 +5740,26 @@ impl P2PNode {
                         message_id,
                         message,
                     } => {
-                        if message.topic.as_str() == RECOVERY_INVITATION_TOPIC {
-                            match crate::p2p::recovery_invitation::RecoveryInvitation::from_bytes(
-                                &message.data,
-                            ) {
-                                Ok(inv) => info!(
-                                    target: "elohim_storage::recovery",
-                                    from = %propagation_source,
-                                    message_id = ?message_id,
-                                    request_hash = %inv.request_hash,
-                                    human_id = %inv.human_id,
-                                    "Received recovery invitation"
-                                ),
-                                Err(e) => warn!(
-                                    target: "elohim_storage::recovery",
-                                    from = %propagation_source,
-                                    error = ?e,
-                                    "Failed to decode RecoveryInvitation"
-                                ),
-                            }
-                        } else if message.topic.as_str()
-                            == crate::p2p::identity_binding_gossip::IDENTITY_BINDING_TOPIC
-                        {
-                            // A.10: receive an identity binding from a peer and upsert
-                            // into peer_identity_bindings with source='gossip'.
-                            // Stage 1: structural verification only (non-empty fields).
-                            // Stage 2: add Ed25519 verify against resolved pubkey.
-                            match crate::p2p::identity_binding_gossip::IdentityBindingGossip::from_bytes(
-                                &message.data,
-                            ) {
-                                Ok(payload) => {
-                                    match payload.verify_structural() {
-                                        Err(reason) => warn!(
-                                            target: "elohim_storage::identity",
-                                            from = %propagation_source,
-                                            reason = %reason,
-                                            "IdentityBindingGossip failed structural verify — dropped"
-                                        ),
-                                        Ok(()) => {
-                                            let now_iso = chrono::Utc::now()
-                                                .format("%Y-%m-%dT%H:%M:%SZ")
-                                                .to_string();
-                                            // Row construction centralised in
-                                            // `binding_row_from_gossip` so the field-flow
-                                            // contract is exercised by the writer here AND
-                                            // the T03b regression test in
-                                            // identity_binding_gossip.rs.
-                                            let row =
-                                                crate::p2p::identity_binding_gossip::binding_row_from_gossip(
-                                                    &payload, &now_iso,
-                                                );
-                                            match self.db_pool.as_ref() {
-                                                Some(pool) => {
-                                                    match pool.get() {
-                                                        Ok(mut conn) => {
-                                                            // Non-authoritative writer: must NOT clobber a
-                                                            // `superseded_by` previously set by the DHT-arrival
-                                                            // path. Use the preserving variant.
-                                                            match crate::db::peer_identity_bindings::upsert_preserving_supersession(&mut conn, &row) {
-                                                                Ok(()) => info!(
-                                                                    target: "elohim_storage::identity",
-                                                                    from = %propagation_source,
-                                                                    peer_id = %payload.peer_id,
-                                                                    agent_cid = %payload.agent_cid,
-                                                                    "IdentityBindingGossip upserted with source='gossip'"
-                                                                ),
-                                                                Err(e) => warn!(
-                                                                    target: "elohim_storage::identity",
-                                                                    from = %propagation_source,
-                                                                    peer_id = %payload.peer_id,
-                                                                    error = %e,
-                                                                    "IdentityBindingGossip db upsert failed"
-                                                                ),
-                                                            }
-                                                        }
-                                                        Err(e) => warn!(
-                                                            target: "elohim_storage::identity",
-                                                            peer_id = %payload.peer_id,
-                                                            error = %e,
-                                                            "IdentityBindingGossip: db pool exhausted"
-                                                        ),
-                                                    }
-                                                }
-                                                None => debug!(
-                                                    target: "elohim_storage::identity",
-                                                    peer_id = %payload.peer_id,
-                                                    "IdentityBindingGossip: no db_pool configured, skipping persistence"
-                                                ),
-                                            }
-                                            // device_archetype is wired from the gossip wire; superseded_by
-                                            // relies on the DHT-arrival path for authoritative supersession.
-
-                                            // NOTE: reconcile signal emission deferred — the controller processes only
-                                            // DNA signals in Stage 1. A P2P-received binding reaching the reconcile layer
-                                            // (for cache invalidation, etc.) is an A.12 concern.
-
-                                            // TODO(A.12): invalidate the remote agent's pubkey_timeline cache entry here.
-                                            // The !Send cache lives in the controller; the receive arm cannot reach it
-                                            // without restructuring. Deferred to the full controller signal-flow landing
-                                            // in A.12.
-                                        }
-                                    }
-                                }
-                                Err(e) => warn!(
-                                    target: "elohim_storage::identity",
-                                    from = %propagation_source,
-                                    error = ?e,
-                                    "Failed to decode IdentityBindingGossip"
-                                ),
-                            }
-                        } else if message.topic.as_str()
-                            == crate::p2p::conductor_agent_info_gossip::CONDUCTOR_AGENT_INFO_TOPIC
-                        {
-                            // Step-zero substrate gossip — edge handler. Lightweight:
-                            // decode, structural verify, try_send into bounded mpsc.
-                            // The subscriber worker (spawned in main.rs) drains the
-                            // mpsc, rate-limits, batches, and calls admin_ws.add_agent_info.
-                            //
-                            // Channel-full drops are safe by design: the next 60s
-                            // publisher heartbeat re-delivers, so at most one heartbeat
-                            // window of latency on stabilization. Feature flag off
-                            // (agent_info_inbound_tx = None) → silently ignore.
-                            match crate::p2p::conductor_agent_info_gossip::ConductorAgentInfo::from_bytes(
-                                &message.data,
-                            ) {
-                                Ok(payload) => {
-                                    if let Err(reason) = payload.verify_structural() {
-                                        debug!(
-                                            target: "elohim_storage::agent_info",
-                                            from = %propagation_source,
-                                            reason = %reason,
-                                            "ConductorAgentInfo failed structural verify — dropped"
-                                        );
-                                    } else if let Some(tx) = &self.agent_info_inbound_tx {
-                                        if tx.try_send(payload).is_err() {
-                                            debug!(
-                                                target: "elohim_storage::agent_info",
-                                                from = %propagation_source,
-                                                "agent_info inbound queue full — dropped (heartbeat will re-deliver)"
-                                            );
-                                        }
-                                    }
-                                    // else: feature flag is off, no sender wired — silently ignore
-                                }
-                                Err(e) => debug!(
-                                    target: "elohim_storage::agent_info",
-                                    from = %propagation_source,
-                                    error = %e,
-                                    "ConductorAgentInfo decode failed — dropped"
-                                ),
-                            }
-                        } else if message.topic.as_str() == RECOVERY_REVOCATION_TOPIC {
-                            // M4: subscribe/log stub. Active consumer logic lands in M5
-                            // (elohim defender + UI). Log is the seam M5 hooks into.
-                            // TODO: factor shared body into handle_revocation_message helper
-                            // once the event-loop borrow structure allows it (see arm below).
-                            match crate::p2p::recovery_revocation::RecoveryRevocationMessage::from_bytes(
-                                &message.data,
-                            ) {
-                                Ok(msg) => {
-                                    // D.6 wire point B: dedup on the same synthetic key as
-                                    // the direct-notify path (wire point C) so a revocation
-                                    // arriving via gossipsub after direct-notify (or vice
-                                    // versa) is dropped before any projection work.
-                                    // Synthetic dedup key: `KeyRevocation:{revocation_id}` namespace. UUIDs
-                                    // don't collide with EPR CIDs (which start with "bafy"). Future integrity
-                                    // kinds should use `KeyRotation:{id}` / `AgentPeerBinding:{id}` etc. — the
-                                    // namespace prefix prevents cross-kind collisions even if id formats overlap.
-                                    let dedup_key =
-                                        format!("KeyRevocation:{}", msg.revocation_id);
-                                    if !self.dedup.insert(&dedup_key) {
-                                        debug!(
-                                            target: "elohim_storage::dedup",
-                                            from = %propagation_source,
-                                            revocation_id = %msg.revocation_id,
-                                            "duplicate gossip revocation — dropped"
-                                        );
-                                    } else {
-                                        info!(
-                                            target: "recovery.revocation.inbound",
-                                            from = %propagation_source,
-                                            message_id = ?message_id,
-                                            revocation_id = %msg.revocation_id,
-                                            human_id = %msg.human_id,
-                                            status = %msg.status,
-                                            "Received recovery revocation"
-                                        );
-                                    }
-                                }
-                                Err(e) => warn!(
-                                    target: "recovery.revocation.inbound",
-                                    from = %propagation_source,
-                                    error = ?e,
-                                    "Failed to decode RecoveryRevocationMessage"
-                                ),
-                            }
-                        } else if message.topic.as_str()
-                            == crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION
-                        {
-                            // D.6 Fix 1 (CRITICAL): canonical integrity-revocation topic arm.
-                            // TOPIC_INTEGRITY_REVOCATION = "elohim/integrity/revocation" is the
-                            // new canonical name. M3/M4 publishers still use RECOVERY_REVOCATION_TOPIC
-                            // = "recovery.revocation" (arm above); new publishers (D.5+) use this name.
-                            // BOTH arms must route to the same handler with the same dedup key.
-                            // TODO: factor into handle_revocation_message helper when event-loop
-                            // borrow structure permits; body kept in sync with RECOVERY_REVOCATION_TOPIC arm.
-                            match crate::p2p::recovery_revocation::RecoveryRevocationMessage::from_bytes(
-                                &message.data,
-                            ) {
-                                Ok(msg) => {
-                                    // Same synthetic dedup key as wire points B and C — cross-channel
-                                    // dedup contract from D.6: regardless of which topic name a
-                                    // revocation arrives on, KeyRevocation:{revocation_id} is the key.
-                                    // See first KeyRevocation: dedup site for namespace rationale.
-                                    let dedup_key =
-                                        format!("KeyRevocation:{}", msg.revocation_id);
-                                    if !self.dedup.insert(&dedup_key) {
-                                        debug!(
-                                            target: "elohim_storage::dedup",
-                                            from = %propagation_source,
-                                            revocation_id = %msg.revocation_id,
-                                            topic = crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
-                                            "duplicate integrity/revocation gossip — dropped"
-                                        );
-                                    } else {
-                                        info!(
-                                            target: "recovery.revocation.inbound",
-                                            from = %propagation_source,
-                                            message_id = ?message_id,
-                                            revocation_id = %msg.revocation_id,
-                                            human_id = %msg.human_id,
-                                            status = %msg.status,
-                                            topic = crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
-                                            "Received recovery revocation (canonical topic)"
-                                        );
-                                    }
-                                }
-                                Err(e) => warn!(
-                                    target: "recovery.revocation.inbound",
-                                    from = %propagation_source,
-                                    error = ?e,
-                                    topic = crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
-                                    "Failed to decode RecoveryRevocationMessage (canonical topic)"
-                                ),
-                            }
-                        } else if message.topic.as_str()
-                            == crate::p2p::inventory_gossip::INVENTORY_TOPIC
-                        {
-                            // T14: receive blob inventory snapshot or delta from a peer.
-                            // Try snapshot first, then delta. We don't have a wire-level
-                            // discriminator; distinguishing relies on serde — snapshots have
-                            // `hashes` (no `added`/`removed`) and deltas have `added`/`removed`
-                            // (no `hashes`). serde will fail one and accept the other.
-
-                            use crate::p2p::inventory_gossip::{
-                                BlobInventoryDelta, BlobInventorySnapshot,
-                            };
-
-                            if let Ok(snapshot) = BlobInventorySnapshot::from_bytes(&message.data) {
-                                if let Err(e) = snapshot.verify_structural() {
-                                    warn!(
-                                        target: "elohim_storage::inventory",
-                                        from = %propagation_source,
-                                        error = ?e,
-                                        "Inventory snapshot failed structural verify — dropped"
-                                    );
-                                } else if let Some(pool) = self.db_pool.as_ref() {
-                                    match pool.get() {
-                                        Ok(mut conn) => {
-                                            let now_iso = chrono::Utc::now()
-                                                .format("%Y-%m-%dT%H:%M:%SZ")
-                                                .to_string();
-                                            let when = micros_to_iso(snapshot.snapshot_at)
-                                                .unwrap_or(now_iso);
-                                            let hashes_str: Vec<String> = snapshot
-                                                .hashes
-                                                .iter()
-                                                .map(|b| b.as_str().to_string())
-                                                .collect();
-                                            match crate::db::peer_blob_inventory::apply_snapshot(
-                                                &mut conn,
-                                                &snapshot.peer_id,
-                                                &hashes_str,
-                                                snapshot.sequence as i64,
-                                                &when,
-                                            ) {
-                                                Ok(crate::db::peer_blob_inventory::SnapshotApplyOutcome::Applied) => {
-                                                    // INFO (was DEBUG): on alpha, gossipsub
-                                                    // inventory publish fails after pod
-                                                    // restarts, so the presence/absence of
-                                                    // this line is the primary signal for
-                                                    // diagnosing a heal 404 — it tells us
-                                                    // whether a peer's inventory ever landed.
-                                                    // Emitted only on a genuine content change
-                                                    // now, so it no longer floods under a
-                                                    // re-delivery storm while staying the
-                                                    // "new inventory landed" diagnostic.
-                                                    info!(
-                                                        target: "elohim_storage::inventory",
-                                                        from = %propagation_source,
-                                                        peer_id = %snapshot.peer_id,
-                                                        count = snapshot.hashes.len(),
-                                                        sequence = snapshot.sequence,
-                                                        "Inventory snapshot applied"
-                                                    );
-                                                    // Wave 3: commitment-driven fetch.
-                                                    // Score each advertised blob against our
-                                                    // active replicates-dwelling commitments;
-                                                    // enqueue HIGH-priority blobs for fetch.
-                                                    // Active commitments are loaded ONCE per
-                                                    // inventory message (not per hash).
-                                                    self.score_and_enqueue_snapshot(
-                                                        &mut conn,
-                                                        &snapshot.peer_id,
-                                                        &snapshot.hints,
-                                                        &hashes_str,
-                                                    );
-                                                }
-                                                Ok(crate::db::peer_blob_inventory::SnapshotApplyOutcome::Deduplicated) => {
-                                                    // Byte-identical re-echo: a WAN gossipsub
-                                                    // re-delivery, or a redundant periodic
-                                                    // re-snapshot of unchanged inventory.
-                                                    // Carries no new information — skip the
-                                                    // per-hash commitment re-score (the CPU
-                                                    // sink that pegged a full-arc sink) and
-                                                    // stay at DEBUG so the storm no longer
-                                                    // floods stdout at tens of lines/sec.
-                                                    debug!(
-                                                        target: "elohim_storage::inventory",
-                                                        from = %propagation_source,
-                                                        peer_id = %snapshot.peer_id,
-                                                        sequence = snapshot.sequence,
-                                                        "Inventory snapshot deduplicated (identical content)"
-                                                    );
-                                                }
-                                                Err(e) => warn!(
-                                                    target: "elohim_storage::inventory",
-                                                    from = %propagation_source,
-                                                    error = %e,
-                                                    "apply_snapshot failed"
-                                                ),
-                                            }
-                                        }
-                                        Err(e) => warn!(
-                                            target: "elohim_storage::inventory",
-                                            error = %e,
-                                            "inventory: db pool exhausted"
-                                        ),
-                                    }
-                                }
-                            } else if let Ok(delta) = BlobInventoryDelta::from_bytes(&message.data)
-                            {
-                                if let Err(e) = delta.verify_structural() {
-                                    warn!(
-                                        target: "elohim_storage::inventory",
-                                        from = %propagation_source,
-                                        error = ?e,
-                                        "Inventory delta failed structural verify — dropped"
-                                    );
-                                } else if let Some(pool) = self.db_pool.as_ref() {
-                                    match pool.get() {
-                                        Ok(mut conn) => {
-                                            let when = micros_to_iso(delta.emitted_at)
-                                                .unwrap_or_else(|| {
-                                                    chrono::Utc::now()
-                                                        .format("%Y-%m-%dT%H:%M:%SZ")
-                                                        .to_string()
-                                                });
-                                            let added_str: Vec<String> = delta
-                                                .added
-                                                .iter()
-                                                .map(|b| b.as_str().to_string())
-                                                .collect();
-                                            let removed_str: Vec<String> = delta
-                                                .removed
-                                                .iter()
-                                                .map(|b| b.as_str().to_string())
-                                                .collect();
-                                            match crate::db::peer_blob_inventory::apply_delta(
-                                                &mut conn,
-                                                &delta.peer_id,
-                                                &added_str,
-                                                &removed_str,
-                                                delta.sequence as i64,
-                                                &when,
-                                            ) {
-                                                Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Applied) => {
-                                                    debug!(
-                                                        target: "elohim_storage::inventory",
-                                                        peer_id = %delta.peer_id,
-                                                        sequence = delta.sequence,
-                                                        added = delta.added.len(),
-                                                        removed = delta.removed.len(),
-                                                        "Inventory delta applied"
-                                                    );
-                                                    // Wave 3: commitment-driven fetch for added hashes.
-                                                    // Score each added hash against our active commitments;
-                                                    // enqueue HIGH-priority blobs for fetch.
-                                                    if !delta.added.is_empty() {
-                                                        self.score_and_enqueue_snapshot(
-                                                            &mut conn,
-                                                            &delta.peer_id,
-                                                            &delta.hints,
-                                                            &added_str,
-                                                        );
-                                                    }
-                                                }
-                                                Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Replay) => {
-                                                    debug!(
-                                                        target: "elohim_storage::inventory",
-                                                        peer_id = %delta.peer_id,
-                                                        sequence = delta.sequence,
-                                                        "Inventory delta replay — dropped silently"
-                                                    );
-                                                }
-                                                Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Gap {
-                                                    expected,
-                                                    received,
-                                                }) => {
-                                                    warn!(
-                                                        target: "elohim_storage::inventory",
-                                                        peer_id = %delta.peer_id,
-                                                        expected,
-                                                        received,
-                                                        "Inventory delta gap — requesting snapshot"
-                                                    );
-                                                    // Best-effort: send the snapshot-request command.
-                                                    // Parse the peer_id string into a libp2p::PeerId.
-                                                    if let Ok(pid) = delta.peer_id.parse::<libp2p::PeerId>() {
-                                                        let cmd = P2PCommand::SnapshotRequest { peer_id: pid };
-                                                        let _ = self.command_tx.try_send(cmd);
-                                                    }
-                                                }
-                                                Err(e) => warn!(
-                                                    target: "elohim_storage::inventory",
-                                                    error = %e,
-                                                    "apply_delta failed"
-                                                ),
-                                            }
-                                        }
-                                        Err(e) => warn!(
-                                            target: "elohim_storage::inventory",
-                                            error = %e,
-                                            "inventory: db pool exhausted"
-                                        ),
-                                    }
-                                }
-                            } else {
-                                debug!(
-                                    target: "elohim_storage::inventory",
-                                    from = %propagation_source,
-                                    "Inventory message decoded as neither snapshot nor delta — dropped"
-                                );
-                            }
-                        } else if message.topic.as_str()
-                            == crate::p2p::salvage_gossip::SALVAGE_CAPACITY_TOPIC
-                        {
-                            // P3-4: receive a salvage-capacity advertisement from an
-                            // opt-in peer. Project it into the `salvage_capacity` reality
-                            // table; the salvage pass reads the fresh, opted-in entries as
-                            // its candidate pool. Mirrors the inventory snapshot arm's
-                            // pool/conn/error handling. agent_cid-keyed by construction.
-                            use crate::p2p::salvage_gossip::SalvageCapacityAd;
-
-                            match SalvageCapacityAd::from_bytes(&message.data) {
-                                Ok(ad) => {
-                                    if let Err(e) = ad.verify_structural() {
-                                        warn!(
-                                            target: "elohim_storage::salvage",
-                                            from = %propagation_source,
-                                            error = ?e,
-                                            "Salvage-capacity ad failed structural verify — dropped"
-                                        );
-                                    } else if let Some(pool) = self.db_pool.as_ref() {
-                                        match pool.get() {
-                                            Ok(mut conn) => {
-                                                let when = chrono::Utc::now()
-                                                    .format("%Y-%m-%dT%H:%M:%SZ")
-                                                    .to_string();
-                                                match crate::db::salvage_capacity::apply_capacity(
-                                                    &mut conn,
-                                                    &ad.agent_cid,
-                                                    ad.spare_bytes as i64,
-                                                    &ad.archetype,
-                                                    &when,
-                                                    ad.seq as i64,
-                                                ) {
-                                                    Ok(()) => debug!(
-                                                        target: "elohim_storage::salvage",
-                                                        from = %propagation_source,
-                                                        agent_cid = %ad.agent_cid,
-                                                        spare_bytes = ad.spare_bytes,
-                                                        archetype = %ad.archetype,
-                                                        seq = ad.seq,
-                                                        "Salvage-capacity ad applied"
-                                                    ),
-                                                    Err(e) => warn!(
-                                                        target: "elohim_storage::salvage",
-                                                        from = %propagation_source,
-                                                        error = %e,
-                                                        "apply_capacity failed"
-                                                    ),
-                                                }
-                                            }
-                                            Err(e) => warn!(
-                                                target: "elohim_storage::salvage",
-                                                error = %e,
-                                                "salvage: db pool exhausted"
-                                            ),
-                                        }
-                                    }
-                                }
-                                Err(e) => debug!(
-                                    target: "elohim_storage::salvage",
-                                    from = %propagation_source,
-                                    error = %e,
-                                    "Salvage-capacity ad failed to decode — dropped"
-                                ),
-                            }
-                        } else if message.topic.as_str().starts_with("elohim/") {
-                            // D.6 wire point B (gossipsub EPR announce): per-pillar
-                            // reach-scoped topics carry a msgpack-encoded CID string
-                            // (announce-only; receivers fetch the full atom via EPR atom
-                            // protocol if wanted). Stage 1: decode CID + dedup only.
-                            // Full receive-side projection is downstream (Phase 3+).
-                            match rmp_serde::from_slice::<String>(&message.data) {
-                                Ok(cid) => {
-                                    if !self.dedup.insert(&cid) {
-                                        debug!(
-                                            target: "elohim_storage::dedup",
-                                            from = %propagation_source,
-                                            topic = %message.topic,
-                                            cid = %cid,
-                                            "duplicate gossip announce — dropped"
-                                        );
-                                    } else {
-                                        debug!(
-                                            target: "elohim_storage::epr",
-                                            from = %propagation_source,
-                                            topic = %message.topic,
-                                            cid = %cid,
-                                            "gossip EPR announce (deduped; full fetch deferred to Phase 3+)"
-                                        );
-                                    }
-                                }
-                                Err(e) => {
-                                    debug!(
-                                        target: "elohim_storage::epr",
-                                        from = %propagation_source,
-                                        topic = %message.topic,
-                                        error = %e,
-                                        "gossip EPR announce: msgpack decode failed"
-                                    );
-                                }
-                            }
-                        } else {
-                            debug!(topic = %message.topic, "Gossipsub message on untracked topic");
-                        }
+                        // Transport-neutral dispatch (shared with the iroh
+                        // receive loop). libp2p passes `self` as the
+                        // `InventoryFetch` hook so the commitment-driven active
+                        // fetch + delta-gap snapshot-request stay byte-identical.
+                        let source = crate::p2p::gossip_dispatch::GossipSource::Libp2p {
+                            peer: propagation_source.to_string(),
+                            message_id: format!("{message_id:?}"),
+                        };
+                        let ctx = crate::p2p::gossip_dispatch::GossipDispatchCtx {
+                            db_pool: self.db_pool.as_ref(),
+                            dedup: &self.dedup,
+                            agent_info_inbound_tx: self.agent_info_inbound_tx.as_ref(),
+                            inventory_fetch: Some(self),
+                        };
+                        crate::p2p::gossip_dispatch::handle_gossip(
+                            &ctx,
+                            message.topic.as_str(),
+                            &message.data,
+                            &source,
+                        );
                     }
                     other => debug!(event = ?other, "Gossipsub event"),
                 }
@@ -7908,5 +7390,34 @@ mod reach_gate_tests {
             &CallerIdentity::Anonymous,
             None
         ));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InventoryFetch — libp2p-command-path inventory hook for the transport-neutral
+// gossip dispatch. Keeps the commitment-driven active fetch + delta-gap
+// snapshot-request byte-identical to the pre-refactor inline behavior while
+// letting the iroh receive loop pass `None` (documented Dual-mode asymmetry).
+// ---------------------------------------------------------------------------
+impl crate::p2p::gossip_dispatch::InventoryFetch for P2PNode {
+    fn score_and_enqueue(
+        &self,
+        conn: &mut diesel::SqliteConnection,
+        source_peer_id: &str,
+        hints: &[crate::p2p::inventory_gossip::BlobHint],
+        hashes: &[String],
+    ) {
+        self.score_and_enqueue_snapshot(conn, source_peer_id, hints, hashes);
+    }
+
+    fn request_snapshot_for_gap(&self, peer_id: &str) {
+        // Best-effort: parse the peer_id string into a libp2p::PeerId and send
+        // the snapshot-request command. An iroh NodeId will not parse (iroh
+        // never calls this — `inventory_fetch` is `None` on that plane).
+        if let Ok(pid) = peer_id.parse::<libp2p::PeerId>() {
+            let _ = self
+                .command_tx
+                .try_send(P2PCommand::SnapshotRequest { peer_id: pid });
+        }
     }
 }

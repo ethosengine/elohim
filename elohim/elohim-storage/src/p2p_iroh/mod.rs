@@ -27,6 +27,7 @@ pub mod epr;
 pub mod epr_atom_backend;
 pub mod epr_backend;
 mod gossip;
+pub mod gossip_receive;
 mod identity;
 pub mod multi_stack_fixture;
 mod node;
@@ -56,6 +57,7 @@ pub use epr::{
 pub use epr_atom_backend::EprAtomServiceBackend;
 pub use epr_backend::EprServiceBackend;
 pub use gossip::{GossipEvent, IrohGossip};
+pub use gossip_receive::spawn_iroh_gossip_receive;
 pub use identity::load_or_generate as load_or_generate_secret_key;
 pub use node::{AlpnRegistration, IrohNode};
 pub use shard::{IrohShardClient, IrohShardProtocol, ShardBackend, SHARD_ALPN};
