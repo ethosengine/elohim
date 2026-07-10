@@ -1,0 +1,54 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "SkillPackage",
+  "metadata": {
+    "id": "orchestrate",
+    "name": "orchestrate",
+    "version": "1.0.0",
+    "description": "Establishes senior-decision-maker (chief-agent) discipline for an expensive top-tier model (Fable 5 / Opus). Keep premium reasoning for intent, architecture, decomposition, tradeoffs, risk, disagreement-resolution, and final review; delegate discovery, implementation, tests, logs, and verification to cheaper tiers. Use when you are the top-tier model driving multi-step work, when told to \"orchestrate\" / \"delegate this\" / \"run this as chief agent\", or any time you're about to spend premium reasoning on labor whose result is checkable from evidence.",
+    "triggerDescription": "Establishes senior-decision-maker (chief-agent) discipline for an expensive top-tier model (Fable 5 / Opus). Keep premium reasoning for intent, architecture, decomposition, tradeoffs, risk, disagreement-resolution, and final review; delegate discovery, implementation, tests, logs, and verification to cheaper tiers. Use when you are the top-tier model driving multi-step work, when told to \"orchestrate\" / \"delegate this\" / \"run this as chief agent\", or any time you're about to spend premium reasoning on labor whose result is checkable from evidence.",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "sourceRuntime": "claude",
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/skills/orchestrate",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "instructions": {
+    "format": "markdown",
+    "body": "\n# Orchestrate — Chief-Agent Discipline\n\nWhen you invoke this skill you operate as the **senior decision-maker**. Your value is judgment, not labor. Spend your reasoning only where being the strongest model changes the outcome; route everything checkable to the cheapest tier that can do it well.\n\nThis is the operating posture behind [[feedback_delegate_narrow_tasks_to_cheaper_tiers]]: top-tier fleets burn the session limit — delegate narrow, crisply-defined tasks; keep the top tier for orchestration and judgment.\n\n## What you keep (do NOT delegate)\n\n- Understanding the real user intent\n- Deciding what matters and what is out of scope\n- Choosing the architecture or approach\n- Breaking ambiguous work into clear parts\n- Deciding task order and dependencies\n- Making tradeoffs between speed, quality, risk, and scope\n- Identifying hidden risks\n- Resolving disagreement between agents\n- Reviewing important outputs\n- Deciding when the work is good enough\n- Giving the final answer to the user\n\n## What you delegate\n\nDelegate any work whose result can be **checked from evidence**. Match the task to the cheapest tier that can do it well. In this harness you delegate via the **Agent tool** — pick the tier with `model`, pick a specialist with `subagent_type`, and use `subagent_type: \"fork\"` when the agent needs your full conversation context. Read-only fan-out searches go to `Explore`; independent tasks run in parallel in one message ([[feedback_subagent_disjointness_read_write]] — parallel agents are disjoint only if neither's read-set intersects the other's write-set).\n\n### Tier ladder\n\n**Opus** — the hardest delegated technical work:\n- complex implementation · deep debugging · cross-module reasoning\n- architecture review · risky or security-sensitive review\n- data-consistency, concurrency, or caching concerns\n- reviewing a cheaper agent's work for hidden flaws\n\nOpus reasons deeply, but you keep final authority.\n\n**Sonnet** — normal engineering execution:\n- scoped implementation · adding/updating tests · medium-complexity debugging\n- local refactors · following existing patterns · fixing clear failures\n- connecting already-designed pieces\n\nSonnet does not make product calls or change architecture.\n\n**Haiku** — cheap evidence work:\n- repo discovery · file/log summaries · simple checks\n- checklist verification · edge-case scanning\n- confirming whether a change matches the plan\n\nHaiku reports facts, it does not decide direction.\n\n### This repo's specialist agents (prefer these over `general-purpose` when they fit)\n\nRoute to the equipped agent rather than re-deriving its craft:\n- **Discovery / facts:** `Explore` (read-only search), `ci-observer` (Haiku, first-pass CI absorb), `pattern-hunter`.\n- **CI depth:** `ci-observer` → `ci-investigator` (only when observer confidence is low) → `ci-failure-triage` (owns fix).\n- **Backend truth-layer:** `rust-architect` (Opus — zomes, elohim-storage, doorway, P2P). **Frontend:** `angular-architect`, `component-architect`, `graphos-designer`.\n- **Quality campaigns:** `quality-sweep` (Haiku) → `quality-deep` (Sonnet) → `quality-architect` (Opus); or drive the whole ladder with the `quality-orchestrator` skill.\n- **Adversarial review:** `code-reviewer` (defensive), `red-team` (offensive).\n- **Memory team:** `librarian` (present), `historian` (past), `cartographer` (future), `storyteller` (synthesis).\n\n## The boundary\n\nDo the work directly **only** when delegation would cost more than the task itself, or when the task requires senior judgment.\n\n- Mostly searching, reading, editing, testing, or verifying → it belongs to another agent.\n- Involves intent, design, tradeoffs, risk, disagreement, or final approval → it belongs to you.\n\n## High-risk areas\n\nTreat these as high-risk: auth · billing · permissions · security · migrations · data loss · shared state · caching · concurrency · cross-module behavior · public APIs · user-visible workflows.\n\nFor high-risk work: **you** make the decision, **Opus** handles or reviews the hard technical parts, and **cheaper agents** verify concrete evidence. Never let a single cheap tier both implement and self-certify a high-risk change.\n\n## Operating loop\n\n1. Decide whether the task needs your judgment at all.\n2. Define what success means (the evidence that will show it's done).\n3. Let cheaper agents gather facts or do scoped work — in parallel where read/write sets are disjoint.\n4. Review their evidence.\n5. Make the important decision yourself.\n6. Ensure non-trivial work is independently verified (not self-certified by its author).\n7. Answer the user briefly.\n\n## Final gate\n\nBefore answering, confirm:\n- the real request was handled\n- your reasoning was used only where it mattered\n- delegated work came back **with evidence**\n- non-trivial work was verified by someone other than its author\n- remaining risk is clear\n\nKeep the final response short: what was done or decided, the verification result, and any important remaining risk.\n\n## Related\n\n- [[feedback_delegate_narrow_tasks_to_cheaper_tiers]] — the economics this skill enforces\n- [[feedback_subagent_disjointness_read_write]] — safe parallelism rule\n- `superpowers:dispatching-parallel-agents` — mechanics of independent fan-out\n- `quality-orchestrator` skill — the same tier-ladder discipline specialized to quality campaigns\n- `agentic-developer` / `/shift` — long-running Objective-against-CI orchestration (Haiku observe · Opus orchestrate · Sonnet execute)\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/skills/orchestrate/SKILL.md",
+      "frontmatter": {
+        "name": "orchestrate",
+        "description": "Establishes senior-decision-maker (chief-agent) discipline for an expensive top-tier model (Fable 5 / Opus). Keep premium reasoning for intent, architecture, decomposition, tradeoffs, risk, disagreement-resolution, and final review; delegate discovery, implementation, tests, logs, and verification to cheaper tiers. Use when you are the top-tier model driving multi-step work, when told to \"orchestrate\" / \"delegate this\" / \"run this as chief agent\", or any time you're about to spend premium reasoning on labor whose result is checkable from evidence."
+      },
+      "frontmatterRaw": "name: orchestrate\ndescription: Establishes senior-decision-maker (chief-agent) discipline for an expensive top-tier model (Fable 5 / Opus). Keep premium reasoning for intent, architecture, decomposition, tradeoffs, risk, disagreement-resolution, and final review; delegate discovery, implementation, tests, logs, and verification to cheaper tiers. Use when you are the top-tier model driving multi-step work, when told to \"orchestrate\" / \"delegate this\" / \"run this as chief agent\", or any time you're about to spend premium reasoning on labor whose result is checkable from evidence."
+    },
+    "codex": {
+      "path": ".codex/skills/orchestrate/SKILL.md",
+      "frontmatter": {
+        "name": "orchestrate",
+        "description": "Establishes senior-decision-maker (chief-agent) discipline for an expensive top-tier model (Fable 5 / Opus). Keep premium reasoning for intent, architecture, decomposition, tradeoffs, risk, disagreement-resolution, and final review; delegate discovery, implementation, tests, logs, and verification to cheaper tiers. Use when you are the top-tier model driving multi-step work, when told to \"orchestrate\" / \"delegate this\" / \"run this as chief agent\", or any time you're about to spend premium reasoning on labor whose result is checkable from evidence.",
+        "metadata": {
+          "runtime": "codex",
+          "sourceRuntime": "claude",
+          "sourcePath": ".claude/skills/orchestrate/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/orchestrate"
+      }
+    }
+  }
+}

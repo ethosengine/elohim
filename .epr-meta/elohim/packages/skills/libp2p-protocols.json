@@ -1,0 +1,59 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "SkillPackage",
+  "metadata": {
+    "id": "libp2p-protocols",
+    "name": "libp2p-protocols",
+    "version": "1.0.0",
+    "description": "Reference for Elohim custom libp2p protocols, request-response codecs, message serialization (MessagePack), and wire format specification. Use when someone asks \"add a new protocol\", \"implement a codec\", \"debug message serialization\", \"wire format\", or works with sync/shard protocol handlers.",
+    "triggerDescription": "Reference for Elohim custom libp2p protocols, request-response codecs, message serialization (MessagePack), and wire format specification. Use when someone asks \"add a new protocol\", \"implement a codec\", \"debug message serialization\", \"wire format\", or works with sync/shard protocol handlers.",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "sourceRuntime": "claude",
+    "assetRefs": [],
+    "author": "elohim-protocol",
+    "governance": {
+      "eprRef": "epr:elohim-agent/skills/libp2p-protocols",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "instructions": {
+    "format": "markdown",
+    "body": "\n# libp2p Protocols Reference\n\n> **Parallel stack:** Every plane described here has an iroh-ALPN counterpart in `elohim-storage/src/p2p_iroh/` — same wire bytes (MessagePack/CBOR), different transport. Adding a new protocol means designing transport-neutral service + libp2p inline handler + iroh `ProtocolHandler` + `Backend` trait adapter. See `rust-architect.md` §\"Truth in motion\" for the design pattern and `project_iroh_alpn_handlers_one_stream_design.md` for the `loop { accept_bi }` handler discipline (single-stream-per-conn handlers deadlock under bench reuse). The linked iroh memory entries carry temporal phase/gate state.\n\nThe Elohim Protocol defines three custom libp2p protocols for P2P communication.\n\n## Protocol Identifiers\n\n| Protocol | ID | Purpose |\n|----------|----|---------|\n| Sync | `/elohim/sync/1.0.0` | Content sync (stream positions, doc changes) |\n| Shard | `/elohim/shard/1.0.0` | Blob shard transfer (Get/Have/Push) |\n| Cluster | `/elohim/cluster/1.0.0` | Cluster coordination (future) |\n\n---\n\n## Wire Format\n\nAll protocols use **length-prefixed MessagePack**:\n\n```\n┌──────────────────────────────────────────┐\n│  4 bytes (big-endian u32)  │  Payload    │\n│  Length of payload         │  MessagePack │\n│                            │  encoded     │\n└──────────────────────────────────────────┘\n```\n\n- **Length prefix**: 4 bytes, big-endian `u32`\n- **Payload**: MessagePack (via `rmp-serde`)\n- **Max message size**: 10 MB (`10 * 1024 * 1024` bytes)\n\n---\n\n## SyncCodec Implementation\n\nThe codec implements `libp2p::request_response::Codec`:\n\n```rust\n#[derive(Debug, Clone)]\npub struct SyncCodec;\n\n#[async_trait]\nimpl request_response::Codec for SyncCodec {\n    type Protocol = StreamProtocol;\n    type Request = SyncMessage;\n    type Response = SyncMessage;\n\n    async fn read_request<T>(&mut self, _: &Self::Protocol, io: &mut T) -> io::Result<Self::Request>\n    where T: AsyncRead + Unpin + Send {\n        read_message(io).await\n    }\n\n    async fn write_request<T>(&mut self, _: &Self::Protocol, io: &mut T, req: Self::Request) -> io::Result<()>\n    where T: AsyncWrite + Unpin + Send {\n        write_message(io, &req).await\n    }\n\n    // read_response and write_response follow same pattern\n}\n```\n\n### Read/Write Implementation\n\n```rust\nasync fn read_message<T>(io: &mut T) -> io::Result<SyncMessage>\nwhere T: AsyncRead + Unpin + Send {\n    // Read 4-byte length prefix\n    let mut len_buf = [0u8; 4];\n    io.read_exact(&mut len_buf).await?;\n    let len = u32::from_be_bytes(len_buf) as usize;\n\n    // Validate size\n    if len > MAX_MESSAGE_SIZE {\n        return Err(io::Error::new(io::ErrorKind::InvalidData,\n            format!(\"message too large: {} bytes\", len)));\n    }\n\n    // Read and decode MessagePack payload\n    let mut buf = vec![0u8; len];\n    io.read_exact(&mut buf).await?;\n    rmp_serde::from_slice(&buf).map_err(|e|\n        io::Error::new(io::ErrorKind::InvalidData, format!(\"msgpack: {}\", e)))\n}\n\nasync fn write_message<T>(io: &mut T, msg: &SyncMessage) -> io::Result<()>\nwhere T: AsyncWrite + Unpin + Send {\n    let payload = rmp_serde::to_vec(msg)?;\n    let len = (payload.len() as u32).to_be_bytes();\n    io.write_all(&len).await?;\n    io.write_all(&payload).await?;\n    io.flush().await\n}\n```\n\n---\n\n## Sync Protocol Messages (elohim-node)\n\n```rust\nuse serde::{Serialize, Deserialize};\n\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub enum SyncMessage {\n    /// Request events since a stream position\n    SyncRequest {\n        since: u64,\n        limit: Option<u32>,\n    },\n\n    /// Response with sync events\n    SyncResponse {\n        events: Vec<SyncEvent>,\n        has_more: bool,\n    },\n\n    /// Request document changes\n    DocRequest {\n        doc_id: String,\n        heads: Vec<String>,     // Automerge heads we have\n    },\n\n    /// Response with document changes\n    DocResponse {\n        doc_id: String,\n        changes: Vec<Vec<u8>>,  // Automerge change blobs\n    },\n\n    /// Announce new local event to peers\n    Announce {\n        event: SyncEvent,\n    },\n}\n```\n\n### SyncEvent\n\n```rust\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct SyncEvent {\n    pub position: u64,\n    pub doc_id: String,\n    pub change_hash: String,\n    pub kind: EventKind,\n    pub timestamp: u64,\n}\n\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub enum EventKind {\n    Local,      // I created this change\n    New,        // Just received from peer\n    Backfill,   // Historical sync (catching up)\n    Outlier,    // DAG gap (reference before content)\n}\n```\n\n---\n\n## Shard Protocol Messages (elohim-storage)\n\n```rust\npub enum ShardRequest {\n    /// Request shard data by hash\n    Get { hash: String },\n\n    /// Check if peer has a shard\n    Have { hash: String },\n\n    /// Push a shard to peer for replication\n    Push { hash: String, data: Vec<u8> },\n}\n\npub enum ShardResponse {\n    /// Shard data\n    Data(Vec<u8>),\n\n    /// Boolean: peer has shard\n    Have(bool),\n\n    /// Replication acknowledged\n    PushAck,\n\n    /// Shard not found\n    NotFound,\n\n    /// Error\n    Error(String),\n}\n```\n\n---\n\n## Request-Response Lifecycle\n\n### Inbound Request\n\n```\nPeer A sends request  -->  Your node receives via swarm event\n                           |\n                           v\n                    ElohimBehaviourEvent::RequestResponse(\n                        Event::Message { peer, message: Message::Request { request, channel } }\n                    )\n                           |\n                           v\n                    Process request, send response:\n                    swarm.behaviour_mut().request_response\n                        .send_response(channel, response)?;\n```\n\n### Outbound Request\n\n```\nYour node sends request:\n    let request_id = swarm.behaviour_mut().request_response\n        .send_request(&peer_id, request);\n                           |\n                           v (later)\n                    ElohimBehaviourEvent::RequestResponse(\n                        Event::Message { peer, message: Message::Response { request_id, response } }\n                    )\n                           |\n                    -- OR --\n                    ElohimBehaviourEvent::RequestResponse(\n                        Event::OutboundFailure { peer, request_id, error }\n                    )\n```\n\n---\n\n## MessagePack Serialization\n\nUsing `rmp-serde` crate:\n\n```rust\n// Serialize\nlet bytes: Vec<u8> = rmp_serde::to_vec(&message)?;\n\n// Deserialize\nlet message: SyncMessage = rmp_serde::from_slice(&bytes)?;\n```\n\nAll message types must derive `Serialize` and `Deserialize` from serde.\n\n---\n\n## Adding a New Protocol\n\n1. Define protocol ID string: `/elohim/your-protocol/1.0.0`\n2. Define request/response message types with `Serialize` + `Deserialize`\n3. Create codec implementing `request_response::Codec`\n4. Add to `ElohimBehaviour` struct as new `request_response::Behaviour<YourCodec>`\n5. Handle events in the swarm event loop\n\n---\n\n## Key Files\n\n| File | Purpose |\n|------|---------|\n| `steward/node/src/p2p/protocols.rs` | SyncCodec, protocol constants, wire format |\n| `steward/node/src/sync/protocol.rs` | SyncMessage types, SyncEvent, EventKind |\n| `elohim/elohim-storage/src/p2p/shard_protocol.rs` | Shard protocol codec |\n| `elohim/elohim-storage/src/p2p/sync_protocol.rs` | Storage sync protocol |\n\n## External References\n\n- libp2p request-response: `https://docs.rs/libp2p-request-response/`\n- rmp-serde: `https://docs.rs/rmp-serde/`\n- MessagePack spec: `https://msgpack.org/`\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/skills/libp2p-protocols/SKILL.md",
+      "frontmatter": {
+        "name": "libp2p-protocols",
+        "description": "Reference for Elohim custom libp2p protocols, request-response codecs, message serialization (MessagePack), and wire format specification. Use when someone asks \"add a new protocol\", \"implement a codec\", \"debug message serialization\", \"wire format\", or works with sync/shard protocol handlers.",
+        "metadata": {
+          "author": "elohim-protocol",
+          "version": "1.0.0"
+        }
+      },
+      "frontmatterRaw": "name: libp2p-protocols\ndescription: Reference for Elohim custom libp2p protocols, request-response codecs, message serialization (MessagePack), and wire format specification. Use when someone asks \"add a new protocol\", \"implement a codec\", \"debug message serialization\", \"wire format\", or works with sync/shard protocol handlers.\nmetadata:\n  author: elohim-protocol\n  version: 1.0.0"
+    },
+    "codex": {
+      "path": ".codex/skills/libp2p-protocols/SKILL.md",
+      "frontmatter": {
+        "name": "libp2p-protocols",
+        "description": "Reference for Elohim custom libp2p protocols, request-response codecs, message serialization (MessagePack), and wire format specification. Use when someone asks \"add a new protocol\", \"implement a codec\", \"debug message serialization\", \"wire format\", or works with sync/shard protocol handlers.",
+        "metadata": {
+          "runtime": "codex",
+          "sourceRuntime": "claude",
+          "sourcePath": ".claude/skills/libp2p-protocols/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/libp2p-protocols"
+      }
+    }
+  }
+}

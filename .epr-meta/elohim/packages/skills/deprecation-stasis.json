@@ -1,0 +1,54 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "SkillPackage",
+  "metadata": {
+    "id": "deprecation-stasis",
+    "name": "deprecation-stasis",
+    "version": "1.0.0",
+    "description": "Drive the deprecation/security-concern discipline to stasis in one loop — reconcile the deterministic ledger (.claude/data/deprecations.jsonl) against the canonical backlog (genesis/data/timeline/backlog/{deprecation,security}-*.md), dispatch deprecation-triage for the highest-leverage open item, re-check blocked items whose blockers may have cleared, re-measure, repeat until stasis. Sibling of /memory-stasis-loop (same measure→dispatch→re-measure shape). NOT for CI findings — that class closes deterministically in ci-harvest (disappearance/reopen) and drains under the agentic-developer loop's floor/ceiling rails. Use when \"drain the deprecation ledger\", \"deprecation stasis pass\", on a /loop or scheduled routine, or when the sentinel's nudges have accumulated past comfort.",
+    "triggerDescription": "Drive the deprecation/security-concern discipline to stasis in one loop — reconcile the deterministic ledger (.claude/data/deprecations.jsonl) against the canonical backlog (genesis/data/timeline/backlog/{deprecation,security}-*.md), dispatch deprecation-triage for the highest-leverage open item, re-check blocked items whose blockers may have cleared, re-measure, repeat until stasis. Sibling of /memory-stasis-loop (same measure→dispatch→re-measure shape). NOT for CI findings — that class closes deterministically in ci-harvest (disappearance/reopen) and drains under the agentic-developer loop's floor/ceiling rails. Use when \"drain the deprecation ledger\", \"deprecation stasis pass\", on a /loop or scheduled routine, or when the sentinel's nudges have accumulated past comfort.",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "sourceRuntime": "claude",
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/skills/deprecation-stasis",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "instructions": {
+    "format": "markdown",
+    "body": "\n# Deprecation Stasis Sweep\n\nThe capture side is deterministic and always-on (the `deprecation-sentinel`\nPostToolUse hook: fingerprint dedupe → ledger; NEW → background\n`deprecation-triage` dispatch; re-encounter → backlog citation, no re-fire).\nThis sweep is the **deliberate drain**: it walks both stores to stasis the way\n`/memory-stasis-loop` walks the memory disciplines.\n\n**Stasis** := the ledger is EMPTY, or contains only `blocked` entries with a\nstill-valid, documented blocker in their canonical backlog entry. Fixed items\nDECOMPOSE at close (ledger line + backlog entry deleted; the verifying commit\nis the record; rare chronicle graduation) — everything in the backlog has a\nlive trajectory or a status, or it's not there. Terminal tombstones in either\nstore are themselves an incoherence to repair.\n\n## The loop\n\nEach round:\n\n### 1. Measure (scoreboard)\n\n```bash\npython3 - <<'EOF'\nimport json, collections\ncounts = collections.Counter()\nentries = []\nfor l in open('.claude/data/deprecations.jsonl'):\n    e = json.loads(l); counts[e.get('status','open')] += 1; entries.append(e)\nprint(dict(counts) or 'EMPTY — stasis (capture side)')\nfor e in entries:\n    print(e['fp'], e.get('status'), e.get('backlog','(no backlog)'), '-', e['line'][:90])\nEOF\nls genesis/data/timeline/backlog/deprecation-*.md genesis/data/timeline/backlog/security-*.md 2>/dev/null\n```\n\nCross-check coherence: every non-`open` ledger entry must point at a backlog\nfile whose frontmatter `fingerprints:` includes it and whose\n`deprecation_status:` agrees with the ledger status (domain axis, live states\nonly). The entry's `status:` field carries the unified delivery gradient\n(`backlog`/`wip` — captured-or-blocked / fix-in-flight) so the shared\n`delivery-status-distribution.py` projection and /converge rank deprecation\nconcerns like every other backlog item. Any `fixed`/`stable` tombstone parked\nin either store is a missed decomposition — close it out (delete; chronicle\nfirst only if genuinely meaningful). Incoherence = the first thing to fix (it\nbreaks the deterministic citation).\n\n### 2. Pick highest-leverage work\n\nPriority order:\n1. **Ledger↔backlog incoherence** (deterministic layer is lying) — repair\n   directly.\n2. **`open` entries** (captured, never triaged — a dispatch was lost or\n   declined) — dispatch `deprecation-triage` with those fingerprints.\n3. **`blocked` entries whose blocker may have cleared** — read the backlog\n   entry's \"Current decision\"; check the blocker empirically (package\n   version now available? substrate capability flipped in\n   genesis/manifests/cluster-state.yaml? upstream issue closed — WebFetch\n   it). Cleared → dispatch `deprecation-triage` to re-attempt; still\n   blocked → refresh the decision line with today's evidence and move on.\n4. **`triaged` entries older than a week** (fix in flight that never\n   landed) — dispatch to finish or demote to `blocked` with the reason.\n\nDispatch one `deprecation-triage` (Opus) at a time for focused concerns, or\nfan out in parallel when concerns are independent (different packages,\ndifferent projects).\n\n> **CI findings are NOT this sweep's class.** That ledger\n> (`.claude/data/ci-findings.jsonl`) closes deterministically inside\n> `ci-harvest.py` (confirmation-by-disappearance via green streaks;\n> recurrence-reopen) and its open items drain under the\n> **agentic-developer loop's CI findings rails** (floor: pass/unstable/fail\n> ratios; ceiling: brainstorming-confidence) — see\n> `.claude/skills/agentic-developer/SKILL.md` and the findings-sentinel\n> pattern spec §3.3.\n\n### 3. Re-measure and decide\n\nRe-run the scoreboard. Loop while the non-stasis count is shrinking. Stop at\nstasis, or when a round makes no progress (then report exactly what is stuck\nand why — a stuck item usually means the concern needs an operator-initiated\nsprint, which is a `vision-readiness` roadmap conversation, not more agent\nrounds).\n\n## Wiring options\n\n- **Manual**: invoke this skill at any boundary.\n- **Looped**: `/loop /deprecation-stasis` self-paced until stasis.\n- **Routine**: a `/schedule` weekly remote agent invoking this skill —\n  skips cheaply when the scoreboard is already at stasis.\n\n## Hard rules\n\n- Never edit ledger statuses by hand here without also reconciling the\n  backlog entry (and vice versa) — coherence of the two stores is what lets\n  the sentinel answer re-encounters deterministically.\n- Commit-only; the integrator pushes.\n- A `blocked` verdict with a documented, verified blocker is SUCCESS, not\n  failure — the goal is stasis, not zero entries.\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/skills/deprecation-stasis/SKILL.md",
+      "frontmatter": {
+        "name": "deprecation-stasis",
+        "description": "Drive the deprecation/security-concern discipline to stasis in one loop — reconcile the deterministic ledger (.claude/data/deprecations.jsonl) against the canonical backlog (genesis/data/timeline/backlog/{deprecation,security}-*.md), dispatch deprecation-triage for the highest-leverage open item, re-check blocked items whose blockers may have cleared, re-measure, repeat until stasis. Sibling of /memory-stasis-loop (same measure→dispatch→re-measure shape). NOT for CI findings — that class closes deterministically in ci-harvest (disappearance/reopen) and drains under the agentic-developer loop's floor/ceiling rails. Use when \"drain the deprecation ledger\", \"deprecation stasis pass\", on a /loop or scheduled routine, or when the sentinel's nudges have accumulated past comfort."
+      },
+      "frontmatterRaw": "name: deprecation-stasis\ndescription: Drive the deprecation/security-concern discipline to stasis in one loop — reconcile the deterministic ledger (.claude/data/deprecations.jsonl) against the canonical backlog (genesis/data/timeline/backlog/{deprecation,security}-*.md), dispatch deprecation-triage for the highest-leverage open item, re-check blocked items whose blockers may have cleared, re-measure, repeat until stasis. Sibling of /memory-stasis-loop (same measure→dispatch→re-measure shape). NOT for CI findings — that class closes deterministically in ci-harvest (disappearance/reopen) and drains under the agentic-developer loop's floor/ceiling rails. Use when \"drain the deprecation ledger\", \"deprecation stasis pass\", on a /loop or scheduled routine, or when the sentinel's nudges have accumulated past comfort."
+    },
+    "codex": {
+      "path": ".codex/skills/deprecation-stasis/SKILL.md",
+      "frontmatter": {
+        "name": "deprecation-stasis",
+        "description": "Drive the deprecation/security-concern discipline to stasis in one loop — reconcile the deterministic ledger (.claude/data/deprecations.jsonl) against the canonical backlog (genesis/data/timeline/backlog/{deprecation,security}-*.md), dispatch deprecation-triage for the highest-leverage open item, re-check blocked items whose blockers may have cleared, re-measure, repeat until stasis. Sibling of /memory-stasis-loop (same measure→dispatch→re-measure shape). NOT for CI findings — that class closes deterministically in ci-harvest (disappearance/reopen) and drains under the agentic-developer loop's floor/ceiling rails. Use when \"drain the deprecation ledger\", \"deprecation stasis pass\", on a /loop or scheduled routine, or when the sentinel's nudges have accumulated past comfort.",
+        "metadata": {
+          "runtime": "codex",
+          "sourceRuntime": "claude",
+          "sourcePath": ".claude/skills/deprecation-stasis/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/deprecation-stasis"
+      }
+    }
+  }
+}

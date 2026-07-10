@@ -1,0 +1,54 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "SkillPackage",
+  "metadata": {
+    "id": "story-harvest",
+    "name": "story-harvest",
+    "version": "1.0.0",
+    "description": "Use when finishing a development branch, after resolving a debugging session, or whenever a failure-then-fix cycle reveals engineering constraints worth preserving as a2o scenarios. Also invocable manually with /story-harvest.",
+    "triggerDescription": "Use when finishing a development branch, after resolving a debugging session, or whenever a failure-then-fix cycle reveals engineering constraints worth preserving as a2o scenarios. Also invocable manually with /story-harvest.",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "sourceRuntime": "claude",
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/skills/story-harvest",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "instructions": {
+    "format": "markdown",
+    "body": "\n# Story Harvest\n\n## Overview\n\nCapture engineering discoveries as a2o scenarios before context fades.\n\nWhen a bridge engineer tests a design to failure, the failure reveals a constraint — a load limit, a material property, an environmental factor. They document that constraint as a specification. Future bridges are designed and tested against it. The specification is replicable: anyone can test against it.\n\nThis skill applies the same loop to software: **bug -> design -> proven capability -> scenario**.\n\n## When This Fires\n\n- **Finishing a branch**: Between \"tests pass\" and \"present options\" in the finishing-a-development-branch workflow.\n- **After debugging**: When systematic-debugging resolves a root cause and the fix is verified.\n- **Manual**: `/story-harvest` at any time.\n\n## The Discovery Loop\n\n```\nFailure observed\n    |\n    v\nConstraint revealed ------> specific parameters\n    |                        (memory, concurrency, cache size,\n    v                         timeout, peer count...)\nDesign addresses it\n    |\n    v\nScenario captures it -----> replicable proof the constraint is handled\n    |\n    v\nFuture work inherits the guard rail\n```\n\n## Process\n\n### Step 1: Gather Context\n\nReview what happened on this branch or debugging session:\n\n```bash\n# Branch work\ngit log --oneline $(git merge-base HEAD dev)..HEAD\ngit diff --stat $(git merge-base HEAD dev)..HEAD\n\n# Check for captured intent\ncat .claude/data/dev-intent.jsonl | tail -5\n```\n\nAlso consider: what was the user working through in conversation? What broke? What surprised them?\n\n### Step 2: Identify Discoveries\n\nAsk the user (or reason from context):\n\n1. **What failed, or what did you test to its limits?**\n   Not \"what bug did you fix\" but \"what constraint did the failure reveal?\"\n\n2. **At what specific values did it fail?**\n   The parameters matter. \"Storage broke\" is noise. \"Storage with 256MB container limit receiving 30 concurrent requests for a 40-file HTML5 app triggers OOM\" is engineering knowledge. Those specific values — 256MB, 30 concurrent, 40 files — become the parameters that define peer diversity presets and operator recommendations.\n\n3. **How does the system now handle that constraint?**\n   The design that addresses it. This becomes the capability proof scenario.\n\n4. **What did you need to observe to diagnose it?**\n   The diagnostic capability that enabled the discovery. If you couldn't see it, you couldn't design for it.\n\n### Step 3: Assess Value\n\nNot every change yields a story worth capturing. The highest-value discoveries share traits:\n\n**Parameter-bearing stories** are the most valuable. When a discovery carries specific operational values (memory limits, concurrency thresholds, cache sizes, timeout windows, peer counts), those values do double duty: they prove the constraint in the scenario AND they inform operator presets, documentation, and recommended configurations after major releases. A story about \"storage with X allocated memory under Y concurrent requests\" creates parameters for the diversity of peers — it's how a laptop preset (200MB cache) differs from a home node (2GB) from a network node (10GB).\n\n**Constraint boundaries** — stories that define where one behavior transitions to another — are worth capturing even without exact numbers, because they mark the territory for future measurement.\n\n**Observability stories** — \"an operator can see/control X\" — preserve the diagnostic capability that made the discovery possible in the first place.\n\n**Skip** stories that are just \"feature X works as designed\" with no constraint, boundary, or parameter insight. Those are covered by normal acceptance tests.\n\n### Step 4: Classify and Scaffold\n\nEach discovery maps to one of three scenario types:\n\n**Failure Regression** (`@regression`)\n\"Without X, Y breaks.\" The original failure preserved as a regression anchor. If the failure ever stops being reproducible, the architecture should be revisited — the constraint may have moved, not disappeared.\n\n```gherkin\n@wip @regression\nScenario: Without projection cache, browser load overwhelms storage\n  Given the doorway projection cache is disabled\n  And elohim-storage is allocated 256MB memory\n  When 10 browsers simultaneously load \"evolution-of-trust\" (40 files each)\n  Then elohim-storage receives 300+ concurrent requests\n  And some requests fail or storage resource usage spikes dangerously\n  # Constraint: P2P storage node with 256MB cannot absorb CDN-pattern traffic.\n  # These parameters inform the home_node preset (2GB cache minimum).\n```\n\n**Capability Proof** (`@wip`, becomes `@regression` when wired)\n\"With X enabled, the system handles Y.\" The bridge that holds.\n\n```gherkin\n@wip\nScenario: With projection cache enabled, same load is absorbed\n  Given the doorway projection cache is enabled and warm\n  When 10 browsers simultaneously load \"evolution-of-trust\"\n  Then zero requests reach elohim-storage\n  And all browsers receive complete responses\n```\n\n**Observability Gate** (`@wip`)\n\"An operator can see/control Z.\" The diagnostic capability that enabled the discovery.\n\n```gherkin\n@wip\nScenario: Response headers indicate which cache layer served the request\n  When Matthew requests a file from \"evolution-of-trust\"\n  Then the response includes a header indicating the serving layer\n```\n\n### Step 5: Place Scenarios\n\nIdentify the right feature file:\n- Check existing files under `genesis/a2o/features/` for topical fit\n- If no file fits, suggest a new file with the appropriate directory and tags\n- Follow conventions: `@e2e @{domain}` tags, `@wip` on all new scenarios, named personas, doorway background\n\nAppend scenario outlines to the identified file, or present them to the user for placement.\n\n### Step 6: Note Operational Parameters\n\nIf the discovery carried specific parameter values, note them explicitly in a comment on the scenario:\n\n```gherkin\n# Operational parameters: 256MB memory, 30 concurrent browsers, 40 files/app\n# Informs: NodeCapabilities presets (cache_budget_bytes), operator documentation\n# Review after: major releases, container sizing changes\n```\n\nThese comments are the raw material for operator guides and preset updates. They connect the scenario back to the configuration decisions it informs.\n\n## Output\n\nFor each discovery, produce:\n1. The scenario skeleton (Given/When/Then with specific parameters)\n2. Classification tag (`@regression` or `@wip`)\n3. A one-line constraint statement as a comment\n4. Operational parameter notes where applicable\n5. Suggested file placement\n\nIf no discoveries are worth capturing, say so. Not every branch reveals a constraint. The skill is advisory, not a gate.\n\n## Integration\n\nThis skill is invoked by:\n- **finishing-a-development-branch** — between Step 1 (tests pass) and Step 3 (present options)\n- **systematic-debugging** — after root cause is identified and fix is verified\n- **Manual** — `/story-harvest`\n\n## What This Is NOT\n\n- Not a full Gherkin authoring tool (step definitions come later)\n- Not a gate that blocks finishing (advisory only)\n- Not a substitute for writing scenarios before implementation (story-first is still the default)\n- Not for capturing \"feature X works\" acceptance tests (those come from the story-first loop)\n\nThis skill captures what the story-first loop misses: the **constraints discovered during implementation** that weren't in the original specification.\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/skills/story-harvest/SKILL.md",
+      "frontmatter": {
+        "name": "story-harvest",
+        "description": "Use when finishing a development branch, after resolving a debugging session, or whenever a failure-then-fix cycle reveals engineering constraints worth preserving as a2o scenarios. Also invocable manually with /story-harvest."
+      },
+      "frontmatterRaw": "name: story-harvest\ndescription: Use when finishing a development branch, after resolving a debugging session, or whenever a failure-then-fix cycle reveals engineering constraints worth preserving as a2o scenarios. Also invocable manually with /story-harvest."
+    },
+    "codex": {
+      "path": ".codex/skills/story-harvest/SKILL.md",
+      "frontmatter": {
+        "name": "story-harvest",
+        "description": "Use when finishing a development branch, after resolving a debugging session, or whenever a failure-then-fix cycle reveals engineering constraints worth preserving as a2o scenarios. Also invocable manually with /story-harvest.",
+        "metadata": {
+          "runtime": "codex",
+          "sourceRuntime": "claude",
+          "sourcePath": ".claude/skills/story-harvest/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/story-harvest"
+      }
+    }
+  }
+}

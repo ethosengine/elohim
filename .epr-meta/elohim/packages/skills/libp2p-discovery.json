@@ -1,0 +1,59 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "SkillPackage",
+  "metadata": {
+    "id": "libp2p-discovery",
+    "name": "libp2p-discovery",
+    "version": "1.0.0",
+    "description": "Reference for P2P peer discovery (mDNS, Kademlia), NAT traversal (relay, DCUTR), peer tracking, and network topology. Use when someone asks \"peers not connecting\", \"add bootstrap nodes\", \"mDNS not finding peers\", \"configure Kademlia\", or works on NAT traversal and peer discovery.",
+    "triggerDescription": "Reference for P2P peer discovery (mDNS, Kademlia), NAT traversal (relay, DCUTR), peer tracking, and network topology. Use when someone asks \"peers not connecting\", \"add bootstrap nodes\", \"mDNS not finding peers\", \"configure Kademlia\", or works on NAT traversal and peer discovery.",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "sourceRuntime": "claude",
+    "assetRefs": [],
+    "author": "elohim-protocol",
+    "governance": {
+      "eprRef": "epr:elohim-agent/skills/libp2p-discovery",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "instructions": {
+    "format": "markdown",
+    "body": "\n# libp2p Discovery & NAT Traversal Reference\n\n> **Parallel stack:** The iroh stack (`elohim-storage/src/p2p_iroh/`) uses different discovery mechanics — `Endpoint::builder().discovery_n0()` (n0 number-zero pkarr/relay-based) gated behind the `use_n0_discovery` flag, plus a `cross_stack_peer_map` Diesel table (`agent_cid` PK; bridges libp2p `PeerId` ↔ iroh `NodeId`). See `rust-architect.md` §\"Truth in motion\" for the parallel-stack design; iroh memory entries carry temporal phase/gate state including the self-hostable pkarr resolver direction.\n\nPeer discovery and connectivity management for the Elohim P2P network.\n\n## Discovery Mechanisms\n\n### 1. mDNS (Local Network Discovery)\n\nZero-configuration discovery on the local network (LAN). Peers on the same subnet find each other automatically.\n\n```rust\nuse libp2p::mdns;\n\n// In ElohimBehaviour\npub mdns: mdns::tokio::Behaviour,\n\n// Setup\nlet mdns = mdns::tokio::Behaviour::new(\n    mdns::Config::default(),\n    key.public().to_peer_id(),\n)?;\n```\n\n**Events:**\n```rust\n// Peer discovered on local network\nmdns::Event::Discovered(Vec<(PeerId, Multiaddr)>)\n\n// Peer no longer advertising\nmdns::Event::Expired(Vec<(PeerId, Multiaddr)>)\n```\n\n**When discovered peers arrive:**\n```rust\nfor (peer_id, addr) in peers {\n    // Add to Kademlia routing table for global lookups\n    swarm.behaviour_mut().kademlia.add_address(&peer_id, addr.clone());\n    // Notify coordinator for sync initiation\n    event_tx.send(SwarmEvent::PeerDiscovered { peer_id, addrs: vec![addr] }).await;\n}\n```\n\n**Use case:** Family cluster discovery. Nodes on the same home network find each other without configuration.\n\n---\n\n### 2. Kademlia DHT (Global Discovery)\n\nDistributed hash table for peer discovery across the internet.\n\n```rust\nuse libp2p::kad;\n\n// In ElohimBehaviour\npub kademlia: kad::Behaviour<kad::store::MemoryStore>,\n\n// Setup\nlet store = kad::store::MemoryStore::new(key.public().to_peer_id());\nlet mut kademlia = kad::Behaviour::new(key.public().to_peer_id(), store);\n```\n\n**Mode configuration:**\n\n| Mode | Used By | Description |\n|------|---------|-------------|\n| `Server` | elohim-node | Actively stores and serves routing info |\n| `Client` | elohim-storage | Only queries, doesn't serve |\n\n```rust\n// elohim-node: Server mode (holds routing table entries)\nkademlia.set_mode(Some(kad::Mode::Server));\n\n// elohim-storage: Client mode (lighter, query-only)\nkademlia.set_mode(Some(kad::Mode::Client));\n```\n\n**Bootstrap peer addition:**\n```rust\n// Parse multiaddr with /p2p/ component\n// e.g., /ip4/1.2.3.4/tcp/4001/p2p/12D3KooWAbCdEf...\nfn parse_peer_addr(addr_str: &str) -> Option<(PeerId, Multiaddr)> {\n    let addr: Multiaddr = addr_str.parse().ok()?;\n    let peer_id = addr.iter().find_map(|p| {\n        if let Protocol::P2p(peer_id) = p { Some(peer_id) } else { None }\n    })?;\n    let addr_without_p2p: Multiaddr = addr.iter()\n        .filter(|p| !matches!(p, Protocol::P2p(_)))\n        .collect();\n    Some((peer_id, addr_without_p2p))\n}\n\n// Add bootstrap nodes\nfor node_str in &config.bootstrap_nodes {\n    if let Some((peer_id, addr)) = parse_peer_addr(node_str) {\n        swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);\n    }\n}\n```\n\n---\n\n### 3. Identify Protocol\n\nExchanges node metadata with connected peers.\n\n```rust\nuse libp2p::identify;\n\nlet identify = identify::Behaviour::new(\n    identify::Config::new(\n        \"/elohim/id/1.0.0\".to_string(),\n        key.public(),\n    )\n    .with_agent_version(format!(\"elohim-node/{}\", env!(\"CARGO_PKG_VERSION\"))),\n);\n```\n\n**Events:**\n```rust\nidentify::Event::Received { peer_id, info } => {\n    // info.agent_version: \"elohim-node/0.1.0\"\n    // info.listen_addrs: Vec<Multiaddr>\n    // info.protocols: Vec<StreamProtocol>\n}\n```\n\n**Use case:** Determine peer capabilities, version, and reachable addresses.\n\n---\n\n## Bootstrap Peer Management\n\n### Signal Server Bootstrap\n\nThe doorway signal server provides initial peer discovery:\n\n```\n1. New node starts\n2. GET /signal/{pubkey} -> list of peer multiaddrs\n3. Connect directly to returned peers\n4. Add to Kademlia for ongoing discovery\n```\n\n### Manual Peer Addition\n\n```rust\n// In ElohimSwarm\npub fn add_peer(&mut self, peer_id: PeerId, addrs: Vec<Multiaddr>) {\n    for addr in addrs {\n        self.swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);\n    }\n}\n```\n\n### Initial Kademlia Population\n\nAfter bootstrap, initiate Kademlia routing table refresh:\n\n```rust\n// Find closest peers to random key (routing table fill)\nswarm.behaviour_mut().kademlia.get_closest_peers(PeerId::random());\n```\n\n---\n\n## NAT Traversal (Roadmap)\n\n### Current State\n\nNAT traversal is currently **stub/TODO** in `steward/node/src/p2p/nat.rs`.\n\n### Planned: Relay Protocol\n\nFor peers behind NATs that can't be reached directly:\n\n```rust\nuse libp2p::relay;\n\n// On relay node (public IP)\nlet relay = relay::Behaviour::new(\n    key.public().to_peer_id(),\n    relay::Config::default(),\n);\n\n// On client behind NAT\nlet relay_client = relay::client::Behaviour::new(\n    key.public().to_peer_id(),\n    relay::client::Config::default(),\n);\n```\n\n**Relay flow:**\n```\nNode A (behind NAT) -> Relay (public) -> Node B (behind NAT)\n```\n\n### Planned: DCUTR (Direct Connection Upgrade through Relay)\n\nAfter relay establishes connection, attempt direct hole-punching:\n\n```rust\nuse libp2p::dcutr;\n\nlet dcutr = dcutr::Behaviour::new(key.public().to_peer_id());\n```\n\n**DCUTR flow:**\n```\n1. A connects to B via relay\n2. Exchange observed addresses\n3. Simultaneous connect attempt (hole punch)\n4. If successful: direct connection, relay dropped\n```\n\n### Planned: AutoNAT\n\nDetect NAT status automatically:\n\n```rust\nuse libp2p::autonat;\n\nlet autonat = autonat::Behaviour::new(\n    key.public().to_peer_id(),\n    autonat::Config::default(),\n);\n```\n\n**Status detection:**\n- `NatStatus::Public` - Directly reachable\n- `NatStatus::Private` - Behind NAT, needs relay\n- `NatStatus::Unknown` - Not enough data\n\n---\n\n## Peer Tracking\n\nThe `SyncCoordinator` tracks known peers and their sync state:\n\n```rust\n// steward/node/src/network/operator.rs\npub struct PeerState {\n    pub peer_id: PeerId,\n    pub addrs: Vec<Multiaddr>,\n    pub last_seen: Instant,\n    pub sync_position: u64,         // Their last known position\n    pub pending_requests: HashSet<OutboundRequestId>,\n}\n```\n\n### Peer Lifecycle\n\n```\n1. Discovered (mDNS or Kademlia)    -> PeerDiscovered event\n2. Connected (TCP/QUIC handshake)    -> ConnectionEstablished\n3. Identified (identify protocol)    -> Know capabilities\n4. Syncing (exchange positions)      -> Active data flow\n5. Disconnected                      -> ConnectionClosed\n6. Expired (mDNS timeout)           -> PeerExpired event\n```\n\n---\n\n## Multiaddr Format\n\n```\n/ip4/192.168.1.100/tcp/4001                    # TCP IPv4\n/ip4/1.2.3.4/udp/4001/quic-v1                  # QUIC IPv4\n/ip6/::1/tcp/4001                               # TCP IPv6\n/ip4/1.2.3.4/tcp/4001/p2p/12D3KooW...          # With peer ID\n/dns4/node.elohim.host/tcp/4001/p2p/12D3KooW... # DNS\n```\n\n---\n\n## Gotchas\n\n1. **RUSTFLAGS override** - Must use `RUSTFLAGS=\"\" cargo build` for elohim-node. System sets getrandom cfg for WASM builds.\n\n2. **mDNS requires tokio** - Use `mdns::tokio::Behaviour`, not `mdns::async_io::Behaviour`.\n\n3. **Kademlia Server vs Client** - Server mode on always-on nodes, Client mode on ephemeral devices. Wrong mode wastes resources or limits discovery.\n\n4. **Relay is not implemented yet** - NAT traversal is a TODO. Currently only works on same LAN (mDNS) or with direct connectivity.\n\n5. **Bootstrap cold start** - First node in a network has no peers. Signal server bootstrap is essential.\n\n---\n\n## Key Files\n\n| File | Purpose |\n|------|---------|\n| `steward/node/src/p2p/transport.rs` | Swarm builder, Kademlia + mDNS + identify setup |\n| `steward/node/src/p2p/nat.rs` | NAT traversal (stub - TODO) |\n| `steward/node/src/network/operator.rs` | Peer tracking, sync state |\n| `steward/node/src/config.rs` | P2PConfig (listen addrs, bootstrap nodes) |\n| `elohim/holochain/docs/P2P-DATAPLANE.md` | Bootstrap flow, architecture |\n| `elohim/elohim-storage/src/p2p/behaviour.rs` | Storage P2P behaviour |\n\n## External References\n\n- libp2p-kad: `https://docs.rs/libp2p-kad/`\n- libp2p-mdns: `https://docs.rs/libp2p-mdns/`\n- libp2p-relay: `https://docs.rs/libp2p-relay/`\n- libp2p-dcutr: `https://docs.rs/libp2p-dcutr/`\n- NAT concepts: `https://libp2p.io/concepts/nat/overview/`\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/skills/libp2p-discovery/SKILL.md",
+      "frontmatter": {
+        "name": "libp2p-discovery",
+        "description": "Reference for P2P peer discovery (mDNS, Kademlia), NAT traversal (relay, DCUTR), peer tracking, and network topology. Use when someone asks \"peers not connecting\", \"add bootstrap nodes\", \"mDNS not finding peers\", \"configure Kademlia\", or works on NAT traversal and peer discovery.",
+        "metadata": {
+          "author": "elohim-protocol",
+          "version": "1.0.0"
+        }
+      },
+      "frontmatterRaw": "name: libp2p-discovery\ndescription: Reference for P2P peer discovery (mDNS, Kademlia), NAT traversal (relay, DCUTR), peer tracking, and network topology. Use when someone asks \"peers not connecting\", \"add bootstrap nodes\", \"mDNS not finding peers\", \"configure Kademlia\", or works on NAT traversal and peer discovery.\nmetadata:\n  author: elohim-protocol\n  version: 1.0.0"
+    },
+    "codex": {
+      "path": ".codex/skills/libp2p-discovery/SKILL.md",
+      "frontmatter": {
+        "name": "libp2p-discovery",
+        "description": "Reference for P2P peer discovery (mDNS, Kademlia), NAT traversal (relay, DCUTR), peer tracking, and network topology. Use when someone asks \"peers not connecting\", \"add bootstrap nodes\", \"mDNS not finding peers\", \"configure Kademlia\", or works on NAT traversal and peer discovery.",
+        "metadata": {
+          "runtime": "codex",
+          "sourceRuntime": "claude",
+          "sourcePath": ".claude/skills/libp2p-discovery/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/libp2p-discovery"
+      }
+    }
+  }
+}

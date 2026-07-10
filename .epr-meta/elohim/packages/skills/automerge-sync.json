@@ -1,0 +1,59 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "SkillPackage",
+  "metadata": {
+    "id": "automerge-sync",
+    "name": "automerge-sync",
+    "version": "1.0.0",
+    "description": "Reference for Automerge 0.5 CRDT sync engine, stream positions, delta sync protocol, document lifecycle, conflict resolution, and browser-side integration. Use when someone asks \"how does sync work\", \"handle merge conflicts\", \"manage stream positions\", \"offline-first content\", or implements CRDT document flows.",
+    "triggerDescription": "Reference for Automerge 0.5 CRDT sync engine, stream positions, delta sync protocol, document lifecycle, conflict resolution, and browser-side integration. Use when someone asks \"how does sync work\", \"handle merge conflicts\", \"manage stream positions\", \"offline-first content\", or implements CRDT document flows.",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "sourceRuntime": "claude",
+    "assetRefs": [],
+    "author": "elohim-protocol",
+    "governance": {
+      "eprRef": "epr:elohim-agent/skills/automerge-sync",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "instructions": {
+    "format": "markdown",
+    "body": "\n# Automerge Sync Engine Reference\n\nThe sync engine provides **local-first** experience with CRDT-based conflict resolution using Automerge.\n\n## Design Philosophy\n\n- **Offline-first**: Full functionality without network\n- **Eventual consistency**: All nodes converge to same state\n- **No conflicts**: CRDTs make concurrent edits merge cleanly\n- **Stream-based sync**: Delta updates via position tracking\n\n---\n\n## Document Model\n\nEach content item is one Automerge document, stored in SQLite (native) or IndexedDB (browser).\n\n```\nContent item \"concept-governance\"  ->  Automerge document (binary blob)\nContent item \"path-onboarding\"     ->  Automerge document (binary blob)\nUser progress \"user123/concept-x\"  ->  Automerge document (binary blob)\n```\n\n**What goes in Automerge docs:**\n- Content metadata (title, description, type)\n- Path definitions (chapters, steps, ordering)\n- User progress (mastery levels, engagement counts)\n\n**What does NOT go in Automerge docs:**\n- Media files (use blob/shard storage instead - hash references only)\n- Attestations (use Holochain DHT)\n- Trust links (use Holochain DHT)\n\n---\n\n## Stream Positions\n\nInspired by Matrix's sync API. Each agent maintains a monotonic sequence number.\n\n```rust\npub struct AgentStream {\n    /// Current position (monotonically increasing)\n    pub position: u64,\n\n    /// Recent events for quick replay\n    pub recent_events: VecDeque<SyncEvent>,\n\n    /// Maximum events to keep in memory\n    pub max_recent: usize,\n}\n```\n\n### SyncEvent\n\n```rust\npub struct SyncEvent {\n    /// Position in this agent's stream\n    pub position: u64,\n\n    /// Document that changed\n    pub doc_id: String,\n\n    /// Automerge change hash\n    pub change_hash: String,\n\n    /// Kind of event\n    pub kind: EventKind,\n\n    /// Timestamp\n    pub timestamp: u64,\n}\n```\n\n### Event Kinds\n\n```rust\npub enum EventKind {\n    Local,      // I created this change locally\n    New,        // Just received from a peer\n    Backfill,   // Historical sync (catching up)\n    Outlier,    // Received reference before content (DAG gap)\n}\n```\n\n| Kind | When Used | Priority |\n|------|-----------|----------|\n| Local | User edits offline | Highest - sync first |\n| New | Received from peer | High - recent activity |\n| Backfill | Joining network | Normal - historical |\n| Outlier | DAG incomplete | Low - resolve later |\n\n---\n\n## Sync Protocol\n\n### Message Types\n\n```rust\npub enum SyncMessage {\n    /// Request events since position\n    SyncRequest {\n        since: u64,\n        limit: Option<u32>,\n    },\n\n    /// Response with events\n    SyncResponse {\n        events: Vec<SyncEvent>,\n        has_more: bool,\n    },\n\n    /// Request document changes\n    DocRequest {\n        doc_id: String,\n        heads: Vec<String>,  // Automerge heads we have\n    },\n\n    /// Response with document changes\n    DocResponse {\n        doc_id: String,\n        changes: Vec<Vec<u8>>,  // Automerge change blobs\n    },\n\n    /// Announce new local event\n    Announce {\n        event: SyncEvent,\n    },\n}\n```\n\n### Sync Flow\n\n```\nNode A (position: 100)              Node B (position: 85)\n\n1. Connect                          1. Connect\n\n2. Exchange positions               2. Exchange positions\n   \"I'm at 100\"  ───────────────>\n                  <───────────────  \"I'm at 85\"\n\n3. B is behind, A sends             3. Receive events 86-100\n   events 86-100  ───────────────>\n\n                                    4. For each new doc_id:\n                                       DocRequest { doc_id, heads }\n                  <───────────────\n\n5. DocResponse { changes }          5. Merge changes into local doc\n               ───────────────>\n\n6. Both at 100                      6. Now at 100\n```\n\n### Periodic Sync\n\nThe `SyncCoordinator` schedules periodic sync with connected peers:\n\n```\nEvery 30s:\n  For each connected peer:\n    If peer.sync_position < my_position:\n      Send SyncResponse with delta events\n    If peer.sync_position > my_position:\n      Send SyncRequest { since: my_position }\n```\n\n---\n\n## Conflict Resolution\n\n### Automerge handles conflicts automatically:\n\n**Different fields** - Both changes preserved:\n```\nInitial: { title: \"Original\", version: 1 }\nAlice:   { title: \"Alice's Title\", version: 1 }\nBob:     { title: \"Original\", version: 2 }\nMerged:  { title: \"Alice's Title\", version: 2 }\n```\n\n**Same field** - Deterministic winner (by actor ID):\n```\nInitial: { status: \"draft\" }\nAlice:   { status: \"published\" }\nBob:     { status: \"archived\" }\nMerged:  { status: \"published\" }  // if Alice's ID < Bob's\n```\n\nAccess conflicting values:\n```rust\ndoc.get_conflicts(\"status\")  // [\"published\", \"archived\"]\n```\n\n### Governance Override\n\nFor conflicts requiring human judgment:\n```rust\npub enum ConflictResolution {\n    Automatic(AutomergeResolution),\n    Governance {\n        conflict_id: String,\n        options: Vec<ConflictOption>,\n    },\n}\n```\n\n---\n\n## Document Lifecycle\n\nCreating: build Automerge doc -> store locally -> add to event log (EventKind::Local) -> announce to peers.\nReceiving: check if doc exists -> full request (empty heads) or incremental sync (send our heads) -> merge -> log as EventKind::New.\n\nSee `references/document-lifecycle.md` for full Rust code examples, SQLite/IndexedDB schemas, storage-client-ts sync methods, and OfflineOperationQueueService patterns.\n\n### storage-client-ts Sync Methods\n\nKey methods: `listDocuments()`, `getHeads()`, `getChangesSince()`, `applyChanges()`, `countDocuments()`. See `references/document-lifecycle.md` for usage examples.\n\n---\n\n## Gotchas\n\n1. **Automerge 0.5 crate vs 3.0 design** - The Rust crate is `automerge = \"0.5\"` (in Cargo.toml). The design docs reference \"Automerge 3.0\" which is the JavaScript version. The Rust API differs.\n\n2. **Per-agent stream positions** - Each agent has its own monotonic position. Don't confuse with document-level heads. Positions track the agent's event log, heads track document state.\n\n3. **DAG gaps (Outlier events)** - If you receive a change reference before having the change itself, mark as `Outlier` and fetch later. Don't block sync.\n\n4. **Blob references, not blob sync** - Automerge docs contain hash references to blobs. The blob data itself transfers via the shard protocol, not the sync protocol.\n\n5. **CRDT merge is deterministic** - Same inputs always produce same output. No coordination needed for merge. But same-field conflicts resolve by actor ID ordering, which may surprise users.\n\n---\n\n## Key Files\n\n| File | Purpose |\n|------|---------|\n| `elohim/holochain/docs/SYNC-ENGINE.md` | Primary design document |\n| `steward/node/src/sync/coordinator.rs` | SyncCoordinator (peer tracking, scheduling) |\n| `steward/node/src/sync/protocol.rs` | SyncMessage types |\n| `steward/node/src/sync/stream.rs` | AgentStream, position tracking |\n| `steward/node/src/sync/merge.rs` | Automerge merge operations |\n| `elohim/sdk/storage-client-ts/src/client.ts` | TypeScript sync API |\n| `elohim/holochain/docs/P2P-DATAPLANE.md` | Overall P2P architecture |\n\n## External References\n\n- Automerge docs: `https://automerge.org/docs/`\n- Automerge Rust crate (0.5): `https://docs.rs/automerge/0.5/automerge/`\n- Automerge JS: `https://automerge.org/docs/quickstart/`\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/skills/automerge-sync/SKILL.md",
+      "frontmatter": {
+        "name": "automerge-sync",
+        "description": "Reference for Automerge 0.5 CRDT sync engine, stream positions, delta sync protocol, document lifecycle, conflict resolution, and browser-side integration. Use when someone asks \"how does sync work\", \"handle merge conflicts\", \"manage stream positions\", \"offline-first content\", or implements CRDT document flows.",
+        "metadata": {
+          "author": "elohim-protocol",
+          "version": "1.0.0"
+        }
+      },
+      "frontmatterRaw": "name: automerge-sync\ndescription: Reference for Automerge 0.5 CRDT sync engine, stream positions, delta sync protocol, document lifecycle, conflict resolution, and browser-side integration. Use when someone asks \"how does sync work\", \"handle merge conflicts\", \"manage stream positions\", \"offline-first content\", or implements CRDT document flows.\nmetadata:\n  author: elohim-protocol\n  version: 1.0.0"
+    },
+    "codex": {
+      "path": ".codex/skills/automerge-sync/SKILL.md",
+      "frontmatter": {
+        "name": "automerge-sync",
+        "description": "Reference for Automerge 0.5 CRDT sync engine, stream positions, delta sync protocol, document lifecycle, conflict resolution, and browser-side integration. Use when someone asks \"how does sync work\", \"handle merge conflicts\", \"manage stream positions\", \"offline-first content\", or implements CRDT document flows.",
+        "metadata": {
+          "runtime": "codex",
+          "sourceRuntime": "claude",
+          "sourcePath": ".claude/skills/automerge-sync/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/automerge-sync"
+      }
+    }
+  }
+}

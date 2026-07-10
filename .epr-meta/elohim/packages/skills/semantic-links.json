@@ -1,0 +1,54 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "SkillPackage",
+  "metadata": {
+    "id": "semantic-links",
+    "name": "semantic-links",
+    "version": "1.0.0",
+    "description": "Use when authoring or fixing a doc's cites: — the content-addressed citation convention (slug + desc + fingerprint + generated status/path) that survives file moves. Covers doc-roots AND gospel CLAUDE.mds. Run cite-gen; never hand-write a slug, fingerprint, or path. Triggers: \"add a cites: entry\", \"this cite is dead\", \"migrate cites\", \"what's HELD-CITE vs DEAD-CITE\", \"add concern-routing pointers to a CLAUDE.md\".",
+    "triggerDescription": "Use when authoring or fixing a doc's cites: — the content-addressed citation convention (slug + desc + fingerprint + generated status/path) that survives file moves. Covers doc-roots AND gospel CLAUDE.mds. Run cite-gen; never hand-write a slug, fingerprint, or path. Triggers: \"add a cites: entry\", \"this cite is dead\", \"migrate cites\", \"what's HELD-CITE vs DEAD-CITE\", \"add concern-routing pointers to a CLAUDE.md\".",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "sourceRuntime": "claude",
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/skills/semantic-links",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "instructions": {
+    "format": "markdown",
+    "body": "\n# Semantic-Computable Links\n\nDoc/spec/memory/gospel cites are **content-addressed**, not path-based — so a cite survives the cited doc\nmoving (e.g. into `held/`). A cite is a single human-readable line:\n\n```yaml\ncites:\n  - <ref-slug> | <one-sentence desc> | <fingerprint> [| status: <health hint>] [| path: <locator>]\n```\n\n- **`ref-slug`** — the target's `id:` (its permanent address; survives moves + edits). NEVER a path.\n- **`desc`** — a one-sentence **relationship hint** (the epr-head envelope): *what the target is AND why THIS\n  doc points at it*, so a reader/tool decides whether to follow WITHOUT resolving (progressive discovery).\n  Anchor it from the citing doc's perspective — not the target's bare title (that's the weak migration default).\n- **`fingerprint`** — `sha256:<…>` of the target's content-body at cite-time (a body edit drifts it → `STALE`).\n- **`status:`** — OPTIONAL, **tool-managed** (`cite-propagate` stamps/clears it); absent on healthy links.\n- **`path:`** — **tool-managed** (2026-06-05): the MATERIALIZED LOCATOR — a cache of the slug→path\n  resolution so an agent follows a cite with a plain Read, no resolver run. Stamped at mint, refreshed by\n  every propagate pass (a move self-heals). Never hand-written; never identity — slug + fingerprint stay truth.\n\nA legacy path-string cite (a code path, an external file, no `id:` target) stays a plain path — that's fine.\n\n## The graph's membership (who gets envelopes)\n\n- **Doc roots** — `genesis/docs/` + `.claude/memory/`.\n- **Gospel CLAUDE.mds** (2026-06-05) — `CLAUDE.md` files repo-wide (vendored/dot dirs pruned), membership\n  OPT-IN by declaring `id:`. Concern-routing pointers in a CLAUDE.md are cites like any other.\n- **NOT in the graph** — genesis/data entity docs (humans/presences/timeline/backlog — deliberately\n  plain-path), code paths, URLs, `.claude/` dot-dir process gospels.\n\nMembership is answered in ONE place — `_lib.managed_surfaces.in_cite_graph` (the edit-time registry every\nhook + sweep consults). Never re-hardcode scope in a tool; that's how the 2026-06-05 gospel episode happened.\n\n## Never hand-write a slug, fingerprint, or path — run the tool\n\n```\ncite-gen.py <target>            # emit the envelope line for a doc target (path: stamped at mint)\ncite-gen.py --assign-id <doc>   # give a doc a collision-guarded id: slug\ncite-gen.py --into <doc>        # convert this doc's legacy doc-cites → envelopes (+ refresh path: caches)\ncite-gen.py --verify <doc>      # the dissolution gate: are all cites content-addressed + resolvable?\ncite-gen.py --seal <doc>        # born-linked COMPOSITE: assign-id → --into → --verify, + flag title-default descs\ncite-gen.py --seal-all          # end-of-sprint sweep: seal every GRAPH MEMBER (doc-roots + gospels) with cite debt\ncite-gen.py --refresh <doc> [<ref>...]   # DELIBERATE stale-dequeue: after RE-VERIFYING claims against the\n                                # drifted target, re-bless fingerprint (+ status + path). Verification is\n                                # EDGE-granular — name the ref(s) you verified; bare form blesses ALL edges\ncite-describe.py <doc> '{\"<ref>\":\"<relationship hint>\"}'   # enrich desc (the title default → progressive-discovery hint)\ncite-propagate.py [--apply]     # corpus pass: stamp/clear status:, refresh every path: locator\n```\n\n### Deterministic enforcement (you don't have to remember)\n\n`--seal` is the one command that makes a new doc born-linked; the discipline is wired so it isn't left to recall:\n\n- **preHook** — `.claude/hooks/managed-surface-context.py` (PreToolUse Edit|Write) injects the surface's\n  discipline + exact tooling BEFORE you edit any managed-memory surface (gospel/spec/plan/doc/memory/…),\n  once per file per session. Scope comes from `_lib.managed_surfaces` — the single edit-time registry.\n- **Ceremony POST-step** — `/brainstorm` and `/plan` run `cite-gen --seal <new-doc>` right after writing it.\n- **postHook** — `.claude/hooks/cite-seal-signal.py` (PostToolUse Edit|Write) nudges the moment a GRAPH\n  MEMBER (doc-root .md or gospel CLAUDE.md — registry-scoped) is written with un-sealed cite debt (legacy\n  path-cite to an id-bearing doc, or no `id:` yet). Self-limiting: goes silent once sealed.\n- **End-of-sprint** — `/shift`'s decompose-self close and the `memory-stasis-loop` `cites` dimension run\n  `--seal-all` so nothing graduates into the permanent graph un-sealed. Pair with `cite-describe` for the\n  title-default descs the seal flags.\n\n`cite-gen --into` seeds each new cite's `desc` with the target's title (a placeholder). Upgrade it to a real\nrelationship hint with `cite-describe.py` — it sets `desc` only, preserving ref + fingerprint + status + path.\nThe whole corpus was enriched this way once; new cites just need the one follow-up call.\n\nAuthoring a new spec/plan via `/brainstorm` or `/plan`: write `cites:` as plain paths, then run\n`cite-gen --into <doc>` once — it slug-ifies every doc-cite. The migration (`cites-migrate.py`) already\ndid this for the whole corpus; new docs just run `--into`.\n\n## The audit verdicts (memory-coherence-audit.py)\n\n- **`HELD-CITE`** — target is sequestered in `held/`. **NOT dead** — do not delete the link; it resolves\n  again when the target returns (scope-tree reconciliation).\n- **`DEAD-CITE`** — the slug resolves nowhere. A real dangling link.\n- **`STALE-CANDIDATE`** — the target's content fingerprint drifted. This is a re-verify QUEUE: confirm the\n  citing doc's claims still hold against the moved-on target, then `cite-gen --refresh <doc>` (the\n  deliberate blessing — `--into` never auto-blesses drift).\n- **`CITE-FORMAT-CANDIDATE`** — a legacy doc path-string whose target HAS an `id:` (migratable); run `--into`.\n\n## Key files\n\n- `.claude/scripts/_lib/cite_graph.py` — slug / fingerprint / envelope / verdict / path-materialization primitives.\n- `.claude/scripts/_lib/managed_surfaces.py` — the edit-time registry: surface classes → discipline + tooling +\n  graph membership (single source of scope truth for hooks and sweeps).\n- `.claude/scripts/memory-kit/cite-gen.py` — author / migrate / verify / refresh one doc.\n- `.claude/scripts/memory-kit/cite-describe.py` — enrich a doc's cite descriptions (title default → relationship hint).\n- `.claude/scripts/memory-kit/cites-migrate.py` — one-time corpus migration (assign-id + --into).\n- `.claude/scripts/memory-kit/cite-propagate.py` — materialize the `status:` hint + `path:` locator (the self-describing edge).\n- Spec: `genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md` (§9.1 = the 2026-06-05\n  amendment) + `genesis/docs/superpowers/specs/2026-06-05-managed-surface-edit-discipline-design.md`.\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/skills/semantic-links/SKILL.md",
+      "frontmatter": {
+        "name": "semantic-links",
+        "description": "Use when authoring or fixing a doc's cites: — the content-addressed citation convention (slug + desc + fingerprint + generated status/path) that survives file moves. Covers doc-roots AND gospel CLAUDE.mds. Run cite-gen; never hand-write a slug, fingerprint, or path. Triggers: \"add a cites: entry\", \"this cite is dead\", \"migrate cites\", \"what's HELD-CITE vs DEAD-CITE\", \"add concern-routing pointers to a CLAUDE.md\"."
+      },
+      "frontmatterRaw": "name: semantic-links\ndescription: Use when authoring or fixing a doc's cites: — the content-addressed citation convention (slug + desc + fingerprint + generated status/path) that survives file moves. Covers doc-roots AND gospel CLAUDE.mds. Run cite-gen; never hand-write a slug, fingerprint, or path. Triggers: \"add a cites: entry\", \"this cite is dead\", \"migrate cites\", \"what's HELD-CITE vs DEAD-CITE\", \"add concern-routing pointers to a CLAUDE.md\"."
+    },
+    "codex": {
+      "path": ".codex/skills/semantic-links/SKILL.md",
+      "frontmatter": {
+        "name": "semantic-links",
+        "description": "Use when authoring or fixing a doc's cites: — the content-addressed citation convention (slug + desc + fingerprint + generated status/path) that survives file moves. Covers doc-roots AND gospel CLAUDE.mds. Run cite-gen; never hand-write a slug, fingerprint, or path. Triggers: \"add a cites: entry\", \"this cite is dead\", \"migrate cites\", \"what's HELD-CITE vs DEAD-CITE\", \"add concern-routing pointers to a CLAUDE.md\".",
+        "metadata": {
+          "runtime": "codex",
+          "sourceRuntime": "claude",
+          "sourcePath": ".claude/skills/semantic-links/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/semantic-links"
+      }
+    }
+  }
+}

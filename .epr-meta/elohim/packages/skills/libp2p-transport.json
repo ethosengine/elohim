@@ -1,0 +1,59 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "SkillPackage",
+  "metadata": {
+    "id": "libp2p-transport",
+    "name": "libp2p-transport",
+    "version": "1.0.0",
+    "description": "Reference for libp2p swarm setup, transport configuration, and behaviour composition in steward/node and elohim-storage (both resolve libp2p 0.54.1). Use when someone asks \"configure the swarm\", \"add a new behaviour\", \"set up transport\", or debugs P2P connection issues.",
+    "triggerDescription": "Reference for libp2p swarm setup, transport configuration, and behaviour composition in steward/node and elohim-storage (both resolve libp2p 0.54.1). Use when someone asks \"configure the swarm\", \"add a new behaviour\", \"set up transport\", or debugs P2P connection issues.",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "sourceRuntime": "claude",
+    "assetRefs": [],
+    "author": "elohim-protocol",
+    "governance": {
+      "eprRef": "epr:elohim-agent/skills/libp2p-transport",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "instructions": {
+    "format": "markdown",
+    "body": "\n# libp2p Transport Reference\n\n> **Parallel stack:** A second transport stack lives alongside libp2p — `elohim-storage/src/p2p_iroh/` (iroh QUIC, ALPN-based, with iroh-blobs + iroh-gossip). Services are transport-neutral; libp2p and iroh adapters delegate to them. Selection is via `TransportBackend` config; runtime is mode-exclusive (libp2p OR iroh, never both). See `rust-architect.md` §\"Truth in motion\" for the design. This skill describes the libp2p side specifically; for iroh ALPN handler patterns see `project_iroh_alpn_handlers_one_stream_design.md` and the linked iroh memory entries, which carry the temporal phase/gate state.\n\nThe Elohim Protocol uses libp2p for P2P networking in two crates — both on the same version.\n\n## Two Implementations\n\n| Crate | libp2p Version | Purpose |\n|-------|---------------|---------|\n| `elohim-node` | **0.54.1** (Cargo.lock verified 2026-06-11) | Always-on infrastructure runtime (family nodes) |\n| `elohim-storage` | **0.54.1** (Cargo.lock verified 2026-06-11) | Content storage sidecar |\n\n> **Historical note:** An older \"node 0.53 vs storage 0.54\" split was documented here. The lockfiles falsify it — both crates have been on 0.54 since before the steward/ restructure. The `with_codec()` constructor was a pre-0.54 idiom; actual code uses `Behaviour::new()`.\n\n### Shared API Idioms (0.54.1)\n\n| Feature | Idiom |\n|---------|-------|\n| Request-Response construction | `Behaviour::new([(Proto, ProtocolSupport::Full)], cfg)` |\n| Swarm event loop | `StreamExt::next()` (not the deprecated `select_next_event()`) |\n| NetworkBehaviour derive | `#[derive(NetworkBehaviour)]` |\n| Auto-generated events | `ElohimBehaviourEvent` enum |\n| Required features | `macros` + `ed25519` |\n\n---\n\n## `#[derive(NetworkBehaviour)]` Pattern\n\nThe derive macro composes multiple sub-behaviours into a single behaviour:\n\n```rust\nuse libp2p::swarm::NetworkBehaviour;\n\n#[derive(NetworkBehaviour)]\npub struct ElohimBehaviour {\n    pub request_response: request_response::Behaviour<SyncCodec>,\n    pub mdns: mdns::tokio::Behaviour,\n    pub kademlia: kad::Behaviour<kad::store::MemoryStore>,\n    pub identify: libp2p::identify::Behaviour,\n}\n```\n\n**Requires** `macros` and `ed25519` features in `Cargo.toml`:\n```toml\nlibp2p = { version = \"0.54\", features = [\n    \"tokio\", \"tcp\", \"quic\", \"noise\", \"yamux\",\n    \"mdns\", \"kad\", \"identify\", \"relay\", \"dcutr\",\n    \"request-response\",\n    \"macros\",    # Required for #[derive(NetworkBehaviour)]\n    \"ed25519\",   # Required for identity\n] }\n```\n\nThe derive **auto-generates** `ElohimBehaviourEvent` enum with variants for each sub-behaviour.\n\n---\n\n## Transport Stack\n\n```\nTCP + Noise (encryption) + Yamux (multiplexing)\n  +\nQUIC (built-in encryption + multiplexing)\n```\n\n### Building the Swarm\n\n```rust\nuse libp2p::{identity, noise, tcp, yamux, SwarmBuilder, StreamProtocol};\n\nlet keypair = identity::Keypair::generate_ed25519();\nlet local_peer_id = PeerId::from(keypair.public());\n\nlet swarm = SwarmBuilder::with_existing_identity(keypair)\n    .with_tokio()\n    .with_tcp(\n        tcp::Config::default(),\n        noise::Config::new,       // Noise XX handshake\n        yamux::Config::default,   // Yamux stream muxer\n    )?\n    .with_quic()                  // QUIC transport (UDP)\n    .with_behaviour(|key| {\n        // Build composite behaviour here\n        ElohimBehaviour { ... }\n    })?\n    .with_swarm_config(|c| {\n        c.with_idle_connection_timeout(Duration::from_secs(60))\n    })\n    .build();\n```\n\n---\n\n## Swarm Event Loop\n\nUses `StreamExt::next()` (**not** `select_next_event()` which was deprecated):\n\n```rust\nuse futures::StreamExt;\nuse libp2p::swarm::SwarmEvent as LibSwarmEvent;\n\nloop {\n    let Some(event) = swarm.next().await else {\n        break;\n    };\n\n    match event {\n        LibSwarmEvent::Behaviour(ElohimBehaviourEvent::Mdns(\n            mdns::Event::Discovered(peers),\n        )) => {\n            for (peer_id, addr) in peers {\n                // Handle peer discovery\n            }\n        }\n\n        LibSwarmEvent::Behaviour(ElohimBehaviourEvent::RequestResponse(\n            request_response::Event::Message { peer, message },\n        )) => match message {\n            request_response::Message::Request { request, channel, .. } => {\n                // Handle incoming request, send response via channel\n            }\n            request_response::Message::Response { request_id, response } => {\n                // Handle response to our outbound request\n            }\n        },\n\n        LibSwarmEvent::NewListenAddr { address, .. } => {\n            info!(\"Listening on {}\", address);\n        }\n\n        _ => {}\n    }\n}\n```\n\n---\n\n## Request-Response Setup\n\n### libp2p 0.54 (both crates)\n\n```rust\nuse libp2p::{request_response, StreamProtocol};\n\nlet sync_protocol = StreamProtocol::new(\"/elohim/sync/1.0.0\");\nlet rr_config = request_response::Config::default()\n    .with_request_timeout(Duration::from_secs(30));\n\n// 0.54: Use new() with (protocol, support) pairs\nlet rr = request_response::Behaviour::new(\n    [(sync_protocol, request_response::ProtocolSupport::Full)],\n    rr_config,\n);\n// Note: with_codec() was a pre-0.54 idiom — no longer used here.\n```\n\n### Sending Requests\n\n```rust\n// Send request\nlet request_id = swarm.behaviour_mut()\n    .request_response\n    .send_request(&peer_id, request);\n\n// Send response (on incoming request channel)\nswarm.behaviour_mut()\n    .request_response\n    .send_response(channel, response)?;\n```\n\n---\n\n## Identity Keypair Management\n\n```rust\nuse libp2p::identity;\n\n// Generate new\nlet keypair = identity::Keypair::generate_ed25519();\n\n// Persist to disk\nlet bytes = keypair.to_protobuf_encoding()?;\nstd::fs::write(\"node_key\", &bytes)?;\n\n// Load from disk\nlet bytes = std::fs::read(\"node_key\")?;\nlet keypair = identity::Keypair::from_protobuf_encoding(&bytes)?;\n\n// Get PeerId\nlet peer_id = PeerId::from(keypair.public());\n```\n\n---\n\n## Listen Addresses\n\n```rust\n// From P2PConfig\nfor addr_str in &config.listen_addrs {\n    let addr: Multiaddr = addr_str.parse()?;\n    swarm.listen_on(addr)?;\n}\n\n// Common addresses:\n// /ip4/0.0.0.0/tcp/4001        - TCP on all interfaces\n// /ip4/0.0.0.0/udp/4001/quic-v1 - QUIC on all interfaces\n// /ip6/::/tcp/4001              - IPv6 TCP\n```\n\n---\n\n## Configuration\n\n```rust\n// steward/node/src/config.rs\npub struct P2PConfig {\n    pub listen_addrs: Vec<String>,     // Multiaddr strings\n    pub bootstrap_nodes: Vec<String>,  // /ip4/.../p2p/12D3Koo...\n    pub enable_mdns: bool,             // LAN discovery\n    pub enable_kademlia: bool,         // Global DHT\n}\n```\n\n---\n\n## Build Requirements\n\n```bash\n# elohim-node: Override RUSTFLAGS (system sets getrandom for WASM)\nRUSTFLAGS=\"\" cargo build\nRUSTFLAGS=\"\" cargo test\n\n# elohim-storage: Needs getrandom for WASM target\nRUSTFLAGS='--cfg getrandom_backend=\"custom\"' cargo build --release\n```\n\n---\n\n## Key Files\n\n| File | Purpose |\n|------|---------|\n| `steward/node/src/p2p/transport.rs` | Swarm builder, behaviour composition, event loop |\n| `steward/node/src/p2p/mod.rs` | Module exports |\n| `steward/node/src/p2p/protocols.rs` | SyncCodec, protocol constants |\n| `steward/node/src/p2p/nat.rs` | NAT traversal (stub/TODO) |\n| `steward/node/Cargo.toml` | libp2p 0.54 features declaration (resolves 0.54.1) |\n| `elohim/elohim-storage/src/p2p/behaviour.rs` | Storage P2P behaviour (0.54) |\n| `elohim/holochain/docs/P2P-DATAPLANE.md` | Architecture design document |\n\n## External References\n\n- libp2p 0.54.1 docs: `https://docs.rs/libp2p/0.54.1/libp2p/`\n- libp2p concepts: `https://libp2p.io/concepts/transports/overview/`\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/skills/libp2p-transport/SKILL.md",
+      "frontmatter": {
+        "name": "libp2p-transport",
+        "description": "Reference for libp2p swarm setup, transport configuration, and behaviour composition in steward/node and elohim-storage (both resolve libp2p 0.54.1). Use when someone asks \"configure the swarm\", \"add a new behaviour\", \"set up transport\", or debugs P2P connection issues.",
+        "metadata": {
+          "author": "elohim-protocol",
+          "version": "1.0.0"
+        }
+      },
+      "frontmatterRaw": "name: libp2p-transport\ndescription: Reference for libp2p swarm setup, transport configuration, and behaviour composition in steward/node and elohim-storage (both resolve libp2p 0.54.1). Use when someone asks \"configure the swarm\", \"add a new behaviour\", \"set up transport\", or debugs P2P connection issues.\nmetadata:\n  author: elohim-protocol\n  version: 1.0.0"
+    },
+    "codex": {
+      "path": ".codex/skills/libp2p-transport/SKILL.md",
+      "frontmatter": {
+        "name": "libp2p-transport",
+        "description": "Reference for libp2p swarm setup, transport configuration, and behaviour composition in steward/node and elohim-storage (both resolve libp2p 0.54.1). Use when someone asks \"configure the swarm\", \"add a new behaviour\", \"set up transport\", or debugs P2P connection issues.",
+        "metadata": {
+          "runtime": "codex",
+          "sourceRuntime": "claude",
+          "sourcePath": ".claude/skills/libp2p-transport/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/libp2p-transport"
+      }
+    }
+  }
+}

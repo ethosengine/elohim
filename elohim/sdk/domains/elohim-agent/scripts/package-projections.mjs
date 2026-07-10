@@ -179,10 +179,20 @@ function mcpServerNames(mcpServers) {
   return mcpServers.flatMap((entry) => Object.keys(entry));
 }
 
+function governanceFor(kind, id) {
+  return {
+    eprRef: `epr:elohim-agent/${kind}/${id}`, // offline floor anchor; resolves to earned trust when the substrate is reachable
+    policy: 'capability-governance@1',
+    gates: ['epr-meta-resolver', 'elohim-agent:packages:verify'],
+    ledger: '.claude/data/governance-findings.jsonl',
+  };
+}
+
 function skillPackageFromClaude(path, parsed) {
   const name = parsed.frontmatter.name;
   const version = parsed.frontmatter.metadata?.version ?? '1.0.0';
   const description = parsed.frontmatter.description;
+  const governance = governanceFor('skills', name);
 
   return {
     apiVersion: 'elohim-agent/v1alpha1',
@@ -197,6 +207,7 @@ function skillPackageFromClaude(path, parsed) {
       sourceRuntime: 'claude',
       assetRefs: [],
       author: parsed.frontmatter.metadata?.author,
+      governance,
     },
     instructions: {
       format: 'markdown',
@@ -216,6 +227,7 @@ function skillPackageFromClaude(path, parsed) {
           packageKind: 'SkillPackage',
           sourcePath: relative(REPO_ROOT, path),
           sourceRuntime: 'claude',
+          governance,
         }),
       },
     },
@@ -228,6 +240,7 @@ function agentPackageFromClaude(path, parsed) {
   const model = parsed.frontmatter.model;
   const color = parsed.frontmatter.color;
   const toolRefs = toolRefsFrom(parsed.frontmatter);
+  const governance = governanceFor('agents', name);
 
   return {
     apiVersion: 'elohim-agent/v1alpha1',
@@ -246,6 +259,7 @@ function agentPackageFromClaude(path, parsed) {
       toolRefs,
       sourceRuntime: 'claude',
       mcpServerRefs: mcpServerNames(parsed.frontmatter.mcpServers),
+      governance,
     },
     instructions: {
       format: 'markdown',
@@ -267,13 +281,23 @@ function agentPackageFromClaude(path, parsed) {
           sourceRuntime: 'claude',
           model,
           tools: toolRefs,
+          governance,
         }),
       },
     },
   };
 }
 
-function codexFrontmatter({ name, description, packageKind, sourcePath, sourceRuntime, model, tools }) {
+function codexFrontmatter({
+  name,
+  description,
+  packageKind,
+  sourcePath,
+  sourceRuntime,
+  model,
+  tools,
+  governance,
+}) {
   const metadata = {
     runtime: 'codex',
     sourceRuntime,
@@ -283,6 +307,7 @@ function codexFrontmatter({ name, description, packageKind, sourcePath, sourceRu
   const frontmatter = { name, description, metadata };
   if (model) frontmatter.model = model;
   if (tools?.length) frontmatter.tools = tools.join(', ');
+  if (governance) frontmatter.governance = governance.eprRef;
   return frontmatter;
 }
 
@@ -474,10 +499,27 @@ async function verifyPackage(pkg, validators) {
     );
   }
 
+  assert(
+    Boolean(pkg.metadata.governance?.eprRef),
+    `${pkg.metadata.id} has metadata.governance.eprRef`,
+  );
+
   await verifyProjectionFixture(pkg, 'claude');
   await verifyProjectionFixture(pkg, 'codex');
   await verifyRuntimeProjectionIfPresent(pkg, 'claude');
   await verifyRuntimeProjectionIfPresent(pkg, 'codex');
+  await verifyGovernanceBackref(pkg);
+}
+
+async function verifyGovernanceBackref(pkg) {
+  const eprRef = pkg.metadata.governance?.eprRef;
+  if (!eprRef) return;
+  const paths = projectionFixturePathsFor(pkg);
+  const codexFixture = await readIfExists(paths.codex);
+  assert(
+    typeof codexFixture === 'string' && codexFixture.includes(eprRef),
+    `${pkg.metadata.id} governance backref matches package: codex projection fixture contains ${eprRef}`,
+  );
 }
 
 async function verifyProjectionFixture(pkg, runtime) {
