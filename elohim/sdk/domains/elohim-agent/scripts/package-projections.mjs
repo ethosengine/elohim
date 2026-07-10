@@ -405,6 +405,26 @@ function claudeFrontmatterFromPackage(pkg) {
   return { name, description, metadata };
 }
 
+// Generated Codex frontmatter for a package-master (FLIPPED) skill/agent — the
+// codex backend at parity with the claude one. Carries `master: 'package'` and
+// re-roots provenance: `sourcePath` points at the PACKAGE (the authoritative
+// root), NOT the stale `.claude` source it was born from. Identity (name) never
+// forks per runtime.
+function codexFrontmatterFromPackage(pkg) {
+  const { name, description, sourceRuntime, master, governance } = pkg.metadata;
+  const dir = pkg.kind === 'SkillPackage' ? 'skills' : 'agents';
+  const metadata = {
+    runtime: 'codex',
+    sourceRuntime,
+    master,
+    sourcePath: `.epr-meta/elohim/packages/${dir}/${pkg.metadata.id}.json`,
+    packageKind: pkg.kind,
+  };
+  const frontmatter = { name, description, metadata };
+  if (governance?.eprRef) frontmatter.governance = governance.eprRef;
+  return frontmatter;
+}
+
 function projectMarkdownSurface(pkg, runtime) {
   const projection = pkg.projections[runtime];
   // Per-runtime "compiler backend" seam: each runtime lowers package metadata
@@ -414,11 +434,13 @@ function projectMarkdownSurface(pkg, runtime) {
   // the fidelity gate stays green. A package that has FLIPPED to package-master
   // (metadata.master === 'package') no longer has an authoritative `.claude`
   // source, so its Claude frontmatter is GENERATED from package metadata instead
-  // of read from stale frontmatterRaw — the same generation codexFrontmatter
-  // already does for the codex backend.
+  // of read from stale frontmatterRaw. The codex backend does the same via
+  // codexFrontmatterFromPackage, so BOTH projections reflect the package root.
   let frontmatter;
   if (runtime === 'claude' && pkg.metadata.master === 'package') {
     frontmatter = stringifyYaml(claudeFrontmatterFromPackage(pkg));
+  } else if (runtime === 'codex' && pkg.metadata.master === 'package') {
+    frontmatter = stringifyYaml(codexFrontmatterFromPackage(pkg));
   } else if (projection.frontmatterRaw) {
     frontmatter = `${projection.frontmatterRaw}\n`;
   } else {

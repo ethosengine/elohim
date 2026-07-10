@@ -4,7 +4,8 @@ description: Mandatory gate for any feature design involving data entities (tabl
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/p2p-design-gate/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/p2p-design-gate.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/p2p-design-gate"
 ---
