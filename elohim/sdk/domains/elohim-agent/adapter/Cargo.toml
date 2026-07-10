@@ -14,3 +14,9 @@ description = "Maps the elohim capability-package tree into an eprfs ProjectionM
 [dependencies]
 eprfs-core = { path = "../../../../eprfs/eprfs-core" }
 serde_json.workspace = true
+
+[dev-dependencies]
+bytes.workspace = true
+eprfs-local = { path = "../../../../eprfs/eprfs-local" }
+eprfs-storage = { path = "../../../../eprfs/eprfs-storage" }
+tokio = { workspace = true, features = ["fs"] }

@@ -201,8 +201,12 @@ dependencies = [
 name = "elohim-agent-adapter"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "eprfs-core",
+ "eprfs-local",
+ "eprfs-storage",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]

@@ -241,4 +241,83 @@ mod tests {
             .iter()
             .any(|(cid, bytes)| cid == &expected_b && bytes == B_BYTES));
     }
+
+    /// Deterministic walk collecting `(relative_path, bytes)` for every file
+    /// under `root` — the independent read-back used to prove materialization
+    /// reproduced the source tree byte-identically.
+    fn read_all_files(root: &Path) -> Vec<(std::path::PathBuf, Vec<u8>)> {
+        fn walk_files(base: &Path, current: &Path, out: &mut Vec<(std::path::PathBuf, Vec<u8>)>) {
+            let mut children: Vec<std::path::PathBuf> = fs::read_dir(current)
+                .unwrap()
+                .map(|e| e.unwrap().path())
+                .collect();
+            children.sort();
+            for child in children {
+                if child.is_dir() {
+                    walk_files(base, &child, out);
+                } else {
+                    let rel = child.strip_prefix(base).unwrap().to_path_buf();
+                    let bytes = fs::read(&child).unwrap();
+                    out.push((rel, bytes));
+                }
+            }
+        }
+
+        let mut out = Vec::new();
+        walk_files(root, root, &mut out);
+        out
+    }
+
+    #[tokio::test]
+    async fn materializes_package_tree_byte_identical() {
+        // A small fixture proves the mechanism without walking the real
+        // 59-package tree: one nested directory, three files with distinct
+        // bytes (including an empty file, a boundary the walk must not choke
+        // on).
+        let tree = TempTree::new();
+        fs::write(tree.root.join("top.txt"), b"top-level bytes\n").unwrap();
+        let nested = tree.root.join("nested").join("deeper");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(nested.join("leaf.md"), b"# nested leaf\ncontent here\n").unwrap();
+        fs::write(nested.join("empty.txt"), b"").unwrap();
+
+        let manifest = manifest_from_package_tree(&tree.root).expect("manifest builds");
+
+        let storage = eprfs_storage::MemoryStorage::default();
+        for (cid, bytes) in blobs_for_tree(&tree.root).expect("blobs collected") {
+            storage.insert_blob(cid, bytes::Bytes::from(bytes)).await;
+        }
+
+        let target = std::env::temp_dir().join(format!(
+            "eaa-roundtrip-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = tokio::fs::remove_dir_all(&target).await;
+
+        let materializer = eprfs_local::LocalMaterializer::new(storage);
+        materializer
+            .materialize(
+                &manifest,
+                &target,
+                eprfs_core::MaterializationPolicy::LocalOnly,
+            )
+            .await
+            .expect("materialization succeeds");
+
+        // Every source file exists at target with identical bytes.
+        let source_files = read_all_files(&tree.root);
+        assert_eq!(source_files.len(), 3, "top.txt + leaf.md + empty.txt");
+        for (rel, bytes) in source_files {
+            let materialized = tokio::fs::read(target.join(&rel))
+                .await
+                .unwrap_or_else(|e| panic!("missing materialized file {}: {e}", rel.display()));
+            assert_eq!(materialized, bytes, "mismatch: {}", rel.display());
+        }
+
+        let _ = tokio::fs::remove_dir_all(&target).await;
+    }
 }
