@@ -228,12 +228,20 @@ if command -v node >/dev/null 2>&1 && [ -f genesis/orchestrator/ci-ignore.mjs ];
 fi
 
 # Agentic capability manifests are SDK vocabulary artifacts, not app/storage
-# runtime code. The build graph currently treats root package.json and broad
-# elohim/sdk/** globs as app/storybook/storage inputs, which over-gates this
-# manifest-only slice. Keep the local push gate scoped to the focused schema
-# validation until generated/runtime consumers exist.
+# runtime code. The build graph currently treats broad elohim/sdk/** globs as
+# app/storybook/storage inputs, which over-gates this manifest-only slice.
+# Keep the local push gate scoped to the focused schema validation until
+# generated/runtime consumers exist.
+#
+# NOTE: root package.json (and any other file that can affect builds outside
+# elohim/sdk/domains/elohim-agent/) must NOT be excluded here — excluding it
+# would make the remainder empty for a push that also touches the workspace
+# root, letting it skip every downstream gate (app/storybook/storage,
+# .ci-ignore freshness, the .epr-meta compose-gate backstop, sweettest-check).
+# Only exclude paths that are genuinely inert outside the agent scope: the
+# domains-level README (doc-only) and the agent's own dedicated test script.
 AGENT_MANIFEST_SCOPE_REMAINDER=$(
-  printf '%s\n' "$CHANGED" | grep -Ev '^(package\.json|elohim/sdk/domains/README\.md|elohim/sdk/domains/elohim-agent/.*|elohim/sdk/schemas/scripts/test-elohim-agent-manifest\.mjs)$' || true
+  printf '%s\n' "$CHANGED" | grep -Ev '^(elohim/sdk/domains/README\.md|elohim/sdk/domains/elohim-agent/.*|elohim/sdk/schemas/scripts/test-elohim-agent-manifest\.mjs)$' || true
 )
 if [ -z "$AGENT_MANIFEST_SCOPE_REMAINDER" ] &&
    printf '%s\n' "$CHANGED" | grep -qE '^elohim/sdk/domains/elohim-agent/|^elohim/sdk/schemas/scripts/test-elohim-agent-manifest\.mjs$'; then
