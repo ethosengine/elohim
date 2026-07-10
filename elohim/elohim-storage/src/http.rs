@@ -126,14 +126,31 @@ use tokio::net::TcpListener;
 use tokio::sync::{RwLock, Semaphore};
 use tracing::{debug, error, info, warn};
 
-/// Maximum number of concurrent HTTP requests the server will handle.
-/// Excess requests are SHED (per-request try_acquire → 503 + Retry-After), not
-/// queued — an unbounded wait is just a slower wedge and gated /health too.
-/// Bounds memory under burst (e.g., HTML5 app iframe loading 30+ assets).
+/// Maximum number of concurrent MUTATING (write) HTTP requests. Excess writes
+/// are SHED (per-request try_acquire → 503 + Retry-After), not queued — an
+/// unbounded wait is just a slower wedge and gates /health too. Shedding a write
+/// under burst is CORRECT backpressure: the seeder retries the catching-up shed
+/// (`DoorwayClient.fetch()`), so the write lands once the projector drains.
 const MAX_CONCURRENT_REQUESTS: usize = 64;
+
+/// Maximum number of concurrent READ (GET/HEAD) requests — a SEPARATE, larger
+/// pool from writes. Reads are cheap projection serves; a write burst (e.g.
+/// genesis seeding) must never starve a cheap already-projected `/epr/*` read
+/// (the read-path shed observed in genesis #1272 E2E). Independent pools
+/// guarantee reads a floor no write storm can consume. Still bounded (reads at
+/// enough concurrency cost memory/fds), just bounded on their own budget.
+const MAX_CONCURRENT_READS: usize = 256;
 
 /// Retry-After (seconds) when storage sheds at the request-admission ceiling.
 const STORAGE_SHED_RETRY_AFTER_SECS: u64 = 2;
+
+/// Which admission pool a request draws from. Safe/idempotent methods (GET,
+/// HEAD) are cheap reads and use the larger read pool; every other method
+/// mutates and uses the tighter write pool. `http::Method` GET/HEAD are
+/// associated consts (not enum variants), so this is equality, not a match.
+fn admission_is_read_method(method: &Method) -> bool {
+    *method == Method::GET || *method == Method::HEAD
+}
 
 /// HTTP server state
 pub struct HttpServer {
@@ -161,8 +178,12 @@ pub struct HttpServer {
     extraction_cache: Option<Arc<ExtractionCache>>,
     /// In-memory index: slug -> blobHash (avoids per-request SQLite scan)
     slug_index: Arc<RwLock<std::collections::HashMap<String, String>>>,
-    /// Concurrency limiter: prevents OOM under burst traffic (e.g., HTML5 app loads)
+    /// Write-admission limiter (mutating requests): prevents OOM under burst
+    /// traffic (e.g., HTML5 app loads, seed storms). Reads use `read_semaphore`.
     request_semaphore: Arc<Semaphore>,
+    /// Read-admission limiter (GET/HEAD): a separate, larger pool so a write
+    /// burst can't starve cheap projection reads (genesis #1272 `/epr/*` shed).
+    read_semaphore: Arc<Semaphore>,
     /// Whether the conductor is managed as an embedded child process
     embedded_conductor: bool,
     /// Operator-configured elohim capability profile (Category C — operational, not DHT-derived).
@@ -443,6 +464,7 @@ impl HttpServer {
             extraction_cache: None,
             slug_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
             request_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
+            read_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_READS)),
             embedded_conductor: false,
             elohim_capability: None,
             render_capability: None,
@@ -872,14 +894,26 @@ impl HttpServer {
         let _admit = if admission_exempt {
             None
         } else {
-            match self.request_semaphore.clone().try_acquire_owned() {
+            // Reads (GET/HEAD) draw from a separate, larger pool than writes, so a
+            // write burst (e.g. genesis seeding) cannot starve cheap projection
+            // reads — the `/epr/*` read-path shed in genesis #1272 E2E. Shedding a
+            // WRITE under burst is correct backpressure (the seeder retries the
+            // catching-up shed); shedding a READ the node can serve is not.
+            let is_read = admission_is_read_method(&method);
+            let sem = if is_read {
+                &self.read_semaphore
+            } else {
+                &self.request_semaphore
+            };
+            match sem.clone().try_acquire_owned() {
                 Ok(permit) => Some(permit),
                 Err(_) => {
-                    let available = self.request_semaphore.available_permits();
+                    let available = sem.available_permits();
                     warn!(
                         target: "upstream_shed",
                         counter = "storage_admission_shed_total",
                         path = %path,
+                        pool = if is_read { "read" } else { "write" },
                         available,
                         "storage request admission at ceiling — shedding (503 + Retry-After)"
                     );
@@ -1683,6 +1717,9 @@ impl HttpServer {
         // Promoted to default detail (was Trace-only) so any caller — incl.
         // doorway honoring backpressure — can read remaining admission headroom.
         body["semaphorePermits"] = serde_json::json!(self.request_semaphore.available_permits());
+        // Read pool headroom — separate from writes so a caller can see whether
+        // reads are being starved (they should not be) vs writes shedding.
+        body["readSemaphorePermits"] = serde_json::json!(self.read_semaphore.available_permits());
 
         // info level (default): basic operational data
         if detail >= elohim_compute::DetailLevel::Info {
@@ -14296,5 +14333,27 @@ mod admission_tests {
         // gated path sheds
         assert!(!exempt(&Method::GET, "/db/content/x"));
         assert!(sem.try_acquire().is_err(), "0 permits => gated path sheds");
+    }
+
+    #[test]
+    fn reads_draw_from_read_pool_writes_from_write_pool() {
+        use hyper::Method;
+        // GET/HEAD are reads (larger pool); mutations are writes (tighter pool).
+        assert!(super::admission_is_read_method(&Method::GET));
+        assert!(super::admission_is_read_method(&Method::HEAD));
+        for m in [Method::POST, Method::PATCH, Method::PUT, Method::DELETE] {
+            assert!(!super::admission_is_read_method(&m), "{m} is a write");
+        }
+    }
+
+    #[test]
+    fn write_burst_cannot_starve_reads_independent_pools() {
+        // The core invariant of the split: a write pool exhausted by a seed
+        // burst leaves the read pool fully available — a read never sheds for a
+        // write's sins (genesis #1272 `/epr/*` read-path shed).
+        let write_pool = Semaphore::new(0); // exhausted by a write storm
+        let read_pool = Semaphore::new(super::MAX_CONCURRENT_READS);
+        assert!(write_pool.try_acquire().is_err(), "writes shed under burst");
+        assert!(read_pool.try_acquire().is_ok(), "reads still admitted");
     }
 }
