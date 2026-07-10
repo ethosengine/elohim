@@ -32,6 +32,18 @@
 #   can be silently overwritten and served as truth. Green = "this is THE canonical head the
 #   community's earned-reach grant elected", not "some peer notarized something locally".
 #
+# SHARPENED 2026-07-10 (replication EXONERATED — the gap is PURELY election):
+#   Confirmed live that both blobs are present on both peers — GET the elohim.host bundle on
+#   alpha-A and the alpha-A bundle on elohim.host both return 200. So the divergence is NOT a
+#   byte-replication gap; the bytes moved. It is purely a HEAD-ELECTION gap: each peer serves its
+#   OWN content-row blobHash (declaredHead is null on both), and the serve path does not consult
+#   declared_head at all (`read_head_blob_hash` is called only in tests — the C3 read side is
+#   dead). Worse, the reconcile heal loop resolves the head from EACH peer's OWN conductor, so it
+#   re-stamps each peer's own head — per-node resolution PRESERVES the split. This is why the new
+#   landing served once then "regressed": elohim.host was always going to fall back to its own
+#   head. The cure is a single canonical head-binding, honored on serve over any node-local
+#   authoring — NOT more replication.
+#
 # DEV-TIME SCAFFOLD (honest, and on the clean-up-toward trajectory — never extend it):
 #   We are not participants in the authoritative network; we are devs in god-mode building the
 #   model. Until the socially-derived earned-attestation grant path is wired, the promotion
@@ -109,3 +121,28 @@ Feature: Notary authority — the federation converges on ONE earned canonical h
     # with 401/403 (reach-cohort edit-membership + author/community signature): earned authorship
     # declares, Elohim witnesses the grant, and no unearned peer can move the canonical head.
     Then the HEAD authority surface refuses a non-author move of "elohim-host-landing" on peer "alpha-A"
+
+  # ── EPR upgrade lifecycle (archetype) ────────────────────────────────────────
+  # The whole life of a versioned artifact, not just a single-shot convergence. An archetype
+  # EPR (the landing is the exemplar) is authored, earns commons reach, becomes canonical, is
+  # UPGRADED to a new version that earns canonical in turn, and — the clause that IS the
+  # "deployed once, regressed to old" bug — the upgrade STAYS elected: a re-seed / re-projection
+  # / restart must never fall the served head back to the superseded version. This is the RED
+  # that defines "durable head", and the genesis lifecycle coverage the archetype needs.
+  #
+  # @wip: the author-v2 / promote-to-canonical / re-seed steps are not yet wired (they are the
+  # cure this feature drives). Kept parseable and RED-defining so it names the contract without
+  # aborting the run. Steward-declared binding is the near-term promotion mechanism; the long-term
+  # trajectory is self-electing supersession-lineage (v2 declares it supersedes v1 → DAG tip),
+  # so any peer holding both elects v2 deterministically. See the design + C3 backlog.
+  @wip @requires:multi-node
+  Scenario: An archetype EPR upgrade elects the new head everywhere and does not regress (RED — durable upgrade)
+    Given EPR "elohim-host-landing" resolves the same canonical head across peers "alpha-A" and "elohim.host"
+    When the steward promotes a new version of "elohim-host-landing" to canonical
+    Then EPR "elohim-host-landing" resolves the same canonical head across peers "alpha-A" and "elohim.host"
+    And the canonical head of "elohim-host-landing" is the newly promoted version on peer "elohim.host"
+    # Durability: the head must survive the substrate churn that caused the live regression —
+    # a re-seed and a projector re-run must not resurrect the superseded head.
+    When the substrate re-seeds and re-projects "elohim-host-landing"
+    Then the canonical head of "elohim-host-landing" is the newly promoted version on peer "elohim.host"
+    And the canonical head of "elohim-host-landing" is the newly promoted version on peer "alpha-A"
