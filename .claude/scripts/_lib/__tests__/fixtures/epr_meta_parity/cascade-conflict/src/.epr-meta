@@ -1,0 +1,26 @@
+---
+epr-meta-version: 1
+id: cascade-src-meta
+rules:
+  - id: collide-rule
+    class: deny
+    when: { write: "leaf.md" }
+    no-new-subdirs: true
+  - id: alpha-nested-rule
+    class: ask
+    when: { write: "leaf.md" }
+    route-to: { dest: docs/plans }
+---
+Parity fixture 3 (Task 6 / B2) — legacy nested manifest (not `root: true`), so the cascade
+continues up to the directory-form root manifest at `../.epr-meta/manifest.md`. Overrides
+`collide-rule`'s class from `inject` (root) to `deny` (here) — the nearest-wins case. Adds
+`alpha-nested-rule`, which sorts alphabetically FIRST among the three rule ids even though it is
+resolved LAST (first-seen-position, root-first cascade order).
+Shared corpus for `.claude/scripts/_lib/__tests__/epr_meta_cascade_test.py` and
+`elohim/eprfs/eprfs-meta/tests/parity.rs`. Do not hand-edit one side without the other.
+
+The `when: { write: "leaf.md" }` scope on both rules is deliberate: `src/leaf.md` is a fictional,
+never-created target path used only to resolve the cascade in the parity tests. Scoping keeps these
+rules from ever firing on this manifest's own creation/edits when committed — `.epr-meta` files are
+live governance input to the real git/PreToolUse hooks, not inert test data (a first version of this
+fixture omitted the scope and its own `deny` rule blocked its own commit).

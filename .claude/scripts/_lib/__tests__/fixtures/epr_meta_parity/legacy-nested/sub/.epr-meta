@@ -1,0 +1,20 @@
+---
+epr-meta-version: 1
+id: nested-legacy-meta
+root: true
+rules:
+  - id: nested-legacy-rule
+    class: ask
+    when: { write: "leaf.md" }
+    route-to: { dest: docs/plans }
+---
+Parity fixture 2 (Task 6 / B2) — legacy nested `.epr-meta` flat file (not directory-form),
+marked `root: true` so the cascade terminates here without walking above this fixture.
+Shared corpus for `.claude/scripts/_lib/__tests__/epr_meta_cascade_test.py` and
+`elohim/eprfs/eprfs-meta/tests/parity.rs`. Do not hand-edit one side without the other.
+
+The `when: { write: "leaf.md" }` scope is deliberate: `sub/leaf.md` is a fictional, never-created
+target path used only to resolve the cascade in the parity tests. Scoping the rule to that literal
+filename keeps this fixture's `ask` rule from ever firing on this manifest's own creation/edits when
+committed — `.epr-meta` files are live governance input to the real git/PreToolUse hooks, not inert
+test data.

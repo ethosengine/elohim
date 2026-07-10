@@ -130,4 +130,48 @@ check("cascade collects capability-package-governance rule under packages/skills
 check("capability-package-governance rule resolves to observation/measure class (never deny/ask)",
       _merged["rules"].get("capability-package-governance", {}).get("class") == "measure")
 
+# ── Task 6 (B2): Python↔Rust `.epr-meta` resolver parity fixtures ──
+# These fixtures are REAL, on-disk, and shared verbatim with the Rust resolver's parity test
+# (elohim/eprfs/eprfs-meta/tests/parity.rs) — a single manifest corpus feeding both interpreters, so
+# they cannot silently drift on cascade order or nearest-wins conflict resolution (the standing hazard
+# tracked at genesis/data/timeline/backlog/epr-meta-python-rust-parser-parity.md).
+_parity_fixtures = _repo_root / ".claude/scripts/_lib/__tests__/fixtures/epr_meta_parity"
+
+
+def _ordered_rule_ids(chain):
+    """merge_rules' own dict IS the ordered-resolution contract: first-seen wins POSITION
+    (root-first insertion), nearest wins VALUE (later cascade entries overwrite in place)."""
+    return list(epr_meta.merge_rules(chain)["rules"].keys())
+
+
+# Fixture 1: directory-form root manifest only, no nested cascade.
+_p1_target = _parity_fixtures / "root-directory-form" / "notes" / "new.md"
+_p1_chain = epr_meta.collect_cascade(_p1_target)
+check("parity fixture 1 (root-directory-form): single manifest resolves",
+      len(_p1_chain) == 1 and _p1_chain[0].name == "manifest.md")
+check("parity fixture 1: ordered rule-ids == [root-only-rule]",
+      _ordered_rule_ids(_p1_chain) == ["root-only-rule"])
+
+# Fixture 2: legacy nested `.epr-meta` flat file (not directory-form), root: true at the nested dir.
+_p2_target = _parity_fixtures / "legacy-nested" / "sub" / "leaf.md"
+_p2_chain = epr_meta.collect_cascade(_p2_target)
+check("parity fixture 2 (legacy-nested): single manifest resolves",
+      len(_p2_chain) == 1 and _p2_chain[0].name == ".epr-meta")
+check("parity fixture 2: ordered rule-ids == [nested-legacy-rule]",
+      _ordered_rule_ids(_p2_chain) == ["nested-legacy-rule"])
+
+# Fixture 3: root + nested id-collision (nearest-wins). Rule ids are deliberately non-alphabetical
+# in cascade order (zeta-root-rule, collide-rule, alpha-nested-rule) so a resolver that accidentally
+# sorts by id instead of preserving cascade order would be caught here, not pass by coincidence.
+_p3_target = _parity_fixtures / "cascade-conflict" / "src" / "leaf.md"
+_p3_chain = epr_meta.collect_cascade(_p3_target)
+_p3_merged = epr_meta.merge_rules(_p3_chain)
+check("parity fixture 3 (cascade-conflict): both manifests resolve, root-first",
+      len(_p3_chain) == 2 and _p3_chain[0].name == "manifest.md" and _p3_chain[1].name == ".epr-meta")
+check("parity fixture 3: ordered rule-ids == [zeta-root-rule, collide-rule, alpha-nested-rule]",
+      list(_p3_merged["rules"].keys())
+      == ["zeta-root-rule", "collide-rule", "alpha-nested-rule"])
+check("parity fixture 3: nearest-wins — collide-rule resolves to the NESTED class (deny)",
+      _p3_merged["rules"]["collide-rule"]["class"] == "deny")
+
 print(f"\n  {_passed} assertions passed ✅")
