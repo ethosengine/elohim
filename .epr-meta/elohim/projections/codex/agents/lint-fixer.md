@@ -4,7 +4,8 @@ description: "Tiered lint-fix agent (Haiku-default). Fixes lint issues by tier â
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/lint-fixer.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/lint-fixer.json
   packageKind: AgentPackage
 model: haiku
 tools: Read, Edit, Grep, Glob, Bash

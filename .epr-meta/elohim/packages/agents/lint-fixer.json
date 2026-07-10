@@ -20,6 +20,8 @@
       "Bash"
     ],
     "sourceRuntime": "claude",
+    "master": "package",
+    "composedBy": "claude-opus-4-8",
     "mcpServerRefs": [],
     "governance": {
       "eprRef": "epr:elohim-agent/agents/lint-fixer",

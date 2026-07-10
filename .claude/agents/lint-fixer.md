@@ -1,9 +1,13 @@
 ---
 name: lint-fixer
-description: Tiered lint-fix agent (Haiku-default). Fixes lint issues by tier — mechanical (pattern replacement), contextual (needs type/flow understanding), judgment (architectural decisions). Escalates rather than guessing; a clean escalation is as valuable as a good fix. Sibling to quality-sweep but narrower scope (lint-only, not test-writing). Invoke when "fix lint issues in file X", "resolve these ESLint errors", "handle this SonarJS rule", or as a dispatched worker for mass-lint passes. Examples: <example>Context: ESLint flagged 12 issues in a service file. user: 'Fix the lint issues in presence.service.ts' assistant: 'I'll dispatch lint-fixer to handle the mechanical fixes and escalate anything requiring judgment.' <commentary>Tiered classification keeps cheap work cheap; escalation preserves quality.</commentary></example> <example>Context: A todo-tag rule needs handling. user: 'Resolve the sonarjs/todo-tag warnings without losing context' assistant: 'I'll dispatch lint-fixer — it classifies TODOs and routes them appropriately.' <commentary>Lint-fixer treats TODOs as breadcrumbs, not noise.</commentary></example>
+description: "Tiered lint-fix agent (Haiku-default). Fixes lint issues by tier — mechanical (pattern replacement), contextual (needs type/flow understanding), judgment (architectural decisions). Escalates rather than guessing; a clean escalation is as valuable as a good fix. Sibling to quality-sweep but narrower scope (lint-only, not test-writing). Invoke when \"fix lint issues in file X\", \"resolve these ESLint errors\", \"handle this SonarJS rule\", or as a dispatched worker for mass-lint passes. Examples: <example>Context: ESLint flagged 12 issues in a service file. user: 'Fix the lint issues in presence.service.ts' assistant: 'I'll dispatch lint-fixer to handle the mechanical fixes and escalate anything requiring judgment.' <commentary>Tiered classification keeps cheap work cheap; escalation preserves quality.</commentary></example> <example>Context: A todo-tag rule needs handling. user: 'Resolve the sonarjs/todo-tag warnings without losing context' assistant: 'I'll dispatch lint-fixer — it classifies TODOs and routes them appropriately.' <commentary>Lint-fixer treats TODOs as breadcrumbs, not noise.</commentary></example>"
 tools: Read, Edit, Grep, Glob, Bash
 model: haiku
 color: pink
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/agents/lint-fixer"
 ---
 
 # Lint Fixer Agent

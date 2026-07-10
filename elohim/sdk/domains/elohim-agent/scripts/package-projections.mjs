@@ -402,7 +402,25 @@ function claudeFrontmatterFromPackage(pkg) {
   const { name, description, sourceRuntime, master, governance } = pkg.metadata;
   const metadata = { sourceRuntime, master };
   if (governance?.eprRef) metadata.governance = governance.eprRef;
-  return { name, description, metadata };
+  const frontmatter = { name, description };
+  // Agents carry a LOAD-BEARING execution contract that skills do not: Claude
+  // Code reads top-level `tools:` to scope the subagent's tool access, `model:`
+  // to pick its model, and `color:` for its UI tint. Reconstruct that contract
+  // from package metadata on the flip — dropping it would silently promote a
+  // locked-down agent to default tools + default model (capability escalation).
+  // Kept flat (matching the un-flipped agent frontmatter) and placed before the
+  // nested `metadata:` block so the flip diff is additive: the original
+  // tools/model/color lines stay put, `metadata:` is appended. Skills have none
+  // of this metadata, so the three fields are naturally omitted for them.
+  if (pkg.kind === 'AgentPackage') {
+    const toolRefs = pkg.metadata.toolRefs ?? [];
+    const modelHints = pkg.metadata.modelHints ?? {};
+    if (toolRefs.length) frontmatter.tools = toolRefs.join(', ');
+    if (modelHints.claudeModel) frontmatter.model = modelHints.claudeModel;
+    if (modelHints.claudeColor) frontmatter.color = modelHints.claudeColor;
+  }
+  frontmatter.metadata = metadata;
+  return frontmatter;
 }
 
 // Generated Codex frontmatter for a package-master (FLIPPED) skill/agent — the
@@ -421,6 +439,16 @@ function codexFrontmatterFromPackage(pkg) {
     packageKind: pkg.kind,
   };
   const frontmatter = { name, description, metadata };
+  // Re-emit the agent execution contract for codex too, at parity with the
+  // un-flipped `codexFrontmatter` path (which already emits model + tools). The
+  // flip path had regressed relative to it and dropped both. Codex carries no
+  // `color` on either path — keep it claude-only.
+  if (pkg.kind === 'AgentPackage') {
+    const toolRefs = pkg.metadata.toolRefs ?? [];
+    const claudeModel = pkg.metadata.modelHints?.claudeModel;
+    if (claudeModel) frontmatter.model = claudeModel;
+    if (toolRefs.length) frontmatter.tools = toolRefs.join(', ');
+  }
   if (governance?.eprRef) frontmatter.governance = governance.eprRef;
   return frontmatter;
 }
@@ -637,6 +665,53 @@ async function verifyPackage(pkg, validators) {
     assert(
       JSON.stringify(claudeTools) === JSON.stringify(pkg.metadata.toolRefs),
       `${pkg.metadata.id} tool metadata round-trip`,
+    );
+  }
+
+  if (pkg.kind === 'AgentPackage' && pkg.metadata.master === 'package') {
+    // v1 mcp-less guard: an agent's full `mcpServers` block (type/url) is NOT
+    // reconstructable from stored metadata (`mcpServerRefs` holds only the
+    // server names). A flip would drop that wiring, so refuse to treat an
+    // mcp-bearing agent as flippable until structured preservation lands.
+    const rawFm = pkg.projections?.claude?.frontmatterRaw ?? '';
+    const fmMcp = pkg.projections?.claude?.frontmatter?.mcpServers;
+    const mcpRefs = pkg.metadata.mcpServerRefs ?? [];
+    const hasMcp =
+      (Array.isArray(fmMcp) && fmMcp.length > 0) ||
+      /(^|\n)mcpServers:/.test(rawFm) ||
+      (Array.isArray(mcpRefs) && mcpRefs.length > 0);
+    assert(
+      !hasMcp,
+      `${pkg.metadata.id} is mcp-less (v1 flip scope): a flipped agent must not carry an mcpServers block — ` +
+        `its full server config (type/url) is not reconstructable from stored metadata`,
+    );
+
+    // Contract round-trip: freshness (project(package) === file) is tautological
+    // because the file was regenerated from the package. Prove capability
+    // preservation instead — assert the GENERATED flip frontmatter reconstructs
+    // the execution contract (tools/model/color) from package metadata, not the
+    // stored import-time JSON.
+    const genClaude = parseFrontmatter(stringifyYaml(claudeFrontmatterFromPackage(pkg)));
+    assert(
+      JSON.stringify(toolRefsFrom(genClaude)) === JSON.stringify(pkg.metadata.toolRefs ?? []),
+      `${pkg.metadata.id} generated .claude tools contract round-trip (flip preserves toolRefs)`,
+    );
+    assert(
+      genClaude.model === pkg.metadata.modelHints?.claudeModel,
+      `${pkg.metadata.id} generated .claude model contract round-trip (flip preserves claudeModel)`,
+    );
+    assert(
+      genClaude.color === pkg.metadata.modelHints?.claudeColor,
+      `${pkg.metadata.id} generated .claude color contract round-trip (flip preserves claudeColor)`,
+    );
+    const genCodex = parseFrontmatter(stringifyYaml(codexFrontmatterFromPackage(pkg)));
+    assert(
+      JSON.stringify(toolRefsFrom(genCodex)) === JSON.stringify(pkg.metadata.toolRefs ?? []),
+      `${pkg.metadata.id} generated .codex tools contract round-trip (flip preserves toolRefs)`,
+    );
+    assert(
+      genCodex.model === pkg.metadata.modelHints?.claudeModel,
+      `${pkg.metadata.id} generated .codex model contract round-trip (flip preserves claudeModel)`,
     );
   }
 
@@ -938,6 +1013,65 @@ async function runSelfTest() {
     assert(
       failures === failuresBefore,
       'selftest(c): verifyImportedSourceCoverage takes package-first path for a flipped package (no source-coverage failure)',
+    );
+
+    // (d) The flip generators reconstruct an AGENT's execution contract
+    //     (tools/model/color) from package metadata — capability preservation.
+    //     Skills carry no such metadata; agents do, and dropping it is a
+    //     capability-escalation bug. Proven in memory on a synthetic AgentPackage.
+    const agentBody = '# Synthetic Agent\n\nSynthetic agent body for the flip self-test.\n';
+    const flippedAgent = {
+      apiVersion: 'elohim-agent/v1alpha1',
+      kind: 'AgentPackage',
+      metadata: {
+        id: 'synthetic-agent-flip',
+        name: 'synthetic-agent-flip',
+        version: '1.0.0',
+        description: 'Synthetic flipped agent for the contract self-test.',
+        role: 'synthetic-agent-flip',
+        modelHints: { claudeModel: 'haiku', claudeColor: 'pink' },
+        capabilityRefs: [],
+        toolRefs: ['Read', 'Edit', 'Bash'],
+        sourceRuntime: 'claude', // origin preserved — born from Claude
+        master: 'package', // authority flipped to package-first
+        mcpServerRefs: [],
+        governance: governanceFor('agents', 'synthetic-agent-flip'),
+      },
+      instructions: { format: 'markdown', body: agentBody },
+      projections: {
+        claude: { path: '.claude/agents/synthetic-agent-flip.md', frontmatter: {}, frontmatterRaw: '' },
+        codex: { path: '.codex/agents/synthetic-agent-flip.md', frontmatter: {} },
+      },
+    };
+    const flippedAgentClaude = projectClaude(flippedAgent);
+    assert(
+      flippedAgentClaude.includes('tools: Read, Edit, Bash'),
+      'selftest(d): flipped agent .claude reconstructs tools from metadata.toolRefs',
+    );
+    assert(
+      flippedAgentClaude.includes('model: haiku'),
+      'selftest(d): flipped agent .claude reconstructs model from metadata.modelHints.claudeModel',
+    );
+    assert(
+      flippedAgentClaude.includes('color: pink'),
+      'selftest(d): flipped agent .claude reconstructs color from metadata.modelHints.claudeColor',
+    );
+    assert(
+      flippedAgentClaude.includes('master: package'),
+      'selftest(d): flipped agent .claude still carries metadata.master: package',
+    );
+    const flippedAgentCodex = projectCodex(flippedAgent);
+    assert(
+      flippedAgentCodex.includes('model: haiku'),
+      'selftest(d): flipped agent .codex reconstructs model (parity with un-flipped codex path)',
+    );
+    assert(
+      flippedAgentCodex.includes('tools: Read, Edit, Bash'),
+      'selftest(d): flipped agent .codex reconstructs tools (parity with un-flipped codex path)',
+    );
+    assert(
+      !/\ncolor:/.test(flippedAgentCodex),
+      'selftest(d): flipped agent .codex omits color (claude-only field)',
     );
   } finally {
     await rm(sandbox, { recursive: true, force: true });
