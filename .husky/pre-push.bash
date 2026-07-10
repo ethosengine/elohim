@@ -842,6 +842,19 @@ run_gate() {
         pnpm test 2>&1
         rc=$?
         ;;
+      eprfs)
+        # eprfs is a native crate workspace (5 library crates + the eprfs-agent
+        # adapter, which is an out-of-tree workspace member under sdk/). Like
+        # elohim-epr, reset the WASM getrandom RUSTFLAGS for native linking and
+        # clear any poisoned sccache wrapper. CWD is elohim/eprfs (the manifest's
+        # gate.projects dir); --workspace covers all members including the adapter.
+        # Emitted ONLY by the manifest-driven path (gate.projects key 'eprfs');
+        # the grep fallback has no eprfs pattern, so it never reaches here.
+        RUSTFLAGS="" RUSTC_WRAPPER="" cargo fmt --check 2>&1 && \
+        RUSTFLAGS="" RUSTC_WRAPPER="" cargo clippy --workspace --all-targets -- -D warnings 2>&1 && \
+        RUSTFLAGS="" RUSTC_WRAPPER="" cargo test --workspace --all-targets 2>&1
+        rc=$?
+        ;;
       elohim-library)
         pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src 2>&1 && \
         (cd projects/elohim-service && pnpm exec tsc --noEmit) 2>&1 && \

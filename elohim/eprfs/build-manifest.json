@@ -1,0 +1,38 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-eprfs",
+  "jenkinsPath": "elohim/eprfs/Jenkinsfile",
+  "manualOnly": false,
+  "triggersGenesis": false,
+  "cascades": false,
+  "dependsOn": [],
+  "description": "EPRFS — EPR-governed filesystem projection substrate (eprfs-core/host/local/meta/storage library crates + the eprfs-agent adapter). Publishes the library crates to the internal Nexus 'elohim' registry on main.",
+  "steps": {
+    "rust-build-test": {
+      "description": "fmt + clippy + nextest for the eprfs workspace (5 library crates + the eprfs-agent adapter)",
+      "inputs": {
+        "sources": [
+          "elohim/eprfs/**",
+          "elohim/sdk/domains/elohim-agent/adapter/**",
+          "scripts/ci/cargo-publish-eprfs.sh"
+        ],
+        "buildProcess": ["elohim/eprfs/Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": ["eprfs-crates"],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Rust — tests",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "eprfs": { "dir": "elohim/eprfs", "steps": ["rust-build-test"] }
+    }
+  },
+  "deployment": {}
+}

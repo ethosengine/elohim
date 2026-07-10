@@ -1,0 +1,169 @@
+// eprfs pipeline — EPR-governed filesystem projection substrate.
+//
+// Native Rust workspace: eprfs-core / -host / -local / -meta / -storage (library
+// crates) + the eprfs-agent adapter (binary). Mirrors elohim/epr/Jenkinsfile:
+// runs as a k8s dynamic agent on the ci-builder-nix image, gets its Rust
+// toolchain from `nix develop`. eprfs has no flake of its own, so it BORROWS
+// elohim/epr's flake — the same pinned native Rust toolchain, and eprfs only
+// needs plain native Rust (serde/tokio/cid). If eprfs ever needs a divergent
+// toolchain, give it its own flake and repoint the `path:` below.
+//
+// dependsOn:[] and no shared cargo-cache PVC (could dispatch concurrently → a
+// shared RWO PVC would Multi-Attach); the crate set is small, so an ephemeral
+// pod-local build is the safe trade — same rationale as elohim-epr.
+pipeline {
+  agent {
+    kubernetes {
+      cloud 'kubernetes'
+      yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccount: ee-jenkins
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                  - operations
+                  - edge
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "build"
+      effect: "NoSchedule"
+  containers:
+    - name: builder
+      image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
+      # :latest is a moving tag — force a pull so a cached node cannot serve a
+      # stale nix/nextest layer (same rationale as elohim-epr / the DNA pipeline).
+      imagePullPolicy: Always
+      command: [cat]
+      tty: true
+      resources:
+        requests:
+          memory: "4Gi"
+          cpu: "1"
+          ephemeral-storage: "10Gi"
+        limits:
+          memory: "8Gi"
+          cpu: "4"
+          ephemeral-storage: "20Gi"
+'''
+    }
+  }
+
+  options {
+    overrideIndexTriggers(false)  // Only orchestrator or manual triggers — no webhook/branch indexing.
+    buildDiscarder(logRotator(numToKeepStr: '30'))
+    timeout(time: 30, unit: 'MINUTES')
+  }
+
+  // Accepted so the orchestrator can propagate its dispatch params uniformly
+  // (triggerPipeline always sends these). This pipeline runs its full gate on
+  // any valid trigger, so they are no-ops here — declaring them just avoids
+  // "parameter is not defined" warnings.
+  parameters {
+    booleanParam(name: 'FORCE_BUILD', defaultValue: false, description: 'No-op — the full gate always runs on a valid trigger.')
+    booleanParam(name: 'DEPLOY_ONLY', defaultValue: false, description: 'No-op — eprfs has no deploy stage; accepted for uniform propagation.')
+    string(name: 'CHANGED_PATHS', defaultValue: '', description: 'No-op — newline-delimited changed paths from the orchestrator; unused here.')
+  }
+
+  stages {
+    // Downstream-pipeline guard (fleet convention): only run for an orchestrator
+    // (UpstreamCause), manual (UserIdCause), or branch-indexing trigger.
+    stage('Check Trigger') {
+      steps {
+        script {
+          def validTrigger = currentBuild.getBuildCauses().any { cause ->
+            cause._class.contains('UserIdCause') ||
+            cause._class.contains('UpstreamCause') ||
+            cause._class.contains('BranchIndexingCause')
+          }
+          if (!validTrigger) {
+            echo "⏭️ PIPELINE SKIPPED — dispatch via the orchestrator or a manual trigger"
+            currentBuild.result = 'NOT_BUILT'
+            currentBuild.displayName = "#${env.BUILD_NUMBER} SKIPPED"
+            env.PIPELINE_SKIPPED = 'true'
+          } else {
+            echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
+          }
+        }
+      }
+    }
+
+    stage('Rust — fmt + clippy') {
+      when { expression { env.PIPELINE_SKIPPED != 'true' } }
+      steps {
+        container('builder') {
+          dir('elohim/eprfs') {
+            sh '''
+              nix develop --impure --accept-flake-config "path:$WORKSPACE/elohim/epr" --command bash -c '
+                set -euo pipefail
+                export RUSTFLAGS=""
+                export RUSTC_WRAPPER=""
+                cargo --version
+                cargo fmt --check
+                cargo clippy --workspace --all-targets -- -D warnings
+              '
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Rust — tests') {
+      when { expression { env.PIPELINE_SKIPPED != 'true' } }
+      steps {
+        container('builder') {
+          dir('elohim/eprfs') {
+            sh '''
+              nix develop --impure --accept-flake-config "path:$WORKSPACE/elohim/epr" --command bash -c '
+                set -euo pipefail
+                export RUSTFLAGS=""
+                export RUSTC_WRAPPER=""
+                cargo nextest run --workspace --all-targets
+              '
+            '''
+          }
+        }
+      }
+    }
+
+    // Publish the eprfs LIBRARY crates to the internal Nexus registry on main
+    // only (release-grade; crate versions are immutable). The script is
+    // idempotent + 409-safe — a no-op unless the workspace version was bumped —
+    // and excludes the eprfs-agent binary (publish=false). Runs inside
+    // `nix develop` because `cargo publish` needs the toolchain; the script
+    // clears RUSTFLAGS/RUSTC_WRAPPER itself. Reuses the CI npm token
+    // (`ee-nexus-npm-token`), which authenticates cross-format against
+    // cargo-internal.
+    stage('Publish — cargo (elohim registry)') {
+      when {
+        allOf {
+          expression { env.PIPELINE_SKIPPED != 'true' }
+          anyOf { branch 'main'; expression { env.BRANCH_NAME == 'main' } }
+        }
+      }
+      steps {
+        container('builder') {
+          withCredentials([string(credentialsId: 'ee-nexus-npm-token', variable: 'NEXUS_NPM_TOKEN')]) {
+            sh '''
+              nix develop --impure --accept-flake-config "path:$WORKSPACE/elohim/epr" --command bash -c '
+                set -euo pipefail
+                bash "$WORKSPACE/scripts/ci/cargo-publish-eprfs.sh"
+              '
+            '''
+          }
+        }
+      }
+    }
+  }
+
+  // No post { cleanWs() }: the agent is an ephemeral k8s pod, so the workspace
+  // is discarded when the pod terminates — and cleanWs() isn't available on this
+  // Jenkins (the ws-cleanup step is unregistered).
+}

@@ -38,6 +38,12 @@
       "cascades": false
     },
     {
+      "name": "elohim-eprfs",
+      "manualOnly": false,
+      "triggersGenesis": false,
+      "cascades": false
+    },
+    {
       "name": "elohim-edge",
       "manualOnly": false,
       "triggersGenesis": true,
