@@ -14,7 +14,10 @@ use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::debug;
 
+use super::bus::{MemSignalBus, SignalBus};
+use super::bus_mongo::MongoSignalBus;
 use super::PubKey;
+use crate::db::mongo::MongoClient;
 
 /// Type alias for the WebSocket write half
 pub type WsSink =
@@ -39,16 +42,39 @@ pub struct SignalStore {
     count: AtomicUsize,
     /// Maximum allowed connections
     max_connections: usize,
+    /// Cross-relay signal bus — where frames for non-locally-connected dests are
+    /// published so a sibling relay can deliver them (D2). Mem (lone-pod no-op) or
+    /// the shared Mongo bus, selected exactly like `BootstrapStore`'s k2 backend.
+    bus: Arc<dyn SignalBus>,
 }
 
 impl SignalStore {
-    /// Create a new signal store with the given capacity
-    pub fn new(max_connections: usize) -> Self {
+    /// Create a new signal store with the given capacity.
+    ///
+    /// Safe-by-default: the signal bus is the in-process [`MemSignalBus`] (a lone
+    /// pod has no siblings, so cross-relay forwarding is inertly a no-op) UNLESS a
+    /// `mongo` client is provided AND `BOOTSTRAP_MONGODB_DB` is set — then the
+    /// shared [`MongoSignalBus`] on that same shared DB, so a domain's relays
+    /// forward handshake frames to each other. `relay_id` tags this relay's
+    /// publishes so it filters them back out on drain (loop-free).
+    pub fn new(max_connections: usize, mongo: Option<&MongoClient>, relay_id: String) -> Self {
+        let bus: Arc<dyn SignalBus> = match (mongo, std::env::var("BOOTSTRAP_MONGODB_DB").ok()) {
+            (Some(m), Some(db)) if !db.is_empty() => {
+                Arc::new(MongoSignalBus::new(m, &db, relay_id))
+            }
+            _ => Arc::new(MemSignalBus::new(relay_id)),
+        };
         Self {
             connections: DashMap::with_capacity(max_connections),
             count: AtomicUsize::new(0),
             max_connections,
+            bus,
         }
+    }
+
+    /// The cross-relay signal bus (relay loop publishes local-misses here).
+    pub fn bus(&self) -> &Arc<dyn SignalBus> {
+        &self.bus
     }
 
     /// Check if the store is at capacity
@@ -118,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_store_capacity() {
-        let store = SignalStore::new(2);
+        let store = SignalStore::new(2, None, "test-relay".to_string());
 
         assert!(!store.is_at_capacity());
         assert_eq!(store.connection_count(), 0);
@@ -126,7 +152,7 @@ mod tests {
 
     #[test]
     fn test_store_contains() {
-        let store = SignalStore::new(10);
+        let store = SignalStore::new(10, None, "test-relay".to_string());
         let pk = make_pk(1);
 
         assert!(!store.contains(&pk));

@@ -259,6 +259,15 @@ fn build_health_response(state: &AppState) -> HealthResponse {
     // read from the LIVE store (authoritative shared-vs-per-pod signal); the
     // table id is surfaced only when that backend is the shared mongo store.
     let bootstrap_backend = state.bootstrap.as_ref().map(|b| b.k2().backend_name());
+    // Signal-shared is read from the LIVE signal bus (D2): "mongo" backend = the
+    // shared cross-relay bus is active (a domain's relays forward to each other);
+    // "mem" / absent = a per-pod bus (no cross-relay forwarding). This is the
+    // signal analog of bootstrap_backend and flips to shared when D2 is configured.
+    let signal_shared = state
+        .signal
+        .as_ref()
+        .map(|s| s.bus().backend_name() == "mongo")
+        .unwrap_or(false);
     let dht_backing = DhtBacking {
         bootstrap_url: args.bootstrap_url.clone(),
         bootstrap_backend,
@@ -267,9 +276,7 @@ fn build_health_response(state: &AppState) -> HealthResponse {
             _ => None,
         },
         signal_url: args.signal_url.clone(),
-        // The SBD signal relay is a per-pod in-memory service (spec §2) — no
-        // shared backend exists today, so relay identity is the URL alone.
-        signal_shared: false,
+        signal_shared,
     };
 
     HealthResponse {

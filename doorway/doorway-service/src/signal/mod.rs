@@ -30,6 +30,8 @@
 //! - `MediaEnd` for graceful termination
 //! - Session state tracking
 
+pub mod bus;
+pub mod bus_mongo;
 mod cmd;
 pub mod media;
 mod store;
@@ -339,6 +341,13 @@ async fn handle_signal_connection(
                 // Forward to destination
                 if let Some(dest_write) = store.get(&dest) {
                     let _ = send_message(&dest_write, payload).await;
+                } else {
+                    // Local-miss: dest is not connected to THIS relay. Hand the
+                    // frame (sender header already applied) to the shared bus so a
+                    // sibling relay holding dest's live connection can deliver it
+                    // (cross-relay forward, D2). A lone pod's bus is a no-op — the
+                    // frame is simply dropped and the peer retries, as before.
+                    store.bus().publish(&dest_pk, &payload).await;
                 }
             }
             Err(_) => break,
@@ -349,6 +358,33 @@ async fn handle_signal_connection(
     store.remove(&pk);
     let _ = write.lock().await.close().await;
     info!("Signal: disconnected {:?}", pk);
+}
+
+/// Poll cadence for the cross-relay signal-bus consumer. WebRTC handshake setup is
+/// latency-tolerant, so a short poll (vs. a tailable cursor) is ample and simple.
+const BUS_POLL_MS: u64 = 50;
+
+/// Spawn the cross-relay signal-bus consumer (D2). Drains frames that sibling
+/// relays could not deliver locally and delivers any whose dest is connected
+/// HERE. Loop-free: this only DELIVERS bus frames, never re-publishes them, and
+/// the bus filters out this relay's own publishes. A lone pod's bus drains
+/// nothing, so this is inertly a no-op until a shared (Mongo) bus is configured.
+pub fn spawn_bus_consumer(store: Arc<SignalStore>) {
+    tokio::spawn(async move {
+        let mut cursor: i64 = 0;
+        let poll = std::time::Duration::from_millis(BUS_POLL_MS);
+        loop {
+            let (msgs, next) = store.bus().drain(cursor).await;
+            cursor = next;
+            for msg in msgs {
+                let dest = PubKey(Arc::new(msg.dest));
+                if let Some(sink) = store.get(&dest) {
+                    let _ = send_message(&sink, msg.payload).await;
+                }
+            }
+            tokio::time::sleep(poll).await;
+        }
+    });
 }
 
 /// Send a binary message on the WebSocket

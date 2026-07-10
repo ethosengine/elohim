@@ -8,6 +8,7 @@ pub mod bootstrap_entry;
 mod host;
 mod metadata;
 mod oauth_session;
+pub mod signal_bus;
 mod user;
 
 pub use api_key::{ApiKeyDoc, API_KEY_COLLECTION};
