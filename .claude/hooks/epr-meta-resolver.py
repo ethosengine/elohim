@@ -245,7 +245,7 @@ def main():
     # IN-FLIGHT COVERAGE SIGNAL — independent of the rule cascade. Authoring an .epr-meta is itself
     # never nudged (you're already governing). Computed up-front so it can fire even when there is no
     # cascade at all (the most common gap: a wholly-ungoverned substantial region).
-    cov_nudge = None if target.name == epr_meta.MANIFEST_NAME else _coverage_nudge(target)
+    cov_nudge = None if epr_meta.is_manifest_path(target) else _coverage_nudge(target)
 
     chain = epr_meta.collect_cascade(target)
     if not chain:
@@ -266,7 +266,7 @@ def main():
     #   • editing the manifest itself is never blocked, so you can always fix the typo → advise;
     #   • other writes in the subtree downgrade deny → ASK (overridable) until it's fixed.
     # This encodes "proposed-but-not-yet-valid governance" as `ask`, not a binding `deny`.
-    target_is_manifest = target.name == epr_meta.MANIFEST_NAME
+    target_is_manifest = epr_meta.is_manifest_path(target)
     problems = [(m, errs) for m in chain if (errs := epr_meta.check_meta(m))]
     if problems:
         detail = "; ".join(f"{m}: {', '.join(e)}" for m, e in problems)

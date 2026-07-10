@@ -11,6 +11,7 @@ except Exception:  # pragma: no cover
     yaml = None
 
 MANIFEST_NAME = ".epr-meta"
+MANIFEST_FILE_NAME = "manifest.md"
 MAX_CASCADE_DEPTH = 32
 MAX_MANIFEST_BYTES = 64 * 1024   # refuse to parse an oversized manifest (parse-DoS guard)
 MAX_FLOW_DEPTH = 64              # reject deeply-nested flow YAML before PyYAML can RecursionError
@@ -47,10 +48,43 @@ def _read_block(path: Path):
     return block if _flow_depth_ok(block) else None
 
 
+def manifest_path(path: Path) -> Path:
+    """Resolve an authored epr-meta path. Directory form wins when `path` is `.epr-meta/`."""
+    path = Path(path)
+    if path.is_dir():
+        directory_manifest = path / MANIFEST_FILE_NAME
+        if directory_manifest.is_file():
+            return directory_manifest
+    return path
+
+
+def manifest_for_dir(directory: Path) -> Path | None:
+    """Return the manifest for a directory: `.epr-meta/manifest.md`, then legacy `.epr-meta`."""
+    base = Path(directory) / MANIFEST_NAME
+    directory_manifest = base / MANIFEST_FILE_NAME
+    if directory_manifest.is_file():
+        return directory_manifest
+    if base.is_file():
+        return base
+    return None
+
+
+def is_manifest_path(path: Path) -> bool:
+    """True if `path` names an authored governance manifest — the legacy flat `.epr-meta` file OR
+    the directory form `.epr-meta/manifest.md`. Purely lexical (no disk touch) so it classifies a
+    to-be-written path. Adapters use this to hold the invariant "editing an .epr-meta is never
+    blocked so the fix is never bricked" across BOTH forms."""
+    path = Path(path)
+    if path.name == MANIFEST_NAME:
+        return True
+    return path.name == MANIFEST_FILE_NAME and path.parent.name == MANIFEST_NAME
+
+
 def load_meta(path: Path) -> dict:
     """Parse one .epr-meta (frontmatter block -> nested dict). {} on any failure (caller fails open).
     Size + flow-depth capped so cascade/merge never parse a poisoned manifest. For the precise
     REASON a manifest is unusable (for the resolver's advisory), use check_meta()."""
+    path = manifest_path(path)
     block = _read_block(path)
     if block is None or yaml is None:
         return {}
@@ -83,8 +117,8 @@ def collect_cascade(target: Path) -> list[Path]:
     chain: list[Path] = []
     depth = 0
     while depth < MAX_CASCADE_DEPTH:
-        meta = here / MANIFEST_NAME
-        if meta.is_file():
+        meta = manifest_for_dir(here)
+        if meta is not None:
             chain.append(meta)
             if load_meta(meta).get("root") is True:
                 break
@@ -201,6 +235,7 @@ def check_meta(path: Path) -> list[str]:
     manifest is unusable (size cap / too-deep / unparseable / empty / schema errors) so the hook can
     advise specifically. Distinct from load_meta(), which just returns {} on any failure for the
     cascade/merge fast-path."""
+    path = manifest_path(path)
     try:
         size = path.stat().st_size
     except Exception:
@@ -520,8 +555,8 @@ def subtree_coverage(root: Path, *, min_files: int = 15, min_subdirs: int = 4, m
         return any(fnmatch.fnmatch(r, g) or fnmatch.fnmatch(r + "/", g) for g in exclude_globs)
 
     def visit(d: Path, is_root: bool):
-        meta = d / MANIFEST_NAME
-        if meta.is_file():
+        meta = manifest_for_dir(d)
+        if meta is not None:
             cfg = load_meta(meta)
             # only a VALID claim owns the subtree — a schema-invalid manifest the resolver would reject
             # must NOT be credited as coverage (else the census and the enforcing resolver disagree, and a
@@ -592,8 +627,8 @@ def coverage_advice(target: Path, *, repo_root: Path = None, min_files: int = 15
     here, depth = start, 0
     while depth < MAX_CASCADE_DEPTH:
         chain.append(here)
-        meta = here / MANIFEST_NAME
-        if meta.is_file():
+        meta = manifest_for_dir(here)
+        if meta is not None:
             cfg = load_meta(meta)
             if claims_subtree(cfg) and not validate_meta(cfg):
                 return None  # already inside a valid claimed subtree

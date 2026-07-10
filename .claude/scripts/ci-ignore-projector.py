@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Project the repo-root .epr-meta `ci-trigger:` leg into the flat .ci-ignore.
+"""Project the repo-root .epr-meta manifest `ci-trigger:` leg into the flat .ci-ignore.
 Default: write <repo>/.ci-ignore. --verify: exit 1 if the on-disk file is stale (CI/pre-push gate).
 Reuses .claude/scripts/_lib (epr_meta.find_repo_root + ci_trigger). Fail-open by design: callers
 guard on `command -v python3`, so absence of this script never blocks a push."""
@@ -22,7 +22,7 @@ def main(argv: list[str]) -> int:
     if "--verify" in argv:
         if fresh:
             return 0
-        print("ERROR: .ci-ignore is stale relative to the root .epr-meta ci-trigger leg.\n"
+        print("ERROR: .ci-ignore is stale relative to the root .epr-meta manifest ci-trigger leg.\n"
               "  Run: python3 .claude/scripts/ci-ignore-projector.py && git add .ci-ignore",
               file=sys.stderr)
         return 1

@@ -19,6 +19,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 pub const MANIFEST_NAME: &str = ".epr-meta";
+pub const MANIFEST_FILE_NAME: &str = "manifest.md";
 
 pub type Result<T> = std::result::Result<T, EprMetaError>;
 
@@ -46,9 +47,9 @@ pub enum EprMetaError {
 }
 
 pub fn parse_meta_file(path: impl AsRef<Path>) -> Result<EprMetaRecord> {
-    let path = path.as_ref();
-    let authored = read_authored_meta(path)?;
-    authored.to_record(None, path, None)
+    let path = manifest_path(path.as_ref());
+    let authored = read_authored_meta(&path)?;
+    authored.to_record(None, &path, None)
 }
 
 pub fn resolve_path(
@@ -62,9 +63,8 @@ pub fn resolve_path(
 
     for meta in collect_cascade(repo_root, target) {
         let authored = read_authored_meta(&meta)?;
-        let subject_path = meta
-            .parent()
-            .and_then(|parent| relative_path(repo_root, parent));
+        let subject_path =
+            meta_subject_dir(&meta).and_then(|parent| relative_path(repo_root, parent));
         records.push(authored.to_record(Some(repo_root), &meta, subject_path)?);
     }
 
@@ -105,8 +105,7 @@ fn collect_cascade(repo_root: &Path, target: &Path) -> Vec<PathBuf> {
     let mut chain = Vec::new();
 
     loop {
-        let meta = current.join(MANIFEST_NAME);
-        if meta.is_file() {
+        if let Some(meta) = manifest_for_dir(&current) {
             let is_root = read_authored_meta(&meta)
                 .map(|authored| authored.root)
                 .unwrap_or(false);
@@ -123,6 +122,42 @@ fn collect_cascade(repo_root: &Path, target: &Path) -> Vec<PathBuf> {
 
     chain.reverse();
     chain
+}
+
+fn manifest_path(path: &Path) -> PathBuf {
+    if path.is_dir() {
+        let manifest = path.join(MANIFEST_FILE_NAME);
+        if manifest.is_file() {
+            return manifest;
+        }
+    }
+    path.to_path_buf()
+}
+
+fn manifest_for_dir(dir: &Path) -> Option<PathBuf> {
+    let base = dir.join(MANIFEST_NAME);
+    let directory_manifest = base.join(MANIFEST_FILE_NAME);
+    if directory_manifest.is_file() {
+        Some(directory_manifest)
+    } else if base.is_file() {
+        Some(base)
+    } else {
+        None
+    }
+}
+
+fn meta_subject_dir(meta: &Path) -> Option<&Path> {
+    if meta.file_name().and_then(|name| name.to_str()) == Some(MANIFEST_FILE_NAME)
+        && meta
+            .parent()
+            .and_then(|parent| parent.file_name())
+            .and_then(|name| name.to_str())
+            == Some(MANIFEST_NAME)
+    {
+        meta.parent().and_then(Path::parent)
+    } else {
+        meta.parent()
+    }
 }
 
 fn read_authored_meta(path: &Path) -> Result<AuthoredMeta> {
@@ -477,6 +512,87 @@ rules:
                 .unwrap()
                 .as_path(),
             Path::new("src/.epr-meta")
+        );
+    }
+
+    #[test]
+    fn resolves_directory_form_root_manifest() {
+        let dir = TempDir::new().unwrap();
+        fs::create_dir_all(dir.path().join(MANIFEST_NAME)).unwrap();
+        fs::write(
+            dir.path().join(MANIFEST_NAME).join(MANIFEST_FILE_NAME),
+            r#"---
+epr-meta-version: 1
+id: root-dir-meta
+root: true
+rules:
+  - id: root-policy
+    policy: source-file-loc-ceiling@1
+---
+"#,
+        )
+        .unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::write(dir.path().join("src/lib.rs"), "fn main() {}\n").unwrap();
+
+        let resolution = resolve_path(dir.path(), dir.path().join("src/lib.rs")).unwrap();
+
+        assert_eq!(resolution.records.len(), 1);
+        assert_eq!(resolution.records[0].id, "root-dir-meta");
+        assert_eq!(
+            resolution.records[0]
+                .source
+                .path
+                .as_ref()
+                .unwrap()
+                .as_path(),
+            Path::new(".epr-meta/manifest.md")
+        );
+        assert_eq!(resolution.effective_policies[0].id, "root-policy");
+    }
+
+    #[test]
+    fn directory_form_and_legacy_local_files_cascade_root_first_nearest_wins() {
+        let dir = TempDir::new().unwrap();
+        fs::create_dir_all(dir.path().join(MANIFEST_NAME)).unwrap();
+        fs::write(
+            dir.path().join(MANIFEST_NAME).join(MANIFEST_FILE_NAME),
+            r#"---
+epr-meta-version: 1
+id: root-dir-meta
+root: true
+rules:
+  - id: shared
+    class: inject
+    require-frontmatter: [id]
+---
+"#,
+        )
+        .unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::write(
+            dir.path().join("src").join(MANIFEST_NAME),
+            r#"---
+epr-meta-version: 1
+id: src-legacy-meta
+rules:
+  - id: shared
+    class: ask
+    route-to: { dest: docs/plans }
+---
+"#,
+        )
+        .unwrap();
+        fs::write(dir.path().join("src/lib.rs"), "fn main() {}\n").unwrap();
+
+        let resolution = resolve_path(dir.path(), dir.path().join("src/lib.rs")).unwrap();
+
+        assert_eq!(resolution.records[0].id, "root-dir-meta");
+        assert_eq!(resolution.records[1].id, "src-legacy-meta");
+        assert_eq!(resolution.effective_rules.len(), 1);
+        assert_eq!(
+            resolution.effective_rules[0].predicate,
+            GovernanceRulePredicate::RouteTo
         );
     }
 }

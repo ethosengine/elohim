@@ -8,9 +8,9 @@ from _lib import epr_meta
 
 GENERATED_HEADER = """\
 # GENERATED — DO NOT EDIT.
-# Projected from the `ci-trigger:` leg of the repo-root .epr-meta by
+# Projected from the `ci-trigger:` leg of the repo-root .epr-meta manifest by
 # .claude/scripts/ci-ignore-projector.py. To change what CI ignores, edit the
-# root .epr-meta's ci-trigger.ignore and regenerate (the pre-push freshness gate enforces this).
+# root manifest's ci-trigger.ignore and regenerate (the pre-push freshness gate enforces this).
 #
 # Pattern grammar (gitignore-flavored, parsed by genesis/orchestrator/ci-ignore.mjs):
 #   foo/             subtree prefix match
@@ -22,7 +22,7 @@ GENERATED_HEADER = """\
 
 
 def collect_ci_trigger(repo_root: Path) -> list[str]:
-    """Ordered, de-duplicated ignore-pattern set from the repo-root .epr-meta ci-trigger.ignore.
+    """Ordered, de-duplicated ignore-pattern set from the repo-root .epr-meta manifest ci-trigger.ignore.
     v1 reads the root manifest verbatim (the inline-now source of truth); per-subtree discovery +
     dir-qualification is the deferred decentralization refinement (P6 spec §7). Fail-open: any
     parse failure yields [] (load_meta already returns {} on failure)."""

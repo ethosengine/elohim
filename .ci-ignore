@@ -1,7 +1,7 @@
 # GENERATED — DO NOT EDIT.
-# Projected from the `ci-trigger:` leg of the repo-root .epr-meta by
+# Projected from the `ci-trigger:` leg of the repo-root .epr-meta manifest by
 # .claude/scripts/ci-ignore-projector.py. To change what CI ignores, edit the
-# root .epr-meta's ci-trigger.ignore and regenerate (the pre-push freshness gate enforces this).
+# root manifest's ci-trigger.ignore and regenerate (the pre-push freshness gate enforces this).
 #
 # Pattern grammar (gitignore-flavored, parsed by genesis/orchestrator/ci-ignore.mjs):
 #   foo/             subtree prefix match

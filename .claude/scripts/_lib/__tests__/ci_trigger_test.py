@@ -22,7 +22,8 @@ def check(label, cond):
 with tempfile.TemporaryDirectory() as _td:
     root = Path(_td)
     (root / ".git").mkdir()
-    (root / ".epr-meta").write_text(
+    (root / ".epr-meta").mkdir()
+    (root / ".epr-meta" / "manifest.md").write_text(
         "---\nepr-meta-version: 1\nroot: true\n"
         "ci-trigger:\n  ignore:\n    - .claude/\n    - CLAUDE.md\n    - .claude/\n---\n")  # dup on purpose
     pats = ci_trigger.collect_ci_trigger(root)
@@ -41,7 +42,7 @@ with tempfile.TemporaryDirectory() as _td:
     fresh, _ = ci_trigger.verify(root)
     check("verify: matching .ci-ignore -> fresh", fresh is True)
 
-    (root / ".epr-meta").write_text("---\nepr-meta-version: 1\nroot: true\n---\n")
+    (root / ".epr-meta" / "manifest.md").write_text("---\nepr-meta-version: 1\nroot: true\n---\n")
     check("collect tolerates absent ci-trigger", ci_trigger.collect_ci_trigger(root) == [])
 
 import subprocess, os  # noqa: E402
@@ -52,7 +53,8 @@ for _p in (Path(sys.path[0]) / "ci-ignore-projector.py",):
         PROJECTOR = _p
 with tempfile.TemporaryDirectory() as _td:
     root = Path(_td); (root / ".git").mkdir()
-    (root / ".epr-meta").write_text(
+    (root / ".epr-meta").mkdir()
+    (root / ".epr-meta" / "manifest.md").write_text(
         "---\nepr-meta-version: 1\nroot: true\nci-trigger:\n  ignore:\n    - .claude/\n    - CLAUDE.md\n---\n")
     env = {**os.environ}
     # write mode

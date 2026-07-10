@@ -83,12 +83,13 @@ def build_write(path: str, status: str, content: str | None, head_has_parent: bo
 def verdict_for(path: str, write: dict):
     """Full resolver sequence for one write -> combined Verdict|None. Mirrors
     epr-meta-resolver.py:250-323 minus the Claude-only side-channels. Malformed manifest downgrades
-    deny->ask (unless the target IS an .epr-meta, which is never blocked so the fix is never bricked)."""
+    deny->ask (unless the target IS an .epr-meta — legacy flat OR directory-form
+    `.epr-meta/manifest.md` — which is never blocked so the fix is never bricked)."""
     target = Path(path)
     chain = epr_meta.collect_cascade(target)
     if not chain:
         return None
-    if target.name != epr_meta.MANIFEST_NAME:
+    if not epr_meta.is_manifest_path(target):
         problems = [(m, errs) for m in chain if (errs := epr_meta.check_meta(m))]
         if problems:
             detail = "; ".join(f"{m}: {', '.join(e)}" for m, e in problems)
