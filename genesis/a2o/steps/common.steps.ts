@@ -254,6 +254,25 @@ Before(function (this: E2EWorld, scenario) {
 });
 
 /**
+ * @wip = work-in-progress: the scenario names a contract whose step definitions are not yet
+ * wired (the cure it drives isn't built). The a2o CLAUDE.md documents `@wip` for exactly this,
+ * but nothing enforced the skip — so under cucumber's default strict mode a @wip scenario's
+ * undefined steps would FAIL the run instead of holding. This makes the convention real: a @wip
+ * scenario is HELD (skipped, not failed), the same disposition as a substrate-held one, so a
+ * RED-defining contract can live in its feature before its implementation lands (which is when it
+ * sheds @wip and goes truly RED→green). Registered before setup so it short-circuits early.
+ */
+Before(function (this: E2EWorld, scenario) {
+  const tags = scenario.pickle.tags.map(t => t.name);
+  if (tags.includes('@wip')) {
+    // eslint-disable-next-line no-console
+    console.log(`  ⏭️  HELD (@wip): "${scenario.pickle.name}" — steps not yet wired; skipped, not failed.`);
+    return 'skipped';
+  }
+  return undefined;
+});
+
+/**
  * Clear Playwright capture state before each scenario so errors don't bleed across scenarios.
  * Also begins an observation session on the first registered doorway (best-effort).
  */
