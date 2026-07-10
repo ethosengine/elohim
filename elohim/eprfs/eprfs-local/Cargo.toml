@@ -17,4 +17,5 @@ tokio = { workspace = true, features = ["fs"] }
 [dev-dependencies]
 bytes.workspace = true
 eprfs-storage = { version = "0.1.0", path = "../eprfs-storage", registry = "elohim" }
+tempfile = "3"
 tokio.workspace = true

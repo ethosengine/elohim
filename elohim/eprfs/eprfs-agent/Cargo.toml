@@ -1,0 +1,22 @@
+[package]
+name = "eprfs-agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Domain adapter: elohim-agent capability EPRs -> eprfs projection manifests (claude/codex runtimes)"
+
+[dependencies]
+eprfs-core = { path = "../eprfs-core" }
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
+bytes.workspace = true
+
+[dev-dependencies]
+eprfs-local = { path = "../eprfs-local" }
+eprfs-storage = { path = "../eprfs-storage" }
+tokio.workspace = true
+tempfile = "3"

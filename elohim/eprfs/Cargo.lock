@@ -210,6 +210,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "eprfs-agent"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "eprfs-core",
+ "eprfs-local",
+ "eprfs-storage",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tempfile",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "eprfs-core"
 version = "0.1.0"
 dependencies = [
@@ -238,6 +254,7 @@ dependencies = [
  "eprfs-host",
  "eprfs-storage",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 
