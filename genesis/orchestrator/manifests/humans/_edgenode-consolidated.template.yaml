@@ -145,6 +145,19 @@ spec:
       environment: ENV_PLACEHOLDER
   template:
     metadata:
+      annotations:
+        # Content digest of the hApp behind the floating happ-version tag,
+        # resolved at render time (Jenkinsfile resolveHappDigest). The tag itself
+        # is mutable — a DNA-pipeline rebuild moves dev-latest/latest to new hApp
+        # bytes with NO edge commit, leaving the rest of this pod template
+        # byte-identical. Stamping the digest here makes such a move change the
+        # StatefulSet spec, so `kubectl apply` reports "configured" and the
+        # genesis-peer surge guard lets the conductor rollout restart proceed
+        # (otherwise the bootstrap pair skips the restart on "unchanged" while
+        # other peers pull the new DNA → DNA-hash divergence → DHT partition).
+        # FAIL-SAFE: on resolution failure the Jenkinsfile stamps a unique marker,
+        # never empty/stale — the deploy still restarts rather than silently skew.
+        elohim.host/happ-digest: "HAPP_DIGEST_PLACEHOLDER"
       labels:
         app: elohim-edgenode
         elohim-human: HUMAN_LABEL_PLACEHOLDER

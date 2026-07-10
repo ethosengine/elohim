@@ -124,6 +124,20 @@ spec:
   template:
     metadata:
       annotations:
+        # Content digest of the hApp behind the floating happ-version tag,
+        # resolved at render time (Jenkinsfile resolveHappDigest). The tag is
+        # mutable — a DNA-pipeline rebuild moves dev-latest/latest to new hApp
+        # bytes with NO edge commit, leaving the rest of this pod template
+        # byte-identical. Stamping the digest here makes such a move change the
+        # StatefulSet spec, so `kubectl apply` reports "configured" and Adam's
+        # genesis-peer surge guard lets the conductor rollout restart proceed —
+        # keeping the bootstrap pair (adam + matthew) on the same DNA hash rather
+        # than skipping the restart on "unchanged" → DNA-hash divergence → DHT
+        # partition. FAIL-SAFE: on resolution failure the Jenkinsfile stamps a
+        # unique marker, never empty/stale, so the deploy still restarts.
+        # (Adam + the consolidated template must carry this in lockstep — the
+        # genesis pair moves together.)
+        elohim.host/happ-digest: "HAPP_DIGEST_PLACEHOLDER"
         # Force a rolling restart on next apply so Adam's pod picks up the
         # Phase A elohim-storage image published by edge #901. Holochain
         # #1125 deployed Adam's peer-policy ConfigMap before edge finished

@@ -610,12 +610,59 @@ def emitDeployJunit(String envName, List humans, Map outcomes) {
 }
 
 /**
+ * Resolve the floating hApp tag to its immutable content digest from Harbor.
+ *
+ * HAPP_TAG is mutable: a DNA-pipeline rebuild moves dev-latest/latest to new
+ * hApp bytes with NO edge commit. Stamping the resolved digest into the pod
+ * template makes that move surface as a StatefulSet spec change ("configured"),
+ * so the genesis-peer surge guard's rollout-restart skip stays correct (a
+ * byte-identical STS on a real DNA move would skip the restart on the bootstrap
+ * pair → DNA-hash divergence → DHT partition).
+ *
+ * Bash body lives in genesis/orchestrator/scripts/resolve-happ-digest.sh —
+ * Jenkinsfile helpers stay heredoc-free (this pipeline sits near the 64KB CPS
+ * method-size limit). Reuses the harbor-robot-registry credential the hApp fetch
+ * path already uses.
+ *
+ * FAIL SAFE: on any resolution failure (registry unreachable, tag missing)
+ * returns a unique build-specific marker so the rendered STS still changes and
+ * the restart proceeds — never returns empty or a stale value (either would
+ * silently reopen the skew hole). `|| true` keeps a resolution failure from
+ * aborting the deploy; the fallback path handles it loudly instead.
+ */
+def resolveHappDigest(String happTag, String deployVersion) {
+    def digest = ''
+    withCredentials([usernamePassword(
+        credentialsId: 'harbor-robot-registry',
+        usernameVariable: 'HARBOR_USER',
+        passwordVariable: 'HARBOR_PASS',
+    )]) {
+        digest = sh(
+            script: "bash '${env.WORKSPACE}/genesis/orchestrator/scripts/resolve-happ-digest.sh' '${happTag}' || true",
+            returnStdout: true,
+        ).trim()
+    }
+    if (digest ==~ /sha256:[a-f0-9]{64}/) {
+        echo "Resolved hApp digest for tag '${happTag}': ${digest}"
+        return digest
+    }
+    def fallback = "unresolved-${deployVersion}-${System.currentTimeMillis()}"
+    echo "WARNING: could not resolve hApp digest for tag '${happTag}' — FAILING SAFE with unique marker '${fallback}'. The StatefulSet pod-template will read 'configured', so the genesis-peer rollout restart proceeds (surge guard intentionally bypassed this deploy). Investigate Harbor reachability / tag existence; a persistent failure means the genesis pair restarts on every deploy."
+    return fallback
+}
+
+/**
  * Deploy a human manifest with topology-aware placeholder substitution.
  * Uses | as sed delimiter because URLs contain /.
  */
 def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     def versions = readProperties(file: envFile)
     def deployVersion = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
+    // Resolve the floating hApp tag to its content digest so a DNA-pipeline tag
+    // move (new hApp bytes, no edge commit) surfaces as an STS spec change and
+    // the genesis-peer surge guard lets the rollout restart proceed. FAIL SAFE
+    // by construction — see resolveHappDigest.
+    def happDigest = resolveHappDigest(versions.HAPP_TAG, deployVersion)
     def envConfig = getEnvConfig()[humanConfig.env]
     def p2pNodes = computeP2PBootstrapNodes(humanConfig, allHumans)
 
@@ -693,6 +740,11 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         "s|HAPP_INSTALLER_TAG_PLACEHOLDER|${versions.HAPP_INSTALLER_TAG}|g",
         "s|DOORWAY_APP_TAG_PLACEHOLDER|${versions.DOORWAY_APP_TAG}|g",
         "s|HAPP_TAG_PLACEHOLDER|${versions.HAPP_TAG}|g",
+        // Resolved hApp content digest — stamped into the pod-template annotation
+        // so a floating-tag move (new DNA bytes, no edge commit) changes the STS
+        // spec and the genesis-peer restart-skip stays correct. Digest contains
+        // no `|`, so it's safe with the sed `|` delimiter.
+        "s|HAPP_DIGEST_PLACEHOLDER|${happDigest}|g",
         "s|AGENT_SDK_TAG_PLACEHOLDER|${versions.AGENT_SDK_TAG ?: versions.EDGENODE_TAG}|g",
         "s|DEPLOY_VERSION_PLACEHOLDER|${deployVersion}|g",
         // Topology placeholders
@@ -801,14 +853,21 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // anchor the DHT's full authority arc; a rollout restart of a full-arc anchor
     // triggers a re-gossip / re-validation surge across the whole corpus — the
     // sustained conductor read-pool saturation class
-    // (adam-genesis-anchor-sustained-saturation-post-storm). Image tags are
-    // per-commit (dev-<branch>-<gitHash>), so a REAL storage/DNA change makes
-    // `kubectl apply` report the StatefulSet "configured" (or takes the
-    // delete+reapply path), and the restart below still proceeds — e.g. the
-    // storm-heal storage roll lands on adam normally. Only when apply reports the
-    // StatefulSet UNCHANGED (a doorway-only / no-op deploy) is the explicit
-    // restart a gratuitous bounce; skip it for genesis peers so we don't induce
-    // the surge. Non-genesis (reduced-arc) peers always restart — surge is cheap.
+    // (adam-genesis-anchor-sustained-saturation-post-storm). Every real-change
+    // channel now moves the STS spec: container image tags are per-commit
+    // (dev-<branch>-<gitHash>), AND the mutable floating hApp tag is resolved to
+    // its content digest and stamped into the pod-template `elohim.host/happ-digest`
+    // annotation at render time (resolveHappDigest). So a REAL storage/DNA change
+    // — including a DNA-pipeline hApp rebuild that moves dev-latest/latest with NO
+    // edge commit — makes `kubectl apply` report the StatefulSet "configured" (or
+    // takes the delete+reapply path), and the restart below still proceeds. That
+    // closes the earlier hole where a floating-tag move rendered a byte-identical
+    // STS ("unchanged"), skipping the genesis-pair restart while non-genesis peers
+    // pulled the new DNA → DNA-hash divergence on the bootstrap pair → DHT
+    // partition. Only a genuinely no-op deploy (doorway-only, no image/DNA change)
+    // now reports UNCHANGED, and for that the explicit restart is a gratuitous
+    // bounce; skip it for genesis peers so we don't induce the surge. Non-genesis
+    // (reduced-arc) peers always restart — surge is cheap.
     // (Shell grep, not Groovy =~, to avoid the CPS Matcher-serialization gotcha.)
     def ssUnchanged = false
     if (applyCode == 0) {
