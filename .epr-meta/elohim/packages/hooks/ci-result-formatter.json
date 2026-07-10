@@ -1,0 +1,48 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "HookPackage",
+  "metadata": {
+    "id": "ci-result-formatter",
+    "name": "ci-result-formatter",
+    "version": "1.0.0",
+    "description": "CI Result Formatter - Minimal hook for mcp__jenkins__getBuild failures.",
+    "sourceRuntime": "claude",
+    "runtimeTargets": [
+      "claude"
+    ],
+    "event": "PostToolUse",
+    "matcher": "mcp__jenkins__getBuild",
+    "interpreter": "python3",
+    "language": "python",
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/hooks/ci-result-formatter",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    },
+    "master": "package",
+    "composedBy": "claude-opus-4-8"
+  },
+  "source": {
+    "language": "python",
+    "interpreter": "python3",
+    "path": ".claude/hooks/ci-result-formatter.py",
+    "body": "#!/usr/bin/env python3\n\"\"\"\nCI Result Formatter - Minimal hook for mcp__jenkins__getBuild failures.\nOnly injects context when build failed/unstable.\n\nPostToolUse payload carries the MCP result under `tool_response` (NOT\n`tool_result` — the 2026-07-02 review found this hook dead since birth on that\nkey). The response may be the parsed build dict or an MCP content wrapper\n({\"content\":[{\"type\":\"text\",\"text\":\"{...json...}\"}]}); both are handled.\n\"\"\"\nimport json\nimport sys\n\nHINTS = {\n    'elohim-holochain': ('DNA_BUILD', 'Check Rust/WASM. cargo build locally.'),\n    'elohim-edge': ('INFRASTRUCTURE', 'Check container. Verify hApp artifact.'),\n    'elohim': ('APP_BUILD', 'Check TypeScript. npm run build locally.'),\n    'elohim-genesis': ('SEEDING', 'Check doorway-alpha.elohim.host/health'),\n    'elohim-orchestrator': ('ORCHESTRATOR', 'Fetch ci-summary.json artifact.'),\n    'elohim-sophia': ('SOPHIA_BUILD', 'cd sophia && pnpm lint && pnpm test'),\n    'doorway-quality': ('DOORWAY_QUALITY', 'cd doorway && RUSTFLAGS=\"\" cargo clippy && cargo fmt --check'),\n}\n\n\ndef build_dict(response):\n    \"\"\"Normalize tool_response into the build dict, tolerating the MCP content wrapper.\"\"\"\n    if isinstance(response, dict) and 'content' in response and isinstance(response['content'], list):\n        for item in response['content']:\n            if isinstance(item, dict) and item.get('type') == 'text':\n                try:\n                    parsed = json.loads(item.get('text') or '')\n                except (json.JSONDecodeError, TypeError):\n                    continue\n                if isinstance(parsed, dict):\n                    return parsed\n        return {}\n    return response if isinstance(response, dict) else {}\n\n\ndef main():\n    try:\n        data = json.load(sys.stdin)\n        result = build_dict(data.get('tool_response'))\n        if not result:\n            sys.exit(0)\n\n        status = result.get('result', '')\n        if status not in ['FAILURE', 'UNSTABLE']:\n            sys.exit(0)\n\n        # Find pipeline from job name — longest key wins so 'elohim-genesis'\n        # never falls through to the bare 'elohim' hint.\n        job = data.get('tool_input', {}).get('jobFullName', '')\n        pipeline = max((p for p in HINTS if p in job), key=len, default=None)\n\n        parts = [f\"BUILD: {status} ({result.get('duration', 0)/1000:.0f}s)\"]\n        if pipeline:\n            cat, hint = HINTS[pipeline]\n            parts.append(f\"{cat}: {hint}\")\n\n        print(json.dumps({\n            \"hookSpecificOutput\": {\n                \"hookEventName\": \"PostToolUse\",\n                \"additionalContext\": \" | \".join(parts)\n            }\n        }))\n    except Exception:\n        sys.exit(0)\n\nif __name__ == \"__main__\":\n    main()\n"
+  },
+  "registration": {
+    "event": "PostToolUse",
+    "matcher": "mcp__jenkins__getBuild",
+    "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/ci-result-formatter.py\"",
+    "timeout": 3,
+    "type": "command"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/hooks/ci-result-formatter.py"
+    }
+  }
+}

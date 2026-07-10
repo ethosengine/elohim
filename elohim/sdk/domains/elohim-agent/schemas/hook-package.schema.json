@@ -1,0 +1,84 @@
+{
+  "$id": "elohim-agent:schema:package:hook",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HookPackage",
+  "description": "Canonical Elohim-native package for a lifecycle hook — executable code plus its recorded settings.json registration. The runtime hook file is a byte-identical projection of source.body; the registration is recorded and reconciled read-only (never auto-written).",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "source", "projections"],
+  "properties": {
+    "apiVersion": { "const": "elohim-agent/v1alpha1" },
+    "kind": { "const": "HookPackage" },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "version",
+        "description",
+        "sourceRuntime",
+        "runtimeTargets",
+        "assetRefs"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "sourceRuntime": { "enum": ["claude", "codex", "elohim-agent"] },
+        "runtimeTargets": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["claude", "codex"] }
+        },
+        "event": { "type": ["string", "null"] },
+        "matcher": { "type": ["string", "null"] },
+        "interpreter": { "type": "string" },
+        "language": { "type": "string" },
+        "assetRefs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": true
+    },
+    "source": {
+      "type": "object",
+      "required": ["language", "path", "body"],
+      "properties": {
+        "language": { "type": "string", "minLength": 1 },
+        "interpreter": { "type": "string" },
+        "path": { "type": "string", "minLength": 1 },
+        "body": { "type": "string", "minLength": 1 },
+        "cid": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "registration": {
+      "type": ["object", "null"],
+      "properties": {
+        "event": { "type": "string", "minLength": 1 },
+        "matcher": { "type": ["string", "null"] },
+        "command": { "type": "string", "minLength": 1 },
+        "timeout": { "type": ["number", "null"] },
+        "type": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "projections": {
+      "type": "object",
+      "required": ["claude"],
+      "properties": {
+        "claude": {
+          "type": "object",
+          "required": ["path"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

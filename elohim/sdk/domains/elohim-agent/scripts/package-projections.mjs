@@ -5,6 +5,12 @@ import { tmpdir } from 'node:os';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
+import {
+  HOOK_KIND,
+  hookPackageFromSource,
+  projectHook,
+  verifyHookPackage,
+} from './hook-package.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DOMAIN_DIR = resolve(__dirname, '..');
@@ -25,6 +31,11 @@ const GOVERNANCE_CURSOR_PATH = resolve(REPO_ROOT, '.claude/data/governance-curso
 
 const SKILL_SOURCE_DIR = resolve(REPO_ROOT, '.claude/skills');
 const AGENT_SOURCE_DIR = resolve(REPO_ROOT, '.claude/agents');
+const HOOK_SOURCE_DIR = resolve(REPO_ROOT, '.claude/hooks');
+// Registration surface for hooks. READ-ONLY here: recorded into the package and
+// reconciled against, NEVER auto-written (a bad settings.json write can wedge
+// the whole PreToolUse gating toolchain).
+const SETTINGS_PATH = resolve(REPO_ROOT, '.claude/settings.json');
 
 const args = process.argv.slice(2);
 const command = args.find((arg) => !arg.startsWith('-')) ?? 'verify';
@@ -69,6 +80,16 @@ async function readIfExists(path) {
   } catch (error) {
     if (error?.code === 'ENOENT') return null;
     throw error;
+  }
+}
+
+async function readSettings() {
+  const raw = await readIfExists(SETTINGS_PATH);
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
   }
 }
 
@@ -550,16 +571,62 @@ async function loadSourcePackages({ skillDir = SKILL_SOURCE_DIR, agentDir = AGEN
     }
   }
 
+  for (const pkg of await loadSourceHooks()) {
+    sourcePackages.push(pkg);
+  }
+
   return sourcePackages;
 }
 
+// Hook source loading is OPT-IN and package-driven — the divergence from the
+// markdown path. There are ~28 hook `.py` files but only ADOPTED ones (those
+// with a package under .epr-meta/elohim/packages/hooks/) are treated as source
+// packages. This keeps planting scope-contained (plant ONE, don't blow scope to
+// all hooks) AND keeps the imported-source-coverage gate honest: it never
+// demands a package for an un-adopted hook.
+//
+// A `.py` cannot carry an inline authority marker (rule 3), so authority is
+// read from the PACKAGE: a native (sourceRuntime elohim-agent) or FLIPPED
+// (master: package) hook is package-first and is NOT re-imported from source —
+// its freshness is proved package-first via project(package) === `.claude/hooks`
+// (verifyRuntimeProjectionIfPresent), not the human-source fidelity gate.
+async function loadSourceHooks() {
+  const hookPkgDir = resolve(PACKAGE_DIR, 'hooks');
+  const files = await listJsonFiles(hookPkgDir);
+  if (files.length === 0) return [];
+  const settings = await readSettings();
+  const out = [];
+  for (const file of files) {
+    const pkg = await readJson(resolve(hookPkgDir, file));
+    if (pkg.kind !== HOOK_KIND) continue;
+    if (pkg.metadata.sourceRuntime !== 'claude' || pkg.metadata.master === 'package') continue;
+    const srcPath = resolve(REPO_ROOT, pkg.projections.claude.path);
+    const raw = await readIfExists(srcPath);
+    if (raw === null) continue;
+    out.push(
+      hookPackageFromSource(srcPath, raw, settings, {
+        repoRoot: REPO_ROOT,
+        governance: governanceFor('hooks', pkg.metadata.id),
+      }),
+    );
+  }
+  return out;
+}
+
 function packagePathFor(pkg) {
+  if (pkg.kind === HOOK_KIND) return resolve(PACKAGE_DIR, 'hooks', `${pkg.metadata.id}.json`);
   return pkg.kind === 'SkillPackage'
     ? resolve(PACKAGE_DIR, 'skills', `${pkg.metadata.id}.json`)
     : resolve(PACKAGE_DIR, 'agents', `${pkg.metadata.id}.json`);
 }
 
 function projectionFixturePathsFor(pkg) {
+  // A hook has a SINGLE projected artifact (the code) and no codex target — the
+  // returned object has only a `claude` key, and the write/verify loops iterate
+  // Object.keys(...) so they naturally do the right thing for one or two runtimes.
+  if (pkg.kind === HOOK_KIND) {
+    return { claude: resolve(PROJECTION_DIR, 'claude/hooks', `${pkg.metadata.id}.py`) };
+  }
   return pkg.kind === 'SkillPackage'
     ? {
         claude: resolve(PROJECTION_DIR, 'claude/skills', pkg.metadata.id, 'SKILL.md'),
@@ -572,6 +639,9 @@ function projectionFixturePathsFor(pkg) {
 }
 
 function runtimePathsFor(pkg) {
+  if (pkg.kind === HOOK_KIND) {
+    return { claude: resolve(REPO_ROOT, pkg.projections.claude.path) };
+  }
   return {
     claude: resolve(REPO_ROOT, pkg.projections.claude.path),
     codex: resolve(REPO_ROOT, pkg.projections.codex.path),
@@ -579,6 +649,8 @@ function runtimePathsFor(pkg) {
 }
 
 function projectedTextFor(pkg, runtime) {
+  // Hooks project VERBATIM (byte-for-byte passthrough) and are runtime-agnostic.
+  if (pkg.kind === HOOK_KIND) return projectHook(pkg);
   return runtime === 'claude' ? projectClaude(pkg) : projectCodex(pkg);
 }
 
@@ -591,16 +663,18 @@ async function writePackages(packages) {
 async function writeProjectionFixtures(packages) {
   for (const pkg of packages) {
     const paths = projectionFixturePathsFor(pkg);
-    await writeText(paths.claude, projectClaude(pkg));
-    await writeText(paths.codex, projectCodex(pkg));
+    for (const runtime of Object.keys(paths)) {
+      await writeText(paths[runtime], projectedTextFor(pkg, runtime));
+    }
   }
 }
 
 async function writeRuntimeProjections(packages) {
   for (const pkg of packages) {
     const paths = runtimePathsFor(pkg);
-    await writeText(paths.claude, projectClaude(pkg));
-    await writeText(paths.codex, projectCodex(pkg));
+    for (const runtime of Object.keys(paths)) {
+      await writeText(paths[runtime], projectedTextFor(pkg, runtime));
+    }
   }
 }
 
@@ -608,6 +682,7 @@ async function initLayout() {
   const manifest = resolve(EPR_META_DIR, 'manifest.md');
   await mkdir(resolve(PACKAGE_DIR, 'skills'), { recursive: true });
   await mkdir(resolve(PACKAGE_DIR, 'agents'), { recursive: true });
+  await mkdir(resolve(PACKAGE_DIR, 'hooks'), { recursive: true });
   await mkdir(resolve(PROJECTION_DIR, 'claude'), { recursive: true });
   await mkdir(resolve(PROJECTION_DIR, 'codex'), { recursive: true });
   try {
@@ -624,11 +699,14 @@ async function initLayout() {
 async function loadPackageFixtures() {
   const skillsDir = resolve(PACKAGE_DIR, 'skills');
   const agentsDir = resolve(PACKAGE_DIR, 'agents');
+  const hooksDir = resolve(PACKAGE_DIR, 'hooks');
   const skillFiles = await listJsonFiles(skillsDir);
   const agentFiles = await listJsonFiles(agentsDir);
+  const hookFiles = await listJsonFiles(hooksDir);
   return [
     ...(await Promise.all(skillFiles.map((file) => readJson(resolve(skillsDir, file))))),
     ...(await Promise.all(agentFiles.map((file) => readJson(resolve(agentsDir, file))))),
+    ...(await Promise.all(hookFiles.map((file) => readJson(resolve(hooksDir, file))))),
   ];
 }
 
@@ -636,20 +714,54 @@ async function loadValidators() {
   const ajv = new Ajv2020({ allErrors: true, strict: false });
   const skillSchema = await readJson(resolve(DOMAIN_DIR, 'schemas/skill-package.schema.json'));
   const agentSchema = await readJson(resolve(DOMAIN_DIR, 'schemas/agent-package.schema.json'));
+  const hookSchema = await readJson(resolve(DOMAIN_DIR, 'schemas/hook-package.schema.json'));
   return {
     skill: ajv.compile(skillSchema),
     agent: ajv.compile(agentSchema),
+    hook: ajv.compile(hookSchema),
   };
 }
 
-async function verifyPackage(pkg, validators) {
-  const validate = pkg.kind === 'SkillPackage' ? validators.skill : validators.agent;
+async function verifyPackage(pkg, validators, settings) {
+  const validate =
+    pkg.kind === 'SkillPackage'
+      ? validators.skill
+      : pkg.kind === HOOK_KIND
+        ? validators.hook
+        : validators.agent;
   assert(
     validate(pkg),
     `${pkg.kind} package ${pkg.metadata.id} validates: ${JSON.stringify(validate.errors)}`,
   );
 
   assert(pkg.metadata.id === pkg.metadata.name, `${pkg.metadata.id} name/id round-trip`);
+
+  if (pkg.kind === HOOK_KIND) {
+    // Hooks are code + registration, not markdown + frontmatter: skip every
+    // markdown-only assertion (frontmatter description, agent tool round-trip,
+    // codex governance backref). The hook-specific gates live in the module.
+    await verifyHookPackage(pkg, {
+      assert,
+      settings,
+      lodge: ({ assertionClass, detail }) =>
+        lodgeGovernanceFinding({
+          fingerprint: governanceFingerprint(pkg.kind, pkg.metadata.id, assertionClass),
+          kind: pkg.kind,
+          id: pkg.metadata.id,
+          detail,
+        }),
+    });
+    assert(
+      Boolean(pkg.metadata.governance?.eprRef),
+      `${pkg.metadata.id} has metadata.governance.eprRef`,
+    );
+    // Byte-identity: the projected fixture and the runtime `.py` must equal
+    // source.body exactly (strict `===`, transform-free). Claude-only for hooks.
+    await verifyProjectionFixture(pkg, 'claude');
+    await verifyRuntimeProjectionIfPresent(pkg, 'claude');
+    return;
+  }
+
   assert(pkg.instructions.body.length > 0, `${pkg.metadata.id} has canonical instruction body`);
   assert(
     pkg.projections.claude.frontmatter.description === pkg.metadata.description,
@@ -795,7 +907,9 @@ async function verifySourceFidelity(sourcePackages) {
     if (pkg.metadata.sourceRuntime !== 'claude') continue;
     const sourcePath = resolve(REPO_ROOT, pkg.projections.claude.path);
     const original = await readFile(sourcePath, 'utf8');
-    const ok = projectClaude(pkg) === original;
+    // projectedTextFor routes a HookPackage to the verbatim passthrough
+    // projector (strict byte-identity), and skill/agent to the markdown surface.
+    const ok = projectedTextFor(pkg, 'claude') === original;
     assert(ok, `fidelity: project(import(${pkg.kind}:${pkg.metadata.id})) === source`);
     if (!ok) {
       await lodgeGovernanceFinding({
@@ -873,8 +987,9 @@ async function runVerify() {
   await verifySourceFidelity(sourcePackages);
 
   const validators = await loadValidators();
+  const settings = await readSettings();
   for (const pkg of packageFixtures) {
-    await verifyPackage(pkg, validators);
+    await verifyPackage(pkg, validators, settings);
   }
 }
 
