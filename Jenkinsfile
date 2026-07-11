@@ -319,6 +319,18 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
         if (rc == 0) {
             echo "authorHeadOnce: ${bundle.slug} (${kind}) — head authored via ${host}'s conductor bridge; DHT witnesses it, converges to all peers"
             outcomes[authorKey] = host
+            // Propagate the canonical-head declaration to the OTHER doorways
+            // (DECLARE_ONLY leg in the script; advisory, idempotent-by-content —
+            // cross-peer link gossip can lag/degrade, so each peer's conductor
+            // writes the same canonical link locally). returnStatus: never
+            // fails the build.
+            for (int j = 0; j < doorwayEprUrls.size(); j++) {
+                if (j == i) { continue }
+                withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", 'DECLARE_ONLY=1', "SOURCE_DOORWAY_URL=${doorwayEprUrl}"]) {
+                    sh(returnStatus: true,
+                       script: "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '-' '${bundle.slug}' '${doorwayEprUrls[j]}' '${kind}'")
+                }
+            }
             return host
         }
         echo "authorHeadOnce: ${host} could not author ${bundle.slug} (${kind}) (no live conductor bridge / persistent 503) — failing over to next doorway"

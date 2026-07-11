@@ -20,6 +20,49 @@ KIND="${4:-browser}"
 DO_PATCH="${DO_PATCH:-0}"
 ATTEMPTS="${STAGE_BLOB_ATTEMPTS:-3}"
 
+# DECLARE-ONLY mode (canonical-head propagation). Cross-peer DHT gossip of the
+# canonical link can lag or degrade (the F-T19 outbound class), leaving the
+# non-authoring peer resolving its own root indefinitely. Declaring the SAME
+# target hash through every doorway is idempotent-by-content — staging
+# scaffold-over-scaffold with an identical target converges identically — and
+# stamps each peer's row eagerly. Resolves the hash from the AUTHORING doorway
+# (SOURCE_DOORWAY_URL), POSTs it to THIS doorway. ADVISORY: always exits 0;
+# a "not retrievable" refusal here is the live diagnostic that the peer's
+# conductor cannot fetch the authoring root's action (substrate gossip gap).
+if [ "${DECLARE_ONLY:-0}" = "1" ]; then
+    SRC="${SOURCE_DOORWAY_URL:-}"
+    if [ -z "${SRC}" ]; then
+        echo "  ⚠ DECLARE_ONLY: SOURCE_DOORWAY_URL not set — skipping canonical-head propagation to ${DOORWAY_EPR_URL}" >&2
+        exit 0
+    fi
+    head_hash=$(curl -fSs -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
+        "${SRC}/db/content/${SLUG}/head" 2>/dev/null \
+        | python3 -c "import sys, json; print(json.load(sys.stdin).get('headActionHash',''))" 2>/dev/null) || head_hash=""
+    if [ -z "${head_hash}" ]; then
+        echo "  ⚠ DECLARE_ONLY: could not resolve headActionHash from ${SRC}/db/content/${SLUG}/head — skipping propagation to ${DOORWAY_EPR_URL}" >&2
+        exit 0
+    fi
+    declare_raw=$(curl -sS -o - -w '\n%{http_code}' -X POST \
+        -H 'Content-Type: application/json' \
+        -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
+        -d "{\"headActionHash\":\"${head_hash}\"}" \
+        "${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head" 2>&1) || {
+        echo "  ⚠ DECLARE_ONLY: curl error POSTing canonical-head to ${DOORWAY_EPR_URL}: ${declare_raw} — peer keeps its own head until gossip/heal converges" >&2
+        exit 0
+    }
+    declare_status="${declare_raw##*$'\n'}"
+    declare_body="${declare_raw%$'\n'*}"
+    case "${declare_status}" in
+        2??)
+            echo "  ✓ canonical head propagated to ${DOORWAY_EPR_URL}: ${head_hash} (staging tier)"
+            ;;
+        *)
+            echo "  ⚠ DECLARE_ONLY: ${DOORWAY_EPR_URL} returned HTTP ${declare_status}: ${declare_body} — peer keeps its own head until gossip/heal converges" >&2
+            ;;
+    esac
+    exit 0
+fi
+
 cd "${DIST_DIR}"
 
 # Angular 19 SSR mode emits index.csr.html (Client-Side Rendered fallback)
