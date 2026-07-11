@@ -133,19 +133,21 @@ spec:
       }
     }
 
-    // Publish the eprfs LIBRARY crates to the internal Nexus registry on main
-    // only (release-grade; crate versions are immutable). The script is
-    // idempotent + 409-safe — a no-op unless the workspace version was bumped —
-    // and excludes the eprfs-agent binary (publish=false). Runs inside
-    // `nix develop` because `cargo publish` needs the toolchain; the script
-    // clears RUSTFLAGS/RUSTC_WRAPPER itself. Reuses the CI npm token
-    // (`ee-nexus-npm-token`), which authenticates cross-format against
-    // cargo-internal.
+    // Publish the eprfs LIBRARY crates to the internal Nexus registry on dev
+    // and main (crate versions are immutable either way — the script is
+    // idempotent + 409-safe, a no-op unless the workspace version was bumped,
+    // so dev publishes each version once and main is a no-op re-run). dev
+    // publishing lets registry consumers (brit) build against eprfs without
+    // waiting on a dev→main promotion. Excludes the eprfs-agent binary
+    // (publish=false). Runs inside `nix develop` because `cargo publish`
+    // needs the toolchain; the script clears RUSTFLAGS/RUSTC_WRAPPER itself.
+    // Reuses the CI npm token (`ee-nexus-npm-token`), which authenticates
+    // cross-format against cargo-internal.
     stage('Publish — cargo (elohim registry)') {
       when {
         allOf {
           expression { env.PIPELINE_SKIPPED != 'true' }
-          anyOf { branch 'main'; expression { env.BRANCH_NAME == 'main' } }
+          anyOf { branch 'main'; branch 'dev'; expression { env.BRANCH_NAME in ['main', 'dev'] } }
         }
       }
       steps {

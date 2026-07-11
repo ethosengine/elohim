@@ -9,8 +9,8 @@
 # crate, so its path deps stay path-only and it is excluded here.
 #
 # Idempotent + 409-safe: a crate+version already on the index is a no-op
-# success, so this runs on every main build and only publishes on a version
-# bump. The eprfs crates share one workspace version (`[workspace.package]`),
+# success, so this runs on every dev/main build and only publishes on a
+# version bump. The eprfs crates share one workspace version (`[workspace.package]`),
 # so they bump in lockstep.
 #
 # --no-verify: crates publish in dependency order, but the sparse index needs a
