@@ -200,12 +200,16 @@ RUN sed -i \
 
 # elohim-chrome-asset uses workspace inheritance too — inline the values since
 # the workspace root (elohim/Cargo.toml) isn't in the build context. Only the
-# fields its manifest actually inherits: version/edition/license + sha2.
+# fields its manifest actually inherits: version/edition/license + sha2 +
+# serde/serde_json (ChromeContext, 2026-07-11 — missing these two broke edge
+# #1174 at dep-resolve: "failed to find a workspace root").
 RUN sed -i \
     -e 's|version.workspace = true|version = "0.1.0"|' \
     -e 's|edition.workspace = true|edition = "2021"|' \
     -e 's|license.workspace = true|license = "Apache-2.0"|' \
     -e 's|sha2.workspace = true|sha2 = "0.10"|' \
+    -e 's|serde.workspace = true|serde = { version = "1.0", features = ["derive"] }|' \
+    -e 's|serde_json.workspace = true|serde_json = "1.0"|' \
     elohim-chrome-asset/Cargo.toml
 
 # Create dummy src + bench placeholders to build dependencies.
