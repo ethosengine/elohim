@@ -146,3 +146,25 @@ Feature: Notary authority — the federation converges on ONE earned canonical h
     When the substrate re-seeds and re-projects "elohim-host-landing"
     Then the canonical head of "elohim-host-landing" is the newly promoted version on peer "elohim.host"
     And the canonical head of "elohim-host-landing" is the newly promoted version on peer "alpha-A"
+
+  # ── The upgrade doorbell (operator direction, 2026-07-11) ────────────────────
+  # Today a declared canonical head reaches other peers only by the COINCIDENCE of
+  # passive op-gossip meeting a heal-tick — convergence has no deadline. The doorbell
+  # gives it one: when a head is declared, the declaring peer ANNOUNCES
+  # "canonical-head-changed {content_id}" on a working plane (the libp2p storage gossip
+  # the CRDT sync already trusts for liveness), and every receiving peer triggers its
+  # OWN conductor resolve + verified stamp. The trust rule is absolute (REQ-N5 /
+  # REQ-F4): the announcement carries NO authority and NO head value to adopt — it is
+  # "go verify against the DHT now", and verification terminates in the receiving
+  # peer's own conductor. A forged or stale doorbell ring is harmless: the peer just
+  # re-verifies and lands wherever the notary actually points. This is also how the
+  # CRDT sync plane and the DHT notary plane pull together instead of waiting on each
+  # other — the value plane converges eagerly, the authority plane verifies eagerly.
+  #
+  # @wip: the doorbell carrier (gossip topic + conductor-resolve trigger) is not yet
+  # implemented — dht-unity plan T4. Kept parseable and RED-defining.
+  @wip @requires:multi-node
+  Scenario: A declared canonical head rings the upgrade doorbell — every peer re-verifies and adopts within one sync window (RED — no doorbell)
+    Given EPR "elohim-host-landing" has a declared canonical head on peer "alpha-A"
+    When the canonical head declaration is announced to the federation
+    Then EPR "elohim-host-landing" resolves the same canonical head across peers "alpha-A" and "elohim.host" within one sync window
