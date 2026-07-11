@@ -183,6 +183,42 @@ Feature: Observable + contract-aware auto-distribute
     And the omni resilience icon has class "status-protected" or "status-partial"
     And the omni resilience tooltip mentions stewarding collectives
 
+  # --- Native chrome-asset omni resilience contract (regression guard) ------
+  # Distinct from the Angular protocol-omni scenario above: the doorway ALSO
+  # SSR-splices a hand-written, framework-free chrome element onto every
+  # served page (id="elohim-omni",
+  # elohim/elohim-chrome-asset/src/omni-element.js). protocol-omnibar-chrome
+  # .feature already pins the SERVED-HTML half of that contract (the context
+  # island + content-addressed loader script) but is deliberately HTTP-only —
+  # this scenario is the missing browser-tier coverage of its BEHAVIOR.
+  #
+  # Regression anchor: the element shipped reading data.glyph/standing/reach
+  # — fields that never existed on ResilienceSnapshotView (the real contract
+  # is protectionStatus + feltStatus, /api/v1/resilience/{slug}/household).
+  # The fetch always succeeded against the live endpoint, but the mapper
+  # always computed null, so the segment stayed the neutral ◉ glyph forever
+  # ("Resilience snapshot unavailable") — a false-neutral, never caught at
+  # runtime because the only a2o omni coverage targeted the Angular
+  # protocol-omni component above, not this element. Fixed in cf7679688 (the
+  # real protectionStatus/feltStatus contract mapping + drilldown card) and
+  # b13d4d04e (the tri-state data-omni-resilience-loaded marker: loading →
+  # applied | unmatched, so the DOM itself testifies whether the mapper found
+  # mappable fields). "unmatched" is precisely the phantom-contract
+  # regression state this scenario guards against.
+  #
+  # Deploy-gated: this goes green only once the FIXED element is the one
+  # actually served — the currently-deployed alpha build still serves the
+  # phantom-contract element and will settle on "unmatched", not "applied".
+  @browser-only @resilience-p1 @regression
+  Scenario: Native omni chrome resilience segment speaks the real snapshot contract
+    Given I open the doorway landing page in the browser
+    When I expand the native omni chrome
+    Then the native omni resilience-loaded state settles to "applied"
+    And the native omni resilience glyph shows a live protection state
+    And the native omni resilience title is no longer the phantom placeholder
+    When I click the native omni resilience glyph
+    Then the native omni resilience drilldown card is visible with a headline
+
   @browser-only @resilience-p1 @regression
   Scenario: Omni resilience tooltip folds down into the viewport, never up out of it
     # Regression anchor: the icon-density tooltip was hard-coded to flip UP
