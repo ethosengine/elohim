@@ -69,5 +69,45 @@ pub async fn two_agent_conductors() -> Result<[(SweetConductor, AgentPubKey); 2]
     Ok([(c1, a1), (c2, a2)])
 }
 
+/// Spin up two conductors with the bootstrap module DISABLED, for partition
+/// tests that must author under genuine isolation before an explicit heal.
+///
+/// Why this exists: `SweetConductorConfig::standard()` leaves `mem_bootstrap:
+/// true, disable_bootstrap: false`. Kitsune2's in-memory bootstrap store is a
+/// process-global `HashMap<(test_id, space_id), _>` where `test_id` defaults to
+/// the *thread id at conductor-construction time* and `space_id` is the DNA
+/// hash (network-seed-derived). Under `#[tokio::test(flavor = "multi_thread")]`
+/// two conductors built in the same test frequently land on the same worker
+/// thread and thus SHARE that store for their common space — so the second
+/// conductor's bootstrap poll (which runs one iteration immediately at startup)
+/// discovers the first's agent info and begins gossiping BEFORE the test's
+/// author phase. The intended "pre-exchange partition" never exists: the second
+/// peer sees the first's content/links (duplicate-id collisions, premature
+/// earned-head visibility) even though `exchange_peer_info` has not been called.
+///
+/// Setting `disable_bootstrap = true` turns the bootstrap module off entirely,
+/// so the conductors can ONLY learn about each other through an explicit
+/// `SweetConductor::exchange_peer_info` (direct peer-store injection). Gossip
+/// and publish stay enabled (separate flags), so a post-exchange
+/// `await_consistency` still converges — the canonical partition-then-heal
+/// idiom. See kitsune2_core `factories/mem_bootstrap.rs` for the shared-store
+/// keying that makes the default non-isolating.
+pub async fn two_agent_conductors_isolated() -> Result<[(SweetConductor, AgentPubKey); 2]> {
+    let (c1, a1) = single_agent_conductor_isolated().await?;
+    let (c2, a2) = single_agent_conductor_isolated().await?;
+    Ok([(c1, a1), (c2, a2)])
+}
+
+/// Single conductor with the bootstrap module disabled. See
+/// [`two_agent_conductors_isolated`] for the isolation rationale.
+async fn single_agent_conductor_isolated() -> Result<(SweetConductor, AgentPubKey)> {
+    let config = SweetConductorConfig::standard().tune_network_config(|nc| {
+        nc.disable_bootstrap = true;
+    });
+    let mut conductor = SweetConductor::from_config(config).await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    Ok((conductor, agent))
+}
+
 // Re-export for tests that need direct access to the agent helper.
 pub use holochain::sweettest::SweetAgents;

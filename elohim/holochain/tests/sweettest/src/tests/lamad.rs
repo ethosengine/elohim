@@ -19,7 +19,9 @@ use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
 use elohim_sweettest::common::{
-    conductors::{load_dna, single_agent_conductor, two_agent_conductors},
+    conductors::{
+        load_dna, single_agent_conductor, two_agent_conductors, two_agent_conductors_isolated,
+    },
     fixtures::network_seed,
 };
 
@@ -837,9 +839,18 @@ async fn declare_canonical_rejects_target_id_mismatch() -> Result<()> {
 /// staging declare is sequenced strictly AFTER the earned one (with a sleep) so
 /// its DHT timestamp is provably newer. A tier-blind newest-wins resolver would
 /// return the staging root here.
+///
+/// The partition MUST be genuine, which `standard()` conductors do not give: the
+/// process-global kitsune2 mem-bootstrap store lets two same-space conductors on
+/// one tokio worker thread auto-discover each other before any exchange, so the
+/// second peer would see the first's `tier-x` root (duplicate-id collision) and
+/// its earned link (staging declare refused) — exactly the two CI failures this
+/// test was hitting. `two_agent_conductors_isolated` disables the bootstrap
+/// module so the ONLY path between the peers is the explicit `exchange_peer_info`
+/// heal below. See the helper docs + `feedback_sweettest_cross_agent_consistency`.
 #[tokio::test(flavor = "multi_thread")]
 async fn earned_beats_newer_staging_at_resolve() -> Result<()> {
-    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors_isolated().await?;
     let seed = network_seed(DNA);
     // a1 is the bootstrap steward (progenitor).
     let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
