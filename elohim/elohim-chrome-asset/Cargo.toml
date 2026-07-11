@@ -7,3 +7,5 @@ description = "Content-addressed runtime-served EPR omnibar client element (no V
 
 [dependencies]
 sha2.workspace = true
+serde.workspace = true
+serde_json.workspace = true

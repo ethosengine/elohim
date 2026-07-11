@@ -1075,8 +1075,11 @@ fn build_ssr_user_credential<B>(req: &Request<B>) -> Option<crate::ssr::UserCred
 }
 
 /// Build the inline JSON context the native omnibar element reads (the doorway
-/// inject path). The doorway supplies what the element cannot infer or wants
-/// authoritatively client-side:
+/// inject path). Constructs and serializes a [`elohim_render::ChromeContext`]
+/// — the single typed producer struct shared with the element's `ctx.<field>`
+/// consumer contract (`elohim/elohim-chrome-asset/src/omni-element.js`),
+/// guarded by that crate's structural contract test. The doorway supplies what
+/// the element cannot infer or wants authoritatively client-side:
 /// - `slug` — the EPR address, derived from the request path (root → the landing
 ///   slug `elohim-host-landing`, else the last non-empty path segment), so the
 ///   element doesn't have to re-derive it from `window.location`.
@@ -1088,7 +1091,9 @@ fn build_ssr_user_credential<B>(req: &Request<B>) -> Option<crate::ssr::UserCred
 /// treats an absent env tier as non-visible) — the doorway SSR path does not yet
 /// plumb env-tier/build-marker, and inventing it here would be speculative. The
 /// element's defaults are sensible for the unspecified fields, so a minimal,
-/// honest island is correct.
+/// honest island is correct — `ChromeContext`'s `Option` fields stay `None` and
+/// are omitted from the wire JSON (`skip_serializing_if`), keeping the shape
+/// identical to the hand-built `serde_json::json!` this replaces.
 fn build_chrome_context_json<B>(path: &str, req: &Request<B>) -> String {
     const LANDING_SLUG: &str = "elohim-host-landing";
     let trimmed = path.trim_end_matches('/');
@@ -1102,11 +1107,12 @@ fn build_chrome_context_json<B>(path: &str, req: &Request<B>) -> String {
             .to_string()
     };
     let authenticated = build_ssr_user_credential(req).is_some();
-    serde_json::json!({
-        "slug": slug,
-        "authenticated": authenticated,
-    })
-    .to_string()
+    elohim_render::ChromeContext {
+        slug,
+        authenticated,
+        ..Default::default()
+    }
+    .to_json()
 }
 
 fn resolve_agent_cid_from_request<B>(state: &AppState, req: &Request<B>) -> Option<String> {

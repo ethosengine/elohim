@@ -15,9 +15,11 @@
 //! markup/style **renderers** (the Rust SSR-splice source-of-truth) live in
 //! `elohim-render::chrome`, which hard-depends on `deno_core` (V8). This crate
 //! carries ONLY the served bytes + hash + path helpers + the SSR-HTML inject
-//! helper — its single dependency is `sha2`. Both the doorway (which already
-//! pulls `elohim-render`, re-exporting these) AND the **default** (non-`ssr`)
-//! `elohim-storage` build depend on this crate cheaply, with no V8 in the tree.
+//! helper, plus the [`ChromeContext`] producer struct + `serde`/`serde_json`
+//! (deliberately kept light — no V8, no heavy deps). Both the doorway (which
+//! already pulls `elohim-render`, re-exporting these) AND the **default**
+//! (non-`ssr`) `elohim-storage` build depend on this crate cheaply, with no
+//! V8 in the tree.
 //!
 //! `elohim-render::chrome::element` re-exports everything here so the doorway's
 //! existing `elohim_render::element_*` usage is unchanged.
@@ -25,9 +27,18 @@
 //! Hashing convention mirrors `enhance.rs` / `bootstrap.rs`
 //! (`format!("{:x}", Sha256::digest)`). The filename hash is bare lowercase hex
 //! (a clean content address); [`element_js_hash`] exposes that same hex.
+//!
+//! [`context`] carries [`ChromeContext`] — the single typed producer struct
+//! shared between the doorway (producer) and this crate's structural contract
+//! test (consumer guard), closing the inline-context-island edge of the
+//! producer/consumer contract that the sibling resilience-mapper edge closed
+//! for `/api/v1/resilience/{slug}` (see `resilience_mapper_speaks_the_snapshot_contract`).
 
 use sha2::{Digest, Sha256};
 use std::sync::OnceLock;
+
+mod context;
+pub use context::{ChromeContext, NavLink};
 
 /// The hand-written, self-contained vanilla element script, baked at compile
 /// time. Self-mounts, acquires EPR context, renders + themes + wires behavior.
@@ -274,6 +285,112 @@ mod tests {
             ELEMENT_JS.contains("/household"),
             "resilience fetch no longer targets the /household felt-status variant"
         );
+    }
+
+    #[test]
+    fn chrome_context_speaks_the_producer_contract() {
+        // Structural contract gate for the inline context island — the third
+        // (and last) unchecked producer/consumer edge of the omni element,
+        // sibling to `resilience_mapper_speaks_the_snapshot_contract` above.
+        // `ChromeContext` (context.rs) is the producer; `omni-element.js`'s
+        // `ctx.<field>` reads across `mount`/`buildMarkup`/
+        // `contextFromContentNode` are the consumer. A field dropped from one
+        // side without the other is exactly the drift class that shipped the
+        // resilience-mapper bug (a fetch that always "succeeds" while nothing
+        // matches).
+        let known_fields: std::collections::HashSet<&str> = [
+            "slug",
+            "title",
+            "theme",
+            "buildMarker",
+            "envTier",
+            "showEnv",
+            "authenticated",
+            "accountHref",
+            "showThemeToggle",
+            "navBack",
+            "navForward",
+        ]
+        .into_iter()
+        .collect();
+
+        // Direction 1: every known (ChromeContext) field is actually read by
+        // the element — a producer field the consumer never looks at is dead
+        // weight (and a sign the list drifted from the JS).
+        for field in &known_fields {
+            let needle = format!("ctx.{field}");
+            assert!(
+                ELEMENT_JS.contains(needle.as_str()),
+                "ChromeContext field `{field}` is never read as `{needle}` by the element — \
+                 drop it from context.rs or fix the accessor name"
+            );
+        }
+
+        // Direction 2: scan the element for every `ctx.<ident>` accessor and
+        // assert it is a known field — this is the direction that catches a
+        // *phantom* accessor (a JS read with no producer field), the exact
+        // shape of the resilience-mapper regression.
+        for (pos, _) in ELEMENT_JS.match_indices("ctx.") {
+            // Guard against matching mid-identifier (e.g. a hypothetical
+            // `somectx.foo`) — the char immediately before `ctx.` must not be
+            // an identifier char.
+            let preceded_ok = pos == 0 || {
+                let prev = ELEMENT_JS.as_bytes()[pos - 1];
+                !(prev.is_ascii_alphanumeric() || prev == b'_')
+            };
+            if !preceded_ok {
+                continue;
+            }
+            let rest = &ELEMENT_JS[pos + "ctx.".len()..];
+            let end = rest
+                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+                .unwrap_or(rest.len());
+            let ident = &rest[..end];
+            if ident.is_empty() {
+                continue;
+            }
+            assert!(
+                known_fields.contains(ident),
+                "element reads phantom ctx field `{ident}` — not a ChromeContext field; \
+                 add it to context.rs or fix the accessor"
+            );
+        }
+
+        // Cross-check against the actual serialized field names: a fully
+        // populated ChromeContext must expose exactly this field set (catches
+        // context.rs itself drifting from the mirror list above).
+        let full = ChromeContext {
+            slug: "s".to_string(),
+            authenticated: true,
+            title: Some("t".to_string()),
+            theme: Some("dark".to_string()),
+            build_marker: Some("m".to_string()),
+            env_tier: Some("staging".to_string()),
+            show_env: Some(true),
+            account_href: Some("/account".to_string()),
+            show_theme_toggle: Some(true),
+            nav_back: Some(NavLink {
+                href: "/b".to_string(),
+                label: None,
+            }),
+            nav_forward: Some(NavLink {
+                href: "/f".to_string(),
+                label: None,
+            }),
+        };
+        let v = serde_json::to_value(&full).expect("ChromeContext serializes");
+        let obj = v.as_object().expect("ChromeContext serializes to a map");
+        assert_eq!(
+            obj.len(),
+            known_fields.len(),
+            "serialized ChromeContext field count drifted from the mirror list: {obj:?}"
+        );
+        for key in obj.keys() {
+            assert!(
+                known_fields.contains(key.as_str()),
+                "ChromeContext serializes unexpected field `{key}` — not read by the element"
+            );
+        }
     }
 
     #[test]

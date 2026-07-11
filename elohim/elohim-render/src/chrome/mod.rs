@@ -29,7 +29,7 @@ pub mod theme;
 
 pub use element::{
     element_js_bytes, element_js_hash, element_script_path, escape_json_for_script, inject_element,
-    CONTEXT_SCRIPT_ID, ELEMENT_JS, STABLE_ELEMENT_PATH,
+    ChromeContext, NavLink, CONTEXT_SCRIPT_ID, ELEMENT_JS, STABLE_ELEMENT_PATH,
 };
 pub use enhance::{enhance_js_bytes, enhance_js_hash, enhance_script_path, ENHANCE_JS};
 pub use omnibar::{html_escape, render_omnibar_markup, render_omnibar_style, ChromeInput};
