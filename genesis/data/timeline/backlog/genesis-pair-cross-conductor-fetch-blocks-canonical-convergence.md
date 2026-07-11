@@ -73,6 +73,20 @@ gossip round summaries. Read it on BOTH doorways to pick between the two
 candidates with evidence, then cure (TURN deploy / backoff flush / egress
 fix) as ONE measured change.
 
+**DELTA 2026-07-11 (evening) — seam DEFINITIVELY isolated to the data channel.**
+App #1604 ran the declare propagation in a verified CONVERGED peer-store
+window (conductor-diagnostics on both doorways: 0/7 agents URL-mismatched at
+fire time) and STILL got the not-retrievable refusal on every leg. Combined
+with T1 (bus delivers cross-relay 4/4) and the shared-bootstrap proof, every
+layer above the WebRTC data channel is now exonerated; candidate 1 (ICE with
+no TURN across the shem↔on-prem NAT pair) is the seam. CURE SHIPPED: TURN
+relay fallback (diagnostic third-party, TCP:80/443) added to
+webrtc_config.ice_servers in the edgenode template + adam manifest; sovereign
+replacement tracked in sovereign-turn-relay-transport-commons.md. The
+measurement-during-churn effect is REAL but secondary (stale peer-store URLs
+for ~20min post-restart — quantified 5/7 mismatched → 0/7 after expiry) — it
+delays convergence after every deploy but is not the root cause.
+
 ## The standing diagnostic (free, every deploy)
 
 Every app deploy now emits the live probe in the `authorHeadOnce` /

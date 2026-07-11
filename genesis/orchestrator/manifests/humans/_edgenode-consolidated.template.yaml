@@ -107,6 +107,19 @@ data:
         ice_servers:
           - urls: ["stun:stun.cloudflare.com:3478"]
           - urls: ["stun:stun.l.google.com:19302"]
+          # TURN relay fallback (dht-unity cure, 2026-07-11). The genesis pair
+          # straddles shem(cloud NAT) ↔ on-prem(home NAT); srflx↔srflx pairing
+          # fails silently with STUN only, and app #1604 proved the DHT fetch
+          # stays down even with fully CONVERGED peer stores — the data channel
+          # itself is the seam. DIAGNOSTIC third-party relay (TCP:80/443 forms
+          # survive UDP-blocked egress; TURN sees only encrypted DTLS): replace
+          # with the sovereign Tier-A transport-commons relay — backlog
+          # `sovereign-turn-relay-transport-commons`.
+          - urls:
+              - "turn:staticauth.openrelay.metered.ca:80?transport=tcp"
+              - "turns:staticauth.openrelay.metered.ca:443?transport=tcp"
+            username: "openrelayproject"
+            credential: "openrelayproject"
     data_root_path: "/var/local/lib/holochain"
     keystore:
       type: lair_server_in_proc
