@@ -926,7 +926,7 @@ async fn heal_content(
     for id in tracker.pending_ids() {
         match crate::services::conductor_writes::call_resolve_content_head(hc, &id).await {
             Ok(Some(head)) => match heal_content_one(&head, pool, &app_ctx) {
-                Ok(true) => {
+                Ok(crate::db::content_diesel::StampOutcome::Stamped) => {
                     tracker.mark_completed(&id);
                     healed += 1;
                     let peer = discovered_by
@@ -940,7 +940,16 @@ async fn heal_content(
                         "projection-reconcile[content]: HEALED content anchor from own conductor (peer discovery)"
                     );
                 }
-                Ok(false) => {
+                Ok(crate::db::content_diesel::StampOutcome::SkippedDeclared) => {
+                    // Row already carries a DIFFERENT declared head — the heal
+                    // must not move it (a fresh-boot conductor resolve can fall
+                    // through to the root-author election and would resurrect a
+                    // superseded head over an adopted canonical one — the
+                    // 2026-07-11 20:42:40 regression). Canonical channels own it.
+                    tracker.mark_completed(&id);
+                    tracing::info!(content_id = %id, "projection-reconcile[content]: row already declared — heal left it to the canonical channels");
+                }
+                Ok(crate::db::content_diesel::StampOutcome::NoRow) => {
                     // Row vanished between presence check and stamp (rare race).
                     // Nothing to stamp — resolved, not a conductor miss.
                     tracker.mark_completed(&id);
@@ -977,7 +986,7 @@ fn heal_content_one(
     head: &crate::services::conductor_writes::ContentHeadWire,
     pool: &DbPool,
     app_ctx: &crate::db::AppContext,
-) -> Result<bool, crate::error::StorageError> {
+) -> Result<crate::db::content_diesel::StampOutcome, crate::error::StorageError> {
     let c = &head.content;
     // u64 → i32 saturating cast — identical to the ContentCommitted arm.
     let size_i32 = c
@@ -996,12 +1005,15 @@ fn heal_content_one(
     let mut conn = pool
         .get()
         .map_err(|e| crate::error::StorageError::Internal(format!("pool: {e}")))?;
-    crate::db::content_diesel::stamp_declared_head(
+    crate::db::content_diesel::stamp_declared_head_mode(
         &mut conn,
         app_ctx,
         &c.id,
         head.head_action_hash.as_str(),
         Some(patch),
+        // GapFill: heal fills UNDECLARED rows only — never resurrects a
+        // superseded head over an adopted canonical one (see StampMode docs).
+        crate::db::content_diesel::StampMode::GapFill,
     )
 }
 

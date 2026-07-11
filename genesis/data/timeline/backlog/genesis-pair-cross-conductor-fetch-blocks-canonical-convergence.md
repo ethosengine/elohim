@@ -109,6 +109,19 @@ is measurement follow-through. Guards added so this class cannot recur
 silently: render-time conductor-config ICE validator (gates every human
 manifest render) + substrate-seam-smoke in Dataplane Validation.
 
+**POST-RESOLUTION REGRESSION + GUARD (2026-07-11 ~20:42):** two minutes
+after the first adoption, edge #1180's deploy restarted B's storage and the
+boot-time projection-reconcile heal RESURRECTED the superseded head: the heal
+calls resolve_content_head, which falls through to the root-author election
+while the canonical link is not yet retrievable on a cold conductor, and
+stamped that fallback over the adopted canonical row (scenario 4's exact
+durable-upgrade class — the first live seam-smoke run caught it:
+dht-fetch ADVISORY-DIVERGENT). GUARD: stamp_declared_head gains
+StampMode::{Declare,GapFill} — heal/boot paths are GapFill and can never
+move a row that already carries a different declared head; only canonical
+channels (declare route, propagation, ContentHeadDeclared signal) move
+declared heads. Unit-tested (gapfill_stamp_never_resurrects_over_a_declared_head).
+
 ## The standing diagnostic (free, every deploy)
 
 Every app deploy now emits the live probe in the `authorHeadOnce` /

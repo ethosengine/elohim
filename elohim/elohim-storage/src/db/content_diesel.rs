@@ -948,19 +948,69 @@ pub fn stamp_declared_head(
     head_action_hash: &str,
     patch: Option<ContentProjectionPatch>,
 ) -> Result<bool, StorageError> {
+    stamp_declared_head_mode(conn, ctx, id, head_action_hash, patch, StampMode::Declare)
+        .map(|o| o == StampOutcome::Stamped)
+}
+
+/// How a declared-head stamp may interact with an already-declared row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StampMode {
+    /// Canonical-channel stamp (declare route, canonical-head propagation,
+    /// `ContentHeadDeclared` signal): always writes.
+    Declare,
+    /// Gap-heal stamp (projection-reconcile heal / boot re-projection): fills
+    /// an UNDECLARED row only. A freshly-restarted conductor's
+    /// `resolve_content_head` falls through to the root-author election while
+    /// the canonical link is not yet retrievable; in Declare semantics that
+    /// RESURRECTS a superseded head over a previously-adopted canonical one
+    /// (live regression 2026-07-11 20:42:40, two minutes after the first
+    /// cross-conductor adoption). Heal fills absence; only canonical channels
+    /// move a declared head.
+    GapFill,
+}
+
+/// Outcome of [`stamp_declared_head_mode`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StampOutcome {
+    /// Row updated.
+    Stamped,
+    /// GapFill mode: row already carries a DIFFERENT declared head — left
+    /// untouched (canonical channels own moving it).
+    SkippedDeclared,
+    /// No local row for this id (stamp is existing-row-only by design).
+    NoRow,
+}
+
+pub fn stamp_declared_head_mode(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    head_action_hash: &str,
+    patch: Option<ContentProjectionPatch>,
+    mode: StampMode,
+) -> Result<StampOutcome, StorageError> {
     use diesel::dsl::sql;
     use diesel::sql_types::Text;
 
-    let existing = content::table
+    let existing: Option<Option<String>> = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq(id))
-        .select(diesel::dsl::count_star())
-        .first::<i64>(conn)
-        .map(|c| c > 0)
-        .unwrap_or(false);
+        .select(content::declared_head_action_hash)
+        .first::<Option<String>>(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("Stamp declared head lookup: {e}")))?;
 
-    if !existing {
-        return Ok(false);
+    let declared = match existing {
+        None => return Ok(StampOutcome::NoRow),
+        Some(declared) => declared,
+    };
+
+    if mode == StampMode::GapFill {
+        if let Some(current) = declared.as_deref() {
+            if !current.is_empty() && current != head_action_hash {
+                return Ok(StampOutcome::SkippedDeclared);
+            }
+        }
     }
 
     diesel::update(
@@ -980,7 +1030,7 @@ pub fn stamp_declared_head(
         apply_content_patch_fields(conn, ctx, id, &patch)?;
     }
 
-    Ok(true)
+    Ok(StampOutcome::Stamped)
 }
 
 // ============================================================================
@@ -2798,6 +2848,74 @@ mod tests {
         let restamped =
             stamp_declared_head(&mut conn, &ctx, "cid-present", "uhCkk-head-9", None).unwrap();
         assert!(restamped, "idempotent re-stamp returns Ok(true)");
+    }
+
+    /// HEAD-election (iv) — the boot-resurrection guard (2026-07-11 20:42:40
+    /// regression): a GapFill stamp must NEVER move a row that already carries
+    /// a DIFFERENT declared head (a fresh-boot conductor resolve falls through
+    /// to the root-author election and would resurrect the superseded head);
+    /// Declare mode still moves it, and GapFill still fills an undeclared row.
+    #[test]
+    fn gapfill_stamp_never_resurrects_over_a_declared_head() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("cid-declared")).unwrap();
+
+        // GapFill on an UNDECLARED row fills it (heal's legitimate job).
+        let filled = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-declared",
+            "uhCkk-canonical-NEW",
+            None,
+            StampMode::GapFill,
+        )
+        .unwrap();
+        assert_eq!(filled, StampOutcome::Stamped);
+
+        // GapFill with a DIFFERENT (older / fallback) head must skip.
+        let skipped = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-declared",
+            "uhCkk-superseded-OLD",
+            None,
+            StampMode::GapFill,
+        )
+        .unwrap();
+        assert_eq!(skipped, StampOutcome::SkippedDeclared);
+        let row = get_content(&mut conn, &ctx, "cid-declared", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-canonical-NEW"),
+            "GapFill must not resurrect a superseded head over the adopted canonical"
+        );
+
+        // Same-head GapFill re-stamp is an idempotent refresh, not a skip.
+        let same = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-declared",
+            "uhCkk-canonical-NEW",
+            None,
+            StampMode::GapFill,
+        )
+        .unwrap();
+        assert_eq!(same, StampOutcome::Stamped);
+
+        // Declare mode (canonical channels) still moves the declared head.
+        let moved = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-declared",
+            "uhCkk-canonical-NEWER",
+            None,
+            StampMode::Declare,
+        )
+        .unwrap();
+        assert_eq!(moved, StampOutcome::Stamped);
     }
 
     /// HEAD-election (iii): a verified `stamp_declared_head` carrying a patch
