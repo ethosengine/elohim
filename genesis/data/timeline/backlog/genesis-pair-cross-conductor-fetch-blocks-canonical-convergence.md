@@ -44,22 +44,34 @@ every propagation attempt returns
 
 (zome-side network `get` timeout). Watched divergent 48+ minutes across
 multiple freshly-authored heads. This is the F-T19 class the spine's
-notary-authority evidence already names — now sharpened: the signal bus
-is VERIFIED live on both doorways (`/health dhtBacking.signalShared:
-true`), bridges the SBD relays, and the gap persists. So the failure sits
-BELOW the relay layer. Candidate causes, in investigation order:
+notary-authority evidence already names.
 
-1. tx5/kitsune2 WebRTC session re-establishment: conductors may hold
-   long-backoff state or never re-attempt cross-relay handshakes even
-   though the bus now bridges frames (conductor restarts in edge #1168,
-   #1171 did not heal it).
-2. The bus's cross-pod delivery path is UNVERIFIED at runtime — the
-   `#[ignore]` mongo cross-pod test (`frame_published_on_a_is_drained_by_b_not_a`)
-   has never run against a real Mongo (needs `MONGODB_TEST_URI`). A
-   one-shot manual run against alpha's mongo would confirm or refute in
-   minutes.
-3. Node-level networking on the elohim.host side (the original F-T19
-   framing: outbound timeouts to ~11 peers).
+**DELTA 2026-07-11 (dht-unity T1/T2 executed):** candidate 2 is REFUTED —
+the outside-in SBD probe (`doorway/doorway-service/tools/sbd-cross-relay-probe.py`,
+authenticated clients on both PUBLIC relays) delivered all four legs
+including cross-relay A→B and B→A: the mongo bus bridges frames at runtime.
+Bootstrap is also proven shared end-to-end (both doorways'
+`/admin/bootstrap-coherence`: identical 5 spaces × 35 agents — every
+conductor publishing). T2 pinned the failing member: each doorway's
+declare/resolve rides its PRIMARY conductor (B→adam, A→matthew), so this is
+specifically ADAM's conductor (shem-pinned, cloud NAT) failing to fetch from
+MATTHEW's (on-prem, home NAT). Both conductor configs are STUN-only — **no
+TURN anywhere in the manifests** — so a failed srflx↔srflx ICE pairing has
+no relay fallback (unless tx5's own sbd-relay data fallback engages — the
+open question). Remaining candidates, sharpened:
+
+1. tx5 ICE failure with no TURN fallback (WAN NAT pair adam↔matthew) —
+   and/or tx5's sbd-relay data fallback not engaging despite the now-bridged
+   relay plane; possibly stuck long-backoff sessions.
+2. Node-level egress on the shem side (original F-T19 framing: outbound
+   timeouts to ~11 peers).
+
+**Instrument (deploys with the next edge build):**
+`GET /db/p2p/conductor-diagnostics[?include=metrics]` — the conductor's own
+peer store, live transport connections, fetch queue with `peers_on_backoff`,
+gossip round summaries. Read it on BOTH doorways to pick between the two
+candidates with evidence, then cure (TURN deploy / backoff flush / egress
+fix) as ONE measured change.
 
 ## The standing diagnostic (free, every deploy)
 

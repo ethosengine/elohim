@@ -3,7 +3,7 @@ id: "backlog-doorway-http-rs-modularization"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "Modularize doorway-service server/http.rs — at LoC hard ceiling (7014 lines), ordered seam extraction preserving RouteRegistry wildcard dispatch"
+title: "Modularize doorway-service server/http.rs — at LoC hard ceiling (7022 lines), ordered seam extraction preserving RouteRegistry wildcard dispatch"
 slug: "doorway-http-rs-modularization"
 written: "2026-07-10"
 author: "rust-architect (architecture finding 53c05bb1c007, operator-requested)"
@@ -15,7 +15,7 @@ cites:
   - doorway/doorway-service/src/server/mod.rs
   - doorway/doorway-service/src/server/CLAUDE.md
 shift_objective: |
-  Decompose doorway-service/src/server/http.rs (7014 lines, at/over the LoC
+  Decompose doorway-service/src/server/http.rs (7022 lines, at/over the LoC
   hard ceiling) into focused sibling sub-modules under src/server/, extracting
   the natural seams in the ordered sequence below. Each extraction is one
   self-contained, independently-verifiable step: move the item cluster + its
@@ -34,7 +34,7 @@ shift_objective: |
 
 ## Problem
 
-`doorway/doorway-service/src/server/http.rs` is **7014 lines** — at/over the
+`doorway/doorway-service/src/server/http.rs` is **7022 lines** — at/over the
 crate's LoC hard ceiling. It has accreted the entire doorway request lifecycle
 into one file: `AppState` + all its constructors, the auth-posture / op-gate
 machinery, the admission membrane, the liveness/watchdog subsystem, the EPR
@@ -138,6 +138,26 @@ lives at the `handle_request` dispatch match, which does not move).
 
 ## Readiness notes
 
+- **Re-verified 2026-07-11** (finding 53c05bb1c007 re-fired at 7022 lines, +8
+  from the 7014 at first authoring). The seam map above still holds: all 12
+  co-located test modules named in the seam table are present
+  (`root_unavailable_tests`, `watchdog_tests`, `shakeout_tests`,
+  `handoff_routing_tests`, `epr_dispatch_breaker_tests`, `ssr_session_tests`,
+  `gate_layer_tests`, `dispatch_classification_tests`, `epr_universal_tests`,
+  `epr_claims_dispatch_tests`, `admission_tests`, `op_gate_tests`), the item
+  clusters sit where the table places them, and `server/mod.rs` still does
+  `pub use http::{run, AppState}`. The +8-line drift is concentrated at the tail
+  past `apply_membrane` (response helpers `to_boxed`/`not_found_response`/
+  `service_unavailable_response`/`bad_request_response` now at 5310–5344;
+  admission `admission_exempt`/`catching_up_response`/`apply_membrane` at
+  5365–5411) — the line anchors in the seam table are approximate execution
+  guides, not invariants; re-`grep` the item names at extraction time. **Step-9
+  confirmation:** every downstream consumer imports `crate::server::AppState`
+  (the `mod.rs` re-export), not `server::http::AppState` — so moving `AppState`
+  to `server/state.rs` while preserving the re-export is transparent to all
+  callers (`routes/{apps,journal,admin_cache,federation,self_healing,health,
+  elohim_agent,stream}.rs` verified). The `rg 'server::http::AppState'` sweep
+  should come back empty; the load-bearing sweep target is `server::AppState`.
 - **Ready now.** Pure mechanical extraction on plain native Rust; no upstream
   dependency, no substrate/DNA coupling. Blocked by nothing.
 - **Watch-out — visibility churn.** The single biggest source of per-step

@@ -44,26 +44,28 @@ FAILS (the one blocker):
 | Seam | State | Evidence |
 |---|---|---|
 | DHT space identity (DNA hash) | ONE space | identical DNA both sides (fractal-federation §2) |
-| Bootstrap (kitsune2 discovery) | SHARED ✅ | MongoK2Store, one `elohim-bootstrap` table |
-| Signal relay (SBD, WebRTC handshake path) | BRIDGED at relay layer ✅ / cross-pod delivery UNVERIFIED ⚠ | `signalShared: true` both; the `#[ignore]` mongo cross-pod test has NEVER run |
-| tx5/WebRTC session establishment conductor↔conductor | UNKNOWN — prime suspect | fetch fails despite the two layers above |
-| Conductor pool fan-out behind elohim.host | UNKNOWN — 7 pools; which member answers which probe? | `/health` pool_size 7; probes may hit different members |
-| kitsune2 op-gossip vs explicit `get` | UNKNOWN — historically gossip DID flow (adam accumulated 2081 divergent anchors) | fractal-federation §2; F-T19 emerged later |
-| ICE path between pods (same k8s cluster!) | UNKNOWN — should be trivial host-candidate ICE once offer/answer flows | both namespaces in one cluster |
+| Bootstrap (kitsune2 discovery) | SHARED ✅ end-to-end | MongoK2Store, one `elohim-bootstrap` table; BOTH doorways' `/admin/bootstrap-coherence` read the identical store: 5 spaces × 35 agents = all 7 conductors publishing (probed 2026-07-11) |
+| Signal relay (SBD, WebRTC handshake path) | DELIVERING CROSS-POD ✅ (T1 verdict 2026-07-11) | outside-in probe `doorway/doorway-service/tools/sbd-cross-relay-probe.py`: authenticated SBD clients on the public relays, all 4 legs DELIVERED (A→A, B→B, A→B, B→A) — the mongo bus bridges frames both directions at runtime |
+| tx5/WebRTC session establishment conductor↔conductor | PRIME SUSPECT, sharpened: ICE is STUN-only, NO TURN anywhere | both conductor configs carry `ice_servers: [stun.cloudflare, stun.l.google]` and nothing else; adam (shem, cloud NAT) ↔ matthew (on-prem, home-router NAT) is a WAN NAT pair — srflx↔srflx with no TURN fallback is the classic silent-fail; live evidence readable via `GET /db/p2p/conductor-diagnostics?include=metrics` once deployed (T3 surface, built 2026-07-11) |
+| Conductor pool fan-out behind elohim.host | AUDITED ✅ — deterministic, not intermittent (T2) | CONDUCTOR_URLS fans to ALL 7 humans' conductors on BOTH doorways (`computeConductorUrls`, edge Jenkinsfile); the primary write target differs per doorway: B→adam, A→matthew (CONDUCTOR_ADMIN_URL/STORAGE_URL). Declare/resolve/stamp ride the primary — so "elohim.host can't retrieve" = ADAM's conductor specifically |
+| kitsune2 op-gossip vs explicit `get` | READ VIA T3 SURFACE | `?include=metrics` exposes per-DNA fetch queue (`peers_on_backoff`!) + gossip round summaries |
+| ICE path between pods | NOT same-cluster — adam is shem-pinned (remote), matthew on-prem household (2026-05-27 placement directive) | WAN NAT traversal, not host-candidate ICE; the plan's earlier "both namespaces in one cluster" assumption was WRONG |
 
 ## 4. Tasks — cheapest discriminator first
 
-### T1 — Runtime-prove the signal bus cross-pod path (minutes; the single most likely unlock)
-- [ ] Run the `#[ignore]` proof `frame_published_on_a_is_drained_by_b_not_a` (doorway-service signal bus tests) against alpha's mongo with `MONGODB_TEST_URI`. Operator leg if the mongo is cluster-internal-only; otherwise CI one-shot.
-- [ ] Add a Cat-C observability read so this never goes dark again: extend `/health dhtBacking` (or a `/admin/signal-bus-stats`) with bus counters — frames published / drained / delivered-to-local, per origin_relay. (Doorway-local operational state — legitimate per the doorway trust model.)
-- [ ] If the bus is NOT delivering cross-pod: fix it (the plane is already designed; this is a defect hunt in `bus_mongo.rs` drain/cursor/TTL) and re-run T1. If it IS delivering: the seam is below — go T2/T3.
+### T1 — Runtime-prove the signal bus cross-pod path — ✅ DONE 2026-07-11: BUS DELIVERS, seam is below
+- [x] ~~mongo `#[ignore]` test~~ superseded by a stronger proof: mongo is cluster-internal (unreachable from dev), so an OUTSIDE-IN probe was built instead — `doorway/doorway-service/tools/sbd-cross-relay-probe.py` speaks the SBD protocol against the two PUBLIC relays with real ed25519 auth. All 4 legs DELIVERED (controls A→A/B→B; cross A→B and B→A). This is end-to-end through ingress+relay+bus+relay — strictly stronger than the mongo-only unit proof.
+- [ ] (hardening, non-blocking) Cat-C bus counters on `/health dhtBacking` — frames published / drained / delivered-to-local, per origin_relay.
+- [x] Bus IS delivering → the seam is below. T2/T3 executed.
 
-### T2 — Pool-topology audit behind elohim.host (read-only, an hour)
-- [ ] Map which storage backend + which conductor pool member serves: (a) the `/db/content/.../canonical-head` declare call, (b) the row that stamps, (c) the `/head` resolve, (d) the old-anchor authoring. Are they the SAME member? (`/health` conductor pool block, storage manifests, `hc_registry` routing.)
-- [ ] Confirm every pool member carries the same network config (bootstrap/signal URLs) — one differently-configured member answering probes intermittently would explain "worked historically, fails now."
+### T2 — Pool-topology audit behind elohim.host — ✅ DONE 2026-07-11 (read-only)
+- [x] Routing is deterministic, not intermittent: `computeConductorUrls`/`computeStorageUrls` (edge Jenkinsfile) fan ALL 7 active humans' conductors/storages to BOTH doorways; each doorway's declare/resolve/stamp path rides its PRIMARY (CONDUCTOR_ADMIN_URL/STORAGE_URL): doorway-B→adam, doorway-A→matthew. The failing fetch is adam's conductor, full stop.
+- [x] Network config per member: every conductor gets its own doorway-affinity bootstrap/signal endpoints (`isRemote` split), all STUN-only (`stun.cloudflare` + `stun.l.google`), NO TURN deployed anywhere in the manifests. adam(shem/cloud NAT) ↔ matthew(on-prem/home NAT) therefore has no relay fallback if srflx pairing fails — the sharpest remaining suspect, to be confirmed/refuted by the T3 diagnostics read.
+- Note (T2 side-finding): doorway-B's routed storage answers `connectedPeerCount: null` on `/api/v1/federation/p2p-peers` while doorway-A reports a 6-peer libp2p mesh — the adam-side storage's libp2p visibility needs the same T3 read once the diagnostics route deploys (per-host deploy lag vs genuinely down: distinguish there, not by assumption).
 
 ### T3 — DHT seam map: settle "one network or two" with conductor-level evidence (Loki legs @requires:observability)
-- [ ] Per-conductor kitsune2 peer visibility: does matthew's conductor appear in the elohim.host-side conductor's peer store, and vice versa? (Loki conductor logs; or build a tiny diagnostic surface — dev-mode op per the tenacity principle: a storage/doorway route exposing the conductor's `agent_info` list is a permanent operator-seat win.)
+- [x] Diagnostic surface BUILT (2026-07-11): `GET /db/p2p/conductor-diagnostics` in elohim-storage — conductor peer store (`agent_info` projection: agent/space/url/timestamps/tombstone/arc) + `dump_network_stats` (live transport connections, blocked counts); `?include=metrics` adds per-DNA `dump_network_metrics` (fetch queue incl. `peers_on_backoff`, gossip round summaries). Manifest-declared → doorway auto-forwards; Cat-C, no auth (agent infos already public via shared bootstrap). Deploys with the next edge build.
+- [ ] Per-conductor kitsune2 peer visibility: once deployed, read BOTH doorways' `/db/p2p/conductor-diagnostics` — does matthew's agent url appear in adam's peer store and vice versa? (Route rides the primary conductor per T2, which is exactly the failing member.)
 - [ ] tx5 session evidence: WebRTC offer/answer attempts + outcomes in conductor logs during a declare-propagation window (correlate with the free per-deploy probe).
 - [ ] Distinguish op-gossip from explicit `get`: does ANY matthew-authored op arrive on the elohim.host side (new anchors appearing over hours = gossip alive, get broken) or NOTHING (transport fully down)? The 2081-divergent-anchors history says gossip once worked — establish when it stopped (correlate with F-T19 onset).
 - [ ] Write the findings INTO the fractal-federation spec §2 (update the live diagnosis) — the seam map is the deliverable the operator asked for, not a side note.
