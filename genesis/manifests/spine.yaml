@@ -115,6 +115,24 @@ nodes:
     checks:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
     evidence: >
+      DELTA 2026-07-11 (shift notary-scenario2-green, dev@8953fa423): the
+      ELECTION + DECLARATION layers are DONE and live — tier-aware
+      partition-deterministic cross-root selector (earned>staging at resolve,
+      target-id gate, deterministic tiebreak) hot-swapped onto BOTH genesis
+      conductors (functionally proven: scenario 3 green = new guard refusing
+      unauthorized moves; elohim.host's conductor answers the new fn's own
+      retrievability refusal), the declaration act WIRED (deploy designates:
+      authorHeadOnce -> POST /db/content/{id}/canonical-head, propagated to
+      EVERY doorway each app deploy, idempotent-by-content), declaring side
+      converges within the same deploy (row+resolve = declared hash). The
+      SOLE remaining cause of scenario 2 is SUBSTRATE: elohim.host-side
+      conductors cannot RETRIEVE matthew-authored actions ('target action
+      not retrievable' from the declare propagation, every app deploy — the
+      live per-deploy diagnostic) — the F-T19 cross-conductor fetch gap,
+      with the signal bus now VERIFIED live on both doorways
+      (signalShared:true), so the gap sits below the relay layer. Substrate
+      cure lands -> convergence is automatic on the next deploy. See
+      genesis/data/timeline/backlog/genesis-pair-cross-conductor-fetch-blocks-canonical-convergence.md.
       DELTA 2026-07-04 (shift notary-authority-land, dev@068c917cf): Phase C
       core LANDED and measured — 2 of 3 scenarios STABLE-GREEN across three
       consecutive fresh-trigger edge builds (#1153/#1154/#1155): the HEAD
