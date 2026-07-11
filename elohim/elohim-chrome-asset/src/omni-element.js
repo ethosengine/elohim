@@ -153,9 +153,26 @@
     '#elohim-omni .omni-env-tier { text-transform: uppercase; font-weight: 700; ' +
     'font-size: 10px; letter-spacing: 0.04em; }\n' +
     '#elohim-omni .omni-env-build { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }\n' +
+    '#elohim-omni .omni-resilience-wrap { position: relative; display: inline-flex; }\n' +
     '#elohim-omni .omni-resilience { display: inline-flex; align-items: center; ' +
-    'color: var(--omni-fg, rgba(20,22,30,0.96)); padding: 0 0.25rem; }\n' +
+    'color: var(--omni-fg, rgba(20,22,30,0.96)); padding: 0 0.25rem; ' +
+    'background: transparent; border: none; font: inherit; cursor: pointer; }\n' +
     '#elohim-omni .omni-resilience-neutral { font-size: 12px; line-height: 1; }\n' +
+    // Drilldown card: top-chrome affordances fold DOWN, inline-start-aligned
+    // (omnibar spec §11 tooltip-direction convention — never up off-screen).
+    '#elohim-omni .omni-resilience-card { position: absolute; top: 100%; ' +
+    'inset-inline-start: 0; margin-top: 0.4rem; min-width: 15rem; max-width: 20rem; ' +
+    'padding: 0.6rem 0.75rem; text-align: start; ' +
+    'background: var(--omni-bg, rgba(255,255,255,0.96)); ' +
+    'color: var(--omni-fg, rgba(20,22,30,0.96)); ' +
+    'border: 1px solid var(--omni-border, rgba(20,22,30,0.14)); border-radius: 8px; ' +
+    'box-shadow: var(--omni-shadow, 0 2px 10px rgba(0,0,0,0.12)); ' +
+    'backdrop-filter: blur(10px); }\n' +
+    '#elohim-omni .omni-resilience-card p { margin: 0 0 0.35rem 0; }\n' +
+    '#elohim-omni .omni-resilience-headline { font-weight: 700; }\n' +
+    '#elohim-omni .omni-resilience-reassure { color: var(--omni-muted, rgba(20,22,30,0.55)); }\n' +
+    '#elohim-omni .omni-resilience-facts { display: block; ' +
+    'color: var(--omni-muted, rgba(20,22,30,0.55)); font-size: 11px; }\n' +
     '#elohim-omni .omni-collapse { margin-left: auto; }\n';
 
   // ── CSS-value allowlist (port of omnibar.rs::is_safe_token_value) ───────────
@@ -329,11 +346,18 @@
     }
     html += '</span>';
 
-    // Resilience indicator — neutral glyph; JS swaps it on first expand.
-    html += '<span class="omni-resilience" aria-label="Resilience indicator">';
+    // Resilience indicator — neutral glyph; JS swaps it on first expand from
+    // the live household snapshot, and click drills down into the card.
+    html += '<span class="omni-resilience-wrap">';
+    html +=
+      '<button type="button" class="omni-resilience" ' +
+      'data-omni-action="resilience-toggle" aria-expanded="false" ' +
+      'aria-label="Resilience indicator">';
     html +=
       '<span class="omni-resilience-neutral" data-omni-resilience-glyph ' +
       'title="Resilience snapshot unavailable">◉</span>';
+    html += '</button>';
+    html += '<div class="omni-resilience-card" data-omni-resilience-card hidden></div>';
     html += '</span>';
 
     // Forward nav (server-known target only).
@@ -475,12 +499,18 @@
     if (!slug || typeof window.fetch !== 'function') return;
     omni.setAttribute('data-omni-resilience-loaded', '1');
 
-    var url = '/api/v1/resilience/' + encodeURIComponent(slug);
+    // Prefer the /household variant (felt-status idiom, omnibar spec §11);
+    // fall back to the base snapshot for older storage builds.
+    var base = '/api/v1/resilience/' + encodeURIComponent(slug);
+    var opts = { headers: { accept: 'application/json' }, credentials: 'same-origin' };
     window
-      .fetch(url, { headers: { accept: 'application/json' }, credentials: 'same-origin' })
+      .fetch(base + '/household', opts)
       .then(function (resp) {
-        if (!resp || !resp.ok) return null;
-        return resp.json();
+        if (resp && resp.ok) return resp.json();
+        return window.fetch(base, opts).then(function (r2) {
+          if (!r2 || !r2.ok) return null;
+          return r2.json();
+        });
       })
       .then(function (data) {
         if (!data) return;
@@ -491,24 +521,84 @@
       });
   }
 
+  /// Glyph ladder over the ResilienceSnapshotView contract:
+  /// protectionStatus "protected" → ● · "partial" → ◐ · "at-risk" → ○.
+  var RESILIENCE_GLYPHS = { protected: '●', partial: '◐', 'at-risk': '○' };
+
   function applyResilience(omni, data) {
     try {
-      var glyph = typeof data.glyph === 'string' ? data.glyph : null;
-      var label =
-        typeof data.standing === 'string'
-          ? data.standing
-          : typeof data.reach === 'string'
-            ? data.reach
-            : null;
+      // Real wire contract (resilience-snapshot-view.schema.json):
+      // protectionStatus + coverageShortfall (+ feltStatus on /household).
+      var status =
+        typeof data.protectionStatus === 'string' ? data.protectionStatus : null;
+      var felt = data.feltStatus && typeof data.feltStatus === 'object' ? data.feltStatus : null;
+      var headline = felt && typeof felt.headline === 'string' ? felt.headline : null;
+      var glyph = status ? RESILIENCE_GLYPHS[status] || null : null;
+      var label = headline || (status ? 'Resilience: ' + status : null);
       if (!glyph && !label) return;
       var marks = omni.querySelectorAll('[data-omni-resilience-glyph]');
       for (var i = 0; i < marks.length; i++) {
         if (glyph) marks[i].textContent = glyph;
         if (label) marks[i].setAttribute('title', label);
       }
+      renderResilienceCard(omni, data, status, felt);
     } catch (e) {
       /* never let a projection-shape surprise break the page. */
     }
+  }
+
+  /// Fill the drilldown card from the snapshot. Text via textContent only —
+  /// snapshot strings never touch innerHTML.
+  function renderResilienceCard(omni, data, status, felt) {
+    var card = omni.querySelector('[data-omni-resilience-card]');
+    if (!card) return;
+    while (card.firstChild) card.removeChild(card.firstChild);
+
+    function line(cls, text) {
+      if (!text) return;
+      var p = document.createElement('p');
+      p.className = cls;
+      p.textContent = text;
+      card.appendChild(p);
+    }
+
+    line('omni-resilience-headline', (felt && felt.headline) || (status ? 'Resilience: ' + status : null));
+    line('omni-resilience-reassure', felt && felt.reassurance);
+
+    var facts = [];
+    if (status) facts.push('protection: ' + status);
+    if (typeof data.coverageShortfall === 'number' && data.coverageShortfall > 0) {
+      facts.push('coverage shortfall: ' + data.coverageShortfall);
+    }
+    if (typeof data.stewardingCollectives === 'number') {
+      facts.push('stewarding collectives: ' + data.stewardingCollectives);
+    }
+    if (typeof data.diversityScore === 'number') {
+      facts.push('diversity: ' + data.diversityScore);
+    }
+    if (typeof data.distributionState === 'string') {
+      facts.push('distribution: ' + data.distributionState);
+    }
+    if (facts.length) {
+      var span = document.createElement('span');
+      span.className = 'omni-resilience-facts';
+      span.textContent = facts.join(' · ');
+      card.appendChild(span);
+    }
+  }
+
+  function toggleResilienceCard(actionEl) {
+    var omni = document.getElementById(OMNI_ID);
+    if (!omni) return;
+    var card = omni.querySelector('[data-omni-resilience-card]');
+    if (!card || !card.firstChild) return; // nothing loaded — keep neutral, no empty flyout
+    var open = !card.hasAttribute('hidden');
+    if (open) {
+      card.setAttribute('hidden', '');
+    } else {
+      card.removeAttribute('hidden');
+    }
+    actionEl.setAttribute('aria-expanded', open ? 'false' : 'true');
   }
 
   // ── Event delegation ────────────────────────────────────────────────────────
@@ -524,6 +614,8 @@
       copyValue(actionEl);
     } else if (action === 'theme-toggle') {
       toggleTheme();
+    } else if (action === 'resilience-toggle') {
+      toggleResilienceCard(actionEl);
     }
   }
 
