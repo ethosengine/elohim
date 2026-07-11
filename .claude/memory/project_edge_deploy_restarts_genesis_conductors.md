@@ -1,12 +1,14 @@
 ---
 name: project_edge_deploy_restarts_genesis_conductors
 title: Edge deploy restarts genesis-pair conductors
-description: Edge Deploy stage unconditionally rollout-restarts every conductor StatefulSet (genesis pair included); a doorway-only fix needs the operator kubectl path.
+description: Edge Deploy restarts conductors; genesis pair skips on STS-unchanged (9f9c4aec4), happ-digest stamp keeps real DNA moves restarting; doorway-only fix = operator kubectl path.
 metadata: 
   node_type: memory
   type: project
   originSessionId: 9976da73-b166-447f-a5fa-ac2fa59103b6
 ---
+
+**DELTA 2026-07-10:** since `9f9c4aec4` the genesis pair (adam/matthew) SKIPS the rollout restart when `kubectl apply` reports the STS "unchanged" (saturation-surge guard); commit `aa2651892` closes that guard's floating-happ-tag hole by stamping the resolved happ content digest into the pod template, so a DNA-pipeline tag move still reads "configured" → restart proceeds. Non-genesis peers always restart. The below remains true for non-genesis and for any real change.
 
 **The edge deploy restarts the genesis-pair conductors — there is no doorway-only push path.** `elohim/holochain/Jenkinsfile` "Deploy Edge Node - Alpha" stage calls `deployHumansInParallel` **unconditionally** (≈line 1830) → `deployHumanManifest` → **`Jenkinsfile:712 kubectl rollout restart statefulset/<human>`** for every human (`matthew, adam, jessica, james, pete` = default `HUMAN_ASSIGNMENTS`). `rollout restart` bounces the pod even when the edgenode image is unchanged (it patches the pod-template `restartedAt` annotation). The doorway restart that activates a doorway env/code change is a SEPARATE call right after (`Jenkinsfile:763 rollout restart deployment/elohim-doorway-<env>`).
 
