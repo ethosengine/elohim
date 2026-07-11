@@ -1005,15 +1005,24 @@ fn heal_content_one(
     let mut conn = pool
         .get()
         .map_err(|e| crate::error::StorageError::Internal(format!("pool: {e}")))?;
+    // Canonical-aware stamp mode: a CANONICAL answer (the conductor verified
+    // the cross-root canonical record) is a legitimate forward adoption and
+    // stamps in Declare mode — this is exactly how a peer converges when the
+    // canonical link gossips in between deploys. A FALLBACK answer (cold
+    // conductor, root-author election) may only FILL an undeclared row —
+    // never resurrect a superseded head over an adopted canonical one.
+    let mode = if head.canonical {
+        crate::db::content_diesel::StampMode::Declare
+    } else {
+        crate::db::content_diesel::StampMode::GapFill
+    };
     crate::db::content_diesel::stamp_declared_head_mode(
         &mut conn,
         app_ctx,
         &c.id,
         head.head_action_hash.as_str(),
         Some(patch),
-        // GapFill: heal fills UNDECLARED rows only — never resurrects a
-        // superseded head over an adopted canonical one (see StampMode docs).
-        crate::db::content_diesel::StampMode::GapFill,
+        mode,
     )
 }
 

@@ -19,8 +19,14 @@ pub use manifest::*;
 // Attestation consolidation: consolidated attestation coordinator.
 pub mod attestation;
 pub mod governance_action;
-pub use attestation::{AttestationOutput as ConsolidatedAttestationOutput, IssueAttestationInput, RevokeAttestationInput};
-pub use governance_action::{GovernanceActionOutput, GovernanceActionWithChildren, ProposeGovernanceActionInput, ProposeRecoveryGovernanceActionInput, VoteOnGovernanceActionInput};
+pub use attestation::{
+    AttestationOutput as ConsolidatedAttestationOutput, IssueAttestationInput,
+    RevokeAttestationInput,
+};
+pub use governance_action::{
+    GovernanceActionOutput, GovernanceActionWithChildren, ProposeGovernanceActionInput,
+    ProposeRecoveryGovernanceActionInput, VoteOnGovernanceActionInput,
+};
 
 // EPR Phase 3.5 T8: FeedbackSignal coordinator functions.
 pub mod feedback_signal;
@@ -130,7 +136,6 @@ pub use shefa_types::{
     CreatePremiumGateInput,
     CreateReaCommitmentInput,
     CreateReaEconomicEventInput,
-    UpdateReaCommitmentStateInput,
     // Premium Gating
     CreateStewardCredentialInput,
     CustodianCommitmentOutput,
@@ -147,6 +152,7 @@ pub use shefa_types::{
     StewardCredentialOutput,
     StewardRevenueOutput,
     StewardRevenueSummary,
+    UpdateReaCommitmentStateInput,
 };
 
 // Aliases to disambiguate wire types from integrity entry types
@@ -2483,7 +2489,8 @@ pub fn update_content(input: UpdateContentInput) -> ExternResult<ContentOutput> 
     // 2. Fetch + decode the previous entry.
     let record = get(prev_action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
         wasm_error!(WasmErrorInner::Guest(
-            "update_content: previous record not found on DHT (gossip propagation race?)".to_string(),
+            "update_content: previous record not found on DHT (gossip propagation race?)"
+                .to_string(),
         ))
     })?;
     let mut content: Content = record
@@ -2569,6 +2576,17 @@ pub struct ContentHeadOutput {
     pub declared_at: Timestamp,
     pub supersedes: Option<ActionHash>,
     pub content: Content,
+    /// TRUE when this head is an authoritative answer — a canonical-head
+    /// record (cross-root election) or an explicit declaration act. FALSE
+    /// only for the root-author-newest FALLBACK election in
+    /// `resolve_content_head` (the degraded answer a cold conductor gives
+    /// while the canonical link has not gossiped in yet). Consumers use this
+    /// to decide stamp semantics: a fallback answer may FILL an undeclared
+    /// projection row but must never MOVE a declared one (the 2026-07-11
+    /// boot-resurrection class). `serde(default)` keeps old-conductor wire
+    /// output (no field) deserializing as false — the safe reading.
+    #[serde(default)]
+    pub canonical: bool,
 }
 
 /// Input for `declare_content_head`. `head_action_hash: None` re-affirms the
@@ -2885,7 +2903,7 @@ mod canonical_head_selector_tests {
         let newest_earned = ah(11);
         let candidates = vec![
             cand(true, 100, 1, 10),
-            cand(true, 300, 3, 11),  // newest earned
+            cand(true, 300, 3, 11), // newest earned
             cand(true, 200, 2, 12),
             cand(false, 999, 9, 90), // staging newer than all earned — still loses
         ];
@@ -2988,7 +3006,11 @@ fn authorize_canonical_head_declarer(_declarer: &AgentPubKey) -> ExternResult<()
 }
 
 /// Build a `ContentHeadOutput` from an elected head record.
-fn build_content_head_output(content_id: &str, record: &Record) -> ExternResult<ContentHeadOutput> {
+fn build_content_head_output(
+    content_id: &str,
+    record: &Record,
+    canonical: bool,
+) -> ExternResult<ContentHeadOutput> {
     let head_action_hash = record.action_hashed().hash.clone();
     let author = record.action().author().clone();
     let declared_at = record.action().timestamp();
@@ -3018,6 +3040,7 @@ fn build_content_head_output(content_id: &str, record: &Record) -> ExternResult<
         declared_at,
         supersedes,
         content,
+        canonical,
     })
 }
 
@@ -3038,7 +3061,7 @@ pub fn resolve_content_head(id: String) -> ExternResult<Option<ContentHeadOutput
     // canonical target has not gossiped in yet), fall through to the unchanged
     // root-author-newest election below: preserves prior behavior exactly.
     if let Some(record) = gather_canonical_head_record(&id)? {
-        return Ok(Some(build_content_head_output(&id, &record)?));
+        return Ok(Some(build_content_head_output(&id, &record, true)?));
     }
     let (root_author, records) = match gather_content_chain(&id)? {
         Some(x) => x,
@@ -3049,7 +3072,7 @@ pub fn resolve_content_head(id: String) -> ExternResult<Option<ContentHeadOutput
         .filter(|r| *r.action().author() == root_author)
         .max_by_key(|r| r.action().timestamp());
     match head {
-        Some(record) => Ok(Some(build_content_head_output(&id, &record)?)),
+        Some(record) => Ok(Some(build_content_head_output(&id, &record, false)?)),
         None => Ok(None),
     }
 }
@@ -3105,7 +3128,7 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
     let target = match input.head_action_hash.map(ActionHash::from) {
         // Re-affirm: current head unchanged, no new commit — still a declaration.
         None => {
-            let out = build_content_head_output(&input.id, &current_head)?;
+            let out = build_content_head_output(&input.id, &current_head, true)?;
             emit_signal(ProjectionSignal::ContentHeadDeclared {
                 content_id: out.content_id.clone(),
                 head_action_hash: out.head_action_hash.clone(),
@@ -3131,7 +3154,7 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
 
     // Target already head: idempotent declaration, no new commit.
     if target == current_head_action {
-        let out = build_content_head_output(&input.id, &current_head)?;
+        let out = build_content_head_output(&input.id, &current_head, true)?;
         emit_signal(ProjectionSignal::ContentHeadDeclared {
             content_id: out.content_id.clone(),
             head_action_hash: out.head_action_hash.clone(),
@@ -3173,7 +3196,7 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
             "declare_content_head: new head not retrievable after commit".to_string(),
         ))
     })?;
-    let out = build_content_head_output(&input.id, &new_record)?;
+    let out = build_content_head_output(&input.id, &new_record, true)?;
     emit_signal(ProjectionSignal::ContentHeadDeclared {
         content_id: out.content_id.clone(),
         head_action_hash: out.head_action_hash.clone(),
@@ -3236,7 +3259,7 @@ fn declare_canonical_head_inner(
     // Record the canonical-head link (coordinator-only, gossips to all peers).
     create_canonical_head_link(id, &target, tag)?;
 
-    let out = build_content_head_output(id, &target_record)?;
+    let out = build_content_head_output(id, &target_record, true)?;
     // Reuse the existing declared-head projection signal — storage's
     // `stamp_declared_head` path stamps the canonical head + blob on every peer.
     emit_signal(ProjectionSignal::ContentHeadDeclared {
@@ -12846,8 +12869,10 @@ pub fn update_rea_commitment_state(
     // 4. Write the update entry. Integrity validator allows updates on
     //    Commitment entries (content_store_integrity/src/lib.rs:4352-4364
     //    falls through to validate_create_entry, which Commitment passes).
-    let new_action_hash =
-        update_entry(prev_action_hash, &EntryTypes::Commitment(commitment.clone()))?;
+    let new_action_hash = update_entry(
+        prev_action_hash,
+        &EntryTypes::Commitment(commitment.clone()),
+    )?;
     let entry_hash = hash_entry(&EntryTypes::Commitment(commitment.clone()))?;
 
     Ok(ReaCommitmentOutput {
@@ -12943,20 +12968,22 @@ pub fn create_rea_economic_event(
     // in metadata_json. Validate against republish-epr.schema.json shape before
     // commit. Defense-in-depth alongside elohim-storage's republish_epr_validator.
     if input.action == "republish-epr" {
-        let raw = input
-            .metadata_json
-            .as_deref()
-            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-                "republish-epr action requires metadata_json carrying the republish-epr payload".into()
-            )))?;
-        let payload: serde_json::Value = serde_json::from_str(raw)
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+        let raw = input.metadata_json.as_deref().ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "republish-epr action requires metadata_json carrying the republish-epr payload"
+                    .into()
+            ))
+        })?;
+        let payload: serde_json::Value = serde_json::from_str(raw).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
                 "republish-epr metadata_json not parseable: {e}"
-            ))))?;
-        crate::republish_epr::validate_republish_epr_event(&payload)
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+            )))
+        })?;
+        crate::republish_epr::validate_republish_epr_event(&payload).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
                 "republish-epr schema violation: {e}"
-            ))))?;
+            )))
+        })?;
     }
 
     let now = sys_time()?;
@@ -13320,7 +13347,9 @@ pub fn vote_on_governance_action(
 /// (mirroring the link-creation pattern in `issue_attestation`) and returns all
 /// Content entries found at the link targets.
 #[hdk_extern]
-pub fn get_attestations_for_subject(subject_cid: String) -> ExternResult<Vec<ConsolidatedAttestationOutput>> {
+pub fn get_attestations_for_subject(
+    subject_cid: String,
+) -> ExternResult<Vec<ConsolidatedAttestationOutput>> {
     attestation::get_attestations_for_subject(subject_cid)
 }
 

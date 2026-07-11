@@ -236,6 +236,14 @@ pub struct ContentHeadWire {
     #[serde(default)]
     pub supersedes: Option<HoloHashB64>,
     pub content: ContentEntry,
+    /// TRUE when the zome's answer was authoritative (canonical-head record or
+    /// an explicit declaration act); FALSE for the root-author-newest FALLBACK
+    /// election a cold conductor gives while the canonical link has not
+    /// gossiped in. Drives stamp semantics in the heal path (fallback may FILL
+    /// an undeclared row, never MOVE a declared one). `default` keeps
+    /// old-coordinator wire output (no field) reading as false — safe.
+    #[serde(default)]
+    pub canonical: bool,
 }
 
 /// Caller-input wire shape for the `content_store::declare_content_head` coordinator:

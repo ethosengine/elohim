@@ -42,24 +42,43 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
         echo "  ⚠ DECLARE_ONLY: could not resolve headActionHash from ${SRC}/db/content/${SLUG}/head — skipping propagation to ${DOORWAY_EPR_URL}" >&2
         exit 0
     fi
-    declare_raw=$(curl -sS -o - -w '\n%{http_code}' -X POST \
-        -H 'Content-Type: application/json' \
-        -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
-        -d "{\"headActionHash\":\"${head_hash}\"}" \
-        "${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head" 2>&1) || {
-        echo "  ⚠ DECLARE_ONLY: curl error POSTing canonical-head to ${DOORWAY_EPR_URL}: ${declare_raw} — peer keeps its own head until gossip/heal converges" >&2
-        exit 0
-    }
-    declare_status="${declare_raw##*$'\n'}"
-    declare_body="${declare_raw%$'\n'*}"
-    case "${declare_status}" in
-        2??)
-            echo "  ✓ canonical head propagated to ${DOORWAY_EPR_URL}: ${head_hash} (staging tier)"
-            ;;
-        *)
-            echo "  ⚠ DECLARE_ONLY: ${DOORWAY_EPR_URL} returned HTTP ${declare_status}: ${declare_body} — peer keeps its own head until gossip/heal converges" >&2
-            ;;
-    esac
+    # Retry ladder for DHT publish lag: a head authored SECONDS ago is
+    # legitimately not-yet-retrievable on the remote conductor (its ops are
+    # still publishing/gossiping). Retry ONLY the "not retrievable" refusal —
+    # any other error is structural and retrying it just burns build time.
+    # 4 attempts spaced 90s ≈ 4.5 min, comfortably past observed publish lag
+    # (app #1605's head adopted ~10 min post-author; most land far sooner).
+    attempt=0
+    max_attempts=4
+    while :; do
+        attempt=$((attempt + 1))
+        declare_raw=$(curl -sS -o - -w '\n%{http_code}' -X POST \
+            -H 'Content-Type: application/json' \
+            -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
+            -d "{\"headActionHash\":\"${head_hash}\"}" \
+            "${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head" 2>&1) || {
+            echo "  ⚠ DECLARE_ONLY: curl error POSTing canonical-head to ${DOORWAY_EPR_URL}: ${declare_raw} — peer keeps its own head until gossip/heal converges" >&2
+            exit 0
+        }
+        declare_status="${declare_raw##*$'\n'}"
+        declare_body="${declare_raw%$'\n'*}"
+        case "${declare_status}" in
+            2??)
+                echo "  ✓ canonical head propagated to ${DOORWAY_EPR_URL}: ${head_hash} (staging tier, attempt ${attempt})"
+                break
+                ;;
+            *)
+                if [ "${attempt}" -lt "${max_attempts}" ] && \
+                   printf '%s' "${declare_body}" | grep -q "not retrievable"; then
+                    echo "  … DECLARE_ONLY attempt ${attempt}/${max_attempts}: target not retrievable yet on ${DOORWAY_EPR_URL} (DHT publish lag) — retrying in 90s" >&2
+                    sleep 90
+                    continue
+                fi
+                echo "  ⚠ DECLARE_ONLY: ${DOORWAY_EPR_URL} returned HTTP ${declare_status}: ${declare_body} — peer keeps its own head until gossip/heal converges" >&2
+                break
+                ;;
+        esac
+    done
     exit 0
 fi
 
