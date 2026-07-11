@@ -811,6 +811,11 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
 
     sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${humanConfig.namespace}"
 
+    // Seam-smoke gate: the conductor's webrtc_config must parse into tx5's
+    // camelCase contract with real ICE servers — catches the dead-key class
+    // (ice_servers ran the fleet with ZERO ICE servers until 2026-07-11).
+    sh "bash scripts/ci/validate-conductor-config.sh ${outputFile}"
+
     def resetHumans = (params.RESET_HUMANS ?: false) == true
     if (resetHumans) {
         echo "RESET_HUMANS: deleting StatefulSet ${humanConfig.resourcePrefix} before reapply"
@@ -2024,6 +2029,14 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             }
             steps {
                 container('builder') {
+                    // Substrate seam smoke — one named check per communication
+                    // seam (bootstrap-sharing / signal-bus / peer-store /
+                    // dht-fetch) so a red names ITSELF instead of surfacing as
+                    // an unexplained convergence failure. Advisory while
+                    // scenario 2 stabilizes; flip to --gate after green ×2.
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh "bash '${env.WORKSPACE}/scripts/ci/substrate-seam-smoke.sh' https://doorway-alpha.elohim.host https://elohim.host"
+                    }
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                         withEnv(["E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host"]) {
                             sh "bash '${env.WORKSPACE}/scripts/ci/run-dataplane-validation.sh'"
