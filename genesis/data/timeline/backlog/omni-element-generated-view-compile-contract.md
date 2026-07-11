@@ -124,3 +124,14 @@ add a string assertion for.
 see `chrome_context_speaks_the_producer_contract`'s doc comment in
 `elohim-chrome-asset/src/lib.rs`, which names this backlog item as the
 tracked durable fix.
+
+## Adjacent live defect (2026-07-11, spotted at deploy-verification)
+
+`STABLE_ELEMENT_PATH` (`/chrome/omni-element.js` — the non-content-addressed
+alias for static references like the Tauri `index.html`) answers
+**404 "chrome asset not found"** on both doorways while the content-addressed
+path serves correctly. The doorway's alias lookup misses; only the hashed
+path is wired. Harmless to the doorway-served landing (it splices the hashed
+path) but the Tauri static consumer this alias exists FOR would get no chrome
+at all. Fix alongside this item (same route family), or sooner if Tauri
+chrome testing starts.
