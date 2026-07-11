@@ -7,7 +7,7 @@ title: "Genesis-pair cross-conductor DHT fetch is down — elohim.host-side cond
 slug: "genesis-pair-cross-conductor-fetch-blocks-canonical-convergence"
 written: "2026-07-11"
 author: "shift notary-scenario2-green"
-status: "open"
+status: "resolved"
 priority: "high"
 area: "substrate/kitsune2-connectivity"
 domain: "operator"
@@ -98,6 +98,16 @@ co-located (2081-anchor era) and died at the 2026-05-27 shem split, and why
 the first TURN cure (same wrong key) changed nothing. Fix: key renamed to
 `iceServers` (template + adam manifest) — STUN + TURN now actually reach the
 WebRTC backend.
+
+**RESOLVED 2026-07-11 20:40 UTC.** After the `iceServers` key fix deployed
+(edge #1179), elohim.host's conductor retrieved + verified the
+matthew-authored declared head and adopted it: both doorways now resolve
+identical headActionHash + blobHash for elohim-host-landing
+(uhCkkPVC7g… / sha256-84e1d803…, trust=notarized, same updatedAt). The
+fetch seam is closed; scenario-2 green banking (×2 fresh edge validations)
+is measurement follow-through. Guards added so this class cannot recur
+silently: render-time conductor-config ICE validator (gates every human
+manifest render) + substrate-seam-smoke in Dataplane Validation.
 
 ## The standing diagnostic (free, every deploy)
 

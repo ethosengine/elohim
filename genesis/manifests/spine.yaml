@@ -115,6 +115,20 @@ nodes:
     checks:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
     evidence: >
+      DELTA 2026-07-11 LATE (dht-unity cure, dev@270dbafac): CONVERGED LIVE —
+      both doorways resolve the IDENTICAL canonical head + blob for
+      elohim-host-landing (verified 20:40:35 UTC: uhCkkPVC7g…/84e1d803…,
+      trust=notarized on A and B). ROOT CAUSE of the fetch seam: the conductor
+      webrtc_config key was `ice_servers` (snake) — Holochain passes it
+      verbatim into tx5's serde-camelCase WebRtcConfig, so the fleet ran with
+      ZERO ICE servers since inception; host-candidates-only died at the
+      2026-05-27 shem split (F-T19 era). One-word rename to `iceServers`
+      (+ TURN fallback) cured cross-conductor fetch; elohim.host's conductor
+      verified-adopted the declared head minutes after deploy. Render-time
+      ICE validator + per-seam substrate smoke added to the pipeline.
+      Scenario 2 flip pending ×2 fresh edge validations (measurement, not
+      substance). Earned-authority gate (scenario 3→social grant) remains the
+      node's open red.
       DELTA 2026-07-11 (shift notary-scenario2-green, dev@8953fa423): the
       ELECTION + DECLARATION layers are DONE and live — tier-aware
       partition-deterministic cross-root selector (earned>staging at resolve,
