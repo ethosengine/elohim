@@ -123,6 +123,53 @@ stage_once() {
             return 1
         fi
         echo "  ✓ verified ${SLUG} ${HASH_FIELD} = ${SPA_HASH}"
+
+        # 3. Declare the CROSS-ROOT canonical head (staging tier) — ADVISORY.
+        #    Resolves the notary HEAD this same conductor just witnessed via
+        #    GET /db/content/{id}/head, then names it the canonical head via
+        #    POST /db/content/{id}/canonical-head so scenario 2 (multi-root
+        #    convergence) has a declared answer to resolve. This leg is
+        #    best-effort: the coordinator may be pre-cure (fn-not-found) on a
+        #    host that hasn't picked up the hot-swap yet. NEVER fails the
+        #    deploy — any failure here is a loud warning, not a retry/abort.
+        local head_hash=""
+        head_hash=$(curl -fSs \
+            -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
+            "${DOORWAY_EPR_URL}/db/content/${SLUG}/head" \
+            2>/dev/null \
+            | python3 -c "import sys, json; print(json.load(sys.stdin).get('headActionHash',''))" 2>/dev/null) || head_hash=""
+
+        if [ -z "${head_hash}" ]; then
+            echo "  ⚠ canonical-head declare FAILED — could not resolve headActionHash from GET ${DOORWAY_EPR_URL}/db/content/${SLUG}/head — coordinator may be pre-cure; scenario 2 will stay red" >&2
+        else
+            # No -f here (deliberately): a fn-not-found-class zome error comes
+            # back as a non-2xx JSON body ({"error": "..."}) that we want to
+            # surface verbatim (the hot-swap probe signal) — -f would discard
+            # the body and leave only a bare curl exit code.
+            local canonical_raw canonical_exit canonical_status canonical_body
+            canonical_raw=$(curl -sS -o - -w '\n%{http_code}' -X POST \
+                -H 'Content-Type: application/json' \
+                -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
+                -d "{\"headActionHash\":\"${head_hash}\"}" \
+                "${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head" \
+                2>&1)
+            canonical_exit=$?
+
+            if [ "${canonical_exit}" -ne 0 ]; then
+                echo "  ⚠ canonical-head declare FAILED — curl error against POST ${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head (exit ${canonical_exit}): ${canonical_raw} — coordinator may be pre-cure; scenario 2 will stay red" >&2
+            else
+                canonical_status="${canonical_raw##*$'\n'}"
+                canonical_body="${canonical_raw%$'\n'*}"
+                case "${canonical_status}" in
+                    2??)
+                        echo "  ✓ canonical head declared: ${head_hash} (staging tier)"
+                        ;;
+                    *)
+                        echo "  ⚠ canonical-head declare FAILED — POST ${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head returned HTTP ${canonical_status}: ${canonical_body} — coordinator may be pre-cure; scenario 2 will stay red" >&2
+                        ;;
+                esac
+            fi
+        fi
     else
         echo "  ⊘ [${SLUG}] byte-seed only (DO_PATCH!=1) — no head PATCH from this call."
         echo "    The single notarized head is authored once via a conductor-bridged"

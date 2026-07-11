@@ -248,6 +248,18 @@ pub struct DeclareContentHeadInput {
     pub head_action_hash: Option<String>,
 }
 
+/// Caller-input wire shape for the `content_store::declare_canonical_content_head`
+/// coordinator: the CROSS-ROOT canonical-head selector (notary-authority
+/// convergence, Model B / Tier-1 STAGING tier). Unlike [`DeclareContentHeadInput`],
+/// `head_action_hash` is REQUIRED — a cross-root declaration always names its
+/// explicit target action (any retrievable Content action for the id, including
+/// one authored under a different root by a different agent).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DeclareCanonicalHeadInput {
+    pub id: String,
+    pub head_action_hash: String,
+}
+
 /// Resolve the notary-declared HEAD for a content `id` from THIS conductor's DHT view
 /// via the `content_store::resolve_content_head` coordinator (lamad role). `Ok(None)`
 /// when no HEAD is declared on this conductor's view.
@@ -305,6 +317,42 @@ pub async fn call_declare_content_head(
     let out: ContentHeadWire = rmp_serde::from_slice(&bytes).map_err(|e| {
         StorageError::Serialization(format!(
             "conductor_writes: decode ContentHeadWire (declare): {e}"
+        ))
+    })?;
+    Ok(out)
+}
+
+/// Declare the CROSS-ROOT canonical HEAD for a content `id` via the
+/// `content_store::declare_canonical_content_head` coordinator (lamad role, STAGING
+/// tier). Unlike [`call_declare_content_head`], `head_action_hash` is REQUIRED — the
+/// zome's `DeclareCanonicalHeadInput.head_action_hash` is a `holo_hash::ActionHashB64`
+/// (serde-transparent), which accepts a canonical base64 `uhCkk…` String over the wire.
+/// Returns the resulting [`ContentHeadWire`].
+///
+/// Error strings are preserved verbatim (the underlying `call_zome` error propagates
+/// unmapped via `?`) so callers can match on the coordinator's guard substrings — e.g.
+/// "earned head is protected" (staging cannot override an earned canonical) or
+/// unauthorized-declarer.
+pub async fn call_declare_canonical_content_head(
+    hc: &Arc<HcClient>,
+    id: &str,
+    head_action_hash: String,
+) -> Result<ContentHeadWire, StorageError> {
+    let input = DeclareCanonicalHeadInput {
+        id: id.to_string(),
+        head_action_hash,
+    };
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode DeclareCanonicalHeadInput: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "declare_canonical_content_head", payload)
+        .await?;
+    let out: ContentHeadWire = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode ContentHeadWire (declare_canonical): {e}"
         ))
     })?;
     Ok(out)

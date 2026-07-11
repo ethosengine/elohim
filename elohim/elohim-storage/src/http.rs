@@ -4065,6 +4065,16 @@ impl HttpServer {
             if let Some(cid) = rest.strip_suffix("/head") {
                 return self.handle_content_head(req, method, cid, &app_ctx).await;
             }
+            // Entity-nested CROSS-ROOT canonical-head declaration (notary-
+            // authority convergence, Model B / Tier-1 STAGING tier). Distinct
+            // from the single-author `/head` route above — no author gate;
+            // edge auth (auth_required) is the route's protection. Must
+            // precede the generic content/{id} catch-all below.
+            if let Some(cid) = rest.strip_suffix("/canonical-head") {
+                return self
+                    .handle_content_canonical_head(req, method, cid, &app_ctx)
+                    .await;
+            }
         }
 
         if let Some(content_id) = resource_path.strip_prefix("content/") {
@@ -5071,6 +5081,151 @@ impl HttpServer {
                 }
             }
             _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// POST /db/content/{id}/canonical-head — the CROSS-ROOT canonical-head
+    /// declaration surface (notary-authority convergence, Model B / Tier-1
+    /// STAGING tier). Converges genuinely-independent roots (different agents,
+    /// no supersedes edge between their versions) onto ONE head every
+    /// federation peer resolves, via `content_store::declare_canonical_content_head`.
+    ///
+    /// Unlike [`Self::handle_content_head`]'s POST (single-author,
+    /// chain-membership-gated), there is deliberately NO author gate here — the
+    /// zome-side staging tier is god-mode by design (any declarer may set/replace
+    /// a STAGING canonical; it can never clobber or impersonate an EARNED one,
+    /// enforced zome-side). Edge auth is this route's `.auth_required()`
+    /// registration alone.
+    async fn handle_content_canonical_head(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        content_id: &str,
+        app_ctx: &db::AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use http_body_util::BodyExt;
+
+        /// POST body: the explicit action to declare as the cross-root
+        /// canonical head. REQUIRED — a cross-root declaration always names
+        /// its explicit target (mirrors the zome's `DeclareCanonicalHeadInput`).
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct DeclareCanonicalHeadBody {
+            #[serde(default)]
+            head_action_hash: Option<String>,
+        }
+
+        if method != Method::POST {
+            return Ok(response::method_not_allowed());
+        }
+
+        let pool = self
+            .db_pool
+            .as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not available".into()))?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        // (a) Parse body { headActionHash: String } — missing or empty → 400.
+        let body_bytes = req
+            .into_body()
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
+            .to_bytes();
+        let head_action_hash: String = if body_bytes.is_empty() {
+            return Ok(response::bad_request(
+                "headActionHash is required to declare a canonical content head",
+            ));
+        } else {
+            match serde_json::from_slice::<DeclareCanonicalHeadBody>(&body_bytes) {
+                Ok(b) => match b.head_action_hash {
+                    Some(h) if !h.trim().is_empty() => h,
+                    _ => {
+                        return Ok(response::bad_request(
+                            "headActionHash is required to declare a canonical content head",
+                        ))
+                    }
+                },
+                Err(e) => return Ok(response::bad_request(&format!("Invalid JSON: {}", e))),
+            }
+        };
+
+        // (b) Resolve the lamad conductor bridge.
+        let hc = match self.hc_registry.as_ref().and_then(|r| r.lamad_client()) {
+            Some(hc) => hc,
+            None => {
+                return Ok(response::service_unavailable(
+                    "Conductor bridge unavailable; cannot declare canonical content head",
+                ));
+            }
+        };
+
+        // (c) Declare the cross-root canonical HEAD via the conductor. Errors
+        // (including a fn-not-found-class error from a pre-cure coordinator —
+        // the hot-swap probe signal callers key on) are surfaced verbatim.
+        let declared = match crate::services::conductor_writes::call_declare_canonical_content_head(
+            &hc,
+            content_id,
+            head_action_hash,
+        )
+        .await
+        {
+            Ok(h) => h,
+            Err(e) => {
+                let msg = e.to_string();
+                return Ok(response::json_response(
+                    StatusCode::BAD_GATEWAY,
+                    &serde_json::json!({ "error": msg }),
+                ));
+            }
+        };
+
+        // Eager-stamp the projection so the local read is coherent immediately
+        // (not only once the async projection signal lands) — mirrors
+        // handle_content_head's declare arm / update_via_conductor. Field
+        // mapping mirrors the ContentCommitted projection arm (rea_projection.rs).
+        let content = declared.content;
+        let size_i32 = content
+            .content_size_bytes
+            .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
+        let patch = db::content_diesel::ContentProjectionPatch {
+            blob_cid: content.blob_cid,
+            content_size_bytes: size_i32,
+            title: Some(content.title),
+            description: Some(content.description),
+            content_type: Some(content.content_type),
+            content_format: Some(content.content_format),
+            reach: Some(content.reach),
+            metadata_json: Some(content.metadata_json),
+        };
+        db::content_diesel::stamp_declared_head(
+            &mut conn,
+            app_ctx,
+            content_id,
+            declared.head_action_hash.as_str(),
+            Some(patch),
+        )?;
+
+        // 200 with the fresh HEAD answer, re-read from the stamped row — same
+        // response shape as the single-author declare handler (ContentHeadView).
+        match db::content_diesel::get_content_with_tags(
+            &mut conn,
+            app_ctx,
+            content_id,
+            db::content_diesel::MinTrust::Invisible,
+        )? {
+            Some(cwt) => match crate::views::content_head_view_from_content(&cwt.content) {
+                Some(view) => Ok(response::ok(&view)),
+                None => Ok(response::not_found(
+                    "no notarized head declared for this content",
+                )),
+            },
+            None => Ok(response::not_found(&format!(
+                "Content not found: {}",
+                content_id
+            ))),
         }
     }
 
@@ -12225,6 +12380,17 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         .route(
             Route::post("/db/content/{id}/head")
                 .handler("declare_content_head")
+                .auth_required()
+                .build(),
+        )
+        // CROSS-ROOT canonical-head declaration (notary-authority convergence,
+        // Model B / Tier-1 STAGING tier). No author gate zome-side (god-mode
+        // scaffold; earned-head guard protects an EARNED canonical) — edge
+        // auth (.auth_required() below) is this route's sole protection.
+        // Dispatch lives in handle_content_canonical_head.
+        .route(
+            Route::post("/db/content/{id}/canonical-head")
+                .handler("declare_canonical_content_head")
                 .auth_required()
                 .build(),
         )
