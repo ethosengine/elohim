@@ -87,6 +87,18 @@ measurement-during-churn effect is REAL but secondary (stale peer-store URLs
 for ~20min post-restart — quantified 5/7 mismatched → 0/7 after expiry) — it
 delays convergence after every deploy but is not the root cause.
 
+**ROOT CAUSE REFINED (2026-07-11, late):** the conductor config key was
+`ice_servers` (snake_case) — but Holochain passes `webrtc_config` verbatim
+into tx5's `WebRtcConfig`, which is `#[serde(rename_all = "camelCase")]`:
+the real key is **`iceServers`** (Holochain's own conductor-config doc
+example uses camelCase). The snake_case key was silently ignored, so the
+fleet has run with ZERO ICE servers since inception — no STUN, no srflx,
+host candidates only. That is why WebRTC worked while the pair was
+co-located (2081-anchor era) and died at the 2026-05-27 shem split, and why
+the first TURN cure (same wrong key) changed nothing. Fix: key renamed to
+`iceServers` (template + adam manifest) — STUN + TURN now actually reach the
+WebRTC backend.
+
 ## The standing diagnostic (free, every deploy)
 
 Every app deploy now emits the live probe in the `authorHeadOnce` /
