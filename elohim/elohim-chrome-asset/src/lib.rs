@@ -237,6 +237,46 @@ mod tests {
     }
 
     #[test]
+    fn resilience_mapper_speaks_the_snapshot_contract() {
+        // Structural contract gate for the resilience mapper. The element
+        // once shipped reading phantom fields (data.glyph/standing/reach —
+        // never in any ResilienceSnapshotView) so the fetch succeeded forever
+        // while the mapper matched nothing and the card stayed neutral. This
+        // list mirrors `resilience-snapshot-view.schema.json` `properties`
+        // (source of truth; storage's schema_contract.rs guards struct↔schema
+        // — keep this list in sync when the mapper's reads change; the
+        // durable fix is compiling the element against the generated TS view,
+        // tracked in the omni contract backlog item).
+        for field in [
+            "protectionStatus",
+            "feltStatus",
+            "headline",
+            "reassurance",
+            "coverageShortfall",
+            "stewardingCollectives",
+            "diversityScore",
+            "distributionState",
+        ] {
+            assert!(
+                ELEMENT_JS.contains(field),
+                "element no longer reads wire field `{field}` — update this list with the mapper"
+            );
+        }
+        // The phantom accessors must never come back.
+        for phantom in ["data.glyph", "data.standing", "data.reach"] {
+            assert!(
+                !ELEMENT_JS.contains(phantom),
+                "phantom wire accessor `{phantom}` reintroduced — not in any schema"
+            );
+        }
+        // The household felt-status feed (spec §11) is the primary fetch.
+        assert!(
+            ELEMENT_JS.contains("/household"),
+            "resilience fetch no longer targets the /household felt-status variant"
+        );
+    }
+
+    #[test]
     fn element_carries_the_css_injection_and_href_guards() {
         // The token-value CSS-injection guard and the href scheme allowlist are
         // load-bearing XSS guards baked into the served JS. These string anchors
@@ -270,7 +310,9 @@ mod tests {
         let out = inject_element(html, r#"{"slug":"x"}"#);
 
         // The island + loader land before </body>, in order.
-        let island_at = out.find("id=\"elohim-omni-context\"").expect("island present");
+        let island_at = out
+            .find("id=\"elohim-omni-context\"")
+            .expect("island present");
         let loader_at = out.find("omni-element.").expect("loader present");
         let body_close = out.rfind("</body>").expect("body close present");
         assert!(island_at < body_close, "island must precede </body>");
@@ -294,7 +336,10 @@ mod tests {
         let html = "<div>fragment with no body tag</div>";
         let out = inject_element(html, r#"{"slug":"y"}"#);
         assert!(out.starts_with(html), "original preserved at head");
-        assert!(out.contains("id=\"elohim-omni-context\""), "island appended");
+        assert!(
+            out.contains("id=\"elohim-omni-context\""),
+            "island appended"
+        );
         assert!(out.contains("omni-element."), "loader appended");
     }
 
@@ -307,7 +352,10 @@ mod tests {
         let snippet_at = out.find("id=\"elohim-omni-context\"").unwrap();
         let last_close = out.rfind("</body>").unwrap();
         assert!(snippet_at < last_close);
-        assert!(out.contains("b</script>") || out.contains("b<script"), "near last body: {out}");
+        assert!(
+            out.contains("b</script>") || out.contains("b<script"),
+            "near last body: {out}"
+        );
     }
 
     #[test]
@@ -321,7 +369,10 @@ mod tests {
             !escaped.to_ascii_lowercase().contains("</script"),
             "</script token must be neutralized: {escaped}"
         );
-        assert!(escaped.contains("<\\/script"), "expected <\\/ escape: {escaped}");
+        assert!(
+            escaped.contains("<\\/script"),
+            "expected <\\/ escape: {escaped}"
+        );
 
         // Embedded in the full inject, the island cannot be broken out of.
         let html = "<html><body></body></html>";
@@ -340,7 +391,10 @@ mod tests {
     fn escape_neutralizes_html_comment_open() {
         let payload = r#"{"note":"<!-- comment open"}"#;
         let escaped = escape_json_for_script(payload);
-        assert!(!escaped.contains("<!--"), "comment-open must be defanged: {escaped}");
+        assert!(
+            !escaped.contains("<!--"),
+            "comment-open must be defanged: {escaped}"
+        );
     }
 
     #[test]

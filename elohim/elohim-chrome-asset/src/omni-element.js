@@ -493,11 +493,16 @@
   }
 
   // ── Lazy resilience snapshot (best-effort, on first expand only) ───────────
+  // data-omni-resilience-loaded is TRI-STATE so the DOM itself testifies:
+  // "loading" (fetch in flight / re-entry guard) → "applied" (glyph+card
+  // populated) or "unmatched" (fetch failed OR payload had no mappable
+  // fields — the state that distinguishes network trouble from a
+  // contract mismatch at a glance).
   function maybeLoadResilience(omni) {
-    if (!omni || omni.getAttribute('data-omni-resilience-loaded') === '1') return;
+    if (!omni || omni.getAttribute('data-omni-resilience-loaded')) return;
     var slug = omni.getAttribute('data-omni-resilience-slug');
     if (!slug || typeof window.fetch !== 'function') return;
-    omni.setAttribute('data-omni-resilience-loaded', '1');
+    omni.setAttribute('data-omni-resilience-loaded', 'loading');
 
     // Prefer the /household variant (felt-status idiom, omnibar spec §11);
     // fall back to the base snapshot for older storage builds.
@@ -513,11 +518,15 @@
         });
       })
       .then(function (data) {
-        if (!data) return;
+        if (!data) {
+          omni.setAttribute('data-omni-resilience-loaded', 'unmatched');
+          return;
+        }
         applyResilience(omni, data);
       })
       .catch(function () {
         /* best-effort; leave the neutral glyph. */
+        omni.setAttribute('data-omni-resilience-loaded', 'unmatched');
       });
   }
 
@@ -535,7 +544,11 @@
       var headline = felt && typeof felt.headline === 'string' ? felt.headline : null;
       var glyph = status ? RESILIENCE_GLYPHS[status] || null : null;
       var label = headline || (status ? 'Resilience: ' + status : null);
-      if (!glyph && !label) return;
+      if (!glyph && !label) {
+        omni.setAttribute('data-omni-resilience-loaded', 'unmatched');
+        return;
+      }
+      omni.setAttribute('data-omni-resilience-loaded', 'applied');
       var marks = omni.querySelectorAll('[data-omni-resilience-glyph]');
       for (var i = 0; i < marks.length; i++) {
         if (glyph) marks[i].textContent = glyph;
