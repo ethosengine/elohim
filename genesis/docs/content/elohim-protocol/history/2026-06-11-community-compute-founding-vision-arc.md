@@ -23,12 +23,12 @@ cites:
   - elohim-hub-boundaries-design | the hub design the hub-optional floor constrains — Stage 1/2 humans first-class, count humans carried not nodes | sha256:d7ffa707a34d126f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
   - wave3-valueflows-hrea-interop-design | the designed-pre-implementation VF/hREA interop surface the vision's hREA bet still awaits | sha256:c8d903ad73f0284d | path: genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md
   - requests-offers-application-design | §D.20 Layered Commons + friction-gradient limitarianism — where the commons fund evolved | sha256:321ac092b956fe8e | path: genesis/docs/content/elohim-protocol/architecture/applications/requests-offers-application-design.md
-  - genesis/docs/content/elohim-protocol/governance/epic.md
+  - governance-epic | epic | sha256:be850529ab645a30 | path: genesis/docs/content/elohim-protocol/governance/epic.md
   - genesis/docs/content/elohim-protocol/social_medium/epic.md
   - genesis/docs/content/elohim-protocol/lamad.md
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
   - per-substrate-limitarian-governor-design | rates-as-governed-EPR through propose→vote→tally — where constitutional rates evolved | sha256:5d10a556e2ec7a14 | path: genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md
-  - genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md
+  - trust-compute-gradient-brainstorm | 2026-04-30-trust-compute-gradient-brainstorm | sha256:89c493c73ff6b06b | path: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md
   - genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md
   - genesis/data/timeline/backlog/storage-island-harvest-residue.md
   - elohim/holochain/docs/README.md

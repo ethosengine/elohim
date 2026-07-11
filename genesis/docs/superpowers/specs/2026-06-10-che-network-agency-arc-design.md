@@ -10,7 +10,7 @@ cites:
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
   - che-live-peer-dev-loop-design | the eyes this arc adds hands to — L3 of the browser-feedback series; its read-mostly rail is what Stages A-C graduate beyond | sha256:f976477c2f2baba0 | path: genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md
   - elohim-sdk-architecture | elohim-sdk | sha256:7d1a9b09f3c6592d | path: genesis/docs/architecture/elohim-sdk.md
-  - genesis/docs/architecture/rea-compute-commitment-primitive.md
+  - rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md
 informed-by:
   - genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md
 derived_from:

@@ -14,7 +14,7 @@ cites:
   - d1-through-d5-node-and-household-canon | settled canon: D2 household = Collective(kind household), place-as-first-class deferred to v2 — the lattice keeps D2 and names the dwelling thesis as that v2 | sha256:5ee9472bbefad806 | path: genesis/docs/content/elohim-protocol/history/2026-04-19-d1-through-d5-node-and-household-canon.md
   - genesis/docs/plans/2026-03-15-qahal-community-directory-design.md
   - recovery-protocol-phase-2-revised-design | graduated recovery authority + StewardshipGrant primitives + the IntimateQuorum/Dissolution structural separation the capability-arc thesis honors | sha256:9d1844484ed64de4 | path: genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md
-  - genesis/docs/architecture/rea-compute-commitment-primitive.md
+  - rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md
   - tiered-quilt-stewardship-design | donut tiers (free/dwelling/collective/commons) + §4 quiltPolicy classes — the substrate the steward-finding flywheel shards onto | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
   - genesis/data/timeline/backlog/qahal-household-collective-first-class.md
 refines: genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md

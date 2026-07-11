@@ -21,9 +21,9 @@ cites:
   - blob-custody-reconciliation-design | the FetchBlob per-peer contract (timeout, fail-fast-on-mismatch, serve-only-verified) the pull queue inherits, plus the candidate-list/no-Kademlia-for-blob-hashes resolver seam (R-I) | sha256:b5a567ba337539a2 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-blob-custody-reconciliation-design.md
   - tiered-quilt-stewardship-design | the D5 custody seed — RS(N,K) erasure quilt the striping seam reconstructs against; quilt diversity accounting the dwelling tier participates in; source of the BLAKE3-vs-sha256 divergence flagged in §14 | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
   - records-lifecycle-design | the typed relation vocabulary and lifecycle the cluster-closure walks (reach boundary + closed-state termini), and custody-quilt Commitments as accepted-at-authoring REA — the pin commitment shape | sha256:2b5f54d20108bcf0 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md
-  - genesis/docs/architecture/rea-compute-commitment-primitive.md
+  - rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
-  - genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md
+  - trust-compute-gradient-brainstorm | 2026-04-30-trust-compute-gradient-brainstorm | sha256:89c493c73ff6b06b | path: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md
   - elohim-protocol-specification | protocol-specification | sha256:659b0d47078b298f | path: genesis/docs/content/elohim-protocol/protocol-specification.md
   - genesis/docs/content/elohim-protocol/architecture/cluster-topology.md
   - doorway/CLAUDE.md

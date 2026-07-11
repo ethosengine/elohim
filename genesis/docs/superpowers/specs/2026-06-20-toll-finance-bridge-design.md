@@ -12,7 +12,7 @@ cites:
   - vision-gap-limit-governor-stub | the limit-governor stub (un-blessed) + the conceptual-only donut floor/ceiling governor — the upstream gate on the capped-by property | sha256:14ea8f3e81cd87c8 | path: genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md
   - mutual-storage-replication-dwelling-hub-design | commons-pool + donut split ratios + COMMONS_MIN_FLOOR + proposed->active graduation on ProvideAnnounce | sha256:1acbeeec8b7a3956 | path: genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
   - non-commons-provide-commitments-design | the replicates-* capacity-variant Commitment — commons-pool membership / opt-in hosting backing | sha256:936b660644fde390 | path: genesis/docs/superpowers/specs/2026-06-13-non-commons-provide-commitments-design.md
-  - genesis/docs/architecture/rea-compute-commitment-primitive.md
+  - rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md
 refines: genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md
 # DESIGN-ONLY / vision-deferred. NO doc-level requires_env — but implementation is gated on TWO real
 # upstream items (see §5): the limitarian governor's `substrate_signal` field (to cap toll-reward

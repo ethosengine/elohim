@@ -14,7 +14,7 @@ cites:
   - genesis/docs/plans/2026-03-15-qahal-community-directory-design.md
   - d1-through-d5-node-and-household-canon | D2: household reuses collectives, no new entry types — the constraint the entity model honors | sha256:5ee9472bbefad806 | path: genesis/docs/content/elohim-protocol/history/2026-04-19-d1-through-d5-node-and-household-canon.md
   - tiered-quilt-stewardship-design | §4 v0.2 quiltPolicy classes + pledge clamp — §8 declares qahal/household and ties the ceremony custody commitments as the backing pledges | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
-  - genesis/docs/architecture/rea-compute-commitment-primitive.md
+  - rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md
   - admin-key-lifecycle-dev-to-production | X-API-Key displacement direction — stage 3 of the drive architecture instantiates its commitment-backed delegation for the seeder service-agent | sha256:44dc9b49dec9d439 | path: genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md
   - genesis/data/timeline/backlog/qahal-household-collective-first-class.md
 derived_from: genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md

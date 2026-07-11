@@ -12,7 +12,7 @@ cites:
   - genesis/data/timeline/backlog/agent-peer-binding-cross-signed-proof.md
   - elohim/elohim-storage/src/conductor/process_manager.rs
   - elohim/elohim-storage/src/main.rs
-  - genesis/docs/architecture/stewardship-over-sovereignty.md
+  - stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md
 ---
 
 # Runtime Orchestration + Developer-Mode Bridge

@@ -14,12 +14,12 @@ cites:
   - epr-slice2-universal-address-plan | landed Slice-2 plan: locked decisions (universal address, bridge rationale, /auth vocabulary) this design builds on | sha256:78644191dd11bf3d | path: genesis/docs/superpowers/plans/2026-06-06-epr-slice2-universal-address-plan.md
   - omnibar-consolidation-epr-native-links-design | locked cross-bundle link mechanics (plain href + interceptor, ServingContext) this spec must not contradict | sha256:92df16eea8d9bcf8 | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md
   - semantic-computable-links-design | docs-corpus content-addressed link integrity (slug/fingerprint/status) — the model extended here to runtime links (claims-stale isomorphism) | sha256:1460bc102580ab0d | path: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md
-  - genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md
+  - trust-compute-gradient-brainstorm | 2026-04-30-trust-compute-gradient-brainstorm | sha256:89c493c73ff6b06b | path: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md
   - doorway-stewardship-chain-design | grant/snapshot precedent: Commitment+Attestation chain, JWT fast-path, supersession — the visitor-reach and grant mechanics template | sha256:f90729e7a9887de8 | path: genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
   - records-lifecycle-design | link lifecycle precedent: intentionally-degraded vs maintained, closure rejection, redaction markers — the alias retirement lens | sha256:2b5f54d20108bcf0 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md
-  - genesis/docs/architecture/rea-compute-commitment-primitive.md
-  - genesis/docs/architecture/stewardship-over-sovereignty.md
+  - rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md
+  - stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md
   - genesis/docs/architecture/pillar-bundle-split-runbook.md
 ---
 
