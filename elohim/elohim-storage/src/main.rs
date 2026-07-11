@@ -2565,6 +2565,12 @@ async fn async_main(
     if let Some(ref cm) = conductor_manager {
         http_server = http_server.with_conductor_manager(Arc::clone(cm));
     }
+    // Wire the conductor admin websocket so GET /db/p2p/conductor-diagnostics
+    // can read the peer store + transport/fetch state (dht-unity T3 — the
+    // seam-visibility handle for cross-conductor fetch failures).
+    if let Some(ref admin_ws) = agent_info_admin_ws {
+        http_server = http_server.with_admin_websocket(Arc::clone(admin_ws));
+    }
 
     // Cutover gate #2 (Plan 2 Task 3): wire iroh blob store into HTTP server.
     // When the iroh node started successfully, thread its blob store so that

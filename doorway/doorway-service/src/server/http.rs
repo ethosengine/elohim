@@ -4155,6 +4155,14 @@ async fn handle_request(
             to_boxed(routes::handle_route_registry(Arc::clone(&state)).await)
         }
 
+        // Route registry actuation twin — re-fetch every configured storage
+        // peer's /manifest and recompile its routes in place. Closes the
+        // boot-only registration gap: a storage deploy that ADDS a route no
+        // longer needs a doorway restart to become reachable through it.
+        (Method::POST, "/admin/steward-peers/refresh") => {
+            to_boxed(routes::handle_steward_peers_refresh(Arc::clone(&state)).await)
+        }
+
         // Kitsune2 bootstrap coherence read-model (Cat-C node-local Operational
         // state): spaces/agents held + backend (mem|mongo). With the shared
         // mongo backend live, this is the surface that shows the genesis pair

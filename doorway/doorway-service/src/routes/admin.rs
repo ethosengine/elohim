@@ -862,6 +862,71 @@ pub async fn handle_route_registry(state: Arc<AppState>) -> Response<Full<Bytes>
     )
 }
 
+/// Response for POST /admin/steward-peers/refresh
+#[derive(Debug, Serialize)]
+pub struct StewardPeerRefreshResponse {
+    /// Peers whose manifest re-registered cleanly, with their route counts.
+    pub refreshed: Vec<StewardPeerRefreshResult>,
+    /// Peers whose manifest fetch/parse failed (error text included).
+    pub failed: Vec<StewardPeerRefreshResult>,
+}
+
+/// One peer's refresh outcome.
+#[derive(Debug, Serialize)]
+pub struct StewardPeerRefreshResult {
+    pub storage_url: String,
+    pub routes: Option<usize>,
+    pub error: Option<String>,
+}
+
+/// Handle POST /admin/steward-peers/refresh — re-fetch every configured
+/// storage peer's `/manifest` and recompile its routes IN PLACE.
+///
+/// Steward-peer registration is otherwise boot-only, so a storage deploy
+/// that ADDS a route leaves every already-running doorway blind to it until
+/// the doorway itself restarts. This handle closes that gap as a dev-mode /
+/// operator-seat operation: idempotent, read-only against storage, safe to
+/// call repeatedly. Same Cat-C class as `/admin/routes` (visibility) — this
+/// is its actuation twin.
+pub async fn handle_steward_peers_refresh(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let mut peer_urls: Vec<String> = Vec::new();
+    if let Some(ref storage_url) = state.args.storage_url {
+        peer_urls.push(storage_url.clone());
+    }
+    for url in &state.args.storage_urls {
+        let trimmed = url.trim().to_string();
+        if !trimmed.is_empty() && !peer_urls.contains(&trimmed) {
+            peer_urls.push(trimmed);
+        }
+    }
+
+    let mut refreshed = Vec::new();
+    let mut failed = Vec::new();
+    for storage_url in &peer_urls {
+        match state
+            .route_registry
+            .register_steward_peer(storage_url)
+            .await
+        {
+            Ok(count) => refreshed.push(StewardPeerRefreshResult {
+                storage_url: storage_url.clone(),
+                routes: Some(count),
+                error: None,
+            }),
+            Err(e) => failed.push(StewardPeerRefreshResult {
+                storage_url: storage_url.clone(),
+                routes: None,
+                error: Some(e),
+            }),
+        }
+    }
+
+    json_response(
+        StatusCode::OK,
+        StewardPeerRefreshResponse { refreshed, failed },
+    )
+}
+
 // ============================================================================
 // Capabilities
 // ============================================================================

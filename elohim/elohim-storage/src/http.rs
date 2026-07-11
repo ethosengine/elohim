@@ -213,6 +213,13 @@ pub struct HttpServer {
     /// RESTART the conductor (the only way to apply target_arc_factor — spec §2).
     /// None = no embedded conductor → actuation unavailable.
     conductor_manager: Option<Arc<tokio::sync::Mutex<crate::conductor::ConductorManager>>>,
+    /// Embedded conductor ADMIN websocket — wired at startup (embedded mode
+    /// only) so `GET /db/p2p/conductor-diagnostics` can read the conductor's
+    /// peer store (`agent_info`) and transport/fetch state (`dump_network_stats`
+    /// / `dump_network_metrics`). Cat-C operational read: the handle an
+    /// operator, a negotiating peer, or an embedded agent uses to see WHY a
+    /// cross-conductor fetch is failing. None = route answers 503.
+    admin_websocket: Option<Arc<holochain_client::AdminWebsocket>>,
     /// FeedbackSignal fan-out context (Phase 3.5 T22).
     /// When set, `PUT /api/v1/epr` with FeedbackSignal kind runs
     /// project_signal + back_prop_one_hop + flood_feedback end-to-end.
@@ -445,6 +452,38 @@ fn view_blob_hash_for_id(
     .and_then(|cwt| cwt.content.blob_hash)
 }
 
+/// Project one kitsune2 `AgentInfoSigned` JSON string (as returned by the
+/// conductor admin `agent_info` call) into a compact diagnostic view.
+///
+/// Wire shape: `{"agentInfo":"<inner JSON string>","signature":"<b64>"}` where
+/// the inner document carries `agent`, `space`, `createdAt`, `expiresAt`,
+/// `isTombstone`, `url` (null when the peer has no reachable transport), and
+/// `storageArc`. Tolerant by design — any parse miss degrades to `{"raw": …}`
+/// so a conductor-side encoding change can never blank the whole diagnostic.
+fn project_agent_info(signed_json: &str) -> serde_json::Value {
+    let outer: serde_json::Value = match serde_json::from_str(signed_json) {
+        Ok(v) => v,
+        Err(_) => return serde_json::json!({ "raw": signed_json }),
+    };
+    let inner: serde_json::Value = match outer.get("agentInfo").and_then(|v| v.as_str()) {
+        Some(inner_str) => match serde_json::from_str(inner_str) {
+            Ok(v) => v,
+            Err(_) => return serde_json::json!({ "raw": signed_json }),
+        },
+        // Some encodings inline the object rather than string-wrapping it.
+        None => outer.clone(),
+    };
+    serde_json::json!({
+        "agent": inner.get("agent").cloned().unwrap_or(serde_json::Value::Null),
+        "space": inner.get("space").cloned().unwrap_or(serde_json::Value::Null),
+        "url": inner.get("url").cloned().unwrap_or(serde_json::Value::Null),
+        "createdAt": inner.get("createdAt").cloned().unwrap_or(serde_json::Value::Null),
+        "expiresAt": inner.get("expiresAt").cloned().unwrap_or(serde_json::Value::Null),
+        "isTombstone": inner.get("isTombstone").cloned().unwrap_or(serde_json::Value::Null),
+        "storageArc": inner.get("storageArc").cloned().unwrap_or(serde_json::Value::Null),
+    })
+}
+
 impl HttpServer {
     /// Create a new HTTP server
     pub fn new(blob_store: Arc<BlobStore>, bind_addr: SocketAddr) -> Self {
@@ -474,6 +513,7 @@ impl HttpServer {
             write_through_state: None,
             hc_registry: None,
             conductor_manager: None,
+            admin_websocket: None,
             fan_out_ctx: None,
             #[cfg(feature = "ssr")]
             ssr_state: None,
@@ -593,6 +633,14 @@ impl HttpServer {
         manager: Arc<tokio::sync::Mutex<crate::conductor::ConductorManager>>,
     ) -> Self {
         self.conductor_manager = Some(manager);
+        self
+    }
+
+    /// Wire the embedded conductor's ADMIN websocket so
+    /// `GET /db/p2p/conductor-diagnostics` can read peer store + transport
+    /// state straight from the conductor (Cat-C operational diagnostics).
+    pub fn with_admin_websocket(mut self, admin_ws: Arc<holochain_client::AdminWebsocket>) -> Self {
+        self.admin_websocket = Some(admin_ws);
         self
     }
 
@@ -4044,6 +4092,15 @@ impl HttpServer {
             })));
         }
 
+        // Conductor DHT diagnostics (Cat-C operational read; dht-unity T3).
+        // The permanent seam-visibility handle: what does THIS node's embedded
+        // conductor know about its peers (peer store) and its transport/fetch
+        // state — the read that distinguishes "never learned the address" from
+        // "knows it, cannot connect" during cross-conductor fetch failures.
+        if resource_path == "p2p/conductor-diagnostics" {
+            return self.handle_conductor_diagnostics(req, method).await;
+        }
+
         if resource_path == "content" {
             return self.handle_db_content_list(req, method).await;
         }
@@ -4851,6 +4908,91 @@ impl HttpServer {
     /// is LOAD-BEARING — authentication is checked BEFORE any existence lookup so
     /// a non-author probe against a nonexistent id gets 401/403, never a 404 that
     /// would leak existence or mis-signal "not the author" as "not found".
+    /// GET /db/p2p/conductor-diagnostics — Cat-C operational read of the
+    /// embedded conductor's network view (dht-unity plan T3).
+    ///
+    /// Returns the conductor's peer store (`agent_info` — every AgentInfoSigned
+    /// it currently holds, projected to url/space/timestamps) plus live
+    /// transport stats (`dump_network_stats`: open connections, blocked
+    /// message counts). Pass `?include=metrics` to add per-DNA
+    /// `dump_network_metrics` (fetch queue + peers_on_backoff + gossip round
+    /// summaries) — heavier, so opt-in.
+    ///
+    /// Trust model: everything here is either already public via the shared
+    /// bootstrap table (agent infos) or node-local operational state the node
+    /// itself owns (its own connection list). No content, no identity secrets.
+    async fn handle_conductor_diagnostics(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+        let Some(admin) = &self.admin_websocket else {
+            return Ok(response::service_unavailable(
+                "conductor diagnostics unavailable: no embedded conductor admin connection",
+            ));
+        };
+
+        let include_metrics = req
+            .uri()
+            .query()
+            .map(|q| q.split('&').any(|kv| kv == "include=metrics"))
+            .unwrap_or(false);
+
+        let agent_infos = match admin.agent_info(None).await {
+            Ok(infos) => infos,
+            Err(e) => {
+                return Ok(response::service_unavailable(&format!(
+                    "conductor agent_info failed: {e}"
+                )));
+            }
+        };
+        let agents: Vec<serde_json::Value> =
+            agent_infos.iter().map(|s| project_agent_info(s)).collect();
+
+        // Transport stats: best-effort — a failure here should not hide the
+        // peer store (the more load-bearing half of the diagnostic).
+        let transport_stats = match admin.dump_network_stats().await {
+            Ok(stats) => serde_json::to_value(&stats)
+                .unwrap_or_else(|e| serde_json::json!({ "serializeError": e.to_string() })),
+            Err(e) => serde_json::json!({ "error": e.to_string() }),
+        };
+
+        let network_metrics = if include_metrics {
+            match admin.dump_network_metrics(None, false).await {
+                Ok(metrics) => {
+                    let by_dna: serde_json::Map<String, serde_json::Value> = metrics
+                        .into_iter()
+                        .map(|(dna, m)| {
+                            (
+                                dna.to_string(),
+                                serde_json::to_value(&m).unwrap_or_else(
+                                    |e| serde_json::json!({ "serializeError": e.to_string() }),
+                                ),
+                            )
+                        })
+                        .collect();
+                    Some(serde_json::Value::Object(by_dna))
+                }
+                Err(e) => Some(serde_json::json!({ "error": e.to_string() })),
+            }
+        } else {
+            None
+        };
+
+        let mut body = serde_json::json!({
+            "agentCount": agents.len(),
+            "agents": agents,
+            "transportStats": transport_stats,
+        });
+        if let Some(metrics) = network_metrics {
+            body["networkMetrics"] = metrics;
+        }
+        Ok(response::ok(&body))
+    }
+
     async fn handle_content_head(
         &self,
         req: Request<Incoming>,
@@ -12394,6 +12536,16 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .auth_required()
                 .build(),
         )
+        // Conductor DHT diagnostics (Cat-C operational; dht-unity T3). Live
+        // network state — never cache. Read-only, no auth: agent infos are
+        // already public via the shared bootstrap table, and connection stats
+        // are the node's own operational state (same class as /health).
+        .route(
+            Route::get("/db/p2p/conductor-diagnostics")
+                .handler("conductor_diagnostics")
+                .cache_ttl(0)
+                .build(),
+        )
         // Knowledge graph relationships
         .route(
             Route::get("/db/relationships")
@@ -14650,6 +14802,41 @@ mod admission_tests {
 // no declared head → own row; declared head present but blob NOT local → own
 // row (degrade; never fan out — the replication plane heals absence).
 // =============================================================================
+#[cfg(test)]
+mod conductor_diagnostics_tests {
+    use super::project_agent_info;
+
+    #[test]
+    fn projects_string_wrapped_agent_info() {
+        let inner = r#"{"agent":"AgEnT","space":"SpAcE","createdAt":"1752200000000000","expiresAt":"1752200300000000","isTombstone":false,"url":"wss://signal.example/xyz","storageArc":[0,4294967295]}"#;
+        let signed = serde_json::json!({ "agentInfo": inner, "signature": "c2ln" }).to_string();
+        let v = project_agent_info(&signed);
+        assert_eq!(v["agent"], "AgEnT");
+        assert_eq!(v["url"], "wss://signal.example/xyz");
+        assert_eq!(v["isTombstone"], false);
+        assert_eq!(v["storageArc"][1], 4294967295u32 as u64);
+        assert!(v.get("raw").is_none());
+    }
+
+    #[test]
+    fn projects_inline_object_encoding() {
+        // Fallback: some encodings inline the object instead of string-wrapping.
+        let signed = r#"{"agent":"A","space":"S","url":null,"createdAt":"1","expiresAt":"2","isTombstone":true}"#;
+        let v = project_agent_info(signed);
+        assert_eq!(v["agent"], "A");
+        assert_eq!(v["url"], serde_json::Value::Null);
+        assert_eq!(v["isTombstone"], true);
+    }
+
+    #[test]
+    fn malformed_input_degrades_to_raw_never_panics() {
+        let v = project_agent_info("not json at all");
+        assert_eq!(v["raw"], "not json at all");
+        let v2 = project_agent_info(r#"{"agentInfo":"{broken","signature":"x"}"#);
+        assert_eq!(v2["raw"], r#"{"agentInfo":"{broken","signature":"x"}"#);
+    }
+}
+
 #[cfg(test)]
 mod c3_serve_head_preference_tests {
     use super::*;
