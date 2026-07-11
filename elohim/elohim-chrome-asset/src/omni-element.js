@@ -158,6 +158,7 @@
     'color: var(--omni-fg, rgba(20,22,30,0.96)); padding: 0 0.25rem; ' +
     'background: transparent; border: none; font: inherit; cursor: pointer; }\n' +
     '#elohim-omni .omni-resilience-neutral { font-size: 12px; line-height: 1; }\n' +
+    '#elohim-omni .omni-resilience-neutral svg { display: block; }\n' +
     // Drilldown card: top-chrome affordances fold DOWN, inline-start-aligned
     // (omnibar spec §11 tooltip-direction convention — never up off-screen).
     '#elohim-omni .omni-resilience-card { position: absolute; top: 100%; ' +
@@ -537,9 +538,140 @@
       });
   }
 
-  /// Glyph ladder over the ResilienceSnapshotView contract:
-  /// protectionStatus "protected" → ● · "partial" → ◐ · "at-risk" → ○.
-  var RESILIENCE_GLYPHS = { protected: '●', partial: '◐', 'at-risk': '○' };
+  // ── Resilience dial — deterministic three-plane glyph ─────────────────────
+  // One dial, three complications in FIXED slots (watch-face discipline —
+  // nothing moves, only state changes; same snapshot → same drawing; every
+  // state keeps the vertical mirror axis). Design sheet:
+  // genesis/graphos/design-assets/curated/omni-resilience-dial/index.html
+  //   bezel ring  = doorway plane (reach hint): solid=local · +crown=local-hub
+  //                 · dashed=remote
+  //   orbit triad = p2p plane (replication vs the content's floor): symmetric
+  //                 configs 0={} 1={bottom} 2={top pair + chord} 3=all; the
+  //                 triad CLOSES only when the floor is met (protected)
+  //   center mark = dht plane (trust): commitment-backed → amber 4-point star
+  //                 (the elohim seal), else hollow dot
+  // Unmeasured stays honest: all orbit slots faint, never a fake verdict.
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var DIAL_AMBER = 'var(--omni-amber, #D4A03E)';
+
+  function svgEl(name, attrs) {
+    var e = document.createElementNS(SVG_NS, name);
+    for (var k in attrs) {
+      if (Object.prototype.hasOwnProperty.call(attrs, k)) e.setAttribute(k, String(attrs[k]));
+    }
+    return e;
+  }
+
+  // Doorway-plane hint from the serving location (client-side, best-effort):
+  // loopback (Tauri sidecar, local dev stack) → local; mDNS *.local or
+  // private-LAN host → local-hub; anything else → remote.
+  function reachHint() {
+    try {
+      var h = (window.location && window.location.hostname) || '';
+      if (h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === 'tauri.localhost') {
+        return 'local';
+      }
+      if (
+        /\.local$/.test(h) ||
+        /^10\./.test(h) ||
+        /^192\.168\./.test(h) ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(h)
+      ) {
+        return 'hub';
+      }
+      return 'remote';
+    } catch (e) {
+      return 'remote';
+    }
+  }
+
+  function renderDial(state) {
+    var s = svgEl('svg', { width: 18, height: 18, viewBox: '0 0 24 24', 'aria-hidden': 'true' });
+    var cx = 12;
+    var cy = 12;
+    // bezel — doorway plane
+    var bezel = svgEl('circle', {
+      cx: cx, cy: cy, r: 10.5, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.6
+    });
+    if (state.reach === 'remote') {
+      bezel.setAttribute('stroke-dasharray', '2.4 2.2');
+      bezel.setAttribute('opacity', '0.65');
+    }
+    s.appendChild(bezel);
+    if (state.reach === 'hub') {
+      // the "crown" at 12 o'clock — the home-hub antenna, on the mirror axis
+      s.appendChild(svgEl('line', {
+        x1: 12, y1: 0.2, x2: 12, y2: 3.4,
+        stroke: 'currentColor', 'stroke-width': 1.6, 'stroke-linecap': 'round'
+      }));
+    }
+    // orbit triad — p2p plane (slots: 0=topL 210° · 1=topR 330° · 2=bottom 90°)
+    var R = 6.8;
+    var pts = [210, 330, 90].map(function (a) {
+      var r = (a * Math.PI) / 180;
+      return { x: cx + R * Math.cos(r), y: cy + R * Math.sin(r) };
+    });
+    var lit = state.measured ? Math.max(0, Math.min(3, state.lit)) : 0;
+    // symmetric configuration per count — a state display, not an accumulation
+    var CONFIG = [[], [2], [0, 1], [0, 1, 2]];
+    var on = CONFIG[lit];
+    var stroke = state.sealed ? DIAL_AMBER : 'currentColor';
+    var chords =
+      lit >= 2 ? (lit === 3 && state.floorMet ? [[0, 1], [1, 2], [2, 0]] : [[0, 1]]) : [];
+    for (var c = 0; c < chords.length; c++) {
+      s.appendChild(svgEl('line', {
+        x1: pts[chords[c][0]].x, y1: pts[chords[c][0]].y,
+        x2: pts[chords[c][1]].x, y2: pts[chords[c][1]].y,
+        stroke: stroke, 'stroke-width': 1.2, opacity: 0.9
+      }));
+    }
+    for (var i = 0; i < pts.length; i++) {
+      var isOn = on.indexOf(i) !== -1;
+      s.appendChild(svgEl('circle', {
+        cx: pts[i].x, cy: pts[i].y, r: isOn ? 2.0 : 1.4,
+        fill: isOn ? stroke : 'none',
+        stroke: isOn ? 'none' : 'currentColor', 'stroke-width': 1.0,
+        opacity: isOn ? 1 : state.measured ? 0.4 : 0.22
+      }));
+    }
+    // center — dht trust plane
+    if (state.sealed) {
+      var d = '';
+      for (var j = 0; j < 8; j++) {
+        var a = -Math.PI / 2 + (j * Math.PI) / 4;
+        var r = j % 2 === 0 ? 3.4 : 1.05;
+        d += (j === 0 ? 'M' : 'L') + (cx + r * Math.cos(a)).toFixed(2) + ' ' +
+          (cy + r * Math.sin(a)).toFixed(2);
+      }
+      s.appendChild(svgEl('path', { d: d + 'Z', fill: DIAL_AMBER }));
+    } else {
+      s.appendChild(svgEl('circle', {
+        cx: cx, cy: cy, r: 1.5, fill: 'none',
+        stroke: 'currentColor', 'stroke-width': 1, opacity: 0.55
+      }));
+    }
+    return s;
+  }
+
+  // Map the ResilienceSnapshotView wire shape onto the dial's three planes.
+  function dialStateFromSnapshot(data, status, felt) {
+    var floor = felt && felt.floor && typeof felt.floor === 'object' ? felt.floor : null;
+    var has =
+      floor && typeof floor.hasHouseholds === 'number'
+        ? floor.hasHouseholds
+        : typeof data.stewardingCollectives === 'number'
+          ? data.stewardingCollectives
+          : 0;
+    return {
+      reach: reachHint(),
+      measured: data.distributionState !== 'unmeasured',
+      lit: Math.min(3, has),
+      floorMet: status === 'protected',
+      sealed:
+        typeof data.commitmentBackedCollectives === 'number' &&
+        data.commitmentBackedCollectives > 0
+    };
+  }
 
   function applyResilience(omni, data) {
     try {
@@ -549,17 +681,24 @@
         typeof data.protectionStatus === 'string' ? data.protectionStatus : null;
       var felt = data.feltStatus && typeof data.feltStatus === 'object' ? data.feltStatus : null;
       var headline = felt && typeof felt.headline === 'string' ? felt.headline : null;
-      var glyph = status ? RESILIENCE_GLYPHS[status] || null : null;
       var label = headline || (status ? 'Resilience: ' + status : null);
-      if (!glyph && !label) {
+      if (!status && !label) {
         omni.setAttribute('data-omni-resilience-loaded', 'unmatched');
         return;
       }
       omni.setAttribute('data-omni-resilience-loaded', 'applied');
+      var ds = dialStateFromSnapshot(data, status, felt);
       var marks = omni.querySelectorAll('[data-omni-resilience-glyph]');
       for (var i = 0; i < marks.length; i++) {
-        if (glyph) marks[i].textContent = glyph;
+        while (marks[i].firstChild) marks[i].removeChild(marks[i].firstChild);
+        marks[i].appendChild(renderDial(ds));
         if (label) marks[i].setAttribute('title', label);
+        // page-model legibility: the DOM testifies each plane's state
+        marks[i].setAttribute('data-omni-dial-reach', ds.reach);
+        marks[i].setAttribute('data-omni-dial-lit', String(ds.lit));
+        marks[i].setAttribute('data-omni-dial-floor', ds.floorMet ? 'met' : 'short');
+        marks[i].setAttribute('data-omni-dial-sealed', ds.sealed ? '1' : '0');
+        marks[i].setAttribute('data-omni-dial-measured', ds.measured ? '1' : '0');
       }
       renderResilienceCard(omni, data, status, felt);
     } catch (e) {

@@ -265,8 +265,11 @@ mod tests {
             "reassurance",
             "coverageShortfall",
             "stewardingCollectives",
+            "commitmentBackedCollectives",
             "diversityScore",
             "distributionState",
+            "floor",
+            "hasHouseholds",
         ] {
             assert!(
                 ELEMENT_JS.contains(field),

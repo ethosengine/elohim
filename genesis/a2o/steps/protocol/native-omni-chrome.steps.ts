@@ -47,10 +47,14 @@ const RESILIENCE_GLYPH = `${OMNI} [data-omni-resilience-glyph]`;
 const RESILIENCE_CARD = `${OMNI} [data-omni-resilience-card]`;
 const RESILIENCE_HEADLINE = `${RESILIENCE_CARD} .omni-resilience-headline`;
 
-/// Glyph ladder omni-element.js's applyResilience() maps protectionStatus to
-/// (protected ● / partial ◐ / at-risk ○) — mirrors RESILIENCE_GLYPHS there.
-/// The neutral ◉ (never in this set) is the un-loaded placeholder glyph.
-const LIVE_GLYPHS = ['●', '◐', '○']; // ● ◐ ○
+/// omni-element.js's applyResilience() renders the three-plane resilience
+/// DIAL (an inline <svg>) into the glyph mark and testifies each plane's
+/// state via data-omni-dial-* attributes (reach/lit/floor/sealed/measured).
+/// The neutral ◉ text placeholder (no svg, no dial attrs) is the un-loaded
+/// state the element ships with — and what the phantom-contract regression
+/// left behind forever.
+const DIAL_SVG = `${OMNI} [data-omni-resilience-glyph] svg`;
+const DIAL_REACHES = ['local', 'hub', 'remote'];
 const PHANTOM_TITLE = 'Resilience snapshot unavailable';
 
 const NO_PW_DEVICE_PENDING = 'pending';
@@ -191,10 +195,10 @@ Then(
 );
 
 /**
- * The glyph must be a live protection-status symbol (● protected / ◐ partial
- * / ○ at-risk), never the neutral ◉ placeholder the element ships with
- * before a snapshot applies (or forever, under the phantom-contract
- * regression).
+ * The glyph must be the live three-plane resilience DIAL — an inline <svg>
+ * plus the data-omni-dial-* state attributes — never the neutral ◉ text
+ * placeholder the element ships with before a snapshot applies (or forever,
+ * under the phantom-contract regression).
  *
  * Example:
  *   Then the native omni resilience glyph shows a live protection state
@@ -204,11 +208,21 @@ Then(
   async function (this: E2EWorld) {
     const device = await ensureNativeOmniVisitor(this);
     if (!device) return NO_PW_DEVICE_PENDING;
-    const text = (await device.page.locator(RESILIENCE_GLYPH).first().textContent())?.trim();
+    const dialCount = await device.page.locator(DIAL_SVG).count();
     assert.ok(
-      text && LIVE_GLYPHS.includes(text),
-      `Expected the resilience glyph to be one of ${LIVE_GLYPHS.join(' / ')} (never the neutral ` +
-        `◉ placeholder), got "${String(text)}"`
+      dialCount > 0,
+      'Expected the resilience mark to contain the dial <svg> (never the neutral ◉ text placeholder)'
+    );
+    const mark = device.page.locator(RESILIENCE_GLYPH).first();
+    const reach = await mark.getAttribute('data-omni-dial-reach');
+    assert.ok(
+      reach !== null && DIAL_REACHES.includes(reach),
+      `Expected data-omni-dial-reach in {${DIAL_REACHES.join(', ')}}, got "${String(reach)}"`
+    );
+    const lit = await mark.getAttribute('data-omni-dial-lit');
+    assert.ok(
+      lit !== null && ['0', '1', '2', '3'].includes(lit),
+      `Expected data-omni-dial-lit in 0..3, got "${String(lit)}"`
     );
     return undefined;
   }

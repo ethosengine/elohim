@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Omni resilience dial — v1 concept</title>
+<style>
+  :root {
+    --amber: #D4A03E; --night: #0F1A12; --starlight: #E8E4D9;
+    --fg: #2A2620; --bg: #F4F0E8;
+  }
+  body { background: var(--bg); color: var(--fg); margin: 0;
+    font: 15px/1.5 ui-sans-serif, system-ui; padding: 40px 5vw 120px; }
+  h1 { font-weight: 500; font-size: 34px; margin: 0 0 6px; }
+  .lede { font-style: italic; opacity: .75; max-width: 62ch; margin-bottom: 8px; }
+  h2 { font-weight: 500; font-size: 22px; margin: 44px 0 4px; }
+  .sub { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; opacity: .5; margin-bottom: 16px; }
+  table { border-collapse: collapse; background: #fff; border-radius: 14px;
+    box-shadow: 0 1px 8px rgba(0,0,0,.07); overflow: hidden; }
+  th, td { padding: 12px 16px; text-align: center; font-size: 12px; border-bottom: 1px solid rgba(0,0,0,.05); }
+  th { text-transform: uppercase; letter-spacing: .08em; font-size: 10px; opacity: .55; }
+  td.rowlabel { text-align: left; font-size: 12.5px; max-width: 22ch; }
+  td.rowlabel .k { font-weight: 600; display: block; }
+  td.rowlabel .d { opacity: .55; font-size: 11px; }
+  .dark { background: var(--night); color: var(--starlight); }
+  .dark th, .dark td { border-color: rgba(232,228,217,.08); }
+  .strip { display: flex; gap: 28px; align-items: center; background: var(--night);
+    border-radius: 14px; padding: 22px 26px; color: var(--starlight); }
+  .strip .cell { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .strip .cap { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; opacity: .55; }
+  .omnirow { display: inline-flex; align-items: center; gap: 8px; background: var(--night);
+    color: var(--starlight); border: 1px solid rgba(232,228,217,.2); border-radius: 999px;
+    padding: 6px 14px; font: 12px ui-monospace, monospace; }
+  .omnirow.light { background: #fff; color: var(--fg); border-color: rgba(0,0,0,.14); }
+</style>
+</head>
+<body>
+<h1>Omni resilience dial — v1</h1>
+<p class="lede">One dial, three complications in fixed slots — bezel = doorway plane (reach hint),
+orbit constellation = p2p plane (replication vs the floor), center = dht plane (trust seal).
+Deterministic: same snapshot, same drawing. Nothing moves; only state changes.</p>
+
+<h2>State matrix</h2>
+<div class="sub">rows: replication × trust · columns: doorway plane (bezel)</div>
+<table id="matrix"></table>
+
+<h2>Dark chrome (omni context)</h2>
+<div class="sub">same states on the night chrome</div>
+<table id="matrix-dark" class="dark"></table>
+
+<h2>Size ladder</h2>
+<div class="sub">48 / 24 / 18 / 14 px — protected · sealed · remote</div>
+<div class="strip" id="sizes"></div>
+
+<h2>In the omni chip</h2>
+<div class="sub">18px inline next to the EPR id</div>
+<div style="display:flex; gap:14px; flex-wrap:wrap;">
+  <span class="omnirow"><span id="chip1"></span> EPR elohim-host-landing</span>
+  <span class="omnirow"><span id="chip2"></span> EPR elohim-host-landing</span>
+  <span class="omnirow light"><span id="chip3"></span> EPR elohim-host-landing</span>
+</div>
+
+<script>
+// ── the dial — deterministic renderer ──────────────────────────────────────
+// state = {
+//   reach: 'local' | 'hub' | 'remote',          // doorway plane → bezel
+//   lit: 0..3, floorMet: bool, measured: bool,  // p2p plane → orbit constellation
+//   sealed: bool                                 // dht plane → center mark
+// }
+const NS = 'http://www.w3.org/2000/svg';
+function el(name, attrs) {
+  const e = document.createElementNS(NS, name);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function dial(state, size, ink, amber) {
+  ink = ink || 'currentColor'; amber = amber || 'var(--amber)';
+  const s = el('svg', { width: size, height: size, viewBox: '0 0 24 24', role: 'img' });
+  const cx = 12, cy = 12;
+
+  // ── bezel: doorway plane. solid=local · solid+tick=hub · dashed=remote
+  const bezel = el('circle', { cx, cy, r: 10.5, fill: 'none', stroke: ink, 'stroke-width': 1.6 });
+  if (state.reach === 'remote') {
+    bezel.setAttribute('stroke-dasharray', '2.4 2.2');
+    bezel.setAttribute('opacity', '0.65');
+  }
+  s.appendChild(bezel);
+  if (state.reach === 'hub') {
+    // hub tick: a short radial mark at 12 o'clock — the "home antenna"
+    s.appendChild(el('line', { x1: 12, y1: 0.2, x2: 12, y2: 3.4, stroke: ink, 'stroke-width': 1.6, 'stroke-linecap': 'round' }));
+  }
+
+  // ── orbit constellation: p2p plane. 3 fixed slots, top-left/top-right/bottom.
+  const R = 6.8;
+  // slots: 0=topL(210deg) 1=topR(330deg) 2=bottom(90deg) — vertical mirror axis
+  const ang = [210, 330, 90];
+  const pts = ang.map(a => {
+    const r = a * Math.PI / 180;
+    return { x: cx + R * Math.cos(r), y: cy + R * Math.sin(r) };
+  });
+  const lit = state.measured ? Math.max(0, Math.min(3, state.lit)) : 0;
+  // SYMMETRIC configurations per count (state display, not accumulation):
+  // 0={} 1={bottom} 2={topL,topR} 3=all — every state keeps the mirror axis.
+  const CONFIG = [[], [2], [0, 1], [0, 1, 2]];
+  const on = CONFIG[lit];
+  // constellation chords: 2 lit -> top chord; 3 lit -> top chord; floorMet -> closed triad.
+  const chords = lit >= 2 ? (lit === 3 && state.floorMet
+    ? [[0, 1], [1, 2], [2, 0]] : [[0, 1]]) : [];
+  chords.forEach(([a, b]) => {
+    s.appendChild(el('line', { x1: pts[a].x, y1: pts[a].y, x2: pts[b].x, y2: pts[b].y,
+      stroke: state.sealed ? amber : ink, 'stroke-width': 1.2, opacity: 0.9 }));
+  });
+  pts.forEach((p, i) => {
+    const isOn = on.includes(i);
+    s.appendChild(el('circle', { cx: p.x, cy: p.y, r: isOn ? 2.0 : 1.4,
+      fill: isOn ? (state.sealed ? amber : ink) : 'none',
+      stroke: isOn ? 'none' : ink, 'stroke-width': 1.0,
+      opacity: isOn ? 1 : (state.measured ? 0.4 : 0.22) }));
+  });
+
+  // ── center: dht trust plane. sealed = amber 4-point star; else hollow dot.
+  if (state.sealed) {
+    // 4-point star (the logo's sparkle): diamond with concave sides
+    const r1 = 3.4, r0 = 1.05;
+    let d = '';
+    for (let i = 0; i < 8; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 4;
+      const r = i % 2 === 0 ? r1 : r0;
+      d += (i === 0 ? 'M' : 'L') + (cx + r * Math.cos(a)).toFixed(2) + ' ' + (cy + r * Math.sin(a)).toFixed(2);
+    }
+    s.appendChild(el('path', { d: d + 'Z', fill: amber }));
+  } else {
+    s.appendChild(el('circle', { cx, cy, r: 1.5, fill: 'none', stroke: ink, 'stroke-width': 1, opacity: 0.55 }));
+  }
+  return s;
+}
+
+// ── matrices ────────────────────────────────────────────────────────────────
+const ROWS = [
+  { k: 'Unmeasured', d: 'never entered distribution', st: { lit: 0, floorMet: false, measured: false, sealed: false } },
+  { k: 'At risk · 0/3', d: 'measured, nobody holds it', st: { lit: 0, floorMet: false, measured: true, sealed: false } },
+  { k: 'At risk · 1/3', d: 'one holder', st: { lit: 1, floorMet: false, measured: true, sealed: false } },
+  { k: 'Partial · 2/3', d: 'two holders, line forms', st: { lit: 2, floorMet: false, measured: true, sealed: false } },
+  { k: 'Protected · 3/3', d: 'floor met, triad closes', st: { lit: 3, floorMet: true, measured: true, sealed: false } },
+  { k: 'Protected + sealed', d: 'commitment-backed (DHT trust)', st: { lit: 3, floorMet: true, measured: true, sealed: true } },
+  { k: 'Partial + sealed', d: 'committed but under floor', st: { lit: 2, floorMet: false, measured: true, sealed: true } },
+];
+const COLS = [
+  { k: 'local', reach: 'local' },
+  { k: 'local-hub', reach: 'hub' },
+  { k: 'remote', reach: 'remote' },
+];
+function buildMatrix(tid, size) {
+  const t = document.getElementById(tid);
+  const hr = document.createElement('tr');
+  hr.appendChild(document.createElement('th'));
+  COLS.forEach(c => { const th = document.createElement('th'); th.textContent = c.k; hr.appendChild(th); });
+  t.appendChild(hr);
+  ROWS.forEach(r => {
+    const tr = document.createElement('tr');
+    const lbl = document.createElement('td'); lbl.className = 'rowlabel';
+    lbl.innerHTML = '<span class="k">' + r.k + '</span><span class="d">' + r.d + '</span>';
+    tr.appendChild(lbl);
+    COLS.forEach(c => {
+      const td = document.createElement('td');
+      td.appendChild(dial({ ...r.st, reach: c.reach }, size));
+      tr.appendChild(td);
+    });
+    t.appendChild(tr);
+  });
+}
+buildMatrix('matrix', 34);
+buildMatrix('matrix-dark', 34);
+
+// size ladder
+const sizes = document.getElementById('sizes');
+[48, 24, 18, 14].forEach(sz => {
+  const c = document.createElement('div'); c.className = 'cell';
+  c.appendChild(dial({ reach: 'remote', lit: 3, floorMet: true, measured: true, sealed: true }, sz));
+  const cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = sz + 'px';
+  c.appendChild(cap);
+  sizes.appendChild(c);
+});
+
+// omni chips
+document.getElementById('chip1').appendChild(dial({ reach: 'remote', lit: 1, floorMet: false, measured: true, sealed: false }, 18));
+document.getElementById('chip2').appendChild(dial({ reach: 'remote', lit: 3, floorMet: true, measured: true, sealed: true }, 18));
+document.getElementById('chip3').appendChild(dial({ reach: 'local', lit: 2, floorMet: false, measured: true, sealed: false }, 18));
+</script>
+</body>
+</html>
