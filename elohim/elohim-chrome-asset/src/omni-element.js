@@ -508,14 +508,21 @@
     // fall back to the base snapshot for older storage builds.
     var base = '/api/v1/resilience/' + encodeURIComponent(slug);
     var opts = { headers: { accept: 'application/json' }, credentials: 'same-origin' };
+    function fetchBase() {
+      return window.fetch(base, opts).then(function (r2) {
+        if (!r2 || !r2.ok) return null;
+        return r2.json();
+      });
+    }
     window
       .fetch(base + '/household', opts)
       .then(function (resp) {
-        if (resp && resp.ok) return resp.json();
-        return window.fetch(base, opts).then(function (r2) {
-          if (!r2 || !r2.ok) return null;
-          return r2.json();
-        });
+        if (resp && resp.ok) {
+          // A 200 whose body fails to parse (e.g. an older build's catch-all
+          // serving the HTML shell) still falls back to the base snapshot.
+          return resp.json().catch(fetchBase);
+        }
+        return fetchBase();
       })
       .then(function (data) {
         if (!data) {
@@ -556,7 +563,12 @@
       }
       renderResilienceCard(omni, data, status, felt);
     } catch (e) {
-      /* never let a projection-shape surprise break the page. */
+      /* never let a projection-shape surprise break the page — but never
+       * strand the marker on "loading" either (a post-"applied" throw keeps
+       * its applied state; only an early throw downgrades). */
+      if (omni.getAttribute('data-omni-resilience-loaded') === 'loading') {
+        omni.setAttribute('data-omni-resilience-loaded', 'unmatched');
+      }
     }
   }
 
