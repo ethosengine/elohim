@@ -4038,6 +4038,12 @@ impl HttpServer {
             "gate-decision-challenges",
             "challenge-outcomes",
             "elohim-reputation",
+            // Conductor/network diagnostics namespace (dht-unity T3). Without
+            // this entry, "p2p" is consumed as an h_app_id and the
+            // conductor-diagnostics dispatch arm is dead code (the shadow
+            // class this comment block warns about — proven live on edge
+            // #1172: route 404'd "Unknown database endpoint" on new pods).
+            "p2p",
         ];
         for prefix in &legacy_prefixes {
             if sub_path == *prefix || sub_path.starts_with(&format!("{}/", prefix)) {
@@ -14805,6 +14811,17 @@ mod admission_tests {
 #[cfg(test)]
 mod conductor_diagnostics_tests {
     use super::project_agent_info;
+
+    #[test]
+    fn p2p_namespace_survives_app_context_extraction() {
+        // Regression (edge #1172): "p2p" absent from legacy_prefixes made
+        // extract_app_context eat it as an h_app_id (resource_path became
+        // "conductor-diagnostics"), turning the dispatch arm into dead code
+        // and 404ing the deployed route.
+        let (_ctx, resource_path) =
+            super::HttpServer::extract_app_context("p2p/conductor-diagnostics");
+        assert_eq!(resource_path, "p2p/conductor-diagnostics");
+    }
 
     #[test]
     fn projects_string_wrapped_agent_info() {
