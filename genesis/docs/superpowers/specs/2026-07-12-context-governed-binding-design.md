@@ -138,7 +138,36 @@ built for content, governance, and lineage. Five mappings, each naming a primiti
    flattening of §1(b) is structurally impossible here, because there is no single global binding slot
    to flatten *into* — resolution is always relative to a reach layer.
 
-## 4. How this collapses the variety problem
+## 4. Annotation vocabulary (developer shorthand)
+
+Two annotations name the pattern's roles in protocol terms — deliberate inversions of their
+dependency-injection ancestors (operator-coined, 2026-07-12):
+
+**`@Humilifier`** (inverts `@Qualifier`). A qualifier *asserts*: the developer unilaterally names
+the winning implementation, end of conversation. A humilifier *submits*: it declares a candidate
+binding together with its accountability — the EPR it answers to, the provenance of its claim, the
+standing it stakes. Qualification claims fitness; humilification declares accountability. It is the
+annotation form of bounded authority that is itself accountable.
+
+**`@Truth`** (what resolution yields at runtime). The binding actually considered and selected in a
+context. Three properties, each load-bearing:
+
+1. **Plural.** More than one `@Truth` can hold at the same time: truth is context-scoped — a
+   household binds A while its community binds B, both simultaneously true because truth is
+   reach-scoped. The plurality is a declared-HEAD DAG, never ambiguity.
+2. **Negotiable — atop a non-negotiable witness layer.** Which claim binds is established by
+   negotiation and judgment carrying provenance, and is revisable as evidence (REA feedback)
+   accumulates. What is NOT negotiable is the layer beneath: who claimed what, when — the notary
+   floor is immutable record. `@Truth` selects among witnessed claims; it never edits the
+   witnesses. Negotiable binding atop non-negotiable witness is what separates this from
+   relativism.
+3. **Bounded by love / human flourishing.** The negotiation's terminal criterion is not
+   consistency, recency, or majority but service to human flourishing — the protocol's telos
+   (Mishpat as restoration; mutual flourishing as the crystallization test). This is the deliberate
+   contrast with chain-consensus "truth-shaped" systems the protocol rejects: those make truth
+   singular, mechanical, and incentive-bounded; `@Truth` is contextual, judged, and love-bounded.
+
+## 5. How this collapses the variety problem
 
 Tie §2 and §3 together. Four moves, each one a VSM/Ashby operation realized by an existing primitive,
 turn the unwinnable variety race into a satisfiable one:
@@ -171,7 +200,7 @@ claiming the same decision), content renderers (two renderers for one content ty
 shape appears, an EPR anchors the interface, a declared context-scoped head is the binding, elohim
 negotiation is the resolver, and REA signals are the self-updating qualifier.
 
-## 5. The motivating specimen (today's)
+## 6. The motivating specimen (today's)
 
 The crystallization has a concrete, dated cause. Two implementations of one addressing interface live
 in the substrate right now: **`brit-epr::BritCid`** and **`eprfs-core::BlobCid`**. Both compute a CIDv1
@@ -196,7 +225,7 @@ resolution — `eprfs-core::BlobCid` as the shared derivation owner, the newtype
 *not* unified — is itself a binding decision of exactly this shape: a declared head over kin, made by
 judgment over the tradeoff, with the tag-42 hazard as the lodged evidence.)
 
-## 6. Floor / ceiling
+## 7. Floor / ceiling
 
 Matching the dogfood spec's floor/ceiling discipline:
 
@@ -221,7 +250,7 @@ Matching the dogfood spec's floor/ceiling discipline:
   new sibling (the kinship spec's "relatedness proposes; anchored authority + judgment disposes,"
   applied to bindings).
 
-## 7. P2P design-gate note
+## 8. P2P design-gate note
 
 This spec introduces **no data entity, table, route, or entry type**, so it opens no new design-gate
 obligation. The p2p-design-gate for this arc **already ran with the kinship-lineage spec** — whose §5
