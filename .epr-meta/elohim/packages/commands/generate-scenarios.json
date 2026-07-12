@@ -1,0 +1,39 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "CommandPackage",
+  "metadata": {
+    "id": "generate-scenarios",
+    "name": "generate-scenarios",
+    "version": "1.0.0",
+    "description": "Generate Executable BDD Scenarios from Gap Report",
+    "form": "command",
+    "sourceRuntime": "claude",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/commands/generate-scenarios",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "source": {
+    "language": "markdown",
+    "path": ".claude/commands/generate-scenarios.md",
+    "body": "# Generate Executable BDD Scenarios from Gap Report\n\nRead the BDD coverage gap report and generate executable feature files + step definition skeletons for the top priority gaps.\n\n**Argument**: Number of gaps to generate for (default: 3). Pass as `$ARGUMENTS`.\n\n## Steps\n\n1. Read the gap report:\n```\ngenesis/a2o/reports/coverage-gap-report.json\n```\n\nIf the report doesn't exist, run the scanner first:\n```bash\ncd genesis/a2o && npx tsx scripts/scan-coverage.ts\n```\n\n2. For the top N gaps (from `prioritizedGaps`, where N = `$ARGUMENTS` or 3):\n\n### a. Read Source Genesis Features\nFor each gap, find the genesis feature files that match the gap's domain + governance layer:\n```\ngenesis/docs/content/elohim-protocol/{domain}/{user_type}/scenarios/{governance_layer}.feature\n```\n\nRead these files to understand the conceptual scenarios.\n\n### b. Read Existing Executable Features as Style Reference\nRead these files to match the executable style:\n- `genesis/a2o/features/federation/cross-doorway-content.feature` — feature file pattern\n- `genesis/a2o/steps/federation.steps.ts` — step definition pattern\n\n### c. Generate Feature Files\nCreate `.feature` files at the `suggestedFeatureFile` path from the gap report.\n\n**Translation strategy**: conceptual scenarios describe human experiences. Executable scenarios test the API contracts that would support those flows. For example:\n- \"Workers implement community meal program\" -> test content creation + tagging + cross-doorway discovery\n- \"Workers welcome community stakeholder input\" -> test content creation + governance metadata + search\n\nEach generated feature should:\n- Use `@e2e @{epic}` tags on the first line\n- Include a Background with doorway health checks\n- Translate 3-5 conceptual scenarios into executable ones\n- Use Given/When/Then with the existing step patterns (human registration, content creation, content discovery)\n- Add `@wip` tag to scenarios that need step definitions not yet implemented\n\n### d. Generate Step Definition Skeletons\nCreate skeleton step files at `genesis/a2o/steps/{epic}.steps.ts`.\n\nEach skeleton should:\n- Import from `@cucumber/cucumber` (Given, When, Then)\n- Import `E2EWorld`, `Human`, `BrowserDevice` from the framework\n- Include stub step definitions matching the new feature file\n- Mark incomplete steps with `// TODO: implement` comments\n- Follow the pattern from `federation.steps.ts`\n\n### e. Verify\nFor each generated file:\n- Ensure the feature file parses (no syntax errors)\n- Ensure the step file compiles (typecheck)\n\n3. Report what was generated:\n- List of new feature files with scenario counts\n- List of new step definition files\n- Which steps are fully implemented vs TODO\n- Updated coverage estimate (run scanner again)\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/commands/generate-scenarios.md"
+    },
+    "codex": {
+      "path": ".codex/commands/generate-scenarios.md"
+    }
+  }
+}

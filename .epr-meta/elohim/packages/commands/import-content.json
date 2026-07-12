@@ -1,0 +1,39 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "CommandPackage",
+  "metadata": {
+    "id": "import-content",
+    "name": "import-content",
+    "version": "1.0.0",
+    "description": "Content Import Command",
+    "form": "command",
+    "sourceRuntime": "claude",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/commands/import-content",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "source": {
+    "language": "markdown",
+    "path": ".claude/commands/import-content.md",
+    "body": "# Content Import Command\n\nImport content from source files into lamad ContentNodes.\n\n## Usage\n\n```\n/import-content [action] [options]\n```\n\n## Actions\n\n- `import` - Run incremental import (default)\n- `full` - Run full reimport\n- `preview` - Preview what would change\n- `stats` - Show import statistics\n- `validate` - Validate manifest integrity\n\n## What This Does\n\nThis command triggers the elohim-service content import pipeline:\n\n1. **Scans** `/docs/content/` for markdown (.md) and Gherkin (.feature) files\n2. **Parses** each file extracting:\n   - Path metadata (domain, epic, user type)\n   - YAML frontmatter\n   - Content sections\n   - Gherkin scenarios\n3. **Transforms** content into ContentNodes:\n   - Source nodes (raw content for provenance)\n   - Epic nodes\n   - Role/Archetype nodes\n   - Scenario nodes\n   - Resource nodes\n4. **Extracts relationships** between nodes:\n   - Explicit references\n   - Path-based (same epic/user type)\n   - Tag-based similarity\n   - Content references\n5. **Writes output** to `/output/lamad/`:\n   - `nodes.json` - All ContentNodes\n   - `relationships.json` - Node relationships\n   - `content-manifest.json` - For incremental updates\n   - `import-summary.json` - Statistics\n\n## Example Prompts\n\n- \"Import all content to lamad format\"\n- \"Run a full content reimport\"\n- \"Preview what files have changed since last import\"\n- \"Show me the import statistics\"\n- \"Validate the import manifest\"\n\n## Implementation\n\nLocated at: `elohim-library/projects/elohim-service/`\n\nTo run manually:\n```bash\ncd elohim-library/projects/elohim-service\nnpx ts-node src/cli/import.ts import --source ../../docs/content --output ../../output/lamad\n```\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/commands/import-content.md"
+    },
+    "codex": {
+      "path": ".codex/commands/import-content.md"
+    }
+  }
+}

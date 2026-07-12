@@ -1,0 +1,76 @@
+{
+  "$id": "elohim-agent:schema:package:command",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CommandPackage",
+  "description": "Canonical Elohim-native package for a slash-command prompt (.claude/commands/<name>.md). The command body is VERBATIM markdown (optional frontmatter + body); its runtime projections are byte-identical mirrors — a claude home (.claude/commands/<name>.md, the authored source) and a codex home (.codex/commands/<name>.md). Commands are imported source-fidelity (Claude source stays authored; the package is a certified mirror), not planted: the fidelity gate proves project(import(source)) === source byte-for-byte.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "source", "projections"],
+  "properties": {
+    "apiVersion": { "const": "elohim-agent/v1alpha1" },
+    "kind": { "const": "CommandPackage" },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "version",
+        "description",
+        "sourceRuntime",
+        "runtimeTargets",
+        "assetRefs"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "form": { "const": "command" },
+        "sourceRuntime": { "enum": ["claude", "codex", "elohim-agent"] },
+        "runtimeTargets": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["claude", "codex"] }
+        },
+        "master": { "enum": ["source", "package"] },
+        "composedBy": { "type": "string", "minLength": 1 },
+        "assetRefs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": true
+    },
+    "source": {
+      "type": "object",
+      "required": ["language", "path", "body"],
+      "properties": {
+        "language": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "body": { "type": "string", "minLength": 1 },
+        "cid": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "composition": { "type": "string", "minLength": 1 },
+    "projections": {
+      "type": "object",
+      "required": ["claude", "codex"],
+      "properties": {
+        "claude": {
+          "type": "object",
+          "required": ["path"],
+          "properties": { "path": { "type": "string", "minLength": 1 } },
+          "additionalProperties": false
+        },
+        "codex": {
+          "type": "object",
+          "required": ["path"],
+          "properties": { "path": { "type": "string", "minLength": 1 } },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

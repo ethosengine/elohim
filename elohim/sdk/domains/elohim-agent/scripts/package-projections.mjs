@@ -19,6 +19,12 @@ import {
   runtimeForDoc,
   verifyAgentDocPackage,
 } from './agent-doc-packages.mjs';
+import {
+  COMMAND_KIND,
+  commandPackageFromSource,
+  projectCommand,
+  verifyCommandPackage,
+} from './command-packages.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DOMAIN_DIR = resolve(__dirname, '..');
@@ -40,6 +46,7 @@ const GOVERNANCE_CURSOR_PATH = resolve(REPO_ROOT, '.claude/data/governance-curso
 const SKILL_SOURCE_DIR = resolve(REPO_ROOT, '.claude/skills');
 const AGENT_SOURCE_DIR = resolve(REPO_ROOT, '.claude/agents');
 const HOOK_SOURCE_DIR = resolve(REPO_ROOT, '.claude/hooks');
+const COMMAND_SOURCE_DIR = resolve(REPO_ROOT, '.claude/commands');
 // Registration surface for hooks. READ-ONLY here: recorded into the package and
 // reconciled against, NEVER auto-written (a bad settings.json write can wedge
 // the whole PreToolUse gating toolchain).
@@ -738,7 +745,56 @@ async function loadSourcePackages({ skillDir = SKILL_SOURCE_DIR, agentDir = AGEN
     sourcePackages.push(pkg);
   }
 
+  for (const pkg of await loadSourceCommands()) {
+    sourcePackages.push(pkg);
+  }
+
   return sourcePackages;
+}
+
+// Command source loading is readdir-driven (like skills/agents, NOT the opt-in
+// package-driven hook/doc path) so first adoption works with no packages present.
+// Commands mostly have no frontmatter, so an inline authority marker is
+// unreliable; instead we read the existing command packages and SKIP any that is
+// package-first (native or FLIPPED master: package) — re-importing its source
+// would clobber the package authority. Un-planted commands (the default here) are
+// imported source-fidelity and guarded by verifySourceFidelity.
+async function loadSourceCommands() {
+  let files = [];
+  try {
+    files = (await readdir(COMMAND_SOURCE_DIR)).filter((name) => name.endsWith('.md')).sort();
+  } catch (error) {
+    if (error?.code === 'ENOENT') return [];
+    throw error;
+  }
+  if (files.length === 0) return [];
+
+  // Ids whose existing package has flipped/native authority — never re-import.
+  const cmdPkgDir = resolve(PACKAGE_DIR, 'commands');
+  const planted = new Set();
+  for (const file of await listJsonFiles(cmdPkgDir)) {
+    const pkg = await readJson(resolve(cmdPkgDir, file));
+    if (pkg.kind === COMMAND_KIND && (pkg.metadata.sourceRuntime !== 'claude' || pkg.metadata.master === 'package')) {
+      planted.add(pkg.metadata.id);
+    }
+  }
+
+  const out = [];
+  for (const file of files) {
+    const srcPath = resolve(COMMAND_SOURCE_DIR, file);
+    const raw = await readIfExists(srcPath);
+    if (raw === null) continue;
+    const id = basename(file, '.md');
+    if (planted.has(id)) continue;
+    out.push(
+      commandPackageFromSource(srcPath, raw, {
+        repoRoot: REPO_ROOT,
+        id,
+        governance: governanceFor('commands', id),
+      }),
+    );
+  }
+  return out;
 }
 
 // Hook source loading is OPT-IN and package-driven — the divergence from the
@@ -819,6 +875,7 @@ async function loadSourceDocs() {
 function packagePathFor(pkg) {
   if (pkg.kind === HOOK_KIND) return resolve(PACKAGE_DIR, 'hooks', `${pkg.metadata.id}.json`);
   if (pkg.kind === AGENT_DOC_KIND) return resolve(PACKAGE_DIR, 'agentdocs', `${pkg.metadata.id}.json`);
+  if (pkg.kind === COMMAND_KIND) return resolve(PACKAGE_DIR, 'commands', `${pkg.metadata.id}.json`);
   return pkg.kind === 'SkillPackage'
     ? resolve(PACKAGE_DIR, 'skills', `${pkg.metadata.id}.json`)
     : resolve(PACKAGE_DIR, 'agents', `${pkg.metadata.id}.json`);
@@ -843,6 +900,12 @@ function projectionFixturePathsFor(pkg) {
     }
     return out;
   }
+  if (pkg.kind === COMMAND_KIND) {
+    return {
+      claude: resolve(PROJECTION_DIR, 'claude/commands', `${pkg.metadata.id}.md`),
+      codex: resolve(PROJECTION_DIR, 'codex/commands', `${pkg.metadata.id}.md`),
+    };
+  }
   return pkg.kind === 'SkillPackage'
     ? {
         claude: resolve(PROJECTION_DIR, 'claude/skills', pkg.metadata.id, 'SKILL.md'),
@@ -865,6 +928,8 @@ function runtimePathsFor(pkg) {
     }
     return out;
   }
+  // CommandPackage and the markdown skill/agent packages both carry claude+codex
+  // projection paths; the generic two-runtime return covers them.
   return {
     claude: resolve(REPO_ROOT, pkg.projections.claude.path),
     codex: resolve(REPO_ROOT, pkg.projections.codex.path),
@@ -879,6 +944,9 @@ function projectedTextFor(pkg, runtime) {
   // rewrites a gospel doc. A DERIVED runtime (codex AGENTS.md from a claude gospel)
   // gets the generated governance preamble + verbatim body; `runtime` selects.
   if (pkg.kind === AGENT_DOC_KIND) return projectAgentDoc(pkg, runtime);
+  // Commands project VERBATIM (byte-for-byte), the same body to both the claude
+  // source home and the codex mirror.
+  if (pkg.kind === COMMAND_KIND) return projectCommand(pkg);
   return runtime === 'claude' ? projectClaude(pkg) : projectCodex(pkg);
 }
 
@@ -912,6 +980,7 @@ async function initLayout() {
   await mkdir(resolve(PACKAGE_DIR, 'agents'), { recursive: true });
   await mkdir(resolve(PACKAGE_DIR, 'hooks'), { recursive: true });
   await mkdir(resolve(PACKAGE_DIR, 'agentdocs'), { recursive: true });
+  await mkdir(resolve(PACKAGE_DIR, 'commands'), { recursive: true });
   await mkdir(resolve(PROJECTION_DIR, 'claude'), { recursive: true });
   await mkdir(resolve(PROJECTION_DIR, 'codex'), { recursive: true });
   try {
@@ -930,15 +999,18 @@ async function loadPackageFixtures() {
   const agentsDir = resolve(PACKAGE_DIR, 'agents');
   const hooksDir = resolve(PACKAGE_DIR, 'hooks');
   const agentDocsDir = resolve(PACKAGE_DIR, 'agentdocs');
+  const commandsDir = resolve(PACKAGE_DIR, 'commands');
   const skillFiles = await listJsonFiles(skillsDir);
   const agentFiles = await listJsonFiles(agentsDir);
   const hookFiles = await listJsonFiles(hooksDir);
   const agentDocFiles = await listJsonFiles(agentDocsDir);
+  const commandFiles = await listJsonFiles(commandsDir);
   return [
     ...(await Promise.all(skillFiles.map((file) => readJson(resolve(skillsDir, file))))),
     ...(await Promise.all(agentFiles.map((file) => readJson(resolve(agentsDir, file))))),
     ...(await Promise.all(hookFiles.map((file) => readJson(resolve(hooksDir, file))))),
     ...(await Promise.all(agentDocFiles.map((file) => readJson(resolve(agentDocsDir, file))))),
+    ...(await Promise.all(commandFiles.map((file) => readJson(resolve(commandsDir, file))))),
   ];
 }
 
@@ -950,11 +1022,15 @@ async function loadValidators() {
   const agentDocSchema = await readJson(
     resolve(DOMAIN_DIR, 'schemas/agent-doc-package.schema.json'),
   );
+  const commandSchema = await readJson(
+    resolve(DOMAIN_DIR, 'schemas/command-package.schema.json'),
+  );
   return {
     skill: ajv.compile(skillSchema),
     agent: ajv.compile(agentSchema),
     hook: ajv.compile(hookSchema),
     agentdoc: ajv.compile(agentDocSchema),
+    command: ajv.compile(commandSchema),
   };
 }
 
@@ -966,7 +1042,9 @@ async function verifyPackage(pkg, validators, settings) {
         ? validators.hook
         : pkg.kind === AGENT_DOC_KIND
           ? validators.agentdoc
-          : validators.agent;
+          : pkg.kind === COMMAND_KIND
+            ? validators.command
+            : validators.agent;
   assert(
     validate(pkg),
     `${pkg.kind} package ${pkg.metadata.id} validates: ${JSON.stringify(validate.errors)}`,
@@ -1019,6 +1097,24 @@ async function verifyPackage(pkg, validators, settings) {
       await verifyProjectionFixture(pkg, runtime);
       await verifyRuntimeProjectionIfPresent(pkg, runtime);
     }
+    return;
+  }
+
+  if (pkg.kind === COMMAND_KIND) {
+    // Commands are VERBATIM markdown, not markdown+frontmatter-package: skip the
+    // markdown-package-only assertions. The byte-identity floor is that both the
+    // claude source home and the codex mirror equal source.body exactly (proved by
+    // verifyProjectionFixture / verifyRuntimeProjectionIfPresent), and the claude
+    // source round-trip by verifySourceFidelity.
+    verifyCommandPackage(pkg, { assert });
+    assert(
+      Boolean(pkg.metadata.governance?.eprRef),
+      `${pkg.metadata.id} has metadata.governance.eprRef`,
+    );
+    await verifyProjectionFixture(pkg, 'claude');
+    await verifyProjectionFixture(pkg, 'codex');
+    await verifyRuntimeProjectionIfPresent(pkg, 'claude');
+    await verifyRuntimeProjectionIfPresent(pkg, 'codex');
     return;
   }
 
