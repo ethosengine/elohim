@@ -206,13 +206,13 @@ Feature: Observable + contract-aware auto-distribute
   # mappable fields). "unmatched" is precisely the phantom-contract
   # regression state this scenario guards against.
   #
-  # Deploy-gated (@wip): this goes green only once the FIXED element is the
-  # one actually served — the currently-deployed alpha build still serves the
-  # phantom-contract element and will settle on "unmatched", not "applied".
-  # Remove @wip after the fixed element deploys. The landing-slug target is
-  # valid: live probes (2026-07-11) confirmed BOTH doorways return 200 with
+  # De-@wip'd 2026-07-12: the fixed element IS the one served — live Playwright
+  # probes on BOTH doorways (doorway-alpha.elohim.host + elohim.host) confirmed
+  # expand → data-omni-resilience-loaded settles to "applied" (not "unmatched",
+  # not the phantom contract). The landing-slug target remains valid: live
+  # probes (2026-07-11) confirmed BOTH doorways return 200 with
   # protectionStatus (+ feltStatus on /household) for elohim-host-landing.
-  @wip @browser-only @resilience-p1 @regression
+  @browser-only @resilience-p1 @regression
   Scenario: Native omni chrome resilience segment speaks the real snapshot contract
     Given I open the doorway landing page in the browser
     When I expand the native omni chrome

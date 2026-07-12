@@ -36,6 +36,7 @@ fn test_conn() -> SqliteConnection {
             server_blob_hash TEXT,
             crdt_converged_at TEXT,
             declared_head_action_hash TEXT,
+            declared_head_at BIGINT,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
