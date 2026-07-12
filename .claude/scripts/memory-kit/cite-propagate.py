@@ -37,6 +37,7 @@ SKIP = {"CLAUDE.md", "MEMORY.md", "INDEX.md", "README.md", "TRAJECTORY.md", "cla
 _HINT = {
     "held": "held — target sequestered (see cluster-state.yaml)",
     "stale": "stale — target content moved on; re-verify",
+    "remote": "remote — resolvable on the substrate, absent locally",
     "dead": "dead — target no longer resolves",
 }
 

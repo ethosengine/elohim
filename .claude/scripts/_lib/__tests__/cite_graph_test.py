@@ -135,4 +135,20 @@ check("envelope_verdict ok on a matching short-form token", cg.envelope_verdict(
 check("full-CID digest[:8].hex() == short-form hex16",
       cg._cid_sha256_digest(OK_CID).hex()[:16] == cg.fingerprint(target_cid).split(":")[1])
 
+# ── remote verdict: absent-locally + POSITIVE remote evidence (full-CID token) ──
+# Conservative rule: an absent target is 'remote' ONLY when the fingerprint slot carries a full CID
+# (`baf…`, substrate-resolvable). A short-form/absent fingerprint keeps the existing 'dead' verdict —
+# existing dead cites are NOT reclassified. A resolvable target is never remote (precedence unchanged).
+absent_full_cid = {"legacy_path": False, "ref": "no-such-slug", "fingerprint": OK_CID}
+check("absent target + full-CID (baf…) fingerprint → remote", cg.envelope_verdict(absent_full_cid, sidx) == "remote")
+absent_short = {"legacy_path": False, "ref": "no-such-slug", "fingerprint": "sha256:abc123def4567890"}
+check("absent target + short-form sha256: fingerprint → still dead", cg.envelope_verdict(absent_short, sidx) == "dead")
+absent_nofp = {"legacy_path": False, "ref": "no-such-slug", "fingerprint": ""}
+check("absent target + no fingerprint → still dead", cg.envelope_verdict(absent_nofp, sidx) == "dead")
+absent_nofp_key = {"legacy_path": False, "ref": "no-such-slug"}
+check("absent target + missing fingerprint key → still dead", cg.envelope_verdict(absent_nofp_key, sidx) == "dead")
+# precedence: a resolvable target with a full-CID token is never remote (ok/held/stale as before)
+check("resolvable target + full-CID token is unaffected (ok, not remote)", cg.envelope_verdict(ok_cite, sidx) == "ok")
+check("resolvable target + mismatched full-CID token stays stale (not remote)", cg.envelope_verdict(stale_cite, sidx) == "stale")
+
 print(f"\n  {_p} assertions passed ✅")

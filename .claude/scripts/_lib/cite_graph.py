@@ -272,13 +272,18 @@ def materialize_paths(cites, slug_index: dict, repo_root) -> int:
 
 def envelope_verdict(cite: dict, slug_index: dict) -> str:
     """Health of one ENVELOPE cite, purely from the slug-index + fingerprint (no path/REPO_ROOT needed):
-    ok | held (target sequestered in held/) | stale (fingerprint drift) | dead (slug resolves nowhere).
+    ok | held (target sequestered in held/) | stale (fingerprint drift) | remote (absent locally but a
+    full-CID token gives positive substrate-resolvable evidence) | dead (slug resolves nowhere, no CID).
     A legacy path-string cite is 'ok' (not propagated — it carries no status hint)."""
     if cite.get("legacy_path"):
         return "ok"
     ref = cite["ref"]
     if ref not in slug_index:
-        return "dead"
+        # Absent locally. Conservative: stays 'dead' UNLESS there is POSITIVE remote evidence — a
+        # full-CID token (`baf…`) in the fingerprint slot, a substrate-resolvable content address. A
+        # short-form `sha256:hex16` (or absent) fingerprint is NOT full-CID evidence → 'dead'.
+        fp = cite.get("fingerprint") or ""
+        return "remote" if fp.startswith("baf") else "dead"
     path = str(slug_index[ref]).replace("\\", "/")
     if "/held/" in path:
         return "held"
