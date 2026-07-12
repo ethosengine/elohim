@@ -176,6 +176,29 @@ CURE SHIPPED (this commit):
 Booting the new binary cannot resurrect: pre-migration rows wake with
 `declared_head_at = NULL`, and NULL-ordering rows are unmovable by heal.
 
+**DELTA 2026-07-12 (evening) — app-layer machinery COMPLETE; blocker isolated to
+the dead TURN fallback.** With the monotonic-heal guard + resilient ladder
+deployed, three declare cycles ran: #1613 (12×, all 503-shed), #1614 (12×,
+mixed shed + zome not-retrievable, refused at ~18min post-author), #1615
+(24× ≈ 36min, STILL not-retrievable at attempt 23). Meanwhile the guard held:
+adam never regressed further (B pinned at uhCkkwLFE all day — stale but
+stable). Substrate evidence for the window (Loki, both sides):
+- matthew: `kitsune2 core_publish: could not send publish ops: tx5 send error
+  … timed out` — the authoring side cannot PUSH its ops out; "not retrievable"
+  on adam is downstream of failed publish, not just failed fetch.
+- BOTH sides: the diagnostic third-party TURN (openrelay.metered.ca →
+  216.39.253.123) is unreachable — `no route to host` from shem, `connection
+  timed out` from matthew's network. The free relay service is dead. The
+  2026-07-11 iceServers cure therefore provides STUN-only in practice:
+  srflx↔srflx across shem-cloud ↔ home NAT is an ICE lottery (it won at
+  #1187 ~05:40Z, lost all evening).
+CONCLUSION: scenario-2 convergence is now blocked SOLELY on
+[[sovereign-turn-relay-transport-commons]] (or any reachable TURN) — operator
+domain. Once one declare lands, `declared_head_at` ordering is recorded and
+every future deploy self-converges through the monotonic heal even when the
+POST window is missed. No further app-layer work is useful until the relay
+leg exists.
+
 ## The standing diagnostic (free, every deploy)
 
 Every app deploy now emits the live probe in the `authorHeadOnce` /
