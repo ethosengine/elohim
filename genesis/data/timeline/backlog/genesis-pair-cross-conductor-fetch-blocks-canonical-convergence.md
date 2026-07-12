@@ -122,6 +122,27 @@ move a row that already carries a different declared head; only canonical
 channels (declare route, propagation, ContentHeadDeclared signal) move
 declared heads. Unit-tested (gapfill_stamp_never_resurrects_over_a_declared_head).
 
+**SHIFT-END STATE 2026-07-12 (all fixes deployed; convergence now GATED, not blocked).**
+Fleet rolled with the full stack (canonical-aware coordinator + heal, validator
+7/7, guards) — edge #1186, adam on fresh pod. App #1611 re-authored A's head
+(uhCkko_clhqTYHFR) and ran the declare+propagate leg. B (adam) did NOT converge
+within the watch window — but the reason is now precise and NOT an unknown:
+adam's `/db/content/.../head` returns `503 {"status":"catching-up",
+"retryAfter":30}`. After its restart, adam is grinding its post-restart
+reconcile backlog (the ~2,838-row divergence queue), and the head + likely the
+canonical-head POST endpoints are gated 503 during catch-up. So convergence for
+any ONE row waits on adam draining the WHOLE backlog — the heal-throughput smell
+(~10s/row × thousands ≈ hours) has become load-bearing for convergence TIMING.
+NEXT AGENT: (1) re-read elohim.host /head — if catch-up finished and it shows
+uhCkko_clhqTYHFR (or newer A head), CONVERGED → bank scenario 2. (2) If still
+503 catching-up, wait for drain OR address heal throughput (parallelize /
+prioritize the declared row / raise WITNESS_MAX_PER_TICK). (3) If catch-up done
+but head is still the OLD uhCkkwLFE, the declaration did not land during catch-up
+503 — re-fire [build:app] once adam is serving 200s, and the 8× ladder will
+land it. Everything is deployed; this is timing + the filed heal-throughput
+residual, not a new defect. Do NOT push while an app build is mid-flight
+(re-authors the target the ladder is chasing).
+
 ## The standing diagnostic (free, every deploy)
 
 Every app deploy now emits the live probe in the `authorHeadOnce` /
