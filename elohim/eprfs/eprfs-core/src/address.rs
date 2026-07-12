@@ -39,6 +39,9 @@ impl From<&str> for EprRef {
 
 /// Codec byte for dag-cbor per the IPLD multicodec table — the canonical EPR CID codec.
 const DAG_CBOR_CODEC: u64 = 0x71;
+/// Codec byte for raw bytes per the IPLD multicodec table — for file/body/arbitrary bytes that
+/// are NOT already canonical dag-cbor atoms.
+const RAW_CODEC: u64 = 0x55;
 
 /// Content-addressed blob identifier — a real `CIDv1(dag-cbor, sha2-256)`: the protocol's canonical
 /// **fingerprint**. Byte-identical to the canonical codec `elohim-epr` (`elohim/epr/src/cid.rs`),
@@ -55,9 +58,40 @@ const DAG_CBOR_CODEC: u64 = 0x71;
 pub struct BlobCid(Cid);
 
 impl BlobCid {
-    /// Content-address bytes: `CIDv1(dag-cbor, sha2-256)`. Matches `elohim_epr::cid::compute_cid`.
+    /// Content-address **already-canonical dag-cbor** bytes: `CIDv1(dag-cbor 0x71, sha2-256)`
+    /// (`bafyrei…`). Matches `elohim_epr::cid::compute_cid`. This labels the input as dag-cbor —
+    /// only use it for CBOR-encoded atoms. Arbitrary file/body/blob bytes are NOT dag-cbor and must
+    /// use [`BlobCid::compute_raw`] (codec 0x55) so the codec tag tells the truth about the bytes.
     pub fn compute(bytes: &[u8]) -> Self {
         Self(Cid::new_v1(DAG_CBOR_CODEC, Code::Sha2_256.digest(bytes)))
+    }
+
+    /// Content-address **raw** bytes: `CIDv1(raw 0x55, sha2-256)` (`bafkrei…`). The codec for
+    /// arbitrary file bytes, blob contents, and canonical document bodies — anything that is not a
+    /// canonical dag-cbor atom. Byte-identical to brit's `BritCid::compute_raw` (same golden
+    /// vectors); the `raw_codec_matches_brit_vector` test pins the shared format.
+    ///
+    /// The cite fingerprint `sha256:hex16` is, mathematically, the [`short_fingerprint`] of the
+    /// `compute_raw` CID over the same canonical-body bytes — one sha2-256 digest, two renderings
+    /// (see `2026-07-12-cite-fingerprint-cid-convergence-design.md`).
+    ///
+    /// [`short_fingerprint`]: BlobCid::short_fingerprint
+    pub fn compute_raw(bytes: &[u8]) -> Self {
+        Self(Cid::new_v1(RAW_CODEC, Code::Sha2_256.digest(bytes)))
+    }
+
+    /// The declared cite **short-form**: `"sha256:" + hex(multihash digest)[:16]`. This is the same
+    /// first-16-hex-of-sha2-256 that the Python cite oracle (`cite_graph.fingerprint_text`) and
+    /// brit's `drift_fingerprint` emit — a short projection of THIS CID's digest. For a
+    /// `compute_raw` CID over a canonical body, it equals the doc's cite fingerprint exactly.
+    pub fn short_fingerprint(&self) -> String {
+        // First 8 digest bytes render to the 16 hex chars of the short form (no `hex` dep needed).
+        let mut s = String::with_capacity("sha256:".len() + 16);
+        s.push_str("sha256:");
+        for b in self.0.hash().digest().iter().take(8) {
+            s.push_str(&format!("{b:02x}"));
+        }
+        s
     }
 
     /// Parse a canonical CID string (base32 `bafy…` / `bafk…`). Errors on a non-CID string — the
@@ -125,6 +159,52 @@ mod tests {
         // Empty CBOR map (0xa0): CIDv1 base32 + dag-cbor + sha2-256 begins with "bafyrei".
         let cid = BlobCid::compute(&[0xa0]);
         assert!(cid.to_string().starts_with("bafyrei"), "got {cid}");
+    }
+
+    // Raw-codec golden vector: byte-identical to brit's `BritCid::compute_raw`. "hello world" is
+    // the canonical IPFS raw-CID fixture; if this drifts, eprfs raw fingerprints stop matching brit
+    // + the protocol content-addressing.
+    #[test]
+    fn raw_codec_matches_brit_vector() {
+        let cid = BlobCid::compute_raw(b"hello world");
+        assert_eq!(
+            cid.to_string(),
+            "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e",
+            "got {cid}"
+        );
+        assert!(
+            cid.to_string().starts_with("bafkrei"),
+            "raw codec must render bafkrei…"
+        );
+    }
+
+    #[test]
+    fn compute_raw_and_compute_differ_by_codec() {
+        // Same bytes, different codec tag → different CID (dag-cbor bafyrei… vs raw bafkrei…).
+        let raw = BlobCid::compute_raw(b"hello world");
+        let cbor = BlobCid::compute(b"hello world");
+        assert_ne!(raw, cbor);
+        assert!(raw.to_string().starts_with("bafkrei"));
+        assert!(cbor.to_string().starts_with("bafyrei"));
+        // But the underlying sha2-256 digest — hence the short form — is identical.
+        assert_eq!(raw.short_fingerprint(), cbor.short_fingerprint());
+    }
+
+    // The convergence pin: the cite fingerprint `sha256:hex16` IS the short-form of the raw-codec
+    // CID over the same canonical-body bytes. Expected value hard-coded from the Python oracle
+    // (`cite_graph.fingerprint_text("ok target body")`).
+    #[test]
+    fn short_fingerprint_equals_python_cite_fingerprint() {
+        let body = b"ok target body";
+        let cid = BlobCid::compute_raw(body);
+        assert_eq!(cid.short_fingerprint(), "sha256:4e72cded3d6affd3");
+    }
+
+    #[test]
+    fn short_fingerprint_shape() {
+        let f = BlobCid::compute_raw(b"anything").short_fingerprint();
+        assert!(f.starts_with("sha256:"));
+        assert_eq!(f.len(), "sha256:".len() + 16);
     }
 
     #[test]
