@@ -34,6 +34,22 @@
     ],
     "sourceRuntime": "claude",
     "mcpServerRefs": [],
+    "mcpServers": [
+      {
+        "name": "jenkins",
+        "config": {
+          "type": "http",
+          "url": "https://jenkins.ethosengine.com/mcp-server/mcp"
+        }
+      },
+      {
+        "name": "observability",
+        "config": {
+          "type": "sse",
+          "url": "http://observability-mcp.observability.svc.cluster.local:8000/sse"
+        }
+      }
+    ],
     "governance": {
       "eprRef": "epr:elohim-agent/agents/after-action",
       "policy": "capability-governance@1",

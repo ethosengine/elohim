@@ -255,6 +255,75 @@ function mcpServerNames(mcpServers) {
   return mcpServers.flatMap((entry) => Object.keys(entry));
 }
 
+// Structured, LOSSLESS capture of a `.claude` agent's `mcpServers:` frontmatter
+// block. The generic frontmatter parser is lossy for this shape (it drops the
+// nested `args:` list), so mcp-bearing agents could not be flipped without
+// losing their MCP wiring — the v1 STOP rule. This dedicated parse preserves the
+// full shape: an ordered list of `{ name, config }` where each config value is a
+// scalar (e.g. `command`, `type`, `url`) or a list (e.g. `args`), key order kept.
+// Its inverse is `stringifyMcpServers`; parse(emit(x)) === x is asserted at verify.
+// The two real corpus shapes are mempalace (`command` + `args:[…]`) and the
+// http/sse servers (`type` + `url`), both round-tripped by this pair.
+function parseMcpServersBlock(frontmatterRaw) {
+  if (typeof frontmatterRaw !== 'string') return [];
+  const lines = frontmatterRaw.split('\n');
+  const start = lines.findIndex((line) => line === 'mcpServers:');
+  if (start === -1) return [];
+  const servers = [];
+  let current = null;
+  let listField = null;
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.startsWith(' ')) break; // a column-0 line closes the block
+    const server = line.match(/^ {2}- ([A-Za-z0-9_./-]+):\s*$/);
+    if (server) {
+      current = { name: server[1], config: {} };
+      servers.push(current);
+      listField = null;
+      continue;
+    }
+    if (!current) continue;
+    const item = line.match(/^ {8}- (.*)$/);
+    if (item && listField) {
+      current.config[listField].push(item[1]);
+      continue;
+    }
+    const field = line.match(/^ {6}([A-Za-z0-9_./-]+):(.*)$/);
+    if (field) {
+      const rest = field[2].trim();
+      if (rest === '') {
+        current.config[field[1]] = [];
+        listField = field[1];
+      } else {
+        current.config[field[1]] = rest;
+        listField = null;
+      }
+    }
+  }
+  return servers;
+}
+
+// Emit the canonical `.claude` `mcpServers:` block BODY (the indented lines under
+// the `mcpServers:` header, which the caller prepends) from the structured form,
+// byte-for-byte reproducing the authored shape: `  - name:` / `      key: scalar`
+// / `      key:` + `        - item`. Fixed 2/6/8-space indentation matches the
+// corpus convention (the block is always top-level frontmatter).
+function stringifyMcpServers(servers) {
+  let out = '';
+  for (const { name, config } of servers) {
+    out += `  - ${name}:\n`;
+    for (const [key, value] of Object.entries(config)) {
+      if (Array.isArray(value)) {
+        out += `      ${key}:\n`;
+        for (const item of value) out += `        - ${item}\n`;
+      } else {
+        out += `      ${key}: ${value}\n`;
+      }
+    }
+  }
+  return out;
+}
+
 function governanceFor(kind, id) {
   return {
     eprRef: `epr:elohim-agent/${kind}/${id}`, // offline floor anchor; resolves to earned trust when the substrate is reachable
@@ -377,6 +446,7 @@ function agentPackageFromClaude(path, parsed) {
   const model = parsed.frontmatter.model;
   const color = parsed.frontmatter.color;
   const toolRefs = toolRefsFrom(parsed.frontmatter);
+  const mcpServersStructured = parseMcpServersBlock(parsed.frontmatterRaw);
   const governance = governanceFor('agents', name);
 
   return {
@@ -396,6 +466,11 @@ function agentPackageFromClaude(path, parsed) {
       toolRefs,
       sourceRuntime: 'claude',
       mcpServerRefs: mcpServerNames(parsed.frontmatter.mcpServers),
+      // Structured, lossless MCP wiring (server config, incl. the `args:` list the
+      // generic parser drops), captured from the raw frontmatter so an mcp-bearing
+      // agent can be flipped without losing its MCP block. Absent when the agent
+      // carries no `mcpServers:` block.
+      ...(mcpServersStructured.length ? { mcpServers: mcpServersStructured } : {}),
       governance,
     },
     instructions: {
@@ -480,6 +555,13 @@ function claudeFrontmatterFromPackage(pkg) {
     const toolRefs = pkg.metadata.toolRefs ?? [];
     const modelHints = pkg.metadata.modelHints ?? {};
     if (toolRefs.length) frontmatter.tools = toolRefs.join(', ');
+    // Reconstruct the MCP wiring block from structured metadata, placed between
+    // `tools:` and `model:` to match the authored corpus order (so the flip diff
+    // stays additive). `stringifyYaml` renders the `mcpServers` key via
+    // `stringifyMcpServers` (byte-identical to the source block). Absent for
+    // mcp-less agents. This is what lifts the v1 mcp-less STOP rule.
+    const mcpServers = pkg.metadata.mcpServers ?? [];
+    if (mcpServers.length) frontmatter.mcpServers = mcpServers;
     if (modelHints.claudeModel) frontmatter.model = modelHints.claudeModel;
     if (modelHints.claudeColor) frontmatter.color = modelHints.claudeColor;
   }
@@ -544,6 +626,13 @@ function projectMarkdownSurface(pkg, runtime) {
 function stringifyYaml(value, indent = '') {
   let out = '';
   for (const [key, field] of Object.entries(value)) {
+    // The `mcpServers` block is a list-of-single-key-maps shape the generic
+    // scalar/object serializer cannot render; delegate to the dedicated emitter.
+    // Always top-level frontmatter, so its fixed 2/6/8-space indentation is correct.
+    if (key === 'mcpServers' && Array.isArray(field)) {
+      out += `${indent}${key}:\n${stringifyMcpServers(field)}`;
+      continue;
+    }
     if (field && typeof field === 'object' && !Array.isArray(field)) {
       out += `${indent}${key}:\n${stringifyYaml(field, `${indent}  `)}`;
     } else {
@@ -916,22 +1005,32 @@ async function verifyPackage(pkg, validators, settings) {
   }
 
   if (pkg.kind === 'AgentPackage' && pkg.metadata.master === 'package') {
-    // v1 mcp-less guard: an agent's full `mcpServers` block (type/url) is NOT
-    // reconstructable from stored metadata (`mcpServerRefs` holds only the
-    // server names). A flip would drop that wiring, so refuse to treat an
-    // mcp-bearing agent as flippable until structured preservation lands.
+    // MCP-fidelity guard (supersedes the v1 mcp-less STOP rule). Structured
+    // `metadata.mcpServers` now preserves the full server config, so a flipped
+    // agent MAY carry an mcpServers block — provided the flip loses NOTHING. If
+    // the agent has MCP wiring, prove: (1) the structured capture is present, and
+    // (2) it round-trips through the emitter byte-for-byte (parse(emit(x)) === x),
+    // and (3) the GENERATED flip frontmatter actually carries the reconstructed
+    // block. A regression that drops the emitter fails (2)/(3) here.
     const rawFm = pkg.projections?.claude?.frontmatterRaw ?? '';
-    const fmMcp = pkg.projections?.claude?.frontmatter?.mcpServers;
-    const mcpRefs = pkg.metadata.mcpServerRefs ?? [];
-    const hasMcp =
-      (Array.isArray(fmMcp) && fmMcp.length > 0) ||
-      /(^|\n)mcpServers:/.test(rawFm) ||
-      (Array.isArray(mcpRefs) && mcpRefs.length > 0);
-    assert(
-      !hasMcp,
-      `${pkg.metadata.id} is mcp-less (v1 flip scope): a flipped agent must not carry an mcpServers block — ` +
-        `its full server config (type/url) is not reconstructable from stored metadata`,
-    );
+    const mcpServers = pkg.metadata.mcpServers ?? [];
+    const rawHasMcp = /(^|\n)mcpServers:/.test(rawFm);
+    if (rawHasMcp || mcpServers.length) {
+      assert(
+        mcpServers.length > 0,
+        `${pkg.metadata.id} flipped agent with MCP wiring has structured metadata.mcpServers (not dropped)`,
+      );
+      const emitted = stringifyMcpServers(mcpServers);
+      const reparsed = parseMcpServersBlock(`mcpServers:\n${emitted}model: x\n`);
+      assert(
+        JSON.stringify(reparsed) === JSON.stringify(mcpServers),
+        `${pkg.metadata.id} mcpServers structured round-trip (parse(emit(metadata.mcpServers)) === metadata.mcpServers)`,
+      );
+      assert(
+        stringifyYaml(claudeFrontmatterFromPackage(pkg)).includes(`mcpServers:\n${emitted}`),
+        `${pkg.metadata.id} generated .claude frontmatter carries the reconstructed mcpServers block (flip preserves MCP wiring)`,
+      );
+    }
 
     // Contract round-trip: freshness (project(package) === file) is tautological
     // because the file was regenerated from the package. Prove capability
@@ -1402,6 +1501,81 @@ async function runSelfTest() {
       JSON.stringify(parseOnly(['project', '--only', 'a,b', '--only', 'c'])) ===
         JSON.stringify(['a', 'b', 'c']),
       'selftest(f): parseOnly merges comma-separated + repeated --only flags',
+    );
+
+    // (g) mcpServers structured capture + emitter reproduces the REAL corpus
+    //     block shapes byte-for-byte, and a flipped mcp-bearing agent carries the
+    //     reconstructed block in-position (tools → mcpServers → model). This is
+    //     the fidelity proof that lifts the v1 mcp-less STOP rule. Two shapes:
+    //     mempalace (command + args:[…]) and the http/sse servers (type + url,
+    //     multiple servers) — the exact bytes from `.claude/agents/{librarian,
+    //     after-action}.md`.
+    const mempalaceBlock =
+      'mcpServers:\n' +
+      '  - mempalace:\n' +
+      '      command: mempalace-mcp\n' +
+      '      args:\n' +
+      '        - --palace\n' +
+      '        - /projects/elohim/.mempalace/palace\n';
+    const mempalaceParsed = parseMcpServersBlock(`${mempalaceBlock}model: opus\n`);
+    assert(
+      `mcpServers:\n${stringifyMcpServers(mempalaceParsed)}` === mempalaceBlock,
+      'selftest(g): mempalace block (command + args list) round-trips byte-for-byte',
+    );
+    assert(
+      mempalaceParsed.length === 1 &&
+        mempalaceParsed[0].name === 'mempalace' &&
+        JSON.stringify(mempalaceParsed[0].config.args) ===
+          JSON.stringify(['--palace', '/projects/elohim/.mempalace/palace']),
+      'selftest(g): mempalace args list is captured (the field the generic parser drops)',
+    );
+    const multiBlock =
+      'mcpServers:\n' +
+      '  - jenkins:\n' +
+      '      type: http\n' +
+      '      url: https://jenkins.ethosengine.com/mcp-server/mcp\n' +
+      '  - observability:\n' +
+      '      type: sse\n' +
+      '      url: http://observability-mcp.observability.svc.cluster.local:8000/sse\n';
+    const multiParsed = parseMcpServersBlock(`${multiBlock}model: sonnet\n`);
+    assert(
+      `mcpServers:\n${stringifyMcpServers(multiParsed)}` === multiBlock,
+      'selftest(g): multi-server type/url block round-trips byte-for-byte',
+    );
+    // A flipped mcp-bearing agent: the generated .claude carries the block between
+    // tools and model, byte-identical to the source, with nothing dropped.
+    const mcpAgent = {
+      apiVersion: 'elohim-agent/v1alpha1',
+      kind: 'AgentPackage',
+      metadata: {
+        id: 'synthetic-mcp-flip',
+        name: 'synthetic-mcp-flip',
+        version: '1.0.0',
+        description: 'Synthetic flipped mcp-bearing agent.',
+        role: 'synthetic-mcp-flip',
+        modelHints: { claudeModel: 'opus', claudeColor: 'blue' },
+        capabilityRefs: [],
+        toolRefs: ['Task', 'Bash'],
+        sourceRuntime: 'claude',
+        master: 'package',
+        mcpServerRefs: ['mempalace'],
+        mcpServers: mempalaceParsed,
+        governance: governanceFor('agents', 'synthetic-mcp-flip'),
+      },
+      instructions: { format: 'markdown', body: '# a\n\nbody\n' },
+      projections: {
+        claude: { path: '.claude/agents/synthetic-mcp-flip.md', frontmatter: {}, frontmatterRaw: '' },
+        codex: { path: '.codex/agents/synthetic-mcp-flip.md', frontmatter: {} },
+      },
+    };
+    const mcpFlipClaude = projectClaude(mcpAgent);
+    assert(
+      mcpFlipClaude.includes(`tools: Task, Bash\n${mempalaceBlock}model: opus\n`),
+      'selftest(g): flipped mcp agent .claude carries the mcpServers block in-position (tools → mcpServers → model), byte-identical',
+    );
+    assert(
+      !projectCodex(mcpAgent).includes('mcpServers:'),
+      'selftest(g): flipped mcp agent .codex omits mcpServers (claude-only wiring, parity with un-flipped codex path)',
     );
   } finally {
     await rm(sandbox, { recursive: true, force: true });

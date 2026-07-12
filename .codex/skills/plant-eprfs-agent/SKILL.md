@@ -1,6 +1,6 @@
 ---
 name: plant-eprfs-agent
-description: Plant ONE runtime-authored subagent in its elohim-native package on the eprfs layer (the package becomes the authoritative source-of-truth for the agent's system prompt AND execution contract — tools/model/color; .claude/.codex become generated, content-addressed, provenance-recorded projections that grow from and trace back to it). The agent member of the plant-eprfs family; mcp-less v1, contract-round-trip-guaranteed lossless.
+description: Plant ONE runtime-authored subagent in its elohim-native package on the eprfs layer (the package becomes the authoritative source-of-truth for the agent's system prompt AND execution contract — tools/model/color; .claude/.codex become generated, content-addressed, provenance-recorded projections that grow from and trace back to it). The agent member of the plant-eprfs family; contract + MCP-wiring round-trip-guaranteed lossless.
 metadata:
   runtime: codex
   sourceRuntime: elohim-agent
@@ -21,7 +21,7 @@ This is the **agent** member of the plant-eprfs family (siblings, grown one at a
 
 - **Origin preserved.** The package keeps `metadata.sourceRuntime` (`"claude"`/`"codex"`) — where the agent was *born*.
 - **Authority rooted in the package.** The package gains `metadata.master: "package"` — editing `.claude`/`.codex` directly is now drift; the root is the package.
-- **The execution contract is generated, not passed through.** Unlike a skill (name/description only), an agent's frontmatter carries a *contract*: `model`, `color`, `tools`, and (for some) `mcpServers`. On flip, the projector reconstructs `tools` from `metadata.toolRefs`, `model` from `metadata.modelHints.claudeModel`, and `color` from `metadata.modelHints.claudeColor`. These fields are load-bearing — Claude scopes tool access and model choice from them — so the plant is not lossless unless they round-trip. This skill's floor (below) is that round-trip.
+- **The execution contract is generated, not passed through.** Unlike a skill (name/description only), an agent's frontmatter carries a *contract*: `model`, `color`, `tools`, and (for some) `mcpServers`. On flip, the projector reconstructs `tools` from `metadata.toolRefs`, `model` from `metadata.modelHints.claudeModel`, `color` from `metadata.modelHints.claudeColor`, and the `mcpServers` block from structured `metadata.mcpServers` (byte-for-byte). These fields are load-bearing — Claude scopes tool access and model choice from them — so the plant is not lossless unless they round-trip. This skill's floor (below) is that round-trip.
 - **Provenance recorded.** `eprfs-agent compose-graph` records the content-addressed edge from each projection back to its native package (`packageCid`), attributed to the model that composed it (`composedBy`).
 
 ## The floor this stands on
@@ -31,13 +31,13 @@ Two gates, both green before and after:
 1. **Source fidelity** (`verifySourceFidelity`) — for *un-flipped* agents, `project(import(source)) === source`, byte-for-byte. Planting one agent must never break this for the others.
 2. **Contract round-trip** (the agent analog) — for the *flipped* agent, the generated `.claude`/`.codex` frontmatter's `tools`/`model`/`color` equal the package's `toolRefs`/`modelHints`. Freshness alone (`project(package) === file`) is tautological because the file was regenerated from the package; this contract assertion is what proves the plant lost no capability.
 
-## Only mcp-less agents are plantable in v1
+## MCP-bearing agents are plantable (structured `metadata.mcpServers`)
 
-An agent's full `mcpServers` block (`type`, `url`) is not yet reconstructable from package metadata (`mcpServerRefs` holds only the server *names*). If the agent carries a non-empty `mcpServers` block, **STOP** — planting it would drop its MCP wiring. The verify gate refuses to treat an mcp-bearing agent as flippable. Plant an mcp-less agent instead until the family adds structured `metadata.mcpServers` preservation.
+An agent's full `mcpServers` block is preserved losslessly: import captures the whole shape (server config incl. the `args:` list) into structured `metadata.mcpServers`, and the projector re-emits it byte-for-byte between `tools:` and `model:` on flip. So an mcp-bearing agent IS plantable — but verify fidelity FIRST: the mcp-fidelity gate proves `parse(emit(metadata.mcpServers)) === metadata.mcpServers` and that the generated `.claude` frontmatter carries the reconstructed block, so a plant that would drop MCP wiring fails the gate instead of silently escalating. (The block is Claude-only; the codex projection omits it, at parity with the un-flipped codex path.)
 
 ## Procedure (one agent `X`)
 
-1. **Confirm mcp-less.** `X`'s `.claude/agents/X.md` has no `mcpServers:` block. Otherwise stop (see above).
+1. **Confirm MCP fidelity (if any).** If `X`'s `.claude/agents/X.md` carries an `mcpServers:` block, confirm the package's structured `metadata.mcpServers` captures it and round-trips (the mcp-fidelity gate; see above). An mcp-less agent has nothing to confirm here.
 2. **Confirm the package is faithful.** `node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify` is green — `X`'s package round-trips its source losslessly. If `X` has no package yet, `... import` first.
 3. **Root authority** in `.epr-meta/elohim/packages/agents/X.json`: keep `metadata.sourceRuntime`; add `metadata.master: "package"`; confirm `metadata.modelHints.claudeModel`/`claudeColor` and `metadata.toolRefs` are populated (they carry the contract now); ensure `metadata.governance = { "eprRef": "epr:elohim-agent/agents/X", "policy": "capability-governance@1", "gates": ["epr-meta-resolver","elohim-agent:packages:verify"], "ledger": ".claude/data/governance-findings.jsonl" }`; record `metadata.composedBy: "<your model id>"`.
 4. **Regenerate projections** from the package: `... project --write-fixtures` then `... project --write-runtime`. The projector GENERATES `X`'s `.claude`/`.codex` frontmatter — the nested `metadata` block (`master`/`sourceRuntime`/`governance`) PLUS the reconstructed contract (`tools`/`model`/`color` for claude; `model`/`tools` for codex). Body is the package body.
@@ -56,4 +56,4 @@ Projection is compilation through **per-runtime adapter modules** — a `claude`
 - **CID is single-sourced in eprfs** (`eprfs-core::BlobCid::compute`). Never recompute a CID in JS — call `eprfs-agent`.
 - **Never break fidelity for un-planted agents:** only a `master: package` agent gets generated frontmatter; a still-source agent keeps byte-identical `frontmatterRaw` passthrough.
 - **Identity never forks per runtime.** One persona, one root, many projections.
-- **mcp-bearing agents wait** for structured `mcpServers` preservation before they can be planted.
+- **mcp-bearing agents plant losslessly** via structured `metadata.mcpServers` — the mcp-fidelity gate is the floor that keeps the flip from dropping MCP wiring.

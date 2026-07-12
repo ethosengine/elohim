@@ -32,6 +32,15 @@
     ],
     "sourceRuntime": "claude",
     "mcpServerRefs": [],
+    "mcpServers": [
+      {
+        "name": "jenkins",
+        "config": {
+          "type": "http",
+          "url": "https://jenkins.ethosengine.com/mcp-server/mcp"
+        }
+      }
+    ],
     "governance": {
       "eprRef": "epr:elohim-agent/agents/ci-failure-triage",
       "policy": "capability-governance@1",

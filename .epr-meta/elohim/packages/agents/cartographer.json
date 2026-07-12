@@ -44,6 +44,18 @@
     ],
     "sourceRuntime": "claude",
     "mcpServerRefs": [],
+    "mcpServers": [
+      {
+        "name": "mempalace",
+        "config": {
+          "command": "mempalace-mcp",
+          "args": [
+            "--palace",
+            "/projects/elohim/.mempalace/palace"
+          ]
+        }
+      }
+    ],
     "governance": {
       "eprRef": "epr:elohim-agent/agents/cartographer",
       "policy": "capability-governance@1",
