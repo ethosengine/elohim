@@ -90,16 +90,18 @@ console — the validator and ingress-conflict gates run there and fail
 loudly. Gate scripts are bash+coreutils ONLY (the deploy container has no
 PyYAML — edge #1183).
 
-**Sweettest `already exists` on notary tests.** Retry self-poisoning via the
+**Sweettest `already exists` on multi-conductor tests** (the notary family
+lives in `tests/sweettest/src/tests/lamad.rs`). Retry self-poisoning via the
 process-global mem-bootstrap store — content ids must be per-invocation
 (`unique_id()`); never reintroduce fixed ids in multi-conductor tests.
 
 ## 4. Change discipline (what a maintaining agent may touch)
 
 - **May do freely:** storage/doorway native Rust (fmt/clippy/nextest gates);
-  coordinator-zome changes (hot-swap via `update_coordinators` — verify with
-  the zome's own error text from a live call, the trick that proved the
-  selector deploy); a2o scenarios; CI scripts (test them dependency-free);
+  coordinator-zome changes (partition-SAFE — no DNA-hash move; but the
+  hot-swap only LANDS where `ALLOW_COORDINATOR_UPDATE` is enabled, non-prod
+  true / prod false — verify delivery with the zome's own error text from a
+  live call, the trick that proved the selector deploy); a2o scenarios; CI scripts (test them dependency-free);
   manifests that the render gates validate.
 - **Must treat as network events, never routine:** integrity-zome changes
   (DNA hash moves → partition risk; read dna-upgrade-governance first);
