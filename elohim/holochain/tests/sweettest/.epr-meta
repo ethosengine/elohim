@@ -1,0 +1,52 @@
+---
+epr-meta-version: 1
+id: sweettest-governance
+covers: subtree
+purpose: >
+  Sweettest integration tests for the elohim DNAs (content_store, imagodei, mishpat, …). One class
+  of drift is gate-surfaced here: a `create_content` call given a FIXED string content-id. nextest
+  retries run in the SAME process, and the kitsune2 mem-bootstrap store is process-global — a retry
+  that re-uses a fixed id re-joins the first attempt's DHT residue and `create_content` refuses with
+  "already exists", self-poisoning the retry mechanism for the whole test family (dna #1357, museum
+  defect class #5 bonus). The fix is `unique_id()` (epoch-nanos suffix) per invocation.
+rules:
+  - id: unique-content-id-in-tests
+    class: inject
+    when: { write: "*.rs", contains-any: ["create_content", "test_content("] }
+    validator: epr:validator-sweettest-unique-content-id
+    why: >
+      INVARIANT — sweettest retries share the process-global kitsune2 mem-bootstrap store. A
+      `create_content` (or `test_content(...)`) call with a FIXED string id (e.g. "test-1",
+      "tier-x") makes a nextest RETRY re-join the first attempt's DHT residue, so `create_content`
+      refuses with "already exists" and the retry can never pass — the fixed id self-poisons the
+      retry (dna #1357). Use `unique_id("base")` (the epoch-nanos-suffixed helper in
+      `tests/lamad.rs`) for any id that a multi-conductor or gossip-visible scenario writes, so
+      every attempt gets fresh ids while the scenario stays byte-identical.
+cites:
+  - substrate-convergence-five-defect-arc
+---
+
+# elohim/holochain/tests/sweettest — DNA integration tests
+
+Sweettest scenarios exercising the elohim DNAs across one or more in-process conductors. This
+manifest CLAIMS full responsibility for the subtree (`covers: subtree`); the `src/tests/` scenarios
+inherit it.
+
+## Unique-content-id invariant (edit-time advisory)
+
+**Retries share the process-global mem-bootstrap store; fixed ids self-poison retries.** nextest
+runs its RETRIES in the same OS process, and the kitsune2 mem-bootstrap DHT store is process-global.
+A `create_content` call carrying a fixed string id means a retry re-joins the first attempt's DHT
+residue, and the coordinator refuses the duplicate with "already exists" — so a scenario that fixed
+its ids can never recover on retry (dna #1357). This is the bonus instance of defect class #5 in the
+five-defect convergence arc: a test mechanism that breaks its own retry path. The cure is
+`unique_id("base")` (epoch-nanos suffix, defined in `tests/lamad.rs`) per invocation — fresh ids
+every attempt, byte-identical scenario.
+
+The `unique-content-id-in-tests` rule fires as an advisory (class stays `inject` because
+`epr:validator-sweettest-unique-content-id` is not registered in v1) when a `.rs` write in this
+subtree calls `create_content` / `test_content(...)`. It surfaces the discipline at edit time
+without blocking legitimate edits — single-agent tests with no retry-visible DHT residue may keep a
+fixed id, but any multi-conductor or gossip-visible id should route through `unique_id()`.
+
+See: `genesis/docs/content/elohim-protocol/history/2026-07-12-substrate-convergence-five-defect-arc.md`

@@ -1,0 +1,55 @@
+---
+epr-meta-version: 1
+id: orchestrator-manifests-governance
+covers: subtree
+purpose: >
+  Orchestrator-rendered k8s manifests for the human/edgenode/doorway fleet — StatefulSets,
+  ConfigMaps, network policies. One class of drift is gate-surfaced here: a conductor-config
+  manifest carries a `webrtc_config` object that Holochain passes VERBATIM into tx5's
+  serde-camelCase `WebRtcConfig` — so the ICE-server key MUST be `iceServers`; the snake_case
+  `ice_servers` is an unknown field, silently dropped, and the fleet runs with ZERO ICE servers
+  (the fleet-inception→2026-05-27 silent WebRTC loss, museum defect class #1). The render gate
+  `scripts/ci/validate-conductor-config.sh` rejects the dead key by name at deploy; this rule
+  surfaces the invariant at edit time, where the manifest is authored.
+rules:
+  - id: webrtc-ice-servers-camelcase
+    class: inject
+    when: { write: "*.yaml", contains-any: ["webrtc_config", "webRtcConfig", "ice_servers", "iceServers"] }
+    validator: epr:validator-webrtc-ice-servers-key
+    why: >
+      INVARIANT — `webrtc_config` passes VERBATIM into tx5's serde-camelCase `WebRtcConfig`.
+      The ICE-server list key MUST be `iceServers` (camelCase). The snake_case `ice_servers`
+      is an UNKNOWN field: serde silently drops it and the conductor runs with ZERO ICE servers
+      — WebRTC survives on host candidates only while peers are co-located, then dies silently
+      when topology spreads (adam→shem, 2026-05-27; 2,081 divergent anchors from the co-located
+      era). Use `iceServers`, never `ice_servers`. The render gate
+      `scripts/ci/validate-conductor-config.sh` enforces this at deploy; do not ship a manifest
+      it will reject. Evidence: Holochain conductor-config example (`iceServers`); tx5-connection
+      `config.rs` `#[serde(rename_all = "camelCase")]`.
+cites:
+  - substrate-convergence-five-defect-arc
+---
+
+# genesis/orchestrator/manifests — orchestrator-rendered fleet manifests
+
+Per-human, per-edgenode, and per-doorway k8s manifests rendered by the orchestrator. Conductor
+config (the `webrtc_config` block and related tx5 settings) lives in the `humans/` and `edgenode/`
+subtrees; network policies and namespaces live alongside. This manifest CLAIMS full responsibility
+for the subtree (`covers: subtree`): the coverage walk terminates here, integrity by construction.
+
+## Conductor-config invariant (edit-time advisory)
+
+**`webrtc_config` is passed verbatim into tx5's serde-camelCase `WebRtcConfig`.** The one key that
+bites is the ICE-server list: it MUST be `iceServers`, never `ice_servers`. An unknown field is
+silently ignored by serde, so a snake_case spelling is not a warning — it is a total, silent loss
+of every ICE server, and the fleet "works" until topology makes NAT traversal load-bearing (defect
+class #1 of the five-defect convergence arc). This is the anti-pattern shape: *a config surface that
+tolerates unknown keys turns a spelling into a silent capability loss.*
+
+The `webrtc-ice-servers-camelcase` rule fires as an advisory (class stays `inject` because
+`epr:validator-webrtc-ice-servers-key` is not registered in v1) when any `.yaml` write in this
+subtree contains a webrtc/ICE key. It catches the dead-key reintroduction at edit time without
+blocking legitimate manifest edits. The deterministic gate is
+`scripts/ci/validate-conductor-config.sh`, which rejects the dead key by name at render/deploy.
+
+See: `genesis/docs/content/elohim-protocol/history/2026-07-12-substrate-convergence-five-defect-arc.md`

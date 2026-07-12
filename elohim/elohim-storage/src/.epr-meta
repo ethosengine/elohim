@@ -4,12 +4,14 @@ id: elohim-storage-src-resolution-gate
 covers: subtree
 purpose: >
   Rust implementation of elohim-storage — HTTP handlers, EPR/blob resolution,
-  P2P dataplane, views, and service modules. One invariant is gate-enforced here:
-  any code on the EPR/blob resolution path that returns a hard "App not found" /
+  P2P dataplane, views, and service modules. Two invariants are gate-surfaced here:
+  (1) any code on the EPR/blob resolution path that returns a hard "App not found" /
   "App ZIP not available" for a known-EPR-head / missing-blob case MUST pair that
   arm with a peer-fallback (blob_fetch::race_fetch) branch or an EPR-head-aware
   syncing-status response — the exact shortcut that caused alpha-B to 404 on /
-  while blob bytes were present locally (2026-06-29).
+  while blob bytes were present locally (2026-06-29); and (2) the projection-reconcile
+  heal FILLS absence but never MOVES authority — `StampMode::Declare` only for canonical
+  answers, `GapFill` for fallbacks — the fix for the 2026-07-11 resurrection class.
 rules:
   - id: peer-fallback-invariant
     class: inject
@@ -24,8 +26,24 @@ rules:
       OR (b) an EPR-head-aware syncing-status body instead of a bare 404.
       Root cause and fix plan (read before adding a new resolution-path NotFound arm):
       genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md
+  - id: heal-fills-never-moves
+    class: inject
+    when: { write: "*.rs", contains-any: ["stamp_declared_head", "StampMode", "projection_reconcile", "GapFill"] }
+    validator: epr:validator-heal-fills-never-moves
+    why: >
+      INVARIANT — heal FILLS absence, it never MOVES authority. A projection-reconcile / stamp
+      path uses `StampMode::{Declare, GapFill}`: `Declare` is ONLY for a canonical answer (the
+      zome returns `canonical: bool`); a fallback resolve (`canonical == false`, e.g. a cold
+      conductor's root-author election while the canonical link is not yet retrievable) MUST stamp
+      `GapFill` — it may fill an empty row but must NEVER displace a declared/adopted row. Stamping
+      a fallback over an adopted canonical converts every restart into a rollback (the 2026-07-11
+      resurrection class: HEALED anchor restamped the OLD head 2 min after cross-conductor adoption,
+      across 2,838 divergence-queued rows). Do not widen `Declare`, and do not key the guard on
+      *who* writes (that froze forward adoption, defect #3) — key it on the authority the write
+      CARRIES (`canonical`).
 cites:
   - backlog-dataplane-peer-fallback-and-blob-replication
+  - substrate-convergence-five-defect-arc
 ---
 
 # elohim/elohim-storage/src — Rust storage implementation
@@ -60,9 +78,32 @@ http.rs:5589/5601, alpha-B 2026-06-29; pointer propagation is the CRDT plane, la
 
 See: `genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md`
 
+## Heal invariant — fills-never-moves (gate-surfaced)
+
+**A self-healing loop with a weaker information source than the state it overwrites converts every
+restart into a rollback.** The projection-reconcile heal (`src/p2p/projection_reconcile.rs`) and the
+stamp path (`src/db/content_diesel.rs` — `stamp_declared_head`, `stamp_declared_head_mode`,
+`StampMode`) must obey: heal FILLS absence, it never MOVES authority. `StampMode::Declare` is only
+for a **canonical** answer — the zome now returns `canonical: bool` (a coordinator-only, hot-swapped
+change); a fallback resolve (`canonical == false`, e.g. a cold conductor falling through to the
+root-author election while the canonical link is not yet retrievable) MUST stamp `GapFill`, which may
+fill an empty row but never displaces a declared/adopted row.
+
+The live failure (defect class #2, adam-alpha, 2026-07-11): two minutes after the first-ever
+cross-conductor adoption, the restarted node's heal restamped the OLD head over the adopted canonical
+row — for 2,838 divergence-queued rows, serially, after every restart. The blind first fix (defect
+class #3) keyed the guard on *who* writes and froze forward adoption; the cure was making the SOURCE
+name the authority it carries (`canonical`), not gating on the writer.
+
+The `heal-fills-never-moves` rule fires as an advisory (class stays `inject` because
+`epr:validator-heal-fills-never-moves` is not registered in v1) when any `.rs` write in this subtree
+touches the stamp/heal path. It surfaces the invariant at edit time without blocking legitimate edits.
+
+See: `genesis/docs/content/elohim-protocol/history/2026-07-12-substrate-convergence-five-defect-arc.md`
+
 ## Governance note
 
-This manifest records one gate-enforced invariant. No general authoring gate is
-warranted for the rest of the directory (operator WIP is active; other editing
-conventions live in `CLAUDE.md`). The inject advisory is the lightest signal that
-surfaces the lesson where the shortcut lives.
+This manifest records two gate-surfaced invariants (peer-fallback on the resolution path;
+fills-never-moves on the heal path). No general authoring gate is warranted for the rest of the
+directory (operator WIP is active; other editing conventions live in `CLAUDE.md`). Each inject
+advisory is the lightest signal that surfaces its lesson where the drift recurs.

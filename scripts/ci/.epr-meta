@@ -1,0 +1,55 @@
+---
+epr-meta-version: 1
+id: scripts-ci-governance
+covers: subtree
+purpose: >
+  Bash entrypoints invoked by the Jenkins pipelines and — critically — by the deploy container
+  (render gates, mount verification, conductor-config validation). One class of drift is
+  gate-surfaced here: a script that runs in the deploy container reaches for an interpreter or
+  library that container does not have (PyYAML/python/pip). The deploy container is bash+coreutils
+  ONLY; edge #1183 failed all seven human deploys on a single PyYAML import — the validator that was
+  supposed to guard defect #1 could not run in its own container (museum defect class #5). The
+  requirement is written into each deploy script's header; this rule surfaces it at edit time.
+rules:
+  - id: deploy-scripts-bash-coreutils-only
+    class: inject
+    when: { write: "*.sh", contains-any: ["python", "PyYAML", "pip install", "pip3", "import yaml", "env python"] }
+    validator: epr:validator-deploy-script-runtime
+    why: >
+      INVARIANT — deploy-container scripts are bash + coreutils ONLY. The render/deploy container
+      has no python, no pip, no PyYAML — a script that imports one fails BEFORE `kubectl apply`,
+      silently pinning the fleet on pre-fix builds (edge #1183 failed all 7 human deploys on a
+      PyYAML import; it made the fixes it was gating look inert). Parse YAML/JSON with bash +
+      coreutils (grep/sed/awk), not a python one-liner. And VERIFY where it RUNS, not just locally:
+      a CI tool negative-tested outside its runtime is itself an unverified claim — the same class
+      it polices. If a build-only script (e.g. cargo-publish-*.sh) legitimately needs a richer
+      toolchain, confirm it never runs on the deploy path before proceeding.
+cites:
+  - substrate-convergence-five-defect-arc
+---
+
+# scripts/ci — pipeline + deploy-container bash entrypoints
+
+Bash scripts called by the Jenkins pipelines (`sh "bash '${WORKSPACE}/scripts/ci/<name>.sh' …"`)
+and by the deploy container. This manifest CLAIMS full responsibility for the subtree
+(`covers: subtree`).
+
+## Deploy-container runtime invariant (edit-time advisory)
+
+**The deploy container is bash + coreutils only — no python, no pip, no PyYAML.** A deploy-time
+script (the render gates, `validate-conductor-config.sh`, `verify-epr-mount.sh`, `stage-spa-blob.sh`)
+that reaches for a python interpreter or library dies before `kubectl apply` runs, and — because it
+runs *before* the apply — it silently pins the whole fleet on the pre-fix build. This is defect
+class #5 of the five-defect convergence arc: *CI tooling verified outside its runtime is itself an
+unverified claim.* Edge #1183 is the scar: one `import yaml` failed all seven human deploys and made
+the defect-#2/#3 fixes it was gating look inert.
+
+The `deploy-scripts-bash-coreutils-only` rule fires as an advisory (class stays `inject` because
+`epr:validator-deploy-script-runtime` is not registered in v1) when a `.sh` write in this subtree
+reaches for python/pip/PyYAML. It surfaces the constraint at edit time. Two disciplines the advisory
+teaches: parse config with bash+coreutils, and TEST IN THE CONTAINER, not just on the host. Note the
+subtree also holds build-only scripts (e.g. `cargo-publish-*.sh`) that legitimately use a fuller
+toolchain because they never run on the deploy path — the rule is content-scoped to the python class
+so it does not toll them.
+
+See: `genesis/docs/content/elohim-protocol/history/2026-07-12-substrate-convergence-five-defect-arc.md`
