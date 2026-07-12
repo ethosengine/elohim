@@ -2,10 +2,9 @@
 name: plant-eprfs-agentdoc
 description: Plant ONE runtime-authored agent-doc (CLAUDE.md / AGENTS.md) in its elohim-native package on the eprfs layer. The package becomes the authoritative root for the gospel doc's frontmatter (cite envelopes preserved verbatim) + body; the doc file stays BYTE-IDENTICAL because the projection is verbatim passthrough, so cite-gen is untouched and the cite fingerprints survive intact. The agent-doc member of the plant-eprfs family; the most sensitive plant type (gospel / managed-memory surfaces).
 metadata:
-  author: elohim-protocol
-  version: 1.0.0
   sourceRuntime: elohim-agent
-  packageKind: SkillPackage
+  master: package
+  governance: "epr:elohim-agent/skills/plant-eprfs-agentdoc"
 ---
 # Plant EPRFS Agent-Doc
 

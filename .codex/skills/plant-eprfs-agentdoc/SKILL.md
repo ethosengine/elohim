@@ -4,6 +4,7 @@ description: Plant ONE runtime-authored agent-doc (CLAUDE.md / AGENTS.md) in its
 metadata:
   runtime: codex
   sourceRuntime: elohim-agent
+  master: package
   sourcePath: .epr-meta/elohim/packages/skills/plant-eprfs-agentdoc.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/plant-eprfs-agentdoc"
