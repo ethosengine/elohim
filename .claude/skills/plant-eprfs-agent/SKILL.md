@@ -2,10 +2,9 @@
 name: plant-eprfs-agent
 description: Plant ONE runtime-authored subagent in its elohim-native package on the eprfs layer (the package becomes the authoritative source-of-truth for the agent's system prompt AND execution contract — tools/model/color; .claude/.codex become generated, content-addressed, provenance-recorded projections that grow from and trace back to it). The agent member of the plant-eprfs family; mcp-less v1, contract-round-trip-guaranteed lossless.
 metadata:
-  author: elohim-protocol
-  version: 1.0.0
   sourceRuntime: elohim-agent
-  packageKind: SkillPackage
+  master: package
+  governance: "epr:elohim-agent/skills/plant-eprfs-agent"
 ---
 # Plant EPRFS Agent
 

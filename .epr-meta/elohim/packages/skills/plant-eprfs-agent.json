@@ -15,6 +15,7 @@
     "assetRefs": [],
     "author": "elohim-protocol",
     "composedBy": "claude-opus-4-8",
+    "master": "package",
     "governance": {
       "eprRef": "epr:elohim-agent/skills/plant-eprfs-agent",
       "policy": "capability-governance@1",
