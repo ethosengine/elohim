@@ -2,10 +2,9 @@
 name: plant-eprfs-hook
 description: Plant ONE runtime-authored hook in its elohim-native package on the eprfs layer (the package becomes the authoritative source-of-truth for the hook's executable code AND its settings.json registration; the .claude/hooks file stays byte-identical and the wiring is recorded, never rewritten). The hook member of the plant-eprfs family; verbatim-passthrough fidelity, registration reconciled read-only.
 metadata:
-  author: elohim-protocol
-  version: 1.0.0
   sourceRuntime: elohim-agent
-  packageKind: SkillPackage
+  master: package
+  governance: "epr:elohim-agent/skills/plant-eprfs-hook"
 ---
 # Plant EPRFS Hook
 

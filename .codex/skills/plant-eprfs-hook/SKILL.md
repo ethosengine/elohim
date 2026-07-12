@@ -4,6 +4,7 @@ description: Plant ONE runtime-authored hook in its elohim-native package on the
 metadata:
   runtime: codex
   sourceRuntime: elohim-agent
+  master: package
   sourcePath: .epr-meta/elohim/packages/skills/plant-eprfs-hook.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/plant-eprfs-hook"
