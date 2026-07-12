@@ -95,4 +95,20 @@ cgmod.seal_all()
 check("seal_all sealed the fresh doc (id assigned)", fm.parse_file(fresh).get("id") is not None)
 check("seal_all converted fresh's cite to envelope", not cg.parse_cites(fm.parse_file(fresh))[0]["legacy_path"])
 
+# ── full-CID token in the fingerprint slot survives the cite pipeline (convergence, Slice-3) ──
+# A machine-facing surface may seal a full body CID instead of the short form; envelope_verdict
+# must accept it and parse/serialize must round-trip it. Golden CID from `eprfs cid --body`.
+cidt = D / "cid-target.md"
+cidt.write_text("---\ntitle: CID Target\nid: cid-target\n---\ncid body content\n")
+OK_CID = "bafkreidmi27tswvwvwm45sbvlytbbe4yo5acu3jpif42eynnk3h4sntyty"
+cid_env = cg.parse_cite(f"cid-target | a machine-sealed edge | {OK_CID}")
+check("full CID parses into the fingerprint slot", cid_env["fingerprint"] == OK_CID)
+check("full-CID envelope survives serialize round-trip",
+      cg.parse_cite(cg.serialize_cite(cid_env))["fingerprint"] == OK_CID)
+check("envelope_verdict ok on matching full-CID token",
+      cg.envelope_verdict(cid_env, {"cid-target": str(cidt)}) == "ok")
+cidt.write_text("---\ntitle: CID Target\nid: cid-target\n---\nbody DRIFTED\n")
+check("envelope_verdict stale after body drift under a full-CID token",
+      cg.envelope_verdict(cid_env, {"cid-target": str(cidt)}) == "stale")
+
 print(f"\n  {_p} assertions passed ✅")

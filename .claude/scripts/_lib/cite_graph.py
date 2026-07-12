@@ -16,6 +16,7 @@ fingerprint stay the truth). Pure-stdlib; imports _lib.frontmatter.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import os
 import re
@@ -75,8 +76,21 @@ def body_of(path) -> str:
     return _fm.parse_file(path).body
 
 
+def _body_digest(body: str) -> bytes:
+    """The raw sha2-256 digest of the canonical body (frontmatter excluded, stripped). The SAME
+    digest the canonical body CID carries — see `envelope_verdict`'s full-CID branch."""
+    return hashlib.sha256(body.strip().encode("utf-8", "replace")).digest()
+
+
 def fingerprint_text(body: str) -> str:
-    return "sha256:" + hashlib.sha256(body.strip().encode("utf-8", "replace")).hexdigest()[:16]
+    """The cite fingerprint: the declared SHORT-FORM PROJECTION of the body's canonical CID
+    (CIDv1 · raw codec 0x55 · sha2-256) — the first 16 hex chars of the SAME sha2-256 digest that
+    CID wraps. One digest, two renderings (full CID ↔ `sha256:hex16`). The authoritative
+    derivation lives in Rust: `eprfs_core::BlobCid::short_fingerprint` (and brit's
+    `drift_fingerprint`), pinned to this hashlib fast-path by the corpus parity test. Python NEVER
+    encodes a CID — the Slice-2 `eprfs cid` CLI is the single source when a full CID is needed
+    (`genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md`)."""
+    return "sha256:" + _body_digest(body).hex()[:16]
 
 
 def fingerprint(path) -> str:
@@ -147,7 +161,32 @@ def is_gospel_claude_md(path, repo_root) -> bool:
 
 
 def _is_fingerprint(p: str) -> bool:
-    return p.startswith("sha256:") or p.startswith("bafy")
+    # `sha256:hex16` short-form, OR a full CIDv1 base32 token in the fingerprint slot — both
+    # `bafy…` (dag-cbor 0x71) and `bafk…` (raw 0x55). A raw-codec body CID starts `bafk`, so the
+    # earlier `bafy`-only guard would have dropped it; `baf` covers the multibase-b CID family.
+    return p.startswith(("sha256:", "baf"))
+
+
+def _cid_sha256_digest(token: str) -> bytes | None:
+    """DECODE-only (never ENCODE): extract the sha2-256 digest bytes from a CIDv1 base32 token, or
+    None if it is not a base32 sha2-256 CID. Python is allowed to DECODE a CID to compare digests
+    (Slice-3 verdict support); it is FORBIDDEN to construct/encode one — the `eprfs cid` CLI is the
+    sole encoder (single-source invariant). Handles only the multibase-`b` (base32) family our CIDs
+    use."""
+    if not token.startswith("b"):
+        return None
+    b32 = token[1:].upper()
+    try:
+        raw = base64.b32decode(b32 + "=" * ((-len(b32)) % 8))
+    except (ValueError, TypeError):
+        return None
+    # CIDv1 layout: <version=0x01><codec varint><mh-code varint><mh-size varint><digest>.
+    # Our codecs (0x55 raw, 0x71 dag-cbor) and mh fields are all single-byte varints.
+    if len(raw) < 4 or raw[0] != 0x01 or raw[2] != 0x12:  # 0x12 = sha2-256
+        return None
+    size = raw[3]
+    digest = raw[4:4 + size]
+    return digest if len(digest) == size else None
 
 
 _PATH_EXTS = (".md", ".yaml", ".yml", ".py", ".ts", ".tsx", ".js", ".rs", ".json",
@@ -243,12 +282,20 @@ def envelope_verdict(cite: dict, slug_index: dict) -> str:
     path = str(slug_index[ref]).replace("\\", "/")
     if "/held/" in path:
         return "held"
-    if cite.get("fingerprint"):
+    fp = cite.get("fingerprint")
+    if fp:
         try:
-            if fingerprint(path) != cite["fingerprint"]:
-                return "stale"
+            body = body_of(path)
         except OSError:
-            pass
+            return "ok"  # unreadable target — not a fingerprint-drift signal
+        if fp.startswith("baf"):
+            # Full-CID token: DECODE its digest and compare to the recomputed body digest (the same
+            # sha2-256 the short-form truncates). No CID is ever encoded in Python.
+            d = _cid_sha256_digest(fp)
+            if d is None or d != _body_digest(body):
+                return "stale"
+        elif fingerprint_text(body) != fp:
+            return "stale"
     return "ok"
 
 

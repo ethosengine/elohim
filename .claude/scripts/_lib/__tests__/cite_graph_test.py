@@ -111,4 +111,28 @@ check("is_gospel_claude_md accepts in-scope", cg.is_gospel_claude_md(groot / "ap
 check("is_gospel_claude_md rejects vendored", not cg.is_gospel_claude_md(groot / "node_modules" / "dep" / "CLAUDE.md", groot))
 check("is_gospel_claude_md rejects non-CLAUDE.md name", not cg.is_gospel_claude_md(groot / "app" / "x.md", groot))
 
+# ── full-CID tokens in the fingerprint slot (cite↔CID convergence, Slice-3) ──
+# A `bafk…` raw-codec body CID is now valid in the fingerprint slot; verdict decodes it and
+# compares the sha2-256 digest against the recomputed body digest. Golden CIDs from `eprfs cid`.
+target_cid = Path(d) / "cid-target.md"
+target_cid.write_text("---\ntitle: T\nid: cid-doc\n---\ncid body content\n")
+OK_CID = "bafkreidmi27tswvwvwm45sbvlytbbe4yo5acu3jpif42eynnk3h4sntyty"
+WRONG_CID = "bafkreib7g36t3a3n4i3w5k3g6efwxam25af2fy3e2vjtwibu5cftdii5ui"
+sidx = {"cid-doc": str(target_cid)}
+check("_is_fingerprint accepts a raw (bafk) CID", cg._is_fingerprint(OK_CID))
+check("_is_fingerprint accepts a dag-cbor (bafy) CID", cg._is_fingerprint("bafyreiabc"))
+check("_is_fingerprint accepts sha256 short-form", cg._is_fingerprint("sha256:abc"))
+check("_cid_sha256_digest decodes 32 raw bytes", len(cg._cid_sha256_digest(OK_CID)) == 32)
+check("_cid_sha256_digest rejects a non-CID", cg._cid_sha256_digest("sha256:abc") is None)
+ok_cite = {"legacy_path": False, "ref": "cid-doc", "fingerprint": OK_CID}
+check("envelope_verdict ok on a matching full-CID token", cg.envelope_verdict(ok_cite, sidx) == "ok")
+stale_cite = {"legacy_path": False, "ref": "cid-doc", "fingerprint": WRONG_CID}
+check("envelope_verdict stale on a mismatched full-CID token", cg.envelope_verdict(stale_cite, sidx) == "stale")
+# the short-form path still works alongside the CID path
+short_ok = {"legacy_path": False, "ref": "cid-doc", "fingerprint": cg.fingerprint(target_cid)}
+check("envelope_verdict ok on a matching short-form token", cg.envelope_verdict(short_ok, sidx) == "ok")
+# the full CID's digest and the short-form truncate the SAME sha2-256 digest
+check("full-CID digest[:8].hex() == short-form hex16",
+      cg._cid_sha256_digest(OK_CID).hex()[:16] == cg.fingerprint(target_cid).split(":")[1])
+
 print(f"\n  {_p} assertions passed ✅")
