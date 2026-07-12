@@ -2,8 +2,9 @@
 name: elohim-epr-metafile
 description: Authoring guide for `.epr-meta` — the directory-local compose-gate manifest read by the epr-meta-resolver PreToolUse hook. Use when establishing or tightening governance for a directory — doc-shaped or code (the latter governing the over-engineering/YAGNI drift) — or (the main loop) when closing a drift you just cleaned by writing the co-located rule that prevents the recurrence. Teaches the closed signal vocabulary, the enforcement-class ladder, the cascade, and — the heart of it — how to choose the lightest signal that drives a directory toward stasis instead of nagging. Companion to the spec (mechanism) and to p2p-design-gate / epr-content-addressing.
 metadata:
-  author: elohim-protocol
-  version: 1.3.0
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/elohim-epr-metafile"
 ---
 
 # Authoring `.epr-meta` — Directory-Local Governance That Converges

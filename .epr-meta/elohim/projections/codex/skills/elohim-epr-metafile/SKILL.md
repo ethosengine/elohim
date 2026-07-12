@@ -4,7 +4,8 @@ description: Authoring guide for `.epr-meta` — the directory-local compose-gat
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/elohim-epr-metafile/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/elohim-epr-metafile.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/elohim-epr-metafile"
 ---
