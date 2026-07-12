@@ -2,10 +2,9 @@
 name: plant-eprfs-skill
 description: Plant ONE runtime-authored skill in its elohim-native package on the eprfs layer (the package becomes the authoritative source-of-truth; .claude/.codex become generated, content-addressed, provenance-recorded projections that grow from and trace back to it). The skill member of the plant-eprfs family; fidelity-gate-guaranteed lossless.
 metadata:
-  author: elohim-protocol
-  version: 1.0.0
   sourceRuntime: elohim-agent
-  packageKind: SkillPackage
+  master: package
+  governance: "epr:elohim-agent/skills/plant-eprfs-skill"
 ---
 # Plant EPRFS Skill
 

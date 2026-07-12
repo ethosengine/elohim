@@ -4,6 +4,7 @@ description: Plant ONE runtime-authored skill in its elohim-native package on th
 metadata:
   runtime: codex
   sourceRuntime: elohim-agent
+  master: package
   sourcePath: .epr-meta/elohim/packages/skills/plant-eprfs-skill.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/plant-eprfs-skill"
