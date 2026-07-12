@@ -1243,6 +1243,16 @@ async function runProject({ writeFixtures, writeRuntime, only = [] }) {
   }
 }
 
+// The authority class of a package, for the verify accounting line:
+//  - native         : born in the package (sourceRuntime elohim-agent), no runtime source.
+//  - package-first  : born from a runtime but FLIPPED (master: package) — authority is the package.
+//  - source-fidelity: un-flipped runtime-sourced — proved by verifySourceFidelity
+//                     (project(import(source)) === source).
+function packageClass(pkg) {
+  if (pkg.metadata.sourceRuntime === 'elohim-agent') return 'native';
+  return pkg.metadata.master === 'package' ? 'package-first' : 'source-fidelity';
+}
+
 async function runVerify() {
   const sourcePackages = await loadSourcePackages();
   const packageFixtures = await loadPackageFixtures();
@@ -1255,6 +1265,15 @@ async function runVerify() {
   for (const pkg of packageFixtures) {
     await verifyPackage(pkg, validators, settings);
   }
+
+  // Per-class accounting so a shifting check total self-explains (a plant moves a
+  // package from source-fidelity → package-first; an adopt adds one; etc.).
+  const classes = { 'package-first': 0, 'source-fidelity': 0, native: 0 };
+  for (const pkg of packageFixtures) classes[packageClass(pkg)] += 1;
+  console.log(
+    `\n${packageFixtures.length} packages: ${classes['package-first']} package-first, ` +
+      `${classes['source-fidelity']} source-fidelity, ${classes.native} native`,
+  );
 }
 
 // ── Synthetic self-test for the package-master flip machinery ──
