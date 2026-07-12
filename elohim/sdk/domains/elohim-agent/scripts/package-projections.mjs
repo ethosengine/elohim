@@ -824,12 +824,6 @@ function packagePathFor(pkg) {
     : resolve(PACKAGE_DIR, 'agents', `${pkg.metadata.id}.json`);
 }
 
-// An agent-doc has a SINGLE projection keyed by its one runtime (claude for
-// CLAUDE.md, codex for AGENTS.md) — never a cross-runtime fork.
-function agentDocRuntime(pkg) {
-  return Object.keys(pkg.projections)[0];
-}
-
 function projectionFixturePathsFor(pkg) {
   // A hook has a SINGLE projected artifact (the code) and no codex target — the
   // returned object has only a `claude` key, and the write/verify loops iterate
@@ -838,9 +832,16 @@ function projectionFixturePathsFor(pkg) {
     return { claude: resolve(PROJECTION_DIR, 'claude/hooks', `${pkg.metadata.id}.py`) };
   }
   if (pkg.kind === AGENT_DOC_KIND) {
-    const runtime = agentDocRuntime(pkg);
-    const base = basename(pkg.projections[runtime].path);
-    return { [runtime]: resolve(PROJECTION_DIR, runtime, 'agentdocs', pkg.metadata.id, base) };
+    // An agent-doc has ONE projection for the plant case (its native runtime), but
+    // MAY carry a derived-runtime projection too (a claude gospel that also emits a
+    // codex AGENTS.md). Iterate every declared projection so both fixtures are
+    // written/verified; a single-projection doc naturally yields one entry.
+    const out = {};
+    for (const runtime of Object.keys(pkg.projections)) {
+      const base = basename(pkg.projections[runtime].path);
+      out[runtime] = resolve(PROJECTION_DIR, runtime, 'agentdocs', pkg.metadata.id, base);
+    }
+    return out;
   }
   return pkg.kind === 'SkillPackage'
     ? {
@@ -858,8 +859,11 @@ function runtimePathsFor(pkg) {
     return { claude: resolve(REPO_ROOT, pkg.projections.claude.path) };
   }
   if (pkg.kind === AGENT_DOC_KIND) {
-    const runtime = agentDocRuntime(pkg);
-    return { [runtime]: resolve(REPO_ROOT, pkg.projections[runtime].path) };
+    const out = {};
+    for (const runtime of Object.keys(pkg.projections)) {
+      out[runtime] = resolve(REPO_ROOT, pkg.projections[runtime].path);
+    }
+    return out;
   }
   return {
     claude: resolve(REPO_ROOT, pkg.projections.claude.path),
@@ -870,9 +874,11 @@ function runtimePathsFor(pkg) {
 function projectedTextFor(pkg, runtime) {
   // Hooks project VERBATIM (byte-for-byte passthrough) and are runtime-agnostic.
   if (pkg.kind === HOOK_KIND) return projectHook(pkg);
-  // Agent-docs project VERBATIM too — the ENTIRE raw file (frontmatter incl. cite
-  // envelopes + body) emitted unchanged, so the flip never rewrites a gospel doc.
-  if (pkg.kind === AGENT_DOC_KIND) return projectAgentDoc(pkg);
+  // Agent-docs project VERBATIM for their NATIVE runtime — the ENTIRE raw file
+  // (frontmatter incl. cite envelopes + body) emitted unchanged, so the flip never
+  // rewrites a gospel doc. A DERIVED runtime (codex AGENTS.md from a claude gospel)
+  // gets the generated governance preamble + verbatim body; `runtime` selects.
+  if (pkg.kind === AGENT_DOC_KIND) return projectAgentDoc(pkg, runtime);
   return runtime === 'claude' ? projectClaude(pkg) : projectCodex(pkg);
 }
 
@@ -1007,9 +1013,12 @@ async function verifyPackage(pkg, validators, settings) {
       Boolean(pkg.metadata.governance?.eprRef),
       `${pkg.metadata.id} has metadata.governance.eprRef`,
     );
-    const runtime = agentDocRuntime(pkg);
-    await verifyProjectionFixture(pkg, runtime);
-    await verifyRuntimeProjectionIfPresent(pkg, runtime);
+    // Byte-identity for EVERY declared projection: the native-runtime projection is
+    // verbatim source.body; a derived codex projection is preamble + source.body.
+    for (const runtime of Object.keys(pkg.projections)) {
+      await verifyProjectionFixture(pkg, runtime);
+      await verifyRuntimeProjectionIfPresent(pkg, runtime);
+    }
     return;
   }
 
