@@ -160,7 +160,7 @@ The identity of the entity IS a hash of its content. If the content changes, the
 **NOT addresses — keep these as bare sha256.** The discriminator: *does something resolve / dereference / fetch it?* If no, it is not an address — leave it.
 - **Dedup / fingerprint keys** — e.g. `fp = sha256(node|class|provenance)[:12]` (findings / runtime sentinels). An internal index key, never fetched.
 - **Byte-equality verification** — e.g. `sha256-verify the ts-rs codegen diff`, blob-arrival integrity checks. Comparing bytes, not naming content.
-- **Cite fingerprints** — `cites:` frontmatter `sha256:<hex>` is the `cite-gen` tool's content-address *of a citation*; it is tool-generated, a SEPARATE system — **never hand-edit, never migrate to CID.**
+- **Cite fingerprints** — `cites:` frontmatter `sha256:<hex>` is now formally the **short-form projection of the body CID** (`CIDv1(raw 0x55, sha2-256(canonical-body))`) per the 2026-07-12 cite↔CID convergence — one digest, two renderings, not a separate system. Envelopes stay short-form; it is still tool-generated (`cite-gen`) — **never hand-edit.**
 
 **Legacy / in-migration:** the bare `sha256-<hex>` blob wire marker (currently described in `elohim-storage/CLAUDE.md` / `doorway/CLAUDE.md`, on the `/blob/<hash>` path) is the **legacy** form; the canonical target is the wrapping CID `bafkrei…`. Moving the blob plane (`/blob`, `BlobStore`, inventory-gossip wire, seeder) from bare-hash to CID is a named **downstream migration arc** — describe *current* behavior accurately, design *new* surfaces CID-first.
 
