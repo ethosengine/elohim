@@ -115,6 +115,24 @@ nodes:
     checks:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
     evidence: >
+      DELTA 2026-07-12 (shift convergence-bank, dev@bcc023322): FIRST FULL
+      3/3 GREEN — edge #1187 Dataplane Validation passed ALL notary-authority
+      scenarios including scenario 2 (seam-smoke: "landing canonical head
+      CONVERGED"); adam adopted the declaration after finishing its
+      post-restart heal-backlog catch-up. The convergence-test sweettest pair
+      is BANKED green x2 fresh triggers (DNA #1359/#1360) under isolated
+      conductors (bcc023322 — the pre-exchange partition the tests assume is
+      now real; mem-bootstrap thread-keying defect class closed for the whole
+      family). Edge #1188 (the x2 attempt) regressed scenario 2 — measured
+      DURING its own post-deploy churn: elohim.host caughtUp=false and
+      serving its legacy root (f41d blob) hours into catch-up, live-probed
+      08:3x UTC. The binding constraint is HEAL THROUGHPUT (~10s/row x
+      thousands post-restart), not election/declaration/fetch — all proven.
+      Node stays red on the strict x2 rule; flip condition = edge validation
+      on a settled fleet (elohim.host caughtUp=true), which the next
+      app-deploy declare + heal completion produces without code change.
+      Seam-smoke --gate flip HELD until validation is churn-aware (gating
+      now would institutionalize churn-window false-reds).
       DELTA 2026-07-11 LATE (dht-unity cure, dev@270dbafac): CONVERGED LIVE —
       both doorways resolve the IDENTICAL canonical head + blob for
       elohim-host-landing (verified 20:40:35 UTC: uhCkkPVC7g…/84e1d803…,
