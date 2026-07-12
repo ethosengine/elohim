@@ -143,6 +143,39 @@ land it. Everything is deployed; this is timing + the filed heal-throughput
 residual, not a new defect. Do NOT push while an app build is mid-flight
 (re-authors the target the ladder is chasing).
 
+**DELTA 2026-07-12 (midday) — shift-end branch 3 was HALF the story: it landed,
+then regressed.** The decision tree assumed the declaration never landed. Live
+evidence says otherwise: edge #1187's seam-smoke (~05:40Z) read `dht-fetch: OK —
+CONVERGED (uhCkko_…)` on BOTH doorways — B's row briefly held the fresh head —
+and #1188 (~07:40Z) read `ADVISORY-DIVERGENT — A=uhCkko_ B=uhCkkwLFE` again.
+The mover: adam's own-conductor heal (`projection-reconcile[content]: HEALED
+content anchor from own conductor`, 11:26:49Z — matches the row's updatedAt to
+the second). Adam's conductor had not integrated the newer canonical link, so
+its resolve answered the OLD canonical record — `canonical: true`, yet STALE —
+and `heal_content_one`'s canonical⇒Declare stamp legally moved the declared
+head BACKWARDS. Same resurrection class as the 2026-07-11 20:42 regression,
+one level up: the GapFill guard covered fallback answers; a stale canonical
+answer is the same rollback wearing a canonical costume.
+
+Second defect, same window: the DECLARE_ONLY retry ladder treated HTTP 503
+(`{"status":"catching-up"}` — adam's admission layer shedding writes while the
+reconcile drain holds the write pool) as STRUCTURAL and aborted at attempt 3/8
+(app #1612). Backpressure is retryable by definition — the ladder gave up on
+the exact signal that says "try again shortly."
+
+CURE SHIPPED (this commit):
+1. `StampMode::HealCanonical` — heal with a canonical answer may fill, refresh
+   the same head, or move a declared row ONLY with proof of forward ordering:
+   new `content.declared_head_at` column (zome declaration Timestamp, i64 µs)
+   compared against the answer's `ContentHeadWire.declared_at`; NULL on either
+   side refuses the move. Deliberate channels (declare route, propagation POST,
+   own-conductor signal) keep unconditional Declare (revert stays a legitimate
+   authority act). Unit: `heal_canonical_stamp_is_monotonic`.
+2. Ladder: 503/429 now retry on a 30s cadence (12 attempts total; 90s stays
+   the not-retrievable cadence).
+Booting the new binary cannot resurrect: pre-migration rows wake with
+`declared_head_at = NULL`, and NULL-ordering rows are unmovable by heal.
+
 ## The standing diagnostic (free, every deploy)
 
 Every app deploy now emits the live probe in the `authorHeadOnce` /

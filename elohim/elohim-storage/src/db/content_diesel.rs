@@ -859,8 +859,13 @@ pub fn upsert_with_anchor(
             content::dht_anchor_hash.eq(dht_anchor_hash),
             // HEAD-election rule: an own-conductor-witnessed commit advances the
             // notary-declared HEAD to the committed action (see the invariant doc
-            // above). Author-only auto-declare — set alongside the anchor.
+            // above). Author-only auto-declare — set alongside the anchor. The
+            // commit signal carries no declaration Timestamp, so the stored
+            // ordering is NULLed with it: a stale `declared_head_at` left over
+            // from a prior declaration would misorder every later
+            // heal-monotonicity check (the next timestamped declare restores it).
             content::declared_head_action_hash.eq(dht_anchor_hash),
+            content::declared_head_at.eq(None::<i64>),
             content::updated_at.eq(sql::<Text>("CURRENT_TIMESTAMP")),
         ))
         .execute(conn)
@@ -946,24 +951,47 @@ pub fn stamp_declared_head(
     ctx: &AppContext,
     id: &str,
     head_action_hash: &str,
+    declared_at: Option<i64>,
     patch: Option<ContentProjectionPatch>,
 ) -> Result<bool, StorageError> {
-    stamp_declared_head_mode(conn, ctx, id, head_action_hash, patch, StampMode::Declare)
-        .map(|o| o == StampOutcome::Stamped)
+    stamp_declared_head_mode(
+        conn,
+        ctx,
+        id,
+        head_action_hash,
+        declared_at,
+        patch,
+        StampMode::Declare,
+    )
+    .map(|o| o == StampOutcome::Stamped)
 }
 
 /// How a declared-head stamp may interact with an already-declared row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StampMode {
-    /// Canonical-channel stamp (declare route, canonical-head propagation,
-    /// `ContentHeadDeclared` signal): always writes.
+    /// Deliberate canonical-channel stamp (declare route, canonical-head
+    /// propagation, own-conductor `ContentHeadDeclared` signal): always
+    /// writes. These channels are request-borne or own-authored — moving a
+    /// declared head (including deliberately BACKWARDS: revert is a
+    /// legitimate authority act on a version DAG) is exactly their job.
     Declare,
-    /// Gap-heal stamp (projection-reconcile heal / boot re-projection): fills
-    /// an UNDECLARED row only. A freshly-restarted conductor's
-    /// `resolve_content_head` falls through to the root-author election while
-    /// the canonical link is not yet retrievable; in Declare semantics that
-    /// RESURRECTS a superseded head over a previously-adopted canonical one
-    /// (live regression 2026-07-11 20:42:40, two minutes after the first
+    /// Heal stamp for a CANONICAL conductor answer (projection-reconcile with
+    /// `ContentHeadWire.canonical == true`): fills an undeclared row,
+    /// refreshes the same head, and may MOVE a declared row only when the
+    /// answer's `declared_at` is provably NEWER than the stored ordering. A
+    /// conductor that has not yet integrated a newer cross-root canonical
+    /// link answers with the OLD canonical record — canonical, yet stale —
+    /// and an unconditional Declare-mode stamp moved the head BACKWARDS
+    /// (live regression 2026-07-12: elohim-host-landing converged at edge
+    /// #1187's seam-smoke, healed back to the superseded head by #1188).
+    /// Unknown ordering (either side NULL) refuses the move: heal converges
+    /// rows forward; deliberate channels do everything else.
+    HealCanonical,
+    /// Heal stamp for a FALLBACK conductor answer (root-author election on a
+    /// cold conductor while the canonical link is not yet retrievable): fills
+    /// an UNDECLARED row only. In Declare semantics this RESURRECTED a
+    /// superseded head over a previously-adopted canonical one (live
+    /// regression 2026-07-11 20:42:40, two minutes after the first
     /// cross-conductor adoption). Heal fills absence; only canonical channels
     /// move a declared head.
     GapFill,
@@ -977,6 +1005,11 @@ pub enum StampOutcome {
     /// GapFill mode: row already carries a DIFFERENT declared head — left
     /// untouched (canonical channels own moving it).
     SkippedDeclared,
+    /// HealCanonical mode: row already carries a DIFFERENT declared head and
+    /// the incoming answer is not provably newer (stale canonical record, or
+    /// ordering unknown on either side) — left untouched. The deliberate
+    /// canonical channels own any non-forward move.
+    SkippedStale,
     /// No local row for this id (stamp is existing-row-only by design).
     NoRow,
 }
@@ -986,29 +1019,52 @@ pub fn stamp_declared_head_mode(
     ctx: &AppContext,
     id: &str,
     head_action_hash: &str,
+    declared_at: Option<i64>,
     patch: Option<ContentProjectionPatch>,
     mode: StampMode,
 ) -> Result<StampOutcome, StorageError> {
     use diesel::dsl::sql;
     use diesel::sql_types::Text;
 
-    let existing: Option<Option<String>> = content::table
+    let existing: Option<(Option<String>, Option<i64>)> = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq(id))
-        .select(content::declared_head_action_hash)
-        .first::<Option<String>>(conn)
+        .select((
+            content::declared_head_action_hash,
+            content::declared_head_at,
+        ))
+        .first::<(Option<String>, Option<i64>)>(conn)
         .optional()
         .map_err(|e| StorageError::Internal(format!("Stamp declared head lookup: {e}")))?;
 
-    let declared = match existing {
+    let (declared, stored_declared_at) = match existing {
         None => return Ok(StampOutcome::NoRow),
-        Some(declared) => declared,
+        Some(row) => row,
     };
 
-    if mode == StampMode::GapFill {
-        if let Some(current) = declared.as_deref() {
-            if !current.is_empty() && current != head_action_hash {
+    let moving_declared_row = matches!(
+        declared.as_deref(),
+        Some(current) if !current.is_empty() && current != head_action_hash
+    );
+
+    match mode {
+        StampMode::Declare => {}
+        StampMode::GapFill => {
+            if moving_declared_row {
                 return Ok(StampOutcome::SkippedDeclared);
+            }
+        }
+        StampMode::HealCanonical => {
+            if moving_declared_row {
+                // Monotonic move: allowed ONLY with proof of forward ordering.
+                // NULL on either side = unknown = refuse (heal never gambles).
+                let provably_newer = matches!(
+                    (declared_at, stored_declared_at),
+                    (Some(incoming), Some(stored)) if incoming > stored
+                );
+                if !provably_newer {
+                    return Ok(StampOutcome::SkippedStale);
+                }
             }
         }
     }
@@ -1025,6 +1081,31 @@ pub fn stamp_declared_head_mode(
     ))
     .execute(conn)
     .map_err(|e| StorageError::Internal(format!("Stamp declared head failed: {}", e)))?;
+
+    // Ordering bookkeeping: a stamp that carries the declaration's zome
+    // Timestamp records it; a stamp that MOVES the head without one must NULL
+    // the stored ordering (it belongs to the prior declaration — keeping it
+    // would misorder every later monotonicity check). Same-head stamps
+    // without a timestamp keep whatever ordering is already known.
+    if let Some(incoming) = declared_at {
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set(content::declared_head_at.eq(Some(incoming)))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Stamp declared_head_at failed: {e}")))?;
+    } else if moving_declared_row {
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set(content::declared_head_at.eq(None::<i64>))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Clear declared_head_at failed: {e}")))?;
+    }
 
     if let Some(patch) = patch {
         apply_content_patch_fields(conn, ctx, id, &patch)?;
@@ -1421,6 +1502,7 @@ mod tests {
                 p2p_published_at TEXT,
                 crdt_converged_at TEXT,
                 declared_head_action_hash TEXT,
+                declared_head_at BIGINT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
@@ -2813,7 +2895,8 @@ mod tests {
         let ctx = AppContext::new("lamad");
 
         // Missing row → Ok(false), no fabrication.
-        let missing = stamp_declared_head(&mut conn, &ctx, "cid-absent", "uhCkk-x", None).unwrap();
+        let missing =
+            stamp_declared_head(&mut conn, &ctx, "cid-absent", "uhCkk-x", None, None).unwrap();
         assert!(
             !missing,
             "stamp on a missing row must return Ok(false) and NOT insert"
@@ -2828,7 +2911,8 @@ mod tests {
         // Existing row → Ok(true), both hashes set to the verified head.
         create_content(&mut conn, &ctx, mk_plain("cid-present")).unwrap();
         let stamped =
-            stamp_declared_head(&mut conn, &ctx, "cid-present", "uhCkk-head-9", None).unwrap();
+            stamp_declared_head(&mut conn, &ctx, "cid-present", "uhCkk-head-9", None, None)
+                .unwrap();
         assert!(stamped, "stamp on an existing row must return Ok(true)");
 
         let row = get_content(&mut conn, &ctx, "cid-present", MinTrust::Invisible)
@@ -2846,7 +2930,8 @@ mod tests {
 
         // Idempotent re-stamp still returns Ok(true).
         let restamped =
-            stamp_declared_head(&mut conn, &ctx, "cid-present", "uhCkk-head-9", None).unwrap();
+            stamp_declared_head(&mut conn, &ctx, "cid-present", "uhCkk-head-9", None, None)
+                .unwrap();
         assert!(restamped, "idempotent re-stamp returns Ok(true)");
     }
 
@@ -2868,6 +2953,7 @@ mod tests {
             "cid-declared",
             "uhCkk-canonical-NEW",
             None,
+            None,
             StampMode::GapFill,
         )
         .unwrap();
@@ -2879,6 +2965,7 @@ mod tests {
             &ctx,
             "cid-declared",
             "uhCkk-superseded-OLD",
+            None,
             None,
             StampMode::GapFill,
         )
@@ -2900,6 +2987,7 @@ mod tests {
             "cid-declared",
             "uhCkk-canonical-NEW",
             None,
+            None,
             StampMode::GapFill,
         )
         .unwrap();
@@ -2912,10 +3000,135 @@ mod tests {
             "cid-declared",
             "uhCkk-canonical-NEWER",
             None,
+            None,
             StampMode::Declare,
         )
         .unwrap();
         assert_eq!(moved, StampOutcome::Stamped);
+    }
+
+    /// HEAD-election (v) — the stale-canonical resurrection guard (2026-07-12
+    /// live regression: elohim-host-landing converged at edge #1187's
+    /// seam-smoke, healed BACKWARDS to the superseded head by #1188): a
+    /// HealCanonical stamp may fill, refresh, or move FORWARD (provably newer
+    /// `declared_at`), but must never move a declared row backwards or on
+    /// unknown ordering.
+    #[test]
+    fn heal_canonical_stamp_is_monotonic() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("cid-mono")).unwrap();
+
+        // Fill an undeclared row (heal's legitimate job) — records ordering.
+        let filled = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-mono",
+            "uhCkk-old",
+            Some(1_000),
+            None,
+            StampMode::HealCanonical,
+        )
+        .unwrap();
+        assert_eq!(filled, StampOutcome::Stamped);
+
+        // A deliberate canonical channel adopts a NEWER declaration.
+        assert!(
+            stamp_declared_head(&mut conn, &ctx, "cid-mono", "uhCkk-new", Some(2_000), None)
+                .unwrap()
+        );
+
+        // The regression: a conductor that has not integrated the newer
+        // canonical link answers with the OLD canonical record. The heal must
+        // NOT move the row backwards.
+        let stale = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-mono",
+            "uhCkk-old",
+            Some(1_000),
+            None,
+            StampMode::HealCanonical,
+        )
+        .unwrap();
+        assert_eq!(
+            stale,
+            StampOutcome::SkippedStale,
+            "stale canonical answer must never move a declared head backwards"
+        );
+        let row = get_content(&mut conn, &ctx, "cid-mono", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some("uhCkk-new"));
+
+        // Unknown ordering (incoming None) must also refuse the move.
+        let unknown = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-mono",
+            "uhCkk-old",
+            None,
+            None,
+            StampMode::HealCanonical,
+        )
+        .unwrap();
+        assert_eq!(unknown, StampOutcome::SkippedStale);
+
+        // Same-head refresh is idempotent, never a skip.
+        let same = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-mono",
+            "uhCkk-new",
+            Some(2_000),
+            None,
+            StampMode::HealCanonical,
+        )
+        .unwrap();
+        assert_eq!(same, StampOutcome::Stamped);
+
+        // A provably NEWER canonical answer moves the row forward — this is
+        // exactly how a peer converges when the canonical link gossips in.
+        let forward = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-mono",
+            "uhCkk-newest",
+            Some(3_000),
+            None,
+            StampMode::HealCanonical,
+        )
+        .unwrap();
+        assert_eq!(forward, StampOutcome::Stamped);
+        let row = get_content(&mut conn, &ctx, "cid-mono", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-newest")
+        );
+
+        // A Declare-channel move WITHOUT a timestamp NULLs the stored ordering
+        // (it belongs to the prior declaration) — after which a heal cannot
+        // move the row at all until a timestamped declare restores ordering.
+        assert!(
+            stamp_declared_head(&mut conn, &ctx, "cid-mono", "uhCkk-untimed", None, None).unwrap()
+        );
+        let stuck = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-mono",
+            "uhCkk-newest",
+            Some(3_000),
+            None,
+            StampMode::HealCanonical,
+        )
+        .unwrap();
+        assert_eq!(
+            stuck,
+            StampOutcome::SkippedStale,
+            "heal never gambles on unknown stored ordering"
+        );
     }
 
     /// HEAD-election (iii): a verified `stamp_declared_head` carrying a patch
@@ -2954,6 +3167,7 @@ mod tests {
             &ctx,
             id,
             "uhCkk-verified-head",
+            None,
             Some(ContentProjectionPatch {
                 blob_cid: Some("sha256-greenbundle".to_string()),
                 ..Default::default()

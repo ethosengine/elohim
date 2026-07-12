@@ -319,6 +319,7 @@ mod trust_label_tests {
             server_blob_hash: None,
             crdt_converged_at: None,
             declared_head_action_hash: None,
+            declared_head_at: None,
         }
     }
 

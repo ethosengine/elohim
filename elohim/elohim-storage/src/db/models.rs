@@ -119,6 +119,16 @@ pub struct Content {
     /// head, so `upsert_with_anchor` advances this alongside `dht_anchor_hash`. NULL = no
     /// declared head yet. Classification: A (projection of the notary-declared HEAD action).
     pub declared_head_action_hash: Option<String>,
+    /// Zome `Timestamp` (i64 microseconds since the Unix epoch) of the declaration act behind
+    /// `declared_head_action_hash` — the ORDERING key that keeps heal-channel stamps monotonic
+    /// (a stale-canonical conductor answer must never move a declared head BACKWARDS; live
+    /// regression 2026-07-12, elohim-host-landing). NULL = ordering unknown (pre-migration row,
+    /// or the head was advanced by a channel carrying no zome timestamp): heal may FILL but
+    /// never MOVE such a row. Internal-only — `serde(skip)`/`ts(skip)` keep the HTTP wire and
+    /// generated TS byte-identical. Classification: A (projection of declaration ordering).
+    #[serde(skip)]
+    #[ts(skip)]
+    pub declared_head_at: Option<i64>,
 }
 
 /// Content with tags attached (API response)

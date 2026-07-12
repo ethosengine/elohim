@@ -31,16 +31,22 @@ rules:
     when: { write: "*.rs", contains-any: ["stamp_declared_head", "StampMode", "projection_reconcile", "GapFill"] }
     validator: epr:validator-heal-fills-never-moves
     why: >
-      INVARIANT — heal FILLS absence, it never MOVES authority. A projection-reconcile / stamp
-      path uses `StampMode::{Declare, GapFill}`: `Declare` is ONLY for a canonical answer (the
-      zome returns `canonical: bool`); a fallback resolve (`canonical == false`, e.g. a cold
-      conductor's root-author election while the canonical link is not yet retrievable) MUST stamp
-      `GapFill` — it may fill an empty row but must NEVER displace a declared/adopted row. Stamping
-      a fallback over an adopted canonical converts every restart into a rollback (the 2026-07-11
+      INVARIANT — heal FILLS absence or converges FORWARD; it never moves authority backwards. A
+      projection-reconcile / stamp path uses `StampMode::{Declare, HealCanonical, GapFill}`:
+      `Declare` is ONLY for deliberate canonical channels (declare route, propagation POST,
+      own-conductor `ContentHeadDeclared` signal — request-borne/own-authored, may move a head
+      anywhere including a deliberate revert); a heal with a canonical answer (`canonical == true`)
+      MUST stamp `HealCanonical` — fill, same-head refresh, or a move ONLY with proof of forward
+      ordering (`declared_at` newer than the stored `declared_head_at`; NULL either side = refuse):
+      a conductor that has not yet integrated a newer canonical link answers with the OLD canonical
+      record — canonical, yet stale — and an unconditional Declare stamp moved the head BACKWARDS
+      (2026-07-12: elohim-host-landing converged at edge #1187's seam-smoke, healed back to the
+      superseded head by #1188). A fallback resolve (`canonical == false`, e.g. a cold conductor's
+      root-author election) MUST stamp `GapFill` — fill an empty row only (the 2026-07-11
       resurrection class: HEALED anchor restamped the OLD head 2 min after cross-conductor adoption,
       across 2,838 divergence-queued rows). Do not widen `Declare`, and do not key the guard on
       *who* writes (that froze forward adoption, defect #3) — key it on the authority the write
-      CARRIES (`canonical`).
+      CARRIES (`canonical` + declaration ordering).
 cites:
   - backlog-dataplane-peer-fallback-and-blob-replication
   - substrate-convergence-five-defect-arc

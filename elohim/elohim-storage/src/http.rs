@@ -5206,6 +5206,7 @@ impl HttpServer {
                     app_ctx,
                     content_id,
                     declared.head_action_hash.as_str(),
+                    Some(declared.declared_at),
                     Some(patch),
                 )?;
 
@@ -5353,6 +5354,7 @@ impl HttpServer {
             app_ctx,
             content_id,
             declared.head_action_hash.as_str(),
+            Some(declared.declared_at),
             Some(patch),
         )?;
 
@@ -14884,6 +14886,7 @@ mod c3_serve_head_preference_tests {
             server_blob_hash: None,
             crdt_converged_at: None,
             declared_head_action_hash: declared.map(str::to_string),
+            declared_head_at: None,
         }
     }
 
