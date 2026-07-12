@@ -472,7 +472,13 @@ async fn declare_head_notarizes_and_supersedes() -> Result<()> {
 ///   d. An UNDECLARED id still resolves root-author-newest (behavior unchanged).
 #[tokio::test(flavor = "multi_thread")]
 async fn declare_canonical_head_converges_independent_roots() -> Result<()> {
-    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
+    // ISOLATED conductors: this test authors the SAME id on both conductors and
+    // depends on a genuine pre-exchange partition. Under the default config the
+    // process-global mem-bootstrap store (thread-id-keyed) can join the peers
+    // before the author phase, so c2's create_content sees c1's root and refuses
+    // with "already exists" — the dna #1357/#1358 red. Same cure as
+    // earned_beats_newer_staging_at_resolve; see two_agent_conductors_isolated.
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors_isolated().await?;
     let seed = network_seed(DNA);
     // a1 is the bootstrap steward (progenitor_pubkey in DNA properties).
     let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
@@ -631,7 +637,11 @@ async fn declare_canonical_head_converges_independent_roots() -> Result<()> {
 /// `declare_canonical_head_converges_independent_roots`.)
 #[tokio::test(flavor = "multi_thread")]
 async fn earned_head_guard_and_scaffold_over_scaffold() -> Result<()> {
-    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
+    // ISOLATED conductors: authors "guard-c" on BOTH conductors pre-exchange —
+    // same partition assumption (and same nondeterministic "already exists"
+    // failure mode) as declare_canonical_head_converges_independent_roots; it
+    // passed #1358 only by winning the thread-placement race.
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors_isolated().await?;
     let seed = network_seed(DNA);
     // a1 is the bootstrap steward (progenitor_pubkey in DNA properties).
     let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
