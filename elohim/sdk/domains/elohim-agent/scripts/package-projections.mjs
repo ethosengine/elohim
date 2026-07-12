@@ -14,6 +14,7 @@ import {
 import {
   AGENT_DOC_KIND,
   agentDocPackageFromSource,
+  frontmatterScalar,
   projectAgentDoc,
   runtimeForDoc,
   verifyAgentDocPackage,
@@ -74,6 +75,32 @@ function parseOnly(argv) {
   return out;
 }
 const ONLY = parseOnly(args);
+const DRY_RUN = args.includes('--dry-run');
+
+// Value-bearing flag reader (`--id foo` or `--id=foo`); null when absent.
+function flagValue(argv, flag) {
+  const idx = argv.indexOf(flag);
+  if (idx !== -1 && argv[idx + 1] && !argv[idx + 1].startsWith('-')) return argv[idx + 1];
+  const eq = argv.find((a) => a.startsWith(`${flag}=`));
+  return eq ? eq.slice(flag.length + 1) : null;
+}
+
+// Positional (non-flag) tokens, skipping the values consumed by value-bearing
+// flags (`--only`, `--id`) so `adopt-doc path/to/CLAUDE.md --id foo` reads
+// `path/to/CLAUDE.md` as the sole argument, not `foo`.
+function positionalArgs(argv) {
+  const out = [];
+  const valueFlags = new Set(['--only', '--id']);
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg.startsWith('-')) {
+      if (valueFlags.has(arg) && argv[i + 1] && !argv[i + 1].startsWith('-')) i++;
+      continue;
+    }
+    out.push(arg);
+  }
+  return out;
+}
 
 // Filter a package list to those matching an `--only` selection. A package matches
 // a bare id (`pkg.metadata.id`) or a kind-qualified token (`${pkg.kind}:${id}`).
@@ -1577,12 +1604,119 @@ async function runSelfTest() {
       !projectCodex(mcpAgent).includes('mcpServers:'),
       'selftest(g): flipped mcp agent .codex omits mcpServers (claude-only wiring, parity with un-flipped codex path)',
     );
+
+    // (h) import-hook / adopt-doc argument parsing: positionalArgs skips the
+    //     value consumed by a value-bearing flag (--id/--only), and flagValue
+    //     reads both `--id foo` and `--id=foo`.
+    assert(
+      JSON.stringify(positionalArgs(['adopt-doc', 'a/b/CLAUDE.md', '--id', 'foo', '--dry-run'])) ===
+        JSON.stringify(['adopt-doc', 'a/b/CLAUDE.md']),
+      'selftest(h): positionalArgs skips the --id value (doc path is the sole argument)',
+    );
+    assert(
+      JSON.stringify(positionalArgs(['import-hook', 'my-hook', '--dry-run'])) ===
+        JSON.stringify(['import-hook', 'my-hook']),
+      'selftest(h): positionalArgs keeps the hook name past a boolean flag',
+    );
+    assert(
+      flagValue(['adopt-doc', 'x', '--id', 'foo'], '--id') === 'foo' &&
+        flagValue(['adopt-doc', 'x', '--id=bar'], '--id') === 'bar' &&
+        flagValue(['adopt-doc', 'x'], '--id') === null,
+      'selftest(h): flagValue reads --id both spaced and =, null when absent',
+    );
   } finally {
     await rm(sandbox, { recursive: true, force: true });
   }
 }
 
+// Refuse to overwrite an already-planted (package-master) package from its
+// generated source — that would clobber the authority the flip established.
+async function refusesPlantedClobber(pkgPath, id) {
+  const existing = await readIfExists(pkgPath);
+  if (!existing) return false;
+  try {
+    if (JSON.parse(existing)?.metadata?.master === 'package') {
+      fail(
+        `${id} is already planted (master: package) — re-importing from its generated source would ` +
+          `clobber the package authority; edit the package JSON directly instead`,
+      );
+      return true;
+    }
+  } catch {
+    // unparseable existing package — let the scaffold overwrite it
+  }
+  return false;
+}
+
+// `import-hook <name>` — scaffold a HookPackage from `.claude/hooks/<name>.py`
+// plus its settings.json registration (read READ-ONLY; settings.json is NEVER
+// written). Writes the package JSON + its verbatim projection fixture, ready to
+// be planted later. `--dry-run` prints the package without writing.
+async function runImportHook(name, { dryRun }) {
+  assert(Boolean(name), 'import-hook requires a hook name: import-hook <name> [--dry-run]');
+  if (!name) return;
+  const srcPath = resolve(HOOK_SOURCE_DIR, `${name}.py`);
+  const raw = await readIfExists(srcPath);
+  assert(raw !== null, `import-hook: source exists ${relative(REPO_ROOT, srcPath)}`);
+  if (raw === null) return;
+  const pkgPath = resolve(PACKAGE_DIR, 'hooks', `${name}.json`);
+  if (await refusesPlantedClobber(pkgPath, name)) return;
+  const settings = await readSettings();
+  const pkg = hookPackageFromSource(srcPath, raw, settings, {
+    repoRoot: REPO_ROOT,
+    governance: governanceFor('hooks', name),
+  });
+  if (dryRun) {
+    console.log(JSON.stringify(pkg, null, 2));
+    pass(`import-hook dry-run: scaffolded HookPackage ${name} (registration ${pkg.registration ? 'recorded' : 'null — unregistered'}; not written)`);
+    return;
+  }
+  await writeJson(pkgPath, pkg);
+  await writeProjectionFixtures([pkg]);
+  pass(
+    `import-hook: scaffolded HookPackage ${name} → ${relative(REPO_ROOT, pkgPath)} ` +
+      `(settings.json registration recorded read-only, never written)`,
+  );
+}
+
+// `adopt-doc <path> [--id <id>]` — scaffold an AgentDocPackage from a CLAUDE.md /
+// AGENTS.md path. The doc bytes are copied VERBATIM (frontmatter incl. cite
+// envelopes + body). The id defaults to the doc's frontmatter `id:` (its gospel
+// slug); pass `--id` when the doc declares none. Writes the package + its
+// verbatim projection fixture. `--dry-run` prints without writing.
+async function runAdoptDoc(docPath, { id, dryRun }) {
+  assert(Boolean(docPath), 'adopt-doc requires a doc path: adopt-doc <path> [--id <id>] [--dry-run]');
+  if (!docPath) return;
+  const srcPath = resolve(REPO_ROOT, docPath);
+  const raw = await readIfExists(srcPath);
+  assert(raw !== null, `adopt-doc: source exists ${docPath}`);
+  if (raw === null) return;
+  const gospelId = frontmatterScalar(raw, 'id');
+  const docId = id ?? gospelId;
+  assert(
+    Boolean(docId),
+    `adopt-doc: derived an id for ${docPath} (from frontmatter id:, else pass --id <id>)`,
+  );
+  if (!docId) return;
+  const pkgPath = resolve(PACKAGE_DIR, 'agentdocs', `${docId}.json`);
+  if (await refusesPlantedClobber(pkgPath, docId)) return;
+  const pkg = agentDocPackageFromSource(srcPath, raw, {
+    repoRoot: REPO_ROOT,
+    id: docId,
+    governance: governanceFor('agentdocs', docId),
+  });
+  if (dryRun) {
+    console.log(JSON.stringify(pkg, null, 2));
+    pass(`adopt-doc dry-run: scaffolded AgentDocPackage ${docId} (not written)`);
+    return;
+  }
+  await writeJson(pkgPath, pkg);
+  await writeProjectionFixtures([pkg]);
+  pass(`adopt-doc: scaffolded AgentDocPackage ${docId} → ${relative(REPO_ROOT, pkgPath)}`);
+}
+
 async function main() {
+  const positionals = positionalArgs(args);
   switch (command) {
     case 'init':
       await initLayout();
@@ -1592,6 +1726,12 @@ async function main() {
       break;
     case 'import':
       await runImport({ writeProjections: WRITE_FIXTURES });
+      break;
+    case 'import-hook':
+      await runImportHook(positionals[1], { dryRun: DRY_RUN });
+      break;
+    case 'adopt-doc':
+      await runAdoptDoc(positionals[1], { id: flagValue(args, '--id'), dryRun: DRY_RUN });
       break;
     case 'project':
       await runProject({ writeFixtures: WRITE_FIXTURES, writeRuntime: WRITE_RUNTIME, only: ONLY });
@@ -1604,7 +1744,9 @@ async function main() {
       await runVerify();
       break;
     default:
-      fail(`unknown command: ${command} (expected init, import, project, verify, selftest)`);
+      fail(
+        `unknown command: ${command} (expected init, import, import-hook, adopt-doc, project, verify, selftest)`,
+      );
   }
 
   if (failures > 0) {
