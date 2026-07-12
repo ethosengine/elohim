@@ -4,11 +4,11 @@
 use std::collections::BTreeMap;
 
 use eprfs_core::BlobCid;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{AgentProjectionError, Result};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CanonicalAgent {
     pub slug: String,
     pub description: String,
@@ -17,6 +17,19 @@ pub struct CanonicalAgent {
     pub color: Option<String>,
     pub extra: BTreeMap<String, serde_yaml::Value>,
     pub body: String,
+    /// OPTIONAL lineage: the parent package CIDs this envelope was composed from.
+    /// Rendered in deterministic order (sorted by CID string) in
+    /// [`canonical_bytes`](CanonicalAgent::canonical_bytes). Empty by default —
+    /// SUPPORT ONLY: never auto-populated from frontmatter here. Because the
+    /// lineage section is appended ONLY when at least one lineage field is
+    /// present, an absent-lineage envelope hashes exactly as it did before these
+    /// fields existed (no existing package CID moves).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parents: Vec<BlobCid>,
+    /// OPTIONAL single-parent derivation pointer. `None` by default — SUPPORT
+    /// ONLY, never auto-populated here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub derived_from: Option<BlobCid>,
 }
 
 /// Raw frontmatter as authored (before normalization).
@@ -67,6 +80,9 @@ impl CanonicalAgent {
             color: raw.color,
             extra: raw.extra,
             body,
+            // Lineage is SUPPORT-ONLY: parse never captures it (no auto-population).
+            parents: Vec::new(),
+            derived_from: None,
         })
     }
 
@@ -98,6 +114,24 @@ impl CanonicalAgent {
         }
         out.push_str("\nbody:\n");
         out.push_str(&self.body);
+        // OPTIONAL lineage — additive by construction. A section is appended ONLY
+        // when at least one lineage field is present, so an absent-lineage envelope
+        // produces the exact pre-lineage bytes and its CID is unchanged. Parents
+        // render in sorted (CID-string) order, so insertion order never affects the
+        // fingerprint.
+        if !self.parents.is_empty() || self.derived_from.is_some() {
+            out.push_str("\nparents:");
+            let mut sorted: Vec<String> = self.parents.iter().map(BlobCid::to_string).collect();
+            sorted.sort();
+            for parent in &sorted {
+                out.push('\n');
+                out.push_str(parent);
+            }
+            out.push_str("\nderived_from:");
+            if let Some(derived_from) = &self.derived_from {
+                out.push_str(&derived_from.to_string());
+            }
+        }
         out.into_bytes()
     }
 
@@ -366,6 +400,96 @@ mod tests {
             ),
             Err(other) => panic!("expected a Yaml error, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn absent_lineage_canonical_bytes_and_cid_are_unchanged() {
+        // GOLDEN vector. SAMPLE carries NO lineage, so its canonical_bytes MUST be
+        // byte-identical to the pre-lineage output and its cid() MUST equal this
+        // captured baseline. If either moves, every existing package CID moved — a
+        // forbidden invariant break (the whole reason lineage is append-only).
+        let agent = CanonicalAgent::parse(SAMPLE).unwrap();
+        assert!(
+            agent.parents.is_empty(),
+            "parse must not auto-populate parents"
+        );
+        assert!(
+            agent.derived_from.is_none(),
+            "parse must not auto-populate derived_from"
+        );
+        let text = String::from_utf8(agent.canonical_bytes()).unwrap();
+        assert!(
+            !text.contains("\nparents:"),
+            "absent lineage must NOT append a section"
+        );
+        assert!(!text.contains("\nderived_from:"));
+        // Baseline cid captured from a pre-field build (single-sourced
+        // BlobCid::compute over canonical_bytes).
+        assert_eq!(
+            agent.cid().to_string(),
+            "bafyreic36hmigi34p4nf6s2l3sfpnlcuop7hlc6zzd7uee2q6ar2ekzioy"
+        );
+    }
+
+    #[test]
+    fn lineage_parents_are_order_independent_and_content_sensitive() {
+        let base = CanonicalAgent::parse(SAMPLE).unwrap();
+        let p1 = BlobCid::compute(b"parent-one");
+        let p2 = BlobCid::compute(b"parent-two");
+
+        // Same parents, different insertion order → identical canonical_bytes.
+        let mut a = base.clone();
+        a.parents = vec![p1.clone(), p2.clone()];
+        let mut b = base.clone();
+        b.parents = vec![p2.clone(), p1.clone()];
+        assert_eq!(
+            a.canonical_bytes(),
+            b.canonical_bytes(),
+            "parents must be sorted → insertion order cannot change the fingerprint"
+        );
+        assert_eq!(a.cid(), b.cid());
+
+        // Adding a parent changes the cid (and differs from the no-lineage cid).
+        let mut c = base.clone();
+        c.parents = vec![p1.clone()];
+        assert_ne!(a.cid(), c.cid(), "different parent sets → different cid");
+        assert_ne!(base.cid(), c.cid(), "adding a parent moves the cid");
+
+        // derived_from participates too.
+        let mut d = base.clone();
+        d.derived_from = Some(p1);
+        assert_ne!(base.cid(), d.cid(), "setting derived_from moves the cid");
+    }
+
+    #[test]
+    fn lineage_json_round_trips() {
+        // Absent lineage: the fields are skipped in JSON (clean wire), and the
+        // struct round-trips.
+        let bare = CanonicalAgent::parse(SAMPLE).unwrap();
+        let bare_json = serde_json::to_string(&bare).unwrap();
+        assert!(
+            !bare_json.contains("parents"),
+            "empty parents must be skipped: {bare_json}"
+        );
+        assert!(
+            !bare_json.contains("derivedFrom") && !bare_json.contains("derived_from"),
+            "None derived_from must be skipped: {bare_json}"
+        );
+        let bare_back: CanonicalAgent = serde_json::from_str(&bare_json).unwrap();
+        assert_eq!(bare, bare_back);
+
+        // Present lineage: fields serialize and deserialize back identically.
+        let mut with_lineage = bare.clone();
+        with_lineage.parents = vec![
+            BlobCid::compute(b"parent-one"),
+            BlobCid::compute(b"parent-two"),
+        ];
+        with_lineage.derived_from = Some(BlobCid::compute(b"origin"));
+        let json = serde_json::to_string(&with_lineage).unwrap();
+        let back: CanonicalAgent = serde_json::from_str(&json).unwrap();
+        assert_eq!(with_lineage, back);
+        assert_eq!(with_lineage.parents.len(), 2);
+        assert!(back.derived_from.is_some());
     }
 
     #[test]
