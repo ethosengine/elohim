@@ -54,8 +54,12 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
     #     Backpressure clears in seconds-to-minutes, NOT structural: app #1612
     #     aborted here at attempt 3/8 and elohim.host kept the superseded head
     #     for the whole day. 30s cadence.
+    # DECLARE_MAX_ATTEMPTS: cross-conductor retrievability today lands anywhere
+    # in an 18-50min window post-author (edge #1187 adopted ~50min post-author;
+    # app #1614's 18min ladder missed). The Jenkinsfile propagation leg sets a
+    # higher ceiling; 12 stays the default for other callers.
     attempt=0
-    max_attempts=12
+    max_attempts="${DECLARE_MAX_ATTEMPTS:-12}"
     while :; do
         attempt=$((attempt + 1))
         declare_raw=$(curl -sS -o - -w '\n%{http_code}' -X POST \
