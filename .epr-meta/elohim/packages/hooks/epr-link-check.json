@@ -1,0 +1,48 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "HookPackage",
+  "metadata": {
+    "id": "epr-link-check",
+    "name": "epr-link-check",
+    "version": "1.0.0",
+    "description": "Post-edit EPR link suggestion hook for Claude Code.",
+    "sourceRuntime": "claude",
+    "runtimeTargets": [
+      "claude"
+    ],
+    "event": "PostToolUse",
+    "matcher": "Edit|Write",
+    "interpreter": "python3",
+    "language": "python",
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/hooks/epr-link-check",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    },
+    "master": "package",
+    "composedBy": "claude-opus-4-8"
+  },
+  "source": {
+    "language": "python",
+    "interpreter": "python3",
+    "path": ".claude/hooks/epr-link-check.py",
+    "body": "#!/usr/bin/env python3\n\"\"\"\nPost-edit EPR link suggestion hook for Claude Code.\nDetects <a> tags, markdown links, and routerLink attributes that could\nbecome epr: content links — the protocol's native addressing format.\n\nOnly outputs if it finds convertible links. Suggestions are informational,\nnot blocking.\n\nHook Type: PostToolUse\nMatcher: Edit|Write\n\"\"\"\n\nimport json\nimport os\nimport re\nimport sys\n\n\ndef extract_content_slug(url: str) -> str | None:\n    \"\"\"Extract a content slug from a URL if it looks like internal content.\n\n    Returns the slug (e.g. 'manifesto') or None if the URL is external,\n    an anchor, or already uses epr: format.\n    \"\"\"\n    if not url:\n        return None\n\n    # Skip external, anchor-only, already-epr, mailto, tel\n    if url.startswith(('http://', 'https://', '#', 'epr:', 'mailto:', 'tel:')):\n        return None\n\n    # /lamad/resource/{slug} → slug\n    m = re.match(r'/lamad/resource/([a-z0-9-]+)', url)\n    if m:\n        return m.group(1)\n\n    # /content/{slug} → slug\n    m = re.match(r'/content/([a-z0-9-]+)', url)\n    if m:\n        return m.group(1)\n\n    # Relative path like ./fair-exchange or fair-exchange.md (no slashes in slug)\n    m = re.match(r'\\.?/?([a-z][a-z0-9-]+)(?:\\.md)?$', url)\n    if m and '/' not in m.group(1):\n        return m.group(1)\n\n    return None\n\n\ndef scan_html(lines: list[str]) -> list[str]:\n    \"\"\"Scan HTML template lines for convertible links.\"\"\"\n    suggestions = []\n\n    for i, line in enumerate(lines, 1):\n        # Skip lines that already use epr: or the EPR link component\n        if 'epr:' in line or 'app-epr-link' in line:\n            continue\n\n        # Detect <a href=\"...\"> with internal URLs\n        for m in re.finditer(r'<a\\s[^>]*href=\"([^\"]+)\"', line):\n            href = m.group(1)\n            slug = extract_content_slug(href)\n            if slug:\n                suggestions.append(\n                    f'  L{i}: href=\"{href}\" \\u2192 consider epr:{slug}'\n                )\n\n        # Detect routerLink=\"/lamad/resource/...\"\n        for m in re.finditer(r'routerLink=\"(/lamad/resource/([^\"]+))\"', line):\n            route, slug = m.group(1), m.group(2)\n            suggestions.append(\n                f'  L{i}: routerLink=\"{route}\" \\u2192 consider '\n                f'<app-epr-link epr=\"epr:{slug}\">'\n            )\n\n    return suggestions\n\n\ndef scan_markdown(lines: list[str]) -> list[str]:\n    \"\"\"Scan markdown lines for convertible links.\"\"\"\n    suggestions = []\n\n    for i, line in enumerate(lines, 1):\n        # Skip lines that already use epr:\n        if 'epr:' in line:\n            continue\n\n        # Skip fenced code blocks\n        if line.strip().startswith('```'):\n            continue\n\n        # Detect [text](url) where url could become epr:\n        for m in re.finditer(r'\\[([^\\]]+)\\]\\(([^)]+)\\)', line):\n            text, url = m.group(1), m.group(2)\n            slug = extract_content_slug(url)\n            if slug:\n                suggestions.append(\n                    f'  L{i}: [{text}]({url}) \\u2192 consider [{text}](epr:{slug})'\n                )\n\n    return suggestions\n\n\ndef main():\n    try:\n        data = json.load(sys.stdin)\n\n        tool_input = data.get('tool_input', {})\n        file_path = tool_input.get('file_path', '')\n\n        if not file_path:\n            sys.exit(0)\n\n        # Only check HTML templates and markdown files\n        ext = os.path.splitext(file_path)[1]\n        if ext not in ('.html', '.md'):\n            sys.exit(0)\n\n        # Skip files outside the main content areas\n        if not any(d in file_path for d in (\n            '/elohim-app/', '/genesis/', '/doorway-app/'\n        )):\n            sys.exit(0)\n\n        try:\n            with open(file_path) as f:\n                lines = f.readlines()\n        except (FileNotFoundError, PermissionError):\n            sys.exit(0)\n\n        # Route to scanner by file type\n        if ext == '.html':\n            suggestions = scan_html(lines)\n        elif ext == '.md':\n            suggestions = scan_markdown(lines)\n        else:\n            suggestions = []\n\n        if suggestions:\n            basename = os.path.basename(file_path)\n            tip = ('  Tip: Use <app-epr-link epr=\"epr:id\"> in templates, '\n                   '[text](epr:id) in markdown')\n            msg = (f'[EPR] {basename}:\\n'\n                   + '\\n'.join(suggestions[:8])\n                   + '\\n' + tip)\n            result = {\n                'hookSpecificOutput': {\n                    'hookEventName': 'PostToolUse',\n                    'additionalContext': msg,\n                }\n            }\n            print(json.dumps(result))\n\n        sys.exit(0)\n\n    except json.JSONDecodeError:\n        sys.exit(0)\n    except Exception as e:\n        print(f'epr-link-check hook error: {e}', file=sys.stderr)\n        sys.exit(1)\n\n\nif __name__ == '__main__':\n    main()\n"
+  },
+  "registration": {
+    "event": "PostToolUse",
+    "matcher": "Edit|Write",
+    "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/epr-link-check.py\"",
+    "timeout": 3,
+    "type": "command"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/hooks/epr-link-check.py"
+    }
+  }
+}
