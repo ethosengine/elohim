@@ -132,6 +132,20 @@ struct ContentHeadOutput {
 // Fixture helper
 // ---------------------------------------------------------------------------
 
+/// Per-invocation unique content id. nextest RETRIES run in the same process,
+/// and the kitsune2 mem-bootstrap store is process-global — a retry that
+/// re-uses fixed ids re-joins the first attempt's DHT residue and
+/// `create_content` refuses with "already exists" (dna #1357, two failed
+/// attempts of the same build). An epoch-nanos suffix gives every attempt
+/// fresh ids while keeping the scenario byte-identical.
+fn unique_id(base: &str) -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system clock before UNIX_EPOCH")
+        .as_nanos();
+    format!("{base}-{nanos}")
+}
+
 fn test_content(id: &str) -> CreateContentInput {
     CreateContentInput {
         id: id.to_string(),
@@ -473,17 +487,20 @@ async fn declare_canonical_head_converges_independent_roots() -> Result<()> {
     let zome1 = cell1.zome("content_store");
     let zome2 = cell2.zome("content_store");
 
+    let landing_x = unique_id("landing-x");
+    let solo_y = unique_id("solo-y");
+
     // --- (a) Two INDEPENDENT roots for one id. Authored BEFORE peer-info
     // exchange, so each conductor's `content_exists_by_id` sees an empty local
     // DHT view and both creates succeed — reproducing the deploy-time double
     // authoring (adam's f41d / matthew's 6af9) deterministically.
     let root_a: ContentOutput = c1
-        .call(&zome1, "create_content", test_content("landing-x"))
+        .call(&zome1, "create_content", test_content(&landing_x))
         .await;
     let root_a_action = root_a.action_hash.clone();
 
     let root_b: ContentOutput = c2
-        .call(&zome2, "create_content", test_content("landing-x"))
+        .call(&zome2, "create_content", test_content(&landing_x))
         .await;
     let root_b_action = root_b.action_hash.clone();
     assert_ne!(
@@ -493,14 +510,14 @@ async fn declare_canonical_head_converges_independent_roots() -> Result<()> {
 
     // Control id: single-author create + update on c1 (undeclared canonical).
     let _solo: ContentOutput = c1
-        .call(&zome1, "create_content", test_content("solo-y"))
+        .call(&zome1, "create_content", test_content(&solo_y))
         .await;
     let solo_updated: ContentOutput = c1
         .call(
             &zome1,
             "update_content",
             UpdateContentInput {
-                id: "solo-y".to_string(),
+                id: solo_y.clone(),
                 title: Some("Solo revision".to_string()),
             },
         )
@@ -522,7 +539,7 @@ async fn declare_canonical_head_converges_independent_roots() -> Result<()> {
 
     // Both agents can now resolve SOME head for the id (both roots gossiped).
     let pre_a: Option<ContentHeadOutput> = c1
-        .call(&zome1, "resolve_content_head", "landing-x".to_string())
+        .call(&zome1, "resolve_content_head", landing_x.clone())
         .await;
     assert!(pre_a.is_some(), "c1 must resolve a head pre-declaration");
 
@@ -535,7 +552,7 @@ async fn declare_canonical_head_converges_independent_roots() -> Result<()> {
             &zome1,
             "declare_canonical_content_head",
             DeclareCanonicalHeadInput {
-                id: "landing-x".to_string(),
+                id: landing_x.clone(),
                 head_action_hash: ActionHashB64::from(root_b_action.clone()).to_string(),
             },
         )
@@ -560,7 +577,7 @@ async fn declare_canonical_head_converges_independent_roots() -> Result<()> {
     let deadline = Instant::now() + Duration::from_secs(30);
     let head_c2: ContentHeadOutput = loop {
         let h: Option<ContentHeadOutput> = c2
-            .call(&zome2, "resolve_content_head", "landing-x".to_string())
+            .call(&zome2, "resolve_content_head", landing_x.clone())
             .await;
         if let Some(h) = h {
             if h.head_action_hash == root_b_action {
@@ -575,7 +592,7 @@ async fn declare_canonical_head_converges_independent_roots() -> Result<()> {
     assert_eq!(head_c2.author, a2, "c2 resolves the canonical author (a2)");
 
     let head_c1: Option<ContentHeadOutput> = c1
-        .call(&zome1, "resolve_content_head", "landing-x".to_string())
+        .call(&zome1, "resolve_content_head", landing_x.clone())
         .await;
     let head_c1 = head_c1.expect("c1 must resolve the canonical head");
     assert_eq!(
@@ -587,7 +604,7 @@ async fn declare_canonical_head_converges_independent_roots() -> Result<()> {
     // --- (d) The UNDECLARED control id still resolves root-author-newest — the
     // canonical override falls through cleanly to the unchanged election.
     let solo_head: Option<ContentHeadOutput> = c1
-        .call(&zome1, "resolve_content_head", "solo-y".to_string())
+        .call(&zome1, "resolve_content_head", solo_y.clone())
         .await;
     let solo_head = solo_head.expect("undeclared id must still resolve a head");
     assert_eq!(
@@ -629,14 +646,17 @@ async fn earned_head_guard_and_scaffold_over_scaffold() -> Result<()> {
     let zome1 = cell1.zome("content_store");
     let zome2 = cell2.zome("content_store");
 
+    let guard_c = unique_id("guard-c");
+    let guard_b = unique_id("guard-b");
+
     // --- Two independent roots for "guard-c" (authored before gossip), for the
     // scaffold-over-scaffold case. a2 also authors so a1 can retarget to it.
     let root_ca: ContentOutput = c1
-        .call(&zome1, "create_content", test_content("guard-c"))
+        .call(&zome1, "create_content", test_content(&guard_c))
         .await;
     let root_ca_action = root_ca.action_hash.clone();
     let root_cb: ContentOutput = c2
-        .call(&zome2, "create_content", test_content("guard-c"))
+        .call(&zome2, "create_content", test_content(&guard_c))
         .await;
     let root_cb_action = root_cb.action_hash.clone();
 
@@ -658,7 +678,7 @@ async fn earned_head_guard_and_scaffold_over_scaffold() -> Result<()> {
             &zome1,
             "declare_canonical_content_head",
             DeclareCanonicalHeadInput {
-                id: "guard-c".to_string(),
+                id: guard_c.clone(),
                 head_action_hash: ActionHashB64::from(root_ca_action.clone()).to_string(),
             },
         )
@@ -669,7 +689,7 @@ async fn earned_head_guard_and_scaffold_over_scaffold() -> Result<()> {
             &zome1,
             "declare_canonical_content_head",
             DeclareCanonicalHeadInput {
-                id: "guard-c".to_string(),
+                id: guard_c.clone(),
                 head_action_hash: ActionHashB64::from(root_cb_action.clone()).to_string(),
             },
         )
@@ -686,7 +706,7 @@ async fn earned_head_guard_and_scaffold_over_scaffold() -> Result<()> {
             &zome2,
             "declare_earned_canonical_head",
             DeclareCanonicalHeadInput {
-                id: "guard-c".to_string(),
+                id: guard_c.clone(),
                 head_action_hash: ActionHashB64::from(root_cb_action.clone()).to_string(),
             },
         )
@@ -703,7 +723,7 @@ async fn earned_head_guard_and_scaffold_over_scaffold() -> Result<()> {
     // --- (b) earned-head guard: a1 (progenitor) declares an EARNED canonical for
     // "guard-b" (authored locally by a1), then a scaffold declare is REFUSED.
     let root_b: ContentOutput = c1
-        .call(&zome1, "create_content", test_content("guard-b"))
+        .call(&zome1, "create_content", test_content(&guard_b))
         .await;
     let root_b_action = root_b.action_hash.clone();
 
@@ -712,7 +732,7 @@ async fn earned_head_guard_and_scaffold_over_scaffold() -> Result<()> {
             &zome1,
             "declare_earned_canonical_head",
             DeclareCanonicalHeadInput {
-                id: "guard-b".to_string(),
+                id: guard_b.clone(),
                 head_action_hash: ActionHashB64::from(root_b_action.clone()).to_string(),
             },
         )
@@ -727,7 +747,7 @@ async fn earned_head_guard_and_scaffold_over_scaffold() -> Result<()> {
             &zome1,
             "declare_canonical_content_head",
             DeclareCanonicalHeadInput {
-                id: "guard-b".to_string(),
+                id: guard_b.clone(),
                 head_action_hash: ActionHashB64::from(root_b_action.clone()).to_string(),
             },
         )
