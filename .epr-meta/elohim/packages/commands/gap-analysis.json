@@ -1,0 +1,39 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "CommandPackage",
+  "metadata": {
+    "id": "gap-analysis",
+    "name": "gap-analysis",
+    "version": "1.0.0",
+    "description": "BDD Coverage Gap Analysis",
+    "form": "command",
+    "sourceRuntime": "claude",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/commands/gap-analysis",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "source": {
+    "language": "markdown",
+    "path": ".claude/commands/gap-analysis.md",
+    "body": "# BDD Coverage Gap Analysis\n\nRun the BDD coverage gap scanner and interpret the results for sprint planning.\n\n## Steps\n\n1. Run the scanner:\n```bash\ncd genesis/a2o && npx tsx scripts/scan-coverage.ts\n```\n\n2. Read the generated report:\n```\ngenesis/a2o/reports/coverage-gap-report.json\n```\n\n3. Present an interpreted analysis with:\n\n### Summary Statistics\n- Total conceptual scenarios (from genesis feature files)\n- Total executable scenarios (from Cypress + Cucumber-JS)\n- Coverage percentage\n- Number of epics with zero test coverage\n\n### Top 5 Priority Gaps\nFor each of the top 5 entries in `prioritizedGaps`:\n- **Domain** and **governance layer**\n- **Conceptual density** (how many scenarios exist conceptually)\n- **Rationale** for why this gap matters\n- **Suggested feature file** path for new executable tests\n\n### Sprint Recommendations\nUsing quality-architect user story format:\n\n```\n**As a** [persona from the gap's user types]\n**I want** [executable E2E coverage for this domain]\n**So that** [the loop closes and regressions are caught]\n\n### Acceptance Criteria\n- [ ] Feature file created at suggested path\n- [ ] Step definitions use E2EWorld, DoorwayClient, BrowserDevice patterns\n- [ ] At least N scenarios converted from conceptual to executable\n- [ ] `npm run scan:coverage` shows improved coverage for this epic\n```\n\n### Genesis Features to Convert First\nFor each gap, list the specific genesis feature files (`featureFile` from the conceptual scenarios) that should be translated first. Prioritize files with the most scenarios.\n\n### Loop Status\nHow many iterations of the scanner → generate → review loop have occurred (check git log for coverage-gap-report.json commits). Note the trend in coverage percentage.\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/commands/gap-analysis.md"
+    },
+    "codex": {
+      "path": ".codex/commands/gap-analysis.md"
+    }
+  }
+}

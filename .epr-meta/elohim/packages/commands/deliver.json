@@ -1,0 +1,39 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "CommandPackage",
+  "metadata": {
+    "id": "deliver",
+    "name": "deliver",
+    "version": "1.0.0",
+    "description": "The finisher — runs after a sprint completion to actually deliver the promised feature. Re-orients on plan/manifesto, renders the experience, judges screenshot vs promise as tier-3 stewardship, and grinds through whatever's missing (scenarios, glue, debugging, content) until the screenshot proves delivery.",
+    "form": "command",
+    "sourceRuntime": "claude",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/commands/deliver",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "source": {
+    "language": "markdown",
+    "path": ".claude/commands/deliver.md",
+    "body": "---\ndescription: The finisher — runs after a sprint completion to actually deliver the promised feature. Re-orients on plan/manifesto, renders the experience, judges screenshot vs promise as tier-3 stewardship, and grinds through whatever's missing (scenarios, glue, debugging, content) until the screenshot proves delivery.\n---\n\n# /deliver\n\nInvokes the `deliver` skill to close the gap from \"CI green / sprint claimed done\" to \"human verifiably sees the delivered feature.\"\n\nSibling to `/shift`. Different intent: `/shift` drives a numerical CI metric to green; `/deliver` drives a feature from \"claimed done\" to \"actually visible.\"\n\n## Usage\n\n- `/deliver <handle>` — handle is a plan name, manifesto reference, or natural-language gap description. Examples:\n  - `/deliver light-up-the-topology`\n  - `/deliver \"I want to see the topology show up — light-up-the-topology landed but the app doesn't render it\"`\n  - `/deliver imagodei-recovery-flow`\n- `/deliver resume <shift-id>` — *(v2, not yet implemented)* resume a bailed run after operator answers the bail question\n\n## What it does\n\n1. **Exhaustive context gather** — searches plans, specs, manifesto/epics, prior sprint-results, Gherkin features, memory, and code surface for anything matching the handle. Soft cap ~50 grep/read calls. Populates a `search_trail` audit log.\n2. **Composes a FeaturePromise** at `.claude/shifts/<shift-id>.feature-promise.json` per `.claude/schemas/feature-promise.schema.json` — vision quotes (verbatim from manifesto), plan deliverables (verbatim from plan), scenarios existing/missing, screenshot targets, scope philosophy, search trail.\n3. **Initial render** — Playwright the app at the expected delivery surface; capture screenshot + cucumber-report-browser.json + errors-{device}.json.\n4. **Initial tier-3 judgment** — orchestrator (Opus) compares screenshot vs FeaturePromise. Verdict ∈ {delivered, partial, error_state, missing}, citing plan_deliverables verbatim.\n5. **Composes journal** at `.claude/shifts/<shift-id>.journal.md`; presents user with FeaturePromise + iter-0 verdict; waits for \"kick off\" confirmation.\n6. **Iteration loop** — refresh on vision-goal → render → tier-3 judge → diagnose gap (dispatches sub-skill: debugging, /generate-scenarios, angular-architect, rust-architect, tauri-architect, page-model, content-pipeline, brainstorming, ci-observer visual-triage, ci-investigator) → fix → re-render. Loop until two consecutive `delivered` verdicts (one fresh-trigger), all scenarios pass, no regression-elsewhere.\n7. **Close** — sprint result at `.claude/shifts/<shift-id>.sprint-result.md` carrying the screenshot artifact (the proof), plan-vs-delivery match summary, scenarios authored, glue written grouped by pillar, debugging journey, search trail, consent-asks made.\n\n## Bail criteria (high bar — search-first, bail-last)\n\nBail only when:\n\n1. **Design genuinely uncharted** — `search_trail` ≥ 7 locations with hit/miss; bail-with-proposal text takes the form *\"Searched [list]. Found [partial refs]. Cannot reconcile to delivery shape because [specific gap]. Need from operator: [specific call].\"*\n2. **Destructive consent required** — irreversible op outside auto-mode authorization.\n\nNever bail on scope, \"I don't know how to fix this,\" or iteration count alone.\n\n## See also\n\n- Skill: `.claude/skills/deliver/SKILL.md`\n- Spec: `genesis/docs/superpowers/specs/2026-05-06-deliver-skill-design.md`\n- Schema: `.claude/schemas/feature-promise.schema.json`\n- Sibling: `/shift` (peer skill, different intent)\n- Required pre-read inside the skill: `pipeline-diagnostics` skill (canonical Jenkins-fetch patterns)\n\n## Loading the skill\n\nUse the `Skill` tool with `skill: deliver`.\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/commands/deliver.md"
+    },
+    "codex": {
+      "path": ".codex/commands/deliver.md"
+    }
+  }
+}
