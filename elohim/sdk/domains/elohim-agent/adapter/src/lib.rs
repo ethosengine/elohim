@@ -80,6 +80,11 @@ struct ComposeKind {
     /// metadata when a package JSON omits its own top-level `kind`.
     default_kind: &'static str,
     layout: ProjectionLayout,
+    /// True for kinds whose projection is a byte-identical passthrough of the
+    /// package's `source.body` (hooks, agentdocs — no frontmatter transform). For
+    /// these the projection node is addressed with the raw codec and carries a
+    /// `sourceDocCid` witness (see [`compose_graph_from_package_tree`]).
+    verbatim_passthrough: bool,
 }
 
 /// The compose table — the single place the producer learns about artifact
@@ -92,21 +97,25 @@ const COMPOSE_KINDS: &[ComposeKind] = &[
         dir: "skills",
         default_kind: "SkillPackage",
         layout: ProjectionLayout::NestedById,
+        verbatim_passthrough: false,
     },
     ComposeKind {
         dir: "agents",
         default_kind: "AgentPackage",
         layout: ProjectionLayout::Flat,
+        verbatim_passthrough: false,
     },
     ComposeKind {
         dir: "hooks",
         default_kind: "HookPackage",
         layout: ProjectionLayout::Flat,
+        verbatim_passthrough: true,
     },
     ComposeKind {
         dir: "agentdocs",
         default_kind: "AgentDocPackage",
         layout: ProjectionLayout::NestedById,
+        verbatim_passthrough: true,
     },
 ];
 
@@ -129,6 +138,15 @@ const COMPOSE_KINDS: &[ComposeKind] = &[
 /// from [`COMPOSE_KINDS`]. A projection whose fixture is absent is simply
 /// omitted — coverage is a fact the graph reports, not a precondition. When
 /// `projections_root` is `None`, only package nodes are emitted.
+///
+/// For **verbatim-passthrough** kinds (hooks, agentdocs — whose projection is a
+/// byte-identical copy of the package's `source.body`), the projection node is
+/// addressed with the raw codec and carries a `sourceDocCid =
+/// BlobCid::compute_raw(source.body)` witness in its metadata. Because the node's
+/// own CID is then `compute_raw` over the projection bytes, `sourceDocCid` equals
+/// the projection CID exactly — a content-addressed proof that "projection ==
+/// source doc" (it would diverge the instant a projection stopped matching its
+/// source body).
 ///
 /// The kinds are walked in [`COMPOSE_KINDS`] order, packages in sorted filename
 /// order, and runtimes in sorted key order, so the output is deterministic and
@@ -212,6 +230,22 @@ fn collect_compose_kind(
             }),
         ));
 
+        // Verbatim-passthrough kinds (hooks, agentdocs) project `source.body`
+        // byte-for-byte. For them we witness "projection == source doc" as a
+        // content address: `sourceDocCid = compute_raw(source.body)` — recorded on
+        // the projection node — must EQUAL the projection's own raw CID. The
+        // equality is proven by the CIDs, never asserted: if a projection ever
+        // diverged from its source body, the two raw CIDs would differ.
+        let source_doc_cid = if spec.verbatim_passthrough {
+            package
+                .get("source")
+                .and_then(|source| source.get("body"))
+                .and_then(Value::as_str)
+                .map(|body| BlobCid::compute_raw(body.as_bytes()))
+        } else {
+            None
+        };
+
         // One projection node + edge per declared runtime whose fixture exists.
         let Some(root) = projections_root else {
             continue;
@@ -229,7 +263,29 @@ fn collect_compose_kind(
             }
 
             let proj_bytes = read_bytes(&mirror)?;
-            let proj_cid = BlobCid::compute(&proj_bytes);
+            // Verbatim-passthrough projections ARE raw document bytes, so they take
+            // the raw codec (bafkrei…): the node's own CID is then `compute_raw` over
+            // its bytes and — when projection == source doc — equals `source_doc_cid`.
+            // Composed kinds (skills/agents) keep the dag-cbor addressing used
+            // elsewhere in the graph.
+            let proj_cid = if spec.verbatim_passthrough {
+                BlobCid::compute_raw(&proj_bytes)
+            } else {
+                BlobCid::compute(&proj_bytes)
+            };
+
+            let mut proj_metadata = json!({
+                "role": "projection",
+                "kind": kind,
+                "id": id,
+                "runtime": runtime,
+                "path": mirror.to_string_lossy(),
+                "declaredPath": declared,
+            });
+            // The witness: for verbatim kinds, sourceDocCid == this node's cid.
+            if let Some(source_doc_cid) = &source_doc_cid {
+                proj_metadata["sourceDocCid"] = json!(source_doc_cid.to_string());
+            }
 
             graph.add_node(CompositionNode::new(
                 proj_cid.clone(),
@@ -238,14 +294,7 @@ fn collect_compose_kind(
                     ProjectionSourceKind::Content,
                     format!("{id}@{runtime}"),
                 ),
-                json!({
-                    "role": "projection",
-                    "kind": kind,
-                    "id": id,
-                    "runtime": runtime,
-                    "path": mirror.to_string_lossy(),
-                    "declaredPath": declared,
-                }),
+                proj_metadata,
             ));
 
             graph.add_edge(DerivationEdge::projection(
@@ -609,6 +658,87 @@ mod tests {
         assert_eq!(graph.nodes.len(), 1, "package node only");
         assert!(graph.edges.is_empty(), "no projections => no edges");
         assert!(graph.validate().is_ok());
+    }
+
+    #[test]
+    fn verbatim_kind_projection_witnesses_source_doc_cid() {
+        // For verbatim-passthrough kinds (AgentDocPackage, HookPackage) the
+        // projection is a byte-identical copy of the package `source.body`. The
+        // projection node must carry `sourceDocCid = compute_raw(source.body)` AND
+        // its own CID must be `compute_raw` over the projection bytes — so
+        // `sourceDocCid == projectionCid`, a content-addressed proof, not an
+        // assertion.
+        let tree = TempTree::new();
+        let pkg_root = tree.root.join("packages");
+        let proj_root = tree.root.join("projections");
+
+        let write = |rel: &str, bytes: &[u8]| {
+            let p = pkg_root.join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(&p, bytes).unwrap();
+        };
+        let write_proj = |rel: &str, bytes: &[u8]| {
+            let p = proj_root.join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(&p, bytes).unwrap();
+        };
+
+        // AgentDocPackage: source.body is the whole gospel doc, projected verbatim
+        // (nested-by-id layout, leaf = the doc's own name).
+        const DOC_BODY: &[u8] = b"# CLAUDE.md\n\nverbatim gospel body\n";
+        write(
+            "agentdocs/gospel.json",
+            format!(
+                r#"{{"kind":"AgentDocPackage","metadata":{{"id":"gospel"}},"source":{{"body":{}}},"projections":{{"claude":{{"path":"CLAUDE.md"}}}}}}"#,
+                serde_json::to_string(&String::from_utf8(DOC_BODY.to_vec()).unwrap()).unwrap()
+            )
+            .as_bytes(),
+        );
+        write_proj("claude/agentdocs/gospel/CLAUDE.md", DOC_BODY);
+
+        // HookPackage: source.body is the hook code, projected verbatim (flat).
+        const HOOK_BODY: &[u8] = b"#!/usr/bin/env python3\nprint('hook')\n";
+        write(
+            "hooks/gate.json",
+            format!(
+                r#"{{"kind":"HookPackage","metadata":{{"id":"gate"}},"source":{{"body":{}}},"projections":{{"claude":{{"path":".claude/hooks/gate.py"}}}}}}"#,
+                serde_json::to_string(&String::from_utf8(HOOK_BODY.to_vec()).unwrap()).unwrap()
+            )
+            .as_bytes(),
+        );
+        write_proj("claude/hooks/gate.py", HOOK_BODY);
+
+        let graph = compose_graph_from_package_tree(&pkg_root, Some(&proj_root), "claude-opus-4-8")
+            .unwrap();
+        assert!(graph.validate().is_ok());
+
+        // Assert the witness on each verbatim projection node.
+        for (id, body) in [("gospel", DOC_BODY), ("gate", HOOK_BODY)] {
+            let node = graph
+                .nodes
+                .iter()
+                .find(|n| n.metadata["role"] == "projection" && n.metadata["id"] == id)
+                .unwrap_or_else(|| panic!("projection node for {id} present"));
+
+            let expected = BlobCid::compute_raw(body);
+            // sourceDocCid witness present and equals compute_raw(source.body)…
+            assert_eq!(
+                node.metadata["sourceDocCid"],
+                expected.to_string(),
+                "sourceDocCid must be compute_raw(source.body) for {id}"
+            );
+            // …and equals the projection node's OWN cid (the content-addressed
+            // "projection == source doc" proof).
+            assert_eq!(
+                node.cid, expected,
+                "projection cid must equal sourceDocCid for verbatim kind {id}"
+            );
+            // Verbatim projections use the raw codec (bafkrei…).
+            assert!(
+                node.cid.to_string().starts_with("bafkrei"),
+                "verbatim projection cid must be raw-codec for {id}"
+            );
+        }
     }
 
     #[tokio::test]
