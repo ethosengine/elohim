@@ -1,0 +1,16 @@
+[package]
+name = "eprfs-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Thin CLI for single-sourced content addressing over files (the CID seam scripts shell out to)"
+publish = ["elohim"]
+
+[[bin]]
+name = "eprfs"
+path = "src/main.rs"
+
+[dependencies]
+eprfs-core = { path = "../eprfs-core" }

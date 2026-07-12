@@ -226,6 +226,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "eprfs-cli"
+version = "0.1.0"
+dependencies = [
+ "eprfs-core",
+]
+
+[[package]]
 name = "eprfs-core"
 version = "0.1.0"
 dependencies = [
