@@ -46,10 +46,11 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
     # legitimately not-yet-retrievable on the remote conductor (its ops are
     # still publishing/gossiping). Retry ONLY the "not retrievable" refusal —
     # any other error is structural and retrying it just burns build time.
-    # 4 attempts spaced 90s ≈ 4.5 min, comfortably past observed publish lag
-    # (app #1605's head adopted ~10 min post-author; most land far sooner).
+    # 8 attempts spaced 90s ≈ 12 min: the one directly-observed cross-conductor
+    # adoption landed ~10 min post-author (app #1605 → 20:40:35Z), so the
+    # ladder must outlast the real publish window, not the hoped-for one.
     attempt=0
-    max_attempts=4
+    max_attempts=8
     while :; do
         attempt=$((attempt + 1))
         declare_raw=$(curl -sS -o - -w '\n%{http_code}' -X POST \
