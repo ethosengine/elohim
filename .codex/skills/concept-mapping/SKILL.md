@@ -53,6 +53,7 @@ Route through the concern-routing atlas: `genesis/docs/content/elohim-protocol/a
 | "add an app" | a domain app-manifest | SDK + app-manifest (§3.5/§3.7) |
 | a container image / package | the OS/packaging seam | OS/packaging (§3.2) |
 | reverse proxy / TLS edge | doorway projection (the cert itself = operator-infra, out-of-seam) | doorway (§3.9) |
+| DI / IoC container binding resolution (which impl of an interface?) | context-governed binding — EPR anchor = interface, declared context-scoped head = binding, elohim negotiation = resolver, REA signals = the self-updating qualifier (spec: `genesis/docs/superpowers/specs/2026-07-12-context-governed-binding-design.md`) | SDK + governance-action (§3.5) |
 
 Derive any others live from the atlas — do **not** maintain a separate analogy table (it would drift; the atlas is the source).
 
