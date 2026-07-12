@@ -50,6 +50,42 @@ const WRITE_FIXTURES = args.includes('--write-fixtures') || args.includes('--wri
 const WRITE_RUNTIME = args.includes('--write-runtime');
 const LEGACY_WRITE = command === 'verify' && WRITE_FIXTURES;
 
+// `--only <Kind:name|name>` scopes a `project` write to a subset of packages —
+// repeatable (`--only a --only b`) and/or comma-separated (`--only a,b`), and a
+// value may be a bare id (`librarian`) or a kind-qualified id (`AgentPackage:librarian`).
+// This exists because `project --write-runtime` otherwise rewrites EVERY package's
+// runtime surface (a whole-tree clobber hazard — it can overwrite an in-flight
+// authored file). A plant/edit uses `--only` to regenerate ONLY its target.
+// Absent `--only`, behavior is unchanged (all packages).
+function parseOnly(argv) {
+  const out = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--only') {
+      const value = argv[i + 1];
+      if (value && !value.startsWith('-')) {
+        out.push(...value.split(',').map((v) => v.trim()).filter(Boolean));
+        i++;
+      }
+    } else if (arg.startsWith('--only=')) {
+      out.push(...arg.slice('--only='.length).split(',').map((v) => v.trim()).filter(Boolean));
+    }
+  }
+  return out;
+}
+const ONLY = parseOnly(args);
+
+// Filter a package list to those matching an `--only` selection. A package matches
+// a bare id (`pkg.metadata.id`) or a kind-qualified token (`${pkg.kind}:${id}`).
+// Empty selection ⇒ identity (all packages), so the default path is untouched.
+function selectOnly(packages, only) {
+  if (!only || only.length === 0) return packages;
+  const set = new Set(only);
+  return packages.filter(
+    (pkg) => set.has(pkg.metadata.id) || set.has(`${pkg.kind}:${pkg.metadata.id}`),
+  );
+}
+
 let failures = 0;
 let passes = 0;
 
@@ -1060,9 +1096,12 @@ async function runImport({ writeProjections }) {
   );
 }
 
-async function runProject({ writeFixtures, writeRuntime }) {
-  const packages = await loadPackageFixtures();
-  assert(packages.length > 0, 'found elohim packages to project');
+async function runProject({ writeFixtures, writeRuntime, only = [] }) {
+  const packages = selectOnly(await loadPackageFixtures(), only);
+  assert(
+    packages.length > 0,
+    only.length ? `--only matched at least one package: ${only.join(', ')}` : 'found elohim packages to project',
+  );
   if (writeFixtures) {
     await writeProjectionFixtures(packages);
     pass('wrote package-derived projection fixtures');
@@ -1331,6 +1370,39 @@ async function runSelfTest() {
         runtimeForDoc(resolve(sandbox, 'x/AGENTS.md')) === 'codex',
       'selftest(e): runtime is fixed by basename (CLAUDE.md→claude, AGENTS.md→codex)',
     );
+
+    // (f) `--only` scopes a project write to a subset (plant/edit regenerates ONLY
+    //     its target, avoiding the whole-tree runtime clobber). Empty selection is
+    //     identity (default unchanged); a token matches a bare id or `Kind:id`; a
+    //     kind-mismatched token matches nothing. Pure filter — no filesystem.
+    const onlyPkgs = [
+      { kind: 'SkillPackage', metadata: { id: 'alpha' } },
+      { kind: 'AgentPackage', metadata: { id: 'beta' } },
+      { kind: 'SkillPackage', metadata: { id: 'gamma' } },
+    ];
+    assert(
+      selectOnly(onlyPkgs, []).length === 3,
+      'selftest(f): empty --only selects all (default behavior unchanged)',
+    );
+    assert(
+      JSON.stringify(selectOnly(onlyPkgs, ['beta']).map((p) => p.metadata.id)) === '["beta"]',
+      'selftest(f): --only bare id selects exactly that package',
+    );
+    assert(
+      JSON.stringify(
+        selectOnly(onlyPkgs, ['SkillPackage:alpha', 'gamma']).map((p) => p.metadata.id),
+      ) === '["alpha","gamma"]',
+      'selftest(f): --only is repeatable/comma-separated and accepts Kind:id + bare id',
+    );
+    assert(
+      selectOnly(onlyPkgs, ['SkillPackage:beta']).length === 0,
+      'selftest(f): a kind-qualified token that mismatches the kind selects nothing (beta is an AgentPackage)',
+    );
+    assert(
+      JSON.stringify(parseOnly(['project', '--only', 'a,b', '--only', 'c'])) ===
+        JSON.stringify(['a', 'b', 'c']),
+      'selftest(f): parseOnly merges comma-separated + repeated --only flags',
+    );
   } finally {
     await rm(sandbox, { recursive: true, force: true });
   }
@@ -1348,7 +1420,7 @@ async function main() {
       await runImport({ writeProjections: WRITE_FIXTURES });
       break;
     case 'project':
-      await runProject({ writeFixtures: WRITE_FIXTURES, writeRuntime: WRITE_RUNTIME });
+      await runProject({ writeFixtures: WRITE_FIXTURES, writeRuntime: WRITE_RUNTIME, only: ONLY });
       break;
     case 'verify':
       if (LEGACY_WRITE) {
