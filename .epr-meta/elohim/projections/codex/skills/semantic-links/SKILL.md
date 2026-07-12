@@ -31,6 +31,14 @@ cites:
 
 A legacy path-string cite (a code path, an external file, no `id:` target) stays a plain path — that's fine.
 
+**The fingerprint is a CID short-form (not a separate hash system).** `sha256:hex16` is, mathematically,
+the first 16 hex of the sha2-256 digest that the target body's canonical content address wraps —
+`CIDv1(raw 0x55, sha2-256(canonical_body))` (`bafkrei…`). One digest, two renderings. So the fingerprint slot
+also accepts a **full CIDv1 token** (`bafk…`/`bafy…`): human-facing envelopes keep the short form, machine-facing
+surfaces may seal the full CID, and verdicts handle both. Python never *encodes* a CID — the `eprfs cid <path>
+--body --short` CLI is the single-source encoder. Details:
+`genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md`.
+
 ## The graph's membership (who gets envelopes)
 
 - **Doc roots** — `genesis/docs/` + `.claude/memory/`.
