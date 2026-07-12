@@ -148,13 +148,111 @@ export function agentDocPackageFromSource(
   return pkg;
 }
 
-// The agent-doc projector: PURE VERBATIM PASSTHROUGH. The doc bytes are the same
-// regardless of anything — frontmatter (incl. cite envelopes) and body are
-// emitted exactly as stored. This is the single most important safety property:
-// a gospel/managed-memory doc is never reformatted, re-fenced, or marker-injected
-// on projection, so cite fingerprints survive byte-identical.
-export function projectAgentDoc(pkg) {
-  return pkg.source.body;
+// ── Codex agent-doc adapter (the DERIVED-runtime projection) ────────────────
+//
+// A doc's NATIVE runtime (metadata.sourceRuntime) projects VERBATIM — the whole
+// point of the plant floor. But a doc MAY additionally declare a DERIVED-runtime
+// projection: e.g. a CLAUDE.md (sourceRuntime: claude) that also projects an
+// AGENTS.md for codex. Codex has no PreToolUse hook system, so it cannot receive
+// the edit-time governance contract Claude gets from hooks. The derived codex
+// projection therefore carries a GENERATED governance-contract PREAMBLE the
+// adapter owns, followed by the SAME gospel body verbatim (single-sourced from
+// this package's source.body, so a CLAUDE.md edit flows into AGENTS.md — they
+// cannot drift). The preamble is repo-wide governance (identical for any codex
+// root agent-doc), so it lives in code, not the package; parameterize per-doc
+// only if a second codex agent-doc ever needs a different contract.
+//
+// Byte-identity still holds per runtime: project(pkg, 'codex') === the AGENTS.md
+// on disk exactly (adapter emits it, --write-runtime writes it), so the standing
+// verifyProjectionFixture / verifyRuntimeProjectionIfPresent gates cover it.
+export function codexAgentDocPreamble(pkg) {
+  const nativePath = pkg.source?.path ?? 'CLAUDE.md';
+  return `# AGENTS.md — Codex Governance Contract (Elohim Protocol)
+
+This is Codex's root gospel. The gospel body below the horizontal rule is the
+SAME text as \`${nativePath}\`, projected verbatim from the \`${pkg.metadata.id}\`
+package — the two cannot drift. THIS preamble is the codex-localized governance
+contract: what Claude Code receives from edit-time hooks but Codex, having no
+PreToolUse hook system, cannot. Read it first. It binds you *morally* where it
+cannot bind you *mechanically*, and it names the gates that bind you
+mechanically regardless of harness.
+
+## 1. Editing agentic surfaces is package-first
+
+The skills, subagents, hooks, and agent-docs (\`.claude/*\`, \`.codex/*\`,
+\`CLAUDE.md\`, \`AGENTS.md\`) are PROJECTIONS of Elohim-native packages under
+\`.epr-meta/elohim/packages/\`. Two disciplines coexist; the marker decides which:
+
+- **A package marked \`metadata.master: "package"\` (planted) is authoritative.**
+  Edit its package JSON, then regenerate ONLY that surface and re-verify:
+  \`node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs project --write-fixtures --write-runtime --only <Kind:id>\`
+  then \`… verify\`. NEVER hand-edit the projected \`.claude\`/\`.codex\` file — the
+  next projection clobbers it and \`verify\` reds on the drift.
+- **A Claude-sourced package that is NOT planted (no \`master\`) is source-first.**
+  Edit its \`.claude/*\` source directly, then re-import:
+  \`… project --write-fixtures\` (or \`elohim-agent:packages:write\`). The package is
+  a certified mirror; the fidelity gate proves \`project(import(source)) === source\`.
+
+If unsure which a surface is, read its package's \`metadata.master\`. When in
+doubt, do not edit the projection — edit the package or the source.
+
+## 2. The \`.epr-meta\` compose-gate binds you morally
+
+Claude enforces directory-local governance at edit time via a PreToolUse hook;
+Codex has no such hook, so the SAME rules bind you by contract instead of by
+mechanism. Before writing a file, honor the nearest \`.epr-meta\` ancestor
+(the cascade: closest manifest wins, root \`/.epr-meta/manifest.md\` is the base):
+a \`specs/\` doc requires lifecycle frontmatter; \`elohim/\` carries an
+interface-first-reuse advisory (reuse the existing trait/type before adding a
+parallel one); code directories may carry YAGNI/over-engineering guards. A
+manifest that would DENY a Claude edit should stop you too — you just won't get
+a prompt. Treat a missing prompt as your own responsibility, not permission.
+
+## 3. Gates that bind Codex mechanically (harness-independent)
+
+These run outside any harness and WILL fail your push or CI:
+
+- **\`.husky/pre-push\`** — project-detected quality gates (lint / format:check /
+  typecheck / tests), plus \`sweettest-check\` when the push targets \`dev\`/\`main\`.
+  Do not bypass with \`--no-verify\` unless the gates already ran green.
+- **\`pnpm run elohim-agent:packages:verify\`** — projection/governance drift. If
+  you touched any agentic surface or its package, this must be GREEN before commit.
+- **cite-gen** owns \`cites:\` frontmatter. NEVER hand-write a slug, path, or
+  \`sha256:\` fingerprint — run \`python3 .claude/scripts/memory-kit/cite-gen.py\`.
+  A hand-edited fingerprint fails the cite gate.
+
+## 4. Rails (non-negotiable)
+
+- **Never \`git add -A\` / \`git commit -a\`** — the worktree is shared across
+  concurrent sessions. Stage path-scoped: \`git add <explicit paths>\`.
+- **Never push without green gates**, and never amend or force-push shared history.
+- **Native (non-WASM) cargo needs \`CARGO_TARGET_DIR\`** at the pool slot per the
+  disk policy; WASM/DNA workspaces stay plain cargo.
+- **\`RUSTFLAGS\` gotcha:** the environment sets
+  \`RUSTFLAGS=--cfg getrandom_backend="custom"\` for Holochain WASM. Native builds
+  (doorway, steward/node) need \`RUSTFLAGS=""\`; \`elohim/elohim-storage\` keeps the
+  custom backend flag.
+
+---
+
+`;
+}
+
+// The agent-doc projector. For a doc's NATIVE runtime (claude for a CLAUDE.md)
+// it is PURE VERBATIM PASSTHROUGH — the doc bytes are emitted exactly as stored
+// (frontmatter incl. cite envelopes + body), never reformatted or marker-injected,
+// so cite fingerprints survive byte-identical. For a DERIVED runtime (a codex
+// AGENTS.md projected from a claude-sourced package) it emits the generated
+// governance-contract preamble followed by the verbatim gospel body. `runtime` is
+// optional: absent (or equal to the native sourceRuntime) ⇒ verbatim passthrough,
+// preserving every existing single-projection call site.
+export function projectAgentDoc(pkg, runtime) {
+  const body = pkg.source.body;
+  const native = pkg.metadata?.sourceRuntime;
+  if (runtime && runtime !== native && runtime === 'codex') {
+    return `${codexAgentDocPreamble(pkg)}${body}`;
+  }
+  return body;
 }
 
 // Agent-doc-specific verify assertions (rule 1's non-emptiness leg + the
