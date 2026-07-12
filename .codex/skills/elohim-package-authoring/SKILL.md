@@ -4,6 +4,7 @@ description: Author and maintain Elohim-native skills and agents from .epr-meta/
 metadata:
   runtime: codex
   sourceRuntime: elohim-agent
+  master: package
   sourcePath: .epr-meta/elohim/packages/skills/elohim-package-authoring.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/elohim-package-authoring"
