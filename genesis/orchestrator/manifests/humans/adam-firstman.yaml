@@ -94,7 +94,7 @@ data:
           - urls:
               - "turn:turn.elohim.host:3478?transport=udp"
               - "turn:turn.elohim.host:3478?transport=tcp"
-              - "turns:turn.elohim.host:5349?transport=tcp"
+              - "turns:turn.elohim.host:443?transport=tcp"
             username: "elohim"
             credential: "alpha-turn-commons-2026"
     data_root_path: "/var/local/lib/holochain"
