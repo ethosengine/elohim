@@ -56,3 +56,52 @@ relays + mongo bus); TURN is the one leg outsourced.
   design session rather than treating as an isolated ops chore.
 - Measure: the per-deploy declare-propagation probe stays green across ×2
   fresh edge builds after the swap.
+
+## Update 2026-07-13 — the diagnostic relay is confirmed GLOBALLY DEAD; cure authored, deploy-ready
+
+**New evidence (why this is now urgent, not merely a hardening chore).** The
+openrelay diagnostic relay is not slow — it is gone. Identical `i/o timeout`
+reaching `staticauth.openrelay.metered.ca:80` AND `:443` from THREE disjoint
+networks: adam (shem/cloud), matthew (on-prem/home), and the dev env (a third
+ISP). Three networks failing the same way ⇒ the relay endpoints are down, not
+any local egress. Conductor evidence (Loki, both edgenodes):
+`tx5_go_pion_sys: failed to get server reflexive address ...
+openrelay.metered.ca ... i/o timeout` → `Failed to ping without candidate
+pairs. Connection is not possible yet.` → kitsune2 gossip rounds initiate/accept
+(signaling is fine) but time out (the data channel never forms) → matthew-
+authored actions are `not retrievable` on adam → the notary content arm re-flags
+the same divergent set every sweep (divergentAnchor pinned ~2080), saturates
+adam's conductor (`PTxnGuard` held 1–2s), and holds the doorway-B→adam circuit
+breaker OPEN — so https://elohim.host serves `503 catching-up` on every read.
+This is the live user-visible outage, not a benign stale head.
+
+**Seam confirmed (dht-unity T3).** Discovery WORKS — matthew's conductor peer
+store carries agents on BOTH signal clouds (shared bootstrap gossips agent_infos
+across the pair). The failure is purely tx5/WebRTC session establishment across
+the WAN NAT pair with no working relay. STUN-only + a dead TURN = no candidate
+pair. So the sovereign relay is the whole remaining item behind notary
+scenario 2.
+
+**Cure authored (this session), deploy-ready:**
+- `genesis/orchestrator/manifests/infra/alpha-coturn.yaml` — coturn 4.6.2,
+  hostNetwork-pinned to shem (node-type=remote, the public-IP node; this
+  cluster has no LoadBalancer/MetalLB and the nginx ingress can't carry raw
+  UDP/TCP), LTC auth, cert-manager TLS for `turn.elohim.host`, relay range
+  49160–49200/udp. Passes no gate yet because it is infra (applied directly).
+- `_edgenode-consolidated.template.yaml` + `adam-firstman.yaml` iceServers
+  swapped openrelay → `turn:turn.elohim.host:3478` (udp+tcp) + `turns:5349`.
+  Both PASS `scripts/ci/validate-conductor-config.sh`.
+
+**Irreducible operator residual (cluster-owned; no repo change bypasses it) —**
+enumerated in the manifest header, summarized: (1) DNS A record
+`turn.elohim.host → shem public IP`; (2) open shem cloud firewall for
+3478/udp+tcp, 5349/tcp, 49160–49200/udp; (3) set `external-ip` in the ConfigMap
+if shem is a cloud-NAT host; (4) confirm the cert-manager ClusterIssuer name.
+The backlog's "turns on :443" ask conflicts with nginx owning shem:443 — the
+manifest uses 5349; honoring :443 needs a second IP or ingress TCP passthrough
+(operator call). After deploy: the per-deploy `✓ canonical head propagated`
+probe + notary scenario 2 green ×2 is the DoD.
+
+Status stays **open** — code is banked, but "done" is gated on the operator
+deploy above; a follow-up agent should verify the probe post-deploy, not
+re-author the manifest.

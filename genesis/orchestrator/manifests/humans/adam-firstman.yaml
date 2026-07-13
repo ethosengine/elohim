@@ -85,16 +85,18 @@ data:
         iceServers:
           - urls: ["stun:stun.cloudflare.com:3478"]
           - urls: ["stun:stun.l.google.com:19302"]
-          # TURN relay fallback (dht-unity cure, 2026-07-11) — see the
-          # edgenode template's comment; adam is the shem-side genesis anchor,
-          # the exact peer whose fetches toward the household fail. DIAGNOSTIC
-          # third-party relay; sovereign replacement tracked in backlog
-          # `sovereign-turn-relay-transport-commons`.
+          # Sovereign TURN relay — see the edgenode template's comment. adam is
+          # the shem-side genesis anchor, the exact peer whose fetches toward the
+          # household fail. The prior diagnostic relay (openrelay.metered.ca)
+          # went globally dead 2026-07-13; replaced by our own coturn
+          # (`genesis/orchestrator/manifests/infra/alpha-coturn.yaml`). Keep the
+          # credential in sync with that ConfigMap's `user=`.
           - urls:
-              - "turn:staticauth.openrelay.metered.ca:80?transport=tcp"
-              - "turns:staticauth.openrelay.metered.ca:443?transport=tcp"
-            username: "openrelayproject"
-            credential: "openrelayproject"
+              - "turn:turn.elohim.host:3478?transport=udp"
+              - "turn:turn.elohim.host:3478?transport=tcp"
+              - "turns:turn.elohim.host:5349?transport=tcp"
+            username: "elohim"
+            credential: "alpha-turn-commons-2026"
     data_root_path: "/var/local/lib/holochain"
     keystore:
       type: lair_server_in_proc
