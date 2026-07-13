@@ -92,15 +92,22 @@ scenario 2.
   swapped openrelay → `turn:turn.elohim.host:3478` (udp+tcp) + `turns:5349`.
   Both PASS `scripts/ci/validate-conductor-config.sh`.
 
+**Placement (refined 2026-07-13):** the relay lives on shem's OWN dedicated
+public IP `136.50.16.133` — distinct from the `.49` nginx-ingress IP. That
+dissolves the earlier ":443 vs nginx" tension: since `.133 ≠ .49`, coturn owns
+`turns:443` cleanly (the household-egress-friendly port the backlog mandated),
+no ingress passthrough needed. This is also the first concrete step of the T5
+"doorway owns the transport commons on its own IP" architecture — bootstrap +
+signal already sovereign; TURN now joins them, off the shared HTTP ingress.
+
 **Irreducible operator residual (cluster-owned; no repo change bypasses it) —**
-enumerated in the manifest header, summarized: (1) DNS A record
-`turn.elohim.host → shem public IP`; (2) open shem cloud firewall for
-3478/udp+tcp, 5349/tcp, 49160–49200/udp; (3) set `external-ip` in the ConfigMap
-if shem is a cloud-NAT host; (4) confirm the cert-manager ClusterIssuer name.
-The backlog's "turns on :443" ask conflicts with nginx owning shem:443 — the
-manifest uses 5349; honoring :443 needs a second IP or ingress TCP passthrough
-(operator call). After deploy: the per-deploy `✓ canonical head propagated`
-probe + notary scenario 2 green ×2 is the DoD.
+enumerated in the manifest header: (1) DNS A record
+`turn.elohim.host → 136.50.16.133` (or `shem.ethosengine.com` to the same IP,
+then rename the 3 config refs); (2) open shem's `.133` firewall for
+3478/udp+tcp, 443/tcp, 49160–49200/udp; (3) set `external-ip=136.50.16.133/<priv>`
+in the ConfigMap iff `.133` is cloud-mapped (host holds a private IP); (4)
+confirm the cert-manager ClusterIssuer name. After deploy: the per-deploy
+`✓ canonical head propagated` probe + notary scenario 2 green ×2 is the DoD.
 
 Status stays **open** — code is banked, but "done" is gated on the operator
 deploy above; a follow-up agent should verify the probe post-deploy, not
