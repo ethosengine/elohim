@@ -137,7 +137,7 @@ It is the agent *face* of the commons. For collectives that are primarily abstra
 
 ## Why This Structure Defeats Capture
 
-1. **Values are constitutionally immutable** - Core definitions encoded in blockchain smart contracts at the global layer
+1. **Values are constitutionally immutable** - Core definitions anchored at the graduated-immutability global layer as substrate-level HARD-BLOCKs (not amendable policy, and not a blockchain smart contract) — the deepest commitments are the hardest to change, and the existential floors are mechanical
 2. **P2P networks enforce constitution** - Each Elohim agent must cryptographically prove decisions trace to constitutional values
 3. **Graduated consensus requirements** - Changes require increasingly difficult consensus as you move up layers
 4. **Cross-scale verification** - Elohim agents at different layers verify each other's constitutional compliance
