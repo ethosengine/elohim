@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "validate": "npx tsx src/schema-validation.ts ../data/lamad/content",
+    "sync:cid-artifacts": "npx tsx src/sync-cid-artifacts.ts",
     "validate:verbose": "npx tsx src/schema-validation.ts ../data/lamad/content --verbose",
     "bootstrap": "npx tsx src/bootstrap.ts",
     "seed": "npx tsx src/seed.ts",
