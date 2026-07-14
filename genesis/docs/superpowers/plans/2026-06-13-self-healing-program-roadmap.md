@@ -1,12 +1,20 @@
+---
+id: self-healing-program-roadmap
+status: Draft
+cites:
+  - self-healing-control-plane-design | the four-pillar control-plane design + structural no-overwhelm invariant this roadmap sequences into a buildable program | sha256:e46a55190a70c79b | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-design.md
+  - self-healing-opportunity-map | the user-agency axis (see/reset/pause; WANT→GapTracker→REA-Commitment loop) this roadmap sequences alongside the control-plane design | sha256:31400dda6437b0dd | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-opportunity-map.md
+---
+
 # Self-Healing Control Plane — Program Roadmap (2026-06-13)
 
 The actuatable self-healing control plane, decomposed into a buildable program: 2 design docs + 5 implementation-ready plans + 1 cross-thread handoff. **All work is plan-only — no code has changed.** Execution is gated on your go and coordination with the parallel (arc) thread.
 
 ## Artifacts
 
-**Design** (repo root — working drafts):
-- `SELF-HEALING-OPPORTUNITY-MAP-2026-06-13.md` — the user-agency axis (see / reset / pause; the WANT → GapTracker → REA-Commitment loop; mostly wiring over substrate that already self-heals).
-- `SELF-HEALING-CONTROL-PLANE-DESIGN-2026-06-13.md` — the four-pillar control plane + the structural no-overwhelm invariant; §12 = the memory axis + arc-shrink. **This is the single current source of the design.**
+**Design** (this directory — working drafts):
+- `2026-06-13-self-healing-opportunity-map.md` — the user-agency axis (see / reset / pause; the WANT → GapTracker → REA-Commitment loop; mostly wiring over substrate that already self-heals).
+- `2026-06-13-self-healing-control-plane-design.md` — the four-pillar control plane + the structural no-overwhelm invariant; §12 = the memory axis + arc-shrink. **This is the single current source of the design.**
 
 **Plans** (`genesis/docs/superpowers/plans/`):
 | Plan | Pillar | What it ships |
@@ -53,7 +61,7 @@ The actuatable self-healing control plane, decomposed into a buildable program: 
 
 ## Doc-hygiene state — resolution (a) applied (working drafts)
 
-**Done (2026-06-13):** all five plans are now plain working drafts. C's + D's frontmatter stripped to match A/B/Auto; C's auto-created duplicate canonical spec (`…specs/2026-06-13-actuatable-self-healing-control-plane.md`, a verbatim now-stale copy of the root design doc) deleted; C's two body references to it repointed to the root design doc. The root `SELF-HEALING-CONTROL-PLANE-DESIGN-2026-06-13.md` is the single current source of the design (it alone carries the §12 arc-shrink edits).
+**Done (2026-06-13):** all five plans are now plain working drafts. C's + D's frontmatter stripped to match A/B/Auto; C's auto-created duplicate canonical spec (`…specs/2026-06-13-actuatable-self-healing-control-plane.md`, a verbatim now-stale copy of the root design doc) deleted; C's two body references to it repointed to the design doc. `2026-06-13-self-healing-control-plane-design.md` (this directory) is the single current source of the design (it alone carries the §12 arc-shrink edits).
 
 **Deferred (b) Promote + seal** — when you commit to the program as *the plan*: pick one canonical spec home, sync the root design doc's §12 into it, `cite-gen --seal` all five plans against it. Per advisor guidance, do NOT seal vision-in-motion until you've greenlit execution.
 

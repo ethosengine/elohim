@@ -1,3 +1,10 @@
+---
+id: self-healing-opportunity-map
+status: Draft
+cites:
+  - self-healing-control-plane-design | the four-pillar control-plane + no-overwhelm design whose reliability primitives this opportunity map wires to the user axis | sha256:e46a55190a70c79b | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-design.md
+---
+
 # Self-Healing & User-Agency Opportunity Map
 
 ## 1. Reframe

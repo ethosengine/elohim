@@ -984,7 +984,7 @@ In `server/http.rs`, add the match arm immediately after the `/admin/render-stat
 
 ```rust
         // Unified self-healing read model — Cat C node-local Operational state
-        // (SELF-HEALING-CONTROL-PLANE-DESIGN-2026-06-13.md §6). Composed
+        // (2026-06-13-self-healing-control-plane-design.md §6). Composed
         // fresh per request from in-process snapshots + on-demand projector
         // fetch. Legitimate doorway-local aggregate (NOT a per-domain proxy):
         // fails the swap test by design — a node serves its OWN runtime state,

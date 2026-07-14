@@ -1,6 +1,26 @@
+---
+id: "roadmap-founding-milestone-sprint-roadmap"
+kind: "roadmap"
+contentType: "roadmap-item"
+title: "Elohim Protocol Sprint Roadmap (founding milestone map, M1–M6)"
+slug: "founding-milestone-sprint-roadmap"
+written: "2026-02-12"
+author: "Matthew Dowell"
+status: "superseded"
+superseded_by: "roadmap-vision-readiness-sprint-roadmap"
+target_window: "M1–M6 (founding milestone map)"
+themes: [milestone-map, sprint-breakdown, founding-vision, lamad-vertical]
+tags: [roadmap, founding, milestone-map, historical]
+---
+
 # Elohim Protocol Sprint Roadmap
 
 Last updated: 2026-02-12
+
+> **Home note (relocated from repo root 2026-07-14):** this is the *founding* milestone/sprint roadmap
+> (M1–M6, authored 2026-02-12). The **maintained** prioritization home is
+> [`vision-readiness-sprint-roadmap.md`](./vision-readiness-sprint-roadmap.md) — consult that for current
+> ranking; this doc is preserved for the original milestone map and vision framing.
 
 ## Vision Statement
 
