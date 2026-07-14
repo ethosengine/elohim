@@ -14,6 +14,8 @@ cites:
 
 ---
 
+> **The Elohim Protocol is a decentralized, peer-to-peer software platform** — an AI-mediated network for community, learning, and economic cooperation, governed by a shared constitution and built so that no single party, including its creator, can own or control it. This document examines that design as a *disputation*: each commitment is pressed by its strongest objection before it is trusted. Plain definitions of recurring terms (elohim, reach, standing, the witness, REA) are in the [glossary](./glossary.md).
+
 ## On the Form of This Document
 
 This is not [the manifesto](./manifesto.md) and not [the constitution](./constitution.md). The manifesto states the vision; the constitution states the law. This document examines the *theology* — and it does so in the oldest form the church has for examining a contested claim honestly: the **disputation**.
@@ -54,7 +56,7 @@ Stated plainly: **Mammon is already the church's catechist; the catechesis is in
 
 **On the contrary,** Paul does not counsel the church to scan for sin but to fill the field of attention with the generative good: "whatever is true, whatever is honorable, whatever is just, whatever is pure, whatever is lovely... think on these things" (Philippians 4:8). Formation by attending to the good is the opposite logic from formation by policing the bad.
 
-**Resolution.** The protocol's center of gravity is upstream, and its deepest competence is suited exactly to it. The same REA engine that was always meant to make invisible care visible and to value it is, without a single new capability, the engine that lightens the mental load whose unequal weight erodes mutuality long before the bedroom — the freight that *Fair Play* names and that the marriage research points to when it says: stop worrying about the crisis and tend everything that leads up to it. Making invisible labor visible and fairly held is not a surveillance problem; it is a contribution-accounting problem, the one thing the protocol was born to solve. And the anthropology under this is not utopian but *sanctifying*: people become good through environment, relationship, practice, and time, with rails for the few who cannot hold mutuality (Article 10) — Aristotelian habituation baptized, the slow formation of virtue in a common life that makes the good more practicable than the bad. The witness in the home is the rare exception this soil is built to make rarer; Gottman is the proof that such a witness need not be a security camera, for he read the climate of a marriage not to catch the crime but to teach the couple to build, and handed the reading back to them. That is formative witness, not forensic: the faithful Observer is a coach in the kitchen, not a detective in the bedroom.
+**Resolution.** The protocol's center of gravity is upstream, and its deepest competence is suited exactly to it. The same REA engine (Resource–Event–Agent accounting — the layer that records contributions of care and labor as economic events) that was always meant to make invisible care visible and to value it is, without a single new capability, the engine that lightens the mental load whose unequal weight erodes mutuality long before the bedroom — the freight that *Fair Play* names and that the marriage research points to when it says: stop worrying about the crisis and tend everything that leads up to it. Making invisible labor visible and fairly held is not a surveillance problem; it is a contribution-accounting problem, the one thing the protocol was born to solve. And the anthropology under this is not utopian but *sanctifying*: people become good through environment, relationship, practice, and time, with rails for the few who cannot hold mutuality (Article 10) — Aristotelian habituation baptized, the slow formation of virtue in a common life that makes the good more practicable than the bad. The witness in the home is the rare exception this soil is built to make rarer; Gottman is the proof that such a witness need not be a security camera, for he read the climate of a marriage not to catch the crime but to teach the couple to build, and handed the reading back to them. That is formative witness, not forensic: the faithful Observer (the protocol's proposed in-home AI witness) is a coach in the kitchen, not a detective in the bedroom.
 
 **Reply to Objection 1.** The objection mistakes sanctification for Pelagianism. The claim is not that good soil makes people automatically good — the doctrine of sin stands (Article 3), and the rails for those who would exploit mutuality are kept (Article 10). The claim is only that the good can be made *practicable*, which is what every spiritual formation that ever worked has assumed. Grace builds on nature; it does not bypass the heart, but neither does it leave the heart to fend alone in soil designed to starve it.
 
@@ -331,3 +333,24 @@ Wisdom begins where the architecture stops, and looks up.
 > *"Now we see through a glass, darkly; but then face to face."* — 1 Corinthians 13:12
 
 *This is a living document, written in the form of a disputation because the challenges are the inheritance, not the footnotes. Articles may be added and objections sharpened as the protocol is examined further. The room it leaves for faith is meant to stay open.*
+
+---
+
+## Sources & Notes
+
+Scriptural references (and *1 Enoch*, cited by chapter) are given inline throughout. Named non-Biblical sources invoked in the Articles:
+
+- **Eve Rodsky**, *Fair Play* (2019) — the unequal division of domestic "mental load."
+- **John Gottman** (with Julie Gottman), Gottman Institute marriage research; e.g. *The Seven Principles for Making Marriage Work* (1999) — reading the "climate" of a marriage.
+- **Aristotle**, *Nicomachean Ethics*, Book II — virtue formed by habituation ("Aristotelian habituation").
+- **C.S. Lewis**, *The Last Battle* (1956), ch. 15 — the Calormene Emeth received by Aslan ("all find what they truly seek").
+- **Aleksandr Solzhenitsyn**, "Live Not by Lies" (1974 essay).
+- **Bessel van der Kolk**, *The Body Keeps the Score* (2014).
+- **Christopher R. Browning**, *Ordinary Men: Reserve Police Battalion 101 and the Final Solution in Poland* (1992).
+- **Stanley Milgram**, *Obedience to Authority* (1974); the obedience experiments (1961–63).
+- **Bob Altemeyer**, *The Authoritarians* (2006) — right-wing authoritarianism (RWA) and the "double high."
+- **Jim Sidanius & Felicia Pratto**, *Social Dominance* (1999) — social-dominance orientation (SDO); and **Karen Stenner**, *The Authoritarian Dynamic* (2005) — authoritarian activation by manufactured threat.
+- **Sweden's compulsory-sterilization program** (~1935–1976; roughly 63,000 people) — documented by 1997 reporting in *Dagens Nyheter* and the government commission report **SOU 2000:20**.
+- ***1 Enoch* 6–16** — the "Watchers" narrative (an extra-canonical Second-Temple text).
+
+Recurring terms are defined in the [glossary](./glossary.md).

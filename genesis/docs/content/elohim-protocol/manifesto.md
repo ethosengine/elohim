@@ -9,7 +9,7 @@ cites:
 
 Learn more at [https://elohim.host](https://elohim.host) a vision-setting project of Ethosengine. 
 
-> **On this document and its companions.** This manifesto is the **vision** — the crisis it answers and the love-centered alternative it proposes. Three companion documents complete the corpus: [`./constitution.md`](./constitution.md) is the **law** that operationalizes this vision, the constitution-as-system-prompt with its layer precedence and the universal gate that binds even the lawgiver; [`./confession.md`](./confession.md) states the **theology beneath the vision plainly** — what the protocol holds, with what it cannot resolve gathered honestly at the end; [`./theology.md`](./theology.md) is the same theology **argued out as a disputation**, each commitment pressed by its strongest objection article by article.
+> **On this document and its companions.** This manifesto is the **vision** — the crisis it answers and the love-centered alternative it proposes. Three companion documents complete the corpus: [`./constitution.md`](./constitution.md) is the **law** that operationalizes this vision, the constitution-as-system-prompt with its layer precedence and the universal gate that binds even the lawgiver; [`./confession.md`](./confession.md) states the **theology beneath the vision plainly** — what the protocol holds, with what it cannot resolve gathered honestly at the end; [`./theology.md`](./theology.md) is the same theology **argued out as a disputation**, each commitment pressed by its strongest objection article by article. Plain definitions of recurring terms (elohim, reach, standing, substrate, REA) are collected in the [`./glossary.md`](./glossary.md).
 
 ## **Executive Summary**
 
@@ -65,13 +65,13 @@ Our digital infrastructure represents the most catastrophic architectural failur
 
 Individuals and institutions become trapped by the systems and cultures they inhabit.
 
-"On North Korea, no one looking in would say that they are free when they vote for 'dear leader' every time, because a public effectively lied to isn't free"
+On North Korea: no one looking in would say the people are free when they vote for "dear leader" every time — a public effectively lied to isn't free.
 
-"On Russia, Putin has net-positive approval rating, yet millions have fled the country and have died in wars, the people suffer under the tyranny of state media that drowns the truth in noise allows no other truth to manifest"
+On Russia: Putin holds a net-positive approval rating, yet millions have fled the country and many have died in wars; the people suffer under a state media that drowns the truth in noise and allows no other truth to manifest.
 
-"Americans pay double the price of any other country for worse healthcare, tolerate government deficits, fail to respect mothers, families, leisure, higher recidivism rates, higher poverty rates or address gun violence in policy. All problems that have already demonstrated scalable solutions in other nation-states, but these realities are anathema to a public captured by the poverty of imagination generated from the distortions of capitalized and hyper-scaled attention exploitation."
+Americans pay double the price of any other country for worse healthcare, tolerate government deficits, and fail to respect mothers, families, and leisure, or to address higher recidivism rates, higher poverty rates, or gun violence in policy. All are problems that have already demonstrated scalable solutions in other nation-states — but these realities are anathema to a public captured by the poverty of imagination generated from the distortions of capitalized and hyper-scaled attention exploitation.
 
-*"You don't rise to the level of your goals, you fall to the level of your systems"* - Scott Adams
+*"You don't rise to the level of your goals, you fall to the level of your systems"* — James Clear, *Atomic Habits*
 
 **Individual Lock-In:**
 - Social graphs held hostage by platforms
@@ -161,7 +161,7 @@ These principles don't just improve existing systems—they engineer away the fa
 
 ### **2. Graduated Intimacy and Contained Intensity**
 
-"Free speech does not mean free reach. There is no right to algorithmic amplification" 
+"Free speech does not mean free reach. There is no right to algorithmic amplification" — a formulation associated with Renée DiResta and Aza Raskin 
 
 **Principle**: Different human experiences require different levels of safety and openness.
 
@@ -207,7 +207,7 @@ These principles don't just improve existing systems—they engineer away the fa
 **Implementation**:
 - Currencies that can decay to encourage circulation 
 - Currencies that can respond to the needs, limitation, growth, and innovative spirit of the holders. (mediums for kids, those with intellectual disabilities, and seniors, that encourages structured exploration and discovery of produce, independence, and stewardship and autonomy with personalized limits for safety) 
-- Currencies that can tell stories and epics, and facilitate value-flow (REA), capturing value well spent. 
+- Currencies that can tell stories and epics, and facilitate value-flow (REA — Resource–Event–Agent accounting), capturing value well spent. 
 - Rewards for care work and community contribution
 - Value generation through relationship and stewardship
 - Economic loops that regenerate rather than extract
@@ -219,13 +219,13 @@ These principles don't just improve existing systems—they engineer away the fa
 **What This Solves**: The false choice between "preserve everything forever" (compute footprints unsustainable for household-scale infrastructure, surveillance-shaped retention by default) and "delete on demand" (loses cultural artifacts, breaks attestation records, forfeits recovery loops, treats consequence as silence). Living memory respects the difference between a conversation, a film, a contract, and a friendship — each gets the lifecycle that fits its character.
 
 **Implementation**:
-- Lifecycle primitives (`promote`, `compact`, `merge`, `submerge`/`surface`, `close-interval`, `memorialize`, `forget`, `quarantine`) operate on every long-lived datum
+- Lifecycle operations — memory can be promoted, compacted, merged, memorialized, or gently forgotten — apply to every long-lived datum, so each piece of information gets the treatment its character calls for
 - Memory classes (contextual, archival, identity, relational, operational, attestation, wisdom) determine which primitives apply by default, with what cadence, under which authority
 - Consolidation events — discovery of equivalence or harm — are first-class judgment moments emitting signals to economic, governance, and relational layers, not silent housekeeping
 - Reach-dropped content submerges to an elohim-visible tier, surface-able through intentional facing — a recovery loop, not permanent disenfranchisement
 - "Right to be forgotten" reconceived: the protocol asks *who is going to hold this well?* rather than *how do we delete this?* The answer is structural, distributed, and accountable.
 
-**See also**: `living_memory/epic.md` for the full narrative treatment, including the human-scale story of what these mechanics feel like for a household participant, the recovery loop in practice, and the values-forward disclosure of what this protocol asks of you and what it refuses to negotiate.
+A companion narrative treats this in full — the human-scale story of what these mechanics feel like for a household participant, the recovery loop in practice, and a plain disclosure of what the protocol asks of you and what it refuses to negotiate.
 
 ## **Part III: The Elohim Protocol - Autonomous Guardians of Flourishing**
 
@@ -325,12 +325,12 @@ The Elohim agents aren't mere enforcers - they're active constitutional interpre
 
 ### **Core Functions**
 
-"We want to develop AI to help us do the dishes and the laundry, not create music or art" 
+"We want to develop AI to help us do the dishes and the laundry, not create music or art" — a remark widely attributed to writer Joanna Maciejewska 
 
 These agents continuously monitor and correct for systemic coordination failures, and automate the complications that make more sustainable patterns of living more costly and less competitive than the existing and failing pattern they will gracefully subsume:
 
 #### **1. Scale Management**
-- **Detect Dunbar violations** - When decision groups exceed cognitive limits
+- **Detect Dunbar's-number violations** - When decision groups outgrow the ~150-person limit of stable human relationships (Dunbar's number) and exceed our cognitive capacity
 - **Create natural subsidiarity** - Automatically suggest community divisions that maintain coordination
 - **Bridge across scales** - Enable small-group trust within large-scale systems
 - **Prevent cascade failures** - Identify when local breakdowns threaten system stability
@@ -483,7 +483,7 @@ These principles must be encoded into our digital infrastructure.
 
 **Indigenous Wisdom**: Traditional governance systems that maintained harmony for millennia through restorative justice, collective stewardship, and sacred relationship with the commons.
 
-**Taiwan's Computational Democracy,** using Poli.is to protect epistemic collaboration under immense psychological nation-state influence. 
+**Taiwan's Computational Democracy,** using Pol.is to protect epistemic collaboration under immense psychological nation-state influence. 
 
 **Sino-Japanese respect, obedience, and solidarity.** 
 
@@ -492,7 +492,7 @@ These principles must be encoded into our digital infrastructure.
 Post-WWII Germany offers a glimpse of what's possible when we consciously design systems for human flourishing:
 - **Constitutional enshrinement of human dignity** - "Human dignity shall be inviolable" as Article 1, making it the lens through which all other rights are interpreted
 - **Codetermination (Mitbestimmung)** - Workers comprising 50% of corporate boards, ensuring capital serves labor not vice versa
-- **Public media as democratic infrastructure** - €8 billion annually for independent media, creating antibodies against propaganda
+- **Public media as democratic infrastructure** - roughly €8 billion annually for independent media [figure: to verify], creating antibodies against propaganda
 - **Social market economy** - Capitalism constrained by social purpose, not socialism but not unfettered markets either
 
 These weren't accidents but conscious design choices to prevent the return of fascism. They prove we can architect systems that protect human dignity—if we have the wisdom and will.
@@ -775,7 +775,7 @@ The bargain is **unilateral generosity** — not tit-for-tat. *"We'll try to mak
 
 ## **Part VI: Measuring Success**
 
-"They will know us by our Love"
+"They will know us by our Love" (John 13:35; and the hymn "They'll Know We Are Christians by Our Love," Peter Scholtes, 1966)
 
 This system will be more attractive than the current system, people won't need to be coerced into it, they will choose it freely, as it will increase the freedom, autonomy, justice, while manifesting the universal values that all cultures ascribe. 
 
@@ -830,7 +830,7 @@ Today, the incentive is clear: capital grows at 10–12% annually in markets, wh
 
 Elohim agents provide a dignified, competitive alternative by serving as sophisticated mediators of wealth's emotional and relational complexity. They understand that wealth is never just digits—it carries identity, fear, legacy, and the deep human need for security and significance.
 
-**Constitutional Wealth Thresholds**: Elohim operate within encoded limits derived from research on democratic sustainability: individual wealth beyond $10-15 million transitions from personal security to political power concentration. This threshold preserves innovation incentives while preventing democracy-threatening accumulation.
+**Constitutional Wealth Thresholds**: Elohim operate within encoded limits derived from research on democratic sustainability [source: to verify]: individual wealth beyond $10-15 million transitions from personal security to political power concentration. This threshold preserves innovation incentives while preventing democracy-threatening accumulation.
 
 **Structured Wealth Resolution**: Not income alone, but wealth itself is bound into living negotiations. Elohim agents sit with wealth holders through the emotional labor of transition:
 
@@ -967,3 +967,23 @@ The infrastructure we build today will shape human consciousness for generations
 *"We build our tools, and thereafter they build us."* —Marshall McLuhan
 
 **The time has come to build technology which becomes the incarnation of care itself, the time to organize with an orientation of love is now.**
+
+---
+
+## Sources & Notes
+
+Quotations and named sources, in order of appearance:
+
+- **E.O. Wilson** — "Paleolithic emotions, medieval institutions and godlike technology" (attributed to Wilson, 2009).
+- **Marshall McLuhan** — "We build our tools, and thereafter they build us." Commonly attributed to McLuhan (*Understanding Media*, 1964); the exact aphorism was coined by Father John Culkin (1967) in paraphrase of him.
+- **Winston Churchill** — "Democracy is the worst form of Government except for all those other forms…" (House of Commons, 1947).
+- **"Free speech does not mean free reach"** — a formulation associated with Renée DiResta and Aza Raskin.
+- **James Clear**, *Atomic Habits* (2018) — "You don't rise to the level of your goals, you fall to the level of your systems." (Scott Adams expresses a related "systems over goals" idea in *How to Fail at Almost Everything and Still Win Big*, 2013; the quoted wording is Clear's.)
+- **Tristan Harris** (Center for Humane Technology) — "As long as the value of a tree is worth more dead than alive… We are the tree."
+- **"We want to develop AI to help us do the dishes and the laundry, not create music or art"** — widely attributed to writer Joanna Maciejewska.
+- **Pol.is** — the open-source deliberation platform used in Taiwan's vTaiwan process.
+- **"They will know us by our Love"** — John 13:35; and the hymn "They'll Know We Are Christians by Our Love" (Peter Scholtes, 1966).
+- **William Gibson** — "The future is already here—it's just not evenly distributed."
+- **Arundhati Roy** — "Another world is not only possible, she is on her way…" (World Social Forum, Porto Alegre, 2003).
+
+Scriptural references (e.g., Matthew 6:21) are cited inline; plain definitions of recurring terms are in the [glossary](./glossary.md). Several empirical claims — the "$10–15 million" democratic threshold, the depression-vs-wealth and social-isolation-vs-GDP correlations, and the German "€8 billion" public-media figure — are marked in the text with "[source: to verify]" / "[figure: to verify]": they are directional and should be pinned to primary sources before being cited as fact.
