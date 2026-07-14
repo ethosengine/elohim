@@ -1,3 +1,10 @@
+---
+id: self-healing-control-plane-design
+status: Draft
+cites:
+  - self-healing-opportunity-map | the user-agency/closed-loop sibling design — the see/reset/pause affordances that surface this control plane to a person | sha256:31400dda6437b0dd | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-opportunity-map.md
+---
+
 # Actuatable Self-Healing Control Plane
 
 > ## ⛔ LEAK-AXIS CORRECTED — 2026-06-19 (the control-plane design STANDS)
