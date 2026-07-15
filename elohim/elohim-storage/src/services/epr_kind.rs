@@ -32,6 +32,7 @@ pub(crate) fn kind_canonical_str(k: EprKind) -> &'static str {
         EprKind::Delegation => "Delegation",
         EprKind::FeedbackSignal => "FeedbackSignal",
         EprKind::AttentionTending => "AttentionTending",
+        EprKind::WitnessedInteraction => "WitnessedInteraction",
     }
 }
 
@@ -148,6 +149,7 @@ mod tests {
             (EprKind::Delegation, "Delegation"),
             (EprKind::FeedbackSignal, "FeedbackSignal"),
             (EprKind::AttentionTending, "AttentionTending"),
+            (EprKind::WitnessedInteraction, "WitnessedInteraction"),
         ];
 
         for (kind, expected) in cases {
