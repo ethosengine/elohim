@@ -167,6 +167,11 @@
           },
           {
             "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/sovereignty-guard-signal.py\"",
+            "timeout": 2
+          },
+          {
+            "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/placement-drift-signal.py\"",
             "timeout": 2
           },

@@ -85,3 +85,35 @@ policies:
       verify), this rule only measures. The soft/hard LoC ceiling doubles as a growth signal: a
       package whose embedded instructions body has outgrown one file should split into a
       referenced asset or a second package rather than balloon.
+
+  - id: sovereignty-ontology-guard
+    version: 1
+    title: Sovereignty ontology guard — affirm the frame, never assert the apex
+    binding: binding-local
+    class: ask
+    scope: { write: "*.md", contains-any: ["sovereign", "Sovereign"] }
+    validator: epr:validator-sovereignty-ontology-guard
+    status: active
+    established_by: operator-ratification-pending-2026-07-15
+    why: >
+      The Elohim ontology REJECTS crypto self-sovereignty as an apex value (canon:
+      genesis/docs/architecture/stewardship-over-sovereignty.md — "we do not consider sovereignty
+      itself to be the right framing"; values-forward.md Stance II.4 — "sovereignty is not forbidden,
+      it is made mechanically expensive"). A human's identity is imago dei — an inviolable right
+      BACKSTOPPED by community/institutional expression, not a self-asserted crypto primitive; real
+      agency comes from community backstopping the individual. This guard fires on NET-NEW apex framing
+      (self-sovereign as the top identity/agency tier; "true/full data sovereignty" as a goal) — it is
+      an AFFIRMATION prompt, not a ban. Confirm your usage is one of the three LEGITIMATE frames and
+      proceed, or reframe: (1) ADVERSARY — naming what is resisted (surveillance capitalism) or external
+      actors ("near-sovereign yet subject to the protocol"); (2) BOUNDED — "sovereign WITHIN higher
+      bounds", the collective human floor sovereign over the machine; (3) BRIDGE-LEGIBILITY — a
+      self-sovereign wallet making a participant legible to EXTERNAL sovereigns (a credit union/mutual),
+      where head/ceiling/authority still flow from the commons governance pool. If your surface's frame
+      is already adjudicated (the wallet bridge), declare it once — a `sovereignty-frame:` marker in the
+      doc, or a nearest-wins `.epr-meta` override on this rule id — and the guard goes quiet.
+      Parallel rules (the story of why, followable): the DESIGN-TIME sibling is the p2p-design-gate skill's
+      Identity Ontology Guard (same discipline, fired before you design a tier, not as you write it); the
+      LIFE-STAGE companion is genesis/docs/architecture/cradle-to-grave-capability-gradient.md (why
+      unqualified self-sovereignty can't model wards/IDD/seniors — the right is exercised WITH/THROUGH
+      others). Dismissals aggregate to sovereignty-guard-signal.py so the RULE itself surfaces for drift
+      review: the protocol governing the bytes of its own repo.

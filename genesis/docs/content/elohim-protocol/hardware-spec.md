@@ -4,18 +4,18 @@
 
 The Elohim Protocol requires a distributed computing architecture that enables families and communities to own their digital infrastructure while participating in a global network. This document consolidates all hardware requirements across the protocol's various applications.
 
-## Progressive Sovereignty: The Onboarding Journey
+## Progressive Participation: The Onboarding Journey
 
-The Elohim Protocol meets users where they are, providing a gradual path from curious visitor to fully sovereign node operator. This progressive model ensures no one is excluded due to technical barriers or resource constraints, while incentivizing deeper participation over time.
+The Elohim Protocol meets users where they are, providing a gradual path from curious visitor to full node operator with community-grounded autonomy. This progressive model ensures no one is excluded due to technical barriers or resource constraints, while incentivizing deeper participation over time.
 
-### The Four Stages of Digital Sovereignty
+### The Four Stages of Participation
 
 | Stage | Hardware Required | Identity Model | Network Role |
 |-------|-------------------|----------------|--------------|
 | **1. Visitor** | Any browser | Anonymous session | Consumer |
 | **2. Hosted User** | Any browser | Custodial keys (hosted) | Participant |
-| **3. App User** | Tier 1 (Consumer Device) | Self-sovereign (local) | Intermittent peer |
-| **4. Node Operator** | Tier 1 (lightweight) or Tier 3 (full) | Self-sovereign (always-on) | Infrastructure provider |
+| **3. App User** | Tier 1 (Consumer Device) | Community-grounded autonomy (local keys) | Intermittent peer |
+| **4. Node Operator** | Tier 1 (lightweight) or Tier 3 (full) | Community-grounded autonomy (always-on) | Infrastructure provider |
 
 *Note: Stage 4 hardware requirements depend on the hApp. Lightweight apps (messaging, identity) can run on mobile. Heavy workloads (media storage, AI inference, community hub) need Tier 3.*
 
@@ -28,7 +28,7 @@ Users create an account on elohim.host. The platform generates and manages crypt
 **Why custodial?** Most people aren't ready to manage cryptographic keys. Hosting provides a familiar account-based experience while still participating in the decentralized network. The key innovation: migration is always possible. No lock-in.
 
 ### Stage 3: App User (Hub-and-Spoke)
-Users install the Elohim desktop app on their laptop or PC (Tier 1 hardware). Keys are stored locally, providing self-sovereignty without requiring always-on infrastructure. The app syncs with the DHT when online.
+Users install the Elohim desktop app on their laptop or PC (Tier 1 hardware). Keys are stored locally, providing community-grounded autonomy without requiring always-on infrastructure. The app syncs with the DHT when online.
 
 **The Hub-and-Spoke Model**: Inspired by [Learning Equality](https://learningequality.org), this stage serves communities with intermittent connectivity:
 - A church, school, or community center operates an always-on "hub" (Stage 4)
@@ -84,7 +84,7 @@ This progressive model means:
 - Standard consumer hardware for development work
 - Minimum 8GB RAM, modern CPU for local web interfaces
 - Used primarily for content creation and administrative tasks
-- **Stage 3/4 capability**: Can run local Holochain conductor for self-sovereign participation. Full Stage 4 for lightweight apps; Stage 3 (intermittent) for heavier workloads.
+- **Stage 3/4 capability**: Can run local Holochain conductor for community-grounded (local-key) participation. Full Stage 4 for lightweight apps; Stage 3 (intermittent) for heavier workloads.
 
 **Smart Home Integration**
 - WiFi security cameras (privacy-focused models preferred)
@@ -106,10 +106,10 @@ This progressive model means:
 
 ### Tier 3: Elohim Family Node (Core Infrastructure)
 **Supports**: Stage 4 (Node Operator) - Full network participation
-**Purpose**: Family digital sovereignty and AI inference
+**Purpose**: Family data stewardship and AI inference
 **Form Factor**: Mini-rack system, approximately refrigerator-sized
 
-This represents the heart of the Elohim ecosystem - a substantial computing investment that replaces dozens of cloud subscriptions while providing true data sovereignty.
+This represents the heart of the Elohim ecosystem - a substantial computing investment that replaces dozens of cloud subscriptions while providing community-grounded data stewardship (keys held locally, backstopped by community recovery).
 
 **Network Roles Enabled**:
 - DHT shard hosting (always-on availability)
@@ -312,7 +312,7 @@ The node replaces numerous cloud subscriptions:
 - Home security: $200+/year (Nest, Ring subscriptions)
 - **Total replaced subscriptions**: $680-800/year
 
-**Break-even timeline**: 5-8 years for hardware costs, immediate value from data sovereignty and community network effects
+**Break-even timeline**: 5-8 years for hardware costs, immediate value from community-grounded data stewardship and community network effects
 
 ## Deployment Considerations
 
@@ -380,7 +380,7 @@ All hardware specifications and software must be open source:
 - **Mesh Resilience**: Network continues functioning during attacks
 - **Decentralized Backup**: No single point of failure
 
-### Data Sovereignty
+### Data Stewardship
 - **Local Storage**: All personal data remains on family node
 - **Selective Sharing**: Granular control over data distribution
 - **Encryption**: End-to-end protection for all sensitive information
@@ -402,10 +402,10 @@ All hardware specifications and software must be open source:
 
 ## Conclusion
 
-This hardware ecosystem represents a significant departure from current cloud-dependent computing. The investment mirrors the historical transition from renting phone lines to owning phones - initially expensive but ultimately liberating. The Elohim node transforms from luxury to necessity as families recognize the true cost of cloud dependence: surveillance, extraction, and loss of digital sovereignty.
+This hardware ecosystem represents a significant departure from current cloud-dependent computing. The investment mirrors the historical transition from renting phone lines to owning phones - initially expensive but ultimately liberating. The Elohim node transforms from luxury to necessity as families recognize the true cost of cloud dependence: surveillance, extraction, and loss of community-grounded control over one's data.
 
 The specifications are ambitious but achievable with current technology. As superintelligence emerges, these nodes become the foundation for human-AI collaboration that preserves human agency while leveraging artificial intelligence for genuine flourishing.
 
 The hardware doesn't just enable new applications - it enables new ways of being human in the digital age. By owning the infrastructure of their digital lives, families reclaim agency over their data, their relationships, and their future.
 
-The Elohim Protocol hardware ecosystem is designed not just for today's needs, but for the long-term flourishing of human communities in an age of artificial intelligence. It represents infrastructure for digital sovereignty, community resilience, and human dignity in the 21st century.
+The Elohim Protocol hardware ecosystem is designed not just for today's needs, but for the long-term flourishing of human communities in an age of artificial intelligence. It represents infrastructure for community-grounded data stewardship, community resilience, and human dignity in the 21st century.
