@@ -93,7 +93,8 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 
 ```
 ├── elohim/                        # Core Runtime (Rust + Holochain)
-│   ├── epr/                       # elohim-epr — canonical EPR codec (CBOR + CIDv1 + Ed25519)
+│   ├── epr/                       # elohim-epr — canonical EPR codec (DAG-CBOR + CIDv1 + Ed25519); content-addressing root every layer projects from (ts-rs → sdk/epr-ts)
+│   ├── eprfs/                     # Native Elohim filesystem projection layer — eprfs-core/-agent/-cli/-host/-local/-meta/-storage (packages as source-of-truth → generated projections)
 │   ├── elohim-views/              # ts-rs-anchored HTTP wire View / InputView types
 │   ├── elohim-storage/            # P2P content storage service (chunked blobs, redundancy)
 │   ├── elohim-cache-core/         # Caching primitives (extraction, LRU, blob)
@@ -124,7 +125,7 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 │   │   ├── elohim-wasm/           # Client-side WASM verification
 │   │   ├── rna/                   # Schema templates & fixtures
 │   │   └── local-dev/  docs/  tests/   # Local conductor launcher, docs, sweettests
-│   ├── brit/                      # Covenant git — gitoxide fork w/ build-provenance EPRs (submodule)
+│   ├── brit/                      # Covenant git — gitoxide fork w/ build-provenance EPRs; brit-epr = parity-proven elohim-epr codec re-impl that superseded the Python cite tooling (submodule)
 │   ├── rakia/                     # Substrate-containment crates: rakia-core, rakia-brit (submodule)
 │   └── holochain-conductor/  kitsune2/  tx5/   # Upstream forks, reference-only (submodule, update=none)
 │
@@ -187,11 +188,14 @@ This progressive model ensures no one is excluded due to technical barriers, whi
 
 ## Architecture at a Glance
 
-### Substrate
+"Runs on Holochain" undersells it. The substrate is a **layered, content-addressed stack** — Holochain is *one* layer of it (the integrity/notary floor), not the whole thing:
 
-The protocol runs on **[Holochain](https://holochain.org/)** — a framework for distributed applications where each person maintains their own source chain, validated by peers through a distributed hash table (DHT). No global consensus is required, and no central server sits in the path.
+- **Content-addressing codec** — `elohim/epr/` (**elohim-epr**) is the root: canonical DAG-CBOR envelopes, CIDv1, Ed25519. Identity is *content-derived* — an address is a hash of what a thing *is* — so the same identifier resolves anywhere and reach is earned at authoring rather than asserted. This layer sits *below* the DNA-hash boundary (no integrity zome depends on it), so it is **not** Holochain-bound; it is the shape every other layer projects from (ts-rs fans it straight to the browser via `sdk/epr-ts/`), and the native filesystem projection layer `elohim/eprfs/` builds on it.
+- **Integrity / notary floor** — **[Holochain](https://holochain.org/)**: each person keeps their own source chain, validated by peers through a distributed hash table (DHT) — no global consensus, no central server in the path. DNAs in `elohim/holochain/dna/` *notarize* the protocol's structural commitments at commit time (identity, learning, governance, shared coordination). This is where a record becomes *notarized* — one rung of the ladder, not the substrate entire.
+- **P2P dataplane** — **Elohim Storage** (`elohim/elohim-storage/`) over **dual transport** (**libp2p** *and* **iroh**): the same content identifier resolves regardless of which transport delivered the bytes. Storage behaves as an eager *reconciliation controller* (the DHT is the manifest; storage reconciles toward it), not a passive cache — chunked blobs, capability advertisement, redundancy.
+- **Provenance** — **brit** (`elohim/brit/`, a gitoxide fork) and **rakia** (`elohim/rakia/`) carry build-and-authorship provenance as content-addressed EPRs; `brit-epr` is a parity-proven re-implementation of the elohim-epr codec — it *depends on* elohim-epr, never the reverse — that superseded the earlier Python cite tooling.
 
-DNAs in `elohim/holochain/dna/` notarize the protocol's structural commitments at commit time — covering identity, learning, governance, and the shared coordination used by every pillar. **libp2p** and **iroh** (the peer-to-peer networking layers) move content-addressed bytes between nodes; the same content identifier works regardless of which transport delivered it. **Elohim Storage** (`elohim/elohim-storage/`) is the local P2P content store — chunked blobs, capability advertisement, redundancy.
+The unifying spine across the layers is a **witness ladder** — *local witness → peer-validated → notarized* — orthogonal to the **participation tracks** that describe how a node takes part (DHT-notary floor · libp2p/iroh substrate · HTTP/WS spoke · doorway projection). Federation and governance ride *over* this dataplane (see Surfaces).
 
 ### Surfaces
 
