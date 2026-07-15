@@ -49,6 +49,13 @@
       "path": "genesis/research/repos/hyperdht",
       "relevance": "Networking prior art (p2p layer, NOT doorway/federation) — the DHT powering Hyperswarm: peer discovery by topic/discoveryKey (find peers without leaking the core key) with UDP HOLEPUNCHING as a first-class feature into Noise-encrypted streams. One of the most mature holepunching-first JS-ecosystem DHTs (deployed at scale via Holepunch/Keet); relevant to the live WAN-NAT gap and the tx5/go-pion lineage. Discovery-by-topic rhymes with affinity-weighted steward topology.",
       "pillar": "elohim"
+    },
+    {
+      "name": "civic-ai",
+      "url": "https://github.com/audreyt/civic.ai.git",
+      "path": "genesis/research/repos/civic-ai",
+      "relevance": "Peer project / conceptual prior-art — the civic.ai static site + the '6-Pack of Care' governance framework (Audrey Tang + Caroline Green, Oxford Institute for Ethics in AI; illustrations by Nicky Case; Astro/markdown, bilingual EN/zh-TW). The Eastern 'Kami of the Commons' approach to the same entity our elohim names, from a different ontology than our Judeo-Christian framing: bounded, inspectable, community-OWNED local AI stewards a community can correct and switch off (alignment-by-process; care as a daily capability; many small locally-governed systems vs one universal governor). NOTE: the repo is the framework + site, NOT runtime code — but the KAMI CONCEPT it articulates is exactly the light per-device agent-local-steward runtime the elohim architecture has DEFERRED (the eprfs / witnessed-interaction work). Deep-dive next for the governance framework + the concept mirror, not a codebase to port. Kindred aim, different lens. Contact: Audrey Tang (au@civic.ai) + Caroline Green.",
+      "pillar": "elohim"
     }
   ]
 }
