@@ -194,6 +194,8 @@ This progressive model ensures no one is excluded due to technical barriers, whi
 
 ## Architecture at a Glance
 
+### Substrate
+
 "Runs on Holochain" undersells it. The substrate is a **layered, content-addressed stack** — Holochain is *one* layer of it (the integrity/notary floor), not the whole thing:
 
 - **Content-addressing codec** — `elohim/epr/` (**elohim-epr**) is the root: canonical DAG-CBOR envelopes, CIDv1, Ed25519. Identity is *content-derived* — an address is a hash of what a thing *is* — so the same identifier resolves anywhere and reach is earned at authoring rather than asserted. This layer sits *below* the DNA-hash boundary (no integrity zome depends on it), so it is **not** Holochain-bound; it is the shape every other layer projects from (ts-rs fans it straight to the browser via `sdk/epr-ts/`), and the native filesystem projection layer `elohim/eprfs/` builds on it.
