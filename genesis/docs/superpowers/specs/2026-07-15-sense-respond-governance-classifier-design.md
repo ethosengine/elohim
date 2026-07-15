@@ -184,6 +184,13 @@ is set deliberately wide (§9.4); (3) **`classifier_agent` is coordinator-derive
 v1 it is self-reported, so **all v1 signals are advisory-weight only** (§11.4). The engine-facing triple
 (`cls`, `reason`, `rule_id`) is derivable from this shape, so the existing `combine()`/`_emit_*` paths keep working.
 
+> **CORRECTION (frame-witness-primitive-architecture §2.4).** The escalation-provenance fields (`compute_source`,
+> `resolved_by_hop`, `bounded_by`) must **NOT** sit in the content-addressed `FrameClassification` — if they are in
+> `canonical_bytes` they are in the CID, and when the H3 leg lands and a record sets `resolved_by_hop: H3` the *same
+> judgement* mints a *different CID* and the aggregation anchor moves. They split into a separate, CID-coupled
+> `ResolutionProvenance`; the durable `FrameClassification` hashes only over `{target_cid, frame_ref, verdict, confidence,
+> evidence}`. The primitive is homed in `elohim/epr::witness` (ts-rs → `epr-ts`), not a `.py` — see the architecture spec.
+
 ## 6. The seam + the harness-neutral choke point (agent-agnosticism)
 
 The union's most-repeated flaw — every crux critique hit it — is that a PreToolUse loop is **Claude-Code-specific**:

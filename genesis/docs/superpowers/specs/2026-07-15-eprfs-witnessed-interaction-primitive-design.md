@@ -101,7 +101,7 @@ are independently instantiable; the ladder is invariant across every instance.
 | Slot | Definition |
 |---|---|
 | **object** | the content-addressed thing spent-upon — the REA *Resource*; the aggregation anchor is always its **CID**, never a path/name |
-| **substrate** | which dimension is spent — a member of the DHT-notarized `SubstrateSignal` enum (`attention, compute, storage, bandwidth, energy, time, resource`), extended by one classification-valued member `governance` |
+| **substrate** | which dimension is spent — a member of the DHT-notarized `SubstrateSignal` enum (`attention, compute, storage, bandwidth, energy, time, resource`). **CORRECTION (frame-witness-primitive-architecture §2.3):** governance is **NOT** an 8th substrate member — adding one *moves the DNA hash* (integrity-zome change). Governance rides as a **magnitude variant** (`Vote`/`Classification`) over an existing substrate, never a new resource dimension. |
 | **action** | REA verb — `use` (non-depleting) \| `consume` (depleting) \| `produce` \| `cite` \| `affirm` \| `dismiss` |
 | **magnitude** | algebra-tagged: `Count{value, unit}` (additive monoid, ℝ≥0) or `Vote{sign}` (ordinal tally, signed) |
 
@@ -640,7 +640,7 @@ edges — which must **SEVER the live `contributor_presences::recognition_score`
 already a ranking input) with a regression test, not merely declare a forward invariant (§6.4, §4.5) — *both land before
 any wire code*; **(G1)** the extractor registry + `ConsumptionExtractor` trait + dwell fallback (generalizing the
 classifier's labeling-function bank) + `LocalConsumptionTick` Automerge doc, offline, monotonic-clock; **(G2)** the
-`SubstrateSignal` `governance` member + `Count`/`Vote` magnitude algebra unifying the two carriers; **(G3, DNA-lineage)**
+the `Count`/`Vote`/`Classification` magnitude algebra unifying the two carriers (governance = a `Magnitude` variant, **NOT** a `SubstrateSignal` member — DNA-hash-moving, frame-witness-primitive-architecture §2.3); **(G3, DNA-lineage)**
 the `attestation:consumption-record` subtype (payload `proof_evidence.class:"witness"`, B3) + the `signer ∉
 {provider,receiver}` disinterest gate (net-new coordinator logic, S3; coordinator-level at v1) + a
 **bidirectional-corroboration-density dampener** in `witness_weight` (S2, reciprocal-ring resistance); **(G4)** the
