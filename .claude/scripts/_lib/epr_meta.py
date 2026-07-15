@@ -357,7 +357,57 @@ def _p2p_design_gate(write: dict) -> bool:
     return any(s in c for s in ("GET /api/v1", "PRIMARY KEY", "uuid"))
 
 
-REFERENCE_VALIDATORS = {"epr:validator-p2p-design-gate": _p2p_design_gate}
+# ── Sovereignty ontology guard (a validator-EPR). Fires an `ask` when a write NEWLY INTRODUCES
+# apex-assertion sovereignty framing — "self-sovereign" as the top identity/agency tier, "true/full
+# data sovereignty" celebrated as a goal — the crypto ontology the protocol rejects. It is a GUARD,
+# not a ban (`ask`, one-keystroke override); the `why:` teaches the fix and names the three LEGITIMATE
+# frames it deliberately does NOT fire on. Canon: genesis/docs/architecture/stewardship-over-sovereignty.md
+# ("we do not consider sovereignty itself to be the right framing") + values-forward.md Stance II.4
+# ("sovereignty is not forbidden — it is made mechanically expensive").
+#   Legitimate (guard stays silent): (1) ADVERSARY frame — what's resisted / external actors
+#   ("nation-states near-sovereign yet subject to the protocol"); (2) BOUNDED frame — "sovereign within
+#   higher bounds", the collective human floor sovereign over the machine; (3) BRIDGE-LEGIBILITY frame —
+#   a self-sovereign wallet making a participant legible to EXTERNAL sovereigns (a credit union/mutual),
+#   authority/head/ceiling still flowing from the commons governance pool.
+#   Drift (guard fires): self-sovereign as the protocol's OWN apex identity value; "true data
+#   sovereignty" as an implementation goal.
+# The guard fires only on NET-NEW apex framing (post-edit count > pre-edit count), so editing a file to
+# CLEAN sovereignty — or any maintenance edit to a surface already carrying it — is never trapped.
+_SOV_APEX_PHRASES = (
+    "self-sovereign", "self sovereign", "self-sovereignty", "self sovereignty",
+    "true data sovereignty", "full data sovereignty", "sovereign identity",
+    "digital sovereignty", "fully sovereign",
+)
+# A co-located frame declaration suppresses the guard where the frame is already adjudicated (the wallet
+# bridge crate declares this once, in-content or via a nearest-wins `.epr-meta` override on the rule id).
+_SOV_FRAME_MARKER = "sovereignty-frame:"
+
+
+def _sov_apex_count(text: str) -> int:
+    t = text.lower()
+    return sum(t.count(p) for p in _SOV_APEX_PHRASES)
+
+
+def _sovereignty_ontology_guard(write: dict) -> bool:
+    post = write.get("content") or ""
+    if _SOV_FRAME_MARKER in post.lower():
+        return False  # frame explicitly declared/adjudicated for this surface
+    post_n = _sov_apex_count(post)
+    if post_n == 0:
+        return False
+    if write.get("is_new"):
+        return True  # brand-new file: all apex framing is net-new
+    try:
+        pre = Path(write["path"]).read_text(errors="replace")
+    except OSError:
+        return True  # can't read prior state — fail toward surfacing (it's only an `ask`)
+    return post_n > _sov_apex_count(pre)  # net-new only; cleaning/maintenance never fires
+
+
+REFERENCE_VALIDATORS = {
+    "epr:validator-p2p-design-gate": _p2p_design_gate,
+    "epr:validator-sovereignty-ontology-guard": _sovereignty_ontology_guard,
+}
 
 
 # ── Policy registry: define-once-bind-many rules (the Mishpat::Precedent shape, dev-tooling tier).

@@ -43,8 +43,8 @@ Humans progress through agency stages as they deepen engagement:
 |-------|-----------|------|---------------|---------|
 | `visitor` | None | None | Browser localStorage | N/A |
 | `hosted` | Remote edge node | Custodial (edge holds) | DHT via edge node | Costs covered by commons/steward |
-| `app-steward` | Local on device | Self-sovereign | DHT + local conductor | Self-hosted |
-| `node-steward` | Always-on local | Self-sovereign | DHT + hosts others | Receives value flows |
+| `app-steward` | Local on device | Community-grounded autonomy | DHT + local conductor | Self-hosted |
+| `node-steward` | Always-on local | Community-grounded autonomy | DHT + hosts others | Receives value flows |
 
 ### Stage Detection Logic
 
@@ -60,7 +60,7 @@ type IdentityMode =
   | 'anonymous'      // Pure browser, no session
   | 'session'        // localStorage visitor
   | 'hosted'         // Holochain with custodial keys
-  | 'self-sovereign' // Holochain with keys on device
+  | 'self-sovereign' // DEPRECATED label (see identity.model.ts) — the tier is community-grounded autonomy: keys on device, backstopped by community recovery
   | 'migrating';     // In transition between stages
 ```
 
@@ -100,7 +100,7 @@ type KeyLocation =
 
 | Guard | Purpose |
 |-------|---------|
-| `identityGuard` | Requires network authentication (hosted or self-sovereign) |
+| `identityGuard` | Requires network authentication (hosted or community-grounded local-key) |
 | `sessionOrAuthGuard` | Allows session OR network authentication |
 | `attestationGuard(type)` | Requires specific attestation |
 

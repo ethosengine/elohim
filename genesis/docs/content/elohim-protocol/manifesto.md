@@ -155,7 +155,7 @@ These principles don't just improve existing systems—they engineer away the fa
 
 **Implementation**:
 - Peer-to-peer networks (e.g., Holochain) that eliminate central servers
-- Cryptographically secured data sovereignty for individuals
+- Cryptographically secured data stewardship — individuals hold their keys, backstopped by community recovery (agency grounded in the commons, not individual lock-out)
 - Community-owned computational resources
 - Resilient mesh networks that survive institutional capture
 

@@ -1,0 +1,35 @@
+---
+epr-meta-version: 1
+id: elohim-protocol-canon-governance
+root: true
+purpose: >
+  The protocol canon — manifesto, constitution, values-forward, theology, hardware/protocol specs
+  and the governance persona trees. The vision-bearing surface; every word here is read as the
+  protocol's own stance. This manifest anchors edit-time governance for the tree: the first rule is
+  the sovereignty ontology guard, because the crypto self-sovereignty ontology is the drift that most
+  persistently leaks into these documents (AI agents default to it — it is overrepresented in training
+  data — and it slips past review at tier-naming, reading as a neutral capability level rather than the
+  ontological claim it is).
+rules:
+  - id: sovereignty-ontology-guard
+    policy: sovereignty-ontology-guard@1
+validators:
+  - ref: epr:validator-sovereignty-ontology-guard
+    fuel: 100
+cites:
+  - stewardship-over-sovereignty | the foundational canon this guard enforces — rejects crypto-sovereignty, reserves stewardship/agency/authority, frames threshold/hardware crypto as accelerators of community recovery never gates | path: genesis/docs/architecture/stewardship-over-sovereignty.md
+  - values-forward | the classifier peer that frames sovereignty correctly (Stance II.4 — not forbidden, made mechanically expensive; the human floor sovereign over the machine, no self-sovereign apex) | path: genesis/docs/content/elohim-protocol/values-forward.md
+  - cradle-to-grave-capability-gradient | the life-stage companion — why unqualified self-sovereignty can't model wards/IDD/seniors; the right is exercised with/through others (supported decision-making, not substituted judgment) | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md
+---
+
+# elohim-protocol/ — the protocol canon (governed)
+
+This directory is the vision. Its governance base is the **sovereignty ontology guard** (bound from
+`.claude/epr-meta/policies.yaml`, realized by `epr:validator-sovereignty-ontology-guard`): a write that
+NET-NEW introduces apex-assertion sovereignty framing ("self-sovereign" as the top identity tier, "true
+data sovereignty" as a goal) draws an `ask` that affirms the frame against the three legitimate uses
+(adversary / bounded / bridge-legibility) and points at the canon. It is a **guard, not a ban** — one
+keystroke to proceed when the usage is legitimate — and it fires only on *introduction*, so editing a
+doc to *clean* its sovereignty framing is never trapped. Dismissals aggregate through
+`sovereignty-guard-signal.py` (PostToolUse) into a drift ledger so the rule itself surfaces for
+evaluation: the protocol exercising its own governance over the bytes of this repo.
