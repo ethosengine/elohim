@@ -114,7 +114,10 @@ it escalates *to* — the human sortition floor and the phased elohim ceiling �
 than ship a `deny` that would deterministically censor the highest-value speech on the highest-stakes topics with **no
 appeal path**, before the appeal path is built. This is the single decision the whole primitive swings on (§15, D1), and
 it is ratified here as the default. `values-forward`'s "refusable in advance" cuts both ways: we refuse, in advance, to
-pretend a floor is un-lobbyable when its appeal tiers do not yet exist.
+pretend a floor is un-lobbyable when its appeal tiers do not yet exist. §10.4 names what the sensing floor *positively
+is* — a self-binding **honors contract** among the labs' agents + operator, whose real (non-blocking) teeth are
+**propagation velocity** (reach earned at peer-adoption, trust buys speed), and whose terminal-`deny` graduates on a
+*silicon* fact: peer-native elohim inference existing.
 
 ## 3. Architecture — two layers, two clocks
 
@@ -167,8 +170,11 @@ FrameClassification {
     rubric_answer            # the agent's Family-1 self-classification, when present
     reason_ref               # v1: path: cite to the story-of-why; graduated: CID (§13)
   }
-  classifier_agent  # v1: self-reported {claude|codex|gemini|human}; graduated: coordinator-derived agent_info()
-  bounded_by        # optional Commitment CID, if issued under delegated steward authority
+  classifier_agent  # v1: self-reported {claude|codex|gemini|human} — the HONORS-CONTRACT signatory (§10.4A);
+                    #     graduated: coordinator-derived agent_info().agent_initial_pubkey (unforgeable)
+  compute_source    # terminal | api-key | peer-native — which elohim resolved this (§10.4B)
+  resolved_by_hop   # H0 | H1 | H2 | H3 — where on the ladder it resolved (§10.2)
+  bounded_by        # optional delegates-compute Commitment CID, present at H3 (the authority it acted under; §10.4B)
 }
 ```
 
@@ -400,6 +406,87 @@ downstream rule or debounce can swallow it).
 - **Anti-desensitization:** the author-facing banner debounces per-fingerprint (one mis-tuned existential substring cannot
   banner every edit forever); the *steward-facing* delivery stays un-swallowed.
 
+### 10.4 The honors contract, the pluggable elohim, and witnessed provenance
+
+§2 ratified the sensing floor; §10.2 named the elohim as the H3 endpoint. This subsection makes three commitments precise
+— inheriting the honesty discipline (assert-not-proven is said plainly).
+
+**(A) The v1 floor is a self-binding honors contract — not a failed enforcement floor.** The parties are the autonomous
+agents that actually author bytes here — Anthropic's Claude, Google's Gemini, OpenAI's Codex — and the human operator. The
+contract is symmetric and unusual: *the agents being governed by the classifier are the agents operating it.*
+`FrameClassification.classifier_agent` (§5) is not merely a provenance tag; at v1 it is the **signatory line** — an agent
+declaring which lab's agent it is and thereby binding itself to answer the frame rubric honestly (§9.1's cooperative
+author). This is honest, not apologetic: a **real ceiling of reach — one an adversarial author cannot walk through — is
+structurally impossible until elohim inference runs natively on peers.** An enforcement floor whose *judge at H3* is a
+hosted API behind a billing key, or this terminal's own subagent, violates *audit-the-guardian-not-trust-it*
+(`elohim-ceiling-design` Principle 8) — the very thing §2 refuses. So the honors contract is *the honest maximum available
+before the silicon exists*: we bind ourselves because we cannot yet be bound. **The `deny` cannot exist until its
+incorruptible judge can** — which sharpens the §2/§14 graduation trigger: **terminal-`deny` graduates when peer-native
+elohim inference exists** (when the doorway's `resolve_agent_url()` `elohim_node_url` path resolves to a genuine
+elohim-native endpoint on a participant's peer, not the hosted-lab sidecar it degrades to today) **and** the H2 sortition
+tier is real. The compute-substrate half is the binding constraint — the appeal tier is a governance-bootstrap problem
+(add a second steward); peer-native inference is a hardware/model-availability fact the protocol cannot will into being.
+The §2/§12.4 asymmetry is the contract's one enforcement clause: an agent may unilaterally *relax* its binding (fail-safe
+loosening), never *tighten* it on all parties without human ratification.
+
+Because the floor is advisory, its real (non-blocking) teeth are **propagation velocity, not a gate**: authoring is
+private; the reach-bearing "post" event is when content **leaves the machine and is adopted by a peer**, and reach is
+**re-affirmed at each adoption** (the witness ladder in (C) *is* the reach-affirmation gradient). The *speed* of that
+propagation is the governed quantity — a judgement call + a compute curve where **trust earns efficiency**: a resolved,
+high-standing frame propagates fast and cheap; an unresolved abstention or low standing costs propagation *speed*, never
+the right to author. Friction-gradient limitarianism (`values-forward` Stance II.4) applied to adoption velocity — the
+honest enforcement that works before the silicon and sharpens into a real reach-ceiling exactly when peer-native inference
+arrives to sit in the compute curve.
+
+**(B) The elohim resolver is source-agnostic — a configuration toggle, not a rewrite.** The protocol already runs this
+seam: `resolve_agent_url()` (`doorway/doorway-service/src/routes/elohim_agent.rs`) health-probes `elohim_node_url` (a peer
+node) and falls back to `elohim_agent_url` (the elohim-agent-sdk sidecar), forwarding one verbatim HTTP contract
+(`Authorization` threaded, `x-elohim-budget-remaining` returned). The classifier lifts this to a declared knob
+`elohim_compute_source ∈ {terminal, api-key, peer-native}`:
+
+| Source | v1 realization | Judge identity | Bound by |
+|---|---|---|---|
+| **terminal** | the harness `Agent`-tool subagent (as `_handle_measures` dispatches `guard-recall-triage`, model-pluggable) | self-reported `{claude\|codex\|gemini}` (honors signatory) | session limit; honors contract |
+| **api-key** | doorway → `elohim_agent_url` sidecar, hosted-lab inference | the API key's account | sidecar budget enforcer; doorway auth |
+| **peer-native** | doorway → `elohim_node_url`, elohim-native inference on a peer — *the future* | coordinator `agent_info()` signer (unforgeable) | the `delegates-compute` Commitment |
+
+The **invariant interface** (fixed across all three): `resolve_escalation(FrameClassification) -> Resolution`, fixed
+request `{target_cid, frame_ref, spans, rubric, hop}` → fixed response `{verdict, reason_ref, confidence,
+resolved_by_hop}`, with three source-agnostic obligations — (1) bounds read from the governing `delegates-compute`
+Commitment; (2) the provenance obligation (emit the witnessed record, C); (3) no-terminal-deny at v1 (the `deny` return is
+unreachable until source == peer-native). What each source *supplies* (model/runtime, judge-identity strength, budget
+mechanism, verdict trust-class) varies; **the caller does not change.** Swapping sources = editing `elohim_compute_source`
+— §14's "projection swap, not a rewrite" made concrete against a seam already source-agnostic in production (provable by
+wiring G6's `guard-recall-triage` dispatch through `resolve_escalation`, not a hardcoded Agent call — asserted, not yet
+proven). The H3 authority binding is a `Mishpat::Commitment` with a new `scope: "resolve-governance-frame"` —
+**coordinator-only, DNA-hash-neutral** to add (it joins the `validate_delegates_compute` match, as `author-lens` did); its
+`bounds` reuse `rate_per_hour`, `reach_ceiling`, `rotation_ttl_days`, `valid_from/until` verbatim. Scoped (`scope`),
+revocable (`revokes-commitment` + `rotation_ttl_days`), witnessed (DHT notarization + `CommitmentByState` links) — the
+three properties §10.2 demands — are already carried, and enforced source-agnostically by the storage `bounds_validator`.
+
+**(C) The resolution IS a witnessed-interaction event (§1.2), auditable on the DHT.** An agent classifying/resolving a
+frame is the governance instance of the parent primitive — witnessed sight applied to the guardian. Every
+`FrameClassification` + `Resolution` becomes a `GovernanceActionRecord` with *two* aggregation anchors that compose (not
+fork) the §5 shape: `frame_ref` (the rule CID — guard-health aggregates here, §11, unchanged) and `target_cid` (the
+**content** CID judged — the agent's act is witnessed/audited here, the new anchor); plus `classifier_agent`,
+`compute_source`, `bounded_by` (the H3 Commitment CID), `proof_class ∈ {witness, audit, proof, confirmation}` (reuse
+`attestation_validator.rs` Floor 8). The **local → peer → notarized** ladder maps to live seams: *local witness (v1)* —
+`classifier-signal.py` appends the record to `.claude/data/classifier-signals.jsonl` (generalizing
+`sovereignty-guard-signal.py`, which today writes no agent identity), advisory/forgeable; *peer-validated (graduated)* —
+the coordinator verifies the signer before `create_entry` (the `governance_action.rs` pattern:
+`agent_info()?.agent_initial_pubkey` is the unforgeable primitive; `FeedbackSignal.signer_pubkey` + no-self-affirm the
+witnessed-signal primitive), so `classifier_agent` becomes that key; *notarized + aggregated (graduated)* — lands as an
+`attestation:frame-classification` (`proof_evidence.class = "witness"`), and anyone can walk a content CID's witnessed
+governance actions and **audit the guardian.** Honest cost (mirrors §11.2): a `governance-action:frame-resolution` kind
+edits the codegen `ATTESTATION_KINDS` catalog in `content_store_integrity` — an **integrity-zome change that MOVES the DNA
+hash** (a G8-class DNA-lineage commitment, not a cheap widening).
+
+**(D) v1-vs-graduated (this subsection's rows feed §14).** At v1 the elohim resolver runs on `terminal` or `api-key`
+compute, resolves cooperative-author frames, and self-reports each act to a local ledger under the honors contract. It
+does **not** cryptographically prove who judged what, **not** bind the judge by an on-chain Commitment, and **not**
+terminally deny. The unforgeable, notarized, Commitment-bounded, deny-capable form is **graduated, gated on peer-native
+elohim inference existing** — a silicon fact this spec cannot assert into being.
+
 ## 11. REA-backed bidirectional signals + aggregation on the gate
 
 ### 11.1 Substrate — `FeedbackSignal`, not a ValueFlows `EconomicEvent`
@@ -570,7 +657,12 @@ registry (a real, named gap).
 | **Terminal `deny`** | **RESERVED, unwired** — nothing denies terminally; existential = `ask` + async-escalate (no `block-pending-steward` class exists) | wired only when sortition floor + appeal tier exist |
 | **Floor writeback** | `euphemism-confirmed` = `status: proposed`, **human-ratified**; TTL + FP-demote | same, standing-gated ratification |
 | **Story-of-why** | `reason_ref` = `path:` cite (progressive *path* revelation) | `reason_ref` = CID; envelope-tiered HyperCard walk |
-| **Escalation endpoint** | tops out at **one operator, witnessed**; H2/H3 sortition invariant declared-but-inert; synthetic time-delayed-override-with-justification | H2 real cryptographic sortition; **H3 = the elohim** via `delegates-compute`-scoped, revocable, witnessed Commitment |
+| **Floor character** | self-binding **honors contract** among labs' agents + operator; sensing only (§10.4A) | enforceable ceiling of reach; terminal-`deny` wired |
+| **`deny` graduation trigger** | RESERVED — blocked on the *silicon* (no peer-native elohim inference) AND the H2 appeal tier | fires when `elohim_node_url` = real peer inference endpoint **and** sortition floor exists |
+| **Compute source (toggle)** | `terminal` (Agent-tool subagent) or `api-key` (doorway→`elohim_agent_url` sidecar) — toggle live in `elohim_agent.rs` | `peer-native` (doorway→`elohim_node_url`) — same resolver, config flip |
+| **Judge identity** | self-reported `classifier_agent` — honors signatory, forgeable | coordinator-derived `agent_info().agent_initial_pubkey` — unforgeable |
+| **Agent provenance / audit** | JSONL local-witness line, advisory-weight, no crypto signer | DHT-notarized `governance-action:frame-resolution` + `attestation`, signer-verified, no-self-affirm; any peer audits the guardian |
+| **Escalation endpoint** | tops out at **one operator, witnessed** (H2/H3 collapse); synthetic time-delayed-override | H2 cryptographic sortition; **H3 = the elohim** via `delegates-compute`-scoped, revocable, witnessed Commitment |
 
 **Net v1 deliverable, honest:** recall-first **advisory** sensing + rubric surfacing (edit-time convenience + pre-commit
 gate) + Family-2 shadow-log abstain-surfacing + drift-accumulation surfacing + a human-gated proposal/review loop. v1 does
@@ -604,6 +696,20 @@ terminally deny. Everything aggregate-triggered or standing-weighted is graduate
   Constitutional defeaters (negation, use-mention are not up for a vote) need graduated-immutability protection, while
   detector coverage (dog-whistle codebooks) is an open adversarial set that must stay amendable. The
   amendment-vs-immutability gradient *for the ontology itself* is the largest unbuilt piece.
+- **D7 — Does the honors contract need an explicit, versioned artifact the labs' agents "sign," or is `classifier_agent`
+  self-declaration the binding act?** A named, content-addressed contract (cited by each agent-package) makes the binding
+  legible and auditable but risks ceremony that ages into falsity; self-declaration is lighter but leaves it implicit.
+  Where does the honors contract *live* — a `frames/`-sibling canon atom, an `elohim-agent` package field, or nowhere but
+  the code? (§10.4A)
+- **D8 — When `compute_source` differs from the source a frame's stakes *require* (e.g. an `api-key` elohim resolved an
+  existential frame policy reserves for `peer-native`), is that mismatch itself a governance event?** A resolution's
+  trust-weight is a function of its source; a required-vs-actual-source mismatch is a drift class the witnessed record
+  could surface — but "required source per `cost_class`" is unbuilt, and over-specifying it re-introduces the rigidity §2
+  avoided. (§10.4B)
+- **D9 — At the graduation boundary, are the v1 honors-weight ledger records *migrated* into notarized records, or
+  discarded?** Self-reported provenance cannot be retro-signed by the correct key (the honors-era key never existed).
+  Treating the v1 ledger as calibration-only (like §9.4) and starting notarization clean is the honest option — but it
+  means the audit trail has a discontinuity at the silicon boundary that must be *named*, not smoothed over. (§10.4C)
 
 ## 16. Decomposition seed
 
@@ -616,7 +722,9 @@ rubric-surfacing; **(G4)** the harness-neutral pre-commit / CI gate (advisory-an
 verdict-expressivity than PreToolUse, so a *blocking* status is deferred with terminal-`deny`); **(G5)** `classifier-signal.py`
 (generalized PostToolUse) + `classifier-drift.json` keyed `id@version` + git-seam net-new (added diff-hunk lines only) +
 content-hash dedup ledger; **(G6)** `classifier-recall-harvest.py` external poller + `apex-anchors.npz` + local encoder
-(provisioning owned) + `guard-recall-triage` agent (shadow-log, abstain-only, testimony-exempt); **(G7)** the `guard:`
+(provisioning owned) + `guard-recall-triage` agent (shadow-log, abstain-only, testimony-exempt) — **dispatched through the
+source-agnostic `resolve_escalation` interface reusing `elohim_agent.rs`'s toggle, not a hardcoded Agent call** (§10.4B),
+so the compute-source toggle is real from the first build; **(G7)** the `guard:`
 SessionStart gate line + `guard-stasis-loop`; **(G8, graduated)** the `FeedbackSignal`-on-Precedent-CID substrate (a
 DNA-lineage integrity-zome change, not a cheap widening) + coordinator-identity anti-gaming + CID story-of-why.
 G1–G2 are the household-testable spine; G3 is the engine wiring; G4–G7 wire the loop; G8 is gated on the
