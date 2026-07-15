@@ -32,6 +32,7 @@ pub(crate) fn kind_canonical_str(k: EprKind) -> &'static str {
         EprKind::Delegation => "Delegation",
         EprKind::FeedbackSignal => "FeedbackSignal",
         EprKind::AttentionTending => "AttentionTending",
+        EprKind::WitnessedInteraction => "WitnessedInteraction",
     }
 }
 
@@ -148,6 +149,7 @@ mod tests {
             (EprKind::Delegation, "Delegation"),
             (EprKind::FeedbackSignal, "FeedbackSignal"),
             (EprKind::AttentionTending, "AttentionTending"),
+            (EprKind::WitnessedInteraction, "WitnessedInteraction"),
         ];
 
         for (kind, expected) in cases {
@@ -158,8 +160,8 @@ mod tests {
             );
         }
 
-        // Also assert we covered all 11 variants (update when enum grows).
-        assert_eq!(cases.len(), 11, "expected 11 EprKind variants");
+        // Also assert we covered all 12 variants (update when enum grows).
+        assert_eq!(cases.len(), 12, "expected 12 EprKind variants");
     }
 
     // T11 — Reach::is_floor_allowed tests

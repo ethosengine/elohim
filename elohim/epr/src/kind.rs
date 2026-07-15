@@ -31,6 +31,15 @@ pub enum EprKind {
     /// chain; never gossiped. `Visibility::Private` HDI entry lands at T5.
     /// Wire type: `elohim_storage::p2p::attention_tending::AttentionTending`.
     AttentionTending,
+    /// Frame/witness primitive — the parent of the consumption-meter and
+    /// governance-frame-classifier specializations. A witness emits an REA-shaped
+    /// record `(object_cid, substrate, action, magnitude)` about a content-addressed
+    /// object; it aggregates on the object CID, substrate-denominated. Governance
+    /// rides in the magnitude algebra (`Vote` / `Classification`), never as a
+    /// substrate member. Adding this variant is DNA-hash-neutral (no integrity zome
+    /// depends on `elohim-epr`). Wire type: `elohim_epr::witness::WitnessedInteraction`.
+    /// See `genesis/docs/superpowers/specs/2026-07-15-frame-witness-primitive-architecture-design.md`.
+    WitnessedInteraction,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
@@ -67,6 +76,18 @@ impl EprKind {
             // enrichment that tending lifecycle (T15) may add; none are structurally
             // required at the wire layer.
             EprKind::AttentionTending => &[],
+            // WitnessedInteraction: no required coupling legs. This kind is the
+            // *parent* that unifies the value (Magnitude::Count) and governance
+            // (Magnitude::Vote / Magnitude::Classification) specializations. Because
+            // which coupling a record needs is a per-record property of its magnitude
+            // algebra — a Count consumption record leans on Value; a Vote/Classification
+            // governance record leans on Governance — NO single leg can be universally
+            // required for the kind. The intersection of what the specializations would
+            // require is empty. Any leg is optional enrichment determined by the
+            // magnitude, mirroring AttentionTending's reasoning. (At v1 a
+            // WitnessedInteraction is self-reported / advisory-weight; accountability
+            // graduates with agent_initial_pubkey, not with a structural coupling leg.)
+            EprKind::WitnessedInteraction => &[],
         }
     }
 }

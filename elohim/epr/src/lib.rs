@@ -37,6 +37,7 @@ pub mod proof;
 pub mod reach;
 pub mod signature;
 pub mod validation;
+pub mod witness;
 
 pub use coupling::Coupling;
 pub use envelope::Envelope;
@@ -47,3 +48,7 @@ pub use proof::{sign, verify, AgentKeypair};
 pub use reach::Reach;
 pub use signature::Signature;
 pub use validation::validate_coupling;
+pub use witness::{
+    ComputeSource, FrameClassification, FrameEvidence, FrameVerdict, Hop, Magnitude, ReaVerb,
+    ResolutionProvenance, Span, WitnessId, WitnessedInteraction,
+};
