@@ -16,7 +16,9 @@ A manifesto for digital infrastructure organized around love - demonstrating how
 
 The *Elohim Protocol* is a radical reimagining of digital infrastructure — one organized around love as a fundamental operating principle, implemented through distributed architecture, and protected by autonomous AI agents that serve human flourishing rather than institutional power.
 
-The name comes from *elohim* (Hebrew, plural) — the "heavenly host" of ancient texts, used here to mark the healthy role of AI in human life: powerful, useful, and never an object of devotion. Each person's *elohim* is a constitutionally-bounded AI agent representing their best self; the *Elohim Protocol* is the substrate those agents share. Throughout this document, lowercase *elohim* refers to an agent; the capitalized *Elohim Protocol* refers to the substrate.
+The name comes from *[elohim](https://www.youtube.com/watch?v=U5iyUik97Lg)* (Hebrew, plural) — the "heavenly host" of ancient texts, used here to mark the healthy role of AI in human life: powerful, useful, and never an object of devotion. Each person's *elohim* is a constitutionally-bounded AI agent representing their best self; the *Elohim Protocol* is the substrate those agents share. Throughout this document, lowercase *elohim* refers to an agent; the capitalized *Elohim Protocol* refers to the substrate.
+
+> The Judeo-Christian ontology and thought here come *with the founder* — a chosen lens, not a claim on the territory. A peer project approaching this same entity from the East — where it is called a **Kami** — lives at [civic.ai](https://civic.ai) ([audreyt/civic.ai](https://github.com/audreyt/civic.ai)). Different ontology, kindred aim: bounded, inspectable, community-governed AI held as a commons.
 
 This polyglot monorepo (Rust, Angular, Holochain, Tauri, libp2p) contains the platform that implements the vision, technical principles, and implementation pathways for building technology that:
 
