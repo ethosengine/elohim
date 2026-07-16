@@ -1,0 +1,21 @@
+---
+epr-meta-version: 1
+id: alpha-capacity-ledger-governance
+purpose: >
+  Governs the operator-promoted Rakia capacity ledger. The ledger is the Category-C projection of
+  observed alpha test-bench constraints; editing it re-evaluates the current deployment portfolio
+  against the prospective hard envelope before that new observation earns reach.
+coupling:
+  governance: epr:alpha-test-bench-compute-envelope
+  value: epr:rea-compute-commitment-primitive
+rules:
+  - id: test-bench-aggregate-capacity
+    policy: test-bench-aggregate-capacity@1
+---
+
+# `genesis/data/rakia` — observed capacity governance
+
+`compute-capacity.json` is promoted by the cluster steward from a read-only observation snapshot.
+The EPR binding connects that operational projection to the same governance contract that evaluates
+`deployments.json`, so changing either side recomputes the relationship instead of trusting a stale
+derived total.

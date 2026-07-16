@@ -1,0 +1,29 @@
+---
+epr-meta-version: 1
+id: deployment-records-governance
+purpose: >
+  Governs genesis/orchestrator/data/deployments.json — the per-human deployment records that are
+  THE source of truth for each human's conductor resource budget. Binds archetype-resource-alignment
+  so per-human resource edits are measured against their deviceArchetype's canonical budget, not
+  just an open-ended floor, then binds test-bench-aggregate-capacity so the resulting portfolio is
+  measured against the operator-promoted alpha cluster envelope.
+coupling:
+  governance: epr:alpha-test-bench-compute-envelope
+  value: epr:rea-compute-commitment-primitive
+rules:
+  - id: archetype-resource-alignment
+    policy: archetype-resource-alignment@1
+  - id: test-bench-aggregate-capacity
+    policy: test-bench-aggregate-capacity@1
+---
+
+# `genesis/orchestrator/data` — deployment-record governance
+
+`deployments.json` resource fields are a **class** property (deviceArchetype). This binding surfaces
+intra-archetype drift (one human bumped, its class left behind) as an `ask`; realign the class by
+moving the archetype budget, or declare a justified `resourceOverride` on the exceptional human.
+
+The second binding composes upward: it replaces the ledger's prior human allocation with the
+prospective active deployment portfolio, then checks aggregate requests **and limits** against the
+operator-promoted allocatable envelope. The arithmetic is substrate evidence; the `ask` preserves
+the steward's agency to ratify an intentional exception at reach.

@@ -42,11 +42,16 @@ resources:
   observability:
     role: Grafana/Loki/Prometheus/Tempo stack (grafana.ethosengine.com) — playwright↔backend correlation
     available: true
-    note: restored 2026-06-04 ~21:00Z (operator repaired grafana.db datasource uids — Grafana 13 makes
-          provisioning failures boot-fatal; crashlooped since the ethosengine reboot). Evidence-backed:
-          MCP list_datasources returns loki/prometheus/tempo/alertmanager with canonical uids; /api/health
-          200. Was connection-refused ≥15:30-20:30Z 2026-06-04. Correlation-dependent diagnostics declare
-          requires_env: [observability].
+    note: restored 2026-07-11 — operator root-caused + fixed the observability-mcp gateway (mcp/grafana
+          image tracked :latest, which silently rolled to a build adding a DNS-rebinding -allowed-hosts
+          guard defaulting to loopback-only; the deployment set -address 0.0.0.0:8000 but never
+          -allowed-hosts, so in-cluster/Che FQDN requests 403'd while the operator's localhost tunnel
+          still worked — hence "healthy from here, broken from Che"). Fix: pinned mcp/grafana to a digest
+          and set -allowed-hosts to the service FQDN variants + loopback, applied in
+          ethosengine-devops/kube-manifests/available/observability/mcp-grafana.yaml. Evidence-backed:
+          this session independently re-curled observability-mcp.observability.svc.cluster.local:8000/sse
+          post-fix and got 200 + `event: endpoint` (was 403 "forbidden: host not allowed" minutes
+          earlier, verified degraded 2026-07-11 before the fix landed).
 
 # requires_env vocabulary used by tests/stories/gates (declare on the artifact):
 #   shem               — needs the shem multi-tenant canvas (cross-node)
