@@ -4,7 +4,8 @@ description: "Quality system architect (Opus). Ensures coherence with project vi
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/quality-architect.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/quality-architect.json
   packageKind: AgentPackage
 model: opus
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP, TaskList, TaskGet, TaskUpdate, TaskCreate, SendMessage, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__get_component_measures, mcp__sonarqube__get_project_quality_gate_status, mcp__sonarqube__analyze_code_snippet

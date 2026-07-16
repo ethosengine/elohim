@@ -4,7 +4,8 @@ description: "CI/CD first-pass absorber (Haiku). Always-first responder for Jenk
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/ci-observer.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/ci-observer.json
   packageKind: AgentPackage
 model: haiku
 tools: Bash, Glob, Grep, Read, WebFetch, mcp__jenkins__getBuildLog, mcp__jenkins__searchBuildLog, mcp__jenkins__getBuild, mcp__jenkins__getJob, mcp__jenkins__getJobs, mcp__jenkins__getStatus, mcp__jenkins__whoAmI, mcp__jenkins__getJobScm, mcp__jenkins__getBuildScm, mcp__jenkins__getBuildChangeSets, mcp__jenkins__getTestResults, mcp__jenkins__getFlakyFailures

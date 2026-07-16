@@ -4,7 +4,8 @@ description: "Tauri desktop architect (Sonnet). Designs Tauri 2.x IPC commands, 
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/tauri-architect.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/tauri-architect.json
   packageKind: AgentPackage
 model: sonnet
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch

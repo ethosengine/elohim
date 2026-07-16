@@ -4,7 +4,8 @@ description: "Pattern-library implementer (Sonnet). Owns Library B (the designed
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/graphos-designer.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/graphos-designer.json
   packageKind: AgentPackage
 model: sonnet
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch

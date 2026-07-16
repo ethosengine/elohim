@@ -4,7 +4,8 @@ description: "First-pass code quality agent (Haiku). Handles ~80% of lint fixes 
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/quality-sweep.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/quality-sweep.json
   packageKind: AgentPackage
 model: haiku
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, TaskList, TaskGet, TaskUpdate, SendMessage

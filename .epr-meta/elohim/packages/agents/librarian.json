@@ -55,7 +55,9 @@
       "mcp__mempalace__mempalace_hook_settings"
     ],
     "sourceRuntime": "claude",
-    "mcpServerRefs": [],
+    "mcpServerRefs": [
+      "mempalace"
+    ],
     "mcpServers": [
       {
         "name": "mempalace",

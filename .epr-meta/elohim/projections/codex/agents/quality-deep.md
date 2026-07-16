@@ -4,7 +4,8 @@ description: "Second-pass code quality agent (Sonnet). Receives ~20% escalations
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/quality-deep.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/quality-deep.json
   packageKind: AgentPackage
 model: sonnet
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP, TaskList, TaskGet, TaskUpdate, TaskCreate, SendMessage

@@ -4,7 +4,8 @@ description: "CI-findings triage and fix agent (Opus) — findings-sentinel patt
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/ci-failure-triage.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/ci-failure-triage.json
   packageKind: AgentPackage
 model: opus
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch, mcp__jenkins__getBuildLog, mcp__jenkins__searchBuildLog, mcp__jenkins__getBuild, mcp__jenkins__getJob, mcp__jenkins__getBuildChangeSets, mcp__jenkins__getTestResults, mcp__jenkins__getFlakyFailures

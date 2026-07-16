@@ -4,7 +4,8 @@ description: "Deprecation/security-concern triage and fix agent (Opus). Dispatch
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/deprecation-triage.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/deprecation-triage.json
   packageKind: AgentPackage
 model: opus
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch

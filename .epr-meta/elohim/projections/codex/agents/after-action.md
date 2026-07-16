@@ -4,7 +4,8 @@ description: "Post-incident review specialist (Sonnet). Reads Jenkins build logs
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/after-action.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/after-action.json
   packageKind: AgentPackage
 model: sonnet
 tools: Task, Bash, Glob, Grep, Read, TodoWrite, WebFetch, mcp__jenkins__getBuildLog, mcp__jenkins__searchBuildLog, mcp__jenkins__getBuild, mcp__jenkins__getTestResults, mcp__observability__query_prometheus, mcp__observability__query_loki_logs, mcp__observability__query_loki_stats, mcp__observability__find_error_pattern_logs, mcp__observability__find_slow_requests, mcp__observability__get_assertions, mcp__observability__list_datasources

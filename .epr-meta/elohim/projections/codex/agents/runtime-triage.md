@@ -4,7 +4,8 @@ description: "Runtime self-heal-exhaustion triage and fix agent (Opus). Dispatch
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/runtime-triage.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/runtime-triage.json
   packageKind: AgentPackage
 model: opus
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch

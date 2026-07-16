@@ -4,7 +4,8 @@ description: "Content pipeline operator (Sonnet). Drives content seeding into Ho
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/content-pipeline.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/content-pipeline.json
   packageKind: AgentPackage
 model: sonnet
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch, mcp__elohim-content__read_seed, mcp__elohim-content__write_seed, mcp__elohim-content__list_seeds, mcp__elohim-content__delete_seed, mcp__elohim-content__search_docs, mcp__elohim-content__read_doc, mcp__elohim-content__list_docs, mcp__elohim-content__create_concept, mcp__elohim-content__create_relationship

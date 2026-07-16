@@ -4,7 +4,8 @@ description: "Frontend/UI-layer architect (Opus) — owns elohim-app Angular 19,
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/angular-architect.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/angular-architect.json
   packageKind: AgentPackage
 model: opus
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP

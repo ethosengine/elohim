@@ -4,7 +4,8 @@ description: "Codebase pattern detector (Sonnet). Hunts cross-cutting patterns â
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/pattern-hunter.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/pattern-hunter.json
   packageKind: AgentPackage
 model: sonnet
 tools: Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__get_component_measures
