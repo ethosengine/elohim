@@ -22,8 +22,28 @@ brit / other domain adapters
 - `eprfs-core` — pure model + traits. No git, no FUSE, no storage HTTP client.
 - `eprfs-host` — host filesystem capability profiles for Linux, macOS, Windows, portable directories, and peer-managed projections.
 - `eprfs-local` — materializes projection manifests into ordinary filesystem trees.
-- `eprfs-meta` — parses authored `.epr-meta` files and resolves what EPR meta/head coupling applies to a projected path.
+- `eprfs-meta` — parses, resolves, and natively evaluates authored `.epr-meta` cascades and version-pinned policies.
 - `eprfs-storage` — storage-facing adapter scaffolding and test doubles for `elohim-storage` integration.
+- `elohim-epr-cli` — the `epr` onboarding, local coherence, path explanation, and reach-readiness interface.
+
+## Repository Governance CLI
+
+The native `epr` tool keeps two moments distinct:
+
+- `epr check` advises on local working-tree authoring and always leaves local agency intact.
+- `epr ready` evaluates the committed change set that is asking for reach and exits non-zero when a governance-floor finding blocks that boundary.
+
+First contact from a fresh clone is explicit and local-only:
+
+```bash
+env RUSTFLAGS= CARGO_TARGET_DIR=/tmp/eprfs-onboarding-target \
+  cargo run --manifest-path elohim/eprfs/Cargo.toml -q -p elohim-epr-cli -- setup
+```
+
+`setup` only points this clone's local Git configuration at the checked-in
+`.husky/pre-push` gate. It does not publish, install global state, or change the
+working tree. The remaining commands are `doctor`, `explain <path>`, `check`,
+and `ready [--target <ref>] [--deep]`; every report is also available as JSON.
 
 ## Host Profiles
 

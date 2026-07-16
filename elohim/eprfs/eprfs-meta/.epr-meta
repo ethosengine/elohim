@@ -1,0 +1,18 @@
+---
+epr-meta-version: 1
+id: eprfs-meta-domain-neutrality
+purpose: >
+  Keeps the publishable metadata resolver/evaluator domain-neutral. This crate defines policy
+  ontology, resolution, ValidatorProvider, typed requests, and typed outcomes; concrete Elohim
+  repository policies live outside it and arrive through the provider boundary.
+rules:
+  - id: eprfs-meta-domain-neutrality
+    policy: eprfs-meta-domain-neutrality@1
+---
+
+# `eprfs-meta` — interfaces, not policy instances
+
+The crate may know that a policy references a validator and may ask a host to evaluate that
+reference. It must not know what any concrete validator means. Reach-time governance catches a new
+concrete validator identity; the Rust architecture test proves the invariant even outside an Elohim
+harness.
