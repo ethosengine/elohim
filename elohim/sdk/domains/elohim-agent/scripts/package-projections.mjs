@@ -25,6 +25,14 @@ import {
   projectCommand,
   verifyCommandPackage,
 } from './command-packages.mjs';
+import {
+  MCP_PROFILE_KIND,
+  MCP_SERVER_KIND,
+  projectMcpProfile,
+  projectMcpServer,
+  verifyMcpProfilePackage,
+  verifyMcpServerPackage,
+} from './mcp-packages.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DOMAIN_DIR = resolve(__dirname, '..');
@@ -286,7 +294,9 @@ function toolRefsFrom(frontmatter) {
 
 function mcpServerNames(mcpServers) {
   if (!Array.isArray(mcpServers)) return [];
-  return mcpServers.flatMap((entry) => Object.keys(entry));
+  return mcpServers.flatMap((entry) =>
+    typeof entry?.name === 'string' ? [entry.name] : Object.keys(entry ?? {}),
+  );
 }
 
 // Structured, LOSSLESS capture of a `.claude` agent's `mcpServers:` frontmatter
@@ -499,7 +509,7 @@ function agentPackageFromClaude(path, parsed) {
       capabilityRefs: [],
       toolRefs,
       sourceRuntime: 'claude',
-      mcpServerRefs: mcpServerNames(parsed.frontmatter.mcpServers),
+      mcpServerRefs: mcpServerNames(mcpServersStructured),
       // Structured, lossless MCP wiring (server config, incl. the `args:` list the
       // generic parser drops), captured from the raw frontmatter so an mcp-bearing
       // agent can be flipped without losing its MCP block. Absent when the agent
@@ -876,6 +886,12 @@ function packagePathFor(pkg) {
   if (pkg.kind === HOOK_KIND) return resolve(PACKAGE_DIR, 'hooks', `${pkg.metadata.id}.json`);
   if (pkg.kind === AGENT_DOC_KIND) return resolve(PACKAGE_DIR, 'agentdocs', `${pkg.metadata.id}.json`);
   if (pkg.kind === COMMAND_KIND) return resolve(PACKAGE_DIR, 'commands', `${pkg.metadata.id}.json`);
+  if (pkg.kind === MCP_SERVER_KIND) {
+    return resolve(PACKAGE_DIR, 'mcp-servers', `${pkg.metadata.id}.json`);
+  }
+  if (pkg.kind === MCP_PROFILE_KIND) {
+    return resolve(PACKAGE_DIR, 'mcp-profiles', `${pkg.metadata.id}.json`);
+  }
   return pkg.kind === 'SkillPackage'
     ? resolve(PACKAGE_DIR, 'skills', `${pkg.metadata.id}.json`)
     : resolve(PACKAGE_DIR, 'agents', `${pkg.metadata.id}.json`);
@@ -906,6 +922,15 @@ function projectionFixturePathsFor(pkg) {
       codex: resolve(PROJECTION_DIR, 'codex/commands', `${pkg.metadata.id}.md`),
     };
   }
+  if (pkg.kind === MCP_SERVER_KIND || pkg.kind === MCP_PROFILE_KIND) {
+    const dir = pkg.kind === MCP_SERVER_KIND ? 'mcp-servers' : 'mcp-profiles';
+    return Object.fromEntries(
+      Object.entries(pkg.projections).map(([runtime, projection]) => [
+        runtime,
+        resolve(PROJECTION_DIR, runtime, dir, pkg.metadata.id, basename(projection.path)),
+      ]),
+    );
+  }
   return pkg.kind === 'SkillPackage'
     ? {
         claude: resolve(PROJECTION_DIR, 'claude/skills', pkg.metadata.id, 'SKILL.md'),
@@ -918,6 +943,17 @@ function projectionFixturePathsFor(pkg) {
 }
 
 function runtimePathsFor(pkg) {
+  // Server packages are reusable definitions. Only an explicit profile may
+  // activate them into project runtime configuration.
+  if (pkg.kind === MCP_SERVER_KIND) return {};
+  if (pkg.kind === MCP_PROFILE_KIND) {
+    return Object.fromEntries(
+      Object.entries(pkg.projections).map(([runtime, projection]) => [
+        runtime,
+        resolve(REPO_ROOT, projection.path),
+      ]),
+    );
+  }
   if (pkg.kind === HOOK_KIND) {
     return { claude: resolve(REPO_ROOT, pkg.projections.claude.path) };
   }
@@ -936,7 +972,7 @@ function runtimePathsFor(pkg) {
   };
 }
 
-function projectedTextFor(pkg, runtime) {
+function projectedTextFor(pkg, runtime, packages = []) {
   // Hooks project VERBATIM (byte-for-byte passthrough) and are runtime-agnostic.
   if (pkg.kind === HOOK_KIND) return projectHook(pkg);
   // Agent-docs project VERBATIM for their NATIVE runtime — the ENTIRE raw file
@@ -947,6 +983,8 @@ function projectedTextFor(pkg, runtime) {
   // Commands project VERBATIM (byte-for-byte), the same body to both the claude
   // source home and the codex mirror.
   if (pkg.kind === COMMAND_KIND) return projectCommand(pkg);
+  if (pkg.kind === MCP_SERVER_KIND) return projectMcpServer(pkg, runtime);
+  if (pkg.kind === MCP_PROFILE_KIND) return projectMcpProfile(pkg, packages, runtime);
   return runtime === 'claude' ? projectClaude(pkg) : projectCodex(pkg);
 }
 
@@ -956,20 +994,20 @@ async function writePackages(packages) {
   }
 }
 
-async function writeProjectionFixtures(packages) {
+async function writeProjectionFixtures(packages, packageCatalog = packages) {
   for (const pkg of packages) {
     const paths = projectionFixturePathsFor(pkg);
     for (const runtime of Object.keys(paths)) {
-      await writeText(paths[runtime], projectedTextFor(pkg, runtime));
+      await writeText(paths[runtime], projectedTextFor(pkg, runtime, packageCatalog));
     }
   }
 }
 
-async function writeRuntimeProjections(packages) {
+async function writeRuntimeProjections(packages, packageCatalog = packages) {
   for (const pkg of packages) {
     const paths = runtimePathsFor(pkg);
     for (const runtime of Object.keys(paths)) {
-      await writeText(paths[runtime], projectedTextFor(pkg, runtime));
+      await writeText(paths[runtime], projectedTextFor(pkg, runtime, packageCatalog));
     }
   }
 }
@@ -981,6 +1019,8 @@ async function initLayout() {
   await mkdir(resolve(PACKAGE_DIR, 'hooks'), { recursive: true });
   await mkdir(resolve(PACKAGE_DIR, 'agentdocs'), { recursive: true });
   await mkdir(resolve(PACKAGE_DIR, 'commands'), { recursive: true });
+  await mkdir(resolve(PACKAGE_DIR, 'mcp-servers'), { recursive: true });
+  await mkdir(resolve(PACKAGE_DIR, 'mcp-profiles'), { recursive: true });
   await mkdir(resolve(PROJECTION_DIR, 'claude'), { recursive: true });
   await mkdir(resolve(PROJECTION_DIR, 'codex'), { recursive: true });
   try {
@@ -1000,17 +1040,23 @@ async function loadPackageFixtures() {
   const hooksDir = resolve(PACKAGE_DIR, 'hooks');
   const agentDocsDir = resolve(PACKAGE_DIR, 'agentdocs');
   const commandsDir = resolve(PACKAGE_DIR, 'commands');
+  const mcpServersDir = resolve(PACKAGE_DIR, 'mcp-servers');
+  const mcpProfilesDir = resolve(PACKAGE_DIR, 'mcp-profiles');
   const skillFiles = await listJsonFiles(skillsDir);
   const agentFiles = await listJsonFiles(agentsDir);
   const hookFiles = await listJsonFiles(hooksDir);
   const agentDocFiles = await listJsonFiles(agentDocsDir);
   const commandFiles = await listJsonFiles(commandsDir);
+  const mcpServerFiles = await listJsonFiles(mcpServersDir);
+  const mcpProfileFiles = await listJsonFiles(mcpProfilesDir);
   return [
     ...(await Promise.all(skillFiles.map((file) => readJson(resolve(skillsDir, file))))),
     ...(await Promise.all(agentFiles.map((file) => readJson(resolve(agentsDir, file))))),
     ...(await Promise.all(hookFiles.map((file) => readJson(resolve(hooksDir, file))))),
     ...(await Promise.all(agentDocFiles.map((file) => readJson(resolve(agentDocsDir, file))))),
     ...(await Promise.all(commandFiles.map((file) => readJson(resolve(commandsDir, file))))),
+    ...(await Promise.all(mcpServerFiles.map((file) => readJson(resolve(mcpServersDir, file))))),
+    ...(await Promise.all(mcpProfileFiles.map((file) => readJson(resolve(mcpProfilesDir, file))))),
   ];
 }
 
@@ -1025,16 +1071,24 @@ async function loadValidators() {
   const commandSchema = await readJson(
     resolve(DOMAIN_DIR, 'schemas/command-package.schema.json'),
   );
+  const mcpServerSchema = await readJson(
+    resolve(DOMAIN_DIR, 'schemas/mcp-server-package.schema.json'),
+  );
+  const mcpProfileSchema = await readJson(
+    resolve(DOMAIN_DIR, 'schemas/mcp-profile-package.schema.json'),
+  );
   return {
     skill: ajv.compile(skillSchema),
     agent: ajv.compile(agentSchema),
     hook: ajv.compile(hookSchema),
     agentdoc: ajv.compile(agentDocSchema),
     command: ajv.compile(commandSchema),
+    mcpServer: ajv.compile(mcpServerSchema),
+    mcpProfile: ajv.compile(mcpProfileSchema),
   };
 }
 
-async function verifyPackage(pkg, validators, settings) {
+async function verifyPackage(pkg, validators, settings, packageCatalog) {
   const validate =
     pkg.kind === 'SkillPackage'
       ? validators.skill
@@ -1044,13 +1098,34 @@ async function verifyPackage(pkg, validators, settings) {
           ? validators.agentdoc
           : pkg.kind === COMMAND_KIND
             ? validators.command
-            : validators.agent;
+            : pkg.kind === MCP_SERVER_KIND
+              ? validators.mcpServer
+              : pkg.kind === MCP_PROFILE_KIND
+                ? validators.mcpProfile
+                : validators.agent;
   assert(
     validate(pkg),
     `${pkg.kind} package ${pkg.metadata.id} validates: ${JSON.stringify(validate.errors)}`,
   );
 
   assert(pkg.metadata.id === pkg.metadata.name, `${pkg.metadata.id} name/id round-trip`);
+
+  if (pkg.kind === MCP_SERVER_KIND) {
+    verifyMcpServerPackage(pkg, { assert });
+    for (const runtime of Object.keys(pkg.projections)) {
+      await verifyProjectionFixture(pkg, runtime, packageCatalog);
+    }
+    return;
+  }
+
+  if (pkg.kind === MCP_PROFILE_KIND) {
+    verifyMcpProfilePackage(pkg, packageCatalog, { assert });
+    for (const runtime of Object.keys(pkg.projections)) {
+      await verifyProjectionFixture(pkg, runtime, packageCatalog);
+      await verifyRuntimeProjectionIfPresent(pkg, runtime, packageCatalog);
+    }
+    return;
+  }
 
   if (pkg.kind === HOOK_KIND) {
     // Hooks are code + registration, not markdown + frontmatter: skip every
@@ -1227,25 +1302,25 @@ async function verifyGovernanceBackref(pkg) {
   }
 }
 
-async function verifyProjectionFixture(pkg, runtime) {
+async function verifyProjectionFixture(pkg, runtime, packageCatalog = []) {
   const paths = projectionFixturePathsFor(pkg);
   await verifyProjection(
     paths[runtime],
-    projectedTextFor(pkg, runtime),
+    projectedTextFor(pkg, runtime, packageCatalog),
     `projection fixture is fresh: ${relative(REPO_ROOT, paths[runtime])}`,
     `stale projection fixture: ${relative(REPO_ROOT, paths[runtime])} (run pnpm run elohim-agent:packages:write)`,
     `missing expected projection fixture: ${relative(REPO_ROOT, paths[runtime])} (run pnpm run elohim-agent:packages:write)`,
   );
 }
 
-async function verifyRuntimeProjectionIfPresent(pkg, runtime) {
+async function verifyRuntimeProjectionIfPresent(pkg, runtime, packageCatalog = []) {
   const paths = runtimePathsFor(pkg);
   const actual = await readIfExists(paths[runtime]);
   if (actual === null) {
     pass(`runtime projection absent; skipped: ${relative(REPO_ROOT, paths[runtime])}`);
     return;
   }
-  const expected = projectedTextFor(pkg, runtime);
+  const expected = projectedTextFor(pkg, runtime, packageCatalog);
   assert(actual === expected, `runtime projection is fresh: ${relative(REPO_ROOT, paths[runtime])}`);
   if (actual !== expected) {
     fail(
@@ -1328,17 +1403,18 @@ async function runImport({ writeProjections }) {
 }
 
 async function runProject({ writeFixtures, writeRuntime, only = [] }) {
-  const packages = selectOnly(await loadPackageFixtures(), only);
+  const packageCatalog = await loadPackageFixtures();
+  const packages = selectOnly(packageCatalog, only);
   assert(
     packages.length > 0,
     only.length ? `--only matched at least one package: ${only.join(', ')}` : 'found elohim packages to project',
   );
   if (writeFixtures) {
-    await writeProjectionFixtures(packages);
+    await writeProjectionFixtures(packages, packageCatalog);
     pass('wrote package-derived projection fixtures');
   }
   if (writeRuntime) {
-    await writeRuntimeProjections(packages);
+    await writeRuntimeProjections(packages, packageCatalog);
     pass('wrote package-derived runtime projections');
   }
   if (!writeFixtures && !writeRuntime) {
@@ -1367,8 +1443,28 @@ async function runVerify() {
 
   const validators = await loadValidators();
   const settings = await readSettings();
+  const mcpServerIds = new Set(
+    packageFixtures.filter((pkg) => pkg.kind === MCP_SERVER_KIND).map((pkg) => pkg.metadata.id),
+  );
+  for (const pkg of packageFixtures.filter((candidate) => candidate.kind === 'AgentPackage')) {
+    for (const ref of pkg.metadata.mcpServerRefs ?? []) {
+      assert(mcpServerIds.has(ref), `${pkg.metadata.id} resolves MCP server ref ${ref}`);
+    }
+  }
+
+  const profilePaths = new Set();
+  for (const profile of packageFixtures.filter((pkg) => pkg.kind === MCP_PROFILE_KIND)) {
+    for (const projection of Object.values(profile.projections)) {
+      assert(
+        !profilePaths.has(projection.path),
+        `${profile.metadata.id} owns unique MCP runtime path ${projection.path}`,
+      );
+      profilePaths.add(projection.path);
+    }
+  }
+
   for (const pkg of packageFixtures) {
-    await verifyPackage(pkg, validators, settings);
+    await verifyPackage(pkg, validators, settings, packageFixtures);
   }
 
   // Per-class accounting so a shifting check total self-explains (a plant moves a
@@ -1728,6 +1824,44 @@ async function runSelfTest() {
       !projectCodex(mcpAgent).includes('mcpServers:'),
       'selftest(g): flipped mcp agent .codex omits mcpServers (claude-only wiring, parity with un-flipped codex path)',
     );
+
+    // (g2) First-class server packages lower one canonical connection into the
+    // two project config dialects. Legacy SSE remains Claude-only and fails
+    // closed if accidentally targeted at Codex.
+    const jenkinsServer = {
+      kind: MCP_SERVER_KIND,
+      metadata: {
+        id: 'jenkins',
+        runtimeTargets: ['claude', 'codex'],
+      },
+      connection: {
+        transport: 'streamable-http',
+        url: 'https://jenkins.example/mcp',
+        auth: { mode: 'none' },
+      },
+      policy: { required: false },
+    };
+    assert(
+      projectMcpServer(jenkinsServer, 'claude').includes('"type": "http"') &&
+        projectMcpServer(jenkinsServer, 'codex').includes('[mcp_servers.jenkins]'),
+      'selftest(g2): one MCP server package lowers to Claude JSON and Codex TOML',
+    );
+    const sseServer = {
+      ...jenkinsServer,
+      metadata: { id: 'legacy-sse', runtimeTargets: ['claude', 'codex'] },
+      connection: {
+        transport: 'sse',
+        url: 'http://observability.example/sse',
+        auth: { mode: 'none' },
+      },
+    };
+    let sseRejected = false;
+    try {
+      projectMcpServer(sseServer, 'codex');
+    } catch (error) {
+      sseRejected = error.message.includes('does not support legacy SSE');
+    }
+    assert(sseRejected, 'selftest(g2): Codex projection rejects legacy SSE fail-closed');
 
     // (h) import-hook / adopt-doc argument parsing: positionalArgs skips the
     //     value consumed by a value-bearing flag (--id/--only), and flagValue

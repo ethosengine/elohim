@@ -19,6 +19,7 @@
         "modelHints",
         "capabilityRefs",
         "toolRefs",
+        "mcpServerRefs",
         "sourceRuntime"
       ],
       "properties": {
@@ -38,6 +39,24 @@
         "toolRefs": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
+        },
+        "mcpServerRefs": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+          "uniqueItems": true
+        },
+        "mcpServers": {
+          "description": "Legacy source-fidelity capture of inline Claude MCP definitions. New package-first agents resolve mcpServerRefs instead.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "config"],
+            "properties": {
+              "name": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+              "config": { "type": "object", "additionalProperties": true }
+            },
+            "additionalProperties": false
+          }
         },
         "sourceRuntime": { "enum": ["claude", "codex", "elohim-agent"] }
       },

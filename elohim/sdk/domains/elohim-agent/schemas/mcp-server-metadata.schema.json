@@ -1,0 +1,15 @@
+{
+  "$id": "elohim-agent:schema:metadata:mcp-server",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "McpServerMetadata",
+  "description": "Metadata for a reusable MCP server capability.",
+  "type": "object",
+  "required": ["id", "version", "description", "transport"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "transport": { "enum": ["stdio", "streamable-http", "sse"] }
+  },
+  "additionalProperties": true
+}

@@ -13,6 +13,8 @@
       "codex"
     ],
     "assetRefs": [],
+    "composedBy": "gpt-5.6",
+    "master": "package",
     "governance": {
       "eprRef": "epr:elohim-agent/commands/import-content",
       "policy": "capability-governance@1",

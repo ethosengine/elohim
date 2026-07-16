@@ -81,10 +81,10 @@ is a CI follow-up; until then, build it locally from `elohim/eprfs`.)
   Claude/Codex source files do not. Planting (next bullet) flips this.
 - **The package-master flip is available, per package (2026-07-10).** The
   `plant-eprfs-*` skill family (`plant-eprfs-skill`, `-agent`, `-hook`,
-  `-agentdoc`) plants a runtime-authored artifact: the package keeps
+  `-agentdoc`, `-command`) plants a runtime-authored artifact: the package keeps
   `metadata.sourceRuntime` (origin preserved) and gains
   `metadata.master: "package"` (authority rooted in the package). Once
-  planted, the package `instructions.body` is the source of truth and the
+  planted, the package body (`instructions.body` or verbatim `source.body`) is the source of truth and the
   `.claude`/`.codex` files are generated-and-clobbered projections —
   editing them directly is drift. The fidelity gate above is what makes
   planting lossless: because `project(import(source)) === source`

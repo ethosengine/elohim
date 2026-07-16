@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "observability": {
+      "type": "sse",
+      "url": "http://observability-mcp.observability.svc.cluster.local:8000/sse"
+    }
+  }
+}

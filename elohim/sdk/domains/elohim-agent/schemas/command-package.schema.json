@@ -2,7 +2,7 @@
   "$id": "elohim-agent:schema:package:command",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CommandPackage",
-  "description": "Canonical Elohim-native package for a slash-command prompt (.claude/commands/<name>.md). The command body is VERBATIM markdown (optional frontmatter + body); its runtime projections are byte-identical mirrors — a claude home (.claude/commands/<name>.md, the authored source) and a codex home (.codex/commands/<name>.md). Commands are imported source-fidelity (Claude source stays authored; the package is a certified mirror), not planted: the fidelity gate proves project(import(source)) === source byte-for-byte.",
+  "description": "Canonical Elohim-native package for a slash-command prompt (.claude/commands/<name>.md). The command body is VERBATIM markdown (optional frontmatter + body); its runtime projections are byte-identical mirrors — a Claude home (.claude/commands/<name>.md) and a Codex home (.codex/commands/<name>.md). An unplanted command remains source-fidelity; a command with metadata.master=package is package-first. In both cases the fidelity floor is byte identity: project(import(source)) === source before planting, and project(package) === every runtime projection afterward.",
   "type": "object",
   "required": ["apiVersion", "kind", "metadata", "source", "projections"],
   "properties": {

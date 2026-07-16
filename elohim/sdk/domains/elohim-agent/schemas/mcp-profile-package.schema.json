@@ -1,0 +1,79 @@
+{
+  "$id": "elohim-agent:schema:package:mcp-profile",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "McpProfilePackage",
+  "description": "Explicit activation profile that composes reusable MCP server packages into project-scoped runtime registrations.",
+  "type": "object",
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "scope",
+    "serverRefs",
+    "projections"
+  ],
+  "properties": {
+    "apiVersion": { "const": "elohim-agent/v1alpha1" },
+    "kind": { "const": "McpProfilePackage" },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "version",
+        "description",
+        "sourceRuntime",
+        "master",
+        "runtimeTargets",
+        "governance"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "sourceRuntime": { "const": "elohim-agent" },
+        "master": { "const": "package" },
+        "runtimeTargets": {
+          "type": "array",
+          "items": { "enum": ["claude", "codex"] },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "governance": {
+          "type": "object",
+          "required": ["eprRef"],
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "scope": { "const": "project" },
+    "serverRefs": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "projections": {
+      "type": "object",
+      "required": ["claude", "codex"],
+      "properties": {
+        "claude": {
+          "type": "object",
+          "required": ["path"],
+          "properties": { "path": { "const": ".mcp.json" } },
+          "additionalProperties": false
+        },
+        "codex": {
+          "type": "object",
+          "required": ["path"],
+          "properties": { "path": { "const": ".codex/config.toml" } },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

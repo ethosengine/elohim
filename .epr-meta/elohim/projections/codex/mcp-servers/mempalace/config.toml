@@ -1,0 +1,3 @@
+[mcp_servers.mempalace]
+command = "mempalace-mcp"
+args = ["--palace", "/projects/elohim/.mempalace/palace"]

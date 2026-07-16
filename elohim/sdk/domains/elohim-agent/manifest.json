@@ -14,7 +14,11 @@
       "counter": { "$ref": "./manifest/content-types/counter.json" },
       "policy": { "$ref": "./manifest/content-types/policy.json" },
       "validator": { "$ref": "./manifest/content-types/validator.json" },
-      "projection-binding": { "$ref": "./manifest/content-types/projection-binding.json" }
+      "mcp-server": { "$ref": "./manifest/content-types/mcp-server.json" },
+      "mcp-profile": { "$ref": "./manifest/content-types/mcp-profile.json" },
+      "projection-binding": {
+        "$ref": "./manifest/content-types/projection-binding.json"
+      }
     },
     "contentFormats": {
       "agent-manifest-json": {
@@ -28,7 +32,12 @@
       "USES": {
         "description": "An agent or agent spec uses a declared capability.",
         "sourceTypes": ["agent", "agent-spec"],
-        "targetTypes": ["skill"]
+        "targetTypes": ["skill", "mcp-server"]
+      },
+      "ACTIVATES": {
+        "description": "An MCP activation profile selects a reusable server definition for runtime registration.",
+        "sourceTypes": ["mcp-profile"],
+        "targetTypes": ["mcp-server"]
       },
       "INSTRUCTS": {
         "description": "A standing instruction surface instructs an executable agent role.",
@@ -38,12 +47,33 @@
       "GOVERNS": {
         "description": "A policy governs an agentic artifact.",
         "sourceTypes": ["policy"],
-        "targetTypes": ["skill", "agent", "agent-spec", "hook", "event", "signal", "counter", "validator", "projection-binding"]
+        "targetTypes": [
+          "skill",
+          "agent",
+          "agent-spec",
+          "hook",
+          "event",
+          "signal",
+          "counter",
+          "validator",
+          "mcp-server",
+          "mcp-profile",
+          "projection-binding"
+        ]
       },
       "VALIDATES": {
         "description": "A validator checks a hook, policy, projection binding, or artifact payload.",
         "sourceTypes": ["validator"],
-        "targetTypes": ["skill", "agent", "agent-spec", "hook", "policy", "projection-binding"]
+        "targetTypes": [
+          "skill",
+          "agent",
+          "agent-spec",
+          "hook",
+          "policy",
+          "mcp-server",
+          "mcp-profile",
+          "projection-binding"
+        ]
       },
       "BINDS": {
         "description": "A hook binds lifecycle phases and matchers to validation or policy surfaces.",
@@ -63,7 +93,16 @@
       "PROJECTS": {
         "description": "A projection binding maps canonical artifacts to runtime surfaces.",
         "sourceTypes": ["projection-binding"],
-        "targetTypes": ["skill", "agent", "agent-spec", "hook", "policy", "validator"]
+        "targetTypes": [
+          "skill",
+          "agent",
+          "agent-spec",
+          "hook",
+          "policy",
+          "validator",
+          "mcp-server",
+          "mcp-profile"
+        ]
       }
     },
     "signals": {

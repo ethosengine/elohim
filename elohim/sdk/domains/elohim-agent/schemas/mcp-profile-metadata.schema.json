@@ -1,0 +1,21 @@
+{
+  "$id": "elohim-agent:schema:metadata:mcp-profile",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "McpProfileMetadata",
+  "description": "Metadata for a runtime MCP activation profile.",
+  "type": "object",
+  "required": ["id", "version", "description", "scope", "serverRefs"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "scope": { "const": "project" },
+    "serverRefs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": true
+}

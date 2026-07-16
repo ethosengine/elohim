@@ -172,12 +172,27 @@ export function codexAgentDocPreamble(pkg) {
 This is Codex's root gospel. The gospel body below the horizontal rule is the
 SAME text as \`${nativePath}\`, projected verbatim from the \`${pkg.metadata.id}\`
 package — the two cannot drift. THIS preamble is the codex-localized governance
-contract: what Claude Code receives from edit-time hooks but Codex, having no
-PreToolUse hook system, cannot. Read it first. It binds you *morally* where it
-cannot bind you *mechanically*, and it names the gates that bind you
-mechanically regardless of harness.
+contract: what Claude Code already receives from edit-time hooks but this repo
+has not yet projected into Codex's current project-hook ABI. Read it first.
+Until \`epr doctor\` reports the Codex hook projection present and the runtime
+trusts it, this binds you *morally* where it cannot bind you *mechanically*, and
+it names the gates that bind you mechanically regardless of harness.
 
-## 1. Editing agentic surfaces is package-first
+## 1. First contact: inspect before changing
+
+From a fresh clone, activate the checked-in reach gate and inspect the native
+governance floor before substantive work:
+
+\`env RUSTFLAGS= CARGO_TARGET_DIR=/tmp/eprfs-onboarding-target cargo run --manifest-path elohim/eprfs/Cargo.toml -q -p elohim-epr-cli -- setup\`
+
+After that first build, use \`epr doctor\` (or the same \`cargo run … -- doctor\`)
+to inspect harness projections and hook activation, \`epr explain <path>\` before
+an unfamiliar edit, and \`epr check\` for local advice. Local checks never take
+authority over the working tree. \`epr ready [--target <ref>]\` is the explicit
+reach rehearsal: it evaluates committed changes against their merge base and
+fails only findings that would prevent the requested push/merge boundary.
+
+## 2. Editing agentic surfaces is package-first
 
 The skills, subagents, hooks, and agent-docs (\`.claude/*\`, \`.codex/*\`,
 \`CLAUDE.md\`, \`AGENTS.md\`) are PROJECTIONS of Elohim-native packages under
@@ -196,10 +211,12 @@ The skills, subagents, hooks, and agent-docs (\`.claude/*\`, \`.codex/*\`,
 If unsure which a surface is, read its package's \`metadata.master\`. When in
 doubt, do not edit the projection — edit the package or the source.
 
-## 2. The \`.epr-meta\` compose-gate binds you morally
+## 3. The \`.epr-meta\` compose-gate binds you morally
 
-Claude enforces directory-local governance at edit time via a PreToolUse hook;
-Codex has no such hook, so the SAME rules bind you by contract instead of by
+Claude enforces directory-local governance at edit time via a PreToolUse hook.
+Current Codex supports project-local lifecycle hooks, but this repo has not yet
+projected the shared definitions to \`.codex/hooks.json\`; until that projection
+is present and trusted, the SAME rules bind you by contract instead of by
 mechanism. Before writing a file, honor the nearest \`.epr-meta\` ancestor
 (the cascade: closest manifest wins, root \`/.epr-meta/manifest.md\` is the base):
 a \`specs/\` doc requires lifecycle frontmatter; \`elohim/\` carries an
@@ -208,7 +225,7 @@ parallel one); code directories may carry YAGNI/over-engineering guards. A
 manifest that would DENY a Claude edit should stop you too — you just won't get
 a prompt. Treat a missing prompt as your own responsibility, not permission.
 
-## 3. Gates that bind Codex mechanically (harness-independent)
+## 4. Gates that bind Codex mechanically (harness-independent)
 
 These run outside any harness and WILL fail your push or CI:
 
@@ -221,7 +238,7 @@ These run outside any harness and WILL fail your push or CI:
   \`sha256:\` fingerprint — run \`python3 .claude/scripts/memory-kit/cite-gen.py\`.
   A hand-edited fingerprint fails the cite gate.
 
-## 4. Rails (non-negotiable)
+## 5. Rails (non-negotiable)
 
 - **Never \`git add -A\` / \`git commit -a\`** — the worktree is shared across
   concurrent sessions. Stage path-scoped: \`git add <explicit paths>\`.
