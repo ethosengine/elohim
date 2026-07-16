@@ -1,0 +1,33 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "McpServerPackage",
+  "metadata": {
+    "id": "jenkins",
+    "name": "jenkins",
+    "version": "1.0.0",
+    "description": "Anonymous read-only Jenkins MCP access for Elohim CI evidence.",
+    "sourceRuntime": "elohim-agent",
+    "master": "package",
+    "runtimeTargets": ["claude", "codex"],
+    "governance": {
+      "eprRef": "epr:elohim-agent/mcp-servers/jenkins",
+      "policy": "capability-governance@1",
+      "gates": ["epr-meta-resolver", "elohim-agent:packages:verify"],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "connection": {
+    "transport": "streamable-http",
+    "url": "https://jenkins.ethosengine.com/mcp-server/mcp",
+    "auth": { "mode": "none" }
+  },
+  "policy": {
+    "required": false,
+    "startupTimeoutSec": 15,
+    "toolTimeoutSec": 60
+  },
+  "projections": {
+    "claude": { "path": ".mcp.json" },
+    "codex": { "path": ".codex/config.toml" }
+  }
+}

@@ -4,7 +4,14 @@
   "title": "ProjectionBindingMetadata",
   "description": "Metadata for a runtime projection binding.",
   "type": "object",
-  "required": ["id", "version", "description", "runtime", "targetPattern", "sourceType"],
+  "required": [
+    "id",
+    "version",
+    "description",
+    "runtime",
+    "targetPattern",
+    "sourceType"
+  ],
   "properties": {
     "id": { "type": "string", "minLength": 1 },
     "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
@@ -13,7 +20,16 @@
     "targetPattern": { "type": "string", "minLength": 1 },
     "sourceType": {
       "type": "string",
-      "enum": ["skill", "agent", "agent-spec", "hook", "policy", "validator"]
+      "enum": [
+        "skill",
+        "agent",
+        "agent-spec",
+        "hook",
+        "policy",
+        "validator",
+        "mcp-server",
+        "mcp-profile"
+      ]
     }
   },
   "additionalProperties": true

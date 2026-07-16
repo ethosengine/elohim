@@ -3,8 +3,9 @@ epr-meta-version: 1
 id: capability-package-governance
 purpose: >
   Governs the elohim-native capability package tree — the JSON packages under
-  `agents/` and `skills/` that are the canonical source for generated Claude/Codex runtime
-  surfaces (`.claude/{agents,skills}/*`, `.codex/{agents,skills}/*`; see
+  `agents/`, `skills/`, `mcp-servers/`, and `mcp-profiles/` that are the canonical source for
+  generated Claude/Codex runtime surfaces (`.claude/{agents,skills}/*`,
+  `.codex/{agents,skills}/*`, `.mcp.json`, `.codex/config.toml`; see
   `.claude/skills/elohim-package-authoring/SKILL.md`). Binds the `capability-governance` policy
   (observation tier — never blocks) so editing a package surfaces the re-import discipline: run
   `package-projections.mjs verify` (and regenerate when intended) before the runtime projections

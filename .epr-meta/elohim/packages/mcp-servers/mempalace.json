@@ -1,0 +1,28 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "McpServerPackage",
+  "metadata": {
+    "id": "mempalace",
+    "name": "mempalace",
+    "version": "1.0.0",
+    "description": "Local MemPalace semantic and temporal memory MCP server.",
+    "sourceRuntime": "elohim-agent",
+    "master": "package",
+    "runtimeTargets": ["claude", "codex"],
+    "governance": {
+      "eprRef": "epr:elohim-agent/mcp-servers/mempalace",
+      "policy": "capability-governance@1",
+      "gates": ["epr-meta-resolver", "elohim-agent:packages:verify"],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "connection": {
+    "transport": "stdio",
+    "command": "mempalace-mcp",
+    "args": ["--palace", "/projects/elohim/.mempalace/palace"]
+  },
+  "projections": {
+    "claude": { "path": ".mcp.json" },
+    "codex": { "path": ".codex/config.toml" }
+  }
+}

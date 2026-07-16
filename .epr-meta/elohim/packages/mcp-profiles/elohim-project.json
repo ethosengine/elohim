@@ -1,0 +1,25 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "McpProfilePackage",
+  "metadata": {
+    "id": "elohim-project",
+    "name": "elohim-project",
+    "version": "1.0.0",
+    "description": "Shared project MCP registrations for Claude Code and Codex.",
+    "sourceRuntime": "elohim-agent",
+    "master": "package",
+    "runtimeTargets": ["claude", "codex"],
+    "governance": {
+      "eprRef": "epr:elohim-agent/mcp-profiles/elohim-project",
+      "policy": "capability-governance@1",
+      "gates": ["epr-meta-resolver", "elohim-agent:packages:verify"],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "scope": "project",
+  "serverRefs": ["jenkins"],
+  "projections": {
+    "claude": { "path": ".mcp.json" },
+    "codex": { "path": ".codex/config.toml" }
+  }
+}

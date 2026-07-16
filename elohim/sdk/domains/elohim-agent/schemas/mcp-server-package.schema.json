@@ -1,0 +1,134 @@
+{
+  "$id": "elohim-agent:schema:package:mcp-server",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "McpServerPackage",
+  "description": "Canonical non-secret definition of one reusable MCP server, lowered into runtime-specific registration dialects.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "connection", "projections"],
+  "properties": {
+    "apiVersion": { "const": "elohim-agent/v1alpha1" },
+    "kind": { "const": "McpServerPackage" },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "version",
+        "description",
+        "sourceRuntime",
+        "master",
+        "runtimeTargets",
+        "governance"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "sourceRuntime": { "const": "elohim-agent" },
+        "master": { "const": "package" },
+        "runtimeTargets": {
+          "type": "array",
+          "items": { "enum": ["claude", "codex"] },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "governance": {
+          "type": "object",
+          "required": ["eprRef"],
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "connection": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["transport", "command"],
+          "properties": {
+            "transport": { "const": "stdio" },
+            "command": { "type": "string", "minLength": 1 },
+            "args": { "type": "array", "items": { "type": "string" } },
+            "envVars": {
+              "description": "Ambient environment variable names forwarded at runtime; values are never stored in the package.",
+              "type": "array",
+              "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+              "uniqueItems": true
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["transport", "url", "auth"],
+          "properties": {
+            "transport": { "enum": ["streamable-http", "sse"] },
+            "url": { "type": "string", "pattern": "^https?://" },
+            "auth": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": ["mode"],
+                  "properties": { "mode": { "const": "none" } },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": ["mode", "envVar"],
+                  "properties": {
+                    "mode": { "const": "bearer-env" },
+                    "envVar": {
+                      "type": "string",
+                      "pattern": "^[A-Z][A-Z0-9_]*$"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "policy": {
+      "type": "object",
+      "properties": {
+        "required": { "type": "boolean" },
+        "startupTimeoutSec": { "type": "number", "exclusiveMinimum": 0 },
+        "toolTimeoutSec": { "type": "number", "exclusiveMinimum": 0 },
+        "enabledTools": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "disabledTools": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "projections": { "$ref": "#/$defs/projections" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "projection": {
+      "type": "object",
+      "required": ["path"],
+      "properties": { "path": { "type": "string", "minLength": 1 } },
+      "additionalProperties": false
+    },
+    "projections": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "claude": { "$ref": "#/$defs/projection" },
+        "codex": { "$ref": "#/$defs/projection" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "McpServerPackage",
+  "metadata": {
+    "id": "observability",
+    "name": "observability",
+    "version": "1.0.0",
+    "description": "Cluster observability MCP access through the current legacy SSE endpoint.",
+    "sourceRuntime": "elohim-agent",
+    "master": "package",
+    "runtimeTargets": ["claude"],
+    "governance": {
+      "eprRef": "epr:elohim-agent/mcp-servers/observability",
+      "policy": "capability-governance@1",
+      "gates": ["epr-meta-resolver", "elohim-agent:packages:verify"],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "connection": {
+    "transport": "sse",
+    "url": "http://observability-mcp.observability.svc.cluster.local:8000/sse",
+    "auth": { "mode": "none" }
+  },
+  "projections": {
+    "claude": { "path": ".mcp.json" }
+  }
+}

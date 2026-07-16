@@ -1,0 +1,34 @@
+{
+  "description": "An explicit activation profile that composes MCP server capabilities into runtime-scoped registration surfaces.",
+  "metadataSchema": { "$ref": "./schemas/mcp-profile-metadata.schema.json" },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "ACTIVATES": ["mcp-server"],
+        "GOVERNS": ["policy"],
+        "PROJECTS": ["projection-binding"]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "runtime-projection",
+        "recognition": "capability-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "community",
+      "minimumReach": "private",
+      "governanceModel": "steward-consent",
+      "signalTypes": ["projection-drift-detected", "validation-executed"]
+    },
+    "claims": [
+      {
+        "asserts": "capability-usable",
+        "contradictedBy": "projection-drift",
+        "validityHorizon": "P90D",
+        "leg": "governance"
+      }
+    ]
+  }
+}

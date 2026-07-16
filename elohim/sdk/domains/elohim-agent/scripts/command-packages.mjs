@@ -18,14 +18,15 @@
 // practice than special-casing the SkillPackage importer/projector/pathing on a
 // `metadata.form` marker.
 //
-// AUTHORITY MODEL — source-fidelity (un-planted), like an un-planted skill. The
-// Claude source stays the authored master; the package is a certified mirror
-// carrying the governance backref. The projector is VERBATIM PASSTHROUGH, so the
-// standing fidelity gate proves `project(import(source)) === source` byte-for-byte
-// for the claude runtime, and the codex projection is a byte-identical mirror of
-// the same body. (Commands are NOT planted here — deliberately: keep the authored
-// slash-command surface Claude-editable; adopt the package as the certified
-// mirror + governance home.)
+// AUTHORITY MODEL — dual, like the rest of the plant-eprfs family. An un-planted
+// command is source-fidelity: the Claude file stays authored and the package is a
+// certified mirror carrying the governance backref. A command with
+// `metadata.master === "package"` is package-first: the package's `source.body`
+// becomes authoritative and both runtime files are generated projections. The
+// projector is VERBATIM PASSTHROUGH in either mode, so planting changes authority,
+// never bytes. Before the flip the standing gate proves
+// `project(import(source)) === source`; afterward it proves
+// `project(package) === projection` for both runtimes.
 
 import { basename, relative } from 'node:path';
 import { frontmatterScalar } from './agent-doc-packages.mjs';

@@ -81,7 +81,7 @@ struct ComposeKind {
     default_kind: &'static str,
     layout: ProjectionLayout,
     /// True for kinds whose projection is a byte-identical passthrough of the
-    /// package's `source.body` (hooks, agentdocs — no frontmatter transform). For
+    /// package's `source.body` (hooks, agentdocs, commands — no frontmatter transform). For
     /// these the projection node is addressed with the raw codec and carries a
     /// `sourceDocCid` witness (see [`compose_graph_from_package_tree`]).
     verbatim_passthrough: bool,
@@ -117,10 +117,28 @@ const COMPOSE_KINDS: &[ComposeKind] = &[
         layout: ProjectionLayout::NestedById,
         verbatim_passthrough: true,
     },
+    ComposeKind {
+        dir: "commands",
+        default_kind: "CommandPackage",
+        layout: ProjectionLayout::Flat,
+        verbatim_passthrough: true,
+    },
+    ComposeKind {
+        dir: "mcp-servers",
+        default_kind: "McpServerPackage",
+        layout: ProjectionLayout::NestedById,
+        verbatim_passthrough: false,
+    },
+    ComposeKind {
+        dir: "mcp-profiles",
+        default_kind: "McpProfilePackage",
+        layout: ProjectionLayout::NestedById,
+        verbatim_passthrough: false,
+    },
 ];
 
 /// Build a content-addressed [`CompositionGraph`] over every elohim capability
-/// package under `package_root/{skills,agents,hooks,agentdocs}/*.json` — the
+/// package under `package_root/{skills,agents,hooks,agentdocs,commands,...}/*.json` — the
 /// verifiable "how was every artifact composed" derivation graph. Every CID in
 /// the output is [`BlobCid::compute`] over real bytes; this producer never
 /// re-implements a hash.
@@ -139,7 +157,7 @@ const COMPOSE_KINDS: &[ComposeKind] = &[
 /// omitted — coverage is a fact the graph reports, not a precondition. When
 /// `projections_root` is `None`, only package nodes are emitted.
 ///
-/// For **verbatim-passthrough** kinds (hooks, agentdocs — whose projection is a
+/// For **verbatim-passthrough** kinds (hooks, agentdocs, commands — whose projection is a
 /// byte-identical copy of the package's `source.body`), the projection node is
 /// addressed with the raw codec and carries a `sourceDocCid =
 /// BlobCid::compute_raw(source.body)` witness in its metadata. Because the node's
@@ -614,15 +632,50 @@ mod tests {
         );
         write_proj("claude/agentdocs/gamma/CLAUDE.md", b"# gamma gospel\n");
 
+        // A command: claude + codex projections, both flat and byte-identical.
+        write(
+            "commands/delta.json",
+            br##"{"kind":"CommandPackage","metadata":{"id":"delta","master":"package"},"source":{"body":"# delta\n"},"projections":{"claude":{"path":".claude/commands/delta.md"},"codex":{"path":".codex/commands/delta.md"}}}"##,
+        );
+        write_proj("claude/commands/delta.md", b"# delta\n");
+        write_proj("codex/commands/delta.md", b"# delta\n");
+
+        // An MCP server definition and activation profile both use nested
+        // fixtures because their runtime paths are aggregate root config files.
+        write(
+            "mcp-servers/jenkins.json",
+            br#"{"kind":"McpServerPackage","metadata":{"id":"jenkins","master":"package"},"projections":{"claude":{"path":".mcp.json"},"codex":{"path":".codex/config.toml"}}}"#,
+        );
+        write_proj(
+            "claude/mcp-servers/jenkins/.mcp.json",
+            b"{\"mcpServers\":{\"jenkins\":{}}}\n",
+        );
+        write_proj(
+            "codex/mcp-servers/jenkins/config.toml",
+            b"[mcp_servers.jenkins]\n",
+        );
+        write(
+            "mcp-profiles/project.json",
+            br#"{"kind":"McpProfilePackage","metadata":{"id":"project","master":"package"},"projections":{"claude":{"path":".mcp.json"},"codex":{"path":".codex/config.toml"}}}"#,
+        );
+        write_proj(
+            "claude/mcp-profiles/project/.mcp.json",
+            b"{\"mcpServers\":{\"jenkins\":{}}}\n",
+        );
+        write_proj(
+            "codex/mcp-profiles/project/config.toml",
+            b"[mcp_servers.jenkins]\n",
+        );
+
         let graph = compose_graph_from_package_tree(&pkg_root, Some(&proj_root), "claude-opus-4-8")
             .unwrap();
 
         assert!(graph.validate().is_ok(), "graph must satisfy invariants");
 
-        // 3 package nodes + 4 projection nodes (2 skill + 1 hook + 1 agentdoc).
-        assert_eq!(graph.nodes.len(), 7, "3 packages + 4 projections");
-        // 4 Projection edges (2 skill + 1 hook + 1 agentdoc).
-        assert_eq!(graph.edges.len(), 4, "one edge per existing projection");
+        // 6 package nodes + 10 projection nodes (2 skill + 1 hook + 1 agentdoc
+        // + 2 command + 2 MCP server + 2 MCP profile).
+        assert_eq!(graph.nodes.len(), 16, "6 packages + 10 projections");
+        assert_eq!(graph.edges.len(), 10, "one edge per existing projection");
 
         // Every edge's source is a package node cid, derived a projection cid,
         // and the package's cid is the canonical CID of its bytes.
@@ -641,6 +694,18 @@ mod tests {
         assert_eq!(alpha_node.metadata["composedBy"], "claude-opus-4-8");
         assert_eq!(alpha_node.source.namespace, NAMESPACE);
         assert_eq!(alpha_node.source.id, "SkillPackage:alpha");
+
+        let profile_bytes = fs::read(pkg_root.join("mcp-profiles/project.json")).unwrap();
+        let profile_cid = BlobCid::compute(&profile_bytes);
+        assert_eq!(
+            graph
+                .edges
+                .iter()
+                .filter(|edge| edge.source == profile_cid)
+                .count(),
+            2,
+            "MCP profile has claude + codex projection edges"
+        );
     }
 
     #[test]
@@ -662,7 +727,8 @@ mod tests {
 
     #[test]
     fn verbatim_kind_projection_witnesses_source_doc_cid() {
-        // For verbatim-passthrough kinds (AgentDocPackage, HookPackage) the
+        // For verbatim-passthrough kinds (AgentDocPackage, HookPackage,
+        // CommandPackage) the
         // projection is a byte-identical copy of the package `source.body`. The
         // projection node must carry `sourceDocCid = compute_raw(source.body)` AND
         // its own CID must be `compute_raw` over the projection bytes — so
@@ -708,36 +774,61 @@ mod tests {
         );
         write_proj("claude/hooks/gate.py", HOOK_BODY);
 
+        // CommandPackage: source.body is one flat markdown command projected
+        // byte-identically into both runtime homes.
+        const COMMAND_BODY: &[u8] = b"# /do-it\n\nDo the thing.\n";
+        write(
+            "commands/do-it.json",
+            format!(
+                r#"{{"kind":"CommandPackage","metadata":{{"id":"do-it"}},"source":{{"body":{}}},"projections":{{"claude":{{"path":".claude/commands/do-it.md"}},"codex":{{"path":".codex/commands/do-it.md"}}}}}}"#,
+                serde_json::to_string(&String::from_utf8(COMMAND_BODY.to_vec()).unwrap()).unwrap()
+            )
+            .as_bytes(),
+        );
+        write_proj("claude/commands/do-it.md", COMMAND_BODY);
+        write_proj("codex/commands/do-it.md", COMMAND_BODY);
+
         let graph = compose_graph_from_package_tree(&pkg_root, Some(&proj_root), "claude-opus-4-8")
             .unwrap();
         assert!(graph.validate().is_ok());
 
         // Assert the witness on each verbatim projection node.
-        for (id, body) in [("gospel", DOC_BODY), ("gate", HOOK_BODY)] {
-            let node = graph
+        for (id, body, expected_projections) in [
+            ("gospel", DOC_BODY, 1),
+            ("gate", HOOK_BODY, 1),
+            ("do-it", COMMAND_BODY, 2),
+        ] {
+            let nodes: Vec<_> = graph
                 .nodes
                 .iter()
-                .find(|n| n.metadata["role"] == "projection" && n.metadata["id"] == id)
-                .unwrap_or_else(|| panic!("projection node for {id} present"));
+                .filter(|n| n.metadata["role"] == "projection" && n.metadata["id"] == id)
+                .collect();
+            assert_eq!(
+                nodes.len(),
+                expected_projections,
+                "projection count for {id}"
+            );
 
             let expected = BlobCid::compute_raw(body);
-            // sourceDocCid witness present and equals compute_raw(source.body)…
-            assert_eq!(
-                node.metadata["sourceDocCid"],
-                expected.to_string(),
-                "sourceDocCid must be compute_raw(source.body) for {id}"
-            );
-            // …and equals the projection node's OWN cid (the content-addressed
-            // "projection == source doc" proof).
-            assert_eq!(
-                node.cid, expected,
-                "projection cid must equal sourceDocCid for verbatim kind {id}"
-            );
-            // Verbatim projections use the raw codec (bafkrei…).
-            assert!(
-                node.cid.to_string().starts_with("bafkrei"),
-                "verbatim projection cid must be raw-codec for {id}"
-            );
+            for node in nodes {
+                // sourceDocCid witness present and equals compute_raw(source.body)…
+                assert_eq!(
+                    node.metadata["sourceDocCid"],
+                    expected.to_string(),
+                    "sourceDocCid must be compute_raw(source.body) for {id}"
+                );
+                // …and equals the projection node's OWN cid (the content-addressed
+                // "projection == source doc" proof).
+                assert_eq!(
+                    node.cid, expected,
+                    "projection cid must equal sourceDocCid for verbatim kind {id}"
+                );
+                // Verbatim projections use the raw codec (bafkrei…).
+                assert!(
+                    node.cid.to_string().starts_with("bafkrei"),
+                    "verbatim projection cid must be raw-codec for {id}"
+                );
+            }
         }
     }
 
