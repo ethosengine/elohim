@@ -4,7 +4,8 @@ description: Use when finishing a development branch, after resolving a debuggin
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/story-harvest/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/story-harvest.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/story-harvest"
 ---

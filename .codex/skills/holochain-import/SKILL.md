@@ -4,7 +4,8 @@ description: Holochain content import pipeline. Use when "seed DHT with content"
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/holochain-import/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/holochain-import.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/holochain-import"
 ---

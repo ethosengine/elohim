@@ -2,8 +2,9 @@
 name: automerge-sync
 description: Reference for Automerge 0.5 CRDT sync engine, stream positions, delta sync protocol, document lifecycle, conflict resolution, and browser-side integration. Use when someone asks "how does sync work", "handle merge conflicts", "manage stream positions", "offline-first content", or implements CRDT document flows.
 metadata:
-  author: elohim-protocol
-  version: 1.0.0
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/automerge-sync"
 ---
 
 # Automerge Sync Engine Reference

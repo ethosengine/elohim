@@ -4,7 +4,8 @@ description: Reference for Elohim custom libp2p protocols, request-response code
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/libp2p-protocols/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/libp2p-protocols.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/libp2p-protocols"
 ---

@@ -1,6 +1,10 @@
 ---
 name: deliver
 description: Use when a recent sprint was marked complete but the feature isn't actually visible or usable in the app — CI green doesn't match human-visible delivery, components built but not wired, scenarios passing but the user can't see what was promised
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/deliver"
 ---
 
 # Deliver — The Finisher

@@ -4,7 +4,8 @@ description: "Librarian-solo hygiene-sweep toolkit and cadence. Provides eight d
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/memory-kit/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/memory-kit.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/memory-kit"
 ---

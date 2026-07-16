@@ -4,7 +4,8 @@ description: Cartographer-scoped forward-projection synthesis that ranks the dev
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/converge/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/converge.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/converge"
 ---

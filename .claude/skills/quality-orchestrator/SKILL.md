@@ -1,6 +1,10 @@
 ---
 name: quality-orchestrator
 description: Coordinate team-based quality campaigns across the three-tier pipeline — escalate from quality-sweep (Haiku, mechanical) to quality-deep (Sonnet, complex tests/refactor) to quality-architect (Opus, systemic gaps). Use when "run a quality campaign", "coverage push on X module", "orchestrate quality work across multiple agents", or planning multi-tier quality effort over a sprint.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/quality-orchestrator"
 ---
 
 # Quality Orchestrator — Team-Based Campaign System

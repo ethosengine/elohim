@@ -4,7 +4,8 @@ description: Reference for P2P peer discovery (mDNS, Kademlia), NAT traversal (r
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/libp2p-discovery/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/libp2p-discovery.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/libp2p-discovery"
 ---

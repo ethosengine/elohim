@@ -4,7 +4,8 @@ description: REFERENCE knowledge for Tauri 2.9 DESKTOP SHELL development — tau
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/tauri-desktop/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/tauri-desktop.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/tauri-desktop"
 ---

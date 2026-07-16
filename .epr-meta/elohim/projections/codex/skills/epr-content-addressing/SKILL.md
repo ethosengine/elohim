@@ -4,7 +4,8 @@ description: Reference for content linking in the Elohim Protocol — how links 
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/epr-content-addressing/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/epr-content-addressing.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/epr-content-addressing"
 ---

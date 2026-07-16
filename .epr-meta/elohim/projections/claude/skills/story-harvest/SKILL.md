@@ -1,6 +1,10 @@
 ---
 name: story-harvest
 description: Use when finishing a development branch, after resolving a debugging session, or whenever a failure-then-fix cycle reveals engineering constraints worth preserving as a2o scenarios. Also invocable manually with /story-harvest.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/story-harvest"
 ---
 
 # Story Harvest

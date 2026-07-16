@@ -2,8 +2,9 @@
 name: libp2p-discovery
 description: Reference for P2P peer discovery (mDNS, Kademlia), NAT traversal (relay, DCUTR), peer tracking, and network topology. Use when someone asks "peers not connecting", "add bootstrap nodes", "mDNS not finding peers", "configure Kademlia", or works on NAT traversal and peer discovery.
 metadata:
-  author: elohim-protocol
-  version: 1.0.0
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/libp2p-discovery"
 ---
 
 # libp2p Discovery & NAT Traversal Reference

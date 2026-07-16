@@ -4,7 +4,8 @@ description: Validate, seed, and verify content in Holochain DHT. Use when seedi
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/seed-workflow/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/seed-workflow.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/seed-workflow"
 ---

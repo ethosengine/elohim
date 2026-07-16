@@ -4,7 +4,8 @@ description: "Use when a build failed, when comparing two Jenkins builds to meas
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/pipeline-diagnostics/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/pipeline-diagnostics.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/pipeline-diagnostics"
 ---

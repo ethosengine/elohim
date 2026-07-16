@@ -4,7 +4,8 @@ description: Establishes senior-decision-maker (chief-agent) discipline for an e
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/orchestrate/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/orchestrate.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/orchestrate"
 ---

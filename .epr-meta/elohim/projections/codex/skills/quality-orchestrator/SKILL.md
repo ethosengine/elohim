@@ -4,7 +4,8 @@ description: Coordinate team-based quality campaigns across the three-tier pipel
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/quality-orchestrator/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/quality-orchestrator.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/quality-orchestrator"
 ---

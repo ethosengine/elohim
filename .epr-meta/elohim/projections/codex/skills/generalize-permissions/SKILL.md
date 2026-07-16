@@ -4,7 +4,8 @@ description: Cluster near-duplicate entries in .claude/settings.json + settings.
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/generalize-permissions/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/generalize-permissions.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/generalize-permissions"
 ---

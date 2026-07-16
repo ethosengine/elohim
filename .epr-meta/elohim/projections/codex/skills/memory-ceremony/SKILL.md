@@ -4,7 +4,8 @@ description: Orchestrate the four-agent memory team (librarian, historian, carto
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/memory-ceremony/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/memory-ceremony.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/memory-ceremony"
 ---

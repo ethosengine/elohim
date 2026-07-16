@@ -1,6 +1,10 @@
 ---
 name: orchestrate
 description: Establishes senior-decision-maker (chief-agent) discipline for an expensive top-tier model (Fable 5 / Opus). Keep premium reasoning for intent, architecture, decomposition, tradeoffs, risk, disagreement-resolution, and final review; delegate discovery, implementation, tests, logs, and verification to cheaper tiers. Use when you are the top-tier model driving multi-step work, when told to "orchestrate" / "delegate this" / "run this as chief agent", or any time you're about to spend premium reasoning on labor whose result is checkable from evidence.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/orchestrate"
 ---
 
 # Orchestrate — Chief-Agent Discipline

@@ -1,6 +1,10 @@
 ---
 name: seed-workflow
 description: Validate, seed, and verify content in Holochain DHT. Use when seeding content, running validation, checking seed statistics, managing snapshots, or troubleshooting seeding issues.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/seed-workflow"
 ---
 
 # Content Seeding Workflow

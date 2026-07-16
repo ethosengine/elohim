@@ -1,6 +1,10 @@
 ---
 name: holochain-import
 description: Holochain content import pipeline. Use when "seed DHT with content", "run hc-rna fixtures", "import content to Holochain", "manage seed snapshots", or troubleshooting DHT seeding. Complements elohim-import (transformation layer) by handling the DHT-seed layer.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/holochain-import"
 ---
 
 # Holochain Content Import Pipeline

@@ -2,8 +2,9 @@
 name: libp2p-transport
 description: Reference for libp2p swarm setup, transport configuration, and behaviour composition in steward/node and elohim-storage (both resolve libp2p 0.54.1). Use when someone asks "configure the swarm", "add a new behaviour", "set up transport", or debugs P2P connection issues.
 metadata:
-  author: elohim-protocol
-  version: 1.0.0
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/libp2p-transport"
 ---
 
 # libp2p Transport Reference

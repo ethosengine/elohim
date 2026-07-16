@@ -1,6 +1,10 @@
 ---
 name: page-model
 description: Audit Angular component legibility — data-testid coverage for tests/agents, accessible labeling for people. Scans templates, reports gaps, suggests fixes, escalates components that need redesign. Use when "add testids to this component", "page object audit", "a11y scan on Angular templates", "are these tests legible to agents?", or instrumenting Angular for E2E + page-object selectors.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/page-model"
 ---
 
 # Page Model

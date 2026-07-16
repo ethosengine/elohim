@@ -4,7 +4,8 @@ description: REFERENCE for integrating the Sophia assessment engine into Angular
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/sophia-integration/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/sophia-integration.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/sophia-integration"
 ---

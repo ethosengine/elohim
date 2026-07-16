@@ -1,6 +1,10 @@
 ---
 name: memory-ceremony
 description: Orchestrate the four-agent memory team (librarian, historian, cartographer, storyteller) through a four-phase substrate-currency ceremony — population-wide drift triage, four-lens deep-read on 1-2 picked surfaces, storyteller-pen synthesis, apply + downstream coherence verification. The deliverable is substrate-grounded gospel-tier rewrites. Invoke when the substrate-currency audit accumulates drift signal, when a major substrate landing happens that the gospel-tier hasn't absorbed, or on operator request.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/memory-ceremony"
 ---
 
 # /memory-ceremony — Four-Phase Substrate-Currency Ceremony

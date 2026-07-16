@@ -1,6 +1,10 @@
 ---
 name: pipeline-diagnostics
-description: Use when a build failed, when comparing two Jenkins builds to measure a fix's impact, when checking whether a specific commit landed in a build, when reading a2o sprint-report findings, or when retrieving any archived CI artifact. Also use when `mcp__jenkins__*` tools are absent from your tool list (some subagent contexts) and you'd otherwise give up or grep the repo blindly — public Jenkins URLs + WebFetch work as a fallback. Triggers: "did my fix land?", "why is the next build still failing?", "what's in the sprint-report?"
+description: "Use when a build failed, when comparing two Jenkins builds to measure a fix's impact, when checking whether a specific commit landed in a build, when reading a2o sprint-report findings, or when retrieving any archived CI artifact. Also use when `mcp__jenkins__*` tools are absent from your tool list (some subagent contexts) and you'd otherwise give up or grep the repo blindly — public Jenkins URLs + WebFetch work as a fallback. Triggers: \"did my fix land?\", \"why is the next build still failing?\", \"what's in the sprint-report?\""
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/pipeline-diagnostics"
 ---
 
 # Pipeline Diagnostics

@@ -4,7 +4,8 @@ description: Use when starting a planning or brainstorm pass on a feature or sub
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/atlas-grounding/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/atlas-grounding.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/atlas-grounding"
 ---
