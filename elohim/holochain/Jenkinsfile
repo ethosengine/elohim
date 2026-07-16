@@ -389,7 +389,7 @@ def getEnvConfig() {
             ],
             doorwayManifest: 'genesis/orchestrator/manifests/doorway/alpha.yaml',
             envFile: 'genesis/orchestrator/environments/alpha.env',
-            infraManifests: ['genesis/orchestrator/manifests/infra/alpha-mongodb.yaml', 'genesis/orchestrator/manifests/infra/alpha-nats.yaml', 'genesis/orchestrator/manifests/infra/alpha-coturn-ethosengine.yaml', 'genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml'],
+            infraManifests: ['genesis/orchestrator/manifests/infra/alpha-mongodb.yaml', 'genesis/orchestrator/manifests/infra/alpha-nats.yaml', 'genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml', 'genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml'],
             healthUrl: 'https://doorway-alpha.elohim.host',
         ],
         staging: [

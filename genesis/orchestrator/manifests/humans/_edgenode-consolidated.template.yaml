@@ -114,7 +114,7 @@ data:
           # itself is the seam. The prior diagnostic relay
           # (openrelay.metered.ca) went GLOBALLY DEAD 2026-07-13 (i/o timeout
           # from adam, matthew, AND a third network). Replaced by our own coturn
-          # pair — `genesis/orchestrator/manifests/infra/alpha-coturn-ethosengine.yaml`,
+          # pair — `genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml`,
           # `alpha-coturn-shem.yaml`. Keep the credential in sync with those
           # ConfigMaps' `user=`.
           # Dual-WAN ICE failover: ethosengine (on-prem) relay primary, shem
