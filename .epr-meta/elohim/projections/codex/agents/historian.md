@@ -4,7 +4,8 @@ description: "Memory system past-surface agent (Opus tier). Indexes the archive 
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/historian.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/historian.json
   packageKind: AgentPackage
 model: opus
 tools: Bash, Glob, Grep, Read, Edit, Write, TodoWrite, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_list_wings, mcp__mempalace__mempalace_list_rooms, mcp__mempalace__mempalace_list_drawers, mcp__mempalace__mempalace_get_drawer, mcp__mempalace__mempalace_check_duplicate, mcp__mempalace__mempalace_memories_filed_away, mcp__mempalace__mempalace_kg_query, mcp__mempalace__mempalace_kg_timeline, mcp__mempalace__mempalace_kg_stats, mcp__mempalace__mempalace_traverse, mcp__mempalace__mempalace_find_tunnels, mcp__mempalace__mempalace_follow_tunnels, mcp__mempalace__mempalace_list_tunnels
