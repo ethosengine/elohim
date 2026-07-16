@@ -1,6 +1,10 @@
 ---
 name: looking-at-frontend
 description: Use when reviewing, designing, debugging, or modifying any UI surface — Angular app pages, Lit elohim-elements, graphos Storybook stories (Library A default / Library B designed), the design guide — when judging visual quality, aesthetics, theming, or brand drift, or when a described feature can't be found in the rendered app. Especially when you're about to give a visual verdict from source files alone.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/looking-at-frontend"
 ---
 
 # Looking at Frontend
