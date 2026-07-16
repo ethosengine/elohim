@@ -38,7 +38,9 @@
         "elohim-agent:packages:verify"
       ],
       "ledger": ".claude/data/governance-findings.jsonl"
-    }
+    },
+    "master": "package",
+    "composedBy": "claude-opus-4-8"
   },
   "instructions": {
     "format": "markdown",

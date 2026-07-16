@@ -4,7 +4,8 @@ description: "CI/CD deep-dive investigator (Sonnet). The only path to specific f
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/ci-investigator.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/ci-investigator.json
   packageKind: AgentPackage
 model: sonnet
 tools: Task, Bash, Glob, Grep, Read, TodoWrite, WebFetch, mcp__jenkins__getBuildLog, mcp__jenkins__searchBuildLog, mcp__jenkins__getBuild, mcp__jenkins__getJob, mcp__jenkins__getJobs, mcp__jenkins__triggerBuild, mcp__jenkins__updateBuild, mcp__jenkins__getStatus, mcp__jenkins__whoAmI, mcp__jenkins__getJobScm, mcp__jenkins__getBuildScm, mcp__jenkins__getBuildChangeSets, mcp__jenkins__getTestResults, mcp__jenkins__getFlakyFailures, mcp__observability__query_prometheus, mcp__observability__query_prometheus_histogram, mcp__observability__list_prometheus_metric_names, mcp__observability__query_loki_logs, mcp__observability__query_loki_stats, mcp__observability__query_loki_patterns, mcp__observability__analyze_loki_labels, mcp__observability__find_error_pattern_logs, mcp__observability__find_slow_requests, mcp__observability__get_assertions, mcp__observability__list_datasources, mcp__observability__get_dashboard_by_uid

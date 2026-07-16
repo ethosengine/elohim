@@ -4,7 +4,8 @@ description: "Protocol element author (Sonnet). Builds accessible, blank-slate L
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/component-architect.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/component-architect.json
   packageKind: AgentPackage
 model: sonnet
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP

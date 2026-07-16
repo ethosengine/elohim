@@ -4,7 +4,8 @@ description: "Adversarial security analyst (Opus). Thinks like a motivated attac
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/red-team.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/red-team.json
   packageKind: AgentPackage
 model: opus
 tools: Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__analyze_code_snippet, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__show_rule

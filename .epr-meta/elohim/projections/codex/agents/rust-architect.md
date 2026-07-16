@@ -4,7 +4,8 @@ description: "Rust truth-layer architect (Opus). Owns the full backend spine —
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/rust-architect.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/rust-architect.json
   packageKind: AgentPackage
 model: opus
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite

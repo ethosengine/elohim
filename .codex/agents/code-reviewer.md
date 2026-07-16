@@ -4,7 +4,8 @@ description: "Code quality + security reviewer (Sonnet). Reviews recently-writte
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/agents/code-reviewer.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/agents/code-reviewer.json
   packageKind: AgentPackage
 model: sonnet
 tools: Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__analyze_code_snippet, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__get_project_quality_gate_status, mcp__sonarqube__show_rule, mcp__sonarqube__get_component_measures
