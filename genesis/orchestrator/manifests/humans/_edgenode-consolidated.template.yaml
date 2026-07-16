@@ -114,12 +114,20 @@ data:
           # itself is the seam. The prior diagnostic relay
           # (openrelay.metered.ca) went GLOBALLY DEAD 2026-07-13 (i/o timeout
           # from adam, matthew, AND a third network). Replaced by our own coturn
-          # — `genesis/orchestrator/manifests/infra/alpha-coturn.yaml`. Keep the
-          # credential in sync with that ConfigMap's `user=`.
+          # pair — `genesis/orchestrator/manifests/infra/alpha-coturn-ethosengine.yaml`,
+          # `alpha-coturn-shem.yaml`. Keep the credential in sync with those
+          # ConfigMaps' `user=`.
+          # Dual-WAN ICE failover: ethosengine (on-prem) relay primary, shem
+          # relay redundant — either works, ICE gathers candidates from both.
+          # turns:5349 TLS is a later phase; this phase is 3478-first.
           - urls:
               - "turn:turn.elohim.host:3478?transport=udp"
               - "turn:turn.elohim.host:3478?transport=tcp"
-              - "turns:turn.elohim.host:443?transport=tcp"
+            username: "elohim"
+            credential: "alpha-turn-commons-2026"
+          - urls:
+              - "turn:turn-shem.elohim.host:3478?transport=udp"
+              - "turn:turn-shem.elohim.host:3478?transport=tcp"
             username: "elohim"
             credential: "alpha-turn-commons-2026"
     data_root_path: "/var/local/lib/holochain"

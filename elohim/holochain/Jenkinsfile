@@ -389,7 +389,7 @@ def getEnvConfig() {
             ],
             doorwayManifest: 'genesis/orchestrator/manifests/doorway/alpha.yaml',
             envFile: 'genesis/orchestrator/environments/alpha.env',
-            infraManifests: ['genesis/orchestrator/manifests/infra/alpha-mongodb.yaml', 'genesis/orchestrator/manifests/infra/alpha-nats.yaml'],
+            infraManifests: ['genesis/orchestrator/manifests/infra/alpha-mongodb.yaml', 'genesis/orchestrator/manifests/infra/alpha-nats.yaml', 'genesis/orchestrator/manifests/infra/alpha-coturn-ethosengine.yaml', 'genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml'],
             healthUrl: 'https://doorway-alpha.elohim.host',
         ],
         staging: [
@@ -1503,6 +1503,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 nerdctl -n k8s.io tag elohim-agent-sdk:${IMAGE_TAG} elohim-agent-sdk:${GIT_COMMIT_HASH}
                             """
+
+                            // Beacon build (scripts/ci); UNSTABLE-isolated so it can't abort critical delivery.
+                            catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                                sh "bash '${env.WORKSPACE}/scripts/ci/build-relay-addr-beacon.sh'"
+                            }
                         }
                     }
                 }
@@ -1767,6 +1772,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                         echo "Agent SDK image not found, skipping push"
                                     fi
                                 """
+
+                                // Relay Addr Beacon push+alias — scripts/ci/push-relay-addr-beacon.sh
+                                sh "bash '${env.WORKSPACE}/scripts/ci/push-relay-addr-beacon.sh'"
 
                                 // Also push dev-latest aliases on dev branch for backward compat
                                 if (env.BRANCH_NAME == 'dev') {

@@ -88,6 +88,7 @@ sovereign coturn replacement the same hour.
 | CA/TLS (Let's Encrypt) | policy flip, outage | design question (DANE-over-pkarr? raw-key pinning for peers?) | open |
 | shem (rented compute) | provider action | household/hub redistribution — hub-optional floor already doctrine | partially covered |
 | GitHub/Jenkins/Harbor (dev plane) | account/org action | self-hosted already (Jenkins/Harbor/Nexus); GitHub exit = git's native distribution | mostly real |
+| TURN relay mechanism (coturn, external C, WebRTC-specific) | separate process, per-relay op burden | native Rust relay: libp2p Circuit Relay v2 + iroh relay, as the conductor DHT migrates off tx5 | filed: this row + 2026-07-16 dual-wan design |
 
 ## Deliverable
 
