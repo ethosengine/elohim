@@ -4,7 +4,8 @@ description: Use when an Elohim question is framed in conventional-computing ter
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/concept-mapping/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/concept-mapping.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/concept-mapping"
 ---
