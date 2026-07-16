@@ -404,9 +404,207 @@ def _sovereignty_ontology_guard(write: dict) -> bool:
     return post_n > _sov_apex_count(pre)  # net-new only; cleaning/maintenance never fires
 
 
+# ── Archetype resource alignment (a validator-EPR). Fires an `ask` when deployments.json carries
+# INTRA-ARCHETYPE resource drift: a consolidated human whose edgenode* budget != its
+# deviceArchetype's CANONICAL value in archetype-resource-budgets.json, WITHOUT an explicit
+# `resourceOverride: {<field>, justification}`. Inverts control: the archetype budget is the
+# SOURCE, a human derives it, and a role-justified exception (e.g. adam, the genesis anchor)
+# declares an override ONCE. Catches the "bump the one crashlooping instance, leave the rest of
+# the class behind" drift that the floor-only >= check cannot see. Details -> stderr on fire.
+_ARCH_FIELDS = (
+    ("edgenodeCpuRequest", "cpuRequest"),
+    ("edgenodeCpuLimit", "cpuLimit"),
+    ("edgenodeMemoryRequest", "memoryRequest"),
+    ("edgenodeMemoryLimit", "memoryLimit"),
+)
+_ARCH_BUDGETS_PATH = "genesis/data/devices/archetype-resource-budgets.json"
+
+
+def _archetype_resource_alignment(write: dict) -> bool:
+    import json as _json
+    import sys as _sys
+    if Path(write["path"]).name != "deployments.json":
+        return False
+    content = write.get("content")
+    if content is None:
+        return False
+    try:
+        humans = _json.loads(content).get("humans", [])
+    except Exception:
+        return False  # unparseable pending edit -> abstain (never block on a syntax error)
+    try:
+        budgets = _json.loads(Path(_ARCH_BUDGETS_PATH).read_text()).get("budgets", {})
+    except Exception:
+        budgets = {}
+    drifts = []
+    for h in humans:
+        if h.get("pattern") != "consolidated":
+            continue
+        arch = h.get("deviceArchetype")
+        ov = h.get("resourceOverride") or {}
+        justified = bool(ov.get("justification"))
+        canon = budgets.get(arch, {})
+        for dep_field, budget_key in _ARCH_FIELDS:
+            val = h.get(dep_field)
+            if val is None:
+                continue
+            if justified and budget_key in ov:
+                if val != ov[budget_key]:
+                    drifts.append((h.get("name"), arch, budget_key, val, f"override declares {ov[budget_key]}"))
+                continue
+            expected = canon.get(budget_key)
+            if expected is not None and val != expected:
+                drifts.append((h.get("name"), arch, budget_key, val, f"archetype canonical {expected}"))
+    if not drifts:
+        return False
+    print("  archetype-resource-alignment — intra-class drift (one-off instead of the class):", file=_sys.stderr)
+    for name, arch, field, val, exp in drifts:
+        print(f"    · {name} [{arch}] {field}={val} != {exp}", file=_sys.stderr)
+    print("    FIX: move the archetype's budget (realigns the whole class) OR add "
+          "resourceOverride:{<field>,justification} to the exceptional human.", file=_sys.stderr)
+    return True
+
+
+# ── Alpha test-bench aggregate capacity (a validator-EPR). The Rakia ledger is an
+# operator-promoted Category-C observation, not a live-cluster oracle. This validator replaces the
+# ledger's previously observed human allocation with the prospective active deployments, retains the
+# observed non-human commitments, and checks both requests and limits against allocatable CPU/memory.
+# It evaluates from BOTH directions: a deployments.json edit uses the ledger on disk; a promoted
+# compute-capacity.json edit uses deployments.json on disk. No kubectl/Prometheus dependency.
+_CAPACITY_LEDGER_PATH = "genesis/data/rakia/compute-capacity.json"
+_DEPLOYMENTS_PATH = "genesis/orchestrator/data/deployments.json"
+
+
+def _cpu_m(value) -> int | None:
+    if isinstance(value, int):
+        return value
+    if not isinstance(value, str):
+        return None
+    try:
+        if value.endswith("m"):
+            return int(value[:-1])
+        return int(float(value) * 1000)
+    except (TypeError, ValueError):
+        return None
+
+
+def _memory_mi(value) -> int | None:
+    if isinstance(value, int):
+        return value
+    if not isinstance(value, str):
+        return None
+    units = (("Ki", 1 / 1024), ("Mi", 1), ("Gi", 1024), ("Ti", 1024 * 1024))
+    try:
+        for suffix, factor in units:
+            if value.endswith(suffix):
+                return int(float(value[:-len(suffix)]) * factor)
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _bundle(obj: dict | None, cpu_key: str = "cpu_m", memory_key: str = "memory_Mi") -> tuple[int, int]:
+    obj = obj or {}
+    return (_cpu_m(obj.get(cpu_key)) or 0, _memory_mi(obj.get(memory_key)) or 0)
+
+
+def _planned_human_resources(deployments: dict, kind: str) -> tuple[int, int]:
+    cpu_key = "edgenodeCpuRequest" if kind == "requests" else "edgenodeCpuLimit"
+    memory_key = "edgenodeMemoryRequest" if kind == "requests" else "edgenodeMemoryLimit"
+    cpu = memory = 0
+    for human in deployments.get("humans", []):
+        if human.get("pattern") != "consolidated" or human.get("suspended") is True:
+            continue
+        cpu += _cpu_m(human.get(cpu_key)) or 0
+        memory += _memory_mi(human.get(memory_key)) or 0
+    return cpu, memory
+
+
+def _observed_human_resources(ledger: dict, kind: str) -> tuple[int, int]:
+    cpu = memory = 0
+    for human in (ledger.get("elohimHumans") or {}).values():
+        if human.get("suspended") is True:
+            continue
+        for deployment in (human.get("deployments") or {}).values():
+            resource = deployment.get(kind) or deployment.get(f"{kind}_sum") or {}
+            dcpu, dmemory = _bundle(resource)
+            cpu += dcpu
+            memory += dmemory
+    return cpu, memory
+
+
+def _observed_total_limits(ledger: dict) -> tuple[int, int]:
+    cpu = memory = 0
+    node_types = ((ledger.get("cluster") or {}).get("nodeTypes") or {}).values()
+    for node_type in node_types:
+        for node in node_type.get("nodes", []):
+            if node.get("ready") is not True:
+                continue
+            ncpu, nmemory = _bundle(node.get("limits"))
+            cpu += ncpu
+            memory += nmemory
+    return cpu, memory
+
+
+def _aggregate_capacity_violations(deployments: dict, ledger: dict) -> list[tuple[str, str, int, int]]:
+    cluster = ledger.get("cluster") or {}
+    alloc_cpu, alloc_memory = _bundle(cluster.get("totalAllocatable"))
+    committed_cpu, committed_memory = _bundle(cluster.get("totalCommitted"))
+    observed_req_cpu, observed_req_memory = _observed_human_resources(ledger, "requests")
+    planned_req_cpu, planned_req_memory = _planned_human_resources(deployments, "requests")
+    observed_lim_cpu, observed_lim_memory = _observed_human_resources(ledger, "limits")
+    planned_lim_cpu, planned_lim_memory = _planned_human_resources(deployments, "limits")
+    total_lim_cpu, total_lim_memory = _observed_total_limits(ledger)
+
+    projected = {
+        ("requests", "cpu_m"): max(0, committed_cpu - observed_req_cpu) + planned_req_cpu,
+        ("requests", "memory_Mi"): max(0, committed_memory - observed_req_memory) + planned_req_memory,
+        ("limits", "cpu_m"): max(0, total_lim_cpu - observed_lim_cpu) + planned_lim_cpu,
+        ("limits", "memory_Mi"): max(0, total_lim_memory - observed_lim_memory) + planned_lim_memory,
+    }
+    ceilings = {"cpu_m": alloc_cpu, "memory_Mi": alloc_memory}
+    return [
+        (kind, resource, value, ceilings[resource])
+        for (kind, resource), value in projected.items()
+        if ceilings[resource] > 0 and value > ceilings[resource]
+    ]
+
+
+def _test_bench_aggregate_capacity(write: dict) -> bool:
+    import json as _json
+    import sys as _sys
+
+    name = Path(write["path"]).name
+    if name not in ("deployments.json", "compute-capacity.json"):
+        return False
+    try:
+        if name == "deployments.json":
+            deployments = _json.loads(write.get("content") or "")
+            ledger = _json.loads(Path(_CAPACITY_LEDGER_PATH).read_text())
+        else:
+            ledger = _json.loads(write.get("content") or "")
+            deployments = _json.loads(Path(_DEPLOYMENTS_PATH).read_text())
+    except Exception:
+        return False  # syntax/IO diagnostics belong to their dedicated validators
+
+    violations = _aggregate_capacity_violations(deployments, ledger)
+    if not violations:
+        return False
+    print("  test-bench-aggregate-capacity — prospective portfolio exceeds promoted envelope:",
+          file=_sys.stderr)
+    for kind, resource, value, ceiling in violations:
+        print(f"    · aggregate {kind}.{resource}={value} > allocatable {ceiling}",
+              file=_sys.stderr)
+    print("    FIX: reconcile active budgets, promote a newer operator-observed Rakia ledger, OR "
+          "acknowledge the intentional overcommit at reach.", file=_sys.stderr)
+    return True
+
+
 REFERENCE_VALIDATORS = {
     "epr:validator-p2p-design-gate": _p2p_design_gate,
     "epr:validator-sovereignty-ontology-guard": _sovereignty_ontology_guard,
+    "epr:validator-archetype-resource-alignment": _archetype_resource_alignment,
+    "epr:validator-test-bench-aggregate-capacity": _test_bench_aggregate_capacity,
 }
 
 

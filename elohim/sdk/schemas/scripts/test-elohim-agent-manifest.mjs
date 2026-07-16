@@ -38,7 +38,10 @@ async function loadAppManifestValidator() {
     ['../v1/enums/epr-kind.schema.json', 'epr:enums/epr-kind.schema.json'],
     ['../v1/manifest/pillar-projection.schema.json', 'epr:pillar-projection.schema.json'],
     ['../v1/manifest/observation-kind.schema.json', 'epr:observation-kind.schema.json'],
-    ['../v1/enums/session-lifecycle-state.schema.json', 'epr:enums/session-lifecycle-state.schema.json'],
+    [
+      '../v1/enums/session-lifecycle-state.schema.json',
+      'epr:enums/session-lifecycle-state.schema.json',
+    ],
   ];
 
   for (const [relativePath, schemaId] of referencedSchemas) {
@@ -77,6 +80,8 @@ const expectedContentTypes = [
   'counter',
   'policy',
   'validator',
+  'mcp-server',
+  'mcp-profile',
   'projection-binding',
 ];
 
@@ -179,6 +184,27 @@ const metadataFixtures = {
       fuelDefault: 1000,
     },
   },
+  'mcp-server': {
+    schema: 'mcp-server-metadata.schema.json',
+    missing: 'transport',
+    fixture: {
+      id: 'jenkins',
+      version: '1.0.0',
+      description: 'Read-only Jenkins MCP server.',
+      transport: 'streamable-http',
+    },
+  },
+  'mcp-profile': {
+    schema: 'mcp-profile-metadata.schema.json',
+    missing: 'serverRefs',
+    fixture: {
+      id: 'elohim-project',
+      version: '1.0.0',
+      description: 'Project MCP activation profile.',
+      scope: 'project',
+      serverRefs: ['jenkins'],
+    },
+  },
   'projection-binding': {
     schema: 'projection-binding-metadata.schema.json',
     missing: 'sourceType',
@@ -223,10 +249,7 @@ async function testMetadataSchemas() {
 
     const invalid = structuredClone(fixture);
     delete invalid[missing];
-    assert(
-      !validate(invalid),
-      `${name} metadata schema rejects missing ${missing}`,
-    );
+    assert(!validate(invalid), `${name} metadata schema rejects missing ${missing}`);
   }
 }
 

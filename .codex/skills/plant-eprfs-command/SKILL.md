@@ -1,0 +1,41 @@
+---
+name: plant-eprfs-command
+description: Plant ONE runtime-authored slash command in its elohim-native CommandPackage on the eprfs layer. The package becomes authoritative while the Claude and Codex command files remain byte-identical verbatim projections. The command member of the plant-eprfs family; fidelity-gate-guaranteed lossless.
+metadata:
+  runtime: codex
+  sourceRuntime: elohim-agent
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/plant-eprfs-command.json
+  packageKind: SkillPackage
+governance: "epr:elohim-agent/skills/plant-eprfs-command"
+---
+# Plant EPRFS Command
+
+Plant ONE runtime-authored slash command in its elohim-native `CommandPackage`: the package under `.epr-meta/elohim/packages/commands/` becomes authoritative, while `.claude/commands/X.md` and `.codex/commands/X.md` remain byte-identical generated projections. This is the command member of the `plant-eprfs` family. Use `elohim-package-authoring` for the shared package-first discipline.
+
+Plant one command, prove it, then the next.
+
+## Why the command flip is verbatim
+
+A command is a flat markdown prompt with optional frontmatter, not a skill-style runtime dialect. Its package stores the entire file in `source.body`. `projectCommand` returns that string unchanged for both runtimes. Planting therefore moves authority without reformatting frontmatter, rewriting `$ARGUMENTS`, or localizing runtime-specific prose.
+
+Before planting, the fidelity gate proves `project(import(source)) === source` byte-for-byte. After planting, it proves `project(package) === .claude command === .codex command`. The command cannot carry a reliable inline authority marker because many commands have no frontmatter, so the importer reads authority from the existing package and skips any `metadata.master: "package"` command.
+
+## Procedure (one command `X`)
+
+1. Run `node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify`. Confirm `CommandPackage:X` is source-fidelity and its Claude source round-trips byte-for-byte. If the package does not exist, run the normal command import first.
+2. Snapshot the two command projections with `sha256sum .claude/commands/X.md .codex/commands/X.md`.
+3. Edit `.epr-meta/elohim/packages/commands/X.json` only. Preserve `metadata.sourceRuntime`; add `metadata.master: "package"` and `metadata.composedBy: "<your model id>"`. Ensure `metadata.governance` carries `eprRef: epr:elohim-agent/commands/X`, `policy: capability-governance@1`, gates `epr-meta-resolver` and `elohim-agent:packages:verify`, and ledger `.claude/data/governance-findings.jsonl`. Do not edit `source.body`.
+4. Regenerate only the target: `node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs project --write-fixtures --write-runtime --only CommandPackage:X`.
+5. Re-run the hashes. Both runtime files and both projection fixtures must be byte-identical to `source.body`; any content diff is a STOP condition.
+6. Run `node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify`. `CommandPackage:X` must now report package-first and must not require a re-importable Claude source.
+7. Record composition with `eprfs-agent compose-graph .epr-meta/elohim/packages --projections-root .epr-meta/elohim/projections --composed-by "<your model id>"`. Confirm the command package has two projection edges and the verbatim `sourceDocCid` witness equals each projection CID.
+8. Commit the package path-scoped. Then plant the next command.
+
+## Invariants
+
+- Never transform command bytes while planting. The entire `source.body`, including optional frontmatter and trailing newline, is authoritative.
+- Never re-import a package-master command from `.claude/commands`; edit its package JSON instead.
+- Never bulk-write all runtime projections for a one-command plant; use `--only CommandPackage:X`.
+- Keep identity shared across runtimes: one command id, one package root, two byte-identical projections.
+- Compute CIDs only through eprfs (`eprfs-core::BlobCid::compute`); never duplicate CID logic in JavaScript.

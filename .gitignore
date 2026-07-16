@@ -4,7 +4,6 @@
 .claude/scheduled_tasks.lock
 # Runtime advisory locks from the findings harvesters (ci-harvest, sentinels)
 .claude/data/*.lock
-.mcp.json
 .worktrees/
 .claude/worktrees/
 
