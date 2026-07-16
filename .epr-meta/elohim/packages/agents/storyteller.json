@@ -44,7 +44,9 @@
       "mcp__mempalace__mempalace_kg_add"
     ],
     "sourceRuntime": "claude",
-    "mcpServerRefs": [],
+    "mcpServerRefs": [
+      "mempalace"
+    ],
     "mcpServers": [
       {
         "name": "mempalace",
@@ -65,7 +67,9 @@
         "elohim-agent:packages:verify"
       ],
       "ledger": ".claude/data/governance-findings.jsonl"
-    }
+    },
+    "master": "package",
+    "composedBy": "claude-opus-4-8"
   },
   "instructions": {
     "format": "markdown",
