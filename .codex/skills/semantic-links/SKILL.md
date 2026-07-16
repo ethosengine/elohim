@@ -4,7 +4,8 @@ description: "Use when authoring or fixing a doc's cites: — the content-addres
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/semantic-links/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/semantic-links.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/semantic-links"
 ---

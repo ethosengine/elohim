@@ -1,6 +1,10 @@
 ---
 name: semantic-links
-description: Use when authoring or fixing a doc's cites: — the content-addressed citation convention (slug + desc + fingerprint + generated status/path) that survives file moves. Covers doc-roots AND gospel CLAUDE.mds. Run cite-gen; never hand-write a slug, fingerprint, or path. Triggers: "add a cites: entry", "this cite is dead", "migrate cites", "what's HELD-CITE vs DEAD-CITE", "add concern-routing pointers to a CLAUDE.md".
+description: "Use when authoring or fixing a doc's cites: — the content-addressed citation convention (slug + desc + fingerprint + generated status/path) that survives file moves. Covers doc-roots AND gospel CLAUDE.mds. Run cite-gen; never hand-write a slug, fingerprint, or path. Triggers: \"add a cites: entry\", \"this cite is dead\", \"migrate cites\", \"what's HELD-CITE vs DEAD-CITE\", \"add concern-routing pointers to a CLAUDE.md\"."
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/semantic-links"
 ---
 
 # Semantic-Computable Links
