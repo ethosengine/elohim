@@ -13,23 +13,23 @@ use hdk::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct IssueAttestationInput {
-    pub attestation_kind: String,           // e.g. "attestation:humanness"
+    pub attestation_kind: String, // e.g. "attestation:humanness"
     pub subject_cid: String,
-    pub subject_kind: String,               // agent | content | device | hub | computation | governance-action
+    pub subject_kind: String, // agent | content | device | hub | computation | governance-action
     pub title: String,
     pub description: Option<String>,
-    pub reach: String,                      // private | community | public | commons
-    pub metadata: serde_json::Value,        // structured per per-subtype metadata schema
+    pub reach: String,               // private | community | public | commons
+    pub metadata: serde_json::Value, // structured per per-subtype metadata schema
     pub parent_governance_action_cid: Option<String>,
-    pub vote_value: Option<String>,         // approve | reject | abstain — only for vote attestations
-    pub proof_class: String,                // witness (default) | audit | proof | confirmation
+    pub vote_value: Option<String>, // approve | reject | abstain — only for vote attestations
+    pub proof_class: String,        // witness (default) | audit | proof | confirmation
     pub proof_evidence: serde_json::Value,
     pub expires_at: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AttestationOutput {
-    pub cid: String,                        // EntryHash of the issued attestation Content
+    pub cid: String, // EntryHash of the issued attestation Content
     pub attestation_kind: String,
     pub subject_cid: String,
     pub issuer_cid: String,
@@ -46,7 +46,8 @@ pub fn issue_attestation(input: IssueAttestationInput) -> ExternResult<Attestati
     // the integrity zome also enforces this — defense in depth)
     if !ATTESTATION_KINDS.contains(&input.attestation_kind.as_str()) {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "unknown_attestation_subtype: {}", input.attestation_kind
+            "unknown_attestation_subtype: {}",
+            input.attestation_kind
         ))));
     }
 
@@ -77,8 +78,11 @@ pub fn issue_attestation(input: IssueAttestationInput) -> ExternResult<Attestati
         "summary_metric": input.metadata,
     });
 
-    let metadata_json = serde_json::to_string(&metadata)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("metadata serialization: {e}"))))?;
+    let metadata_json = serde_json::to_string(&metadata).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "metadata serialization: {e}"
+        )))
+    })?;
 
     // Build a unique id for this attestation
     // (uuid crate is not available in WASM — derive from entry_hash post-create)
@@ -159,7 +163,7 @@ fn determine_validation_method(input: &IssueAttestationInput) -> &'static str {
     if input.parent_governance_action_cid.is_some() {
         "M-of-N-vote"
     } else {
-        "peer-confirm"  // default for unilateral attestations issued via this coordinator
+        "peer-confirm" // default for unilateral attestations issued via this coordinator
     }
 }
 
@@ -176,10 +180,11 @@ pub fn get_attestations_for_subject(subject_cid: String) -> ExternResult<Vec<Att
 
     let mut results = Vec::with_capacity(links.len());
     for link in links {
-        let entry_hash = link
-            .target
-            .into_entry_hash()
-            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("link target is not an EntryHash".into())))?;
+        let entry_hash = link.target.into_entry_hash().ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "link target is not an EntryHash".into()
+            ))
+        })?;
 
         // Mirror B.4 adaptation: use get(AnyDhtHash) which accepts EntryHash,
         // not must_get_valid_record which only accepts ActionHash.
@@ -193,7 +198,11 @@ pub fn get_attestations_for_subject(subject_cid: String) -> ExternResult<Vec<Att
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("decode attestation: {e}"))))?
-            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("linked entry is not a Content entry".into())))?;
+            .ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "linked entry is not a Content entry".into()
+                ))
+            })?;
 
         let issuer_cid = content.author_id.unwrap_or_default();
 
@@ -212,8 +221,11 @@ pub fn revoke_attestation(input: RevokeAttestationInput) -> ExternResult<Attesta
     // Resolve the original attestation entry by its CID (entry hash).
     // Note: `must_get_valid_record` accepts ActionHash only; we use `get` with
     // AnyDhtHash (accepts EntryHash) to retrieve by the CID the caller holds.
-    let original_hash = EntryHash::try_from(input.attestation_cid.clone())
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("invalid attestation_cid: {e}"))))?;
+    let original_hash = EntryHash::try_from(input.attestation_cid.clone()).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "invalid attestation_cid: {e}"
+        )))
+    })?;
     let original_record = get(AnyDhtHash::from(original_hash), GetOptions::default())?
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("attestation not found".into())))?;
     let original_content: content_store_integrity::Content = original_record
@@ -241,10 +253,8 @@ pub fn revoke_attestation(input: RevokeAttestationInput) -> ExternResult<Attesta
     }
 
     // Decode the original metadata and inject the revocation block.
-    let mut metadata: serde_json::Value =
-        serde_json::from_str(&original_content.metadata_json).map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("decode metadata: {e}")))
-        })?;
+    let mut metadata: serde_json::Value = serde_json::from_str(&original_content.metadata_json)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("decode metadata: {e}"))))?;
 
     let revoked_at = format!("{:?}", sys_time()?);
     metadata["revocation"] = serde_json::json!({
