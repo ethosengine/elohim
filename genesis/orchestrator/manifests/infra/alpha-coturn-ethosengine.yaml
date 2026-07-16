@@ -269,7 +269,8 @@ spec:
             - "--on-change-exec"
             - "pkill -TERM -x turnserver"
           env:
-            - name: CLOUDFLARE_API_TOKEN
+            # Beacon reads the Cloudflare token from CF_API_TOKEN (see relay-addr-beacon config).
+            - name: CF_API_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: relay-addr-beacon-cloudflare
