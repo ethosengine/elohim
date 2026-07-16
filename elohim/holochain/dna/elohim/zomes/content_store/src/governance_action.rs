@@ -29,15 +29,15 @@ use crate::attestation::{issue_attestation, AttestationOutput, IssueAttestationI
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProposeGovernanceActionInput {
-    pub governance_kind: String,             // e.g. "governance-action:renewal-request"
+    pub governance_kind: String, // e.g. "governance-action:renewal-request"
     pub subject_cid: String,
     pub title: String,
     pub description: Option<String>,
     pub reach: String,
-    pub threshold: serde_json::Value,        // see governance-action-metadata.schema.json
+    pub threshold: serde_json::Value, // see governance-action-metadata.schema.json
     pub eligibility_predicate: Option<serde_json::Value>,
     pub ballot_format: String,
-    pub closes_at: String,                   // RFC3339 UTC
+    pub closes_at: String, // RFC3339 UTC
     pub parameters: Option<serde_json::Value>,
 }
 
@@ -53,7 +53,7 @@ pub struct GovernanceActionOutput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VoteOnGovernanceActionInput {
     pub parent_governance_action_cid: String,
-    pub vote_value: String,                  // approve | reject | abstain
+    pub vote_value: String, // approve | reject | abstain
     pub vote_weight: Option<String>,
     pub evidence: Option<serde_json::Value>,
 }
@@ -262,7 +262,8 @@ pub fn propose_governance_action(
 ) -> ExternResult<GovernanceActionOutput> {
     if !GOVERNANCE_ACTION_KINDS.contains(&input.governance_kind.as_str()) {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "unknown_governance_action_kind: {}", input.governance_kind
+            "unknown_governance_action_kind: {}",
+            input.governance_kind
         ))));
     }
 
@@ -343,16 +344,28 @@ pub fn vote_on_governance_action(
     // EntryHash, the canonical CID form returned by propose_governance_action.
     let parent_hash = EntryHash::try_from(input.parent_governance_action_cid.clone())
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("invalid parent_cid: {e}"))))?;
-    let parent_record = get(AnyDhtHash::from(parent_hash), GetOptions::default())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("parent governance action not found".into())))?;
+    let parent_record =
+        get(AnyDhtHash::from(parent_hash), GetOptions::default())?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "parent governance action not found".into()
+            ))
+        })?;
     let parent_content: content_store_integrity::Content = parent_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("decode parent: {e}"))))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("parent is not a Content entry".into())))?;
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "parent is not a Content entry".into()
+            ))
+        })?;
 
     let parent_metadata: serde_json::Value = serde_json::from_str(&parent_content.metadata_json)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("decode parent metadata: {e}"))))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "decode parent metadata: {e}"
+            )))
+        })?;
     let subject_cid = parent_metadata["subject_cid"]
         .as_str()
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("parent has no subject_cid".into())))?
@@ -361,9 +374,12 @@ pub fn vote_on_governance_action(
     // Lookup child_attestation_kind from the hardcoded manifest mapping.
     // NOTE: This mapping should later be replaced by a codegen-emitted constant (Task A.7 follow-up).
     let child_kind = child_attestation_kind_for_governance_action(&parent_content.content_type)
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(format!(
-            "no child_attestation_kind declared for {}", parent_content.content_type
-        ))))?;
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "no child_attestation_kind declared for {}",
+                parent_content.content_type
+            )))
+        })?;
 
     let attestation_input = IssueAttestationInput {
         attestation_kind: child_kind.to_string(),
@@ -409,16 +425,28 @@ pub fn get_governance_action_with_children(
     let parent_entry_hash = EntryHash::try_from(parent_cid.clone())
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("invalid parent_cid: {e}"))))?;
     let parent_record = get(AnyDhtHash::from(parent_entry_hash), GetOptions::default())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("parent governance action not found".into())))?;
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "parent governance action not found".into()
+            ))
+        })?;
     let parent_content: content_store_integrity::Content = parent_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("decode parent: {e}"))))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("parent is not a Content entry".into())))?;
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "parent is not a Content entry".into()
+            ))
+        })?;
 
     let proposer_cid = parent_content.author_id.clone().unwrap_or_default();
     let parent_metadata: serde_json::Value = serde_json::from_str(&parent_content.metadata_json)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("decode parent metadata: {e}"))))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "decode parent metadata: {e}"
+            )))
+        })?;
     let subject_cid = parent_metadata["subject_cid"]
         .as_str()
         .unwrap_or_default()
@@ -449,12 +477,16 @@ pub fn get_governance_action_with_children(
 
     let mut children = Vec::with_capacity(child_links.len());
     for link in child_links {
-        let child_entry_hash = link
-            .target
-            .into_entry_hash()
-            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("child link target is not an EntryHash".into())))?;
+        let child_entry_hash = link.target.into_entry_hash().ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "child link target is not an EntryHash".into()
+            ))
+        })?;
 
-        let record = get(AnyDhtHash::from(child_entry_hash.clone()), GetOptions::default())?;
+        let record = get(
+            AnyDhtHash::from(child_entry_hash.clone()),
+            GetOptions::default(),
+        )?;
         let Some(record) = record else {
             continue;
         };
@@ -463,7 +495,11 @@ pub fn get_governance_action_with_children(
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("decode child: {e}"))))?
-            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("child link target is not a Content entry".into())))?;
+            .ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "child link target is not a Content entry".into()
+                ))
+            })?;
 
         let child_metadata: serde_json::Value =
             serde_json::from_str(&child_content.metadata_json).unwrap_or_default();

@@ -280,7 +280,12 @@ mod tests {
     fn graduation_record_without_floor_accepted() {
         // graduation-record is not a policy kind; it should validate without a floor sub-object.
         // Mirrors onboarding_without_floor_accepted — same principle.
-        let m = make_manifest("graduation-record", None, r#"{"appraisedAt":"2026-05-28"}"#, 1);
+        let m = make_manifest(
+            "graduation-record",
+            None,
+            r#"{"appraisedAt":"2026-05-28"}"#,
+            1,
+        );
         assert!(
             m.validate().is_ok(),
             "graduation-record manifests must not require a floor sub-object"

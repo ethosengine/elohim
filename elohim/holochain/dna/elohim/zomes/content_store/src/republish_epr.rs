@@ -20,7 +20,14 @@ use serde_json::Value;
 ///
 /// Returns `Ok(())` on success; `Err(reason)` on any schema violation.
 pub fn validate_republish_epr_event(payload: &Value) -> Result<(), String> {
-    let required = ["action", "performer", "bounded_by", "target", "payload", "signed_at"];
+    let required = [
+        "action",
+        "performer",
+        "bounded_by",
+        "target",
+        "payload",
+        "signed_at",
+    ];
     for field in required {
         if payload.get(field).is_none() {
             return Err(format!("republish-epr missing required field: {field}"));

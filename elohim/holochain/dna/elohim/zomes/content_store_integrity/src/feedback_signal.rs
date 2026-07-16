@@ -39,7 +39,14 @@ use hdi::prelude::*;
 /// Values mirror `SignalKind` enum wire names (kebab-case) from T1.
 /// `"vouch"` added in T5 (Light Up the Graph sprint).
 /// `"forget-request"` added in observation-event-layer §9.4 (right-to-be-forgotten flow).
-const SIGNAL_KINDS: &[&str] = &["squelch", "correction", "retraction", "quarantine", "vouch", "forget-request"];
+const SIGNAL_KINDS: &[&str] = &[
+    "squelch",
+    "correction",
+    "retraction",
+    "quarantine",
+    "vouch",
+    "forget-request",
+];
 
 /// Bootstrap `vouch_kind` taxonomy.
 ///

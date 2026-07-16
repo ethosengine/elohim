@@ -41,9 +41,7 @@ use serde_json::Value;
 /// Returns immediately on the first failing floor.
 /// Call only for entries where `content_type` starts with `"attestation:"` or
 /// `"governance-action:"`.
-pub fn validate_attestation_floors(
-    content: &Content,
-) -> ExternResult<ValidateCallbackResult> {
+pub fn validate_attestation_floors(content: &Content) -> ExternResult<ValidateCallbackResult> {
     let ct = content.content_type.as_str();
 
     if ct.starts_with("attestation:") {
@@ -197,10 +195,7 @@ fn floor1_governance_action_kind(content: &Content) -> Result<(), String> {
 ///    requires the op's action timestamp, which is not available inside a bare
 ///    SelfHealingEntry validator. This simplified check confirms the parent
 ///    entry is decodable and structurally valid.
-fn floor5_temporal(
-    _content: &Content,
-    meta: &Value,
-) -> ExternResult<Result<(), String>> {
+fn floor5_temporal(_content: &Content, meta: &Value) -> ExternResult<Result<(), String>> {
     // 5a: expires_at parse check
     if let Some(Value::String(exp)) = meta.get("expires_at") {
         if chrono_parse_rfc3339(exp).is_err() {
@@ -225,7 +220,10 @@ fn floor5_temporal(
             Err(reason) => return Ok(Err(format!("floor5_failed: {}", reason))),
         };
 
-        if !parent_content.content_type.starts_with("governance-action:") {
+        if !parent_content
+            .content_type
+            .starts_with("governance-action:")
+        {
             return Ok(Err(format!(
                 "floor5_failed: parent_governance_action_cid resolves to \
                  non-governance-action entry (type='{}')",
@@ -260,10 +258,7 @@ fn floor5_temporal(
 /// - `must_get_entry` to confirm the entry exists on the DHT
 /// - Decode as Content, verify `content_type` matches the current entry
 /// - Verify `author_id` matches the current entry's `author_id`
-fn floor7_revocation(
-    content: &Content,
-    meta: &Value,
-) -> ExternResult<Result<(), String>> {
+fn floor7_revocation(content: &Content, meta: &Value) -> ExternResult<Result<(), String>> {
     let supersedes_cid = match meta
         .get("revocation")
         .and_then(|r| r.get("supersedes_cid"))
@@ -319,22 +314,25 @@ fn floor8_proof_class(meta: &Value) -> Result<(), String> {
         None => return Ok(()), // No proof_evidence — floor not applicable for this entry
     };
 
-    let class = match proof_ev.get("class").and_then(|v| v.as_str()) {
-        Some(c) => c,
-        None => {
-            return Err(
+    let class =
+        match proof_ev.get("class").and_then(|v| v.as_str()) {
+            Some(c) => c,
+            None => return Err(
                 "floor8_failed: proof_evidence.class is required when proof_evidence is present"
                     .to_string(),
-            )
-        }
-    };
+            ),
+        };
 
     match class {
         "witness" => {
             // No extra material required
         }
         "audit" => {
-            if proof_ev.get("merkle_root").and_then(|v| v.as_str()).is_none() {
+            if proof_ev
+                .get("merkle_root")
+                .and_then(|v| v.as_str())
+                .is_none()
+            {
                 return Err(
                     "floor8_failed: proof_evidence.merkle_root (string) is required for \
                      class=audit"
@@ -343,7 +341,11 @@ fn floor8_proof_class(meta: &Value) -> Result<(), String> {
             }
         }
         "proof" => {
-            if proof_ev.get("proof_blob").and_then(|v| v.as_str()).is_none() {
+            if proof_ev
+                .get("proof_blob")
+                .and_then(|v| v.as_str())
+                .is_none()
+            {
                 return Err(
                     "floor8_failed: proof_evidence.proof_blob (string) is required for \
                      class=proof"
@@ -395,8 +397,7 @@ fn gov_threshold_shape(meta: &Value) -> Result<(), String> {
 
     if threshold.get("type").and_then(|v| v.as_str()).is_none() {
         return Err(
-            "gov_floor_threshold_failed: metadata.threshold.type (string) is required"
-                .to_string(),
+            "gov_floor_threshold_failed: metadata.threshold.type (string) is required".to_string(),
         );
     }
     if threshold.get("m").and_then(|v| v.as_u64()).is_none() {
@@ -425,9 +426,9 @@ fn gov_closes_at(meta: &Value) -> Result<(), String> {
             }
             Ok(())
         }
-        Some(_) => Err(
-            "gov_floor_closes_at_failed: metadata.closes_at must be a string".to_string(),
-        ),
+        Some(_) => {
+            Err("gov_floor_closes_at_failed: metadata.closes_at must be a string".to_string())
+        }
         None => Err(
             "gov_floor_closes_at_failed: metadata.closes_at is required for \
              governance-action entries"
@@ -522,11 +523,7 @@ fn chrono_parse_rfc3339(s: &str) -> Result<(), &'static str> {
     }
     // Remainder must end with 'Z' or '+HH:MM' or '-HH:MM' (optionally with fractional seconds)
     let tail = &s[19..];
-    if tail == "Z"
-        || tail.starts_with('+')
-        || tail.starts_with('-')
-        || tail.starts_with('.')
-    {
+    if tail == "Z" || tail.starts_with('+') || tail.starts_with('-') || tail.starts_with('.') {
         Ok(())
     } else {
         Err("timezone suffix invalid")
