@@ -1,6 +1,10 @@
 ---
 name: concept-mapping
 description: Use when an Elohim question is framed in conventional-computing terms — a Linux service/syscall, an OS or hardware primitive, a network protocol, a cloud/hyperscaler service, a k8s primitive — and you need the elohim-native analog AND where the concern is placed. Triggers include "what's the elohim equivalent of X", "where does X live here", "I know Linux/hardware — map my mental model".
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/concept-mapping"
 ---
 
 # Concept Mapping
