@@ -1,0 +1,44 @@
+# relay-addr-beacon — sovereign relay address beacon.
+#
+# Native crate: RUSTFLAGS is cleared (no Holochain WASM getrandom flag).
+# Point CARGO_TARGET_DIR at a writable /tmp slot in constrained environments;
+# it defaults to ./target otherwise.
+
+set dotenv-load := false
+
+export RUSTFLAGS := ""
+
+# List available recipes
+default:
+    @just --list
+
+# Build release binary
+build:
+    cargo build --release
+
+# Run the beacon (pass flags after `--`)
+run *args:
+    cargo run -- {{args}}
+
+# Type-check without building
+check:
+    cargo check
+
+# Format code
+fmt:
+    cargo fmt
+
+# Verify formatting
+fmt-check:
+    cargo fmt --check
+
+# Lint with clippy (warnings are errors)
+clippy:
+    cargo clippy --all-targets -- -D warnings
+
+# Run tests
+test:
+    cargo test
+
+# Full pre-commit gate: format check, clippy, tests.
+gate: fmt-check clippy test

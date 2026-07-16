@@ -1,0 +1,34 @@
+# relay-addr-beacon — sovereign relay address beacon.
+#
+# Self-contained crate: its OWN [workspace] stanza makes it a workspace root so
+# it is never absorbed by a parent monorepo workspace. ZERO internal path-deps —
+# only crates.io deps (served through the Nexus mirror configured in the repo's
+# .cargo/config.toml for local builds, and inline in the Dockerfile for images).
+[workspace]
+
+[package]
+name = "relay-addr-beacon"
+version = "0.1.0"
+edition = "2021"
+description = "Keeps a relay's dynamic residential WAN IP fresh in DNS (Cloudflare) and pkarr, and feeds coturn its external-ip mapping."
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "relay-addr-beacon"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive", "env"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+pkarr = { version = "3.10", default-features = false, features = ["signed_packet"] }
+bytes = "1"
+
+[profile.release]
+strip = true
+lto = "thin"

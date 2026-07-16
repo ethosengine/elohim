@@ -1,0 +1,314 @@
+# Sovereign TURN relay (coturn) — SHEM / remote-WAN leg of the DUAL-WAN
+# redundant relay pair for the alpha genesis conductor pair.
+#
+# WHY THIS EXISTS
+# ----------------
+# The genesis conductor pair straddles shem (cloud NAT) <-> on-prem (home NAT).
+# Holochain's conductor<->conductor transport is tx5/WebRTC; with STUN-only ICE
+# a srflx<->srflx pair across two NATs never forms a candidate pair, so DHT
+# `get`s of peer-authored actions fail and notary canonical heads never
+# converge. A single sovereign relay is a single point of failure for the
+# whole pair, so this replaces the former single alpha-coturn.yaml with TWO
+# independent relays — this one (shem) and its sibling
+# alpha-coturn-ethosengine.yaml — both listed in conductor ICE config so ICE
+# fails over between them. This is the minimal 2-node honest testbed for an
+# N-node federated relay commons.
+#
+# THIS PHASE IS 3478-FIRST: no tls-listening-port, no turns:, no :443/:5349,
+# no cert-manager Certificate. IPv6 is scaffolded (commented) but dormant.
+#
+# TRUST NOTE: a TURN relay sees only encrypted DTLS bytes — it relays, it
+# does not read. It IS an availability + traffic-metadata dependency, which
+# is exactly why the domain owns it (bootstrap + signal are already
+# sovereign; this is the last outsourced transport leg).
+#
+# WAN / NODE: this relay sits on the SHEM node (node-type=remote, the
+# remote-wan-tainted node — same placement as Adam's edgenode), also behind
+# Google-Fiber residential NAT — the host iface holds a private LAN IP (e.g.
+# 192.168.1.100); the public WAN IP is DYNAMIC. external-ip is NOT hand-set
+# here: the relay-addr-beacon sidecar/initContainer discovers the current
+# public IP at runtime and writes it into the live turnserver.conf
+# (coturn-run emptyDir), and keeps Cloudflare DNS (turn-shem.elohim.host)
+# pointed at it as the WAN IP drifts.
+#
+# ┌─ OPERATOR DEPLOY-TIME ACTIONS (irreducible, cluster/network-owned) ───────┐
+# │ 1. Port-forward on the shem router/gateway, targeting this node's LAN IP  │
+# │    (with a DHCP reservation so the forward doesn't go stale):            │
+# │        3478/udp   3478/tcp        (STUN/TURN)                            │
+# │        49160-49200/udp            (relay media range, matches conf below)│
+# │ 2. DNS: turn-shem.elohim.host is Cloudflare-managed; the relay-addr-beacon│
+# │    sidecar keeps its A record synced to this node's current public WAN   │
+# │    IP via the Cloudflare API token below — no manual DNS edits needed    │
+# │    once the beacon is running.                                          │
+# │ 3. Secret: provision `relay-addr-beacon-cloudflare` (key `token`) in the │
+# │    elohim-alpha namespace with a Cloudflare API token scoped to edit DNS │
+# │    on the elohim.host zone. Shared with the ethosengine leg; referenced  │
+# │    below, not created here.                                             │
+# │ 4. external-ip is beacon-managed — do NOT hand-set it in the ConfigMap   │
+# │    below; the beacon appends it into /run/turnserver.conf at runtime.   │
+# └────────────────────────────────────────────────────────────────────────┘
+#
+# IMAGE PREREQUISITE: the coturn Deployment below references
+# relay-addr-beacon:dev-latest, which a prior NORMAL (non-DEPLOY_ONLY)
+# dev-branch build must have pushed to Harbor before a DEPLOY_ONLY apply of
+# this manifest — otherwise both the beacon-init and beacon containers hit
+# ImagePullBackOff.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coturn-base-shem
+  namespace: elohim-alpha
+  labels:
+    app: coturn
+    relay-leg: shem
+    environment: alpha
+    app.kubernetes.io/name: coturn
+    app.kubernetes.io/instance: coturn-shem-alpha
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+data:
+  turnserver.conf: |
+    # coturn — sovereign Tier-A TURN relay, SHEM leg (remote-WAN, dual-WAN pair).
+    # This is the BASE config; relay-addr-beacon renders it to /run/turnserver.conf
+    # with a live external-ip line appended before coturn starts (and re-renders +
+    # restarts coturn on WAN-IP change thereafter).
+    listening-port=3478
+    # Relay media port range — MUST match the operator port-forward (see header).
+    min-port=49160
+    max-port=49200
+    # Long-term-credential mechanism with a static realm user. tx5 takes a static
+    # username/credential (it cannot do the time-limited REST flow), so use LTC,
+    # not use-auth-secret.
+    lt-cred-mech
+    realm=elohim.host
+    # Static user. Alpha idiom = inline dev credential; harden via the pipeline
+    # secret path for prod. Keep in sync with the ethosengine leg and with the
+    # conductor's ICE config (iceServers credential in the human manifests).
+    user=elohim:alpha-turn-commons-2026
+    # external-ip is intentionally ABSENT here — relay-addr-beacon appends it
+    # into the rendered /run/turnserver.conf at runtime (this node sits behind
+    # residential NAT with a dynamic public WAN IP; the base conf can't know it).
+    fingerprint
+    stale-nonce=600
+    no-cli
+    no-multicast-peers
+    # Do not relay to private/link-local/loopback ranges (SSRF hygiene on a
+    # public relay). Deliberately NO allowed-peer-ip — an allow-list here would
+    # block relay to ~all real internet peers (the bug this replaces fixed).
+    denied-peer-ip=10.0.0.0-10.255.255.255
+    denied-peer-ip=172.16.0.0-172.31.255.255
+    denied-peer-ip=192.168.0.0-192.168.255.255
+    denied-peer-ip=169.254.0.0-169.254.255.255
+    denied-peer-ip=127.0.0.0-127.255.255.255
+    # IPv6 denied-peer-ip — v6 relay is not yet a supported transport here,
+    # but these denies are active regardless: coturn binds all addresses by
+    # default, so if the host has a routable IPv6, an SSRF guard must exist
+    # even while v6 relay itself stays dormant.
+    denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+    denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+    denied-peer-ip=::1
+    log-file=stdout
+    simple-log
+    verbose
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coturn-shem
+  namespace: elohim-alpha
+  labels:
+    app: coturn
+    relay-leg: shem
+    environment: alpha
+    app.kubernetes.io/name: coturn
+    app.kubernetes.io/instance: coturn-shem-alpha
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  replicas: 1
+  # Single relay per leg; recreate rather than run two binding the same host ports.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: coturn
+      relay-leg: shem
+      environment: alpha
+  template:
+    metadata:
+      labels:
+        app: coturn
+        relay-leg: shem
+        environment: alpha
+        app.kubernetes.io/name: coturn
+        app.kubernetes.io/instance: coturn-shem-alpha
+        app.kubernetes.io/component: infra
+        app.kubernetes.io/part-of: elohim
+        app.kubernetes.io/managed-by: jenkins
+    spec:
+      # Pinned to shem (node-type=remote) — mirrors Adam's edgenode placement;
+      # REQUIRED so hostNetwork binds the correct public-facing interface.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - remote
+      # shem carries the WAN/remote-zone taint (remote-wan=true:NoSchedule),
+      # kept by the operator to keep cluster infra + dev tooling off the
+      # ISP-latency node by default. This relay belongs there, so tolerate it.
+      tolerations:
+        - key: remote-wan
+          operator: Exists
+          effect: NoSchedule
+      # Raw UDP/TCP + a media port range cannot ride the HTTP nginx ingress and
+      # this cluster has no LoadBalancer/MetalLB — bind the host directly.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      # Lets the beacon sidecar see + signal the coturn process in-pod to apply
+      # a fresh external-ip after a WAN-IP change.
+      shareProcessNamespace: true
+      initContainers:
+        # Renders the live turnserver.conf (base + current external-ip) BEFORE
+        # coturn starts, so coturn never boots advertising a stale/absent
+        # external-ip. Also does a one-shot DNS sync so turn-shem.elohim.host
+        # is correct even if the pod was down across a WAN-IP change.
+        - name: beacon-init
+          image: harbor.ethosengine.com/ethosengine/relay-addr-beacon:dev-latest
+          imagePullPolicy: Always
+          args:
+            - "--once"
+            - "--sink"
+            - "coturn"
+            - "--record-name"
+            - "turn-shem.elohim.host"
+            - "--cf-zone"
+            - "elohim.host"
+            - "--coturn-base-conf"
+            - "/base/turnserver.conf"
+            - "--coturn-out-conf"
+            - "/etc/coturn-run/turnserver.conf"
+            - "--state-dir"
+            - "/var/lib/relay-addr-beacon"
+          volumeMounts:
+            - name: coturn-base
+              mountPath: /base
+              readOnly: true
+            - name: coturn-run
+              mountPath: /etc/coturn-run
+            - name: beacon-state
+              mountPath: /var/lib/relay-addr-beacon
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["KILL"]
+      containers:
+        - name: coturn
+          image: coturn/coturn:4.6.2
+          args: ["-c", "/etc/coturn-run/turnserver.conf"]
+          ports:
+            - name: turn-udp
+              containerPort: 3478
+              protocol: UDP
+              hostPort: 3478
+            - name: turn-tcp
+              containerPort: 3478
+              protocol: TCP
+              hostPort: 3478
+            # Relay media range (49160-49200/udp) is not individually declared
+            # here — hostNetwork=true binds whatever coturn opens directly; the
+            # operator port-forward (see header) is what actually gates it.
+          volumeMounts:
+            - name: coturn-run
+              mountPath: /etc/coturn-run
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+        # Long-running sidecar: re-checks the public WAN IP every 30s, keeps
+        # Cloudflare DNS + the live turnserver.conf in sync, and restarts
+        # coturn in-place (shareProcessNamespace) when the IP actually changes.
+        - name: beacon
+          image: harbor.ethosengine.com/ethosengine/relay-addr-beacon:dev-latest
+          imagePullPolicy: Always
+          args:
+            - "--interval-secs"
+            - "30"
+            - "--sink"
+            - "coturn"
+            - "--sink"
+            - "cloudflare"
+            - "--record-name"
+            - "turn-shem.elohim.host"
+            - "--cf-zone"
+            - "elohim.host"
+            - "--coturn-base-conf"
+            - "/base/turnserver.conf"
+            - "--coturn-out-conf"
+            - "/etc/coturn-run/turnserver.conf"
+            - "--state-dir"
+            - "/var/lib/relay-addr-beacon"
+            # coturn has no config-reload signal for external-ip; the sidecar
+            # shares the pod's process namespace (shareProcessNamespace: true
+            # above), so SIGTERM-ing the turnserver process is enough — the
+            # kubelet restarts just the `coturn` container (restartPolicy
+            # Always applies per-container), which re-reads the freshly
+            # rendered /etc/coturn-run/turnserver.conf.
+            - "--on-change-exec"
+            - "pkill -TERM -x turnserver"
+          env:
+            - name: CLOUDFLARE_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: relay-addr-beacon-cloudflare
+                  key: token
+          volumeMounts:
+            - name: coturn-base
+              mountPath: /base
+              readOnly: true
+            - name: coturn-run
+              mountPath: /etc/coturn-run
+            - name: beacon-state
+              mountPath: /var/lib/relay-addr-beacon
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["KILL"]
+      volumes:
+        - name: coturn-base
+          configMap:
+            name: coturn-base-shem
+        - name: coturn-run
+          emptyDir: {}
+        - name: beacon-state
+          emptyDir: {}
