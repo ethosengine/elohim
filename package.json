@@ -16,6 +16,7 @@
   },
   "scripts": {
     "prepare": "husky",
+    "epr": "RUSTFLAGS= CARGO_TARGET_DIR=/tmp/eprfs-onboarding-target cargo run --manifest-path elohim/eprfs/Cargo.toml -q -p elohim-epr-cli --",
     "app:dev": "pnpm --filter elohim-app start",
     "app:build": "pnpm --filter elohim-app build",
     "app:test": "pnpm --filter elohim-app test",

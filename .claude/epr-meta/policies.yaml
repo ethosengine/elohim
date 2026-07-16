@@ -117,3 +117,64 @@ policies:
       unqualified self-sovereignty can't model wards/IDD/seniors — the right is exercised WITH/THROUGH
       others). Dismissals aggregate to sovereignty-guard-signal.py so the RULE itself surfaces for drift
       review: the protocol governing the bytes of its own repo.
+
+  - id: archetype-resource-alignment
+    version: 1
+    title: Device-archetype resource alignment — one class, one budget
+    binding: binding-local
+    class: ask
+    scope: { write: "deployments.json" }
+    validator: epr:validator-archetype-resource-alignment
+    status: active
+    established_by: operator-ratification-pending-2026-07-16
+    why: >
+      Per-human conductor resources are a CLASS property (deviceArchetype), not an instance one.
+      The floor-only conformance check (validate-deployments.ts, `>= archetype floor`) lets any
+      human sit anywhere above its floor, so firefighting drifts the tree: the ONE crashlooping
+      instance gets bumped while the rest of its archetype is left behind (2026-07: home-nuc held
+      1000m/2000m/3000m across pete/gertrude/eve for the SAME device class). This inverts control
+      — the archetype budget in genesis/data/devices/archetype-resource-budgets.json is the
+      CANONICAL value each consolidated human derives; a human that differs must say WHY via
+      `resourceOverride: { <field>, justification }` (adam, the genesis anchor + doorway-B backend,
+      is the model: an explicit role-justified 8000m over the 4000m family-node base). When an
+      OBSERVATION says a class needs more, move the budget once (realigns the whole class) rather
+      than editing an instance. `ask` tier: surfaces the drift + names each offending human, one
+      keystroke (EPR_META_ACK=1) to proceed; dismissals aggregate for drift review. Static
+      observation, no live metrics dependency — the value is reasoned once and held by the class.
+
+  - id: test-bench-aggregate-capacity
+    version: 1
+    title: Alpha test-bench aggregate capacity — portfolio within observed envelope
+    binding: binding-local
+    class: ask
+    scope: { write: "*.json" }
+    validator: epr:validator-test-bench-aggregate-capacity
+    status: active
+    established_by: operator-ratification-pending-2026-07-16
+    why: >
+      A per-human budget can be locally coherent and still make an impossible portfolio. This policy
+      composes the archetype rule upward to the operator-promoted Category-C capacity ledger at
+      genesis/data/rakia/compute-capacity.json, governed by
+      epr:alpha-test-bench-compute-envelope. It replaces the ledger's previously observed human
+      allocation with the prospective active deployments, retains non-human commitments, and checks
+      aggregate CPU/memory requests AND limits against cluster.totalAllocatable. It evaluates edits
+      from either side (deployments or capacity), uses no live kubectl/Prometheus dependency, and is
+      deliberately `ask`: arithmetic supplies the substrate evidence while the steward retains local
+      agency and explicitly ratifies any intentional overcommit at reach.
+
+  - id: eprfs-meta-domain-neutrality
+    version: 1
+    title: EPRFS meta evaluator stays policy-domain neutral
+    binding: binding-local
+    class: ask
+    scope: { write: "*.rs" }
+    validator: epr:validator-eprfs-meta-domain-neutrality
+    status: active
+    established_by: operator-direction-2026-07-16
+    why: >
+      eprfs-meta defines the ontology and execution interfaces for policies; it must not embed
+      concrete validator identities or repository-domain evaluation logic. Concrete policy code
+      belongs behind ValidatorProvider in the application composition root (and can later be
+      replaced by content-addressed EPR/WASM resolution). A net-new concrete epr:validator-* ref in
+      this publishable crate therefore requires explicit reach acknowledgement. The crate's Rust
+      architecture test independently proves the zero-concrete-reference invariant.

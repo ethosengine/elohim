@@ -1,0 +1,8 @@
+# Generated from McpProfilePackage:elohim-project by package-projections.mjs.
+# Edit .epr-meta/elohim/packages/mcp-{servers,profiles}, not this file.
+
+[mcp_servers.jenkins]
+url = "https://jenkins.ethosengine.com/mcp-server/mcp"
+required = false
+startup_timeout_sec = 15
+tool_timeout_sec = 60

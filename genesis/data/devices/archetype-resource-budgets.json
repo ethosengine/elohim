@@ -1,6 +1,7 @@
 {
   "$comment": "Machine-readable k8s resource-budget FLOOR per deviceArchetype — the contract that was missing when adam under-provisioned silently (backlog archetype-resource-conformance-validation-gap.md). Each human's EFFECTIVE conductor resources (template humans: deployments.json edgenode* fields; explicit-manifest humans e.g. adam: the resources block in their manifest YAML) MUST be >= its archetype floor here. A human MAY exceed the floor for its role (e.g. adam, the genesis anchor + doorway-B backend + seed target, runs cpu limit 8000m vs the family-node-base 4000m floor). validate-deployments.ts enforces this (wired into .husky/pre-push). WHEN YOU BUMP an archetype's baseline sizing, bump the floor here in the same commit — the gate then flags any human left behind (which is exactly the adam/matthew 2026-06-15 propagation drift this closes). Floors seeded 2026-07-07 from the reconciled post-shem-relief baselines: non-family remote fixtures restore to 1000m CPU limit, while family-node anchors remain higher. Physical hardware specs live in devices.json / device-archetypes-design.md; this file is the k8s-budget projection of those, pending the design doc's not-yet-built 'operational envelope derivation'.",
   "schemaVersion": 1,
+  "$alignmentPolicyComment": "2026-07-16: these values are now the CANONICAL per-archetype budget enforced by the archetype-resource-alignment epr-meta rule (.claude/epr-meta/policies.yaml), not merely a >= floor. A consolidated human MUST equal its archetype value unless it declares resourceOverride:{<field>,justification} in deployments.json (adam/jessica/james do). device-home-nuc cpuLimit 1000m->2000m: eve+gertrude (home-nuc) liveness-crashlooped at 1000m during post-outage DHT resync; 2000m covers observed ~1.1-core use + headroom. recycled-laptop/chromebook/pi stay at 1000m and lean on the template startupProbe (the real fix) instead of per-instance CPU inflation.",
   "budgets": {
     "device-family-node-base": {
       "cpuRequest": "1500m",
@@ -23,7 +24,7 @@
     },
     "device-home-nuc": {
       "cpuRequest": "250m",
-      "cpuLimit": "1000m",
+      "cpuLimit": "2000m",
       "memoryRequest": "768Mi",
       "memoryLimit": "3Gi"
     },
