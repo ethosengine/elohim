@@ -10,7 +10,7 @@
 # converge. A single sovereign relay is a single point of failure for the
 # whole pair, so this replaces the former single alpha-coturn.yaml with TWO
 # independent relays — this one (shem) and its sibling
-# alpha-coturn-ethosengine.yaml — both listed in conductor ICE config so ICE
+# alpha-coturn-operations.yaml — both listed in conductor ICE config so ICE
 # fails over between them. This is the minimal 2-node honest testbed for an
 # N-node federated relay commons.
 #
@@ -42,7 +42,7 @@
 # │    once the beacon is running.                                          │
 # │ 3. Secret: provision `relay-addr-beacon-cloudflare` (key `token`) in the │
 # │    elohim-alpha namespace with a Cloudflare API token scoped to edit DNS │
-# │    on the elohim.host zone. Shared with the ethosengine leg; referenced  │
+# │    on the elohim.host zone. Shared with the operations leg; referenced  │
 # │    below, not created here.                                             │
 # │ 4. external-ip is beacon-managed — do NOT hand-set it in the ConfigMap   │
 # │    below; the beacon appends it into /run/turnserver.conf at runtime.   │
@@ -84,7 +84,7 @@ data:
     lt-cred-mech
     realm=elohim.host
     # Static user. Alpha idiom = inline dev credential; harden via the pipeline
-    # secret path for prod. Keep in sync with the ethosengine leg and with the
+    # secret path for prod. Keep in sync with the operations leg and with the
     # conductor's ICE config (iceServers credential in the human manifests).
     user=elohim:alpha-turn-commons-2026
     # external-ip is intentionally ABSENT here — relay-addr-beacon appends it

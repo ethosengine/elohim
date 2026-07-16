@@ -1,5 +1,5 @@
-# Sovereign TURN relay (coturn) — ETHOSENGINE / on-prem leg of the DUAL-WAN
-# redundant relay pair for the alpha genesis conductor pair.
+# Sovereign TURN relay (coturn) — OPERATIONS / Intel-NUC (on-prem) leg of the
+# DUAL-WAN redundant relay pair for the alpha genesis conductor pair.
 #
 # WHY THIS EXISTS
 # ----------------
@@ -9,8 +9,8 @@
 # `get`s of peer-authored actions fail and notary canonical heads never
 # converge. A single sovereign relay is a single point of failure for the
 # whole pair, so this replaces the former single alpha-coturn.yaml with TWO
-# independent relays — this one (ethosengine/on-prem) and its sibling
-# alpha-coturn-shem.yaml — both listed in conductor ICE config so ICE fails
+# independent relays — this one (operations / Intel-NUC, on-prem) and its
+# sibling alpha-coturn-shem.yaml — both listed in conductor ICE config so ICE fails
 # over between them. This is the minimal 2-node honest testbed for an
 # N-node federated relay commons.
 #
@@ -22,17 +22,25 @@
 # is exactly why the domain owns it (bootstrap + signal are already
 # sovereign; this is the last outsourced transport leg).
 #
-# WAN / NODE: this relay sits on the ETHOSENGINE node (node-type=operations),
-# behind Google-Fiber residential NAT — the host iface holds a private LAN IP
-# (e.g. 192.168.1.100); the public WAN IP is DYNAMIC. external-ip is NOT
+# NODE: node-type=operations == the Intel-NUC — the always-on on-prem infra
+# node (mongodb / nats / doorway-alpha hard-pin here too; hard-pinned so the
+# pod can't drift onto an edge node). It sits behind the ETHOSENGINE Google-Fiber
+# WAN — the node the home router forwards 3478 to. NOTE: matthew's doorway is
+# also "on ethosengine" — but that's an HTTP pod on THIS same node behind the
+# :443 ingress; this relay is the separate hostNetwork UDP plane (3478 + media
+# range), so there is no port conflict. Behind residential NAT the host iface
+# holds a private LAN IP — intel-nuc is 192.168.86.102 on matthew's household
+# LAN; the public WAN IP is DYNAMIC and SHARED (intel-nuc + ethosengine sit
+# behind one Google-Fiber router -> one public IP: 136.51.77.49 = elohim.host).
+# external-ip is NOT
 # hand-set here: the relay-addr-beacon sidecar/initContainer discovers the
 # current public IP at runtime and writes it into the live turnserver.conf
 # (coturn-run emptyDir), and keeps Cloudflare DNS (turn.elohim.host) pointed
 # at it as the WAN IP drifts.
 #
 # ┌─ OPERATOR DEPLOY-TIME ACTIONS (irreducible, cluster/network-owned) ───────┐
-# │ 1. Port-forward on the ethosengine router/gateway, targeting this node's  │
-# │    LAN IP (with a DHCP reservation so the forward doesn't go stale):      │
+# │ 1. Port-forward on matthew's household Google-Fiber router (.86 LAN) to  │
+# │    the INTEL-NUC 192.168.86.102 (DHCP-reserve .102 so it can't drift):    │
 # │        3478/udp   3478/tcp        (STUN/TURN)                            │
 # │        49160-49200/udp            (relay media range, matches conf below)│
 # │ 2. DNS: turn.elohim.host is Cloudflare-managed; the relay-addr-beacon     │
@@ -45,6 +53,12 @@
 # │ 4. external-ip is beacon-managed — do NOT hand-set it in the ConfigMap   │
 # │    below; the beacon appends it into /run/turnserver.conf at runtime.   │
 # └────────────────────────────────────────────────────────────────────────┘
+#
+# NAT HAIRPIN (confirm at smoke-test, not a pre-req): matthew's conductor on
+# ethosengine reaching turn.elohim.host (its own shared WAN IP) to hit this
+# relay needs the household router to do NAT hairpin/loopback. If it doesn't,
+# ICE just forms the candidate pair through turn-shem.elohim.host instead
+# (cross-WAN, no hairpin; adam lives on shem) — the dual-relay redundancy.
 #
 # IMAGE PREREQUISITE: the coturn Deployment below references
 # relay-addr-beacon:dev-latest, which a prior NORMAL (non-DEPLOY_ONLY)
@@ -68,7 +82,7 @@ metadata:
     app.kubernetes.io/managed-by: jenkins
 data:
   turnserver.conf: |
-    # coturn — sovereign Tier-A TURN relay, ETHOSENGINE leg (on-prem, dual-WAN pair).
+    # coturn — sovereign Tier-A TURN relay, OPERATIONS / Intel-NUC leg (on-prem, dual-WAN pair).
     # This is the BASE config; relay-addr-beacon renders it to /run/turnserver.conf
     # with a live external-ip line appended before coturn starts (and re-renders +
     # restarts coturn on WAN-IP change thereafter).
@@ -147,7 +161,7 @@ spec:
         app.kubernetes.io/part-of: elohim
         app.kubernetes.io/managed-by: jenkins
     spec:
-      # Pinned to the ethosengine on-prem node (node-type=operations).
+      # Pinned to the operations node (Intel-NUC, node-type=operations).
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

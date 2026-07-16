@@ -89,7 +89,7 @@ data:
           # the shem-side genesis anchor, the exact peer whose fetches toward the
           # household fail. The prior diagnostic relay (openrelay.metered.ca)
           # went globally dead 2026-07-13; replaced by our own coturn pair
-          # (`genesis/orchestrator/manifests/infra/alpha-coturn-ethosengine.yaml`,
+          # (`genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml`,
           # `alpha-coturn-shem.yaml`). Keep the credential in sync with those
           # ConfigMaps' `user=`.
           # Dual-WAN ICE failover: ethosengine (on-prem) relay primary, shem
