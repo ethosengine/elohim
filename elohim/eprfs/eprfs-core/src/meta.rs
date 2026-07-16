@@ -96,6 +96,15 @@ pub struct GovernanceRule {
     pub class: GovernanceRuleClass,
     pub when: Value,
     pub predicate: GovernanceRulePredicate,
+    /// Predicate-specific authored data, preserved losslessly for native
+    /// evaluators (`require-frontmatter` fields, `route-to.dest`, measure
+    /// ceilings, validator refs, and so on).
+    #[serde(default)]
+    pub parameters: Value,
+    /// The version-pinned registry policy that produced this rule, when the
+    /// concrete rule was expanded from a policy binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy_ref: Option<String>,
     pub why: Option<String>,
 }
 

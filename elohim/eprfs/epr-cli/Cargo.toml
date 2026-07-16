@@ -1,0 +1,28 @@
+[package]
+name = "elohim-epr-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Native Elohim development coherence and reach-readiness tooling"
+publish = false
+
+[lib]
+name = "elohim_epr_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "epr"
+path = "src/main.rs"
+
+[dependencies]
+eprfs-core = { path = "../eprfs-core" }
+eprfs-host = { path = "../eprfs-host" }
+eprfs-meta = { path = "../eprfs-meta" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

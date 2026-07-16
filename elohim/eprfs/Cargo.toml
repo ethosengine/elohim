@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "epr-cli",
     "eprfs-agent",
     "eprfs-cli",
     "eprfs-core",

@@ -1,7 +1,15 @@
 //! `.epr-meta` authored-source adapter for eprfs.
 //!
-//! This crate resolves the current directory-local format into the eprfs EPR
-//! meta model. It does not replace the existing hook resolver yet.
+//! This crate resolves and evaluates the current directory-local format into
+//! the eprfs EPR meta model. The Python hook remains a compatibility adapter
+//! while the shared parity corpus proves the native evaluator.
+
+mod evaluation;
+
+pub use evaluation::{
+    evaluate_path, evaluate_path_with, GovernanceEvaluation, GovernanceVerdict, GovernanceWrite,
+    NoValidators, PolicyDiagnostic, ValidatorOutcome, ValidatorProvider, ValidatorRequest,
+};
 
 use std::{
     collections::BTreeMap,
@@ -20,6 +28,9 @@ use serde_json::Value;
 
 pub const MANIFEST_NAME: &str = ".epr-meta";
 pub const MANIFEST_FILE_NAME: &str = "manifest.md";
+pub const MAX_CASCADE_DEPTH: usize = 32;
+pub const MAX_MANIFEST_BYTES: usize = 64 * 1024;
+pub const MAX_FLOW_DEPTH: usize = 64;
 
 pub type Result<T> = std::result::Result<T, EprMetaError>;
 
@@ -41,6 +52,18 @@ pub enum EprMetaError {
         #[source]
         source: serde_yaml::Error,
     },
+
+    #[error(".epr-meta manifest {path:?} exceeds the {limit}-byte safety limit")]
+    ManifestTooLarge { path: PathBuf, limit: usize },
+
+    #[error(".epr-meta manifest {0:?} exceeds the YAML nesting safety limit")]
+    NestingTooDeep(PathBuf),
+
+    #[error("unsupported epr-meta-version {version} in {path:?}; expected 1")]
+    UnsupportedVersion { path: PathBuf, version: u32 },
+
+    #[error("invalid covers value `{covers}` in {path:?}; expected subtree or dir-only")]
+    InvalidCovers { path: PathBuf, covers: String },
 
     #[error(transparent)]
     Eprfs(#[from] eprfs_core::EprfsError),
@@ -104,7 +127,7 @@ fn collect_cascade(repo_root: &Path, target: &Path) -> Vec<PathBuf> {
     };
     let mut chain = Vec::new();
 
-    loop {
+    for _ in 0..MAX_CASCADE_DEPTH {
         if let Some(meta) = manifest_for_dir(&current) {
             let is_root = read_authored_meta(&meta)
                 .map(|authored| authored.root)
@@ -161,16 +184,64 @@ fn meta_subject_dir(meta: &Path) -> Option<&Path> {
 }
 
 fn read_authored_meta(path: &Path) -> Result<AuthoredMeta> {
+    let metadata = fs::metadata(path).map_err(|source| EprMetaError::Read {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    if metadata.len() > MAX_MANIFEST_BYTES as u64 {
+        return Err(EprMetaError::ManifestTooLarge {
+            path: path.to_path_buf(),
+            limit: MAX_MANIFEST_BYTES,
+        });
+    }
     let text = fs::read_to_string(path).map_err(|source| EprMetaError::Read {
         path: path.to_path_buf(),
         source,
     })?;
     let frontmatter =
         frontmatter(&text).ok_or_else(|| EprMetaError::MissingFrontmatter(path.into()))?;
-    serde_yaml::from_str(frontmatter).map_err(|source| EprMetaError::Parse {
-        path: path.to_path_buf(),
-        source,
-    })
+    if !flow_depth_ok(frontmatter) {
+        return Err(EprMetaError::NestingTooDeep(path.to_path_buf()));
+    }
+    let authored: AuthoredMeta =
+        serde_yaml::from_str(frontmatter).map_err(|source| EprMetaError::Parse {
+            path: path.to_path_buf(),
+            source,
+        })?;
+    if authored.version != 1 {
+        return Err(EprMetaError::UnsupportedVersion {
+            path: path.to_path_buf(),
+            version: authored.version,
+        });
+    }
+    if let Some(covers) = authored
+        .covers
+        .as_deref()
+        .filter(|covers| !matches!(*covers, "subtree" | "dir-only"))
+    {
+        return Err(EprMetaError::InvalidCovers {
+            path: path.to_path_buf(),
+            covers: covers.to_string(),
+        });
+    }
+    Ok(authored)
+}
+
+fn flow_depth_ok(text: &str) -> bool {
+    let mut depth = 0usize;
+    for byte in text.bytes() {
+        match byte {
+            b'[' | b'{' => {
+                depth += 1;
+                if depth > MAX_FLOW_DEPTH {
+                    return false;
+                }
+            }
+            b']' | b'}' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    true
 }
 
 fn frontmatter(text: &str) -> Option<&str> {
@@ -216,7 +287,7 @@ fn merge_coupling(target: &mut EprHeadCoupling, source: &EprHeadCoupling) {
 #[serde(rename_all = "kebab-case")]
 struct AuthoredMeta {
     #[serde(rename = "epr-meta-version")]
-    _version: u32,
+    version: u32,
     id: Option<String>,
     #[serde(default)]
     root: bool,
@@ -228,7 +299,7 @@ struct AuthoredMeta {
     #[serde(default)]
     validators: Vec<AuthoredValidator>,
     #[serde(default)]
-    cites: Vec<String>,
+    cites: Vec<serde_yaml::Value>,
 }
 
 impl AuthoredMeta {
@@ -289,7 +360,7 @@ impl AuthoredMeta {
             purpose: self.purpose.clone(),
             coupling: self.coupling.clone().unwrap_or_default().into(),
             governance,
-            cites: self.cites.clone(),
+            cites: self.cites.iter().map(authored_cite_text).collect(),
             source: EprMetaSource {
                 format: ".epr-meta".into(),
                 path: source_projection_path,
@@ -297,6 +368,16 @@ impl AuthoredMeta {
             },
             metadata: Value::Null,
         })
+    }
+}
+
+fn authored_cite_text(value: &serde_yaml::Value) -> String {
+    match value {
+        serde_yaml::Value::String(text) => text.clone(),
+        value => serde_yaml::to_string(value)
+            .unwrap_or_else(|_| "<unreadable-cite>".into())
+            .trim()
+            .to_string(),
     }
 }
 
@@ -362,6 +443,8 @@ impl AuthoredRule {
                 class: rule_class(self.class.as_deref()),
                 when: yaml_to_json(self.when.as_ref()),
                 predicate: self.predicate(),
+                parameters: self.predicate_parameters(),
+                policy_ref: None,
                 why: self.why.clone(),
             }),
             policy: self.policy.as_ref().map(|policy| GovernancePolicyBinding {
@@ -395,6 +478,30 @@ impl AuthoredRule {
             GovernanceRulePredicate::Validator
         } else {
             GovernanceRulePredicate::Unknown
+        }
+    }
+
+    fn predicate_parameters(&self) -> Value {
+        if let Some(value) = self.require_frontmatter.as_ref() {
+            yaml_to_json(Some(value))
+        } else if let Some(value) = self.allowed_types.as_ref() {
+            yaml_to_json(Some(value))
+        } else if let Some(value) = self.route_to.as_ref() {
+            yaml_to_json(Some(value))
+        } else if let Some(value) = self.no_new_subdirs {
+            Value::Bool(value)
+        } else if let Some(value) = self.require_sibling.as_ref() {
+            Value::String(value.clone())
+        } else if let Some(value) = self.dedupe_of.as_ref() {
+            Value::String(value.clone())
+        } else if let Some(value) = self.max_files.as_ref() {
+            yaml_to_json(Some(value))
+        } else if let Some(value) = self.measure.as_ref() {
+            yaml_to_json(Some(value))
+        } else if let Some(value) = self.validator.as_ref() {
+            Value::String(value.clone())
+        } else {
+            Value::Null
         }
     }
 }
@@ -441,6 +548,55 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    fn rust_sources(directory: &Path, out: &mut Vec<PathBuf>) {
+        for entry in fs::read_dir(directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                rust_sources(&path, out);
+            } else if path.extension().and_then(|value| value.to_str()) == Some("rs") {
+                out.push(path);
+            }
+        }
+    }
+
+    #[test]
+    fn publishable_meta_crate_embeds_no_concrete_validator_identity() {
+        let marker = ["epr:", "validator-"].concat();
+        let mut sources = Vec::new();
+        rust_sources(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+            &mut sources,
+        );
+        let offenders: Vec<_> = sources
+            .iter()
+            .filter(|path| fs::read_to_string(path).unwrap().contains(&marker))
+            .cloned()
+            .collect();
+        assert!(
+            offenders.is_empty(),
+            "concrete validator identities belong behind ValidatorProvider, found in {offenders:?}"
+        );
+
+        let provider_impl = ["impl Validator", "Provider for "].concat();
+        let implementations: Vec<_> = sources
+            .into_iter()
+            .filter_map(|path| {
+                let content = fs::read_to_string(&path).unwrap();
+                content.contains(&provider_impl).then_some((path, content))
+            })
+            .collect();
+        assert_eq!(
+            implementations.len(),
+            1,
+            "eprfs-meta may provide only its neutral no-provider fallback"
+        );
+        let neutral_impl = format!("{provider_impl}NoValidators");
+        assert!(
+            implementations[0].1.contains(&neutral_impl),
+            "a concrete ValidatorProvider implementation belongs in a host composition root"
+        );
+    }
 
     #[test]
     fn resolves_meta_cascade_for_path() {
@@ -594,5 +750,30 @@ rules:
             resolution.effective_rules[0].predicate,
             GovernanceRulePredicate::RouteTo
         );
+    }
+
+    #[test]
+    fn rejects_unsupported_manifest_versions() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join(MANIFEST_NAME);
+        fs::write(&path, "---\nepr-meta-version: 2\nroot: true\n---\n").unwrap();
+
+        let error = parse_meta_file(&path).unwrap_err();
+
+        assert!(matches!(
+            error,
+            EprMetaError::UnsupportedVersion { version: 2, .. }
+        ));
+    }
+
+    #[test]
+    fn rejects_oversized_manifests_before_yaml_parsing() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join(MANIFEST_NAME);
+        fs::write(&path, "x".repeat(MAX_MANIFEST_BYTES + 1)).unwrap();
+
+        let error = parse_meta_file(&path).unwrap_err();
+
+        assert!(matches!(error, EprMetaError::ManifestTooLarge { .. }));
     }
 }
