@@ -4,7 +4,8 @@ description: Quarterly horizon-scan of the LLM-memory landscape for the cartogra
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/mem-horizon-scan/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/mem-horizon-scan.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/mem-horizon-scan"
 ---

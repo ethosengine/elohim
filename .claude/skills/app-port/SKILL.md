@@ -1,6 +1,10 @@
 ---
 name: app-port
 description: Use when bringing an external app or prior-art onto the Elohim Protocol — "how would Hylo / this repo work native here", "port my app to elohim", "decompose this product onto the protocol", onboarding an external developer's codebase or product vision. For an INTERNAL feature exploration (not external prior-art), use atlas-grounding instead.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/app-port"
 ---
 
 # App Port

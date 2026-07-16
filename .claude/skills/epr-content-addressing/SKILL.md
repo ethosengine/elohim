@@ -2,8 +2,9 @@
 name: epr-content-addressing
 description: Reference for content linking in the Elohim Protocol — how links carry knowledge, value, and governance context, how reach is earned at authoring, how links adapt to where the learner is, and how verified content addressing works. Use when authoring content links, explaining the architecture, creating content with verified fingerprints, or helping developers understand context-aware linking.
 metadata:
-  author: elohim-protocol
-  version: 1.2.0
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/epr-content-addressing"
 ---
 
 # Content Linking in the Elohim Protocol

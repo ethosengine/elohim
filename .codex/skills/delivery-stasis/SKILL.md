@@ -4,7 +4,8 @@ description: "Drive the WHOLE development cycle to stasis against the developer 
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/delivery-stasis/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/delivery-stasis.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/delivery-stasis"
 ---

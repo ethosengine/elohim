@@ -2,8 +2,9 @@
 name: tauri-desktop
 description: REFERENCE knowledge for Tauri 2.9 DESKTOP SHELL development — tauri-plugin-holochain integration, doorway identity handoff via key bundle crypto, deep linking (cold-start + warm-start buffering), IPC command patterns. Use when "set up Tauri shell", "embed Holochain conductor in steward app", "handle deep links", "desktop identity flow", or working on steward native identity. NOT for starting local dev services (use hc-dev-orchestrator).
 metadata:
-  author: elohim-protocol
-  version: 1.0.0
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/tauri-desktop"
 ---
 
 # Tauri Desktop Reference

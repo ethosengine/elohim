@@ -4,7 +4,8 @@ description: Reference for libp2p swarm setup, transport configuration, and beha
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/libp2p-transport/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/libp2p-transport.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/libp2p-transport"
 ---

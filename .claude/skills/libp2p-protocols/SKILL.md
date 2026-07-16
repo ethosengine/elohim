@@ -2,8 +2,9 @@
 name: libp2p-protocols
 description: Reference for Elohim custom libp2p protocols, request-response codecs, message serialization (MessagePack), and wire format specification. Use when someone asks "add a new protocol", "implement a codec", "debug message serialization", "wire format", or works with sync/shard protocol handlers.
 metadata:
-  author: elohim-protocol
-  version: 1.0.0
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/libp2p-protocols"
 ---
 
 # libp2p Protocols Reference

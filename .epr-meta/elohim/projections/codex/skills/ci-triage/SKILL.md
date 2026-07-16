@@ -4,7 +4,8 @@ description: Surface-level CI/CD failure diagnosis from build logs — under 5 m
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/ci-triage/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/ci-triage.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/ci-triage"
 ---

@@ -4,7 +4,8 @@ description: Reference for Automerge 0.5 CRDT sync engine, stream positions, del
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/automerge-sync/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/automerge-sync.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/automerge-sync"
 ---

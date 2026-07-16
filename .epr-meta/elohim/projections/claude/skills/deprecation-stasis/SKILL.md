@@ -1,6 +1,10 @@
 ---
 name: deprecation-stasis
 description: Drive the deprecation/security-concern discipline to stasis in one loop — reconcile the deterministic ledger (.claude/data/deprecations.jsonl) against the canonical backlog (genesis/data/timeline/backlog/{deprecation,security}-*.md), dispatch deprecation-triage for the highest-leverage open item, re-check blocked items whose blockers may have cleared, re-measure, repeat until stasis. Sibling of /memory-stasis-loop (same measure→dispatch→re-measure shape). NOT for CI findings — that class closes deterministically in ci-harvest (disappearance/reopen) and drains under the agentic-developer loop's floor/ceiling rails. Use when "drain the deprecation ledger", "deprecation stasis pass", on a /loop or scheduled routine, or when the sentinel's nudges have accumulated past comfort.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/deprecation-stasis"
 ---
 
 # Deprecation Stasis Sweep

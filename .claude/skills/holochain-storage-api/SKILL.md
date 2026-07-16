@@ -2,8 +2,9 @@
 name: holochain-storage-api
 description: REFERENCE for elohim-storage Rust BACKEND surface — HTTP API, storage-client SDK, Rust-to-TypeScript type generation pipeline, Angular adapter conventions. Use when "call the storage HTTP API", "fetch content or paths via the SDK", "upload a blob", "create mastery records", "generate TypeScript types from Rust views", or working at the Rust→TS boundary. For Angular FRONTEND assessment rendering, use sophia-integration.
 metadata:
-  author: elohim-protocol
-  version: 1.0.0
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/holochain-storage-api"
 ---
 
 # Holochain Storage API Reference

@@ -1,6 +1,10 @@
 ---
 name: atlas-grounding
 description: Use when starting a planning or brainstorm pass on a feature or subsystem (or grounding external prior-art) and you need current ground-truth across the architecture's relevant seams before designing — "we're exploring X, ground my understanding", "map the seams for X", or as the grounding step before /brainstorm, /shift, or app-port.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/atlas-grounding"
 ---
 
 # Atlas Grounding

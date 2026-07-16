@@ -1,6 +1,10 @@
 ---
 name: generalize-permissions
 description: Cluster near-duplicate entries in .claude/settings.json + settings.local.json allow list into broader patterns under a safety taxonomy. Propose bulk collapses (10 entries → 1 pattern), user approves per-cluster. Run standalone when the allowlist is getting bloated.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/generalize-permissions"
 ---
 
 # Generalize Permissions

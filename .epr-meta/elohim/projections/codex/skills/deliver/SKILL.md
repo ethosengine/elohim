@@ -4,7 +4,8 @@ description: Use when a recent sprint was marked complete but the feature isn't 
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/deliver/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/deliver.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/deliver"
 ---

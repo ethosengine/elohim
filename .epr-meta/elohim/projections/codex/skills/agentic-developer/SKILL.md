@@ -4,7 +4,8 @@ description: First-class overnight agentic developer. Iterates a named Objective
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/agentic-developer/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/agentic-developer.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/agentic-developer"
 ---

@@ -1,6 +1,10 @@
 ---
 name: converge
 description: Cartographer-scoped forward-projection synthesis that ranks the dev corpus into a "what's next" menu. Applies vision×readiness scoring, memorial-tier safeguards, and search-bias compensation to convert the memkit reports (cleanup-backlog-refresh, dedupe-clusters, sprint-digest, path-update-proposals) into per-theme plan edits and a session-start handoff. Runs after librarian hygiene has produced clean inputs. Use when the operator asks "what's next?", before a major /shift kickoff, or when planning a roadmap pass. The output is a ranked menu, not a maintenance pass.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/converge"
 ---
 
 # Converge — Trajectory Synthesis + "What's Next" Menu

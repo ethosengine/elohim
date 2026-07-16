@@ -4,7 +4,8 @@ description: Drive the deprecation/security-concern discipline to stasis in one 
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/deprecation-stasis/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/deprecation-stasis.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/deprecation-stasis"
 ---

@@ -1,6 +1,10 @@
 ---
 name: mem-horizon-scan
 description: Quarterly horizon-scan of the LLM-memory landscape for the cartographer's future-projection role. WebFetches canonical sources at .claude/horizon-scan-sources.md to surface what's emerging externally that might change how our memory team operates. Use when "run a horizon scan", "check the state of LLM memory practice", or when the latest scan in .claude/memory-kit/horizon-scans/ is >90 days old. Auto-triggered by cartographer at the start of a memory-ceremony (or any /converge) when stale.
+metadata:
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/mem-horizon-scan"
 ---
 
 # /mem-horizon-scan — Quarterly external-state check for the memory team

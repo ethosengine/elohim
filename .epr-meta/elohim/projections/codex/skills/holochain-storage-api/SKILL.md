@@ -4,7 +4,8 @@ description: REFERENCE for elohim-storage Rust BACKEND surface — HTTP API, sto
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/holochain-storage-api/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/holochain-storage-api.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/holochain-storage-api"
 ---

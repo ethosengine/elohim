@@ -4,7 +4,8 @@ description: Workflows for transforming Elohim Protocol source content (markdown
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/elohim-import/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/elohim-import.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/elohim-import"
 ---

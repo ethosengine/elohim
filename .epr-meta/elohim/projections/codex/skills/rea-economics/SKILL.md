@@ -4,7 +4,8 @@ description: Reference for REA (Resource-Event-Agent) economics, hREA on Holocha
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/rea-economics/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/rea-economics.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/rea-economics"
 ---

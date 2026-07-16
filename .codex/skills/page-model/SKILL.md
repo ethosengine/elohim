@@ -4,7 +4,8 @@ description: Audit Angular component legibility — data-testid coverage for tes
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/page-model/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/page-model.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/page-model"
 ---

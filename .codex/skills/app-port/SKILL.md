@@ -4,7 +4,8 @@ description: Use when bringing an external app or prior-art onto the Elohim Prot
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/app-port/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/app-port.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/app-port"
 ---

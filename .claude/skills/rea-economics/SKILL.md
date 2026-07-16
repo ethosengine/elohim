@@ -2,8 +2,9 @@
 name: rea-economics
 description: Reference for REA (Resource-Event-Agent) economics, hREA on Holochain, Unyt mutual credit patterns, ValueFlows ontology, and the shefa pillar service landscape. Use when someone asks "create economic event", "set up stewardship", "contributor presence flow", "mutual credit", or works on requests/offers and currency flows.
 metadata:
-  author: elohim-protocol
-  version: 1.0.0
+  sourceRuntime: claude
+  master: package
+  governance: "epr:elohim-agent/skills/rea-economics"
 ---
 
 # REA Economics Reference

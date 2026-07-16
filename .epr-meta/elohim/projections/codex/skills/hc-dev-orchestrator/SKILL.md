@@ -4,7 +4,8 @@ description: START and manage the Elohim P2P Framework local DEVELOPMENT STACK â
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/hc-dev-orchestrator/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/hc-dev-orchestrator.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/hc-dev-orchestrator"
 ---
