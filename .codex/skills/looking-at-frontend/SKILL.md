@@ -4,7 +4,8 @@ description: Use when reviewing, designing, debugging, or modifying any UI surfa
 metadata:
   runtime: codex
   sourceRuntime: claude
-  sourcePath: .claude/skills/looking-at-frontend/SKILL.md
+  master: package
+  sourcePath: .epr-meta/elohim/packages/skills/looking-at-frontend.json
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/looking-at-frontend"
 ---
