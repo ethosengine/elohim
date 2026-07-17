@@ -231,6 +231,18 @@ lazy_static! {
         "Content heads authored through the conductor by the witness-bootstrap sweep.",
     )
     .unwrap();
+
+    /// Provide-loop author calls SKIPPED because no candidate (active local
+    /// session key nor the pod's own conductor cell key) yielded an `agent_cid`
+    /// (`uhCAk…`) provider. The CID-hardening guard (rung 3) refuses to write a
+    /// transport-id provider (`12D3Koo…`) that could never join the resilience
+    /// card's `humans.agent_pub_key = rea_commitments.provider` join — a junk row
+    /// that can never join is worse than absence, so the author skips this tick.
+    pub static ref PROVIDE_PROVIDER_UNRESOLVED: IntCounter = IntCounter::new(
+        "elohim_provide_provider_unresolved_total",
+        "Provide-loop author calls skipped because no agent_cid provider was resolvable.",
+    )
+    .unwrap();
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -262,6 +274,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_OUTBOUND.clone()));
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_INBOUND_SERVED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_AUTHORED.clone()));
+        let _ = REGISTRY.register(Box::new(PROVIDE_PROVIDER_UNRESOLVED.clone()));
     });
 }
 
@@ -372,6 +385,12 @@ pub fn inc_view_federation_inbound_served() {
 /// Record `n` content heads freshly authored by the witness-bootstrap sweep.
 pub fn add_content_witness_authored(n: u64) {
     CONTENT_WITNESS_AUTHORED.inc_by(n);
+}
+
+/// Record one provide-loop author skipped because no `agent_cid` provider was
+/// resolvable (the CID-hardening guard refusing to write a transport id).
+pub fn inc_provide_provider_unresolved() {
+    PROVIDE_PROVIDER_UNRESOLVED.inc();
 }
 
 #[cfg(test)]
