@@ -145,6 +145,46 @@ pub fn heal_human_identity(
         .ok_or_else(|| StorageError::Internal("Human not found after heal".to_string()))
 }
 
+/// GENESIS BOOTSTRAP STOPGAP (rekey-drift self-heal): force the SELF human row's
+/// `agent_pub_key` to the pod's CURRENT conductor cell key when a re-key has left
+/// the stored key stale.
+///
+/// Unlike [`heal_human_identity`] (NULL-only, "never clobber a set value"), this
+/// deliberately OVERWRITES a set value — but ONLY toward the pod's OWN truthful
+/// cell key, and ONLY for the caller-supplied `human_id` (SELF; the caller passes
+/// `SELF_HUMAN_ID`). This exists because a non-prod DNA reinstall mints a new
+/// `AgentPubKey` while the projected `humans.agent_pub_key` still holds the
+/// fossil key — freezing the resilience join on a degraded peer_statuses row.
+/// All other columns (household_id, display_name, …) are preserved.
+///
+/// Idempotent: a no-op (no write) when the stored key already equals `new_key`.
+/// Returns the (possibly-unchanged) row; `NotFound` if the id does not exist.
+pub fn rekey_human_agent_key(
+    conn: &mut SqliteConnection,
+    human_id: &str,
+    new_key: &str,
+) -> Result<Human, StorageError> {
+    let existing = get_human_by_id(conn, human_id)?
+        .ok_or_else(|| StorageError::NotFound(format!("Human not found: {}", human_id)))?;
+
+    // Already current — skip the write (idempotent re-runs).
+    if existing.agent_pub_key.as_deref() == Some(new_key) {
+        return Ok(existing);
+    }
+
+    let now = current_timestamp();
+    diesel::update(humans::table.filter(humans::id.eq(human_id)))
+        .set((
+            humans::agent_pub_key.eq(Some(new_key)),
+            humans::updated_at.eq(&now),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Failed to rekey human agent key: {}", e)))?;
+
+    get_human_by_id(conn, human_id)?
+        .ok_or_else(|| StorageError::Internal("Human not found after rekey".to_string()))
+}
+
 /// Retrieve a human by its stable ID.
 pub fn get_human_by_id(
     conn: &mut SqliteConnection,
