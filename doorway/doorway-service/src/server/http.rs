@@ -2025,6 +2025,11 @@ fn is_service_path(path: &str) -> bool {
         "/blob/",
         "/pkarr/",
         "/.well-known/",
+        // /1.0/identifiers/* — universal-resolver DID resolution has an explicit
+        // arm (did:key local, did:elohim forwarded). Without this the EPR router
+        // (GET + !is_service_path) would shadow it to the SPA bundle — the
+        // /auth/portal incident shape. Reserves the whole /1.0/ resolver namespace.
+        "/1.0/",
     ] {
         if path == *prefix || path.starts_with(prefix) {
             return true;
@@ -2262,6 +2267,21 @@ mod shakeout_tests {
         // Bare root is reserved too (pins it against projection-mount collision).
         assert!(is_service_path("/sync"));
         assert!(is_reserved_url_path("/sync"));
+    }
+
+    #[test]
+    fn service_path_guards_universal_resolver() {
+        // GET /1.0/identifiers/{did} (universal-resolver DID resolution) MUST be a
+        // service path or the EPR router (GET + !is_service_path) shadows it to the
+        // SPA bundle when a root projection is registered — the /auth/portal
+        // incident shape. Two-gate partner of the explicit arm in handle_request.
+        assert!(is_service_path(
+            "/1.0/identifiers/did:key:z6MkuWzukKSaEVxe76gbFYrnW7jUUftksarjkrjUwKdEp8Lr"
+        ));
+        assert!(is_service_path("/1.0/identifiers/did:elohim:uhCAkabcdef"));
+        // The whole /1.0/ resolver namespace is reserved.
+        assert!(is_service_path("/1.0/identifiers"));
+        assert!(is_reserved_url_path("/1.0/identifiers"));
     }
 
     // ── derive_app_subpath — projection url_path → storage sub-path ───────────
@@ -3961,6 +3981,24 @@ async fn handle_request(
         // DID Document at explicit path (alternative)
         (Method::GET, "/identity/did") | (Method::GET, "/identity/did.json") => {
             to_boxed(routes::handle_did_endpoint(Arc::clone(&state)))
+        }
+
+        // Universal-resolver DID resolution (W3C, universal-resolver-compatible).
+        // did:key resolves locally/offline; did:elohim forwards to storage's
+        // /db/identity/did/{did}; did:web and other methods → methodNotSupported.
+        // DID bridge design §3.5. TWO-GATE: this arm MUST have a matching entry in
+        // `is_service_path` (the "/1.0/" prefix) or the EPR router shadows it to
+        // the SPA bundle (the /auth/portal shadow trap).
+        (Method::GET, p) if p == "/1.0/identifiers" || p.starts_with("/1.0/identifiers/") => {
+            let did_param = p.strip_prefix("/1.0/identifiers/").unwrap_or("");
+            let accept = req
+                .headers()
+                .get("accept")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            to_boxed(
+                routes::handle_universal_resolver(Arc::clone(&state), did_param, accept).await,
+            )
         }
 
         // Doorway public signing keys (JWKS format) for federation

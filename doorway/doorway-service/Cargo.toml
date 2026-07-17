@@ -130,6 +130,15 @@ askama = "0.12"
 # Pin to version compatible with Rust 1.83 (base64ct 1.8.1 requires edition 2024)
 base64ct = "=1.6.0"
 
+# W3C DID 1.1 bridge (bridges/did) — the doorway consumes it like a web2 bridge
+# to serve the public DID resolution surfaces (universal-resolver route + the
+# doorway's own did:web document). did-bridge default features keep the did:web
+# `web-resolver` feature OFF (no HTTP client pulled; egress policy undecided).
+# These crates are members of the bridges/did workspace — the edge Dockerfile
+# COPYs bridges/did/Cargo.toml + both crates and prunes did-tests (see Dockerfile).
+did-types = { path = "../../bridges/did/did-types" }
+did-bridge = { path = "../../bridges/did/did-bridge" }
+
 # Shared types with DNAs
 doorway-client = { path = "../../crates/doorway-client" }
 
