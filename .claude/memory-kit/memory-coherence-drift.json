@@ -2,9 +2,9 @@
   "schema_version": 1,
   "entries": {
     "project_local_stack_dht_anchor_gap": {
-      "hits": 68,
+      "hits": 70,
       "last_changed": "elohim/elohim-storage/src/db/content_diesel.rs",
-      "last_signal_at": "2026-07-02T00:22:01Z"
+      "last_signal_at": "2026-07-11T21:39:36Z"
     },
     "project_resilience_snapshot_humans_junction": {
       "hits": 43,
@@ -42,9 +42,9 @@
       "last_signal_at": "2026-06-25T19:01:16Z"
     },
     "project_ci_storage_topology": {
-      "hits": 18,
+      "hits": 39,
       "last_changed": "elohim/holochain/Jenkinsfile",
-      "last_signal_at": "2026-07-02T00:18:39Z"
+      "last_signal_at": "2026-07-16T16:34:54Z"
     },
     "feedback_diesel_migration_timestamp_collision": {
       "hits": 10,
@@ -52,9 +52,9 @@
       "last_signal_at": "2026-06-27T21:48:46Z"
     },
     "project_sweettest_native_build_env": {
-      "hits": 13,
-      "last_changed": "elohim/holochain/tests/sweettest/src/tests/infrastructure.rs",
-      "last_signal_at": "2026-06-23T16:10:18Z"
+      "hits": 14,
+      "last_changed": "elohim/holochain/tests/sweettest/.epr-meta",
+      "last_signal_at": "2026-07-12T02:06:23Z"
     },
     "feedback_codegen_prettier_oscillation": {
       "hits": 19,
@@ -62,9 +62,9 @@
       "last_signal_at": "2026-06-27T16:36:31Z"
     },
     "project_alpha_topology_bootstrap_pair": {
-      "hits": 3,
+      "hits": 4,
       "last_changed": "genesis/orchestrator/data/deployments.json",
-      "last_signal_at": "2026-06-16T13:41:15Z"
+      "last_signal_at": "2026-07-16T21:15:13Z"
     },
     "feedback_no_brittle_commands_in_poststart": {
       "hits": 1,
