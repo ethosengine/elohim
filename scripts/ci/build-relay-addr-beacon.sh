@@ -21,3 +21,10 @@ BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \
     -f relay-addr-beacon/Dockerfile relay-addr-beacon
 
 nerdctl -n k8s.io tag relay-addr-beacon:${IMAGE_TAG} relay-addr-beacon:${GIT_COMMIT_HASH}
+
+# Diagnostic: prove the image is in the k8s.io store immediately after build+tag.
+# If it is present here but absent when push-relay-addr-beacon.sh runs in the
+# later Push stage, the image is being evicted between stages (that script
+# rebuilds on demand to survive it).
+echo "=== relay-addr-beacon images in k8s.io immediately after build ==="
+nerdctl -n k8s.io images | grep -i relay-addr-beacon || echo "(WARN: relay-addr-beacon NOT in k8s.io right after build)"
