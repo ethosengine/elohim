@@ -153,6 +153,16 @@ spec:
             # when doorway-B federation auth hardens. Sibling: alpha.yaml.
             - name: DEV_MODE
               value: "true"
+            # delegates-compute op-gate — SHADOW mode (observe).
+            # Fires the pre-dispatch call to storage's authorize-operation on
+            # POST /db/content(/bulk), LOGS the verdict, and ALWAYS forwards
+            # (AllowWithWarn) — zero blast radius. This lights the REA
+            # compute-commitment substrate (already merged, was defaulting off)
+            # to gather real-traffic verdict telemetry before any enforce flip.
+            # A storage error/404 here just logs a warn; the request still
+            # forwards. CHE_FACING stays unset (enforce is gated behind it).
+            - name: DELEGATES_COMPUTE_OP_GATE
+              value: "observe"
             - name: RUST_LOG
               value: "info,doorway=debug"
             - name: PROJECTION_WRITER
