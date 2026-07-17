@@ -76,9 +76,28 @@ No DNA-hash move; storage + projection only; testable on household-nodes now.
 Mishpat coordinator-zome changes → **DNA-hash-neutral** (payload-in-`payload_json`, coordinator hot-swap;
 the `author-lens`/`binds-policy` precedent). Sweettest, local — no cluster env.
 
+> **B0 — architecture decision (lineage home; resolved 2026-07-17, compose-don't-build).** The identity
+> lineage DAG is realized on the **already-wired imagodei `KeyRotation` edges** (`recovery_v2.rs` —
+> old→new + `RecoveryAuthority`), NOT a new `version_parent` on `mishpat_integrity::Commitment`. Each DNA
+> keeps its proven home: **imagodei owns the key-rotation edges + chain-root derivation** (recovery is its
+> domain, `RecoveryAuthority` already lives there); **mishpat owns the `binds-identity` declaration** (the
+> controller-set + head selection referencing the chain-root — parallel to `binds-policy`, "which head
+> applies is declared"). This avoids adding a second key-rotation mechanism (the `KeyRotation`-vs-new-
+> `version_parent` drift) and avoids widening the mishpat integrity struct (a hash-move risk). So B1's
+> "version_parent DAG" is the `KeyRotation` superseded-chain made queryable with a derived stable root;
+> B2's `binds-identity` (mishpat) points at that root. If the imagodei↔mishpat cross-DNA reference proves
+> unworkable in sweettest, escalate — do not silently collapse both into one DNA.
+
 - [ ] **B1 — version_parent DAG (#1 full).** Model `KeyRotation` (`recovery_v2.rs`) edges as a
   `version_parent` DAG (SET, for the merge/recovery case); derive the chain-root over a multi-node chain
   so A1's degenerate root generalizes. Sweettest: a rotation appends a node; the root is stable across it.
+- [ ] **B1b — storage read-routing + Wave-A carryover (when root≠key becomes real).** Once B1 makes the
+  root value differ from the raw key, route the storage READ filters through the resolved root too (Wave A
+  only routed WRITE paths; raw `.eq()` reads must now normalize via `identity_root_cid`), OR make read-time
+  normalization idempotent so raw-vs-root storage resolves equal. **Wave-A carryover (review-confirmed):**
+  `record_provide_from_content_commitment` (`rea_commitments.rs:518-566`) was intentionally left un-routed
+  in Wave A (self-provide, always the conductor key) — safe while root==key, but it silently orphans under
+  a human-key rotation once reads route. Route it (or prove its keyspace is isolated from rooted joins) here.
 - [ ] **B2 — `binds-identity` discriminator (#2).** New `Mishpat::Commitment` action discriminator
   declaring *chain head = key K; controllers = {set}; controller-policy = self | Steward-set |
   RecoveryAuthority M-of-N*. Reuse the wired `RecoveryRequest`/`RecoveryAuthority` for the human quorum.
