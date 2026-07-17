@@ -117,6 +117,32 @@ property-tested. No substrate change; the whole fleet gains DIDs on day one.
 - Assembly runs in elohim-storage (it owns the joins); the crate defines the
   assembly contract so storage conforms rather than invents.
 
+### 3.4a Method naming — why `did:elohim` (settled 2026-07-17, operator-affirmed)
+
+A DID method names the **verifiable data registry you resolve against** — the network,
+not the subject's domain and not a resolution authority (`did:plc` = PLC, `did:sov` =
+Sovrin). Ours is the elohim protocol substrate, so the method is `did:elohim`.
+Alternatives considered and rejected:
+
+- **`did:imagodei`** — wrong layer twice: the agent key is substrate-level (one key
+  signs across every DNA, not imagodei-scoped), and not every DID subject is imago dei
+  (service agents, nodes, collectives) — stamping the human ontology on non-human
+  subjects would dilute the very framing the ontology guard protects. The pillar's
+  ownership lives where it belongs: the humans projection feeds assembly, and the
+  phase-2 identity head homes in the imagodei DNA.
+- **`did:epr`** — wrong plane: EPR is the record/content grammar (data plane); agent
+  identity is the control plane. A general "resolve any EPR head" method would misuse
+  the DID standard for content resolution (that is CID/eprfs territory) and re-conflate
+  the agent_cid/transport-id/content-CID namespaces. Externally, EPR reads as
+  Electronic Patient Record — a hostile collision for a W3C method registration.
+- **`did:epi`** — an acronym no external peer can expand tells them nothing at the
+  moment of resolution, defeating the peer-facing-clarity goal; collision-prone.
+
+The method name inherits the network's already-public name (elohim.host, the Elohim
+Protocol) — a deliberate consistency the operator affirmed. Settled now because the
+cost asymmetry is maximal: today a rename is one constant; after external peers
+resolve us it is a migration with an `alsoKnownAs` compatibility tail.
+
 ### 3.5 Doorway surfaces (web2 face; consumes did-bridge like a web2 bridge)
 
 - `GET /1.0/identifiers/{did}` — universal-resolver-compatible resolution.
