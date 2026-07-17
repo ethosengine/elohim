@@ -16,7 +16,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { scanCidArtifacts } from './cid-artifact';
+import { scanCidArtifacts } from './cid-artifact.js';
 
 const CONTENT_DIR = resolve(process.cwd(), '../data/lamad/content');
 const DOCS_ROOT = resolve(process.cwd(), '../docs/content/elohim-protocol');
