@@ -38,6 +38,7 @@ pub mod connectivity; // Phase 4 T6 — libp2p connected-peers snapshot helper
 pub mod constitutional_ratio_registry;
 pub mod content_service;
 pub mod contributor_reflexive_facing; // Wave 2 — "how the network sees a contributor" facing (folds in elohim-facings)
+pub mod demand_autopin; // self-healing opportunity map row 15 — auto-pin on a local content read-miss
 pub mod device_capacity; // Phase 4 T7 — available bytes helper
 pub mod disposition_service;
 pub mod distribution;
