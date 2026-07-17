@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.host/schemas/did/did-document-1.1.schema.json",
+  "$comment": "Hand-derived from the W3C DID 1.1 Recommendation (https://www.w3.org/TR/did-1.1/, retrieved 2026-07-17). No normative W3C JSON Schema for DID documents exists; this mechanizes the TR's structural constraints for local conformance testing. CRITICAL: additionalProperties stays TRUE everywhere — DID documents legally carry extension properties, so the schema validates the shape of KNOWN properties and never forbids unknown ones.",
+  "title": "W3C DID 1.1 Document",
+  "type": "object",
+  "required": ["@context", "id"],
+  "additionalProperties": true,
+  "properties": {
+    "@context": {
+      "$ref": "#/$defs/context"
+    },
+    "id": {
+      "$ref": "#/$defs/did"
+    },
+    "alsoKnownAs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "controller": {
+      "$ref": "#/$defs/controller"
+    },
+    "verificationMethod": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/verificationMethod" }
+    },
+    "authentication": { "$ref": "#/$defs/verificationRelationship" },
+    "assertionMethod": { "$ref": "#/$defs/verificationRelationship" },
+    "keyAgreement": { "$ref": "#/$defs/verificationRelationship" },
+    "capabilityInvocation": { "$ref": "#/$defs/verificationRelationship" },
+    "capabilityDelegation": { "$ref": "#/$defs/verificationRelationship" },
+    "service": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/service" }
+    }
+  },
+  "$defs": {
+    "did": {
+      "type": "string",
+      "pattern": "^did:[a-z0-9]+:.+$"
+    },
+    "didContextUrl": {
+      "type": "string",
+      "enum": [
+        "https://www.w3.org/ns/did/v1.1",
+        "https://www.w3.org/ns/did/v1"
+      ]
+    },
+    "context": {
+      "$comment": "Either a single base-context URI, or an ordered set whose FIRST entry is a recognized DID base-context URL (v1.1 preferred, v1 legacy). Later entries may be URIs or inline context objects.",
+      "oneOf": [
+        { "$ref": "#/$defs/didContextUrl" },
+        {
+          "type": "array",
+          "minItems": 1,
+          "prefixItems": [ { "$ref": "#/$defs/didContextUrl" } ],
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "object" }
+            ]
+          }
+        }
+      ]
+    },
+    "controller": {
+      "oneOf": [
+        { "$ref": "#/$defs/did" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/did" }
+        }
+      ]
+    },
+    "verificationMethod": {
+      "type": "object",
+      "required": ["id", "type", "controller"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "controller": { "$ref": "#/$defs/did" },
+        "publicKeyMultibase": { "type": "string" },
+        "publicKeyJwk": { "type": "object" }
+      }
+    },
+    "verificationRelationship": {
+      "$comment": "Array whose entries are either a DID-URL reference (string) or an embedded verification method (object).",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          { "$ref": "#/$defs/verificationMethod" }
+        ]
+      }
+    },
+    "service": {
+      "type": "object",
+      "required": ["id", "type", "serviceEndpoint"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string" },
+        "type": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "serviceEndpoint": { "$ref": "#/$defs/serviceEndpoint" }
+      }
+    },
+    "serviceEndpoint": {
+      "$comment": "A single URI string, a map, or a set of either.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "object" },
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "object" }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

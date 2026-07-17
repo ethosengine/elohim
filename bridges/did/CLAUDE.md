@@ -79,6 +79,13 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
 
+**Conformance gate:** wire shapes are checked against the hand-derived W3C DID
+1.1 schema (`schemas/did-document-1.1.schema.json`) by
+`did-tests/tests/did11_conformance.rs` — every document the crate emits, plus
+the fidelity fixtures, must validate; run it directly with
+`cargo test -p did-tests --test did11_conformance`. The co-located `.epr-meta`
+injects this reminder when you edit a DID wire shape.
+
 ## Reference docs
 
 - Spec: `genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md`
