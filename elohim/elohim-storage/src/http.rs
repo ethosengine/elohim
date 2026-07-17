@@ -286,6 +286,13 @@ pub struct HttpServer {
     /// the HTTP gate is the only gate; piggybacking would silently fail-open.
     #[cfg(feature = "graph-native")]
     graph_engine: Option<Arc<crate::graph::engine::GraphEngine>>,
+    /// Demand-driven auto-pin controller (self-healing opportunity map row 15).
+    /// On a confirmed local content read-miss, authors an `item` DevicePin so
+    /// the acquisition+provide loops acquire and provide the demanded content —
+    /// the runtime input the provide-loop was starved of. Config-gated
+    /// (`demand_autopin_enabled`) + throttled. Default-disabled until
+    /// `with_fetch_config` threads the operator config (prod default: enabled).
+    demand_autopin: Arc<crate::services::demand_autopin::DemandAutoPin>,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -532,6 +539,8 @@ impl HttpServer {
             blob_libp2p_served_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             #[cfg(feature = "graph-native")]
             graph_engine: None,
+            // Disabled until `with_fetch_config` threads the operator config.
+            demand_autopin: Arc::new(crate::services::demand_autopin::DemandAutoPin::disabled()),
         }
     }
 
@@ -791,6 +800,10 @@ impl HttpServer {
         self.fetch_blob_parallelism = config.fetch_blob_parallelism;
         self.inventory_freshness_seconds = config.inventory_freshness_seconds;
         self.heal_on_read_budget_ms = config.heal_on_read_budget_ms;
+        self.demand_autopin = Arc::new(crate::services::demand_autopin::DemandAutoPin::new(
+            config.demand_autopin_enabled,
+            std::time::Duration::from_secs(config.demand_autopin_throttle_seconds),
+        ));
         self
     }
 
@@ -5688,6 +5701,28 @@ impl HttpServer {
                         result,
                         &format!("Content not found: {}", content_id),
                     ));
+                }
+
+                // Demand-driven auto-pin (self-healing opportunity map row 15):
+                // a CONFIRMED local read-miss for content this node was asked
+                // for IS a demand signal. Author an `item` DevicePin (head_ref ==
+                // content id) via the shared idempotent upsert so the acquisition
+                // loop fetches it and the provide loop authors a
+                // replicates-commons commitment — the runtime input the
+                // provide-loop was starved of. Config-gated + throttled (off the
+                // hot path); the DOWNSTREAM provide-eligibility gate decides
+                // whether anything is ever provided, so we do NOT reach-gate
+                // here. Non-fatal: the read path continues regardless.
+                if self.demand_autopin.is_enabled() {
+                    match self.demand_autopin.record_demand(&mut conn, content_id) {
+                        Ok(Some(pin)) => {
+                            debug!(id = %content_id, pin_id = pin.id, "demand auto-pin authored on read-miss");
+                        }
+                        Ok(None) => {}
+                        Err(e) => {
+                            debug!(id = %content_id, error = %e, "demand auto-pin upsert failed (non-fatal)");
+                        }
+                    }
                 }
 
                 // Content not found locally — try P2P EPR resolution + shard fetch

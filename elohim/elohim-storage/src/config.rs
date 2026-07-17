@@ -273,6 +273,40 @@ pub struct Config {
     /// Loaded from env `SALVAGE_DIVERSITY_PLACEMENT`.
     #[serde(default = "default_true")]
     pub salvage_diversity_placement: bool,
+
+    /// Demand-driven auto-pin: when a local content read MISSES (a client asked
+    /// this node for content it does not have), author an `item` DevicePin for
+    /// that content so the acquisition loop fetches it and the provide loop
+    /// authors a `replicates-commons` Commitment. This closes the runtime gap
+    /// where NOTHING pinned at runtime, leaving every pod's provide-loop
+    /// input-starved (self-healing opportunity map row 15).
+    ///
+    /// Default **true**, chosen deliberately. This is *demand-driven*, not
+    /// blanket backfill: a pin is only ever born from a real read someone
+    /// performed (never on boot, never "pin everything present" — those are
+    /// consent-adjacent and out of scope). The imago-dei consent floor that
+    /// makes `salvage_capacity_enabled` default OFF does not apply here — that
+    /// knob conscripts a node to hold OTHER peers' content as a Good-Samaritan;
+    /// this one only reacts to THIS node's own demand. Reach-safety is preserved
+    /// downstream, not here: the provide-eligibility gate
+    /// (`provide_reconcile::ClassifierEligibility`) still decides whether any
+    /// commitment is ever authored, so a non-providable read-miss costs exactly
+    /// one inert local row. Shipping ON is what actually closes the loop — a
+    /// dark default-OFF feature that no operator flips stays inert.
+    ///
+    /// To disable: set env `DEMAND_AUTOPIN_ENABLED` to `0`/`false`/`off` (or
+    /// `demand_autopin_enabled = false` in config.toml). Loaded from env
+    /// `DEMAND_AUTOPIN_ENABLED`.
+    #[serde(default = "default_true")]
+    pub demand_autopin_enabled: bool,
+
+    /// Demand auto-pin throttle window (seconds): repeated read-misses for the
+    /// same content id within this window skip the idempotent DB upsert (the pin
+    /// already exists; rewriting it per request is wasteful). Keeps the pin
+    /// write off the read hot path. Default 300s (5 min). Loaded from env
+    /// `DEMAND_AUTOPIN_THROTTLE_SECONDS`.
+    #[serde(default = "default_demand_autopin_throttle_seconds")]
+    pub demand_autopin_throttle_seconds: u64,
 }
 
 fn default_peer_policy_path() -> PathBuf {
@@ -357,6 +391,12 @@ fn default_salvage_recheck_seconds() -> u64 {
     300
 }
 
+fn default_demand_autopin_throttle_seconds() -> u64 {
+    // 5-minute window: a burst of read-misses for one content id costs one pin
+    // upsert, not one-per-request.
+    300
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -397,6 +437,8 @@ impl Default for Config {
             salvage_target_replicas: default_salvage_target_replicas(),
             salvage_recheck_seconds: default_salvage_recheck_seconds(),
             salvage_diversity_placement: default_true(),
+            demand_autopin_enabled: default_true(),
+            demand_autopin_throttle_seconds: default_demand_autopin_throttle_seconds(),
         }
     }
 }
@@ -483,6 +525,17 @@ mod transport_backend_tests {
         // P3-8: the diversity strategy degrades exactly to XOR without household
         // data, so the knob ships ON; a flipped default must not pass silently.
         assert!(super::Config::default().salvage_diversity_placement);
+    }
+
+    #[test]
+    fn demand_autopin_defaults_on_with_5min_throttle() {
+        // Demand-driven (not blanket) auto-pin ships ON so the runtime provide
+        // loop actually gets an input; a dark default-OFF stays inert. Consent
+        // floor is preserved by the downstream provide-eligibility gate, not by
+        // disabling this. A flipped default must not pass silently.
+        let cfg = super::Config::default();
+        assert!(cfg.demand_autopin_enabled);
+        assert_eq!(cfg.demand_autopin_throttle_seconds, 300);
     }
 
     #[test]

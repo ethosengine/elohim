@@ -429,6 +429,21 @@ async fn async_main(
         );
     }
 
+    // Demand-driven auto-pin (self-healing opportunity map row 15). Default ON
+    // (demand-driven, not blanket backfill; consent floor preserved downstream
+    // by the provide-eligibility gate). Env DISABLES it: 0/false/off/no.
+    if let Ok(v) = std::env::var("DEMAND_AUTOPIN_ENABLED") {
+        config.demand_autopin_enabled = !matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "off" | "no"
+        );
+    }
+    if let Ok(v) = std::env::var("DEMAND_AUTOPIN_THROTTLE_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.demand_autopin_throttle_seconds = n;
+        }
+    }
+
     // Iroh parallel-stack toggle (see plan
     // genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md).
     // Default `Libp2p` — existing deployments unaffected. `iroh` selects

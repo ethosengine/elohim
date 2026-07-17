@@ -59,6 +59,15 @@ pub fn list_active_pins(conn: &mut SqliteConnection) -> QueryResult<Vec<Acquisit
         .load(conn)
 }
 
+/// Count pins with status='active'. Cheap ceiling check for the demand
+/// auto-pin DoS guard (`services/demand_autopin.rs`) — a COUNT, never a load.
+pub fn count_active_pins(conn: &mut SqliteConnection) -> QueryResult<i64> {
+    pins::acquisition_pins
+        .filter(pins::status.eq("active"))
+        .count()
+        .get_result(conn)
+}
+
 /// List all pins regardless of status, ordered by id ascending.
 pub fn list_all_pins(conn: &mut SqliteConnection) -> QueryResult<Vec<AcquisitionPin>> {
     pins::acquisition_pins.order(pins::id.asc()).load(conn)
