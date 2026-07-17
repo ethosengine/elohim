@@ -163,6 +163,12 @@ pub mod node_transport;
 // Transport-Identity Coherence".
 pub mod identity_namespace;
 
+// Identity chain-root — the durable, rotation-stable identifier for an
+// identity's key lineage (degenerate 1-node slice; Wave A). The indirection
+// point every raw-key re-pointing targets. Pure; feature-flag-free. See module
+// docs + the identity-head/key-lineage design.
+pub mod identity_root;
+
 // P2P network modules (require p2p feature)
 #[cfg(feature = "p2p")]
 pub mod p2p;

@@ -142,7 +142,14 @@ pub fn list_contributor_presences(
     }
 
     if let Some(ref claimed_id) = query.claimed_agent_id {
-        base_query = base_query.filter(contributor_presences::claimed_agent_id.eq(claimed_id));
+        // Wave A re-point #6: resolve the claim-lookup THROUGH the chain-root,
+        // not by raw-key equality. The stored `claimed_agent_id` is a chain-root
+        // (see `initiate_claim`), so the query key must be routed through the
+        // same derivation — otherwise a caller passing a surface-variant key (or,
+        // post-Wave-B, a sibling key on the same lineage) would miss the row.
+        let claimed_root = crate::identity_root::identity_root_cid(claimed_id);
+        base_query =
+            base_query.filter(contributor_presences::claimed_agent_id.eq(claimed_root));
     }
 
     if let Some(min_score) = query.min_recognition_score {
@@ -391,6 +398,14 @@ pub fn initiate_claim(
         ));
     }
 
+    // Wave A re-point #6 (design §4.2): anchor the claim on the claiming
+    // identity's chain-root cid, not a point-in-time key, so the claim resolves
+    // through the identity's lineage and survives a future key rotation. In the
+    // degenerate Wave-A slice `identity_root_cid` is value-preserving (root ==
+    // trim(key)); the indirection is what matters — when Wave B lets two keys
+    // share a root, a claim initiated under either key resolves to the presence.
+    let claimed_root = crate::identity_root::identity_root_cid(&input.claiming_agent_id);
+
     diesel::update(
         contributor_presences::table
             .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
@@ -398,7 +413,7 @@ pub fn initiate_claim(
     )
     .set((
         contributor_presences::presence_state.eq(presence_states::CLAIMING),
-        contributor_presences::claimed_agent_id.eq(&input.claiming_agent_id),
+        contributor_presences::claimed_agent_id.eq(&claimed_root),
         contributor_presences::claim_initiated_at.eq(current_timestamp()),
         contributor_presences::claim_verification_method.eq(&input.verification_method),
         contributor_presences::claim_evidence_json.eq(input.evidence_json.as_deref()),
@@ -706,5 +721,79 @@ mod tests {
             results.len(),
             ids
         );
+    }
+
+    // ------------------------------------------------------------------------
+    // Wave A #6 — contributor claim re-anchored on the identity chain-root
+    // ------------------------------------------------------------------------
+
+    /// `initiate_claim` stores the claiming identity's chain-root cid, and a
+    /// claim-lookup resolves the presence THROUGH that root — not by raw-key
+    /// equality. Proven honestly in the degenerate slice with a surface-variant
+    /// key: raw `.eq()` would miss it, root-routed resolution finds it.
+    #[test]
+    fn claim_is_anchored_and_resolved_through_chain_root() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        let presence = insert_presence(
+            &mut conn,
+            &ctx,
+            "presence-grandma",
+            "Grandma",
+            vec!["content-grandma".into()],
+        );
+
+        let agent_key = "uhCAkGrandmaAgentPubKeyCidForClaimRepoint";
+        let claimed = initiate_claim(
+            &mut conn,
+            &ctx,
+            &presence.id,
+            &InitiateClaimInput {
+                claiming_agent_id: agent_key.to_string(),
+                verification_method: "steward-attested".into(),
+                evidence_json: None,
+                facilitated_by: None,
+            },
+        )
+        .expect("initiate claim");
+
+        // WRITE: stored as the chain-root, not a bare point-in-time key.
+        let expected_root = crate::identity_root::identity_root_cid(agent_key);
+        assert_eq!(
+            claimed.claimed_agent_id.as_deref(),
+            Some(expected_root.as_str()),
+            "claimed_agent_id is stored as the identity chain-root"
+        );
+
+        // READ (indirection proof): query with a WHITESPACE-VARIANT of the key.
+        // Its raw string differs from the stored value, so a raw `.eq()` filter
+        // would return nothing; because the lookup routes the query key through
+        // identity_root_cid (same derivation as the write), it resolves the row.
+        // This pins that resolution goes through the root function — the seam
+        // that, in Wave B, lets a sibling key on the same lineage resolve too.
+        let variant_key = format!("  {agent_key}\n");
+        assert_ne!(
+            variant_key, expected_root,
+            "the query key must differ verbatim from the stored root, or the test proves nothing"
+        );
+        let found = list_contributor_presences(
+            &mut conn,
+            &ctx,
+            &ContributorPresenceQuery {
+                claimed_agent_id: Some(variant_key),
+                // NB: `Default` gives limit = 0 (the serde default_limit only
+                // applies on deserialize) → `.limit(0)` returns nothing; set it.
+                limit: 10,
+                ..Default::default()
+            },
+        )
+        .expect("list by claimed agent");
+        assert_eq!(
+            found.len(),
+            1,
+            "claim resolves through the chain-root indirection, not raw-key equality"
+        );
+        assert_eq!(found[0].id, presence.id);
     }
 }
