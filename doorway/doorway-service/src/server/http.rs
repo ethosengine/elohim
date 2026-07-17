@@ -2025,6 +2025,12 @@ fn is_service_path(path: &str) -> bool {
         "/blob/",
         "/pkarr/",
         "/.well-known/",
+        // /p2p/* — node-local P2P sync status (storage build_manifest declares
+        // GET /p2p/status, proxied via the route registry). Without this the
+        // EPR router (GET + !is_service_path) shadows it to the SPA bundle —
+        // the /auth/portal incident shape (the lamad SyncStatusService's JSON
+        // parse then fails on the HTML body).
+        "/p2p/",
     ] {
         if path == *prefix || path.starts_with(prefix) {
             return true;
@@ -2054,6 +2060,10 @@ fn is_service_path(path: &str) -> bool {
             // above and the route-claims fixture). Keeps a bare reserved root
             // from being a legal projection mount or alias target. FLIPPED 2026-06-27.
             | "/sync"
+            // Bare /p2p root — pinned reserved (mirrors the "/p2p/" prefix
+            // above). Keeps a bare reserved root from being a legal projection
+            // mount or alias target.
+            | "/p2p"
             // Only the DID service endpoints are doorway-owned under /identity.
             // The bare "/identity" and "/identity/*" SPA routes (imagodei pillar:
             // /identity/login, /identity/profile, …) must fall through to the EPR
@@ -2262,6 +2272,18 @@ mod shakeout_tests {
         // Bare root is reserved too (pins it against projection-mount collision).
         assert!(is_service_path("/sync"));
         assert!(is_reserved_url_path("/sync"));
+    }
+    #[test]
+    fn shakeout_service_path_guards_p2p() {
+        // /p2p/* (node-local P2P sync status, proxied to storage via the route
+        // registry — storage build_manifest declares GET /p2p/status) MUST be a
+        // service path or the EPR router (GET + !is_service_path) shadows it to
+        // the SPA bundle — the /auth/portal incident shape (the lamad
+        // SyncStatusService's JSON parse then fails on the HTML body).
+        assert!(is_service_path("/p2p/status"));
+        // Bare root is reserved too (pins it against projection-mount collision).
+        assert!(is_service_path("/p2p"));
+        assert!(is_reserved_url_path("/p2p"));
     }
 
     // ── derive_app_subpath — projection url_path → storage sub-path ───────────
