@@ -248,6 +248,43 @@ pub fn set_session_intent(
     Ok(())
 }
 
+/// GENESIS BOOTSTRAP STOPGAP (rekey-drift self-heal): update the ACTIVE session's
+/// `agent_pub_key` to the pod's current cell key when a re-key has left it stale.
+///
+/// CRITICAL interplay: `conductor_commitment_author::resolve_provider` prefers the
+/// SESSION's agent key, and a fossil session key is still `uhCAk…`-shaped (passes
+/// `is_agent_cid`), so without this every future provide commitment keeps getting
+/// authored under the dead key. SELF-scoped: only the active session is touched,
+/// and only when its `human_id` matches `human_id`. Idempotent — returns `None`
+/// (no write) when there is no active session, when it belongs to another human,
+/// or when its key is already current. Returns the updated row otherwise.
+pub fn rekey_active_session_agent_key(
+    conn: &mut SqliteConnection,
+    human_id: &str,
+    new_key: &str,
+) -> Result<Option<LocalSession>, StorageError> {
+    let active = match get_active_session(conn)? {
+        Some(s) => s,
+        None => return Ok(None),
+    };
+    // SELF-only, and skip a no-op write when already current.
+    if active.human_id != human_id || active.agent_pub_key == new_key {
+        return Ok(None);
+    }
+
+    diesel::update(local_sessions::table.filter(local_sessions::id.eq(&active.id)))
+        .set((
+            local_sessions::agent_pub_key.eq(new_key),
+            local_sessions::updated_at.eq(current_timestamp()),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Session rekey failed: {}", e)))?;
+
+    let updated = get_session_by_id(conn, &active.id)?
+        .ok_or_else(|| StorageError::Internal("Session not found after rekey".to_string()))?;
+    Ok(Some(updated))
+}
+
 /// Delete a session by ID
 pub fn delete_session(conn: &mut SqliteConnection, id: &str) -> Result<bool, StorageError> {
     let deleted = diesel::delete(local_sessions::table.filter(local_sessions::id.eq(id)))

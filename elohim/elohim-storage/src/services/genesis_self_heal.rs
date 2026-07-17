@@ -19,9 +19,19 @@
 //! - **Own cell key only.** The supplied `uhcak` is always the pod's own
 //!   conductor cell key (`HcClient::agent_key_uhcak()`), never a claim about
 //!   another agent.
-//! - **NULL-only / re-keyable.** Writes go through [`heal_human_identity`],
-//!   which fills only currently-NULL columns and NEVER clobbers a set value, so
-//!   a later cross-signed key rotation / supersede is not blocked.
+//! - **NULL-fill.** The base heal goes through [`heal_human_identity`], which
+//!   fills only currently-NULL columns and never clobbers a set value.
+//! - **Stale-for-self rekey.** A non-prod DNA reinstall mints a NEW `AgentPubKey`
+//!   (`ALLOW_DNA_REINSTALL=true` on alpha) while the projected
+//!   `humans.agent_pub_key` (and the local session) still hold the FOSSIL key —
+//!   whose `peer_statuses` row is frozen degraded, so `peer_selection` returns
+//!   "peers-unavailable". So when the pod's OWN cell key differs from the SELF
+//!   row's stored key, this OVERWRITES it toward the current cell key (and heals
+//!   the local session the same way — `resolve_provider` prefers the session key,
+//!   and a stale session key is still `uhCAk…`-shaped, so an unhealed session
+//!   would keep authoring provides under the dead key). Scoped to
+//!   `SELF_HUMAN_ID` and gated on `is_agent_cid`; this recurs on every
+//!   DNA-content deploy, so it is a standing boot-time reconcile, not a one-shot.
 //! - **Provenance-recorded.** Every heal emits an `info!` with
 //!   `source="genesis-self-heal-from-cell-key"`.
 //! - **Gated.** The call site is gated behind `genesis_self_heal_identity`
@@ -120,6 +130,34 @@ pub fn genesis_self_heal_identity(
         Err(e) => return Err(e),
     }
 
+    // --- Rekey arm (STALE-FOR-SELF): a non-prod DNA reinstall mints a NEW
+    // AgentPubKey (`ALLOW_DNA_REINSTALL=true` on alpha), but the projected
+    // `humans.agent_pub_key` for SELF still holds the FOSSIL key — and that
+    // fossil's peer_statuses row is frozen degraded, so peer_selection returns
+    // "peers-unavailable". The NULL-only heal above is a no-op on a SET-but-stale
+    // key, so track the pod's own CURRENT cell key here. This recurs on every
+    // DNA-content deploy, so it is a standing boot-time reconcile, not a one-shot.
+    //
+    // Guarded on `is_agent_cid`: the rekey OVERWRITES a set value, so an
+    // empty/invalid cell key must never clobber a good key (empty is already
+    // short-circuited at the top; this also rejects a transport-id `uhcak`).
+    if crate::identity_namespace::is_agent_cid(uhcak) {
+        if let Some(human) = db::humans::get_human_by_id(conn, human_id)? {
+            if let Some(old) = human.agent_pub_key.as_deref() {
+                if old != uhcak {
+                    db::humans::rekey_human_agent_key(conn, human_id, uhcak)?;
+                    tracing::info!(
+                        human_id,
+                        old_key_prefix = %key_prefix(old),
+                        new_key_prefix = %key_prefix(uhcak),
+                        source = "genesis-self-heal-rekey",
+                        "genesis self-heal: rekeyed SELF human agent_pub_key (pod re-key drift)"
+                    );
+                }
+            }
+        }
+    }
+
     // --- Session arm: clear the no-session 401 so seeder `/auth/me` succeeds.
     if !db::local_sessions::has_any_session(conn)? {
         db::local_sessions::create_session(
@@ -141,6 +179,29 @@ pub fn genesis_self_heal_identity(
         )?;
     }
 
+    // --- Session rekey arm (STALE-FOR-SELF, CRITICAL): the freshly-created
+    // session above already carries `uhcak`, so this is a no-op there. But a
+    // session that survived the re-key still holds the fossil key — and
+    // `conductor_commitment_author::resolve_provider` PREFERS the session key.
+    // A stale session key is itself `uhCAk…`-shaped (passes `is_agent_cid`), so
+    // without this every future provide commitment keeps being authored under the
+    // dead key. Track the current cell key so provider resolution flips to it.
+    if crate::identity_namespace::is_agent_cid(uhcak) {
+        if let Some(active) = db::local_sessions::get_active_session(conn)? {
+            if active.human_id == human_id && active.agent_pub_key != uhcak {
+                db::local_sessions::rekey_active_session_agent_key(conn, human_id, uhcak)?;
+                tracing::info!(
+                    human_id,
+                    session_id = %active.id,
+                    old_key_prefix = %key_prefix(&active.agent_pub_key),
+                    new_key_prefix = %key_prefix(uhcak),
+                    source = "genesis-self-heal-rekey",
+                    "genesis self-heal: rekeyed SELF local session agent_pub_key (pod re-key drift)"
+                );
+            }
+        }
+    }
+
     tracing::info!(
         human_id,
         uhcak,
@@ -148,6 +209,12 @@ pub fn genesis_self_heal_identity(
         "genesis bootstrap identity heal"
     );
     Ok(())
+}
+
+/// Short, log-safe prefix of an agent key for the transition record (avoids
+/// dumping the full key into logs while keeping old→new distinguishable).
+fn key_prefix(key: &str) -> String {
+    key.chars().take(12).collect()
 }
 
 #[cfg(test)]
@@ -223,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    fn re_run_is_a_noop_does_not_clobber_or_dup_session() {
+    fn re_run_with_equal_key_is_a_noop_does_not_dup_session() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         insert_null_human(&mut conn, "human-adam-firstman");
@@ -236,13 +303,15 @@ mod tests {
         )
         .expect("first heal");
 
-        // Second run with a DIFFERENT key + household must NOT overwrite the
-        // already-set values, and must NOT create a second session.
+        // Second run with the SAME cell key + household is a pure no-op: it must
+        // not re-write the row, must not clobber household, and must not create a
+        // second session. (A *different* cell key is the re-key case and is
+        // handled by `rekeys_stale_self_human_and_session` — NOT here.)
         genesis_self_heal_identity(
             &mut conn,
             "human-adam-firstman",
-            "uhCAkDIFFERENT",
-            Some("household-other"),
+            "uhCAkADAM",
+            Some("household-eden"),
         )
         .expect("second heal (no-op)");
 
@@ -254,6 +323,232 @@ mod tests {
 
         let sessions = db::local_sessions::list_all_sessions(&mut conn).unwrap();
         assert_eq!(sessions.len(), 1, "no duplicate session on re-run");
+    }
+
+    /// Insert a human whose `agent_pub_key` is ALREADY SET to a (now-stale) key,
+    /// with a household — the production shape AFTER a pod re-key: the humans row
+    /// still holds the fossil `uhCAk…` from before the reinstall.
+    fn insert_keyed_human(conn: &mut SqliteConnection, id: &str, agent_key: &str, household: &str) {
+        create_human(
+            conn,
+            CreateHumanInput {
+                id: id.to_string(),
+                agent_pub_key: Some(agent_key.to_string()),
+                display_name: id.to_string(),
+                bio: None,
+                affinities: "[]".to_string(),
+                profile_reach: "commons".to_string(),
+                location: None,
+                profile_photo_url: None,
+                h_app_id: "imagodei".to_string(),
+                household_id: Some(household.to_string()),
+            },
+        )
+        .expect("insert keyed human");
+    }
+
+    /// Mint an active session for `human_id` carrying `agent_key` — the fossil
+    /// session a re-keyed pod keeps (its key is still `uhCAk…`-shaped, so it
+    /// passes `is_agent_cid` and would otherwise author every future provide under
+    /// the dead key).
+    fn insert_session(conn: &mut SqliteConnection, human_id: &str, agent_key: &str) {
+        db::local_sessions::create_session(
+            conn,
+            CreateLocalSessionInput {
+                id: None,
+                human_id: human_id.to_string(),
+                agent_pub_key: agent_key.to_string(),
+                doorway_url: String::new(),
+                doorway_id: None,
+                identifier: human_id.to_string(),
+                display_name: None,
+                profile_image_hash: None,
+                bootstrap_url: None,
+            },
+        )
+        .expect("insert session");
+    }
+
+    /// (a) STALE-FOR-SELF: a pod re-key leaves the SELF human row AND the local
+    /// session holding the old `uhCAk…`. Self-heal must move BOTH to the pod's
+    /// current cell key, preserving household_id and all other fields.
+    #[test]
+    fn rekeys_stale_self_human_and_session() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        // Post-rekey fossil state: humans row + session both on the OLD key.
+        insert_keyed_human(
+            &mut conn,
+            "human-matthew-manager",
+            "uhCAkOLDfossil",
+            "household-dowell",
+        );
+        insert_session(&mut conn, "human-matthew-manager", "uhCAkOLDfossil");
+
+        genesis_self_heal_identity(
+            &mut conn,
+            "human-matthew-manager",
+            "uhCAkNEWlive",
+            Some("household-dowell"),
+        )
+        .expect("rekey heal");
+
+        // Humans row now tracks the live cell key; household preserved.
+        let healed = get_human_by_id(&mut conn, "human-matthew-manager")
+            .unwrap()
+            .expect("human present");
+        assert_eq!(
+            healed.agent_pub_key.as_deref(),
+            Some("uhCAkNEWlive"),
+            "stale SELF human key must be rekeyed to the current cell key"
+        );
+        assert_eq!(
+            healed.household_id.as_deref(),
+            Some("household-dowell"),
+            "household_id must be preserved through the rekey"
+        );
+
+        // Session (which resolve_provider prefers) now tracks the live key.
+        let session = db::local_sessions::get_active_session(&mut conn)
+            .unwrap()
+            .expect("active session");
+        assert_eq!(
+            session.agent_pub_key, "uhCAkNEWlive",
+            "stale SELF session key must be rekeyed so provider resolution flips to the live key"
+        );
+        // No duplicate session minted.
+        assert_eq!(
+            db::local_sessions::list_all_sessions(&mut conn)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    /// (c) SELF-ONLY: another human's row (a different key) is NEVER touched by a
+    /// self-heal scoped to SELF_HUMAN_ID — no cross-agent writes.
+    #[test]
+    fn never_touches_another_humans_row() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_keyed_human(
+            &mut conn,
+            "human-matthew-manager",
+            "uhCAkOLDfossil",
+            "household-dowell",
+        );
+        insert_session(&mut conn, "human-matthew-manager", "uhCAkOLDfossil");
+        // A DIFFERENT human with its own key + household.
+        insert_keyed_human(
+            &mut conn,
+            "human-adam-firstman",
+            "uhCAkADAMkey",
+            "household-eden",
+        );
+
+        genesis_self_heal_identity(
+            &mut conn,
+            "human-matthew-manager",
+            "uhCAkNEWlive",
+            Some("household-dowell"),
+        )
+        .expect("self rekey heal");
+
+        // SELF healed…
+        let matthew = get_human_by_id(&mut conn, "human-matthew-manager")
+            .unwrap()
+            .unwrap();
+        assert_eq!(matthew.agent_pub_key.as_deref(), Some("uhCAkNEWlive"));
+
+        // …but the OTHER human is completely untouched.
+        let adam = get_human_by_id(&mut conn, "human-adam-firstman")
+            .unwrap()
+            .expect("other human present");
+        assert_eq!(
+            adam.agent_pub_key.as_deref(),
+            Some("uhCAkADAMkey"),
+            "another agent's key must never be rekeyed by a SELF heal"
+        );
+        assert_eq!(adam.household_id.as_deref(), Some("household-eden"));
+    }
+
+    /// (d) SAFETY: an empty cell key never writes — a stale SELF key/session are
+    /// left exactly as they are rather than being clobbered with an empty string.
+    #[test]
+    fn empty_uhcak_does_not_rekey_stale_self() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_keyed_human(
+            &mut conn,
+            "human-matthew-manager",
+            "uhCAkOLDfossil",
+            "household-dowell",
+        );
+        insert_session(&mut conn, "human-matthew-manager", "uhCAkOLDfossil");
+
+        genesis_self_heal_identity(
+            &mut conn,
+            "human-matthew-manager",
+            "",
+            Some("household-dowell"),
+        )
+        .expect("empty uhcak skip");
+
+        let human = get_human_by_id(&mut conn, "human-matthew-manager")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            human.agent_pub_key.as_deref(),
+            Some("uhCAkOLDfossil"),
+            "empty cell key must never clobber a set key"
+        );
+        let session = db::local_sessions::get_active_session(&mut conn)
+            .unwrap()
+            .unwrap();
+        assert_eq!(session.agent_pub_key, "uhCAkOLDfossil");
+    }
+
+    /// (e) DESIGN-QUESTION INTERPLAY: the fossil session key is itself a VALID
+    /// `agent_cid` (`is_agent_cid` == true), so a naive "only heal invalid keys"
+    /// check would skip it — and `conductor_commitment_author::resolve_provider`
+    /// (which prefers the session key) would keep authoring provides under the
+    /// dead key forever. This test proves a *valid-but-stale* session key is still
+    /// rekeyed to the live cell key, which is what flips provider resolution — the
+    /// precondition that makes `ProvideReconciler::reconcile_provides` author a
+    /// FRESH commitment under the new key (see the design-question verdict).
+    #[test]
+    fn valid_but_stale_session_key_is_still_rekeyed() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_keyed_human(
+            &mut conn,
+            "human-matthew-manager",
+            "uhCAkOLDfossil",
+            "household-dowell",
+        );
+        insert_session(&mut conn, "human-matthew-manager", "uhCAkOLDfossil");
+
+        // Precondition: the stale key looks perfectly valid.
+        assert!(
+            crate::identity_namespace::is_agent_cid("uhCAkOLDfossil"),
+            "the fossil session key IS a valid agent_cid — the trap this test guards"
+        );
+
+        genesis_self_heal_identity(
+            &mut conn,
+            "human-matthew-manager",
+            "uhCAkNEWlive",
+            Some("household-dowell"),
+        )
+        .expect("rekey heal");
+
+        let session = db::local_sessions::get_active_session(&mut conn)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            session.agent_pub_key, "uhCAkNEWlive",
+            "a valid-but-stale session key must still be rekeyed to the live cell key"
+        );
     }
 
     #[test]
