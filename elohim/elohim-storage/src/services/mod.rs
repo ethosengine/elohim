@@ -39,6 +39,7 @@ pub mod constitutional_ratio_registry;
 pub mod content_service;
 pub mod contributor_reflexive_facing; // Wave 2 — "how the network sees a contributor" facing (folds in elohim-facings)
 pub mod device_capacity; // Phase 4 T7 — available bytes helper
+pub mod did_identity_store; // did:elohim assembly store — implements the did-bridge ElohimIdentityStore contract (spec §3.4)
 pub mod disposition_service;
 pub mod distribution;
 pub mod distribution_view;

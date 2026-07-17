@@ -55,6 +55,12 @@ doorway-client = { path = "../../crates/doorway-client" }
 valueflows-bridge = { path = "../../bridges/valueflows/valueflows-bridge" }
 valueflows-types = { path = "../../bridges/valueflows/valueflows-types" }
 
+# DID bridge (W3C DID 1.1 identity projection). elohim-storage implements the
+# `did:elohim` ElohimIdentityStore assembly contract and resolves it.
+# See genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md
+did-bridge = { path = "../../bridges/did/did-bridge" }
+did-types = { path = "../../bridges/did/did-types" }
+
 # Protocol cache substrate
 elohim-cache-core = { path = "../elohim-cache-core", features = ["native"] }
 

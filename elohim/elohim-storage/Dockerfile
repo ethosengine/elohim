@@ -120,7 +120,9 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../elohim-chrome-asset"|path = "elohim-chrome-asset"|' Cargo.toml && \
     sed -i 's|path = "../epr"|path = "epr"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-bridge"|path = "bridges/valueflows/valueflows-bridge"|' Cargo.toml && \
-    sed -i 's|path = "../../bridges/valueflows/valueflows-types"|path = "bridges/valueflows/valueflows-types"|' Cargo.toml
+    sed -i 's|path = "../../bridges/valueflows/valueflows-types"|path = "bridges/valueflows/valueflows-types"|' Cargo.toml && \
+    sed -i 's|path = "../../bridges/did/did-bridge"|path = "bridges/did/did-bridge"|' Cargo.toml && \
+    sed -i 's|path = "../../bridges/did/did-types"|path = "bridges/did/did-types"|' Cargo.toml
 
 # Crates under ./crates reference elohim-views via `../../elohim/elohim-views`
 # (the source-tree layout: crates/<name>/ → ../../elohim/elohim-views/). In the
