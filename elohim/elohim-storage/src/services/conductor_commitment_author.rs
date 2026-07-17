@@ -34,6 +34,7 @@
 //!
 //! Spec: 2026-06-08-epr-acquisition-slice2b-provide-loop-design.md (provide loop).
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -171,17 +172,68 @@ pub fn build_provide_announce_input(
     }
 }
 
-/// Resolve the `provider` to write for a content provide. Prefers the node's
-/// holochain `agent_cid` (`uhCAk…`) — the canonical key the resilience-card join
-/// (`humans.agent_pub_key = rea_commitments.provider`) expects — when a valid one
-/// is available from the active local session, else falls back to `self_cid`.
-/// NEVER yields an empty/degraded provider: a known-flagged `self_cid` is safer
-/// than a wrong key. PURE.
-fn resolve_provider(session_agent_cid: Option<&str>, self_cid: &str) -> String {
-    match session_agent_cid {
-        Some(k) if crate::identity_namespace::is_agent_cid(k) => k.to_string(),
-        _ => self_cid.to_string(),
+/// Process-wide count of provide-loop author calls skipped because no candidate
+/// yielded an `agent_cid` provider. Monotonic for process lifetime (mirrors the
+/// `identity_namespace` violation counter idiom). Read by
+/// [`provider_unresolved_skip_count`] (unit tests + introspection).
+static PROVIDER_UNRESOLVED_SKIPS: AtomicU64 = AtomicU64::new(0);
+
+/// Read the running total of provide authors skipped for an unresolvable
+/// `agent_cid` provider. Monotonic; reset only by restart.
+pub fn provider_unresolved_skip_count() -> u64 {
+    PROVIDER_UNRESOLVED_SKIPS.load(Ordering::Relaxed)
+}
+
+/// Record one skipped provide author (no `agent_cid` provider resolvable) and
+/// emit a RATE-SANE signal: the process-wide counter + the scrapeable metric
+/// bump on every skip, but the WARN fires only on the FIRST occurrence per
+/// process (the provide loop retries every tick, so an unresolved-provider node
+/// would otherwise WARN-storm). Subsequent skips log at DEBUG. Returns the new
+/// running total (for tests).
+fn record_provider_unresolved_skip(head_ref: &str) -> u64 {
+    let prior = PROVIDER_UNRESOLVED_SKIPS.fetch_add(1, Ordering::Relaxed);
+    crate::metrics::inc_provide_provider_unresolved();
+    if prior == 0 {
+        tracing::warn!(
+            target: "identity_coherence",
+            counter = "elohim_provide_provider_unresolved_total",
+            head_ref = %head_ref,
+            "provide author: no agent_cid provider resolvable (session + own cell key both \
+             non-agent_cid) — SKIPPING author this tick rather than writing a transport-id \
+             provider that could never join the resilience card (rate-sane: first occurrence)"
+        );
+    } else {
+        tracing::debug!(
+            target: "identity_coherence",
+            counter = "elohim_provide_provider_unresolved_total",
+            head_ref = %head_ref,
+            skips = prior + 1,
+            "provide author: agent_cid provider still unresolvable — skip (throttled)"
+        );
     }
+    prior + 1
+}
+
+/// Resolve the `provider` `agent_cid` (`uhCAk…`) to write for a content provide
+/// from an ordered list of candidates, returning the FIRST that is a valid
+/// `agent_cid`.
+///
+/// The resilience-card join is `humans.agent_pub_key = rea_commitments.provider`,
+/// which expects an `agent_cid` — a libp2p `self_cid` (`12D3Koo…`) or any other
+/// transport id silently never joins (a junk row that can never join is worse
+/// than absence). So this NEVER falls back to a non-`agent_cid`. Candidate order
+/// (resolved by the caller): (a) the active local session's `agent_pub_key`,
+/// (b) the pod's own conductor cell key (`HcClient::agent_key_uhcak`, the same
+/// truthful `uhCAk…` source `genesis_self_heal` fills the humans row from).
+/// Returns `None` when NO candidate is a valid `agent_cid` — the author then
+/// SKIPS this tick. PURE.
+fn resolve_provider(candidates: &[Option<&str>]) -> Option<String> {
+    candidates
+        .iter()
+        .flatten()
+        .map(|s| s.trim())
+        .find(|s| crate::identity_namespace::is_agent_cid(s))
+        .map(|s| s.to_string())
 }
 
 /// Build the `revokes-commitment` payload (snake_case JSON) targeting an
@@ -227,10 +279,15 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
         // CID enforcement (rung 3): resolve the node's holochain agent_cid
         // (`uhCAk…`) for the `provider` field. The resilience-card join is
         // `humans.agent_pub_key = rea_commitments.provider`, which expects the
-        // agent_cid — NOT the libp2p `self_cid` (`12D3Koo…`). Source it from the
-        // active local session (the same key `GET /auth/me` returns); fall back to
-        // `self_cid` when no session is registered yet — never write a degraded or
-        // empty provider (a known-flagged self_cid beats a wrong key).
+        // agent_cid — NOT the libp2p `self_cid` (`12D3Koo…`). Candidate order:
+        // (a) the active local session's key (the same one `GET /auth/me`
+        // returns), then (b) the pod's OWN conductor cell key
+        // (`HcClient::agent_key_uhcak`) — the truthful `uhCAk…` the
+        // `genesis_self_heal` bootstrap fills the humans row from. We NEVER fall
+        // back to `self_cid`: writing a transport id here mints a `provider` row
+        // that can never join the card (worse than absence). If neither candidate
+        // is an agent_cid, SKIP authoring this tick (rate-sane signal) so the
+        // reconciler retries next tick once a truthful key is available.
         let session_cid = {
             let mut sconn = self.pool.get().map_err(|e| {
                 StorageError::Internal(format!("pool checkout for provider resolution: {e}"))
@@ -240,11 +297,27 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
                 .flatten()
                 .map(|s| s.agent_pub_key)
         };
-        let provider = resolve_provider(session_cid.as_deref(), &self.self_cid);
+        let cell_key = self.hc.agent_key_uhcak();
+        let provider = match resolve_provider(&[session_cid.as_deref(), Some(cell_key.as_str())]) {
+            Some(p) => p,
+            None => {
+                // No truthful agent_cid available — skip rather than write a
+                // transport-id provider. Returns Err so the reconciler rolls the
+                // per-key latch back to NeedsCommitment and retries next tick; the
+                // commitment is NOT authored (no conductor write below runs).
+                record_provider_unresolved_skip(&req.head_ref);
+                return Err(StorageError::Internal(format!(
+                    "provide author: no agent_cid provider resolvable for {} \
+                     (session + own cell key both non-agent_cid); skipping author this tick",
+                    req.head_ref
+                )));
+            }
+        };
 
-        // Observe what we ACTUALLY write: a clean uhCAk → silent; a self_cid
-        // fallback (12D3Koo) → WARN + elohim_identity_namespace_violation_total so
-        // the residual drift stays visible. NEVER rejects.
+        // Regression tripwire: `provider` is now guaranteed an agent_cid, so this
+        // stays silent on the correct path — but it would flag (WARN +
+        // elohim_identity_namespace_violation_total) any future edit that
+        // reintroduced a non-agent_cid provider. NEVER rejects.
         crate::identity_namespace::observe_agent_cid_write(
             "rea_commitments.provider",
             Some(&provider),
@@ -485,21 +558,57 @@ mod tests {
     }
 
     #[test]
-    fn resolve_provider_prefers_agent_cid_else_falls_back_to_self_cid() {
-        // A valid uhCAk session key wins — the join-correct provider.
+    fn resolve_provider_prefers_session_agent_cid() {
+        // (i) A valid uhCAk session key wins — the join-correct provider. The
+        // pod's own cell key (also a valid agent_cid) is the second candidate but
+        // is not needed when the session already resolves.
         assert_eq!(
-            resolve_provider(Some("uhCAkExampleAgentCid"), "12D3KooSelf"),
-            "uhCAkExampleAgentCid"
+            resolve_provider(&[Some("uhCAkSessionAgentCid"), Some("uhCAkCellKey")]).as_deref(),
+            Some("uhCAkSessionAgentCid")
         );
-        // A non-uhCAk session value (e.g. a stray transport id) is ignored — never
-        // write a wrong key; fall back to self_cid (which observe() then flags).
+    }
+
+    #[test]
+    fn resolve_provider_falls_back_to_cell_key_when_no_session() {
+        // (ii) No active session (None), but the pod's own conductor cell key is
+        // a valid agent_cid — the genesis_self_heal source (b). Resolves to it.
         assert_eq!(
-            resolve_provider(Some("12D3KooStray"), "12D3KooSelf"),
-            "12D3KooSelf"
+            resolve_provider(&[None, Some("uhCAkCellKey")]).as_deref(),
+            Some("uhCAkCellKey")
         );
-        // No session / empty → self_cid fallback (never empty/degraded).
-        assert_eq!(resolve_provider(None, "12D3KooSelf"), "12D3KooSelf");
-        assert_eq!(resolve_provider(Some(""), "12D3KooSelf"), "12D3KooSelf");
+    }
+
+    #[test]
+    fn resolve_provider_skips_non_agent_cid_session_but_takes_cell_key() {
+        // A stray transport-id session value is NEVER written; the valid cell key
+        // still resolves (candidate order, first agent_cid wins).
+        assert_eq!(
+            resolve_provider(&[Some("12D3KooStraySession"), Some("uhCAkCellKey")]).as_deref(),
+            Some("uhCAkCellKey")
+        );
+    }
+
+    #[test]
+    fn resolve_provider_returns_none_when_nothing_is_agent_cid() {
+        // (iii) Neither the session nor the cell key is an agent_cid (only
+        // transport ids / empties) → None. The author SKIPS this tick rather than
+        // writing a 12D3Koo provider that could never join the resilience card.
+        assert_eq!(
+            resolve_provider(&[Some("12D3KooSession"), Some("12D3KooCell")]),
+            None
+        );
+        assert_eq!(resolve_provider(&[None, None]), None);
+        assert_eq!(resolve_provider(&[Some(""), Some("   ")]), None);
+    }
+
+    #[test]
+    fn provider_unresolved_skip_records_signal() {
+        // (iii cont.) The skip path bumps the process-wide visibility counter (and
+        // the scrapeable metric) so an unresolvable-provider node is not silent.
+        let before = provider_unresolved_skip_count();
+        record_provider_unresolved_skip("epr:skip-1");
+        record_provider_unresolved_skip("epr:skip-2");
+        assert_eq!(provider_unresolved_skip_count(), before + 2);
     }
 
     #[test]
