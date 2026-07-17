@@ -175,6 +175,62 @@ fn verification_relationship_discriminates_reference_vs_embedded() {
     assert!(matches!(rels[0], VerificationRelationship::Embedded(_)));
 }
 
+/// A document with a JWK verification method AND unknown extension properties
+/// at the document, verification-method, and service levels — all must survive
+/// round-trip JSON-value-equivalent (never silently dropped, never keyless).
+const DID_WEB_JWK_DOC: &str = r#"{
+  "@context": [
+    "https://www.w3.org/ns/did/v1.1",
+    "https://w3id.org/security/jwk/v1"
+  ],
+  "id": "did:web:example.com",
+  "unknownDocumentProperty": {"nested": ["a", "b"], "n": 42},
+  "verificationMethod": [
+    {
+      "id": "did:web:example.com#key-1",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:example.com",
+      "publicKeyJwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+      },
+      "unknownVmProperty": "preserve-me"
+    }
+  ],
+  "service": [
+    {
+      "id": "did:web:example.com#svc",
+      "type": "SomeService",
+      "serviceEndpoint": "https://example.com/svc",
+      "unknownServiceProperty": true
+    }
+  ]
+}"#;
+
+#[test]
+fn jwk_and_unknown_extensions_round_trip() {
+    let doc: DidDocument = serde_json::from_str(DID_WEB_JWK_DOC).expect("parse jwk doc");
+
+    // The JWK method is NOT silently keyless.
+    let vm = &doc.verification_method.as_ref().unwrap()[0];
+    assert!(vm.public_key_multibase.is_none());
+    assert!(vm.public_key_jwk.is_some());
+    assert_eq!(vm.public_key_jwk.as_ref().unwrap()["crv"], "Ed25519");
+
+    // Unknown properties captured at each level.
+    assert!(doc.extra.contains_key("unknownDocumentProperty"));
+    assert!(vm.extra.contains_key("unknownVmProperty"));
+    assert!(doc.service.as_ref().unwrap()[0]
+        .extra
+        .contains_key("unknownServiceProperty"));
+
+    // Byte-equivalent (JSON-value-equal) round-trip.
+    let out = serde_json::to_value(&doc).unwrap();
+    let original: serde_json::Value = serde_json::from_str(DID_WEB_JWK_DOC).unwrap();
+    assert_eq!(out, original, "JWK document did not round-trip verbatim");
+}
+
 #[test]
 fn default_context_is_did_v1_1() {
     // The default this crate emits must be the DID 1.1 base context, not 1.0.

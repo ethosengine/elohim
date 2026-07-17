@@ -18,7 +18,8 @@ imago-dei ontology; no surface frames "self-sovereign" as an apex tier.
   and method impls: `did:key` (offline codec), `did:elohim` (projection-assembly
   contract), `did:web` (feature-gated `web-resolver`).
 - **`did-tests`** — registry routing, error-metadata semantics, did:key vectors
-  (real alpha-fleet keys + a published-pubkey vector), did:elohim assembly.
+  (real Holochain agent keys, incl. holo_hash's reference test vector, plus a
+  published-pubkey vector), did:elohim assembly.
 
 ## Methods
 
@@ -43,7 +44,7 @@ let document = result.did_document.expect("resolved");
 The `did:key` codec is also usable standalone — `AgentPubKey` (`uhCAk…`) ↔
 `did:key` (`did:key:z6Mk…`), with the 4 DHT location bytes recomputed on the
 reverse path exactly as `holo_hash` (blake2b-128 XOR-fold), cross-checked
-against real fleet keys.
+against the `holo_hash` reference implementation's own test vectors.
 
 ## Build / test
 

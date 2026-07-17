@@ -94,6 +94,15 @@ pub struct VerificationMethod {
     /// The multibase-encoded public key (present for `Multikey`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key_multibase: Option<String>,
+    /// The JWK-encoded public key (present for JWK-typed methods). **Preserved,
+    /// not interpreted** in phase 1 — carried opaquely so JWK-based documents
+    /// (common in `did:web`) survive round-trip and are not silently keyless.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_key_jwk: Option<Value>,
+    /// Any other verification-method properties, preserved verbatim so legal DID
+    /// extension properties round-trip. Empty ⇒ nothing emitted.
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 impl VerificationMethod {
@@ -104,6 +113,8 @@ impl VerificationMethod {
             type_: "Multikey".to_string(),
             controller,
             public_key_multibase: Some(public_key_multibase),
+            public_key_jwk: None,
+            extra: BTreeMap::new(),
         }
     }
 }
@@ -142,6 +153,9 @@ pub struct Service {
     pub type_: String,
     /// The service endpoint(s).
     pub service_endpoint: ServiceEndpoint,
+    /// Any other service properties, preserved verbatim. Empty ⇒ nothing emitted.
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// A W3C DID 1.1 document — the resolvable identity artifact.
@@ -194,6 +208,11 @@ pub struct DidDocument {
     /// Service endpoints.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service: Option<Vec<Service>>,
+
+    /// Any other top-level document properties, preserved verbatim so legal DID
+    /// extension properties round-trip. Empty ⇒ nothing emitted.
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 impl DidDocument {
@@ -211,6 +230,7 @@ impl DidDocument {
             capability_invocation: None,
             capability_delegation: None,
             service: None,
+            extra: BTreeMap::new(),
         }
     }
 }

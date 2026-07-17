@@ -2,10 +2,12 @@
 //!
 //! Vectors are of two kinds:
 //!
-//! 1. **Real alpha-fleet agent keys** — the reverse path recomputes the 4 DHT
-//!    location bytes; a byte-identical round-trip against a real key proves the
-//!    blake2b loc algorithm matches `holo_hash`. All six fleet keys below were
-//!    cross-checked (prefix `0x842024`, blake2b-128 XOR-fold loc).
+//! 1. **Real Holochain agent keys** — the reverse path recomputes the 4 DHT
+//!    location bytes; a byte-identical round-trip against a real key proves our
+//!    blake2b loc algorithm matches the `holo_hash` reference implementation.
+//!    The first key is `holo_hash`'s own reference test vector; every key here
+//!    is a valid agent-key encoding (prefix `0x842024`, blake2b-128 XOR-fold
+//!    loc) whose stored loc our algorithm reproduces exactly.
 //!
 //! 2. **A did:key vector built from a published ed25519 public key** (RFC 8032
 //!    §7.1 Test 1 public key). The expected `z6Mk…` string is *constructed from
@@ -19,8 +21,8 @@ use did_bridge::{
 };
 use did_types::{Did, VerificationRelationship};
 
-/// (agent_cid, expected did:key) — real alpha-fleet keys.
-const FLEET_VECTORS: &[(&str, &str)] = &[
+/// (agent_cid, expected did:key) — real Holochain agent keys.
+const DID_KEY_VECTORS: &[(&str, &str)] = &[
     (
         "uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH",
         "did:key:z6MkuWzukKSaEVxe76gbFYrnW7jUUftksarjkrjUwKdEp8Lr",
@@ -31,8 +33,8 @@ const FLEET_VECTORS: &[(&str, &str)] = &[
     ),
 ];
 
-/// A larger set of real fleet keys for the loc round-trip (agent_cid only).
-const FLEET_KEYS: &[&str] = &[
+/// A larger set of real agent keys for the loc round-trip (agent_cid only).
+const AGENT_KEYS: &[&str] = &[
     "uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH",
     "uhCAk71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o",
     "uhCAkJ9p-IlfMpeP_HeygQt2jqHDXu4-YRAQezq3L0m9nz3wCa0Mh",
@@ -42,18 +44,18 @@ const FLEET_KEYS: &[&str] = &[
 ];
 
 #[test]
-fn fleet_did_key_vectors_encode_exactly() {
-    for (agent_cid, did_key) in FLEET_VECTORS {
+fn did_key_vectors_encode_exactly() {
+    for (agent_cid, did_key) in DID_KEY_VECTORS {
         assert_eq!(&agent_cid_to_did_key(agent_cid).unwrap(), did_key);
         assert_eq!(&did_key_to_agent_cid(did_key).unwrap(), agent_cid);
     }
 }
 
 #[test]
-fn fleet_keys_loc_recompute_byte_identical() {
+fn agent_keys_loc_recompute_byte_identical() {
     // Reconstructing the agent_cid from its core (recomputing loc) must equal the
-    // real fleet key — proves the loc algorithm matches holo_hash.
-    for agent_cid in FLEET_KEYS {
+    // real key — proves the loc algorithm matches the holo_hash reference.
+    for agent_cid in AGENT_KEYS {
         let core = agent_cid_to_core32(agent_cid).unwrap();
         assert_eq!(
             &did_key_to_agent_cid(&core32_to_did_key(&core)).unwrap(),

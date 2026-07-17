@@ -23,8 +23,9 @@ identity surface — one resolvable DID document per agent — assembled as a
 - **`did:key`** — offline. `AgentPubKey` (`uhCAk…`, 3-byte prefix `0x842024` +
   32-byte ed25519 core + 4-byte DHT loc) ↔ `did:key:z6Mk…` (multicodec `0xed01`
   + base58btc of the core). The reverse path recomputes the loc bytes exactly as
-  `holo_hash` (blake2b-128, XOR-folded 16→4) — cross-checked against real
-  alpha-fleet keys, so the round-trip is byte-identical. `blake2b_simd` is used
+  `holo_hash` (blake2b-128, XOR-folded 16→4) — cross-checked against the
+  `holo_hash` reference implementation's own test vectors, so the round-trip is
+  byte-identical. `blake2b_simd` is used
   directly rather than depending on `holo_hash` (keeps the bridge off the
   Holochain tree and avoids a duplicate-`holo_hash` type conflict when
   `elohim-storage` later consumes this crate).
@@ -38,7 +39,14 @@ identity surface — one resolvable DID document per agent — assembled as a
   the phase-2 identity head.
 - **`did:web`** — feature-gated (`web-resolver`, off by default). URL derivation
   + resolution over an injected `DidWebFetch` trait; no HTTP client in the
-  common build.
+  common build. **Security (SSRF):** `derive_did_web_url` rejects (never
+  sanitizes) any segment that, after percent-decoding, carries an
+  authority/path-confusion character (`@` `/` `\` `?` `#` or control) — this
+  closes the `%40`-userinfo host-confusion class. It does **not** make the
+  resolved host safe: `DidWebFetch` implementations MUST additionally validate
+  the resolved URL's actual host against their egress policy (block loopback /
+  link-local / private / cloud-metadata ranges) before connecting. The crate
+  owns confusion-rejection; the fetcher owns network policy.
 
 ## What phase 1 is NOT (named follow-ons, deliberately deferred)
 

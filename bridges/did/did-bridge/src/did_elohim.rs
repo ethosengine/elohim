@@ -25,7 +25,7 @@ use did_types::{
 use thiserror::Error;
 
 use crate::codec::{agent_cid_to_core32, core32_to_multikey};
-use crate::resolver::{DidResolutionError, DidResolutionResult, DidResolver};
+use crate::resolver::{DidDocumentMetadata, DidResolutionError, DidResolutionResult, DidResolver};
 
 /// A service the identity store reports for an agent, before the resolver frames
 /// it with the subject DID as `id`. `id_fragment` becomes `#<fragment>`.
@@ -70,6 +70,19 @@ pub trait ElohimIdentityStore: Send + Sync {
     /// Transport identifiers for this agent (libp2p PeerId, iroh NodeId) — placed
     /// in `alsoKnownAs` so one resolution surface names all of an agent's ids.
     async fn transport_ids(&self, agent_cid: &str) -> Result<Vec<String>, ElohimStoreError>;
+
+    /// Document metadata (`created` / `updated`) for the DID document.
+    ///
+    /// Defaults to empty so a store can begin supplying timestamps later —
+    /// e.g. once the phase-2 identity head records them — **without** a breaking
+    /// change to this trait or its existing implementors. Phase-1 stores need
+    /// not implement it.
+    async fn document_metadata(
+        &self,
+        _agent_cid: &str,
+    ) -> Result<DidDocumentMetadata, ElohimStoreError> {
+        Ok(DidDocumentMetadata::default())
+    }
 }
 
 /// Resolver for the `did:elohim` method, assembling documents from a store.
@@ -155,7 +168,14 @@ impl<S: ElohimIdentityStore> DidResolver for ElohimResolver<S> {
             doc.service = Some(services);
         }
 
-        Ok(DidResolutionResult::success(doc))
+        let mut result = DidResolutionResult::success(doc);
+        // Populate document metadata from the store (default: empty in phase 1).
+        result.did_document_metadata = self
+            .store
+            .document_metadata(agent_cid)
+            .await
+            .map_err(|e| DidResolutionError::Internal(e.to_string()))?;
+        Ok(result)
     }
 }
 
@@ -165,5 +185,6 @@ fn frame_service(did: &Did, svc: ServiceRef) -> Service {
         id: did.with_fragment(&svc.id_fragment),
         type_: svc.service_type,
         service_endpoint: ServiceEndpoint::Uri(svc.endpoint),
+        extra: std::collections::BTreeMap::new(),
     }
 }

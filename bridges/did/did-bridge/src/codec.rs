@@ -11,8 +11,9 @@
 //!
 //! The reverse path (did:key → agent_cid) **recomputes the 4 DHT location
 //! bytes** from the core exactly as `holo_hash` does — blake2b-128 of the core,
-//! XOR-folded 16→4 bytes — so the round-trip is byte-identical to a real fleet
-//! agent key. Verified against six real alpha-fleet keys (see did-tests).
+//! XOR-folded 16→4 bytes — so the round-trip is byte-identical for a real
+//! Holochain agent key. Cross-checked against the `holo_hash` reference
+//! implementation's own test vectors (see did-tests).
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -159,23 +160,24 @@ pub fn did_key_to_agent_cid(did_key: &str) -> Result<String, CodecError> {
 mod tests {
     use super::*;
 
-    // A real alpha-fleet agent key. Its loc bytes were cross-checked against
-    // holo_hash's blake2b XOR-fold (all 6 fleet keys verified — see did-tests).
-    const FLEET_KEY: &str = "uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH";
-    const FLEET_KEY_DIDKEY: &str = "did:key:z6MkuWzukKSaEVxe76gbFYrnW7jUUftksarjkrjUwKdEp8Lr";
+    // A real Holochain agent key — the `holo_hash` reference implementation's own
+    // test vector. Its loc bytes are cross-checked against holo_hash's blake2b
+    // XOR-fold (see did-tests for the full vector set).
+    const AGENT_KEY: &str = "uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH";
+    const AGENT_KEY_DIDKEY: &str = "did:key:z6MkuWzukKSaEVxe76gbFYrnW7jUUftksarjkrjUwKdEp8Lr";
 
     #[test]
-    fn real_fleet_key_loc_recompute_is_identical() {
+    fn agent_key_loc_recompute_is_identical() {
         // Extract core, then reconstruct the full agent_cid recomputing loc —
-        // must equal the original real key byte-for-byte.
-        let core = agent_cid_to_core32(FLEET_KEY).unwrap();
-        assert_eq!(core32_to_agent_cid(&core), FLEET_KEY);
+        // must equal the original key byte-for-byte.
+        let core = agent_cid_to_core32(AGENT_KEY).unwrap();
+        assert_eq!(core32_to_agent_cid(&core), AGENT_KEY);
     }
 
     #[test]
-    fn real_fleet_key_did_key_vector() {
-        assert_eq!(agent_cid_to_did_key(FLEET_KEY).unwrap(), FLEET_KEY_DIDKEY);
-        assert_eq!(did_key_to_agent_cid(FLEET_KEY_DIDKEY).unwrap(), FLEET_KEY);
+    fn agent_key_did_key_vector() {
+        assert_eq!(agent_cid_to_did_key(AGENT_KEY).unwrap(), AGENT_KEY_DIDKEY);
+        assert_eq!(did_key_to_agent_cid(AGENT_KEY_DIDKEY).unwrap(), AGENT_KEY);
     }
 
     #[test]
