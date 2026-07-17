@@ -490,4 +490,84 @@ mod tests {
             assert_eq!(ids, vec!["absent"]);
         }
     }
+
+    /// Wave 1.2 honesty-boundary proof-gate: the backfill flips the resilience
+    /// snapshot's `distribution_state` from `"unmeasured"` to `"measured"` for
+    /// content the pod genuinely holds — and does so WITHOUT inflating
+    /// `stewarding_collectives` (that count is written only by the real
+    /// `distribute_shards`/`shard_locations` path, Wave 1.3). This is the
+    /// storage-side closure of the DB-free Wave 1.1 fold proof: it binds the
+    /// writer (`run_once`) to the read surface (`household_resilience::snapshot`)
+    /// so "distributionState becomes a measurement" is a verified law, not a
+    /// wiring assumption.
+    #[tokio::test]
+    async fn backfill_flips_distribution_state_to_measured_without_claiming_stewards() {
+        use crate::db::AppContext;
+        use crate::services::household_resilience;
+
+        let pool = test_pool();
+        let blob_store = BlobStore::new_memory();
+        let ctx = AppContext::default_lamad();
+
+        // Content the pod genuinely holds: bytes in the blob store, a content row
+        // pointing at them, but NO shard manifest yet (the pre-backfill dark card).
+        let stored = blob_store
+            .store(b"<html>a household holds this</html>")
+            .await
+            .expect("store blob");
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_content(&mut conn, "held-doc", Some(&stored.hash));
+        }
+
+        // BEFORE: no manifest → honest non-measurement. The card is dark, and it
+        // is honest about being dark (never a fake at-risk verdict).
+        let before =
+            household_resilience::snapshot(&pool, &ctx, "held-doc", None).expect("snapshot before");
+        assert_eq!(
+            before.distribution_state, "unmeasured",
+            "content with no manifest must read as unmeasured (honest dark card)"
+        );
+        assert_eq!(
+            before.stewarding_collectives, 0,
+            "no manifest → empty holder relation → zero stewards"
+        );
+
+        // Run the backfill: records a manifest for the held blob (no p2p handle,
+        // so it does NOT distribute — shard_locations stays empty by design).
+        let config = BackfillConfig {
+            batch_size: 10,
+            item_delay: Duration::from_millis(0),
+            batch_pause: Duration::from_millis(0),
+        };
+        let report = run_once(
+            &pool,
+            &blob_store,
+            "lamad",
+            &config,
+            #[cfg(feature = "p2p")]
+            None,
+        )
+        .await
+        .expect("run_once");
+        assert_eq!(report.recorded, 1, "the held blob must gain a manifest");
+
+        // AFTER: manifest present → the distribution state is now a MEASUREMENT.
+        let after =
+            household_resilience::snapshot(&pool, &ctx, "held-doc", None).expect("snapshot after");
+        assert_eq!(
+            after.distribution_state, "measured",
+            "a recorded manifest must flip distribution_state to measured"
+        );
+
+        // Honesty boundary (plan correction #3): the manifest backfill flips the
+        // MEASUREMENT, but it must NOT fabricate stewards. `stewarding_collectives`
+        // stays zero because no peer has acknowledged holding a shard
+        // (shard_locations is empty until the real distribute_shards path, Wave 1.3).
+        assert_eq!(
+            after.stewarding_collectives, 0,
+            "backfill records a manifest, not a stewardship claim — stewards stay 0 \
+             until real distribution populates shard_locations (Wave 1.3)"
+        );
+    }
 }
