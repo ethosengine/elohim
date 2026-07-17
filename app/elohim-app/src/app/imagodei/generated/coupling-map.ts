@@ -29,7 +29,7 @@ export const IMAGODEI_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
     governance: {
       defaultReach: 'community',
       minimumReach: 'self',
-      governanceModel: 'self-sovereign',
+      governanceModel: 'steward-consent',
       signalTypes: ['identity-created', 'presence-established', 'agency-progressed'],
     },
   },
