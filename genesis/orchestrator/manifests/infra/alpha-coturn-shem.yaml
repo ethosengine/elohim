@@ -194,8 +194,8 @@ spec:
             - "/base/turnserver.conf"
             - "--coturn-out-conf"
             - "/etc/coturn-run/turnserver.conf"
-            - "--state-dir"
-            - "/var/lib/relay-addr-beacon"
+            - "--state-file"
+            - "/var/lib/relay-addr-beacon/state.json"
           volumeMounts:
             - name: coturn-base
               mountPath: /base
@@ -268,8 +268,8 @@ spec:
             - "/base/turnserver.conf"
             - "--coturn-out-conf"
             - "/etc/coturn-run/turnserver.conf"
-            - "--state-dir"
-            - "/var/lib/relay-addr-beacon"
+            - "--state-file"
+            - "/var/lib/relay-addr-beacon/state.json"
             # coturn has no config-reload signal for external-ip; the sidecar
             # shares the pod's process namespace (shareProcessNamespace: true
             # above), so SIGTERM-ing the turnserver process is enough — the
