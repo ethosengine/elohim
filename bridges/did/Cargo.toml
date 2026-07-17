@@ -1,0 +1,38 @@
+[workspace]
+resolver = "2"
+members = [
+    "did-types",
+    "did-bridge",
+    "did-tests",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Elohim Protocol"]
+
+[workspace.dependencies]
+# Serialization — wire-faithful DID 1.1 JSON
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Async resolver trait
+async-trait = "0.1"
+
+# Errors
+thiserror = "1"
+
+# did:key codec — base58btc (multibase 'z'), base64url (holo 'u' form), blake2b loc
+bs58 = "0.5"
+base64 = "0.22"
+blake2b_simd = "1"
+
+# did:web (feature-gated) — percent-decoding of the method-specific-id
+percent-encoding = "2"
+
+# Async test runtime
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
+
+# Property testing (round-trip codec)
+proptest = "1"
