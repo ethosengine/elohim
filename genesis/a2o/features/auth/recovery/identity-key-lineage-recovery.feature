@@ -17,6 +17,20 @@ Feature: A recovered identity keeps its contribution, standing, and claims throu
   # acceptance criterion for the WHOLE arc, and it goes GREEN in Wave D (D1),
   # end-to-end, once the community-recovery quorum can authorize a real
   # `rotate_identity_key`. Keep the `@wip` tag until then.
+  #
+  # STATUS 2026-07-18 (arc partially shipped; stays @wip by operator decision):
+  #   PROVEN & BANKED — chain-root over the lineage DAG + root-stability
+  #   (Wave B, pure-logic + sweettest); `binds-identity` declaration + validator
+  #   (Wave B); the AUTHORIZATION-REFUSAL path below = scenario 2, proven at the
+  #   sweettest layer (unauthorized rotate refused pre-write); did:elohim resolves
+  #   real controllers + lineage, DHT-canonical head selection (Wave C1); the
+  #   attribution / REA / claim re-pointings at the chain-root (Wave A).
+  #   DEFERRED (why full end-to-end is still RED) — (1) no coordinator path mints
+  #   a valid KeyRotation, so scenario 1's "a KeyRotation version node is appended"
+  #   can't run end-to-end: backlog keyrotation-mint-path-witness-backed
+  #   (CryptographicQuorum variant = the narrower unblock); (2) transport-id
+  #   binding is signature-deferred: backlog agent-peer-binding-signing (C2).
+  #   D1 flips @wip→green once the mint path lands.
   # ─────────────────────────────────────────────────────────────────────────
 
   As a person who has lost the key to my identity
