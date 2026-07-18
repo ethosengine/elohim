@@ -32,6 +32,7 @@ pub mod acquisition;
 pub mod adapters;
 pub mod attention_tending;
 pub mod behaviour;
+pub mod binding_cross_signature;
 pub mod blob_fetch;
 pub mod blob_protocol;
 pub mod conductor_agent_info_gossip;
