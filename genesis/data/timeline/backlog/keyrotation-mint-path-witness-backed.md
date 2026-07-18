@@ -54,3 +54,17 @@ recovery-quorum controllers `binds-identity` already declares. The full witness-
 Flip the identity-head plan Wave D from `@wip` to green; route through `p2p-design-gate`
 (this mints a notarized entry) and the DNA-hash-neutrality gate (coordinator-only). Prefer the
 CryptographicQuorum path first as the minimal end-to-end proof.
+
+## ⚠ HARD PRECONDITION — this mint path MUST NOT land without plan task B1b
+(Whole-arc review, 2026-07-18.) Today every identity is a degenerate single-node chain, so the
+storage `identity_root_cid(k)` (trim-only, returns `k`) and the imagodei `identity_chain_root(k)`
+(walks the DAG) are *accidentally equal* — the ONLY reason the Wave-A re-pointings (REA
+provider/receiver, `claimed_agent_id`) and the identity-head `chain_root` coincide. The instant a
+real KeyRotation can be minted, `identity_chain_root(new_key)` walks back to genesis `G` while
+storage `identity_root_cid(new_key)` still returns `new_key` → every re-pointing diverges from the
+head's `chain_root` and **silently breaks** (a claim stored under `G` won't resolve for a lookup
+routed through `new_key`; an REA provider written as `new_key` won't match a head with
+`chain_root=G`). So landing this mint path REQUIRES the plan's **B1b** (upgrade storage
+`identity_root_cid` to walk the DAG AND route the read filters through the resolved root) in the
+SAME change — otherwise the arc's data integrity silently regresses. See
+`genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md` Wave B, task B1b.
