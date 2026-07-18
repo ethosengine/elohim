@@ -53,3 +53,107 @@ Bounded to elohim-storage p2p (`identity_binding_gossip.rs` + `identity_handshak
 `AgentPeerBinding` entry type already exists in imagodei; this is the signing/verify
 layer). Pairs with `keyrotation-mint-path-witness-backed` as the two identity-head
 hardening follow-ons.
+
+---
+
+## Design review (2026-07-18) — build-ready design + 4-lens adversarial red-team
+
+A design pass produced a build-ready cross-signature design; four independent red-team lenses
+(transport-id-spoofing, replay-freshness-rotation, verification-placement/hash-move,
+weak-scheme-vs-honest-sentinel) attacked it. **Verdict: the signature ALGEBRA is sound and
+genuinely stronger than the sentinel — but the durable/temporal model, classification, and one
+signed field are broken. C2 is SALVAGEABLE with the revisions below.**
+
+### What HELD under attack (build on this, don't relitigate)
+- **Bidirectional cross-signature** — transport key signs `agent_cid`, agent (head) key signs
+  `transport_id`; both ids in both halves ⇒ neither side unilaterally claimable.
+- **Domain separation** — distinct tags (`agent-attests-transport` vs `transport-attests-agent`)
+  block lifting one half into the other; cross-transport (libp2p↔iroh, same ed25519 key) lift
+  blocked because `transport_kind`+`transport_id` are inside both signed halves.
+- **Length-prefixed canonical encoder** (NOT `serde_json::Value`/MessagePack map-ordering) — right
+  call, avoids the WASM-boundary serialization trap.
+- **`verify_strict`** (not `.verify()`) for malleability/small-order rejection.
+- **Signing primitive already exists** — agent half via `ConductorSigningClient::sign` →
+  `sign_for_agent` zome fn (`sign_for_agent.rs:86-122`); transport half signed locally (storage owns
+  the libp2p `Keypair` / iroh `SecretKey`). No new conductor surface. **Verification lives in the
+  coordinator gate + storage (DNA-hash-neutral); integrity hardening is a separate Tier-2 hash-move.**
+- **Degrade-to-sentinel** is the correct failure direction (unverified ⇒ routing-only).
+
+### The BLOCKER — the "pincer" (found independently by two lenses)
+Freshness was placed on the self-asserted payload `issued_at` with a ±300s window
+(`parse_iso_and_check_window`, `identity_handshake.rs:308-329`). That is a **liveness** primitive
+applied to a **durable, gossiped, notarized credential**:
+- **Keep ±300s at consume →** every durable binding is `cross_signed` only on the minting node and
+  `unverified` on every remote node (dead-on-arrival exactly where attribution/`alsoKnownAs` needs it).
+- **Remove ±300s →** a compromised *retired* key mints fresh `cross_signed` standing by **backdating
+  `issued_at`** before its supersession (rotation is the compromise-recovery path, so leaked-then-
+  rotated keys are exactly the live population).
+**Resolution:** anchor BOTH freshness AND the supersession-cutoff on the **notarized DHT action
+`Timestamp`** of the `AgentPeerBinding` entry (`must_get_action(...).timestamp`) — author-asserted
+but source-chain-monotonic and DHT-validated, un-backdatable below a real supersession. Reserve
+±300s + a **verifier-issued challenge nonce** (own domain tag, length-prefixed) strictly for the
+*interactive handshake* liveness path.
+
+### Other required revisions (all in-scope, DNA-hash-neutral)
+- **Remove `binding_action_hash` from the signed core** — it's carried INSIDE the entry's own
+  `signature` field, so signing over the entry's own ActionHash is self-referential/unconstructible;
+  the anti-lift property is already fully held by the other signed fields.
+- **Fail-closed classification (type-level, not a remembered `WHERE`):** `proof_status TEXT DEFAULT
+  'unverified' NOT NULL` + backfill all existing rows to `unverified`; a **single writer chokepoint**
+  that calls the shared `verify_cross_signature` (every other insert/update hard-codes `unverified`);
+  positive-match `='cross_signed'` gates only (never `!=unverified`/`IS NOT NULL`); `transport_ids()`
+  returns verified-by-construction with a distinctly-named `routing_transport_ids()` for the
+  unverified cut; a `cross_signed`-only SQL view for `reciprocity_view`/`cluster_view`.
+- **Durable vs ephemeral is the real safe/unsafe cut** (not care-vs-compute): only ephemeral,
+  self-correcting ops (one CID-verified blob fetch, a re-authenticating connect) may consume
+  `unverified`. Durable decisions — replica placement, diversity accounting, `peer_map`
+  cross-transport mappings — MUST gate on `cross_signed` (else replica-capture / diversity-defeat /
+  eclipse via spoofed `(agent→transport)` gossip).
+- **Per-row panic-free decode** of the attacker-controlled proof bytes (one poisoned DHT entry must
+  not empty the projection — the `EprRouter`-poisoned-row class); poisoned-row test.
+- **Close the `sign_for_agent` no-EPR carve-out** for this use (`sign_for_agent.rs:94-111` skips the
+  signer-match gate when no Agent EPR exists) — and state as a hard invariant that a `sign_for_agent`
+  output is never on its own proof of `agent_cid` control; the verifier's head/lineage check is
+  load-bearing and mandatory on every consume path, failing closed when no head/EPR resolves.
+- **Reject `valid_until: None`** (clamp to a protocol max, e.g. 30–90d) so every credential expires
+  and is re-minted under present key control; bound the nonce/dedup store by the validity window.
+- **Encoder Option collision:** emit a 1-byte present/absent flag before `valid_until` (else
+  `None` vs `Some("")` produce identical bytes); pin ONE canonical `transport_id` encoding per kind
+  and store/consume only the pubkey-derived canonical form; reject non-ed25519 transports to `unverified`.
+- **Revocation authorization:** supersede/revoke a binding for `agent_cid` only under a proof from
+  `agent_cid`'s current head (blocks force-revoke DoS; enables compromised-transport-key cut).
+
+### Bite-sized session decomposition (each independently executable to clean delivery)
+- **C2-S1 — algebra core (no deps, DNA-neutral):** `BindingCore` + length-prefixed domain-separated
+  encoder (present/absent flag on `valid_until`) + `CrossSignatureProof` (WITHOUT `binding_action_hash`)
+  + shared pure `verify_cross_signature(core, proof, head_resolver)` + unit tests (injectivity,
+  domain-swap/forged-half rejection). This is the red-team-validated sound core.
+- **C2-S2 — signing wiring:** transport-half (libp2p/iroh by active backend) + agent-half via existing
+  `ConductorSigningClient::sign`→`sign_for_agent` (carve-out closed). Deliverable: storage assembles a
+  complete valid proof for its own `agent_cid`.
+- **C2-S3 — notarized-timestamp anchoring (resolves the pincer):** durable proofs verify timelessly
+  (validity window only, cutoff on notarized action `Timestamp`); ±300s + verifier-issued challenge
+  nonce (own domain tag, length-prefixed) reserved for the interactive handshake.
+- **C2-S4 — verify-on-consume + fail-closed projection:** `proof_status` migration (default unverified
+  NOT NULL + backfill); single-writer verify chokepoint; per-row panic-free decode + poisoned-row test.
+- **C2-S5 — type-level consumer enforcement:** verified-by-construction `transport_ids()` +
+  `routing_transport_ids()`; `cross_signed`-only view for `reciprocity_view`/`cluster_view`; move
+  durable placement + `peer_map` cross-transport to the `cross_signed` cut; did-bridge gate.
+- **C2-S6 — ship R1, gate R2:** R1 (current-head signed) delivers as `cross_signed`; R2 (lineage-
+  inherited) stays fail-closed to `unverified` until its deps land.
+- **C2-S7 — Tier-2 (SEPARATE scheduled arc, MOVES DNA hash):** fold the two self-contained ed25519
+  verifies into integrity `validate_create_agent_peer_binding`, **version-gated by `scheme_version`**
+  (legacy shape-only for `<2`, else retro-invalidates old entries); genesis pair both
+  `ALLOW_DNA_REINSTALL`-flagged; re-mint-under-current-head migration story. Only path to a
+  *notarized* (not receiver-local) guarantee.
+
+### Dependencies + honest state
+- **C2-S1…S5 + S6-R1 are buildable now, DNA-hash-neutral, deliver R1** (current-head bindings verified).
+- **R2 (lineage inheritance) ships INERT** until: (a) the B1b **redesign** (see
+  `keyrotation-mint-path-witness-backed.md` "Design review" — B1b as originally specced is unsound),
+  (b) pubkey-timeline populated by a real `on_key_rotation` (today a no-op stub, `controller.rs:277`),
+  and (c) a new `find_head_by_chain_root` resolver — all keyed on DHT-canonical `KeyRotation.rotated_at`,
+  never node-local arrival order.
+- **Tier-1 verification is receiver-local, NOT notarized** — a DHT-direct third party can still be
+  fooled by a shape-only forged entry until Tier-2. This is inherent to hash-neutrality; state it,
+  don't oversell the coordinator gate as a trust boundary.
