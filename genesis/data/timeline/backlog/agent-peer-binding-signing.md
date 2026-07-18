@@ -141,11 +141,15 @@ but source-chain-monotonic and DHT-validated, un-backdatable below a real supers
   durable placement + `peer_map` cross-transport to the `cross_signed` cut; did-bridge gate.
 - **C2-S6 — ship R1, gate R2:** R1 (current-head signed) delivers as `cross_signed`; R2 (lineage-
   inherited) stays fail-closed to `unverified` until its deps land.
-- **C2-S7 — Tier-2 (SEPARATE scheduled arc, MOVES DNA hash):** fold the two self-contained ed25519
-  verifies into integrity `validate_create_agent_peer_binding`, **version-gated by `scheme_version`**
-  (legacy shape-only for `<2`, else retro-invalidates old entries); genesis pair both
-  `ALLOW_DNA_REINSTALL`-flagged; re-mint-under-current-head migration story. Only path to a
-  *notarized* (not receiver-local) guarantee.
+- **C2-S7 — Tier-2 integrity hardening (MOVES DNA hash — but that's fine in dev):** fold the two
+  self-contained ed25519 verifies into integrity `validate_create_agent_peer_binding` — the only
+  path to a *notarized* (not receiver-local) guarantee. The DNA-hash move is a normal dev
+  `ALLOW_DNA_REINSTALL` reinstall (both genesis peers together), NOT a scheduled prod re-key — so
+  Tier-2 is not a scary deferred arc. **Given that, reconsider the Tier-1/Tier-2 split itself:** the
+  two-tier dance existed only to avoid the hash move; in dev, C2 may just do the integrity
+  verification from the start (still keeping lineage-currency in the coordinator, since HDI has no
+  `get_links`). If bindings migrate across the reinstall, still `scheme_version`-gate so legacy
+  shape-only entries don't retro-invalidate; else fresh DHT + re-mint-under-current-head.
 
 ### Dependencies + honest state
 - **C2-S1…S5 + S6-R1 are buildable now, DNA-hash-neutral, deliver R1** (current-head bindings verified).

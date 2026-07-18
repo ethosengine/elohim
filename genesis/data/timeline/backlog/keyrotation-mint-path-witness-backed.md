@@ -124,24 +124,26 @@ re-key + lineage governance.** The two are mutually exclusive.
   → split-brain roots across the fleet, unrollback-able. A DNA-hash *move* would isolate
   un-upgraded nodes (safe); neutrality trades that away.
 
-### True scope if the mint is ever pursued (a MUCH larger arc than this backlog framed)
-An integrity change (DNA-hash move + re-key/lineage-migration governance) that: binds
-`human_agent_pubkey` + `superseded_agent_pubkey` into the signed `M`; enforces
-`stewardship.human_id` resolves to the target human; enforces the group-key invariant (or honestly
-downgrades the claim to "single cryptographic controller"); switches to `verify_strict`; adds a
-real one-time nonce for single-use; de-grinds the merge/head tiebreak (earliest-`rotated_at`, or
-fail-closed on multi-parent); reads the victim's notarized `controller_policy`; and runs freeze +
-revocation gates in `rotate_identity_key`. This is NOT the "witness-free minimal unblock" — it is a
-security-critical re-key event. Re-scope before any build; route through `p2p-design-gate` +
-`red-team` again on the revised integrity design.
+### True scope — do it right (the integrity change is fine in dev)
+The sound mint is an **integrity change** that: binds `human_agent_pubkey` +
+`superseded_agent_pubkey` into the signed `M`; enforces `stewardship.human_id` resolves to the
+target human; enforces the group-key invariant (or honestly downgrades the claim to "single
+cryptographic controller"); switches to `verify_strict`; adds a real one-time nonce for single-use;
+de-grinds the merge/head tiebreak (earliest-`rotated_at`, or fail-closed on multi-parent); reads
+the victim's notarized `controller_policy`; and runs freeze + revocation gates in
+`rotate_identity_key`. It is NOT the "witness-free coordinator-only minimal unblock" the backlog
+originally promised. **But the DNA-hash move it requires is NOT a blocker here:** everything is
+dev, so it's a normal `ALLOW_DNA_REINSTALL` reinstall (both genesis peers flagged together, per the
+DNA-upgrade-governance doc), not a prod migration. So: do it right — design the integrity validator
+properly, accept the hash move, reinstall the dev DHT. Re-scope + route through `p2p-design-gate` +
+`red-team` again on the revised integrity design before building.
 
-### ⚠ URGENT independent finding (escalated separately)
-`rotate_identity_key` AND `commit_key_rotation` are **already `#[hdk_extern]` in-tree**. IF the
-coordinator WASM carrying them is deployed on alpha/prod, the takeover forgery above may be
-**reachable today**, before any B1b. Verification (query the deployed coordinator's exported fn
-list; confirm `KeyStewardship` creation is reachable) is operator/security-owned (no `kubectl`
-from dev). Captured as its own high-priority item:
-`genesis/data/timeline/backlog/keyrotation-crypto-quorum-forgery-live-check.md`.
+### Reachability note (dev context — NOT an incident)
+`rotate_identity_key` AND `commit_key_rotation` are `#[hdk_extern]` in-tree, so the forgery is
+reachable by construction wherever this coordinator runs. But everything is dev — the repo IS the
+state; there is no separate prod fleet to race. So this is a **correctness bug to fix before the
+mint is considered shippable**, not a live security incident. No kill-switch scramble; just don't
+ship the CryptographicQuorum success path until the integrity binding below lands.
 
 ### B1b is also unsound as designed (must be redesigned, not just "routed")
 The mint's HARD PRECONDITION (B1b) as specified stores the *resolved root* in the
