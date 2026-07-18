@@ -682,6 +682,13 @@ fn validate_binds_identity(payload: &serde_json::Value) -> Result<(), String> {
         "steward-set" => {
             // steward-set: the named controller stewards authorize. The set is
             // already validated non-empty above; nothing further at declare-time.
+            //
+            // Declare/authorize asymmetry (INTENTIONAL): accepting the policy HERE
+            // records the declared intent — it does NOT imply a rotation under it is
+            // authorizable yet. imagodei `authorize_rotation` (identity_lineage.rs,
+            // the `ControllerPolicy::StewardSet` arm) REFUSES steward-set rotations
+            // until Wave C resolves the notarized controller set. Declaring is safe;
+            // authorizing is gated.
             Ok(())
         }
         "recovery-quorum" => {

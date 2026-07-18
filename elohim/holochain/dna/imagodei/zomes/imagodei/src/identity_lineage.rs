@@ -71,7 +71,9 @@ pub fn chain_root_of(start: &AgentPubKey, edges: &[VersionEdge]) -> AgentPubKey 
         if parents.is_empty() {
             return current; // genesis
         }
-        // Deterministic min-by-bytes on merge keeps the root stable.
+        // Deterministic min-by-bytes on merge keeps the root stable (PROVISIONAL
+        // tiebreak — same class as chain_head_of's; real merge-reconcile is the
+        // kinship-lineage follow-on: backlog identity-chain-merge-reconcile-kinship-lineage).
         parents.sort_by(|a, b| a.get_raw_39().cmp(b.get_raw_39()));
         current = parents.remove(0);
     }
@@ -80,7 +82,10 @@ pub fn chain_root_of(start: &AgentPubKey, edges: &[VersionEdge]) -> AgentPubKey 
 /// The current head of a chain: the `new_key` that is not itself superseded by
 /// any edge (the tip), reachable forward from `root`. Empty edge-set ⇒ `root`
 /// itself (an un-rotated identity is its own head). On a fork, byte-minimal tip
-/// for determinism (full merge-reconciliation is the kinship-lineage follow-on).
+/// for determinism — a PROVISIONAL tiebreak. Choosing the head by lineage
+/// judgment (not raw-byte order) on a genuine fork/merge is the kinship-lineage
+/// merge-reconcile follow-on (dormant until real rotation produces multi-tip
+/// DAGs): genesis/data/timeline/backlog/identity-chain-merge-reconcile-kinship-lineage.md
 pub fn chain_head_of(root: &AgentPubKey, edges: &[VersionEdge]) -> AgentPubKey {
     if edges.is_empty() {
         return root.clone();
@@ -260,6 +265,14 @@ pub fn authorize_rotation(
                 )
             }
         }
+        // Declare/authorize asymmetry (INTENTIONAL — not a bug). A steward-set
+        // `controller_policy` is ACCEPTED at DECLARE time by mishpat
+        // `validate_binds_identity` (commitments.rs, the "steward-set" arm — it
+        // records the declared intent, validating only a non-empty controller set)
+        // but REFUSED here at AUTHORIZE time, because resolving the notarized
+        // controller set is Wave C (the did:elohim assembly). Declaring the policy
+        // is safe; authorizing a rotation under it is gated until the set can be
+        // resolved — no insecure default door.
         ControllerPolicy::StewardSet => Err(
             "rotate_identity_key: steward-set controller resolution is Wave C (reads the \
              notarized binds-identity controller set)"
