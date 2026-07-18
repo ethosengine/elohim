@@ -11,7 +11,7 @@ status: "backlog"
 priority: "medium"
 deprecation_status: blocked
 severity: medium
-fingerprints: ["f55c7497fbcb", "e68f63b8dbf3", "ab7c8b27e94f", "afcf8ef8608a", "a6604ecc351d", "2c2c16622939", "8cc10bf8a03b", "e77871f96415", "83fcd27c645c", "98afab72f197", "30de7ef1fec4"]
+fingerprints: ["f55c7497fbcb", "e68f63b8dbf3", "ab7c8b27e94f", "afcf8ef8608a", "a6604ecc351d", "2c2c16622939", "8cc10bf8a03b", "e77871f96415", "83fcd27c645c", "98afab72f197", "30de7ef1fec4", "f7d6c5fa7c1c"]
 relatedNodeIds: []
 tags: [deprecation, rust, cargo, serde_yaml, yaml, dependency-replacement]
 cites:
@@ -192,6 +192,35 @@ assignment. Verified by a unit test over `_is_echo_line`/`classify`/`fingerprint
 attribution byte-confirmed). This layers with the fingerprint dedupe (belt +
 suspenders). Decision unchanged: **blocked** on the operator-initiated dependency
 sprint.
+
+**2026-07-18 re-encounter (re-confirmed blocked; +1 fingerprint; Guard F extended to form F2).**
+One more capture (`f7d6c5fa7c1c`), the SAME archived-serde_yaml concern, from an
+`ls /opt/rust/cargo/registry/cache/*/ | grep …^serde_yaml-` crates.io-reachability
+scope probe. The captured line was the cargo cache ARTIFACT FILENAME
+`serde_yaml-0.9.34+deprecated.crate` — it matched `\bDEPRECATED\b` (the
+`+deprecated.crate` token) and classified as a deprecation. This is the SAME
+`+deprecated` build-metadata self-capture class as the 2026-07-06 lockfile
+captures, but in a **filename** form Guard F did not yet cover: Guard F only
+matched the QUOTED `version = "…+deprecated"` lockfile literal (form F1), not the
+hyphen-joined `-<version>+deprecated[.crate]` registry-artifact token (form F2).
+No new usage, no scope change — the underlying concern was already
+canonicalized+blocked.
+
+**Structural fix landed (this run): Guard F extended to F2.**
+`.claude/hooks/deprecation-sentinel.py` `ECHO_LOCKFILE_VERSION_META_RE` now
+alternates the F1 version-literal pattern with an F2 clause
+`-\d[0-9A-Za-z.]*\+deprecated(?:\.crate)?\b` that skips a cargo registry
+cache/src artifact filename (`serde_yaml-0.9.34+deprecated.crate`, and the
+extension-less extracted-src dir form `serde_yaml-0.9.34+deprecated/`). Zero
+true-positive risk: a live toolchain deprecation is emitted UNQUOTED and
+prose-shaped with a SPACE-`v` version join (`Compiling`/`Downloaded serde_yaml
+v0.9.34+deprecated`) — no `-<digit>…+deprecated` filename token — so it never
+matches F2 and stays capturable (still the stable fp `8cc10bf8a03b`). Verified by
+an ad-hoc harness over `classify`/`_is_echo_line`: F2 cache-filename / full-path /
+extracted-src-dir forms and the F1 literal all suppressed; the live build line,
+the `Downloaded …` true-positive line (fp `98afab72f197`), rust `use of
+deprecated`, and `npm warn deprecated` all still capture. Decision unchanged:
+**blocked** on the operator-initiated dependency sprint.
 
 ## Verification
 
