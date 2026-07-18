@@ -548,14 +548,19 @@ mod tests {
             .expect("document present");
 
         // controller populated from the declared set (self + recovery quorum).
-        match doc.controller.as_ref().expect("controller populated from head") {
+        match doc
+            .controller
+            .as_ref()
+            .expect("controller populated from head")
+        {
             Controller::Many(cs) => assert_eq!(cs.len(), 2),
             other => panic!("expected Controller::Many, got {other:?}"),
         }
         // Lineage: the chain-root surfaces as an alsoKnownAs alias next to transport ids.
         let aka = doc.also_known_as.as_ref().unwrap();
         assert!(
-            aka.iter().any(|a| a == "did:elohim:bafyreichainrootgenesis0000"),
+            aka.iter()
+                .any(|a| a == "did:elohim:bafyreichainrootgenesis0000"),
             "chain-root lineage alias present: {aka:?}"
         );
 

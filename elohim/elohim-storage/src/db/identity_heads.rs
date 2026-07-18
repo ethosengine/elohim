@@ -78,9 +78,7 @@ pub fn upsert_with_anchor(
             .execute(conn)?;
     }
 
-    ih::identity_heads
-        .filter(ih::cid.eq(&new.cid))
-        .first(conn)
+    ih::identity_heads.filter(ih::cid.eq(&new.cid)).first(conn)
 }
 
 /// Fetch a single identity head by its CID. Returns `Ok(None)` when no row exists.
@@ -245,10 +243,16 @@ mod tests {
         let mut conn = test_conn();
         let ts = "2026-07-17T10:00:00Z";
         // Insert in the "wrong" order (larger cid first) to prove ordering, not arrival.
-        upsert_with_anchor(&mut conn, sample_head_signed("ih:zzz", HEAD_KEY, Some("az"), ts))
-            .expect("zzz");
-        upsert_with_anchor(&mut conn, sample_head_signed("ih:aaa", HEAD_KEY, Some("aa"), ts))
-            .expect("aaa");
+        upsert_with_anchor(
+            &mut conn,
+            sample_head_signed("ih:zzz", HEAD_KEY, Some("az"), ts),
+        )
+        .expect("zzz");
+        upsert_with_anchor(
+            &mut conn,
+            sample_head_signed("ih:aaa", HEAD_KEY, Some("aa"), ts),
+        )
+        .expect("aaa");
 
         let head = find_head_by_head_key(&mut conn, HEAD_KEY)
             .expect("query")
