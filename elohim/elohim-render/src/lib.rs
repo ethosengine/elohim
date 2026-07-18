@@ -26,7 +26,7 @@ pub use chrome::{
     ChromeContext, ColorScheme, NavLink, Theme, ThemeTokens, CONTEXT_SCRIPT_ID, ELEMENT_JS,
     ENHANCE_JS, STABLE_ELEMENT_PATH,
 };
-pub use compose::compose_ssr_with_shell;
+pub use compose::{compose_ssr_with_shell, ComposeError};
 pub use data_fetcher::{DataFetcher, FetchRequest, FetchResponse};
 pub use error::{RenderError, Result};
 pub use renderer::{EchoRenderer, Renderer};

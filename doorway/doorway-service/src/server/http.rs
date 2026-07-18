@@ -207,6 +207,16 @@ pub struct AppState {
     /// through this renderer when it is `Some`. `None` is the safe default —
     /// SSR-eligible routes fall back to the normal storage proxy.
     pub renderer: Option<Arc<dyn elohim_render::Renderer>>,
+    /// The app (EPR node slug) whose SERVER bundle `renderer` was loaded from —
+    /// `SSR_BUNDLE_SLUG` at boot. The single loaded renderer can only produce
+    /// THAT app's markup: dispatching it for a different projected app renders
+    /// the wrong app entirely (the /lamad-dark failure: the landing bundle
+    /// rendered for lamad URLs, then compose refused the cross-app splice on
+    /// every request — one wasted V8 render each). `serve_ssr_route` gates on
+    /// this BEFORE rendering. `None` (slug env unset, e.g. an image-baked
+    /// bundle of unknown app) disables the gate; compose still refuses
+    /// cross-app splices downstream.
+    pub renderer_app: Option<String>,
     /// Shared HTTP client for SSR data-fetching (Task 14 carry-forward).
     ///
     /// A single client is allocated at boot and shared via `Arc::clone` by
@@ -366,6 +376,14 @@ fn init_ssr_http_client() -> Arc<reqwest::Client> {
             .build()
             .unwrap_or_default(),
     )
+}
+
+/// The app slug the loaded SSR bundle belongs to (`SSR_BUNDLE_SLUG`), read at
+/// the same boot moment `init_renderer` materializes that slug's server
+/// bundle. Kept as its own accessor so every `AppState` construction site
+/// pairs the renderer with the app it can actually render.
+fn init_renderer_app() -> Option<String> {
+    std::env::var("SSR_BUNDLE_SLUG").ok()
 }
 
 /// Initialize the SSR renderer from the `SSR_BUNDLE_PATH` environment variable.
@@ -546,6 +564,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer: init_renderer(),
+            renderer_app: init_renderer_app(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             ssr_http_client: init_ssr_http_client(),
@@ -661,6 +680,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer: init_renderer(),
+            renderer_app: init_renderer_app(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             ssr_http_client: init_ssr_http_client(),
@@ -791,6 +811,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer: init_renderer(),
+            renderer_app: init_renderer_app(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             ssr_http_client: init_ssr_http_client(),
@@ -924,6 +945,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer: init_renderer(),
+            renderer_app: init_renderer_app(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             ssr_http_client: init_ssr_http_client(),
@@ -3099,12 +3121,28 @@ enum SsrFallbackReason {
     /// `render_output_is_empty`). Shed to the fallback bundle exactly like a
     /// render error, so the client bundles the fallback carries can boot the app.
     EmptyRender,
-    /// A non-empty render succeeded, but the bundle-carrying shell it must be
-    /// composed into (see `compose_render_with_shell`) could not be fetched or
-    /// spliced — a render doc carries NO client bundles on its own, so serving it
-    /// raw is a dead-end static page. Shed to the fallback bundle (which DOES
-    /// carry the client bundles) so the page is always hydratable.
-    ShellUnavailable,
+    /// The loaded renderer serves a DIFFERENT app than this route's projection
+    /// (`renderer_app` ≠ `projection.epr_id`). Rendering would produce the
+    /// wrong app's markup, so SSR is skipped BEFORE any V8 work — the
+    /// /lamad-dark failure mode, now named and render-free.
+    RendererAppMismatch,
+    // The Shell* + Compose variants below: a non-empty render succeeded, but
+    // the bundle-carrying shell could not be composed (see
+    // `compose_render_with_shell`) — a render doc carries NO client bundles on
+    // its own, so serving it raw is a dead-end static page. Shed to the
+    // fallback bundle (which DOES carry the client bundles) so the page is
+    // always hydratable. Each variant names the seam that failed — the
+    // predecessor single `shell-unavailable` tag hid a cross-app selector bug
+    // and an upstream fetch stall behind one string for two weeks.
+    /// No projection to resolve a shell URL from (legacy Registry dispatch).
+    ShellNoProjection,
+    /// The storage upstream's circuit breaker is open — shell fetch skipped.
+    ShellBreakerOpen,
+    /// The shell HTTP fetch failed (non-2xx, timeout, connect error).
+    ShellFetchFailed,
+    /// The splice itself refused — typed by `elohim_render::ComposeError`
+    /// (render-root-missing / render-root-unclosed / shell-root-missing).
+    Compose(elohim_render::ComposeError),
 }
 
 impl SsrFallbackReason {
@@ -3117,7 +3155,11 @@ impl SsrFallbackReason {
             SsrFallbackReason::RenderError(_) => "render-error",
             SsrFallbackReason::ErrorBackoff => "error-backoff",
             SsrFallbackReason::EmptyRender => "empty-render",
-            SsrFallbackReason::ShellUnavailable => "shell-unavailable",
+            SsrFallbackReason::RendererAppMismatch => "renderer-app-mismatch",
+            SsrFallbackReason::ShellNoProjection => "shell-no-projection",
+            SsrFallbackReason::ShellBreakerOpen => "shell-breaker-open",
+            SsrFallbackReason::ShellFetchFailed => "shell-fetch-failed",
+            SsrFallbackReason::Compose(e) => e.reason_str(),
         }
     }
 }
@@ -3224,23 +3266,16 @@ async fn ssr_fallback_response(
 ) -> Response<Full<Bytes>> {
     match fallback {
         SsrFallback::Registry => match reason {
-            SsrFallbackReason::AuthModeUnsupported => ssr_spa_shell_fallback_with_skip_reason(
-                Some("auth-mode-not-supported"),
-                Some(chrome_context_json),
-            ),
-            SsrFallbackReason::Overflow => {
-                ssr_spa_shell_fallback_with_skip_reason(Some("overflow"), Some(chrome_context_json))
-            }
-            SsrFallbackReason::ErrorBackoff => ssr_spa_shell_fallback_with_skip_reason(
-                Some("error-backoff"),
-                Some(chrome_context_json),
-            ),
-            SsrFallbackReason::EmptyRender => ssr_spa_shell_fallback_with_skip_reason(
-                Some("empty-render"),
-                Some(chrome_context_json),
-            ),
-            SsrFallbackReason::ShellUnavailable => ssr_spa_shell_fallback_with_skip_reason(
-                Some("shell-unavailable"),
+            SsrFallbackReason::AuthModeUnsupported
+            | SsrFallbackReason::Overflow
+            | SsrFallbackReason::ErrorBackoff
+            | SsrFallbackReason::EmptyRender
+            | SsrFallbackReason::RendererAppMismatch
+            | SsrFallbackReason::ShellNoProjection
+            | SsrFallbackReason::ShellBreakerOpen
+            | SsrFallbackReason::ShellFetchFailed
+            | SsrFallbackReason::Compose(_) => ssr_spa_shell_fallback_with_skip_reason(
+                Some(reason.as_skip_str()),
                 Some(chrome_context_json),
             ),
             SsrFallbackReason::RenderError(err) => {
@@ -3271,6 +3306,22 @@ async fn ssr_fallback_response(
                 dispatch_to_projected_epr(state, path, *projection, chrome_context_json).await;
             with_ssr_skipped_header(resp, &reason)
         }
+    }
+}
+
+/// Whether the loaded SSR renderer can produce markup for the projected app.
+///
+/// `renderer_app` is the EPR node slug whose server bundle the renderer was
+/// materialized from (`SSR_BUNDLE_SLUG`); `projected_app` is the route's
+/// `projection.epr_id`. Only an exact match may render — a renderer applied to
+/// a different app produces that OTHER app's markup for this app's URL.
+/// `None` (slug unknown, e.g. an image-baked bundle) keeps legacy behavior:
+/// allow, and let compose refuse a cross-app splice downstream. Pure, so the
+/// gate decision is unit-testable without a runtime.
+fn renderer_serves_app(renderer_app: Option<&str>, projected_app: &str) -> bool {
+    match renderer_app {
+        Some(app) => app == projected_app,
+        None => true,
     }
 }
 
@@ -3316,18 +3367,23 @@ async fn compose_render_with_shell(
     state: &AppState,
     fallback: &SsrFallback,
     rendered_html: &str,
-) -> Option<String> {
+) -> Result<String, SsrFallbackReason> {
     let SsrFallback::ProjectedEpr(projection) = fallback else {
-        return None;
+        return Err(SsrFallbackReason::ShellNoProjection);
     };
-    let storage_url = state.args.storage_url.as_deref()?;
+    let storage_url = state
+        .args
+        .storage_url
+        .as_deref()
+        .ok_or(SsrFallbackReason::ShellNoProjection)?;
     if state
         .upstream_breakers
         .is_open(storage_url.trim_end_matches('/'))
     {
-        return None;
+        return Err(SsrFallbackReason::ShellBreakerOpen);
     }
     let shell_url = projected_shell_url(storage_url, projection);
+    let fetch_started = std::time::Instant::now();
     let shell_html = match state
         .ssr_http_client
         .get(&shell_url)
@@ -3335,10 +3391,45 @@ async fn compose_render_with_shell(
         .send()
         .await
     {
-        Ok(resp) if resp.status().is_success() => resp.text().await.ok()?,
-        _ => return None,
+        Ok(resp) if resp.status().is_success() => match resp.text().await {
+            Ok(text) => text,
+            Err(e) => {
+                tracing::warn!(
+                    target: "doorway::ssr",
+                    shell_url = %shell_url,
+                    elapsed_ms = fetch_started.elapsed().as_millis() as u64,
+                    error = %e,
+                    "SSR shell fetch: body read failed"
+                );
+                return Err(SsrFallbackReason::ShellFetchFailed);
+            }
+        },
+        Ok(resp) => {
+            tracing::warn!(
+                target: "doorway::ssr",
+                shell_url = %shell_url,
+                status = resp.status().as_u16(),
+                elapsed_ms = fetch_started.elapsed().as_millis() as u64,
+                "SSR shell fetch: non-success status"
+            );
+            return Err(SsrFallbackReason::ShellFetchFailed);
+        }
+        Err(e) => {
+            // A stalled upstream rides the full EPR_DISPATCH_TIMEOUT here — the
+            // elapsed_ms field is what distinguishes a 10s timeout (peer stall)
+            // from an instant connect refusal in the shed accounting.
+            tracing::warn!(
+                target: "doorway::ssr",
+                shell_url = %shell_url,
+                elapsed_ms = fetch_started.elapsed().as_millis() as u64,
+                error = %e,
+                "SSR shell fetch failed"
+            );
+            return Err(SsrFallbackReason::ShellFetchFailed);
+        }
     };
     elohim_render::compose_ssr_with_shell(rendered_html, &shell_html)
+        .map_err(SsrFallbackReason::Compose)
 }
 
 /// Serve a `render:"angular-ssr"` route through the V8 SSR engine, gated by the
@@ -3372,6 +3463,34 @@ async fn serve_ssr_route(
     // ONCE (authoritative slug + authenticated flag from this request). Both the
     // SSR serve and every fallback splice this identical island.
     let chrome_context_json = build_chrome_context_json(path, &req);
+
+    // App-match gate (BEFORE any render/breaker/semaphore work): the single
+    // loaded renderer can only produce `renderer_app`'s markup. A projected
+    // route belonging to a DIFFERENT app must not be rendered at all —
+    // rendering the wrong app burns a V8 pass whose output compose then
+    // rightly refuses (the /lamad-dark shape: every lamad request paid a
+    // landing-app render just to shed to CSR). Skip render-free, named.
+    if let SsrFallback::ProjectedEpr(projection) = &fallback {
+        if !renderer_serves_app(state.renderer_app.as_deref(), &projection.epr_id) {
+            tracing::info!(
+                target: "doorway::ssr",
+                path = %path,
+                renderer_app = state.renderer_app.as_deref().unwrap_or("<unset>"),
+                projected_app = %projection.epr_id,
+                "loaded renderer serves a different app — SSR skipped without rendering"
+            );
+            return ssr_fallback_response(
+                state,
+                req,
+                path,
+                &endpoint,
+                &chrome_context_json,
+                fallback,
+                SsrFallbackReason::RendererAppMismatch,
+            )
+            .await;
+        }
+    }
 
     // Render-failure circuit breaker (FIRST gate, cheapest + most protective):
     // after FAILURE_THRESHOLD consecutive render errors the breaker is OPEN, so
@@ -3507,17 +3626,18 @@ async fn serve_ssr_route(
             // shed to the hydratable bundle fallback rather than serve a
             // bundle-less document.
             return match compose_render_with_shell(state, &fallback, &cached_html).await {
-                Some(composed) => ssr_html_response_with_observability(
+                Ok(composed) => ssr_html_response_with_observability(
                     composed,
                     "HIT",
                     state.render_capability.as_ref(),
                     None,
                     Some(&chrome_context_json),
                 ),
-                None => {
+                Err(reason) => {
                     tracing::warn!(
                         target: "doorway::ssr",
                         path = %path,
+                        reason = reason.as_skip_str(),
                         "SSR shell composition unavailable (cache HIT) — serving hydratable bundle fallback"
                     );
                     ssr_fallback_response(
@@ -3527,7 +3647,7 @@ async fn serve_ssr_route(
                         &endpoint,
                         &chrome_context_json,
                         fallback,
-                        SsrFallbackReason::ShellUnavailable,
+                        reason,
                     )
                     .await
                 }
@@ -3635,17 +3755,18 @@ async fn serve_ssr_route(
                 // Compose the render into the bundle-carrying shell so it can
                 // hydrate; on failure shed to the hydratable bundle fallback.
                 match compose_render_with_shell(state, &fallback, &html).await {
-                    Some(composed) => ssr_html_response_with_observability(
+                    Ok(composed) => ssr_html_response_with_observability(
                         composed,
                         "MISS",
                         state.render_capability.as_ref(),
                         Some(&trace),
                         Some(&chrome_context_json),
                     ),
-                    None => {
+                    Err(reason) => {
                         tracing::warn!(
                             target: "doorway::ssr",
                             path = %path,
+                            reason = reason.as_skip_str(),
                             "SSR shell composition unavailable — serving hydratable bundle fallback"
                         );
                         ssr_fallback_response(
@@ -3655,7 +3776,7 @@ async fn serve_ssr_route(
                             &endpoint,
                             &chrome_context_json,
                             fallback,
-                            SsrFallbackReason::ShellUnavailable,
+                            reason,
                         )
                         .await
                     }
@@ -5995,6 +6116,58 @@ mod ssr_session_tests {
             SsrFallbackReason::ErrorBackoff.as_skip_str(),
             "error-backoff"
         );
+        // The granular shell-compose vocabulary: the predecessor single
+        // "shell-unavailable" hid a cross-app selector bug (every /lamad
+        // request burned a wrong-app V8 render) and an upstream fetch stall
+        // behind one opaque string. Each seam now names itself.
+        assert_eq!(
+            SsrFallbackReason::RendererAppMismatch.as_skip_str(),
+            "renderer-app-mismatch"
+        );
+        assert_eq!(
+            SsrFallbackReason::ShellNoProjection.as_skip_str(),
+            "shell-no-projection"
+        );
+        assert_eq!(
+            SsrFallbackReason::ShellBreakerOpen.as_skip_str(),
+            "shell-breaker-open"
+        );
+        assert_eq!(
+            SsrFallbackReason::ShellFetchFailed.as_skip_str(),
+            "shell-fetch-failed"
+        );
+        assert_eq!(
+            SsrFallbackReason::Compose(elohim_render::ComposeError::ShellRootMissing {
+                tag: "lamad-root".into()
+            })
+            .as_skip_str(),
+            "shell-root-missing"
+        );
+        assert_eq!(
+            SsrFallbackReason::Compose(elohim_render::ComposeError::RenderedRootNotFound)
+                .as_skip_str(),
+            "render-root-missing"
+        );
+    }
+
+    #[test]
+    fn renderer_app_gate_decisions() {
+        // Exact match renders; any other projected app is refused BEFORE a V8
+        // render is spent (the /lamad-dark regression: the landing bundle
+        // rendered for every lamad URL, compose refused the cross-app splice,
+        // and the manifesto page served blank to crawlers — one wasted render
+        // per request, invisible under the old shell-unavailable tag).
+        assert!(renderer_serves_app(
+            Some("elohim-host-landing"),
+            "elohim-host-landing"
+        ));
+        assert!(!renderer_serves_app(
+            Some("elohim-host-landing"),
+            "lamad-spa"
+        ));
+        // Unknown loaded app (SSR_BUNDLE_SLUG unset — image-baked bundle):
+        // keep legacy allow; compose still refuses cross-app splices.
+        assert!(renderer_serves_app(None, "lamad-spa"));
     }
 
     #[test]
