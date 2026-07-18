@@ -9,6 +9,7 @@ pub mod check;
 pub mod doctor;
 pub mod error;
 pub mod explain;
+pub mod flow;
 pub mod git;
 pub mod process;
 pub mod ready;

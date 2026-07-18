@@ -3,7 +3,7 @@ use std::{env, path::PathBuf, process::ExitCode};
 use elohim_epr_cli::{
     check, doctor,
     error::{Error, Result},
-    explain, git,
+    explain, flow, git,
     git::{ChangeKind, ChangedPath},
     ready,
     report::{FindingStatus, Report},
@@ -11,6 +11,19 @@ use elohim_epr_cli::{
 };
 
 fn main() -> ExitCode {
+    // `flow` is its own command family (value-chain projection + walk); it renders its own
+    // output rather than a Report, so it is dispatched before the Report-shaped commands.
+    let raw: Vec<String> = env::args().skip(1).collect();
+    if raw.first().map(String::as_str) == Some("flow") {
+        return match flow::run(&raw[1..]) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("epr flow: {error}");
+                ExitCode::from(2)
+            }
+        };
+    }
+
     match run() {
         Ok((report, exit_on_not_ready)) => {
             let json = env::args().any(|arg| arg == "--json");
