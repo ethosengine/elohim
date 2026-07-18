@@ -194,13 +194,23 @@ impl ElohimIdentityStore for DidIdentityStore {
         // id as a `did:elohim:<id>` controller DID (storage owns the namespace
         // mapping). A controller id that cannot form a valid DID is skipped rather
         // than aborting the whole resolution — the validator already guarantees
-        // non-empty ids, so this is a defensive filter, not a lossy transform.
+        // non-empty ids, so this is a defensive filter, not a lossy transform. On the
+        // recovery-quorum path a dropped controller IS data loss, so it is warned
+        // (never silent).
         let controller_ids: Vec<String> = serde_json::from_str(&row.controllers_json)
             .map_err(|e| ElohimStoreError::Backend(format!("controllers_json parse: {e}")))?;
-        let controllers = controller_ids
-            .iter()
-            .filter_map(|c| Did::parse(&format!("did:elohim:{c}")).ok())
-            .collect();
+        let mut controllers = Vec::with_capacity(controller_ids.len());
+        for c in &controller_ids {
+            match Did::parse(&format!("did:elohim:{c}")) {
+                Ok(did) => controllers.push(did),
+                Err(e) => tracing::warn!(
+                    controller_id = %c,
+                    head_key = %agent_cid,
+                    error = %e,
+                    "did:elohim identity_head: dropping a controller id that cannot form a valid did:elohim DID"
+                ),
+            }
+        }
 
         Ok(Some(IdentityHead {
             chain_root: row.chain_root,
@@ -401,6 +411,7 @@ mod tests {
                 head_key: head_key.to_string(),
                 controllers_json,
                 controller_policy_json: r#"{"kind":"recovery-quorum","m":2,"n":3}"#.to_string(),
+                signed_at: "2026-07-17T00:00:00Z".to_string(),
                 revoked_at: None,
                 dht_anchor_hash: Some(format!("{cid}-anchor")),
             },

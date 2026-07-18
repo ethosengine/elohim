@@ -45,6 +45,7 @@ pub fn upsert_with_anchor(
             ih::head_key.eq(&new.head_key),
             ih::controllers_json.eq(&new.controllers_json),
             ih::controller_policy_json.eq(&new.controller_policy_json),
+            ih::signed_at.eq(&new.signed_at),
             ih::revoked_at.eq(&new.revoked_at),
             ih::dht_anchor_hash.eq(&new.dht_anchor_hash),
             ih::created_at.eq(&now),
@@ -57,6 +58,7 @@ pub fn upsert_with_anchor(
             ih::head_key.eq(new.head_key.clone()),
             ih::controllers_json.eq(new.controllers_json.clone()),
             ih::controller_policy_json.eq(new.controller_policy_json.clone()),
+            ih::signed_at.eq(new.signed_at.clone()),
             // dht_anchor_hash AND revoked_at are updated conditionally below, never
             // here — so an incoming None cannot clobber an existing anchor or
             // resurrect a revoked head.
@@ -92,8 +94,16 @@ pub fn get_by_cid(conn: &mut SqliteConnection, cid: &str) -> QueryResult<Option<
 /// The did:elohim resolver's read: the current live, notarized identity head whose
 /// `head_key` is `agent_cid`. **Fail-closed**: only a non-revoked AND notarized
 /// (`dht_anchor_hash IS NOT NULL`) head is surfaced — an un-notarized or revoked
-/// declaration must never populate a `controller`. Newest-first so a re-declared head
-/// (a fresh `binds-identity` after rotation) wins over an older one.
+/// declaration must never populate a `controller`.
+///
+/// **Head selection is DHT-canonical, node-independent** — `(signed_at DESC, cid
+/// ASC)`, NEVER `created_at` (local signal-arrival order, which differs per node and
+/// would make the resolved head depend on out-of-order arrival / projector catch-up
+/// / a stale re-projection landing after a legitimate rotation). `signed_at` is the
+/// notarized Commitment-envelope signing time (same on every node); `cid` (the
+/// content-addressed entry_hash) is the deterministic tiebreak for a `signed_at`
+/// collision. This is the design's "heads move by judgment over history, never
+/// last-writer-wins" rule (design §1, kinship-lineage spec).
 pub fn find_head_by_head_key(
     conn: &mut SqliteConnection,
     agent_cid: &str,
@@ -102,7 +112,7 @@ pub fn find_head_by_head_key(
         .filter(ih::head_key.eq(agent_cid))
         .filter(ih::revoked_at.is_null())
         .filter(ih::dht_anchor_hash.is_not_null())
-        .order(ih::created_at.desc())
+        .order((ih::signed_at.desc(), ih::cid.asc()))
         .first(conn)
         .optional()
 }
@@ -141,12 +151,22 @@ mod tests {
     const HEAD_KEY: &str = "uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH";
 
     fn sample_head(cid: &str, head_key: &str, anchor: Option<&str>) -> NewIdentityHead {
+        sample_head_signed(cid, head_key, anchor, "2026-07-17T00:00:00Z")
+    }
+
+    fn sample_head_signed(
+        cid: &str,
+        head_key: &str,
+        anchor: Option<&str>,
+        signed_at: &str,
+    ) -> NewIdentityHead {
         NewIdentityHead {
             cid: cid.to_string(),
             chain_root: "bafyreichainroot0000".to_string(),
             head_key: head_key.to_string(),
             controllers_json: format!(r#"["{head_key}","uhCAkRecoveryQuorumKey"]"#),
             controller_policy_json: r#"{"kind":"recovery-quorum","m":2,"n":3}"#.to_string(),
+            signed_at: signed_at.to_string(),
             revoked_at: None,
             dht_anchor_hash: anchor.map(str::to_string),
         }
@@ -186,6 +206,57 @@ mod tests {
             serde_json::from_str(&head.controllers_json).expect("controllers_json is a JSON array");
         assert_eq!(controllers.len(), 2);
         assert!(controllers.contains(&HEAD_KEY.to_string()));
+    }
+
+    #[test]
+    fn find_head_picks_newest_signed_at_regardless_of_insert_order() {
+        // DHT-canonical selection: when two live+notarized heads exist for one
+        // head_key, the newer `signed_at` wins REGARDLESS of local insert order.
+        // Insert the NEWER-signed head FIRST and the OLDER-signed head SECOND, so a
+        // `created_at DESC` (local-arrival) ordering would wrongly pick the older
+        // one. `signed_at DESC` must pick the newer.
+        let mut conn = test_conn();
+        // Inserted first → earlier created_at, but signed LATER.
+        upsert_with_anchor(
+            &mut conn,
+            sample_head_signed("ih:newer", HEAD_KEY, Some("a-new"), "2026-07-17T09:00:00Z"),
+        )
+        .expect("newer-signed head");
+        // Inserted second → later created_at, but signed EARLIER.
+        upsert_with_anchor(
+            &mut conn,
+            sample_head_signed("ih:older", HEAD_KEY, Some("a-old"), "2026-07-17T08:00:00Z"),
+        )
+        .expect("older-signed head");
+
+        let head = find_head_by_head_key(&mut conn, HEAD_KEY)
+            .expect("query")
+            .expect("a head must resolve");
+        assert_eq!(
+            head.cid, "ih:newer",
+            "must pick the newer SIGNED_AT head, not the later-arriving (created_at) one"
+        );
+    }
+
+    #[test]
+    fn find_head_tiebreaks_on_cid_when_signed_at_collides() {
+        // Two heads with an identical signed_at must resolve deterministically the
+        // SAME on every node — `cid ASC` is the content-addressed tiebreak.
+        let mut conn = test_conn();
+        let ts = "2026-07-17T10:00:00Z";
+        // Insert in the "wrong" order (larger cid first) to prove ordering, not arrival.
+        upsert_with_anchor(&mut conn, sample_head_signed("ih:zzz", HEAD_KEY, Some("az"), ts))
+            .expect("zzz");
+        upsert_with_anchor(&mut conn, sample_head_signed("ih:aaa", HEAD_KEY, Some("aa"), ts))
+            .expect("aaa");
+
+        let head = find_head_by_head_key(&mut conn, HEAD_KEY)
+            .expect("query")
+            .expect("a head must resolve");
+        assert_eq!(
+            head.cid, "ih:aaa",
+            "on a signed_at collision, cid ASC is the deterministic fleet-wide tiebreak"
+        );
     }
 
     #[test]

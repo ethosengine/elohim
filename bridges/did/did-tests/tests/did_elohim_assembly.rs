@@ -123,8 +123,17 @@ async fn head_populates_controllers_and_lineage_alias() {
 }
 
 #[tokio::test]
-async fn single_controller_head_uses_controller_one() {
-    // A self-policy head with exactly one controller emits `Controller::One`.
+async fn single_controller_head_uses_controller_one_and_skips_equal_root_alias() {
+    // Exercises TWO branches with one head whose chain_root is deliberately set
+    // EQUAL to the subject key: (1) a single controller emits `Controller::One`;
+    // (2) the lineage-alias skip fires when `chain_root == subject`.
+    //
+    // NOTE (Wave A1 dependency): whether a real UN-rotated identity actually has
+    // `chain_root == head_key` depends on A1's `identity_root_cid` derivation. If
+    // A1 derives a DISTINCT root cid for the degenerate single-node chain, an
+    // un-rotated identity would EMIT the alias (the skip only fires on literal
+    // equality). This test asserts the skip *branch*, not a claim about A1's
+    // output — the root is pinned == subject here to reach that branch.
     let store = MockElohimStore::populated(FLEET_KEY).with_head(FLEET_KEY, FLEET_KEY, &[FLEET_KEY]);
     let resolver = ElohimResolver::new(store);
     let did = Did::parse(&format!("did:elohim:{FLEET_KEY}")).unwrap();
@@ -145,39 +154,38 @@ async fn single_controller_head_uses_controller_one() {
 }
 
 #[tokio::test]
-async fn no_head_keeps_phase1_document_byte_unchanged() {
-    // The load-bearing regression guard: with NO declared head the assembled
-    // document is byte-identical to the phase-1 output (no `controller`, no
-    // lineage alias — only transport ids in alsoKnownAs).
+async fn no_head_document_is_self_consistent_and_controller_free() {
+    // A SELF-CONSISTENCY + shape check (not a historical-bytes regression guard):
+    // two calls to the SAME current resolver over a no-head store must agree, and
+    // the no-head document must carry no `controller` and no lineage alias — only
+    // transport ids in alsoKnownAs. `MockElohimStore` implements identity_head but
+    // returns None for this agent, so this exercises the default-None fallback.
+    // (The load-bearing phase-1 shape guard is `assembles_full_document_from_store`.)
     let did = Did::parse(&format!("did:elohim:{FLEET_KEY}")).unwrap();
 
-    let phase1 = ElohimResolver::new(MockElohimStore::populated(FLEET_KEY))
+    let a = ElohimResolver::new(MockElohimStore::populated(FLEET_KEY))
         .resolve(&did)
         .await
         .unwrap()
         .did_document
         .unwrap();
-    let phase1_json = serde_json::to_string(&phase1).unwrap();
-
-    // A store that also implements identity_head but returns None for this agent
-    // must produce the identical document (the default-None path).
-    let no_head = ElohimResolver::new(MockElohimStore::populated(FLEET_KEY))
+    let b = ElohimResolver::new(MockElohimStore::populated(FLEET_KEY))
         .resolve(&did)
         .await
         .unwrap()
         .did_document
         .unwrap();
 
-    assert!(no_head.controller.is_none(), "no head ⇒ no controller");
-    let aka = no_head.also_known_as.as_ref().unwrap();
+    assert!(b.controller.is_none(), "no head ⇒ no controller");
+    let aka = b.also_known_as.as_ref().unwrap();
     assert!(
         aka.iter().all(|a| !a.starts_with("did:elohim:")),
         "no head ⇒ no lineage alias in alsoKnownAs: {aka:?}"
     );
     assert_eq!(
-        phase1_json,
-        serde_json::to_string(&no_head).unwrap(),
-        "no-head document must be byte-unchanged from the phase-1 assembly"
+        serde_json::to_string(&a).unwrap(),
+        serde_json::to_string(&b).unwrap(),
+        "the no-head assembly is deterministic (self-consistent) across calls"
     );
 }
 

@@ -424,6 +424,16 @@ fn parse_binds_identity(
         .filter(|v| v.is_object())
         .map(|v| v.to_string())
         .ok_or_else(|| "binds-identity payload missing object 'controller_policy'".to_string())?;
+    // signed_at is the DHT-canonical head-order key. The AUTHORITATIVE value is the
+    // Commitment envelope's `signed_at`, which the signal handler stamps after this
+    // parse (envelope-level metadata, not payload data — `parse_commitment_payload`
+    // does not receive it). We accept a payload-carried `signed_at` here only as a
+    // best-effort fallback so the pure parser yields a complete, orderable row.
+    let signed_at = payload
+        .get("signed_at")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
 
     Ok(NewIdentityHead {
         cid: entry_hash.to_string(),
@@ -431,6 +441,7 @@ fn parse_binds_identity(
         head_key,
         controllers_json,
         controller_policy_json,
+        signed_at,
         revoked_at: None,
         dht_anchor_hash: Some(action_hash.to_string()),
     })
@@ -1116,7 +1127,8 @@ mod tests {
                 "uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH",
                 "uhCAkRecoveryQuorumKey"
             ],
-            "controller_policy": { "kind": "recovery-quorum", "m": 2, "n": 3 }
+            "controller_policy": { "kind": "recovery-quorum", "m": 2, "n": 3 },
+            "signed_at": "2026-07-17T12:00:00Z"
         })
         .to_string()
     }
@@ -1156,6 +1168,9 @@ mod tests {
             serde_json::from_str(&row.controller_policy_json).expect("policy is JSON");
         assert_eq!(policy["kind"], "recovery-quorum");
         assert_eq!(policy["m"], 2);
+        // signed_at is read best-effort from the payload at parse time (the signal
+        // handler overrides with the authoritative Commitment-envelope value).
+        assert_eq!(row.signed_at, "2026-07-17T12:00:00Z");
     }
 
     #[test]

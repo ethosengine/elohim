@@ -3707,6 +3707,11 @@ pub struct IdentityHeadRow {
     pub head_key: String,
     pub controllers_json: String,
     pub controller_policy_json: String,
+    /// The notarized caller-supplied signing time from the Commitment envelope —
+    /// the DHT-canonical, node-independent head-selection order key (`signed_at
+    /// DESC, cid ASC`). NOT `created_at` (local arrival). Empty only for a legacy
+    /// row that predates envelope stamping.
+    pub signed_at: String,
     pub revoked_at: Option<String>,
     /// Source of truth: DHT (Commitment entry in mishpat DNA). Classification: A.
     /// NULL means un-notarized; the head resolver refuses to surface NULL rows.
@@ -3727,6 +3732,10 @@ pub struct NewIdentityHead {
     pub head_key: String,
     pub controllers_json: String,
     pub controller_policy_json: String,
+    /// DHT-canonical head-order key — the notarized Commitment-envelope signing
+    /// time. Stamped by the signal handler from `commitment.signed_at`; a
+    /// payload-carried `signed_at` is a best-effort fallback at parse time.
+    pub signed_at: String,
     pub revoked_at: Option<String>,
     pub dht_anchor_hash: Option<String>,
 }

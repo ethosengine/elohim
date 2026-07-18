@@ -1774,6 +1774,7 @@ diesel::table! {
         head_key -> Text,
         controllers_json -> Text,
         controller_policy_json -> Text,
+        signed_at -> Text,
         revoked_at -> Nullable<Text>,
         dht_anchor_hash -> Nullable<Text>,
         created_at -> Text,

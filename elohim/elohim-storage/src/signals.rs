@@ -920,12 +920,20 @@ pub fn handle_mishpat_signal(
                     );
                 }
                 Ok(crate::mishpat_projection::CommitmentProjection::UpsertIdentityHead(
-                    new_head,
+                    mut new_head,
                 )) => {
                     // binds-identity projects into the A-class `identity_heads` table
                     // (NOT mishpat_commitments). Anchor-preserving upsert; cid =
                     // entry_hash. Feeds the did:elohim head resolver's controllers +
                     // lineage (Wave C1).
+                    //
+                    // Stamp the DHT-canonical head-order key from the notarized
+                    // Commitment envelope's `signed_at` (the caller-supplied signing
+                    // time, deterministic + identical on every node). This — NOT the
+                    // per-node `created_at` — is what `find_head_by_head_key` orders
+                    // on, so head selection is node-independent (design §1: heads move
+                    // by judgment over history, never last-writer-wins-by-arrival).
+                    new_head.signed_at = commitment.signed_at.clone();
                     crate::db::identity_heads::upsert_with_anchor(conn, new_head)
                         .map_err(|e| StorageError::Database(e.to_string()))?;
                     tracing::info!(
