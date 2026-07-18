@@ -1046,6 +1046,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-epr-rea"
+version = "0.1.0"
+dependencies = [
+ "cid",
+ "elohim-epr",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "elohim-peer-fabric"
 version = "0.1.0"
 

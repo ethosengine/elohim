@@ -1,0 +1,23 @@
+[package]
+name = "elohim-epr-rea"
+version = "0.1.0"
+edition = "2021"
+description = "REA/ValueFlows domain layer over EPR atoms — recipes, intents, commitments, flow events, folds, and the value-chain walk"
+license = "CAL-1.0"
+repository = "https://github.com/ethosengine/elohim"
+keywords = ["elohim", "rea", "valueflows", "epr", "p2p"]
+categories = ["data-structures"]
+publish = ["elohim"]
+
+# Kept deliberately light: bridges/valueflows (an isolated workspace) is expected to
+# path-dep this crate — nothing beyond the epr codec + serde family may land here.
+[dependencies]
+elohim-epr = { path = "../epr" }
+cid = { version = "0.11", features = ["serde-codec"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+serde_ipld_dagcbor = "0.6"
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
