@@ -1,6 +1,20 @@
 @wip @auth @recovery @identity-lineage @requires:household-nodes
 Feature: A recovered identity keeps its contribution, standing, and claims through the chain-root
 
+  As a person who has lost the key to my identity
+  I want the community that stands with me to authorize a new key
+  So that everything I have contributed still recognizes me afterward
+
+  The identity is a lineage DAG, not a single fragile key. Its durable name is
+  the chain-root cid (the version_parent=[] genesis node), stable across every
+  rotation and recovery. Contributor attribution, REA economic standing, and
+  presence claims all point at the chain-root — never at a point-in-time key —
+  so a key rotation authorized by the community-recovery quorum leaves every
+  downstream recognition intact. The recovery quorum is a *controller* of the
+  identity head, not an override bolted on (structural imago-dei): the human's
+  controller-policy names the community authority in the same field that names
+  self.
+
   # ─────────────────────────────────────────────────────────────────────────
   # WAVE-D ACCEPTANCE GATE — RED ON PURPOSE.
   #
@@ -32,20 +46,6 @@ Feature: A recovered identity keeps its contribution, standing, and claims throu
   #   binding is signature-deferred: backlog agent-peer-binding-signing (C2).
   #   D1 flips @wip→green once the mint path lands.
   # ─────────────────────────────────────────────────────────────────────────
-
-  As a person who has lost the key to my identity
-  I want the community that stands with me to authorize a new key
-  So that everything I have contributed still recognizes me afterward
-
-  The identity is a lineage DAG, not a single fragile key. Its durable name is
-  the chain-root cid (the version_parent=[] genesis node), stable across every
-  rotation and recovery. Contributor attribution, REA economic standing, and
-  presence claims all point at the chain-root — never at a point-in-time key —
-  so a key rotation authorized by the community-recovery quorum leaves every
-  downstream recognition intact. The recovery quorum is a *controller* of the
-  identity head, not an override bolted on (structural imago-dei): the human's
-  controller-policy names the community authority in the same field that names
-  self.
 
   Background:
     Given the household topology is running as a live multi-peer mesh

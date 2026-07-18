@@ -148,8 +148,7 @@ pub fn list_contributor_presences(
         // same derivation — otherwise a caller passing a surface-variant key (or,
         // post-Wave-B, a sibling key on the same lineage) would miss the row.
         let claimed_root = crate::identity_root::identity_root_cid(claimed_id);
-        base_query =
-            base_query.filter(contributor_presences::claimed_agent_id.eq(claimed_root));
+        base_query = base_query.filter(contributor_presences::claimed_agent_id.eq(claimed_root));
     }
 
     if let Some(min_score) = query.min_recognition_score {

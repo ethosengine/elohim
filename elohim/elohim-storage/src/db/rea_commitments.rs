@@ -684,7 +684,8 @@ pub fn validate_supersession(
     // (a collective slug or agent key). Resolving the input before comparing
     // keeps a re-grant against a collective party from spuriously failing this
     // mismatch guard (predecessor stored as content-CID, input as slug).
-    let input_provider_root = crate::db::collectives::resolve_party_chain_root(conn, &input.provider)?;
+    let input_provider_root =
+        crate::db::collectives::resolve_party_chain_root(conn, &input.provider)?;
     if predecessor.provider != input_provider_root {
         return Err(StorageError::Validation(format!(
             "supersede provider mismatch: predecessor provider '{}' != successor provider '{}'",
@@ -2675,7 +2676,11 @@ mod chain_root_repoint_tests {
         // The REA agent-join resolves the row through the chain-root...
         let by_root = get_commitments_for_agent(&mut conn, &ctx, collective_cid, 10)
             .expect("join by chain-root");
-        assert_eq!(by_root.len(), 1, "join resolves the commitment via chain-root");
+        assert_eq!(
+            by_root.len(),
+            1,
+            "join resolves the commitment via chain-root"
+        );
         // ...and NOT through the raw slug (the pre-Wave-A anchor).
         let by_slug = get_commitments_for_agent(&mut conn, &ctx, "collective-church", 10)
             .expect("join by slug");
@@ -2726,14 +2731,17 @@ mod chain_root_repoint_tests {
         let ctx = ctx();
         let agent = "uhCAkGrandmaExampleAgentPubKeyCidForRepoint";
 
-        let stored = create_commitment(&mut conn, &ctx, commit_input(agent, ""))
-            .expect("create commitment");
+        let stored =
+            create_commitment(&mut conn, &ctx, commit_input(agent, "")).expect("create commitment");
         assert_eq!(stored.provider, identity_root_cid(agent));
         assert_eq!(
             stored.provider, agent,
             "degenerate human root is value-preserving — no join regression"
         );
-        assert_eq!(stored.receiver, "", "empty party stays empty, never invented");
+        assert_eq!(
+            stored.receiver, "",
+            "empty party stays empty, never invented"
+        );
 
         // The join still resolves the human party (unchanged behavior).
         let found = get_commitments_for_agent(&mut conn, &ctx, agent, 10).expect("join");
