@@ -457,6 +457,7 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey) {
         [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
         [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/server",  slug: "elohim-host-landing", kind: "server"],
         [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
+        [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/server",            slug: "lamad-spa", kind: "server"],
     ]
     def outcomes = [:]
 
@@ -1034,9 +1035,11 @@ VEOF
             // Pillar-EPR decomposition (Task B21): app/lamad is the lamad
             // pillar SPA, served as its own EPR at /lamad/... by doorway.
             // Runs AFTER Build App because lamad's tsconfig path aliases
-            // reference app/elohim-app codegen artifacts (B18). Pure SPA,
-            // no SSR — produces app/lamad/dist/lamad/browser/index.html
-            // directly (no index.csr.html materialization required).
+            // reference app/elohim-app codegen artifacts (B18). One ng build
+            // emits BOTH dist/lamad/browser (the shell) and dist/lamad/server
+            // (the SSR bundle stageSpaBlobs seeds as lamad-spa serverBlobHash
+            // — the peer-runtime render source; entry contract gated by
+            // app/scripts/lint-ssr-entry.mjs).
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
@@ -1048,6 +1051,7 @@ VEOF
                     dir('app/lamad') {
                         sh 'pnpm run build'
                         sh 'ls -la dist/lamad/browser/ | head -20'
+                        sh 'ls -la dist/lamad/server/ | head -20'
                     }
                 }
             }

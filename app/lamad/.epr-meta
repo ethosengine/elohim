@@ -1,0 +1,33 @@
+---
+epr-meta-version: 1
+id: app-lamad-epr-app-governance
+covers: subtree
+purpose: >
+  The lamad pillar EPR app — an Angular SPA projected as the lamad-spa EPR node
+  (browser bundle = blobHash, SSR server bundle = serverBlobHash), served at
+  /lamad/... by any doorway or peer runtime projecting it.
+---
+# app/lamad — the lamad pillar EPR app
+
+Considered coverage, no edit-time gate: this app's recurring drifts are already
+held by **structural gates in the lint/test chain**, which converge better than
+edit-time prompts would —
+
+- **SSR-entry contract** (`src/main.server.ts`): exports `default` bootstrap +
+  `renderApplication` wrapper; `SSR_DOCUMENT` root tag matches the
+  `app.component.ts` selector; no custom-element `…/register` side-effect
+  imports in the server graph. Gated by `app/scripts/lint-ssr-entry.mjs`
+  (in `pnpm run lint`) — the authoring-time twin of elohim-render's typed
+  compose refusals. Scar tissue: the 2026-07-18 selector-mismatch regression
+  that kept /lamad dark to crawlers for two weeks.
+- **Minted links, never literals**: `app/scripts/lint-route-literals.mjs`
+  (spec §7.1 epr-route-claims-link-conformance).
+- **Declared route surface**: `src/app/generated/route-claims.ts` is codegen —
+  never hand-edit generated files.
+
+Dependencies must be declared in this app's own `package.json` — resolution via
+another workspace app's hoist is drift (lived: `vite-tsconfig-paths`,
+2026-07-18). Content-shaped; enforced by review until a validator-EPR exists.
+
+The canonical EPR-app SSR pattern (the four declarative touches) is documented
+in `app/CLAUDE.md`.

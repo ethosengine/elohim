@@ -208,6 +208,14 @@ spec:
               value: "/opt/elohim-render/main.server.mjs"
             - name: SSR_BUNDLE_SLUG
               value: "elohim-host-landing"
+            # Multi-app SSR (RendererRegistry): every slug listed here gets its
+            # server bundle materialized from the substrate (the EPR node's
+            # serverBlobHash) and its own renderer isolate; the FIRST is the
+            # default app at SSR_BUNDLE_PATH. A slug whose serverBlobHash isn't
+            # seeded yet is skipped with a warn — the app just stays CSR
+            # (x-ssr-skipped: renderer-app-mismatch) until the blob ships.
+            - name: SSR_BUNDLE_SLUGS
+              value: "elohim-host-landing,lamad-spa"
             # Tokio worker threads — set EXPLICITLY, never CPU-derived. The pod has
             # limits.cpu: 1, so the default runtime spun up a SINGLE worker thread;
             # the 2026-06-13 freeze was one synchronously-blocked await on that lone

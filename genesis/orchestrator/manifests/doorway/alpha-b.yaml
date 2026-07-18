@@ -237,6 +237,11 @@ spec:
               value: "/opt/elohim-render/main.server.mjs"
             - name: SSR_BUNDLE_SLUG
               value: "elohim-host-landing"
+            # Multi-app SSR (RendererRegistry) — same contract as doorway-A:
+            # per-slug server bundles from the substrate, first slug = default,
+            # unseeded slugs skip-with-warn (app stays CSR until the blob ships).
+            - name: SSR_BUNDLE_SLUGS
+              value: "elohim-host-landing,lamad-spa"
             # Tokio worker threads — set EXPLICITLY, never CPU-derived. The pod has
             # limits.cpu: 1, so the default runtime spun up a SINGLE worker thread;
             # the 2026-06-13 freeze was one synchronously-blocked await on that lone

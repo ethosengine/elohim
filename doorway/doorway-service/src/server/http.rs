@@ -202,21 +202,15 @@ pub struct AppState {
     /// Read by /health/startup to expose attempt count and completion status.
     pub warmup_state: Option<Arc<crate::projection::warm_stream::WarmupState>>,
     /// Angular SSR renderer — present when SSR_BUNDLE_PATH env var is set at startup.
-    /// Used by manifest-driven SSR dispatch (Task 13): routes declared with
-    /// `render = "angular-ssr"` in elohim-storage's manifest are dispatched
-    /// through this renderer when it is `Some`. `None` is the safe default —
-    /// SSR-eligible routes fall back to the normal storage proxy.
-    pub renderer: Option<Arc<dyn elohim_render::Renderer>>,
-    /// The app (EPR node slug) whose SERVER bundle `renderer` was loaded from —
-    /// `SSR_BUNDLE_SLUG` at boot. The single loaded renderer can only produce
-    /// THAT app's markup: dispatching it for a different projected app renders
-    /// the wrong app entirely (the /lamad-dark failure: the landing bundle
+    /// Per-app SSR renderers (manifest-driven dispatch, Task 13 → multi-app).
+    /// Routes declared `render = "angular-ssr"` select the renderer FOR THE
+    /// ROUTE'S PROJECTED APP through `RendererRegistry::select` — one seam for
+    /// both the mismatch gate and the lookup, so a renderer is never applied
+    /// to another app's route (the /lamad-dark failure: the landing bundle
     /// rendered for lamad URLs, then compose refused the cross-app splice on
-    /// every request — one wasted V8 render each). `serve_ssr_route` gates on
-    /// this BEFORE rendering. `None` (slug env unset, e.g. an image-baked
-    /// bundle of unknown app) disables the gate; compose still refuses
-    /// cross-app splices downstream.
-    pub renderer_app: Option<String>,
+    /// every request — one wasted V8 render each). Empty registry = SSR off;
+    /// SSR-eligible routes fall back to the normal storage proxy.
+    pub renderer_registry: crate::render::registry::RendererRegistry,
     /// Shared HTTP client for SSR data-fetching (Task 14 carry-forward).
     ///
     /// A single client is allocated at boot and shared via `Arc::clone` by
@@ -378,106 +372,6 @@ fn init_ssr_http_client() -> Arc<reqwest::Client> {
     )
 }
 
-/// The app slug the loaded SSR bundle belongs to (`SSR_BUNDLE_SLUG`), read at
-/// the same boot moment `init_renderer` materializes that slug's server
-/// bundle. Kept as its own accessor so every `AppState` construction site
-/// pairs the renderer with the app it can actually render.
-fn init_renderer_app() -> Option<String> {
-    std::env::var("SSR_BUNDLE_SLUG").ok()
-}
-
-/// Initialize the SSR renderer from the `SSR_BUNDLE_PATH` environment variable.
-///
-/// Returns `Some(renderer)` if the env var is set and the bundle path exists.
-/// Returns `None` silently if the var is unset.
-/// Logs a warning and returns `None` if the path is set but the bundle fails to load.
-///
-/// The renderer is constructed with a `ResolverFetcher` pointing at
-/// `SSR_STORAGE_URL` (defaults to `http://localhost:8090`). Without a real
-/// fetcher, Angular SSR bootstrap hangs indefinitely waiting on HttpClient
-/// calls — that produced `x-ssr-error: render timed out` on every cold render.
-fn init_renderer() -> Option<Arc<dyn elohim_render::Renderer>> {
-    let bundle_path = std::env::var("SSR_BUNDLE_PATH").ok()?;
-    let storage_url = std::env::var("SSR_STORAGE_URL")
-        .or_else(|_| std::env::var("STORAGE_URL"))
-        .unwrap_or_else(|_| "http://localhost:8090".to_string());
-    // Bootstrap default fetcher for the isolate — every render swaps in its own
-    // per-request fetcher (carrying the user credential, and any test-only fault)
-    // via ctx.data_fetcher, so this one is never used for a real render. It still
-    // gets a hard reqwest timeout: a bootstrap fetch must never be the one
-    // unbounded await on the SSR thread (cheap defense, matches the per-request
-    // client's 10s bound).
-    // TODO(phase-2): lazy-on-miss + background refresh
-    if let Ok(slug) = std::env::var("SSR_BUNDLE_SLUG") {
-        let bundle_dir = std::path::Path::new(&bundle_path)
-            .parent()
-            .unwrap_or_else(|| std::path::Path::new("."));
-        let src = crate::ssr::DoorwayBundleSource::new(storage_url.clone());
-        // The SSR runtime materializes the Angular *server* bundle, resolved from
-        // the EPR node's `serverBlobHash` field (not the browser `blobHash`).
-        // `SSR_BUNDLE_SLUG` now names the one EPR node (`elohim-host-landing`),
-        // not a sibling `-ssr` row. On resolve failure (e.g. `serverBlobHash`
-        // absent mid-migration), return None → CSR fallback, never a crash.
-        match elohim_render::materialize_server_bundle(&src, &slug, bundle_dir) {
-            Ok(materialized) => {
-                tracing::info!(
-                    target: "doorway::ssr",
-                    slug = %slug,
-                    path = %materialized.display(),
-                    "SSR server bundle materialized from substrate"
-                );
-            }
-            Err(e) => {
-                tracing::warn!(
-                    target: "doorway::ssr",
-                    slug = %slug,
-                    "SSR server bundle materialization failed: {}",
-                    e
-                );
-                return None;
-            }
-        }
-    }
-    let bootstrap_client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .unwrap_or_default();
-    let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(crate::ssr::ResolverFetcher::new(
-        Arc::new(bootstrap_client),
-        storage_url.clone(),
-    ));
-    // Per-fetch soft budget for SSR data fetches (the TracingFetcher SLA): a fetch
-    // outstanding longer than this is recorded `Stalled` and rejected so the render
-    // falls back fast instead of riding to the 60s wall-time. Env-configurable
-    // (`DOORWAY_SSR_FETCH_SOFT_BUDGET_MS`) — parameter-bearing: too low flaps a
-    // slow-but-healthy storage peer, too high lets a stalled fetch hold the
-    // single sequential isolate. Defaults to elohim-render's DEFAULT_SOFT_BUDGET_MS.
-    let soft_budget_ms = std::env::var("DOORWAY_SSR_FETCH_SOFT_BUDGET_MS")
-        .ok()
-        .and_then(|v| v.parse::<u64>().ok())
-        .filter(|&v| v > 0)
-        .unwrap_or(elohim_render::DEFAULT_SOFT_BUDGET_MS);
-    match elohim_render::AngularRenderer::with_soft_budget(
-        std::path::PathBuf::from(&bundle_path),
-        fetcher,
-        soft_budget_ms,
-    ) {
-        Ok(r) => {
-            tracing::info!(
-                target: "doorway::ssr",
-                bundle = %bundle_path,
-                storage = %storage_url,
-                "SSR renderer ready"
-            );
-            Some(Arc::new(r) as Arc<dyn elohim_render::Renderer>)
-        }
-        Err(e) => {
-            tracing::warn!(target: "doorway::ssr", "SSR disabled: {}", e);
-            None
-        }
-    }
-}
-
 impl AppState {
     /// Create AppState without external services (dev mode, direct proxy)
     pub fn new(args: Args) -> Self {
@@ -563,8 +457,7 @@ impl AppState {
             app_file_cache: None,
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
-            renderer: init_renderer(),
-            renderer_app: init_renderer_app(),
+            renderer_registry: crate::render::registry::RendererRegistry::from_env(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             ssr_http_client: init_ssr_http_client(),
@@ -679,8 +572,7 @@ impl AppState {
             app_file_cache: None,
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
-            renderer: init_renderer(),
-            renderer_app: init_renderer_app(),
+            renderer_registry: crate::render::registry::RendererRegistry::from_env(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             ssr_http_client: init_ssr_http_client(),
@@ -810,8 +702,7 @@ impl AppState {
             app_file_cache: None,
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
-            renderer: init_renderer(),
-            renderer_app: init_renderer_app(),
+            renderer_registry: crate::render::registry::RendererRegistry::from_env(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             ssr_http_client: init_ssr_http_client(),
@@ -944,8 +835,7 @@ impl AppState {
             app_file_cache,
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
-            renderer: init_renderer(),
-            renderer_app: init_renderer_app(),
+            renderer_registry: crate::render::registry::RendererRegistry::from_env(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             ssr_http_client: init_ssr_http_client(),
@@ -3309,22 +3199,6 @@ async fn ssr_fallback_response(
     }
 }
 
-/// Whether the loaded SSR renderer can produce markup for the projected app.
-///
-/// `renderer_app` is the EPR node slug whose server bundle the renderer was
-/// materialized from (`SSR_BUNDLE_SLUG`); `projected_app` is the route's
-/// `projection.epr_id`. Only an exact match may render — a renderer applied to
-/// a different app produces that OTHER app's markup for this app's URL.
-/// `None` (slug unknown, e.g. an image-baked bundle) keeps legacy behavior:
-/// allow, and let compose refuse a cross-app splice downstream. Pure, so the
-/// gate decision is unit-testable without a runtime.
-fn renderer_serves_app(renderer_app: Option<&str>, projected_app: &str) -> bool {
-    match renderer_app {
-        Some(app) => app == projected_app,
-        None => true,
-    }
-}
-
 /// The projected app's shell document URL — the browser build's entry file
 /// (index.html), which carries the client bundle `<script>`s, `<title>`,
 /// `<base>`, and styles. This is the SAME storage `/apps/{epr}/{entry}` surface
@@ -3464,20 +3338,21 @@ async fn serve_ssr_route(
     // SSR serve and every fallback splice this identical island.
     let chrome_context_json = build_chrome_context_json(path, &req);
 
-    // App-match gate (BEFORE any render/breaker/semaphore work): the single
-    // loaded renderer can only produce `renderer_app`'s markup. A projected
-    // route belonging to a DIFFERENT app must not be rendered at all —
-    // rendering the wrong app burns a V8 pass whose output compose then
-    // rightly refuses (the /lamad-dark shape: every lamad request paid a
-    // landing-app render just to shed to CSR). Skip render-free, named.
+    // App-match gate (BEFORE any render/breaker/semaphore work): a renderer
+    // can only produce ITS OWN app's markup. A projected route belonging to an
+    // app no loaded renderer serves must not be rendered at all — rendering
+    // the wrong app burns a V8 pass whose output compose then rightly refuses
+    // (the /lamad-dark shape: every lamad request paid a landing-app render
+    // just to shed to CSR). Skip render-free, named. Gate and renderer lookup
+    // share RendererRegistry::select, so they cannot drift apart.
     if let SsrFallback::ProjectedEpr(projection) = &fallback {
-        if !renderer_serves_app(state.renderer_app.as_deref(), &projection.epr_id) {
+        if state.renderer_registry.mismatch(&projection.epr_id) {
             tracing::info!(
                 target: "doorway::ssr",
                 path = %path,
-                renderer_app = state.renderer_app.as_deref().unwrap_or("<unset>"),
+                loaded_apps = %state.renderer_registry.app_names(),
                 projected_app = %projection.epr_id,
-                "loaded renderer serves a different app — SSR skipped without rendering"
+                "no loaded renderer serves this app — SSR skipped without rendering"
             );
             return ssr_fallback_response(
                 state,
@@ -3580,7 +3455,14 @@ async fn serve_ssr_route(
         None => None,
     };
 
-    if let Some(renderer) = state.renderer.as_ref() {
+    // Select the renderer FOR THIS ROUTE'S APP (the mismatch gate above
+    // guarantees a projected app reaching here has one; a legacy Registry
+    // route with no projection gets the default renderer).
+    let selected_renderer = state.renderer_registry.select(match &fallback {
+        SsrFallback::ProjectedEpr(p) => Some(p.epr_id.as_str()),
+        SsrFallback::Registry => None,
+    });
+    if let Some(renderer) = selected_renderer.as_ref() {
         let render_spec = match elohim_render::RenderSpec::parse(&spec) {
             Ok(s) => s,
             Err(e) => {
@@ -4005,7 +3887,7 @@ async fn handle_request(
             // only (the enclosing `method == Method::GET` guard), so a gated write
             // can never reach the SSR helper — the op-gate invariant holds.
             let dispo = classify_dispatch(&state.route_registry, &method, &path).await;
-            if epr_should_serve_ssr(&dispo, state.renderer.is_some()) {
+            if epr_should_serve_ssr(&dispo, state.renderer_registry.any_loaded()) {
                 if let Disposition::SsrRoute { spec, endpoint } = dispo {
                     // EVERY SSR shed/failure degrades to the projected bundle
                     // (chrome-carrying) — i.e. exactly today's EPR serving.
@@ -6150,25 +6032,11 @@ mod ssr_session_tests {
         );
     }
 
-    #[test]
-    fn renderer_app_gate_decisions() {
-        // Exact match renders; any other projected app is refused BEFORE a V8
-        // render is spent (the /lamad-dark regression: the landing bundle
-        // rendered for every lamad URL, compose refused the cross-app splice,
-        // and the manifesto page served blank to crawlers — one wasted render
-        // per request, invisible under the old shell-unavailable tag).
-        assert!(renderer_serves_app(
-            Some("elohim-host-landing"),
-            "elohim-host-landing"
-        ));
-        assert!(!renderer_serves_app(
-            Some("elohim-host-landing"),
-            "lamad-spa"
-        ));
-        // Unknown loaded app (SSR_BUNDLE_SLUG unset — image-baked bundle):
-        // keep legacy allow; compose still refuses cross-app splices.
-        assert!(renderer_serves_app(None, "lamad-spa"));
-    }
+    // The renderer-app gate decisions (exact-match renders, unserved app is a
+    // mismatch shed, unknown-app image-baked bundle keeps legacy allow) are
+    // pinned in crate::render::registry tests — the gate and the renderer
+    // lookup share RendererRegistry::select, so those tests cover this
+    // dispatch's decision surface too.
 
     #[test]
     fn epr_ssr_fallback_carries_skip_header_and_single_island() {

@@ -12,6 +12,7 @@
 
 pub mod breaker;
 pub mod capability;
+pub mod registry;
 pub mod types;
 
 pub use breaker::SsrRenderBreaker;

@@ -17,15 +17,19 @@ deliberately does NOT do is make `/lamad/*` SSR — that requires the enablement
 A2o anchor: `genesis/a2o/features/ssr/compose-serves-the-projected-app.feature`.
 
 **1. lamad-spa server bundle + per-app renderer selection (the enablement).**
-The doorway loads ONE server bundle (`SSR_BUNDLE_SLUG=elohim-host-landing`); routes projected
-to `lamad-spa` now skip render-free with `x-ssr-skipped: renderer-app-mismatch`. To SSR the
-manifesto: build `app/lamad`'s server bundle (its `angular.json` already has the ssr entry?
-verify), seed `serverBlobHash` on the `lamad-spa` EPR node (root pipeline stageSpaBlob
-currently populates only `elohim-host-landing`), and select a renderer PER projection app at
-dispatch — the `SSR_BUNDLES_DIR` + `RenderCapabilityProfile` path (`doorway/doorway-service/
-src/render/capability.rs`) is the designed home; live alpha runs the degraded single-bundle
-path (`/admin/capability` returns null). The compose primitive is already selector-agnostic,
-so no per-app code follows the bundle.
+BUILT 2026-07-18 (same-day follow-through), pending deploy verification: `app/lamad` has the
+SSR build target (main.server.ts with `<lamad-root>` SSR_DOCUMENT — verified rendering +
+composing with the live lamad shell via the elohim-render rigs); the root Jenkinsfile bundle
+list seeds `dist/lamad/server` as `lamad-spa` `kind: server` (stage-spa-blob.sh PATCHes
+`serverBlobHash`); doorway's `RendererRegistry` (`src/render/registry.rs`) materializes every
+`SSR_BUNDLE_SLUGS` app at boot and selects the renderer per `projection.epr_id` through the
+same seam the mismatch gate uses; alpha manifests set
+`SSR_BUNDLE_SLUGS=elohim-host-landing,lamad-spa`. The authoring-time contract is gated by
+`app/scripts/lint-ssr-entry.mjs`; pattern doc: `app/CLAUDE.md`. REMAINING: verify on deploy
+(pipeline order matters — the first deploy after this lands seeds serverBlobHash, so the
+doorway pods must restart AFTER the seed to materialize lamad-spa; until then the app sheds
+`renderer-app-mismatch` by design). The `SSR_BUNDLES_DIR` + `RenderCapabilityProfile`
+derivation remains the later graduation for capability-advertised multi-bundle discovery.
 
 **2. Peer /apps fetch stalls (the leg the vocabulary now names).**
 doorway-alpha-b's shell fetch to `elohim-adam-alpha:8090/apps/...` intermittently rides the

@@ -646,7 +646,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         // (nothing to render, no limiter). See doorway::render::ssr_semaphore_permits.
         state.render_semaphore = doorway::render::ssr_semaphore_permits(
             render_capability.as_ref(),
-            state.renderer.is_some(),
+            state.renderer_registry.any_loaded(),
         )
         .map(|permits| std::sync::Arc::new(tokio::sync::Semaphore::new(permits)));
         state.render_capability = render_capability;
