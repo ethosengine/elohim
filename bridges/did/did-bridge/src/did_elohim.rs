@@ -13,13 +13,17 @@
 //! - transport ids (libp2p PeerId, iroh NodeId) as `alsoKnownAs`,
 //! - profile + doorway `service` entries.
 //!
-//! Controller is left implicit (subject controls) in phase 1. The phase-2
-//! identity head adds explicit self + community-recovery-quorum controllers
-//! (DID Group Control) — see the spec's named follow-ons.
+//! Controller was left implicit (subject controls) in phase 1. The **phase-2
+//! identity head** (implemented here) resolves the Wave-B `binds-identity`
+//! declaration via [`ElohimIdentityStore::identity_head`] and, when a head is
+//! declared, populates explicit `controller` entries (self / steward-set /
+//! community-recovery quorum — DID 1.1 Group Control) plus a chain-root lineage
+//! `alsoKnownAs` alias. With NO head declared the store returns `None` and the
+//! assembled document is byte-unchanged from the phase-1 implicit-self document.
 
 use async_trait::async_trait;
 use did_types::{
-    Context, Did, DidDocument, Service, ServiceEndpoint, VerificationMethod,
+    Context, Controller, Did, DidDocument, Service, ServiceEndpoint, VerificationMethod,
     VerificationRelationship,
 };
 use thiserror::Error;
@@ -37,6 +41,27 @@ pub struct ServiceRef {
     pub service_type: String,
     /// The service endpoint URI.
     pub endpoint: String,
+}
+
+/// The identity-head facts for an agent, resolved from the Wave-B `binds-identity`
+/// declaration (design §3.4/§4): the stable chain-root, the current head key, and
+/// the controller set. Feeds the phase-2 `did:elohim` assembly — real `controller`
+/// entries + a chain-root lineage alias — replacing the phase-1 implicit-self
+/// document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IdentityHead {
+    /// The stable chain-root identifier (imagodei genesis-key / CID) — the
+    /// identity's durable id, unchanged across every rotation/recovery. Reflected
+    /// as a lineage `alsoKnownAs` alias in the assembled document.
+    pub chain_root: String,
+    /// The current head key of the chain (typically the resolved `agent_cid`).
+    pub head: String,
+    /// The controller DIDs from the declaration — the `controller` set (self,
+    /// steward-set, or community-recovery quorum). Non-empty by the ontology guard
+    /// (a head cannot exist without its controllers); the recovery quorum is a
+    /// controller, never an override. Populates the document `controller` field
+    /// verbatim (straight from the declaration — no editorializing).
+    pub controllers: Vec<Did>,
 }
 
 /// Errors an identity store may raise.
@@ -82,6 +107,22 @@ pub trait ElohimIdentityStore: Send + Sync {
         _agent_cid: &str,
     ) -> Result<DidDocumentMetadata, ElohimStoreError> {
         Ok(DidDocumentMetadata::default())
+    }
+
+    /// The identity-head facts for `agent_cid` — chain-root, current head, and
+    /// controllers — from the Wave-B `binds-identity` declaration, or `None` when
+    /// no head is declared for the agent.
+    ///
+    /// Defaults to `None` so a phase-1 store (no identity-head projection) is
+    /// unaffected — the assembly falls back to the implicit-self-controller
+    /// document, byte-unchanged — **without** a breaking change to this trait or
+    /// its existing implementors, exactly as [`Self::document_metadata`] defaults
+    /// empty. The common case today IS no head.
+    async fn identity_head(
+        &self,
+        _agent_cid: &str,
+    ) -> Result<Option<IdentityHead>, ElohimStoreError> {
+        Ok(None)
     }
 }
 
@@ -136,14 +177,46 @@ impl<S: ElohimIdentityStore> DidResolver for ElohimResolver<S> {
         doc.authentication = Some(vec![VerificationRelationship::Reference(vm_id.clone())]);
         doc.assertion_method = Some(vec![VerificationRelationship::Reference(vm_id)]);
 
-        // Transport ids → alsoKnownAs.
-        let transport_ids = self
+        // Identity head (phase 2): the Wave-B `binds-identity` declaration —
+        // controllers + lineage. Absent (phase-1 store / no head declared) → the
+        // document stays the phase-1 implicit-self document, byte-unchanged.
+        let identity_head = self
+            .store
+            .identity_head(agent_cid)
+            .await
+            .map_err(|e| DidResolutionError::Internal(e.to_string()))?;
+
+        // alsoKnownAs = transport ids, plus a chain-root lineage alias when a head
+        // is declared. The chain-root is a stable alternate identifier for the same
+        // subject, durable across key rotation; a trivial self-alias (root == the
+        // subject key, the degenerate single-node chain) is skipped.
+        let mut also_known_as = self
             .store
             .transport_ids(agent_cid)
             .await
             .map_err(|e| DidResolutionError::Internal(e.to_string()))?;
-        if !transport_ids.is_empty() {
-            doc.also_known_as = Some(transport_ids);
+        if let Some(head) = identity_head.as_ref() {
+            if head.chain_root != agent_cid {
+                let root_alias = format!("did:elohim:{}", head.chain_root);
+                if !also_known_as.contains(&root_alias) {
+                    also_known_as.push(root_alias);
+                }
+            }
+        }
+        if !also_known_as.is_empty() {
+            doc.also_known_as = Some(also_known_as);
+        }
+
+        // controller: populated straight from the declared controller set (DID 1.1
+        // Group Control — a community-recovery quorum is a controller, never an
+        // override). No head, or an empty set → controller stays absent (implicit
+        // self-control), keeping the phase-1 document unchanged.
+        if let Some(head) = identity_head.as_ref() {
+            match head.controllers.as_slice() {
+                [] => {}
+                [one] => doc.controller = Some(Controller::One(one.clone())),
+                many => doc.controller = Some(Controller::Many(many.to_vec())),
+            }
         }
 
         // Services: profile (optional) + doorway endpoints.

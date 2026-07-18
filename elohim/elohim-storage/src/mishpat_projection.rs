@@ -48,7 +48,7 @@
 
 use tracing::warn;
 
-use crate::db::models::{NewLens, NewMishpatCommitment};
+use crate::db::models::{NewIdentityHead, NewLens, NewMishpatCommitment};
 use elohim_epr::Reach;
 
 /// Parse a reach string into the DNA-notarized schema-8 [`Reach`] enum, or
@@ -90,6 +90,11 @@ pub enum CommitmentProjection {
     /// a Commitment, but its projection target is the A-class `lenses` table, not
     /// `mishpat_commitments`). Lens-market S3.
     UpsertLens(NewLens),
+    /// Project a new identity-head row into `identity_heads` (the `binds-identity`
+    /// action — the identity-head declaration is a Commitment, but its projection
+    /// target is the A-class `identity_heads` table, not `mishpat_commitments`).
+    /// Wave C1 of the identity-head-key-lineage arc.
+    UpsertIdentityHead(NewIdentityHead),
     /// Revoke an existing commitment by CID (sets `revoked_at` on that row).
     Revoke {
         /// CID of the original commitment being superseded.
@@ -183,6 +188,8 @@ pub fn parse_commitment_payload(
         "revokes-commitment" => parse_revokes_commitment(&payload),
         "author-lens" => parse_author_lens(&payload, entry_hash, action_hash)
             .map(CommitmentProjection::UpsertLens),
+        "binds-identity" => parse_binds_identity(&payload, entry_hash, action_hash)
+            .map(CommitmentProjection::UpsertIdentityHead),
         other => {
             warn!(
                 action = %other,
@@ -349,6 +356,81 @@ fn parse_author_lens(
         rule_json,
         telos_json,
         version_parent,
+        revoked_at: None,
+        dht_anchor_hash: Some(action_hash.to_string()),
+    })
+}
+
+/// Parse a `binds-identity` payload into a `NewIdentityHead` row (Wave C1).
+///
+/// A `binds-identity` commitment IS a Commitment, but it projects into the A-class
+/// `identity_heads` table, not `mishpat_commitments`. `cid = entry_hash` (the read
+/// key), `dht_anchor_hash = action_hash` (notarised provenance). The declaration
+/// carries `chain_root` (the stable identity-chain id), `head_key` (the current head
+/// agent_cid — the did:elohim resolver's join key), `controllers` (a non-empty array
+/// of controller id strings), and `controller_policy` (the `{kind, m?, n?}` object).
+/// `controllers`/`controller_policy` round-trip to compact JSON.
+///
+/// Fail-closed, mirroring `parse_author_lens`: required fields error (the signal
+/// handler warn-skips that row only, never the whole signal). The B2 coordinator
+/// validator (`validate_binds_identity`) already rejects malformed declarations at
+/// create-time; this is the defense-in-depth projection-side guard for a stale-
+/// coordinator peer or a replay predating the validator.
+///
+/// Ontology guard (imago-dei, structural): `controllers` MUST be non-empty — a head
+/// cannot exist without its controller-set (the recovery quorum is a controller,
+/// never an override). An empty set is refused here, never silently projected.
+fn parse_binds_identity(
+    payload: &serde_json::Value,
+    entry_hash: &str,
+    action_hash: &str,
+) -> Result<NewIdentityHead, String> {
+    let chain_root = payload
+        .get("chain_root")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "binds-identity payload missing non-empty 'chain_root'".to_string())?
+        .to_string();
+    let head_key = payload
+        .get("head_key")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "binds-identity payload missing non-empty 'head_key'".to_string())?
+        .to_string();
+    // controllers: a non-empty array of non-empty strings (the ontology guard —
+    // re-established at the projection layer, defense-in-depth against a stale
+    // coordinator / pre-validator replay).
+    let controllers = payload
+        .get("controllers")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| "binds-identity payload missing array 'controllers'".to_string())?;
+    if controllers.is_empty() {
+        return Err(
+            "binds-identity controllers must be non-empty (a head cannot exist without \
+             its controller-set)"
+                .to_string(),
+        );
+    }
+    if controllers
+        .iter()
+        .any(|c| c.as_str().map(str::is_empty).unwrap_or(true))
+    {
+        return Err("binds-identity controllers entries must be non-empty strings".to_string());
+    }
+    let controllers_json = serde_json::Value::Array(controllers.clone()).to_string();
+    // controller_policy: required object; round-trip to compact JSON.
+    let controller_policy_json = payload
+        .get("controller_policy")
+        .filter(|v| v.is_object())
+        .map(|v| v.to_string())
+        .ok_or_else(|| "binds-identity payload missing object 'controller_policy'".to_string())?;
+
+    Ok(NewIdentityHead {
+        cid: entry_hash.to_string(),
+        chain_root,
+        head_key,
+        controllers_json,
+        controller_policy_json,
         revoked_at: None,
         dht_anchor_hash: Some(action_hash.to_string()),
     })
@@ -1021,6 +1103,87 @@ mod tests {
             delegates_compute_projection_for(&acknowledge).is_none(),
             "acknowledges-reach-change is not a compute delegation → None"
         );
+    }
+
+    // ── binds-identity (identity-head projection, Wave C1) ─────────────────────
+
+    fn binds_identity_payload() -> String {
+        serde_json::json!({
+            "action": "binds-identity",
+            "chain_root": "bafyreichainrootgenesis0000",
+            "head_key": "uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH",
+            "controllers": [
+                "uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH",
+                "uhCAkRecoveryQuorumKey"
+            ],
+            "controller_policy": { "kind": "recovery-quorum", "m": 2, "n": 3 }
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn parse_binds_identity_projects_head_row() {
+        // A binds-identity commitment projects into the A-class identity_heads table
+        // with chain_root/head_key/controllers/policy read through, cid = entry_hash,
+        // dht_anchor_hash = action_hash.
+        let proj = parse_commitment_payload(
+            "binds-identity",
+            &binds_identity_payload(),
+            "uhCEk-identity-entry",
+            "uhCkk-identity-action",
+        )
+        .expect("well-formed binds-identity must parse");
+
+        let row = match proj {
+            CommitmentProjection::UpsertIdentityHead(r) => r,
+            other => panic!("expected UpsertIdentityHead, got {other:?}"),
+        };
+        assert_eq!(row.cid, "uhCEk-identity-entry");
+        assert_eq!(row.chain_root, "bafyreichainrootgenesis0000");
+        assert_eq!(
+            row.head_key,
+            "uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH"
+        );
+        assert_eq!(
+            row.dht_anchor_hash.as_deref(),
+            Some("uhCkk-identity-action"),
+            "dht_anchor_hash = action_hash (notarised provenance)"
+        );
+        let controllers: Vec<String> =
+            serde_json::from_str(&row.controllers_json).expect("controllers_json is a JSON array");
+        assert_eq!(controllers.len(), 2);
+        let policy: serde_json::Value =
+            serde_json::from_str(&row.controller_policy_json).expect("policy is JSON");
+        assert_eq!(policy["kind"], "recovery-quorum");
+        assert_eq!(policy["m"], 2);
+    }
+
+    #[test]
+    fn parse_binds_identity_empty_controllers_rejected() {
+        // Ontology guard (defense-in-depth): a head with no controllers must never
+        // project — a head cannot exist without its controller-set.
+        let mut payload: serde_json::Value =
+            serde_json::from_str(&binds_identity_payload()).unwrap();
+        payload["controllers"] = serde_json::json!([]);
+        let result = parse_commitment_payload(
+            "binds-identity",
+            &payload.to_string(),
+            "eh-empty",
+            "ah-empty",
+        );
+        assert!(result.is_err(), "empty controllers must return Err");
+        assert!(result.unwrap_err().contains("controllers"));
+    }
+
+    #[test]
+    fn parse_binds_identity_missing_chain_root_rejected() {
+        let mut payload: serde_json::Value =
+            serde_json::from_str(&binds_identity_payload()).unwrap();
+        payload.as_object_mut().unwrap().remove("chain_root");
+        let result =
+            parse_commitment_payload("binds-identity", &payload.to_string(), "eh-nc", "ah-nc");
+        assert!(result.is_err(), "missing chain_root must return Err");
+        assert!(result.unwrap_err().contains("chain_root"));
     }
 
     // ── replicates-dwelling ───────────────────────────────────────────────────

@@ -28,6 +28,15 @@
 //!   (distinct write-set) owns its `service` entries.
 //! - **`document_metadata`** — the `humans` row's `created`/`updated` stamps when
 //!   a row exists; otherwise the default empty (we never manufacture timestamps).
+//! - **`identity_head`** (Wave C1 — phase-2) — the live, notarized `binds-identity`
+//!   declaration whose `head_key` is this `agent_cid` (`identity_heads` projection),
+//!   surfacing the chain-root + controller set. `None` when the agent has no
+//!   declared head (the common case today) → the resolver keeps the phase-1
+//!   implicit-self document unchanged. The raw controller ids are framed as
+//!   `did:elohim:<id>` controller DIDs here (storage owns the identity-namespace
+//!   mapping; the resolver stays namespace-agnostic). Controllers come straight
+//!   from the declaration — the community-recovery quorum is a controller, never an
+//!   override (ontology guard).
 //!
 //! Identity-namespace hazard (see `elohim-storage/CLAUDE.md` — "Identity &
 //! Transport-Identity Coherence"): the DID method-specific-id and `agent_cid`
@@ -37,7 +46,10 @@
 //! and `self_cid` is only ever emitted as an `alsoKnownAs` transport id.
 
 use async_trait::async_trait;
-use did_bridge::{DidDocumentMetadata, ElohimIdentityStore, ElohimStoreError, ServiceRef};
+use did_bridge::{
+    DidDocumentMetadata, ElohimIdentityStore, ElohimStoreError, IdentityHead, ServiceRef,
+};
+use did_types::Did;
 
 use crate::db::context::HUMANS_HAPP_ID;
 use crate::db::models::Human;
@@ -158,6 +170,43 @@ impl ElohimIdentityStore for DidIdentityStore {
             }),
             None => Ok(DidDocumentMetadata::default()),
         }
+    }
+
+    async fn identity_head(
+        &self,
+        agent_cid: &str,
+    ) -> Result<Option<IdentityHead>, ElohimStoreError> {
+        // The live, notarized `binds-identity` declaration whose head is this agent
+        // (`identity_heads` projection, fail-closed on un-notarized/revoked rows).
+        // Absent → `None`, and the resolver falls back to the phase-1 self-only
+        // document. The common case today IS no head.
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| ElohimStoreError::Backend(e.to_string()))?;
+        let Some(row) = crate::db::identity_heads::find_head_by_head_key(&mut conn, agent_cid)
+            .map_err(|e| ElohimStoreError::Backend(e.to_string()))?
+        else {
+            return Ok(None);
+        };
+
+        // Controllers come straight from the declaration. Frame each raw controller
+        // id as a `did:elohim:<id>` controller DID (storage owns the namespace
+        // mapping). A controller id that cannot form a valid DID is skipped rather
+        // than aborting the whole resolution — the validator already guarantees
+        // non-empty ids, so this is a defensive filter, not a lossy transform.
+        let controller_ids: Vec<String> = serde_json::from_str(&row.controllers_json)
+            .map_err(|e| ElohimStoreError::Backend(format!("controllers_json parse: {e}")))?;
+        let controllers = controller_ids
+            .iter()
+            .filter_map(|c| Did::parse(&format!("did:elohim:{c}")).ok())
+            .collect();
+
+        Ok(Some(IdentityHead {
+            chain_root: row.chain_root,
+            head: row.head_key,
+            controllers,
+        }))
     }
 }
 
@@ -339,6 +388,74 @@ mod tests {
         assert_eq!(meta, DidDocumentMetadata::default());
     }
 
+    /// Seed a notarized `binds-identity` head projection keyed on `head_key`.
+    fn insert_identity_head(pool: &DbPool, cid: &str, head_key: &str, controllers: &[&str]) {
+        use crate::db::models::NewIdentityHead;
+        let mut conn = pool.get().unwrap();
+        let controllers_json = serde_json::to_string(controllers).unwrap();
+        crate::db::identity_heads::upsert_with_anchor(
+            &mut conn,
+            NewIdentityHead {
+                cid: cid.to_string(),
+                chain_root: "bafyreichainrootgenesis0000".to_string(),
+                head_key: head_key.to_string(),
+                controllers_json,
+                controller_policy_json: r#"{"kind":"recovery-quorum","m":2,"n":3}"#.to_string(),
+                revoked_at: None,
+                dht_anchor_hash: Some(format!("{cid}-anchor")),
+            },
+        )
+        .expect("insert identity head");
+    }
+
+    #[tokio::test]
+    async fn identity_head_resolves_controllers_from_binds_identity() {
+        // Wave C1: a minted binds-identity head is read back with the right
+        // chain_root + controllers (as did:elohim controller DIDs).
+        const RECOVERY: &str = "uhCAkRecoveryQuorumKey0000";
+        let pool = test_pool();
+        insert_identity_head(&pool, "ih:1", AGENT_KEY, &[AGENT_KEY, RECOVERY]);
+        let store = DidIdentityStore::new(pool, Some(AGENT_KEY.to_string()), vec![], None);
+
+        let head = store
+            .identity_head(AGENT_KEY)
+            .await
+            .unwrap()
+            .expect("a live notarized head must resolve");
+        assert_eq!(head.chain_root, "bafyreichainrootgenesis0000");
+        assert_eq!(head.head, AGENT_KEY);
+        // Controllers framed as did:elohim DIDs, straight from the declaration.
+        let expected_self = Did::parse(&format!("did:elohim:{AGENT_KEY}")).unwrap();
+        let expected_recovery = Did::parse(&format!("did:elohim:{RECOVERY}")).unwrap();
+        assert_eq!(head.controllers.len(), 2);
+        assert!(head.controllers.contains(&expected_self));
+        assert!(head.controllers.contains(&expected_recovery));
+    }
+
+    #[tokio::test]
+    async fn identity_head_none_when_no_binding() {
+        // No binds-identity for the agent → None (graceful fallback to phase-1
+        // self-only resolution; the common case today).
+        let pool = test_pool();
+        let store = DidIdentityStore::new(pool, Some(AGENT_KEY.to_string()), vec![], None);
+        assert!(store.identity_head(AGENT_KEY).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn identity_head_fail_closed_on_revoked() {
+        // A revoked head must not surface (fail-closed) — resolution degrades to the
+        // phase-1 document rather than emitting a stale controller set.
+        let pool = test_pool();
+        insert_identity_head(&pool, "ih:rev", AGENT_KEY, &[AGENT_KEY]);
+        {
+            let mut conn = pool.get().unwrap();
+            crate::db::identity_heads::set_revoked_at(&mut conn, "ih:rev", "2026-07-17T03:00:00Z")
+                .expect("revoke");
+        }
+        let store = DidIdentityStore::new(pool, Some(AGENT_KEY.to_string()), vec![], None);
+        assert!(store.identity_head(AGENT_KEY).await.unwrap().is_none());
+    }
+
     /// The load-bearing contract test: a fully-assembled `did:elohim` document
     /// (over the real store) validates against the did-bridge W3C DID 1.1 schema.
     #[tokio::test]
@@ -385,5 +502,64 @@ mod tests {
 
         // Metadata rides through from the humans row.
         assert!(result.did_document_metadata.created.is_some());
+    }
+
+    /// Wave C1 contract test: a `did:elohim` document assembled over the real store
+    /// WITH a notarized `binds-identity` head has its `controller` populated from the
+    /// declaration and still validates against the W3C DID 1.1 schema.
+    #[tokio::test]
+    async fn assembled_document_with_head_populates_controllers_and_conforms() {
+        use did_bridge::{DidResolver, ElohimResolver};
+        use did_types::{Controller, Did};
+        use serde_json::Value;
+
+        const SCHEMA: &str =
+            include_str!("../../../../bridges/did/schemas/did-document-1.1.schema.json");
+        const RECOVERY: &str = "uhCAkRecoveryQuorumKey0000";
+
+        let pool = test_pool();
+        insert_human(&pool, "human-self", AGENT_KEY);
+        insert_identity_head(&pool, "ih:conf", AGENT_KEY, &[AGENT_KEY, RECOVERY]);
+        let store = DidIdentityStore::new(
+            pool,
+            Some(AGENT_KEY.to_string()),
+            vec!["12D3KooWSelfPeerId".to_string()],
+            Some("https://node.example.host".to_string()),
+        );
+        let resolver = ElohimResolver::new(store);
+        let did = Did::parse(&format!("did:elohim:{AGENT_KEY}")).unwrap();
+
+        let doc = resolver
+            .resolve(&did)
+            .await
+            .expect("resolution succeeds")
+            .did_document
+            .expect("document present");
+
+        // controller populated from the declared set (self + recovery quorum).
+        match doc.controller.as_ref().expect("controller populated from head") {
+            Controller::Many(cs) => assert_eq!(cs.len(), 2),
+            other => panic!("expected Controller::Many, got {other:?}"),
+        }
+        // Lineage: the chain-root surfaces as an alsoKnownAs alias next to transport ids.
+        let aka = doc.also_known_as.as_ref().unwrap();
+        assert!(
+            aka.iter().any(|a| a == "did:elohim:bafyreichainrootgenesis0000"),
+            "chain-root lineage alias present: {aka:?}"
+        );
+
+        // Conformance: the with-controllers document still validates against DID 1.1.
+        let schema: Value = serde_json::from_str(SCHEMA).expect("schema is valid JSON");
+        let validator = jsonschema::validator_for(&schema).expect("schema compiles");
+        let instance = serde_json::to_value(&doc).unwrap();
+        let errors: Vec<String> = validator
+            .iter_errors(&instance)
+            .map(|e| format!("{e} (at {})", e.instance_path))
+            .collect();
+        assert!(
+            errors.is_empty(),
+            "with-controllers did:elohim document violates DID 1.1 schema:\n  - {}",
+            errors.join("\n  - ")
+        );
     }
 }

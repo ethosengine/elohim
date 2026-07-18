@@ -73,6 +73,34 @@ async fn did_elohim_assembly_output_conforms_to_did11_schema() {
     );
 }
 
+#[tokio::test]
+async fn did_elohim_with_controllers_conforms_to_did11_schema() {
+    // Wave C1: a did:elohim document assembled WITH an identity head — populated
+    // `controller` (Group Control / recovery quorum) + a chain-root lineage alias
+    // — must still validate against the DID 1.1 schema.
+    const CONTROLLER_KEY: &str = "uhCAkcHVja32JeYONbe1Dag4rWFB8Jj4-Q5Nv6iyClY-J6-teAgTr";
+    const CHAIN_ROOT: &str = "bafyreichainrootgenesisnodecid00000000000000000000000000";
+
+    let store = MockElohimStore::populated(AGENT_KEY).with_head(
+        AGENT_KEY,
+        CHAIN_ROOT,
+        &[AGENT_KEY, CONTROLLER_KEY],
+    );
+    let resolver = ElohimResolver::new(store);
+    let did = Did::parse(&format!("did:elohim:{AGENT_KEY}")).unwrap();
+    let doc = resolver.resolve(&did).await.unwrap().did_document.unwrap();
+
+    // Sanity: the head-derived fields we care about are present.
+    assert!(doc.controller.is_some(), "expected populated controller");
+    let json = serde_json::to_value(&doc).unwrap();
+    assert!(json.get("controller").is_some(), "controller serialized");
+
+    assert_conforms(
+        "did:elohim assembly output (with controllers + lineage)",
+        &json,
+    );
+}
+
 /// A wire-fidelity fixture carrying the legacy DID **1.0** context. It must be
 /// accepted (the schema recognizes v1 as a legal base context).
 const V1_CONTEXT_FIXTURE: &str = r#"{

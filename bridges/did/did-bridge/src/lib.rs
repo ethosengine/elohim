@@ -42,7 +42,9 @@ pub use codec::{
     agent_cid_to_core32, agent_cid_to_did_key, core32_to_agent_cid, core32_to_did_key,
     core32_to_multikey, dht_location_bytes, did_key_to_agent_cid, did_key_to_core32, CodecError,
 };
-pub use did_elohim::{ElohimIdentityStore, ElohimResolver, ElohimStoreError, ServiceRef};
+pub use did_elohim::{
+    ElohimIdentityStore, ElohimResolver, ElohimStoreError, IdentityHead, ServiceRef,
+};
 pub use did_key::{assemble_did_key_document, DidKeyResolver};
 pub use registry::MethodRegistry;
 pub use resolver::{

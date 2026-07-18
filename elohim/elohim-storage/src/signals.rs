@@ -919,6 +919,21 @@ pub fn handle_mishpat_signal(
                         "handle_mishpat_signal: CommitmentCommitted projected → lenses"
                     );
                 }
+                Ok(crate::mishpat_projection::CommitmentProjection::UpsertIdentityHead(
+                    new_head,
+                )) => {
+                    // binds-identity projects into the A-class `identity_heads` table
+                    // (NOT mishpat_commitments). Anchor-preserving upsert; cid =
+                    // entry_hash. Feeds the did:elohim head resolver's controllers +
+                    // lineage (Wave C1).
+                    crate::db::identity_heads::upsert_with_anchor(conn, new_head)
+                        .map_err(|e| StorageError::Database(e.to_string()))?;
+                    tracing::info!(
+                        cid = %entry_hash,
+                        action_hash = %action_hash,
+                        "handle_mishpat_signal: CommitmentCommitted projected → identity_heads"
+                    );
+                }
                 Ok(crate::mishpat_projection::CommitmentProjection::Revoke {
                     target_cid,
                     signed_at,
@@ -937,12 +952,18 @@ pub fn handle_mishpat_signal(
                     let affected_lenses =
                         crate::db::lenses::set_revoked_at(conn, &target_cid, &signed_at)
                             .map_err(|e| StorageError::Database(e.to_string()))?;
+                    // A revoke may also target an identity_heads row (same CID space,
+                    // distinct table) — no-ops (0 rows) when the CID lives elsewhere.
+                    let affected_identity_heads =
+                        crate::db::identity_heads::set_revoked_at(conn, &target_cid, &signed_at)
+                            .map_err(|e| StorageError::Database(e.to_string()))?;
                     tracing::info!(
                         target_cid = %target_cid,
                         action_hash = %action_hash,
                         affected_commitments,
                         affected_lenses,
-                        "handle_mishpat_signal: revokes-commitment projected → set_revoked_at (commitments + lenses)"
+                        affected_identity_heads,
+                        "handle_mishpat_signal: revokes-commitment projected → set_revoked_at (commitments + lenses + identity_heads)"
                     );
                 }
                 Err(e) => {

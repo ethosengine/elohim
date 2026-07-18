@@ -8,8 +8,10 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use did_bridge::{
-    DidResolutionError, DidWebFetch, ElohimIdentityStore, ElohimStoreError, ServiceRef,
+    DidResolutionError, DidWebFetch, ElohimIdentityStore, ElohimStoreError, IdentityHead,
+    ServiceRef,
 };
+use did_types::Did;
 
 /// An in-memory identity store. Configure which agents exist and what they
 /// project, then hand it to an `ElohimResolver`.
@@ -19,6 +21,9 @@ pub struct MockElohimStore {
     pub profiles: HashMap<String, ServiceRef>,
     pub doorways: HashMap<String, Vec<ServiceRef>>,
     pub transports: HashMap<String, Vec<String>>,
+    /// Wave-B `binds-identity` heads, keyed by the head agent_cid. Absent ⇒ the
+    /// phase-1 implicit-self assembly (no `controller`, no lineage alias).
+    pub heads: HashMap<String, IdentityHead>,
 }
 
 impl MockElohimStore {
@@ -52,6 +57,25 @@ impl MockElohimStore {
         );
         s
     }
+
+    /// Declare a Wave-B identity head for `agent_cid`: a stable `chain_root` and a
+    /// controller set (each raw controller id is framed as a `did:elohim:<id>`
+    /// controller DID). Builder — chains onto `populated`/`default`.
+    pub fn with_head(mut self, agent_cid: &str, chain_root: &str, controller_ids: &[&str]) -> Self {
+        let controllers = controller_ids
+            .iter()
+            .map(|c| Did::parse(&format!("did:elohim:{c}")).expect("controller id → did:elohim"))
+            .collect();
+        self.heads.insert(
+            agent_cid.to_string(),
+            IdentityHead {
+                chain_root: chain_root.to_string(),
+                head: agent_cid.to_string(),
+                controllers,
+            },
+        );
+        self
+    }
 }
 
 #[async_trait]
@@ -76,6 +100,13 @@ impl ElohimIdentityStore for MockElohimStore {
 
     async fn transport_ids(&self, agent_cid: &str) -> Result<Vec<String>, ElohimStoreError> {
         Ok(self.transports.get(agent_cid).cloned().unwrap_or_default())
+    }
+
+    async fn identity_head(
+        &self,
+        agent_cid: &str,
+    ) -> Result<Option<IdentityHead>, ElohimStoreError> {
+        Ok(self.heads.get(agent_cid).cloned())
     }
 }
 
