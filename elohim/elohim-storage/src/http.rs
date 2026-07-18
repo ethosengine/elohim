@@ -4030,6 +4030,11 @@ impl HttpServer {
             // Diesel entity routes
             "collectives",
             "humans",
+            // did:elohim resolution namespace (/db/identity/did/{did}). Without
+            // this entry "identity" is consumed as an h_app_id and the
+            // resolution dispatch arm becomes dead code (the same shadow class
+            // the "p2p" comment below warns about).
+            "identity",
             "human-relationships",
             "presences",
             "events",
@@ -4118,6 +4123,14 @@ impl HttpServer {
         // "knows it, cannot connect" during cross-conductor fetch failures.
         if resource_path == "p2p/conductor-diagnostics" {
             return self.handle_conductor_diagnostics(req, method).await;
+        }
+
+        // did:elohim resolution (Cat-C operational projection; DID bridge spec
+        // §3.4). GET /db/identity/did/{did} → the assembled DID 1.1 document.
+        // The `{did}` tail (e.g. `did:elohim:uhCAk…`) carries colons but no
+        // slashes, so a single strip_prefix recovers it whole.
+        if let Some(did_str) = resource_path.strip_prefix("identity/did/") {
+            return self.handle_did_resolution(method, did_str).await;
         }
 
         if resource_path == "content" {
@@ -5010,6 +5023,99 @@ impl HttpServer {
             body["networkMetrics"] = metrics;
         }
         Ok(response::ok(&body))
+    }
+
+    /// GET /db/identity/did/{did} — resolve a `did:elohim` identifier to its
+    /// assembled DID 1.1 document (DID bridge spec §3.4). Cat-C operational
+    /// projection (assembled per request, never stored — P1); doorway
+    /// auto-forwards it (declared in `build_manifest`). Assembly conforms to the
+    /// did-bridge `ElohimIdentityStore` contract — storage supplies the
+    /// agent-key / humans / transport joins; the crate owns the codec + framing.
+    ///
+    /// Error shape is the standard DID resolution result (`didResolutionMetadata.
+    /// error` ∈ {`invalidDid`, `methodNotSupported`, `notFound`, `internalError`}):
+    /// syntactically invalid or non-`elohim` DIDs return 400; unknown agents 404.
+    async fn handle_did_resolution(
+        &self,
+        method: Method,
+        did_str: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use did_bridge::{DidResolutionError, DidResolutionResult, DidResolver, ElohimResolver};
+        use did_types::Did;
+
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        let Some(pool) = self.db_pool.clone() else {
+            return Ok(response::service_unavailable(
+                "identity resolution unavailable: no database pool",
+            ));
+        };
+
+        // Syntax gate → invalidDid (400).
+        let did = match Did::parse(did_str) {
+            Ok(d) => d,
+            Err(e) => {
+                let err = DidResolutionError::InvalidDid(e.to_string());
+                return Ok(response::json_response(
+                    StatusCode::BAD_REQUEST,
+                    &DidResolutionResult::from_error(&err),
+                ));
+            }
+        };
+
+        // Only did:elohim is served here → methodNotSupported (400).
+        if did.method() != "elohim" {
+            let err = DidResolutionError::MethodNotSupported(did.method().to_string());
+            return Ok(response::json_response(
+                StatusCode::BAD_REQUEST,
+                &DidResolutionResult::from_error(&err),
+            ));
+        }
+
+        // Self-identity seams. The own conductor cell key (`uhCAk…`) marks which
+        // agent_cid is *self*; `self_cid` is a TRANSPORT id (libp2p PeerId / iroh
+        // NodeId), emitted only as alsoKnownAs — never as the self agent_cid
+        // (identity-namespace hazard; see the store module + crate CLAUDE.md).
+        let self_agent_cid = self
+            .hc_registry
+            .as_ref()
+            .and_then(|r| r.lamad_client())
+            .map(|hc| hc.agent_key_uhcak())
+            .filter(|k| !k.is_empty());
+        let self_transport_ids = if self.self_cid.is_empty() {
+            Vec::new()
+        } else {
+            vec![self.self_cid.clone()]
+        };
+        // No canonical public base URL is configured in storage today, so the
+        // SELF profile service stays dormant (an absolute endpoint or nothing).
+        let public_base_url = None;
+
+        let store = crate::services::did_identity_store::DidIdentityStore::new(
+            pool,
+            self_agent_cid,
+            self_transport_ids,
+            public_base_url,
+        );
+        let resolver = ElohimResolver::new(store);
+
+        match resolver.resolve(&did).await {
+            Ok(result) => Ok(response::ok(&result)),
+            Err(err) => {
+                let status = match err {
+                    DidResolutionError::NotFound(_) => StatusCode::NOT_FOUND,
+                    DidResolutionError::InvalidDid(_)
+                    | DidResolutionError::MethodNotSupported(_) => StatusCode::BAD_REQUEST,
+                    DidResolutionError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+                };
+                Ok(response::json_response(
+                    status,
+                    &DidResolutionResult::from_error(&err),
+                ))
+            }
+        }
     }
 
     async fn handle_content_head(
@@ -12589,6 +12695,16 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .cache_ttl(0)
                 .build(),
         )
+        // did:elohim resolution (Cat-C operational projection; DID bridge spec
+        // §3.4). Assembled per request from substrate joins — never cache.
+        // Public read (the document is a public projection of substrate truth,
+        // same class as conductor-diagnostics); doorway auto-forwards it.
+        .route(
+            Route::get("/db/identity/did/{did}")
+                .handler("resolve_did")
+                .cache_ttl(0)
+                .build(),
+        )
         // Knowledge graph relationships
         .route(
             Route::get("/db/relationships")
@@ -14858,6 +14974,33 @@ mod conductor_diagnostics_tests {
         let (_ctx, resource_path) =
             super::HttpServer::extract_app_context("p2p/conductor-diagnostics");
         assert_eq!(resource_path, "p2p/conductor-diagnostics");
+    }
+
+    #[test]
+    fn identity_did_namespace_survives_app_context_extraction() {
+        // Same shadow class as the p2p regression above: "identity" must be a
+        // legacy prefix so extract_app_context keeps the whole
+        // "identity/did/{did}" as resource_path (the DID's colons are NOT a
+        // resource separator), else the resolution dispatch arm is dead code.
+        let (_ctx, resource_path) =
+            super::HttpServer::extract_app_context("identity/did/did:elohim:uhCAkAGENTKEYEXAMPLE");
+        assert_eq!(
+            resource_path,
+            "identity/did/did:elohim:uhCAkAGENTKEYEXAMPLE"
+        );
+    }
+
+    #[test]
+    fn build_manifest_includes_resolve_did_route() {
+        let manifest = super::build_manifest();
+        let has_route = manifest.routes.iter().any(|r| {
+            r.path == "/db/identity/did/{did}" && r.method == doorway_client::HttpMethod::Get
+        });
+        assert!(
+            has_route,
+            "GET /db/identity/did/{{did}} missing from build_manifest — doorway \
+             will not auto-forward did:elohim resolution"
+        );
     }
 
     #[test]

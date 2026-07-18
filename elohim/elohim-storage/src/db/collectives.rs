@@ -158,6 +158,67 @@ pub fn collective_id_exists(conn: &mut SqliteConnection, id: &str) -> Result<boo
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }
 
+/// Scope-agnostic lookup of a collective's content-CID identity (`collective_cid`).
+///
+/// Like [`collective_id_exists`], this matches on the bare `collectives(id)`
+/// slug across ALL `h_app_id` scopes — seed-collectives rows land under the
+/// legacy "lamad" scope while REA commitments are authored under other scopes,
+/// so an app-scoped read would miss the parent. Returns:
+/// - `Ok(Some(cid))` — the slug names a collective that has been reconciled to
+///   its DHT content-CID identity;
+/// - `Ok(None)` — either the slug is not a collective at all, OR it is a
+///   collective not yet DHT-anchored (`collective_cid` NULL, pre-coherence).
+///
+/// The caller ([`resolve_party_chain_root`]) cannot distinguish those two `None`
+/// cases from the return alone — and does not need to: both degrade to the
+/// slug-derived root.
+pub fn collective_cid_for_slug(
+    conn: &mut SqliteConnection,
+    slug: &str,
+) -> Result<Option<String>, StorageError> {
+    collectives::table
+        .filter(collectives::id.eq(slug))
+        .select(collectives::collective_cid)
+        .first::<Option<String>>(conn)
+        .optional()
+        .map(|opt| opt.flatten().filter(|s| !s.trim().is_empty()))
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Resolve an economic-party identifier to the chain-root cid it should be
+/// stored as on an REA commitment (Wave A re-point #5, design §4.1).
+///
+/// The identity head is a lineage DAG whose durable name is the chain-root cid;
+/// a commitment must name the root, never a rotation-fragile raw key.
+///
+/// - When `party` names a **collective** (a group-controlled identity head), its
+///   chain-root is the collective's content-CID identity (`collective_cid`) — a
+///   `Collective` + its `Membership{Steward}` set already IS a group-controlled
+///   identity head (design §4.1). Routed through [`identity_root_cid`] for
+///   uniformity. When the collective is not yet DHT-anchored (`collective_cid`
+///   NULL, pre-coherence) this **degrades safely** to the slug-derived root
+///   rather than fabricating a cid — the same degrade-don't-guess stance the
+///   diversity-placement path takes on a NULL household_id.
+/// - Otherwise `party` is a human agent key (or an external label); route it
+///   through [`identity_root_cid`] so the indirection is uniform. Degenerate
+///   today (the value is unchanged), but the seam is installed for Wave B, when
+///   a human's key resolves back to its genesis root.
+///
+/// Empty party in → empty root out (a one-sided provide commitment's empty
+/// `receiver`): never invent an identity for an absent party.
+pub fn resolve_party_chain_root(
+    conn: &mut SqliteConnection,
+    party: &str,
+) -> Result<String, StorageError> {
+    if party.trim().is_empty() {
+        return Ok(String::new());
+    }
+    if let Some(cid) = collective_cid_for_slug(conn, party)? {
+        return Ok(crate::identity_root::identity_root_cid(&cid));
+    }
+    Ok(crate::identity_root::identity_root_cid(party))
+}
+
 /// List collectives with filtering
 pub fn list_collectives(
     conn: &mut SqliteConnection,

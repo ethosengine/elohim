@@ -199,6 +199,7 @@ pub fn validate_commitment_payload(input: &CreateCommitmentInput) -> Result<(), 
         "ratifies-limit-gradient" => validate_ratifies_limit_gradient(&payload),
         "sets-authority-arc" => validate_sets_authority_arc(&payload),
         "author-lens" => validate_author_lens(&payload),
+        "binds-identity" => validate_binds_identity(&payload),
         other => Err(format!(
             "commitments::validate_commitment_payload unhandled action: {other}"
         )),
@@ -589,6 +590,133 @@ fn validate_author_lens(payload: &serde_json::Value) -> Result<(), String> {
         return Err("author-lens telos must be an object".into());
     }
     Ok(())
+}
+
+/// Validator for the `binds-identity` action — the identity-head declaration
+/// (Wave B of the identity-head-key-lineage plan; design §2.2 / §3).
+///
+/// A **binds-identity** commitment IS a `Mishpat::Commitment` with
+/// `action="binds-identity"`; the whole declaration lives in `payload_json`
+/// (zero integrity-struct change → **DNA-hash-NEUTRAL**, the `author-lens` /
+/// `binds-policy` precedent: the mishpat integrity zome's action dispatch ends
+/// `_ => None`, so a new discriminator passes integrity unmodified and this
+/// validator hot-swaps via `update_coordinators`).
+///
+/// It declares, for one identity chain: *"chain-root C's current head is key K;
+/// controllers = {set}; controller-policy = self | steward-set |
+/// recovery-quorum(M,N)."* The **B0 architecture decision**: lineage lives on
+/// the imagodei `KeyRotation` DAG + chain-root derivation; mishpat owns THIS
+/// declaration referencing the imagodei chain-root. `chain_root` is a content
+/// reference (the imagodei genesis-key / CID string) — NOT re-derived here; the
+/// coordinator carries it through faithfully (the imagodei↔mishpat cross-DNA
+/// link is a CID reference, not a runtime bridge).
+///
+/// Ontology guard (imago-dei, structural): `controllers` MUST be non-empty — a
+/// head cannot exist without its controller-set; the recovery quorum is a
+/// *controller*, named in the same `controller_policy` field that names self,
+/// never an override bolted on.
+fn validate_binds_identity(payload: &serde_json::Value) -> Result<(), String> {
+    let required = [
+        "action",
+        "chain_root",
+        "head_key",
+        "controllers",
+        "controller_policy",
+    ];
+    for field in required {
+        if payload.get(field).is_none() {
+            return Err(format!("binds-identity missing required field: {field}"));
+        }
+    }
+    if payload["action"] != "binds-identity" {
+        return Err("action field must equal 'binds-identity'".into());
+    }
+    // chain_root: the stable identity-chain identifier (imagodei genesis-key /
+    // CID). Non-empty string — an empty root binds to no chain.
+    if payload["chain_root"].as_str().unwrap_or("").is_empty() {
+        return Err("binds-identity chain_root must be a non-empty reference".into());
+    }
+    // head_key: the current head of the chain. Non-empty string.
+    let head_key = payload["head_key"].as_str().unwrap_or("");
+    if head_key.is_empty() {
+        return Err("binds-identity head_key must be a non-empty key reference".into());
+    }
+    // controllers: non-empty array of non-empty strings (ontology guard — the
+    // head cannot exist without its controller-set).
+    let controllers = payload
+        .get("controllers")
+        .and_then(|c| c.as_array())
+        .ok_or_else(|| "binds-identity controllers must be an array".to_string())?;
+    if controllers.is_empty() {
+        return Err(
+            "binds-identity controllers must be non-empty (a head cannot exist without \
+             its controller-set)"
+                .into(),
+        );
+    }
+    if controllers
+        .iter()
+        .any(|c| c.as_str().unwrap_or("").is_empty())
+    {
+        return Err("binds-identity controllers entries must be non-empty strings".into());
+    }
+    // controller_policy: object with `kind` ∈ {self, steward-set, recovery-quorum}.
+    let policy = payload
+        .get("controller_policy")
+        .and_then(|p| p.as_object())
+        .ok_or_else(|| "binds-identity controller_policy must be an object".to_string())?;
+    let kind = policy.get("kind").and_then(|k| k.as_str()).unwrap_or("");
+    match kind {
+        "self" => {
+            // self-policy: the current head IS its own controller — the head_key
+            // must appear in the controller-set (structural, not a bolt-on).
+            let head_is_controller = controllers.iter().any(|c| c.as_str() == Some(head_key));
+            if !head_is_controller {
+                return Err(
+                    "binds-identity self-policy requires head_key to be listed in controllers"
+                        .into(),
+                );
+            }
+            Ok(())
+        }
+        "steward-set" => {
+            // steward-set: the named controller stewards authorize. The set is
+            // already validated non-empty above; nothing further at declare-time.
+            //
+            // Declare/authorize asymmetry (INTENTIONAL): accepting the policy HERE
+            // records the declared intent — it does NOT imply a rotation under it is
+            // authorizable yet. imagodei `authorize_rotation` (identity_lineage.rs,
+            // the `ControllerPolicy::StewardSet` arm) REFUSES steward-set rotations
+            // until Wave C resolves the notarized controller set. Declaring is safe;
+            // authorizing is gated.
+            Ok(())
+        }
+        "recovery-quorum" => {
+            // recovery-quorum(M,N): reuses the wired imagodei
+            // RecoveryAuthority/RecoveryRequest semantics at rotation time; here
+            // we validate the declared threshold shape only.
+            let m = policy.get("m").and_then(|v| v.as_u64());
+            let n = policy.get("n").and_then(|v| v.as_u64());
+            match (m, n) {
+                (Some(m), Some(n)) => {
+                    if m == 0 || m > n {
+                        return Err(format!(
+                            "binds-identity recovery-quorum requires 1 <= m <= n; got m={m} n={n}"
+                        ));
+                    }
+                    Ok(())
+                }
+                _ => Err(
+                    "binds-identity recovery-quorum controller_policy requires integer m and n"
+                        .into(),
+                ),
+            }
+        }
+        other => Err(format!(
+            "binds-identity controller_policy.kind '{other}' not in enum \
+             (self|steward-set|recovery-quorum)"
+        )),
+    }
 }
 
 fn validate_delegates_compute(payload: &serde_json::Value) -> Result<(), String> {
@@ -1459,6 +1587,203 @@ mod tests {
         assert!(
             validate_commitment_payload(&input).is_err(),
             "author-lens rule must be an object"
+        );
+    }
+
+    // =========================================================================
+    // binds-identity tests (Wave B — the identity-head declaration; design §2.2)
+    //
+    // A binds-identity IS a Mishpat::Commitment with action="binds-identity";
+    // the whole declaration lives in payload_json (zero integrity change →
+    // DNA-hash-neutral, the author-lens precedent). `chain_root` is a content
+    // reference to the imagodei chain-root (genesis-key/CID) — the imagodei↔
+    // mishpat cross-DNA link is a CID reference, never re-derived here.
+    // =========================================================================
+
+    fn well_formed_binds_identity_payload() -> serde_json::Value {
+        serde_json::json!({
+            "action": "binds-identity",
+            "chain_root": "uhCAk-genesis-agent-key",
+            "head_key": "uhCAk-genesis-agent-key",
+            "controllers": ["uhCAk-genesis-agent-key"],
+            "controller_policy": { "kind": "self" }
+        })
+    }
+
+    fn well_formed_binds_identity_recovery_quorum() -> serde_json::Value {
+        serde_json::json!({
+            "action": "binds-identity",
+            "chain_root": "uhCAk-grandma-genesis-key",
+            "head_key": "uhCAk-grandma-current-key",
+            "controllers": ["uhCAk-friend-a", "uhCAk-friend-b", "uhCAk-friend-c"],
+            "controller_policy": { "kind": "recovery-quorum", "m": 2, "n": 3 }
+        })
+    }
+
+    #[test]
+    fn binds_identity_well_formed_self_validates() {
+        let input = CreateCommitmentInput {
+            action: "binds-identity".to_string(),
+            payload_json: well_formed_binds_identity_payload().to_string(),
+            signed_at: "2026-07-17T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_ok(),
+            "well-formed self-policy binds-identity must validate"
+        );
+    }
+
+    #[test]
+    fn binds_identity_well_formed_recovery_quorum_validates() {
+        let input = CreateCommitmentInput {
+            action: "binds-identity".to_string(),
+            payload_json: well_formed_binds_identity_recovery_quorum().to_string(),
+            signed_at: "2026-07-17T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_ok(),
+            "well-formed recovery-quorum(2,3) binds-identity must validate"
+        );
+    }
+
+    #[test]
+    fn binds_identity_steward_set_validates() {
+        let mut payload = well_formed_binds_identity_payload();
+        payload["controller_policy"] = serde_json::json!({ "kind": "steward-set" });
+        payload["controllers"] = serde_json::json!(["uhCAk-steward-a", "uhCAk-steward-b"]);
+        let input = CreateCommitmentInput {
+            action: "binds-identity".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-07-17T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_ok(),
+            "steward-set binds-identity must validate"
+        );
+    }
+
+    #[test]
+    fn binds_identity_missing_field_rejected() {
+        for drop_field in ["chain_root", "head_key", "controllers", "controller_policy"] {
+            let mut payload = well_formed_binds_identity_payload();
+            payload.as_object_mut().unwrap().remove(drop_field);
+            let input = CreateCommitmentInput {
+                action: "binds-identity".to_string(),
+                payload_json: payload.to_string(),
+                signed_at: "2026-07-17T00:00:00Z".to_string(),
+            };
+            assert!(
+                validate_commitment_payload(&input).is_err(),
+                "binds-identity missing '{drop_field}' must fail validation"
+            );
+        }
+    }
+
+    #[test]
+    fn binds_identity_wrong_action_discriminator_rejected() {
+        let mut payload = well_formed_binds_identity_payload();
+        payload["action"] = serde_json::json!("not-binds-identity");
+        let input = CreateCommitmentInput {
+            action: "binds-identity".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-07-17T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_err(),
+            "binds-identity action field must equal the discriminator"
+        );
+    }
+
+    #[test]
+    fn binds_identity_empty_chain_root_rejected() {
+        let mut payload = well_formed_binds_identity_payload();
+        payload["chain_root"] = serde_json::json!("");
+        let input = CreateCommitmentInput {
+            action: "binds-identity".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-07-17T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_err(),
+            "binds-identity empty chain_root must fail validation"
+        );
+    }
+
+    #[test]
+    fn binds_identity_empty_controllers_rejected() {
+        // Ontology guard: a head cannot exist without its controller-set.
+        let mut payload = well_formed_binds_identity_payload();
+        payload["controllers"] = serde_json::json!([]);
+        let input = CreateCommitmentInput {
+            action: "binds-identity".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-07-17T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_err(),
+            "binds-identity empty controllers must fail validation (ontology guard)"
+        );
+    }
+
+    #[test]
+    fn binds_identity_self_policy_head_not_in_controllers_rejected() {
+        // self-policy: the head must be its own controller (structural).
+        let mut payload = well_formed_binds_identity_payload();
+        payload["controllers"] = serde_json::json!(["uhCAk-someone-else"]);
+        let input = CreateCommitmentInput {
+            action: "binds-identity".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-07-17T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_err(),
+            "self-policy with head_key absent from controllers must fail"
+        );
+    }
+
+    #[test]
+    fn binds_identity_unknown_policy_kind_rejected() {
+        let mut payload = well_formed_binds_identity_payload();
+        payload["controller_policy"] = serde_json::json!({ "kind": "dictator" });
+        let input = CreateCommitmentInput {
+            action: "binds-identity".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-07-17T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_err(),
+            "controller_policy.kind outside {{self,steward-set,recovery-quorum}} must fail"
+        );
+    }
+
+    #[test]
+    fn binds_identity_recovery_quorum_m_greater_than_n_rejected() {
+        let mut payload = well_formed_binds_identity_recovery_quorum();
+        payload["controller_policy"] =
+            serde_json::json!({ "kind": "recovery-quorum", "m": 4, "n": 3 });
+        let input = CreateCommitmentInput {
+            action: "binds-identity".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-07-17T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_err(),
+            "recovery-quorum with m > n must fail validation"
+        );
+    }
+
+    #[test]
+    fn binds_identity_recovery_quorum_missing_threshold_rejected() {
+        let mut payload = well_formed_binds_identity_recovery_quorum();
+        payload["controller_policy"] = serde_json::json!({ "kind": "recovery-quorum" });
+        let input = CreateCommitmentInput {
+            action: "binds-identity".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-07-17T00:00:00Z".to_string(),
+        };
+        assert!(
+            validate_commitment_payload(&input).is_err(),
+            "recovery-quorum without integer m and n must fail validation"
         );
     }
 }

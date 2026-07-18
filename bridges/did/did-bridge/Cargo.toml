@@ -1,0 +1,31 @@
+[package]
+name = "did-bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "DidResolver trait + MethodRegistry and method impls: did:key (offline codec), did:elohim (projection-assembly contract), did:web (feature-gated fetch)."
+
+[features]
+default = []
+# did:web resolver — URL derivation + injected fetch trait. Off by default so
+# no HTTP client is pulled into the common build; the fetch is caller-provided.
+web-resolver = ["dep:percent-encoding"]
+
+[dependencies]
+did-types = { path = "../did-types" }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+
+bs58 = { workspace = true }
+base64 = { workspace = true }
+blake2b_simd = { workspace = true }
+
+percent-encoding = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+proptest = { workspace = true }

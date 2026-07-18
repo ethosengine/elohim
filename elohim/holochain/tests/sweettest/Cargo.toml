@@ -157,6 +157,10 @@ path = "src/tests/replicates_commons_substrate_correct_test.rs"
 name = "commitment_by_state_link_test"
 path = "src/tests/commitment_by_state_link_test.rs"
 
+[[test]]
+name = "identity_lineage"
+path = "src/tests/identity_lineage.rs"
+
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).

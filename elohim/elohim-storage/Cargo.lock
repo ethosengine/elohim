@@ -2039,6 +2039,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab03c107fafeb3ee9f5925686dbb7a73bc76e3932abb0d2b365cb64b169cf04c"
 
 [[package]]
+name = "did-bridge"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "blake2b_simd",
+ "bs58",
+ "did-types",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "did-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "diesel"
 version = "2.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2382,6 +2405,8 @@ dependencies = [
  "cozo",
  "criterion",
  "dashmap 5.5.3",
+ "did-bridge",
+ "did-types",
  "diesel",
  "diesel_migrations",
  "dirs",

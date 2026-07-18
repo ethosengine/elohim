@@ -60,6 +60,16 @@ COPY elohim/elohim-chrome-asset ./elohim/elohim-chrome-asset
 # workspace member of elohim/Cargo.toml. Without this COPY cargo aborts at resolve time:
 # "failed to read /elohim/elohim-peer-fabric/Cargo.toml: No such file".
 COPY elohim/elohim-peer-fabric ./elohim/elohim-peer-fabric
+# bridges/did: did-types + did-bridge are path-deps of doorway-service (DID
+# resolution surfaces). They inherit from the bridges/did workspace root
+# (version.workspace = true, serde = { workspace = true }, …), so cargo must read
+# bridges/did/Cargo.toml when resolving them — COPY the workspace root + both
+# crates. The root's `members` lists did-tests (not copied); prune it below or
+# cargo aborts: "failed to load manifest for workspace member did-tests".
+COPY bridges/did/Cargo.toml ./bridges/did/Cargo.toml
+COPY bridges/did/did-types ./bridges/did/did-types
+COPY bridges/did/did-bridge ./bridges/did/did-bridge
+RUN sed -i '/"did-tests"/d' bridges/did/Cargo.toml
 
 # Prune workspace members that aren't copied into the build context.
 # Keeps: constitution, elohim-agent-service, gate-client, gate-types,
@@ -82,7 +92,9 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../../elohim/elohim-agent/gate-client"|path = "elohim/elohim-agent/gate-client"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/elohim-views"|path = "elohim/elohim-views"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/elohim-render"|path = "elohim/elohim-render"|' Cargo.toml && \
-    sed -i 's|path = "../../elohim/elohim-peer-fabric"|path = "elohim/elohim-peer-fabric"|' Cargo.toml
+    sed -i 's|path = "../../elohim/elohim-peer-fabric"|path = "elohim/elohim-peer-fabric"|' Cargo.toml && \
+    sed -i 's|path = "../../bridges/did/did-types"|path = "bridges/did/did-types"|' Cargo.toml && \
+    sed -i 's|path = "../../bridges/did/did-bridge"|path = "bridges/did/did-bridge"|' Cargo.toml
 
 # Build dependencies (this layer gets cached)
 RUN cargo build --release
@@ -99,6 +111,12 @@ COPY doorway/doorway-service/templates ./templates
 # only surfaces here at `cargo test --lib --bins`. Without this COPY the test build aborts:
 # "couldn't read .../route-claims.vectors.json: No such file or directory (os error 2)".
 COPY elohim/sdk/fixtures /elohim/sdk/fixtures
+# DID 1.1 conformance schema — consumed via include_str! in routes/identity.rs
+# #[cfg(test)] to validate the emitted did:web document. CARGO_MANIFEST_DIR is
+# /app here, so the concat!(.../../../bridges/did/schemas/...) path resolves to
+# /bridges/did/schemas. Test-only (like the fixtures above) — the release build
+# never reads it, so the gap only surfaces at `cargo test --lib --bins`.
+COPY bridges/did/schemas /bridges/did/schemas
 RUN cargo fmt --check
 RUN RUSTFLAGS="" cargo clippy -- -D warnings -W clippy::all
 RUN RUSTFLAGS="" cargo test --lib --bins

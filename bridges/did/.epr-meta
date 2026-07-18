@@ -1,0 +1,41 @@
+---
+epr-meta-version: 1
+id: bridges-did-governance
+root: true
+covers: subtree
+purpose: >
+  The W3C DID 1.1 bridge — DID document data model (did-types), DidResolver/MethodRegistry
+  IoC seam + did:key / did:elohim / did:web methods (did-bridge), and the conformance suite
+  (did-tests). Wire shapes here are STANDARDS-BOUND: the contract is the W3C DID 1.1 TR,
+  mechanized locally as schemas/did-document-1.1.schema.json + the did11_conformance tests.
+rules:
+  - id: did11-conformance-on-wire-shape-edits
+    class: inject
+    when: { write: "*.rs", contains-any: ["DidDocument", "VerificationMethod", "publicKeyMultibase", "@context", "DID_CONTEXT"] }
+    validator: epr:validator-did11-conformance
+    why: "You are editing a DID 1.1 wire shape. The contract is the W3C TR (https://www.w3.org/TR/did-1.1/), mechanized as schemas/did-document-1.1.schema.json. Before committing: cargo test -p did-tests --test did11_conformance (plus the full suite). Invariants that have already drifted once and are test-guarded: emit @context v1.1 / accept+preserve v1; unknown extension properties survive round-trip (never deny_unknown_fields); did:web derived URLs reject decoded '@' '/' '\\' control chars (SSRF)."
+validators:
+  - ref: epr:validator-did11-conformance
+    fuel: 200
+cites:
+  - did-bridge-identity-resolution
+---
+
+# bridges/did/ — W3C DID 1.1 bridge (atlas §3.6, bridge seam)
+
+Governing spec: genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md.
+
+## The conformance discipline (authoritative; the inject rule above is the reminder, the tests are the gate)
+
+1. **Schema**: schemas/did-document-1.1.schema.json — hand-derived from the W3C DID 1.1 TR.
+   It validates the structure of known properties and NEVER forbids extensions
+   (additionalProperties stays true; DID documents legally carry extension properties).
+2. **Suite**: did-tests/tests/did11_conformance.rs validates every document this crate emits,
+   plus the fidelity fixtures, against the schema — and asserts the v1.1 context pin.
+3. **v1 honesty**: the epr:validator-did11-conformance ref is NOT a registered validator-EPR;
+   in v1 the rule degrades to an inject advisory — which is its intended class (teach, never
+   block). If a conformance validator-EPR is ever registered under this name, the rule upgrades
+   in place.
+4. **History**: the three drifts this gate exists for all occurred at birth (2026-07-17):
+   @context nearly pinned to 1.0; extension properties dropped on round-trip; did:web %40
+   host-confusion SSRF. Review caught them once; the suite catches them forever.

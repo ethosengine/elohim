@@ -55,6 +55,11 @@ pub use submit_specialist_revocation::*;
 #[allow(dead_code)]
 mod content_decode;
 
+// Identity key-lineage — chain-root over the KeyRotation version DAG +
+// rotate_identity_key controller-policy authorization (Wave B, identity-head plan).
+// Coordinator-only, DNA-hash-neutral: reads the links commit_key_rotation authors.
+pub mod identity_lineage;
+
 // Bootstrap-steward pattern — reference implementation for the protocol
 // (also ported to mishpat, node-registry, lamad). See bootstrap_steward.rs.
 pub mod bootstrap_steward;
@@ -308,11 +313,7 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 relationship,
                 author,
             })?;
-        } else if let Some(collective) = record
-            .entry()
-            .to_app_option::<Collective>()
-            .ok()
-            .flatten()
+        } else if let Some(collective) = record.entry().to_app_option::<Collective>().ok().flatten()
         {
             // Emit CollectiveCommitted BEFORE MembershipCommitted so the storage
             // projector (T5) can upsert the Collective row before its memberships.
@@ -322,11 +323,7 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 collective,
                 author,
             })?;
-        } else if let Some(membership) = record
-            .entry()
-            .to_app_option::<Membership>()
-            .ok()
-            .flatten()
+        } else if let Some(membership) = record.entry().to_app_option::<Membership>().ok().flatten()
         {
             emit_signal(ImagodeiSignal::MembershipCommitted {
                 action_hash,
@@ -3564,10 +3561,26 @@ pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRot
         rotated_at: now,
     };
 
+    let action_hash = append_key_rotation_entry(rotation.clone())?;
+
+    Ok(KeyRotationOutput {
+        action_hash,
+        rotation,
+    })
+}
+
+/// Append a validated `KeyRotation` to the DHT: create the entry, author the
+/// `current_agent:{human}` (`HumanToCurrentAgent`) and `agent_rotation:{new}`
+/// (`AgentToKeyRotation`) anchor links the lineage walk reads, and emit the
+/// projection signal. Shared by `commit_key_rotation` (recovery-flow path) and
+/// `identity_lineage::rotate_identity_key` (controller-policy path) so both
+/// append the SAME version-DAG node with the SAME links (one rotation mechanism,
+/// per the B0 decision). Callers gate authorization BEFORE calling this.
+pub(crate) fn append_key_rotation_entry(rotation: KeyRotation) -> ExternResult<ActionHash> {
     let action_hash = create_entry(&EntryTypes::KeyRotation(rotation.clone()))?;
 
     let current_agent_anchor =
-        StringAnchor::new("current_agent", &input.human_agent_pubkey.to_string());
+        StringAnchor::new("current_agent", &rotation.human_agent_pubkey.to_string());
     let current_agent_anchor_hash =
         hash_entry(&EntryTypes::StringAnchor(current_agent_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(current_agent_anchor))?;
@@ -3579,7 +3592,7 @@ pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRot
     )?;
 
     let agent_rotation_anchor =
-        StringAnchor::new("agent_rotation", &input.new_agent_pubkey.to_string());
+        StringAnchor::new("agent_rotation", &rotation.new_agent_pubkey.to_string());
     let agent_rotation_anchor_hash =
         hash_entry(&EntryTypes::StringAnchor(agent_rotation_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(agent_rotation_anchor))?;
@@ -3592,13 +3605,10 @@ pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRot
 
     emit_signal(RecoveryV2Signal::KeyRotationCommitted {
         action_hash: action_hash.clone(),
-        rotation: rotation.clone(),
+        rotation,
     })?;
 
-    Ok(KeyRotationOutput {
-        action_hash,
-        rotation,
-    })
+    Ok(action_hash)
 }
 
 // =============================================================================

@@ -1,0 +1,23 @@
+[package]
+name = "did-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Integration & conformance tests for the DID bridge — registry routing, error metadata, did:key vectors, did:elohim assembly."
+publish = false
+
+[dependencies]
+did-types = { path = "../did-types" }
+# did-bridge with the web-resolver feature on, so integration tests can exercise
+# did:web URL derivation and the injected-fetch resolver.
+did-bridge = { path = "../did-bridge", features = ["web-resolver"] }
+# The mock store / fixture fetch in src/lib.rs implement the crate's async traits.
+async-trait = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+tokio = { workspace = true }
+# DID 1.1 conformance gate. default-features off keeps the HTTP/file $ref
+# resolvers (reqwest + rustls + aws-lc) out — the schema uses only local $refs.
+jsonschema = { version = "0.28", default-features = false }

@@ -18,8 +18,8 @@ use super::diesel_schema::{
     content_mastery, content_tags, contributor_dashboards, contributor_presences,
     custodian_metrics, custodian_shares, device_policies, discussions, economic_events,
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
-    human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
-    lens_selections, lens_verdicts, lenses, local_sessions, mishpat_commitments,
+    human_relationships, humans, identity_heads, imagodei_observations, key_rotations,
+    knowledge_maps, lens_selections, lens_verdicts, lenses, local_sessions, mishpat_commitments,
     mutuality_audit_log, node_stewardship, observation_diversity_summary, observation_entries,
     observation_sessions, observations, peer_blob_inventory, peer_identity_bindings,
     peer_inventory_cursor, placement_gaps, places, portal_hosts, precedents, premium_gates,
@@ -3687,6 +3687,65 @@ pub struct NewLens {
     pub rule_json: String,
     pub telos_json: String,
     pub version_parent: Option<String>,
+    pub revoked_at: Option<String>,
+    pub dht_anchor_hash: Option<String>,
+}
+
+// ============================================================================
+// IdentityHeadRow — identity_heads (identity-head-key-lineage, Wave C1)
+// Category A DHT projection. Source of truth: Holochain DHT (mishpat DNA
+// Commitment entry, action='binds-identity'). Populated from the create_commitment
+// post-commit signal. A NULL dht_anchor_hash means un-notarized — the did:elohim
+// head resolver fail-closes on it. `cid` = Commitment entry_hash; `head_key` = the
+// current head agent_cid (the did:elohim resolver's join key); `chain_root` = the
+// stable identity-chain identifier, unchanged across every rotation.
+// Spec: genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md.
+// ============================================================================
+
+/// Queryable row from the `identity_heads` table.
+///
+/// `controllers_json` is a JSON array of controller id strings;
+/// `controller_policy_json` is the `{kind, m?, n?}` policy object. Callers parse
+/// them before framing the `did:elohim` document's `controller` field.
+#[derive(Debug, Clone, Queryable, Identifiable, Selectable, Serialize)]
+#[diesel(table_name = identity_heads)]
+#[diesel(primary_key(cid))]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct IdentityHeadRow {
+    pub cid: String,
+    pub chain_root: String,
+    pub head_key: String,
+    pub controllers_json: String,
+    pub controller_policy_json: String,
+    /// The notarized caller-supplied signing time from the Commitment envelope —
+    /// the DHT-canonical, node-independent head-selection order key (`signed_at
+    /// DESC, cid ASC`). NOT `created_at` (local arrival). Empty only for a legacy
+    /// row that predates envelope stamping.
+    pub signed_at: String,
+    pub revoked_at: Option<String>,
+    /// Source of truth: DHT (Commitment entry in mishpat DNA). Classification: A.
+    /// NULL means un-notarized; the head resolver refuses to surface NULL rows.
+    pub dht_anchor_hash: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Insertable row for `identity_heads`.
+///
+/// `created_at`/`updated_at` are set explicitly in `upsert_with_anchor` via
+/// `current_timestamp()` (mirrors `lenses`/`mishpat_commitments`).
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = identity_heads)]
+pub struct NewIdentityHead {
+    pub cid: String,
+    pub chain_root: String,
+    pub head_key: String,
+    pub controllers_json: String,
+    pub controller_policy_json: String,
+    /// DHT-canonical head-order key — the notarized Commitment-envelope signing
+    /// time. Stamped by the signal handler from `commitment.signed_at`; a
+    /// payload-carried `signed_at` is a best-effort fallback at parse time.
+    pub signed_at: String,
     pub revoked_at: Option<String>,
     pub dht_anchor_hash: Option<String>,
 }

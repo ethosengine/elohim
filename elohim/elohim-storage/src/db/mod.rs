@@ -183,6 +183,13 @@ pub mod mishpat_commitments;
 // Plan: 2026-06-27-plural-mishpat-lenses-service-layer-plan.md (S2).
 pub mod lenses;
 
+// Identity-head projection — `binds-identity` Mishpat::Commitment cache (Category A
+// DHT projection). Source of truth: Holochain DHT (mishpat DNA Commitment entry,
+// action='binds-identity'). NULL dht_anchor_hash = un-notarized (the did:elohim head
+// resolver fail-closes). cid = entry_hash; head_key = current head agent_cid; chain_root
+// = stable identity-chain id. Wave C1 of the identity-head-key-lineage arc.
+pub mod identity_heads;
+
 // Lens-market C-class fold-input tables (lens_selections + lens_verdicts).
 // Operational (Category C): no dht_anchor_hash; affinity/contention computed on read.
 // Plan: 2026-06-27-plural-mishpat-lenses-service-layer-plan.md (S4).

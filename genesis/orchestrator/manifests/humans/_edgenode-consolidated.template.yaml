@@ -423,22 +423,37 @@ spec:
           # 2026-05-27: install_app timeout under CPU starvation (exit 1)
           # and SIGKILL from kubelet liveness misses (exit 137) on healthy
           # pods that just couldn't answer /health inside 1s during gossip.
+          # startupProbe (2026-07-16): post-restart / post-power-outage DHT
+          # resync can leave /health unresponsive for minutes even WITH CPU
+          # headroom (observed: eve SIGKILLed exit137/Error while using only
+          # ~1.1 of 3 cores). This grants a 10-min cold-start grace (40x15s)
+          # before liveness engages at all, so a slow-but-healthy conductor is
+          # not killed mid-resync. Liveness/readiness also loosened below
+          # (timeout 15->20s; liveness failureThreshold 5->10 ~= 5min).
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            periodSeconds: 15
+            timeoutSeconds: 15
+            failureThreshold: 40
+            successThreshold: 1
           readinessProbe:
             httpGet:
               path: /health
               port: 8090
             initialDelaySeconds: 120
             periodSeconds: 10
-            timeoutSeconds: 15
-            failureThreshold: 5
+            timeoutSeconds: 20
+            failureThreshold: 6
           livenessProbe:
             httpGet:
               path: /health
               port: 8090
             initialDelaySeconds: 180
             periodSeconds: 30
-            timeoutSeconds: 15
-            failureThreshold: 5
+            timeoutSeconds: 20
+            failureThreshold: 10
       volumes:
         # Shared volume for hApp (fetched by init container)
         - name: happ-volume

@@ -79,7 +79,10 @@ pub use federation::{
     handle_doorway_keys, handle_federation_doorways, handle_federation_p2p_peers,
 };
 pub use health::{health_check, readiness_check, startup_check, version_info};
-pub use identity::{handle_did_document, handle_did_endpoint, handle_identity_api_request};
+pub use identity::{
+    handle_did_document, handle_did_endpoint, handle_identity_api_request,
+    handle_universal_resolver,
+};
 pub use import::{handle_import_request, match_import_route};
 pub use import_ws::handle_import_progress_ws;
 pub use seed::{handle_check_blob, handle_seed_blob, BlobUploadResponse};

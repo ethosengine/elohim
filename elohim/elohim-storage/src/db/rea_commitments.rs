@@ -573,12 +573,20 @@ pub fn create_commitment(
 ) -> Result<ReaCommitment, StorageError> {
     let id = input.id.unwrap_or_else(|| Uuid::new_v4().to_string());
 
+    // Wave A re-point #5 (design §4.1): a commitment names an identity's
+    // chain-root cid, never a rotation-fragile raw key. A collective party is
+    // stored as its content-CID identity; a human party is routed through the
+    // (degenerate) identity_root_cid so the indirection is uniform. See
+    // `db::collectives::resolve_party_chain_root`.
+    let provider = crate::db::collectives::resolve_party_chain_root(conn, &input.provider)?;
+    let receiver = crate::db::collectives::resolve_party_chain_root(conn, &input.receiver)?;
+
     let new = NewReaCommitment {
         id: &id,
         h_app_id: &ctx.h_app_id,
         action: &input.action,
-        provider: &input.provider,
-        receiver: &input.receiver,
+        provider: &provider,
+        receiver: &receiver,
         resource_conforms_to: input.resource_conforms_to.as_deref(),
         resource_classified_as: input.resource_classified_as.as_deref(),
         resource_quantity_value: input.resource_quantity_value,
@@ -670,10 +678,17 @@ pub fn validate_supersession(
             predecessor.action, input.action
         )));
     }
-    if predecessor.provider != input.provider {
+    // Compare POST-resolution values on both sides: every write path now stores
+    // provider as the identity chain-root (Wave A re-point #5), so the stored
+    // predecessor.provider is a root while input.provider is still the raw party
+    // (a collective slug or agent key). Resolving the input before comparing
+    // keeps a re-grant against a collective party from spuriously failing this
+    // mismatch guard (predecessor stored as content-CID, input as slug).
+    let input_provider_root = crate::db::collectives::resolve_party_chain_root(conn, &input.provider)?;
+    if predecessor.provider != input_provider_root {
         return Err(StorageError::Validation(format!(
             "supersede provider mismatch: predecessor provider '{}' != successor provider '{}'",
-            predecessor.provider, input.provider
+            predecessor.provider, input_provider_root
         )));
     }
     if predecessor.in_scope_of.as_deref() != input.in_scope_of.as_deref() {
@@ -777,13 +792,19 @@ pub fn create_with_supersession(
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("mark-superseded failed: {e}")))?;
 
+        // Store the successor's parties as identity chain-roots (Wave A re-point
+        // #5), identical to the plain-create path — a collective party as its
+        // content-CID, a human party through identity_root_cid.
+        let provider = crate::db::collectives::resolve_party_chain_root(conn, &input.provider)?;
+        let receiver = crate::db::collectives::resolve_party_chain_root(conn, &input.receiver)?;
+
         // Insert the successor (state="proposed", like a plain create).
         let new = NewReaCommitment {
             id: &successor_id,
             h_app_id: &ctx.h_app_id,
             action: &input.action,
-            provider: &input.provider,
-            receiver: &input.receiver,
+            provider: &provider,
+            receiver: &receiver,
             resource_conforms_to: input.resource_conforms_to.as_deref(),
             resource_classified_as: input.resource_classified_as.as_deref(),
             resource_quantity_value: input.resource_quantity_value,
@@ -914,12 +935,21 @@ pub fn upsert_with_anchor(
             .map_err(|e| StorageError::Internal(format!("Update anchor failed: {}", e)))?;
         }
     } else {
+        // PRIMARY production path ("DHT is the truth, storage is the index"):
+        // this is the insert reached from the REA ProjectionSignal handler and
+        // the P2P projection reconciler. Store parties as identity chain-roots
+        // (Wave A re-point #5), identical to the plain-create path — a collective
+        // party as its content-CID, a human party through identity_root_cid. The
+        // reseed/anchor-update branches above preserve provider/receiver, so a
+        // row inserted here keeps its root on every subsequent anchor advance.
+        let provider = crate::db::collectives::resolve_party_chain_root(conn, &input.provider)?;
+        let receiver = crate::db::collectives::resolve_party_chain_root(conn, &input.receiver)?;
         let new = NewReaCommitment {
             id: &id,
             h_app_id: &ctx.h_app_id,
             action: &input.action,
-            provider: &input.provider,
-            receiver: &input.receiver,
+            provider: &provider,
+            receiver: &receiver,
             resource_conforms_to: input.resource_conforms_to.as_deref(),
             resource_classified_as: input.resource_classified_as.as_deref(),
             resource_quantity_value: input.resource_quantity_value,
@@ -2562,5 +2592,266 @@ mod operator_helper_tests {
             err.to_string().contains("trailing slash"),
             "unexpected error: {err}"
         );
+    }
+}
+
+// ============================================================================
+// Wave A #5 — REA party re-point onto the identity chain-root
+// ============================================================================
+
+#[cfg(test)]
+mod chain_root_repoint_tests {
+    use super::*;
+    use crate::db::collectives::{create_collective, CreateCollectiveInput};
+    use crate::db::context::AppContext;
+    use crate::db::diesel_schema::collectives;
+    use crate::identity_root::identity_root_cid;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    fn setup() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory DB");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    fn ctx() -> AppContext {
+        AppContext::new("lamad")
+    }
+
+    fn commit_input(provider: &str, receiver: &str) -> CreateReaCommitmentInput {
+        CreateReaCommitmentInput {
+            id: Some(format!("commit-{provider}-{receiver}")),
+            action: "custody-blob".into(),
+            provider: provider.into(),
+            receiver: receiver.into(),
+            ..Default::default()
+        }
+    }
+
+    /// A collective party's commitment stores the collective's content-CID
+    /// identity (its chain-root), not the raw slug — and the REA agent-join
+    /// resolves the row THROUGH that chain-root (design §4.1).
+    #[test]
+    fn collective_party_commitment_stores_and_joins_on_chain_root() {
+        let mut conn = setup();
+        let ctx = ctx();
+
+        // A collective reconciled to its DHT content-CID identity.
+        let collective_cid = "collective:uhCkkChurchCollectiveContentCid0001";
+        create_collective(
+            &mut conn,
+            &ctx,
+            &CreateCollectiveInput {
+                id: "collective-church".into(),
+                name: "Church Collective".into(),
+                description: None,
+                governance_layer: "community".into(),
+                constitutional_parent_id: None,
+                reach: "commons".into(),
+                region: None,
+                metadata_json: None,
+                created_by: None,
+            },
+        )
+        .expect("create collective");
+        diesel::update(collectives::table.filter(collectives::id.eq("collective-church")))
+            .set(collectives::collective_cid.eq(Some(collective_cid)))
+            .execute(&mut conn)
+            .expect("set collective_cid");
+
+        // A commitment whose provider is the collective SLUG.
+        let stored = create_commitment(&mut conn, &ctx, commit_input("collective-church", ""))
+            .expect("create commitment");
+
+        // Stored as the chain-root cid, NOT the slug.
+        assert_eq!(
+            stored.provider, collective_cid,
+            "collective party is stored as its content-CID chain-root, not the slug"
+        );
+        assert_ne!(stored.provider, "collective-church");
+
+        // The REA agent-join resolves the row through the chain-root...
+        let by_root = get_commitments_for_agent(&mut conn, &ctx, collective_cid, 10)
+            .expect("join by chain-root");
+        assert_eq!(by_root.len(), 1, "join resolves the commitment via chain-root");
+        // ...and NOT through the raw slug (the pre-Wave-A anchor).
+        let by_slug = get_commitments_for_agent(&mut conn, &ctx, "collective-church", 10)
+            .expect("join by slug");
+        assert!(
+            by_slug.is_empty(),
+            "the raw slug no longer anchors the row — the root does"
+        );
+    }
+
+    /// A collective not yet DHT-anchored (collective_cid NULL, pre-coherence)
+    /// degrades safely to the slug-derived root rather than dropping the party.
+    #[test]
+    fn uncohered_collective_degrades_to_slug_root() {
+        let mut conn = setup();
+        let ctx = ctx();
+        create_collective(
+            &mut conn,
+            &ctx,
+            &CreateCollectiveInput {
+                id: "collective-nascent".into(),
+                name: "Nascent".into(),
+                description: None,
+                governance_layer: "community".into(),
+                constitutional_parent_id: None,
+                reach: "commons".into(),
+                region: None,
+                metadata_json: None,
+                created_by: None,
+            },
+        )
+        .expect("create collective");
+
+        let stored = create_commitment(&mut conn, &ctx, commit_input("collective-nascent", ""))
+            .expect("create commitment");
+        assert_eq!(
+            stored.provider,
+            identity_root_cid("collective-nascent"),
+            "pre-coherence collective degrades to its slug-derived root, not NULL"
+        );
+    }
+
+    /// A human agent-key party routes through identity_root_cid uniformly. In the
+    /// degenerate Wave-A slice the value is unchanged (root == f(key), f = trim),
+    /// so no existing agent-join can regress — the seam is installed, inert today.
+    #[test]
+    fn human_party_routes_through_identity_root_unchanged() {
+        let mut conn = setup();
+        let ctx = ctx();
+        let agent = "uhCAkGrandmaExampleAgentPubKeyCidForRepoint";
+
+        let stored = create_commitment(&mut conn, &ctx, commit_input(agent, ""))
+            .expect("create commitment");
+        assert_eq!(stored.provider, identity_root_cid(agent));
+        assert_eq!(
+            stored.provider, agent,
+            "degenerate human root is value-preserving — no join regression"
+        );
+        assert_eq!(stored.receiver, "", "empty party stays empty, never invented");
+
+        // The join still resolves the human party (unchanged behavior).
+        let found = get_commitments_for_agent(&mut conn, &ctx, agent, 10).expect("join");
+        assert_eq!(found.len(), 1);
+    }
+
+    /// Seed a collective reconciled to its DHT content-CID identity; returns the
+    /// (slug, collective_cid) pair.
+    fn seed_cohered_collective(conn: &mut SqliteConnection, ctx: &AppContext) -> (String, String) {
+        let slug = "collective-church".to_string();
+        let cid = "collective:uhCkkChurchCollectiveContentCid0001".to_string();
+        create_collective(
+            conn,
+            ctx,
+            &CreateCollectiveInput {
+                id: slug.clone(),
+                name: "Church Collective".into(),
+                description: None,
+                governance_layer: "community".into(),
+                constitutional_parent_id: None,
+                reach: "commons".into(),
+                region: None,
+                metadata_json: None,
+                created_by: None,
+            },
+        )
+        .expect("create collective");
+        diesel::update(collectives::table.filter(collectives::id.eq(&slug)))
+            .set(collectives::collective_cid.eq(Some(cid.as_str())))
+            .execute(conn)
+            .expect("set collective_cid");
+        (slug, cid)
+    }
+
+    /// REGRESSION (the exact gap the Wave-A review found): the PRIMARY production
+    /// write path — `upsert_with_anchor`, reached from the DHT ProjectionSignal
+    /// handler and the P2P projection reconciler — must also store a collective
+    /// party as its chain-root, not the raw slug. Fails against the pre-fix code
+    /// (which wrote `input.provider` raw); passes once the insert branch routes
+    /// through `resolve_party_chain_root`.
+    #[test]
+    fn signal_projected_collective_commitment_stores_chain_root() {
+        let mut conn = setup();
+        let ctx = ctx();
+        let (slug, cid) = seed_cohered_collective(&mut conn, &ctx);
+
+        let stored = upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            commit_input(&slug, ""),
+            Some("uhCkkProjectionActionHash0001"),
+        )
+        .expect("upsert_with_anchor");
+
+        assert_eq!(
+            stored.provider, cid,
+            "the DHT-signal insert path stores the collective's content-CID chain-root, not the slug"
+        );
+        assert_ne!(stored.provider, slug);
+        // And the REA agent-join resolves the row through the chain-root.
+        let by_root =
+            get_commitments_for_agent(&mut conn, &ctx, &cid, 10).expect("join by chain-root");
+        assert_eq!(by_root.len(), 1);
+    }
+
+    /// The supersede/re-grant path stores the successor party as a chain-root AND
+    /// the provider-mismatch guard compares post-resolution values — so a re-grant
+    /// against a collective party (predecessor stored as content-CID, input as
+    /// raw slug) is admitted rather than spuriously rejected.
+    #[test]
+    fn supersession_against_collective_party_stores_root_and_passes_guard() {
+        let mut conn = setup();
+        let ctx = ctx();
+        let (slug, cid) = seed_cohered_collective(&mut conn, &ctx);
+
+        let scope = "doorway:alpha|epr:lamad".to_string();
+
+        // Predecessor authored via the plain-create path (provider → root).
+        let predecessor = create_commitment(
+            &mut conn,
+            &ctx,
+            CreateReaCommitmentInput {
+                id: Some("commit-pred".into()),
+                action: "provide".into(),
+                provider: slug.clone(),
+                receiver: String::new(),
+                in_scope_of: Some(scope.clone()),
+                ..Default::default()
+            },
+        )
+        .expect("create predecessor");
+        assert_eq!(predecessor.provider, cid, "predecessor stored as root");
+
+        // Re-grant: input carries the RAW slug, matching action + scope. The
+        // guard must resolve the input before comparing, or this fails.
+        let successor = create_with_supersession(
+            &mut conn,
+            &ctx,
+            CreateReaCommitmentInput {
+                id: Some("commit-succ".into()),
+                action: "provide".into(),
+                provider: slug.clone(),
+                receiver: String::new(),
+                in_scope_of: Some(scope),
+                supersedes: Some("commit-pred".into()),
+                ..Default::default()
+            },
+        )
+        .expect("supersession admitted for collective party");
+
+        assert_eq!(
+            successor.provider, cid,
+            "successor party is stored as the collective chain-root"
+        );
+        // Predecessor is now superseded (the ceremony ran end-to-end).
+        let pred_after = get_commitment(&mut conn, &ctx, "commit-pred")
+            .expect("get")
+            .expect("some");
+        assert_eq!(pred_after.state, SUPERSEDED_STATE);
     }
 }

@@ -1,0 +1,39 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "AgentDocPackage",
+  "metadata": {
+    "id": "superpowers-held-stop-marker",
+    "name": "superpowers-held-stop-marker",
+    "version": "1.0.0",
+    "description": "The held/ STOP marker gospel for the superpowers docs tree — the scope-reconcile-generated directory-governance surface that tells every agent (and the planner/runner scan) these docs are BLOCKED-BY-ENV: held because a requires_env capability is unavailable, correct-not-broken, and moved back automatically when the capability returns.",
+    "sourceRuntime": "claude",
+    "runtimeTargets": [
+      "claude"
+    ],
+    "docPath": "genesis/docs/superpowers/held/CLAUDE.md",
+    "gospelId": "superpowers-held-stop-marker",
+    "assetRefs": [],
+    "master": "package",
+    "composedBy": "claude-opus-4-8",
+    "governance": {
+      "eprRef": "epr:elohim-agent/agentdocs/superpowers-held-stop-marker",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "source": {
+    "language": "markdown",
+    "path": "genesis/docs/superpowers/held/CLAUDE.md",
+    "body": "---\nid: superpowers-held-stop-marker\nstatus: active\ncites:\n  - scope-tree-reconciler-design | the reconciler that files docs here when a requires_env cap is unavailable and git mv-s them back when it returns | sha256:5332b1422eb86eb2 | path: genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design.md\n  - placement | held/ is the BLOCKED-BY-ENV state in the placement contract — held, never regressed; partial availability is the steady state | sha256:95be31e6724bb9f5 | path: genesis/docs/PLACEMENT.md\n---\n\n# ⛔ STOP — held artifacts (require unavailable hardware)\n\nThe docs under this `held/` tree declare a `requires_env:` capability that is **not currently available**\n(see `genesis/manifests/cluster-state.yaml`). They are sequestered here, OUTSIDE the planner/runner scan\npath, so they don't false-fail or consume planning focus. This is **held, NOT deleted or regressed** —\npartial availability is the steady state.\n\n- Do NOT edit or \"fix\" these as if broken. They are correct; the hardware is absent.\n- Inbound `cites:` to these resolve as **HELD-CITE** (content-addressed; not dead) — do not delete the link.\n- They move back automatically when their capability returns: `scope-reconcile.py --apply`.\n\nManaged by `.claude/scripts/memory-kit/scope-reconcile.py`. The mover, not a human, files things here.\n"
+  },
+  "composition": "A generated directory-governance marker, not an authored design doc: scope-reconcile.py drops the STOP prose into every held/ zone via _ensure_stop (create-if-absent, so a tracked planted copy is never clobbered on the next --apply). Planting roots the marker's authority in this package so it commits through the superpowers/ [id,status,cites] born-frontmatter gate as a born-linked gospel surface instead of a frontmatter-less orphan that the deny-gate blocks. The two cite envelopes (scope-tree-reconciler-design = the mover's design; placement = the BLOCKED-BY-ENV contract) are the canonical governance sources; they stay cite-gen authored and are preserved byte-identical by the verbatim projector. FOLLOW-UP: teach scope-reconcile.py's STOP template to emit this same sealed frontmatter so freshly-created held zones are born-linked too.",
+  "projections": {
+    "claude": {
+      "path": "genesis/docs/superpowers/held/CLAUDE.md"
+    }
+  }
+}

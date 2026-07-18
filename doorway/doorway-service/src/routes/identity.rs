@@ -1,7 +1,15 @@
 //! DID document and identity endpoints
 //!
-//! Serves the doorway's W3C DID Document for federation discovery.
-//! See doorway/CLAUDE.md "Federation" for the live federation mechanisms.
+//! Serves the doorway's public DID resolution surfaces (DID bridge design §3.5):
+//!   - `GET /.well-known/did.json` — the doorway's own `did:web` document.
+//!   - `GET /1.0/identifiers/{did}` — universal-resolver-compatible resolution
+//!     (did:key locally/offline, did:elohim forwarded to storage, else
+//!     methodNotSupported).
+//!
+//! DID documents are assembled with the `did-types` / `did-bridge` crates
+//! (`bridges/did`) so the surfaces are standards-legible and schema-conformant —
+//! a *projection of substrate truth, never truth itself* (P1). See
+//! `genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md`.
 //!
 //! Also provides a transparent proxy to elohim-storage `/api/v1/identity/*`.
 
@@ -9,112 +17,37 @@ use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
 use hyper::{Method, Request, Response, StatusCode};
-use serde::Serialize;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use tracing::{debug, warn};
 
+use did_bridge::{assemble_did_key_document, DidResolutionError, DidResolutionResult};
+use did_types::{Context, Did, DidDocument, Service, ServiceEndpoint, DID_CONTEXT_V1_1};
+
 use crate::server::AppState;
 
-/// W3C DID Document structure
-/// See: https://www.w3.org/TR/did-core/
-#[derive(Serialize)]
-pub struct DIDDocument {
-    /// JSON-LD context
-    #[serde(rename = "@context")]
-    pub context: Vec<String>,
+// ─────────────────────────────────────────────────────────────────────────────
+// The doorway's own did:web document (GET /.well-known/did.json, /identity/did)
+// ─────────────────────────────────────────────────────────────────────────────
 
-    /// The DID that this document describes
-    pub id: String,
-
-    /// Verification methods (public keys)
-    #[serde(rename = "verificationMethod", skip_serializing_if = "Vec::is_empty")]
-    pub verification_method: Vec<VerificationMethod>,
-
-    /// Authentication verification method references
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub authentication: Vec<String>,
-
-    /// Assertion method references (for signing credentials)
-    #[serde(rename = "assertionMethod", skip_serializing_if = "Vec::is_empty")]
-    pub assertion_method: Vec<String>,
-
-    /// Service endpoints
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub service: Vec<Service>,
-
-    /// Elohim-specific: capabilities this doorway supports
-    #[serde(rename = "elohim:capabilities", skip_serializing_if = "Vec::is_empty")]
-    pub elohim_capabilities: Vec<String>,
-
-    /// Elohim-specific: geographic region for routing
-    #[serde(rename = "elohim:region", skip_serializing_if = "Option::is_none")]
-    pub elohim_region: Option<String>,
-
-    /// Elohim-specific: Holochain cell ID (if connected)
-    #[serde(
-        rename = "elohim:holochainCellId",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub elohim_holochain_cell_id: Option<String>,
-}
-
-/// Verification method (public key) in DID Document
-#[derive(Serialize)]
-pub struct VerificationMethod {
-    /// Full ID of this verification method
-    pub id: String,
-
-    /// Type of verification method
-    #[serde(rename = "type")]
-    pub method_type: String,
-
-    /// Controller of this key
-    pub controller: String,
-
-    /// Public key in multibase format
-    #[serde(rename = "publicKeyMultibase", skip_serializing_if = "Option::is_none")]
-    pub public_key_multibase: Option<String>,
-}
-
-/// Service endpoint in DID Document
-#[derive(Serialize)]
-pub struct Service {
-    /// Full ID of this service
-    pub id: String,
-
-    /// Type of service
-    #[serde(rename = "type")]
-    pub service_type: String,
-
-    /// Service endpoint URL
-    #[serde(rename = "serviceEndpoint")]
-    pub service_endpoint: String,
-}
-
-/// Derive the doorway's DID from its configuration
-fn derive_doorway_did(state: &AppState) -> String {
-    // If doorway_id is set, use it to construct did:web
+/// Derive the doorway's public host — the `<host>` in `did:web:<host>` — from
+/// its configuration, mirroring the precedence the doorway uses elsewhere:
+/// explicit `doorway_id`, else the domain of `doorway_url`, else a local-dev
+/// fallback.
+fn derive_doorway_host(state: &AppState) -> String {
     if let Some(ref doorway_id) = state.args.doorway_id {
-        // doorway_id is like "alpha-elohim-host" or "doorway-a.elohim.host"
-        // If it contains dots, it's already a domain; otherwise, convert dashes
+        // doorway_id is like "alpha-elohim-host" or "doorway-a.elohim.host".
+        // Dots ⇒ already a domain; otherwise convert dashes to dots.
         if doorway_id.contains('.') {
-            format!("did:web:{doorway_id}")
+            doorway_id.clone()
         } else {
-            // Convert "alpha-elohim-host" to "alpha.elohim.host"
-            let domain = doorway_id.replace('-', ".");
-            format!("did:web:{domain}")
+            doorway_id.replace('-', ".")
         }
     } else if let Some(ref doorway_url) = state.args.doorway_url {
-        // Extract domain from URL
-        if let Some(domain) = extract_domain(doorway_url) {
-            format!("did:web:{domain}")
-        } else {
-            // Fallback: use node_id as a local identifier
-            format!("did:web:localhost:doorway:{}", state.args.node_id)
-        }
+        extract_domain(doorway_url)
+            .unwrap_or_else(|| format!("localhost:doorway:{}", state.args.node_id))
     } else {
-        // Local development fallback
-        format!("did:web:localhost:doorway:{}", state.args.node_id)
+        format!("localhost:doorway:{}", state.args.node_id)
     }
 }
 
@@ -135,114 +68,54 @@ fn extract_domain(url: &str) -> Option<String> {
     }
 }
 
-/// Build the DID Document for this doorway
-fn build_did_document(state: &AppState) -> DIDDocument {
-    let did = derive_doorway_did(state);
-    let args = &state.args;
+/// Build the doorway's own `did:web` document.
+///
+/// Phase 1 (DID bridge §3.5) is a *minimal, honest* did:web document: no
+/// verification methods (the doorway holds no DID key — its federation-signing
+/// key is published separately as JWKS at `/.well-known/doorway-keys`, never
+/// fabricated here), and a single `DIDResolution` service advertising this
+/// doorway's universal-resolver endpoint. Assembled via the `did-types` DID 1.1
+/// model so the emitted document is standards-legible and validates against the
+/// W3C DID 1.1 conformance schema.
+fn build_did_web_document(host: &str) -> Result<DidDocument, DidResolutionError> {
+    let did = Did::parse(&format!("did:web:{host}"))
+        .map_err(|e| DidResolutionError::Internal(e.to_string()))?;
 
-    // Build service endpoints
-    let mut services = Vec::new();
-
-    // Blob storage endpoint
-    if let Some(ref storage_url) = args.storage_url {
-        services.push(Service {
-            id: format!("{did}#blobs"),
-            service_type: "ElohimBlobStore".to_string(),
-            service_endpoint: format!("{storage_url}/api/v1/blobs"),
-        });
-    } else if let Some(ref doorway_url) = args.doorway_url {
-        // If no separate storage, doorway serves blobs
-        services.push(Service {
-            id: format!("{did}#blobs"),
-            service_type: "ElohimBlobStore".to_string(),
-            service_endpoint: format!("{doorway_url}/store"),
-        });
-    }
-
-    // Holochain gateway endpoint
-    if let Some(ref doorway_url) = args.doorway_url {
-        // Convert https:// to wss://
-        let ws_url = doorway_url
-            .replace("https://", "wss://")
-            .replace("http://", "ws://");
-        services.push(Service {
-            id: format!("{did}#holochain"),
-            service_type: "HolochainGateway".to_string(),
-            service_endpoint: format!("{}/app/{}", ws_url, args.app_port_min),
-        });
-    }
-
-    // Human registry endpoint (if auth is configured)
-    if args.jwt_secret.is_some() {
-        if let Some(ref doorway_url) = args.doorway_url {
-            services.push(Service {
-                id: format!("{did}#humans"),
-                service_type: "ElohimHumanRegistry".to_string(),
-                service_endpoint: format!("{doorway_url}/auth"),
-            });
-        }
-    }
-
-    // Determine capabilities
-    let mut capabilities = vec!["gateway".to_string()];
-    if args.storage_url.is_some() {
-        capabilities.push("blob-storage".to_string());
-    }
-    if args.jwt_secret.is_some() {
-        capabilities.push("authentication".to_string());
-    }
-    if state.projection.is_some() {
-        capabilities.push("projection".to_string());
-    }
-
-    DIDDocument {
-        context: vec![
-            "https://www.w3.org/ns/did/v1".to_string(),
-            "https://w3id.org/security/suites/ed25519-2020/v1".to_string(),
-            "https://elohim-protocol.org/ns/v1".to_string(),
-        ],
-        id: did.clone(),
-        verification_method: vec![VerificationMethod {
-            id: format!("{did}#node-key"),
-            method_type: "Ed25519VerificationKey2020".to_string(),
-            controller: did.clone(),
-            public_key_multibase: state.node_verifying_key.as_ref().map(|key| {
-                // Multibase z-prefix (base58btc) with Ed25519 multicodec prefix 0xed01
-                let pub_bytes = key.to_bytes();
-                let mut prefixed = vec![0xed, 0x01];
-                prefixed.extend_from_slice(&pub_bytes);
-                format!("z{}", bs58::encode(&prefixed).into_string())
-            }),
-        }],
-        authentication: vec![format!("{}#node-key", did)],
-        assertion_method: vec![format!("{}#node-key", did)],
-        service: services,
-        elohim_capabilities: capabilities,
-        elohim_region: args.region.clone(),
-        elohim_holochain_cell_id: state
-            .zome_configs
-            .get("infrastructure")
-            .map(|entry| format!("{:?}", entry.value())),
-    }
+    let mut doc = DidDocument::new(Context::Single(DID_CONTEXT_V1_1.to_string()), did.clone());
+    doc.service = Some(vec![Service {
+        id: did.with_fragment("resolver"),
+        type_: "DIDResolution".to_string(),
+        service_endpoint: ServiceEndpoint::Uri(format!("https://{host}/1.0/identifiers/")),
+        extra: BTreeMap::new(),
+    }]);
+    // No verificationMethod set: legal and honest — an empty key set with
+    // services is a valid DID 1.1 document (§3.5).
+    Ok(doc)
 }
 
 /// Handle GET /.well-known/did.json
 ///
-/// Returns the doorway's W3C DID Document for federation discovery.
-/// This endpoint is public and does not require authentication.
+/// Returns the doorway's W3C `did:web` document for federation discovery.
+/// Public — no authentication required.
 pub fn handle_did_document(state: Arc<AppState>) -> Response<Full<Bytes>> {
-    let document = build_did_document(&state);
+    let host = derive_doorway_host(&state);
+    let document = match build_did_web_document(&host) {
+        Ok(doc) => doc,
+        Err(e) => {
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("Failed to build DID document: {e}"),
+            );
+        }
+    };
 
     let body = match serde_json::to_string_pretty(&document) {
         Ok(json) => json,
         Err(e) => {
-            return Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .header("Content-Type", "application/json")
-                .body(Full::new(Bytes::from(format!(
-                    r#"{{"error": "Failed to serialize DID document: {e}"}}"#
-                ))))
-                .unwrap();
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("Failed to serialize DID document: {e}"),
+            );
         }
     };
 
@@ -256,10 +129,211 @@ pub fn handle_did_document(state: Arc<AppState>) -> Response<Full<Bytes>> {
 
 /// Handle GET /identity/did (alternative endpoint)
 ///
-/// Same as /.well-known/did.json but at an explicit path.
+/// Same document as /.well-known/did.json but at an explicit path.
 pub fn handle_did_endpoint(state: Arc<AppState>) -> Response<Full<Bytes>> {
     handle_did_document(state)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Universal-resolver surface (GET /1.0/identifiers/{did})
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Handle `GET /1.0/identifiers/{did}` — universal-resolver-compatible DID
+/// resolution (DID bridge §3.5):
+///   - `did:key` resolves LOCALLY, fully offline (no I/O).
+///   - `did:elohim` forwards to the primary storage's `/db/identity/did/{did}`
+///     projection route.
+///   - `did:web` is NOT resolved here in this leg (egress policy undecided; the
+///     web-resolver feature stays off) — reported as `methodNotSupported`.
+///   - any other method → `methodNotSupported`.
+pub async fn handle_universal_resolver(
+    state: Arc<AppState>,
+    did_param: &str,
+    accept: Option<String>,
+) -> Response<Full<Bytes>> {
+    resolve_did_request(
+        state.args.storage_url.as_deref(),
+        did_param,
+        accept.as_deref(),
+    )
+    .await
+}
+
+/// Whether the client asked for the bare DID document (`application/did+json`)
+/// rather than the full resolution-result envelope. The `application/did+ld+json`
+/// media type is deliberately NOT matched here.
+fn wants_bare_document(accept: Option<&str>) -> bool {
+    accept
+        .map(|a| {
+            a.split(',')
+                .any(|part| part.trim().starts_with("application/did+json"))
+        })
+        .unwrap_or(false)
+}
+
+/// Render a resolution result as an HTTP response with content negotiation: on
+/// success, `Accept: application/did+json` yields the bare `didDocument`;
+/// otherwise the full `DidResolutionResult` envelope as `application/json`.
+fn render_resolution(
+    status: StatusCode,
+    result: &DidResolutionResult,
+    accept: Option<&str>,
+) -> Response<Full<Bytes>> {
+    if status.is_success() && wants_bare_document(accept) {
+        if let Some(doc) = &result.did_document {
+            let body = serde_json::to_string_pretty(doc).unwrap_or_else(|_| "{}".to_string());
+            return Response::builder()
+                .status(status)
+                .header("Content-Type", "application/did+json")
+                .body(Full::new(Bytes::from(body)))
+                .unwrap();
+        }
+    }
+
+    let body = serde_json::to_string_pretty(result).unwrap_or_else(|_| "{}".to_string());
+    Response::builder()
+        .status(status)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body)))
+        .unwrap()
+}
+
+/// Map a resolution error to its universal-resolver HTTP status. `invalidDid`
+/// is 400 and `methodNotSupported` is 501 per the DID bridge contract; storage
+/// failures surface as `internalError` (500) with a spec-shaped body — never a
+/// bare 502.
+fn error_status(err: &DidResolutionError) -> StatusCode {
+    match err {
+        DidResolutionError::InvalidDid(_) => StatusCode::BAD_REQUEST,
+        DidResolutionError::NotFound(_) => StatusCode::NOT_FOUND,
+        DidResolutionError::MethodNotSupported(_) => StatusCode::NOT_IMPLEMENTED,
+        DidResolutionError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn resolution_error(err: DidResolutionError, accept: Option<&str>) -> Response<Full<Bytes>> {
+    render_resolution(
+        error_status(&err),
+        &DidResolutionResult::from_error(&err),
+        accept,
+    )
+}
+
+/// Core dispatch — storage-URL-injectable so the did:elohim leg is unit-testable
+/// against a mock storage server.
+async fn resolve_did_request(
+    storage_url: Option<&str>,
+    did_param: &str,
+    accept: Option<&str>,
+) -> Response<Full<Bytes>> {
+    // The DID may arrive percent-encoded; decode leniently (plain DIDs, whose
+    // colons are legal path chars, pass through unchanged).
+    let decoded = urlencoding::decode(did_param)
+        .map(|c| c.into_owned())
+        .unwrap_or_else(|_| did_param.to_string());
+
+    let did = match Did::parse(&decoded) {
+        Ok(d) => d,
+        Err(e) => {
+            return resolution_error(DidResolutionError::InvalidDid(e.to_string()), accept);
+        }
+    };
+
+    match did.method() {
+        // did:key — resolve locally, fully offline.
+        "key" => match assemble_did_key_document(&did) {
+            Ok(doc) => {
+                render_resolution(StatusCode::OK, &DidResolutionResult::success(doc), accept)
+            }
+            Err(e) => resolution_error(e, accept),
+        },
+        // did:elohim — forward to the primary storage's projection route.
+        "elohim" => resolve_elohim_via_storage(storage_url, &did, accept).await,
+        // did:web and everything else are not resolved at the doorway in this leg.
+        other => resolution_error(
+            DidResolutionError::MethodNotSupported(other.to_string()),
+            accept,
+        ),
+    }
+}
+
+/// Forward a `did:elohim` resolution to the primary storage's
+/// `GET /db/identity/did/{did}` route (the manifest-declared identity
+/// projection) and pass through its `DidResolutionResult`. A storage-unavailable
+/// condition maps to a spec-shaped `internalError`, never a bare 502.
+async fn resolve_elohim_via_storage(
+    storage_url: Option<&str>,
+    did: &Did,
+    accept: Option<&str>,
+) -> Response<Full<Bytes>> {
+    let storage_url = match storage_url {
+        Some(u) => u,
+        None => {
+            warn!("did:elohim resolution requested but STORAGE_URL not configured");
+            return resolution_error(
+                DidResolutionError::Internal("storage service not configured".to_string()),
+                accept,
+            );
+        }
+    };
+
+    let url = format!(
+        "{}/db/identity/did/{}",
+        storage_url.trim_end_matches('/'),
+        did.as_string()
+    );
+    debug!(url = %url, "Forwarding did:elohim resolution to storage");
+
+    let client = reqwest::Client::new();
+    let response = match client.get(&url).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            warn!(error = %e, "did:elohim storage forward failed");
+            return resolution_error(
+                DidResolutionError::Internal(format!("storage unavailable: {e}")),
+                accept,
+            );
+        }
+    };
+
+    let status =
+        StatusCode::from_u16(response.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    let raw = match response.bytes().await {
+        Ok(b) => b,
+        Err(e) => {
+            warn!(error = %e, "did:elohim storage response body read failed");
+            return resolution_error(
+                DidResolutionError::Internal(format!("storage response unreadable: {e}")),
+                accept,
+            );
+        }
+    };
+
+    // Re-frame the storage DidResolutionResult so the doorway applies the same
+    // content negotiation as the local paths. If storage returned something we
+    // can't parse, pass the body through unchanged as application/json.
+    match serde_json::from_slice::<DidResolutionResult>(&raw) {
+        Ok(result) => render_resolution(status, &result, accept),
+        Err(_) => Response::builder()
+            .status(status)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from(raw.to_vec())))
+            .unwrap(),
+    }
+}
+
+/// Small JSON error helper for the did:web document handlers.
+fn json_error(status: StatusCode, msg: &str) -> Response<Full<Bytes>> {
+    Response::builder()
+        .status(status)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(format!(r#"{{"error": "{msg}"}}"#))))
+        .unwrap()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Transparent proxy to elohim-storage /api/v1/identity/*
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// Transparent proxy to elohim-storage `/api/v1/identity/*`
 ///
@@ -400,6 +474,13 @@ fn identity_service_unavailable(msg: &str) -> Response<Full<Bytes>> {
 mod tests {
     use super::*;
 
+    async fn read_body(resp: Response<Full<Bytes>>) -> String {
+        let collected = resp.into_body().collect().await.unwrap().to_bytes();
+        String::from_utf8(collected.to_vec()).unwrap()
+    }
+
+    const DID_KEY_FIXTURE: &str = "did:key:z6MkuWzukKSaEVxe76gbFYrnW7jUUftksarjkrjUwKdEp8Lr";
+
     #[test]
     fn test_extract_domain() {
         assert_eq!(
@@ -441,5 +522,148 @@ mod tests {
         let path = "/api/v1/identity/abc-123";
         let url = format!("{}{}", base.trim_end_matches('/'), path);
         assert_eq!(url, "http://localhost:8090/api/v1/identity/abc-123");
+    }
+
+    // ── did:web document (GET /.well-known/did.json) ──────────────────────────
+
+    #[test]
+    fn did_web_document_has_resolver_service_and_no_keys() {
+        let doc = build_did_web_document("alpha.elohim.host").unwrap();
+        assert_eq!(doc.id.as_string(), "did:web:alpha.elohim.host");
+        // Honest: the doorway holds no DID key, so no verification methods.
+        assert!(doc.verification_method.is_none());
+        let services = doc.service.as_ref().expect("service set present");
+        assert_eq!(services.len(), 1);
+        assert_eq!(services[0].type_, "DIDResolution");
+        match &services[0].service_endpoint {
+            ServiceEndpoint::Uri(u) => {
+                assert_eq!(u, "https://alpha.elohim.host/1.0/identifiers/");
+            }
+            _ => panic!("expected a single-URI service endpoint"),
+        }
+    }
+
+    #[test]
+    fn did_web_document_validates_against_did11_schema() {
+        // The hand-derived W3C DID 1.1 conformance schema (bridges/did).
+        // CARGO_MANIFEST_DIR is doorway/doorway-service; ../../bridges/did/... is
+        // the repo path. The edge check stage COPYs bridges/did/schemas to
+        // /bridges/did/schemas so this include_str! resolves there too
+        // (CARGO_MANIFEST_DIR=/app in the container).
+        const SCHEMA: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../bridges/did/schemas/did-document-1.1.schema.json"
+        ));
+        let schema: serde_json::Value = serde_json::from_str(SCHEMA).unwrap();
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        let doc = build_did_web_document("alpha.elohim.host").unwrap();
+        let instance = serde_json::to_value(&doc).unwrap();
+        let errors: Vec<String> = validator
+            .iter_errors(&instance)
+            .map(|e| format!("{} (at {})", e, e.instance_path))
+            .collect();
+        assert!(
+            errors.is_empty(),
+            "did:web document failed DID 1.1 schema:\n{}\ninstance: {}",
+            errors.join("\n"),
+            serde_json::to_string_pretty(&instance).unwrap()
+        );
+    }
+
+    // ── Universal resolver (GET /1.0/identifiers/{did}) ───────────────────────
+
+    #[tokio::test]
+    async fn universal_resolver_did_key_resolves_offline() {
+        let resp = resolve_did_request(None, DID_KEY_FIXTURE, None).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let result: DidResolutionResult = serde_json::from_str(&read_body(resp).await).unwrap();
+        let doc = result.did_document.expect("did:key resolves to a document");
+        assert_eq!(doc.id.as_string(), DID_KEY_FIXTURE);
+        assert_eq!(
+            result.did_resolution_metadata.content_type.as_deref(),
+            Some("application/did+ld+json")
+        );
+    }
+
+    #[tokio::test]
+    async fn universal_resolver_accept_did_json_returns_bare_document() {
+        let resp = resolve_did_request(None, DID_KEY_FIXTURE, Some("application/did+json")).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers().get("Content-Type").unwrap(),
+            "application/did+json"
+        );
+        // Body is the bare document, not the resolution-result envelope.
+        let doc: DidDocument = serde_json::from_str(&read_body(resp).await).unwrap();
+        assert_eq!(doc.id.method(), "key");
+    }
+
+    #[tokio::test]
+    async fn universal_resolver_invalid_did_is_400_invalid_did() {
+        let resp = resolve_did_request(None, "not-a-did", None).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let result: DidResolutionResult = serde_json::from_str(&read_body(resp).await).unwrap();
+        assert_eq!(
+            result.did_resolution_metadata.error.as_deref(),
+            Some("invalidDid")
+        );
+        assert!(result.did_document.is_none());
+    }
+
+    #[tokio::test]
+    async fn universal_resolver_did_web_is_501_method_not_supported() {
+        // did:web is deliberately not resolved at the doorway in this leg.
+        let resp = resolve_did_request(None, "did:web:example.com", None).await;
+        assert_eq!(resp.status(), StatusCode::NOT_IMPLEMENTED);
+        let result: DidResolutionResult = serde_json::from_str(&read_body(resp).await).unwrap();
+        assert_eq!(
+            result.did_resolution_metadata.error.as_deref(),
+            Some("methodNotSupported")
+        );
+    }
+
+    #[tokio::test]
+    async fn universal_resolver_unknown_method_is_501() {
+        let resp = resolve_did_request(None, "did:plc:z72i7hd", None).await;
+        assert_eq!(resp.status(), StatusCode::NOT_IMPLEMENTED);
+    }
+
+    #[tokio::test]
+    async fn universal_resolver_did_elohim_forwards_to_storage() {
+        use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        let did = "did:elohim:uhCAkabcdef";
+        let storage_body = serde_json::json!({
+            "didDocument": {
+                "@context": "https://www.w3.org/ns/did/v1.1",
+                "id": did
+            },
+            "didResolutionMetadata": { "contentType": "application/did+ld+json" },
+            "didDocumentMetadata": {}
+        });
+        Mock::given(matchers::method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(storage_body))
+            .mount(&server)
+            .await;
+
+        let resp = resolve_did_request(Some(&server.uri()), did, None).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let result: DidResolutionResult = serde_json::from_str(&read_body(resp).await).unwrap();
+        assert_eq!(result.did_document.unwrap().id.as_string(), did);
+    }
+
+    #[tokio::test]
+    async fn universal_resolver_did_elohim_storage_unavailable_is_internal_error() {
+        // Point at an unroutable storage URL so the forward fails at connect;
+        // the doorway must map that to a spec-shaped internalError, not a bare 502.
+        let resp =
+            resolve_did_request(Some("http://127.0.0.1:1"), "did:elohim:uhCAkabcdef", None).await;
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let result: DidResolutionResult = serde_json::from_str(&read_body(resp).await).unwrap();
+        assert_eq!(
+            result.did_resolution_metadata.error.as_deref(),
+            Some("internalError")
+        );
     }
 }

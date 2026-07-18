@@ -26,7 +26,7 @@
           "governance": {
             "defaultReach": "community",
             "minimumReach": "self",
-            "governanceModel": "self-sovereign",
+            "governanceModel": "steward-consent",
             "signalTypes": ["identity-created", "presence-established", "agency-progressed"]
           },
           "claims": [

@@ -1762,6 +1762,27 @@ diesel::table! {
     }
 }
 
+// Identity-head projection — `binds-identity` Mishpat::Commitment cache (Category A
+// DHT projection). Source of truth: Holochain DHT (mishpat DNA Commitment entry,
+// action='binds-identity'). NULL dht_anchor_hash = un-notarized (the did:elohim head
+// resolver fail-closes). `cid` = Commitment entry_hash; `head_key` = current head
+// (the agent_cid); `chain_root` = stable identity-chain id.
+// Migration: 2026-07-17-120000_identity_heads
+diesel::table! {
+    identity_heads (cid) {
+        cid -> Text,
+        chain_root -> Text,
+        head_key -> Text,
+        controllers_json -> Text,
+        controller_policy_json -> Text,
+        signed_at -> Text,
+        revoked_at -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
 // Lens-market C-class fold-input tables (Category C operational; no dht_anchor_hash
 // by design — affinity/contention are computed on read, spec §4.4). Hold the fold
 // INPUTS (selections, verdicts); outputs are recomputed per request.
