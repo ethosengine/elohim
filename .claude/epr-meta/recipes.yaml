@@ -1,0 +1,67 @@
+# Recipe registry — ValueFlows ProcessSpecifications for repo-projected flows.
+# Spec: genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md (§4, §5).
+#
+# Two planes per the policy-registry pattern (2026-07-02):
+#   - RECIPE SEMANTICS (stages: name/artifactKind + edges) — mint the ProcessSpec atom;
+#     `paths:` are EXCLUDED from the hashed atom.
+#   - BINDING/PLACEMENT (`paths:` globs, repo-relative) — where each stage's artifacts
+#     live in THIS repository. Graduates to per-directory `.epr-meta` flow bindings;
+#     kept centralized here in v1 so the live compose-gate manifests stay untouched.
+#
+# Edges with `meaningful: true` are the economically meaningful joints — events are
+# expected at these crossings. Which edges are meaningful is a governance decision
+# (adapt per scope), never a constant in the crates.
+
+version: 1
+recipes:
+  - id: elohim-dev-pipeline
+    version: 1
+    description: >
+      The developer value chain: manifesto → epic → architecture seed → spec → plan →
+      gap-item intents → a2o scenario → validation in the running system. The dogfood
+      instance whose walking designs the real-world EPR process modeling.
+    stages:
+      - name: manifesto
+        artifactKind: "doc:manifesto"
+        paths:
+          - "genesis/docs/content/elohim-protocol/manifesto.md"
+          - "genesis/docs/content/elohim-protocol/constitution.md"
+      - name: epic
+        artifactKind: "doc:epic"
+        paths:
+          - "genesis/docs/content/elohim-protocol/*/epic.md"
+      - name: architecture-seed
+        artifactKind: "doc:architecture"
+        paths:
+          - "genesis/docs/content/elohim-protocol/architecture/*.md"
+          - "genesis/docs/architecture/*.md"
+      - name: spec
+        artifactKind: "doc:spec"
+        paths:
+          - "genesis/docs/superpowers/specs/*.md"
+      - name: plan
+        artifactKind: "doc:plan"
+        paths:
+          - "genesis/docs/superpowers/plans/*.md"
+          - "genesis/docs/plans/*.md"
+      - name: intent
+        artifactKind: "gap-item"
+        paths:
+          - ".claude/memory-kit/gap-items/*.json"
+      - name: scenario
+        artifactKind: "a2o:feature"
+        paths:
+          - "genesis/a2o/features/**/*.feature"
+      - name: validation
+        artifactKind: "a2o:verdict"
+        paths:
+          - "genesis/a2o/reports/**"
+    edges:
+      - { from: manifesto, to: epic, meaningful: false, validators: [] }
+      - { from: epic, to: spec, meaningful: true, validators: [cite-seal] }
+      - { from: architecture-seed, to: spec, meaningful: false, validators: [] }
+      - { from: spec, to: plan, meaningful: true, validators: [cite-seal] }
+      - { from: spec, to: intent, meaningful: true, validators: [decompose] }
+      - { from: plan, to: intent, meaningful: true, validators: [decompose] }
+      - { from: spec, to: scenario, meaningful: true, validators: [a2o-parse] }
+      - { from: scenario, to: validation, meaningful: true, validators: [a2o-run] }

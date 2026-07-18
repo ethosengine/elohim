@@ -20,8 +20,12 @@ path = "src/main.rs"
 eprfs-core = { path = "../eprfs-core" }
 eprfs-host = { path = "../eprfs-host" }
 eprfs-meta = { path = "../eprfs-meta" }
+elohim-epr-rea = { path = "../../epr-rea" }
+cid = "0.11"
+glob = "0.3"
 serde.workspace = true
 serde_json.workspace = true
+serde_yaml.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
