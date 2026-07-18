@@ -395,6 +395,7 @@ fn sample_content(id: &str, title: &str) -> Content {
         server_blob_hash: None,
         crdt_converged_at: None,
         declared_head_action_hash: None,
+        declared_head_at: None,
     }
 }
 

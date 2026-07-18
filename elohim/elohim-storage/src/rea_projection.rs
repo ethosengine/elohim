@@ -728,12 +728,17 @@ pub fn handle_rea_signal(
             // Own-conductor-witnessed HEAD declaration → verified stamp on the
             // EXISTING row only (no insert: a HEAD declaration for a row this
             // node never seeded is a no-op here). No value patch — the HEAD
-            // declaration carries only the action, not content fields.
+            // declaration carries only the action, not content fields. The DNA
+            // signal carries no declaration Timestamp: `declared_at = None`
+            // NULLs the stored ordering when this moves the head, so a later
+            // heal cannot misorder against a timestamp left over from a prior
+            // declaration (the next declare/propagation stamp restores it).
             let stamped = content_diesel::stamp_declared_head(
                 &mut conn,
                 ctx,
                 &content_id,
                 head_action_hash.as_str(),
+                None,
                 None,
             )?;
             if !stamped {

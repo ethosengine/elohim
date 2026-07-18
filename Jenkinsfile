@@ -326,7 +326,12 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
             // fails the build.
             for (int j = 0; j < doorwayEprUrls.size(); j++) {
                 if (j == i) { continue }
-                withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", 'DECLARE_ONLY=1', "SOURCE_DOORWAY_URL=${doorwayEprUrl}"]) {
+                // DECLARE_MAX_ATTEMPTS=24 (~36min worst-case): cross-conductor
+                // retrievability lands 18-50min post-author on the live pair —
+                // the default 12-attempt ladder (~18min) misses the tail. One
+                // successful declare records ordering on the peer, after which
+                // the monotonic heal converges it automatically each sweep.
+                withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", 'DECLARE_ONLY=1', 'DECLARE_MAX_ATTEMPTS=24', "SOURCE_DOORWAY_URL=${doorwayEprUrl}"]) {
                     sh(returnStatus: true,
                        script: "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '-' '${bundle.slug}' '${doorwayEprUrls[j]}' '${kind}'")
                 }

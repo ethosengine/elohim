@@ -287,6 +287,79 @@ mod fold_tests {
             hubs.len() as i32,
         );
     }
+
+    /// Slice-0 PROOF-GATE (Wave 1.1) — the HONEST-DARK companion to the
+    /// populated gate above. Over the EMPTY holder-relation the live card
+    /// actually sees (`shard_locations` unpopulated — the plan's corrections
+    /// #1/#3: the card is dark because the table is empty, NOT because of a
+    /// join-namespace bug), the folds return honest zero: no fabricated
+    /// stewards, no phantom hub buckets, no theatrical region split. This pins
+    /// the sprint plan's central thesis — the dark resilience card is a
+    /// data-writer gap, never a lying fold — as an executable assertion, and
+    /// proves the folds never invent distribution the relation does not contain
+    /// (a declared trust surface owes "no fake verdict", including no fake
+    /// non-zero).
+    #[test]
+    fn empty_relation_folds_honestly_dark_no_theater() {
+        let empty: Vec<HolderRow> = vec![];
+
+        // stewardingCollectives is honestly 0 — an honest "no observation",
+        // the exact live dark-card condition, not a fabricated verdict.
+        assert!(
+            stewarding_hubs(&empty).is_empty(),
+            "empty relation fabricates no stewards"
+        );
+
+        // no intra-hub peers invented.
+        assert!(
+            intra_hub_peers(&empty).is_empty(),
+            "empty relation → no phantom hub buckets"
+        );
+
+        // every region bucket is zero, viewer present or absent — the card
+        // shows "no region data" honestly, never a fabricated split.
+        for viewer in [None, Some("us-west")] {
+            let d = regional_distribution(&empty, viewer);
+            assert_eq!(
+                d.local + d.regional + d.global + d.unknown,
+                0,
+                "empty relation → all region buckets zero (viewer={viewer:?})"
+            );
+        }
+    }
+
+    /// Slice-0 PROOF-GATE (Wave 1.1) — honest UNDER-report boundary. A
+    /// single-holder relation (one distinct hub, even with duplicate agent
+    /// rows) lights `stewardingCollectives = 1` EXACTLY — never rounded up
+    /// toward a tier floor — so the folds cannot over-claim protection the
+    /// relation does not evidence. The complement of the populated (>1) gate:
+    /// together they bracket the honesty boundary from both sides (0 stays 0,
+    /// 1 stays 1, N counts distinctly).
+    #[test]
+    fn single_holder_relation_reports_exactly_one_no_overclaim() {
+        let rel = vec![
+            row(Some("household-dowell"), "matthew", Some("us-west")),
+            // duplicate agent row — must collapse, not inflate the count.
+            row(Some("household-dowell"), "matthew", Some("us-west")),
+        ];
+
+        let hubs = stewarding_hubs(&rel);
+        assert_eq!(hubs.len(), 1, "one distinct hub, never inflated");
+
+        assert_eq!(
+            intra_hub_peers(&rel).get("household-dowell"),
+            Some(&1),
+            "one distinct agent, duplicate collapsed"
+        );
+
+        let d = regional_distribution(&rel, Some("us-west"));
+        assert_eq!(d.local, 1, "the single in-region hub");
+        assert_eq!(
+            d.regional + d.global + d.unknown,
+            0,
+            "no bucket beyond the one real holder"
+        );
+    }
 }
 
 #[cfg(test)]

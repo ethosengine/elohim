@@ -57,6 +57,22 @@ relays + mongo bus); TURN is the one leg outsourced.
 - Measure: the per-deploy declare-propagation probe stays green across ×2
   fresh edge builds after the swap.
 
+## Escalation 2026-07-12 (evening): the third-party relay is DEAD — this item
+## is now the SOLE blocker for notary-authority scenario 2
+
+Loki evidence from tonight's declare window: `openrelay.metered.ca` →
+216.39.253.123 is unreachable from BOTH networks — `no route to host` (shem)
+and `connection timed out` (matthew home). The 2026-07-11 iceServers cure is
+therefore STUN-only in practice; adam↔matthew pairing is an ICE lottery (won
+once at edge #1187 ~05:40Z, lost every attempt all evening — app #1615's
+36-minute declare ladder exhausted on `not retrievable`, and matthew's
+kitsune2 logged `could not send publish ops: tx5 send error … timed out`).
+Everything above the relay is DONE: monotonic-heal guard (no more backward
+moves — adam held stable-stale all day), resilient 503-retrying declare
+ladder (DECLARE_MAX_ATTEMPTS=24 on the propagation leg), and one landed
+declare permanently unlocks heal-driven self-convergence. Priority: this is
+the next operator move on the scenario-2 arc.
+
 ## Update 2026-07-13 — the diagnostic relay is confirmed GLOBALLY DEAD; cure authored, deploy-ready
 
 **New evidence (why this is now urgent, not merely a hardening chore).** The

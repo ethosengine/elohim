@@ -42,15 +42,24 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
         echo "  ⚠ DECLARE_ONLY: could not resolve headActionHash from ${SRC}/db/content/${SLUG}/head — skipping propagation to ${DOORWAY_EPR_URL}" >&2
         exit 0
     fi
-    # Retry ladder for DHT publish lag: a head authored SECONDS ago is
-    # legitimately not-yet-retrievable on the remote conductor (its ops are
-    # still publishing/gossiping). Retry ONLY the "not retrievable" refusal —
-    # any other error is structural and retrying it just burns build time.
-    # 8 attempts spaced 90s ≈ 12 min: the one directly-observed cross-conductor
-    # adoption landed ~10 min post-author (app #1605 → 20:40:35Z), so the
-    # ladder must outlast the real publish window, not the hoped-for one.
+    # Retry ladder for DHT publish lag AND peer backpressure. Two retryable
+    # classes, everything else is structural (retrying just burns build time):
+    #   - "not retrievable" refusal — a head authored SECONDS ago is
+    #     legitimately not-yet-retrievable on the remote conductor (ops still
+    #     publishing/gossiping). 90s cadence: the one directly-observed
+    #     cross-conductor adoption landed ~10 min post-author (app #1605 →
+    #     20:40:35Z), so the ladder must outlast the real publish window.
+    #   - HTTP 503/429 — the peer's admission layer sheds writes while its
+    #     reconcile drain holds the write pool ({"status":"catching-up"}).
+    #     Backpressure clears in seconds-to-minutes, NOT structural: app #1612
+    #     aborted here at attempt 3/8 and elohim.host kept the superseded head
+    #     for the whole day. 30s cadence.
+    # DECLARE_MAX_ATTEMPTS: cross-conductor retrievability today lands anywhere
+    # in an 18-50min window post-author (edge #1187 adopted ~50min post-author;
+    # app #1614's 18min ladder missed). The Jenkinsfile propagation leg sets a
+    # higher ceiling; 12 stays the default for other callers.
     attempt=0
-    max_attempts=8
+    max_attempts="${DECLARE_MAX_ATTEMPTS:-12}"
     while :; do
         attempt=$((attempt + 1))
         declare_raw=$(curl -sS -o - -w '\n%{http_code}' -X POST \
@@ -66,6 +75,15 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
         case "${declare_status}" in
             2??)
                 echo "  ✓ canonical head propagated to ${DOORWAY_EPR_URL}: ${head_hash} (staging tier, attempt ${attempt})"
+                break
+                ;;
+            503|429)
+                if [ "${attempt}" -lt "${max_attempts}" ]; then
+                    echo "  … DECLARE_ONLY attempt ${attempt}/${max_attempts}: ${DOORWAY_EPR_URL} shedding writes (HTTP ${declare_status}: ${declare_body}) — retrying in 30s" >&2
+                    sleep 30
+                    continue
+                fi
+                echo "  ⚠ DECLARE_ONLY: ${DOORWAY_EPR_URL} still shedding after ${attempt} attempts (HTTP ${declare_status}: ${declare_body}) — peer keeps its own head until gossip/heal converges" >&2
                 break
                 ;;
             *)

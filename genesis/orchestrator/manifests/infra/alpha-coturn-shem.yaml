@@ -186,6 +186,8 @@ spec:
             - "--once"
             - "--sink"
             - "coturn"
+            - "--sink"
+            - "cloudflare"
             - "--record-name"
             - "turn-shem.elohim.host"
             - "--cf-zone"
@@ -194,8 +196,18 @@ spec:
             - "/base/turnserver.conf"
             - "--coturn-out-conf"
             - "/etc/coturn-run/turnserver.conf"
-            - "--state-dir"
-            - "/var/lib/relay-addr-beacon"
+            - "--state-file"
+            - "/var/lib/relay-addr-beacon/state.json"
+          env:
+            # The one-shot DNS sync at pod start needs the CF token too — without it
+            # (and without the cloudflare sink above) beacon-init published only the
+            # coturn sink, persisted state, and the sidecar then skipped cloudflare
+            # forever ("no change since last publish") → permanent NXDOMAIN.
+            - name: CF_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: relay-addr-beacon-cloudflare
+                  key: token
           volumeMounts:
             - name: coturn-base
               mountPath: /base
@@ -244,9 +256,14 @@ spec:
               cpu: 500m
               memory: 256Mi
           securityContext:
-            allowPrivilegeEscalation: false
+            # turnserver in coturn/coturn images carries file capabilities; exec of a
+            # file-caps binary under allowPrivilegeEscalation=false fails EPERM
+            # ("turnserver: Operation not permitted", observed at restart #19).
+            # Escalation stays bounded: drop ALL, add only NET_BIND_SERVICE.
+            allowPrivilegeEscalation: true
             capabilities:
               drop: ["ALL"]
+              add: ["NET_BIND_SERVICE"]
         # Long-running sidecar: re-checks the public WAN IP every 30s, keeps
         # Cloudflare DNS + the live turnserver.conf in sync, and restarts
         # coturn in-place (shareProcessNamespace) when the IP actually changes.
@@ -268,8 +285,8 @@ spec:
             - "/base/turnserver.conf"
             - "--coturn-out-conf"
             - "/etc/coturn-run/turnserver.conf"
-            - "--state-dir"
-            - "/var/lib/relay-addr-beacon"
+            - "--state-file"
+            - "/var/lib/relay-addr-beacon/state.json"
             # coturn has no config-reload signal for external-ip; the sidecar
             # shares the pod's process namespace (shareProcessNamespace: true
             # above), so SIGTERM-ing the turnserver process is enough — the

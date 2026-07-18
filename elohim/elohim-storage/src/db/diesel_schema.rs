@@ -87,6 +87,7 @@ diesel::table! {
         server_blob_hash -> Nullable<Text>,
         crdt_converged_at -> Nullable<Text>,
         declared_head_action_hash -> Nullable<Text>,
+        declared_head_at -> Nullable<BigInt>,
     }
 }
 

@@ -949,6 +949,20 @@ async fn heal_content(
                     tracker.mark_completed(&id);
                     tracing::info!(content_id = %id, "projection-reconcile[content]: row already declared — heal left it to the canonical channels");
                 }
+                Ok(crate::db::content_diesel::StampOutcome::SkippedStale) => {
+                    // The conductor's CANONICAL answer is not provably newer
+                    // than the declared head this row already adopted — a
+                    // conductor that has not yet integrated the newer canonical
+                    // link answers with the OLD canonical record, and stamping
+                    // it would move the head BACKWARDS (the 2026-07-12
+                    // regression: converged at edge #1187's seam-smoke, healed
+                    // back to the superseded head by #1188). Completed, not
+                    // failed: retrying yields the same stale answer until the
+                    // conductor integrates the newer link, at which point the
+                    // next sweep's answer becomes provably newer and stamps.
+                    tracker.mark_completed(&id);
+                    tracing::info!(content_id = %id, "projection-reconcile[content]: conductor canonical answer not provably newer — heal kept the adopted head");
+                }
                 Ok(crate::db::content_diesel::StampOutcome::NoRow) => {
                     // Row vanished between presence check and stamp (rare race).
                     // Nothing to stamp — resolved, not a conductor miss.
@@ -1006,13 +1020,18 @@ fn heal_content_one(
         .get()
         .map_err(|e| crate::error::StorageError::Internal(format!("pool: {e}")))?;
     // Canonical-aware stamp mode: a CANONICAL answer (the conductor verified
-    // the cross-root canonical record) is a legitimate forward adoption and
-    // stamps in Declare mode — this is exactly how a peer converges when the
-    // canonical link gossips in between deploys. A FALLBACK answer (cold
-    // conductor, root-author election) may only FILL an undeclared row —
-    // never resurrect a superseded head over an adopted canonical one.
+    // the cross-root canonical record) may fill an undeclared row, refresh the
+    // same head, or MOVE a declared row FORWARD (provably newer declared_at) —
+    // this is exactly how a peer converges when the canonical link gossips in
+    // between deploys. It must NOT move a declared row otherwise: a conductor
+    // that has not yet integrated a newer canonical link answers with the OLD
+    // canonical record — canonical, yet stale — and an unconditional Declare
+    // stamp moved the head BACKWARDS (live regression 2026-07-12,
+    // elohim-host-landing). A FALLBACK answer (cold conductor, root-author
+    // election) may only FILL an undeclared row — never resurrect a
+    // superseded head over an adopted canonical one.
     let mode = if head.canonical {
-        crate::db::content_diesel::StampMode::Declare
+        crate::db::content_diesel::StampMode::HealCanonical
     } else {
         crate::db::content_diesel::StampMode::GapFill
     };
@@ -1021,6 +1040,7 @@ fn heal_content_one(
         app_ctx,
         &c.id,
         head.head_action_hash.as_str(),
+        Some(head.declared_at),
         Some(patch),
         mode,
     )

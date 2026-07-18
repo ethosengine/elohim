@@ -20,7 +20,7 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { scanCidArtifacts } from '../cid-artifact';
+import { scanCidArtifacts } from '../cid-artifact.js';
 
 // Tests run from genesis/seeder; artifacts + sources live one level up under genesis/.
 const CONTENT_DIR = resolve(process.cwd(), '../data/lamad/content');

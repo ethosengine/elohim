@@ -1,0 +1,21 @@
+-- Add declared_head_at to content — the zome Timestamp (i64 microseconds since the Unix
+-- epoch) of the declaration act that produced declared_head_action_hash. This is the
+-- ORDERING key that makes heal-channel head stamps monotonic.
+--
+-- Why it exists (live regression 2026-07-12): the projection-reconcile heal stamps its own
+-- conductor's canonical answer in Declare mode ("forward adoption"). But a conductor that
+-- has not yet integrated a NEWER cross-root canonical link answers with the OLD canonical
+-- record — canonical=true, yet STALE — and the heal legally moved the declared head
+-- BACKWARDS (elohim-host-landing: converged on uhCkko_… at edge #1187's seam-smoke, healed
+-- back to uhCkkwLFE… by #1188; re-stamped 11:26:49Z). Same resurrection class the
+-- StampMode::GapFill guard closed for FALLBACK answers, one level up.
+--
+-- With this column, a heal-channel stamp may MOVE an already-declared row only when its
+-- answer's declared_at is provably NEWER than the stored one. NULL = ordering unknown
+-- (pre-migration rows, or a head advanced by a channel that carries no zome timestamp):
+-- heal may FILL such a row but never MOVE it — deliberate canonical channels (declare
+-- route, deploy propagation, own-conductor signal) remain the movers.
+--
+-- Source of truth: DHT (projection of the declaration act's Timestamp).
+-- Classification: A (projection of notary-declared HEAD ordering).
+ALTER TABLE content ADD COLUMN declared_head_at BIGINT;
