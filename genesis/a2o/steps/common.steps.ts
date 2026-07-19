@@ -266,7 +266,9 @@ Before(function (this: E2EWorld, scenario) {
   const tags = scenario.pickle.tags.map(t => t.name);
   if (tags.includes('@wip')) {
     // eslint-disable-next-line no-console
-    console.log(`  ⏭️  HELD (@wip): "${scenario.pickle.name}" — steps not yet wired; skipped, not failed.`);
+    console.log(
+      `  ⏭️  HELD (@wip): "${scenario.pickle.name}" — steps not yet wired; skipped, not failed.`
+    );
     return 'skipped';
   }
   return undefined;

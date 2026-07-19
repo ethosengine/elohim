@@ -2,6 +2,8 @@ import { Component, OnInit, ElementRef, ViewEncapsulation } from '@angular/core'
 
 // @coverage: 100.0% (2026-02-24)
 
+import { eprToUniversalHref } from '@elohim/service';
+
 import { DomInteractionService } from '../../services/dom-interaction.service';
 
 @Component({
@@ -14,6 +16,9 @@ import { DomInteractionService } from '../../services/dom-interaction.service';
 export class HeroComponent implements OnInit {
   isVideoVisible = false;
   isDeepDiveVisible = false;
+
+  /** Minted universal EPR address for the flagship protocol content (→ /epr/elohim-protocol). */
+  readonly protocolHref = eprToUniversalHref({ id: 'elohim-protocol', tier: 'head' });
 
   constructor(
     private readonly el: ElementRef,

@@ -22,6 +22,10 @@ export class LearningSuccessComponent {
   /** The prominent first door — the onboarding path that opens with the manifesto. */
   readonly startHere: EprRelationship = { type: 'START', target: 'elohim-protocol' };
 
+  /** Cross-bundle mount links into the lamad SPA — plain hrefs, not minted content links. */
+  readonly libraryHref = '/lamad'; // route-literal-ok: cross-bundle mount link, not a minted content link
+  readonly exploreHref = '/lamad/explore'; // route-literal-ok: cross-bundle mount link, not a minted content link
+
   /** Alternate doors for visitors who want to self-route. */
   readonly otherWays: WayIn[] = [
     {

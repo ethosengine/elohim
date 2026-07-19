@@ -33,9 +33,11 @@
 
     <p>
       Rather wander?
-      <a href="/lamad" data-testid="landing-wayin-browse">Browse everything in the library</a>
+      <a [href]="libraryHref" data-testid="landing-wayin-browse">
+        Browse everything in the library
+      </a>
       , or
-      <a href="/lamad/explore">explore the map</a>
+      <a [href]="exploreHref">explore the map</a>
       .
     </p>
   </div>
