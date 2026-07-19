@@ -11,7 +11,7 @@
 
 use bson::doc;
 use http_body_util::{BodyExt, Full};
-use hyper::body::{Bytes, Incoming};
+use hyper::body::{Body, Bytes, Incoming};
 use hyper::{Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -19,6 +19,7 @@ use tracing::{info, warn};
 
 use crate::conductor::AgentProvisioner;
 use crate::db::schemas::{UserDoc, USER_COLLECTION};
+use crate::routes::admin_users::require_admin;
 use crate::server::AppState;
 
 /// Summary of a conductor in the pool
@@ -74,7 +75,13 @@ pub struct AgentConductorResponse {
 }
 
 /// Handle GET /admin/conductors
-pub async fn handle_list_conductors(state: Arc<AppState>) -> Response<Full<Bytes>> {
+pub async fn handle_list_conductors<B>(
+    req: &Request<B>,
+    state: Arc<AppState>,
+) -> Response<Full<Bytes>> {
+    if let Err(resp) = require_admin(req, &state).await {
+        return resp;
+    }
     let Some(ref registry) = state.conductor_registry else {
         return json_response(
             StatusCode::OK,
@@ -119,10 +126,14 @@ pub async fn handle_list_conductors(state: Arc<AppState>) -> Response<Full<Bytes
 }
 
 /// Handle GET /admin/conductors/{id}/agents
-pub async fn handle_conductor_agents(
+pub async fn handle_conductor_agents<B>(
+    req: &Request<B>,
     state: Arc<AppState>,
     conductor_id: &str,
 ) -> Response<Full<Bytes>> {
+    if let Err(resp) = require_admin(req, &state).await {
+        return resp;
+    }
     let Some(ref registry) = state.conductor_registry else {
         return json_response(
             StatusCode::NOT_FOUND,
@@ -151,10 +162,14 @@ pub async fn handle_conductor_agents(
 }
 
 /// Handle GET /admin/agents/{agent_pub_key}/conductor
-pub async fn handle_agent_conductor(
+pub async fn handle_agent_conductor<B>(
+    req: &Request<B>,
     state: Arc<AppState>,
     agent_pub_key: &str,
 ) -> Response<Full<Bytes>> {
+    if let Err(resp) = require_admin(req, &state).await {
+        return resp;
+    }
     let Some(ref registry) = state.conductor_registry else {
         return json_response(
             StatusCode::NOT_FOUND,
@@ -198,10 +213,18 @@ fn default_h_app_id() -> String {
 }
 
 /// Handle POST /admin/conductors/assign — manual agent→conductor assignment
-pub async fn handle_assign_agent(
-    req: Request<Incoming>,
-    state: Arc<AppState>,
-) -> Response<Full<Bytes>> {
+///
+/// Body-generic so the admin gate is unit-testable; the gate runs (and can
+/// reject with 401/403) BEFORE the request body is ever consumed.
+pub async fn handle_assign_agent<B>(req: Request<B>, state: Arc<AppState>) -> Response<Full<Bytes>>
+where
+    B: Body<Data = Bytes>,
+    B::Error: std::fmt::Display,
+{
+    if let Err(resp) = require_admin(&req, &state).await {
+        return resp;
+    }
+
     let Some(ref registry) = state.conductor_registry else {
         return json_response(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -804,5 +827,112 @@ fn json_response<T: Serialize>(status: StatusCode, body: T) -> Response<Full<Byt
             .status(StatusCode::INTERNAL_SERVER_ERROR)
             .body(Full::new(Bytes::from("Failed to serialize response")))
             .unwrap(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Authorization gate on the conductor-pool admin endpoints.
+    //!
+    //! Regression coverage for the auth bypass caught by
+    //! `genesis/a2o/features/deployment/conductor-visibility.feature:35`
+    //! ("Non-admin cannot access conductor pool"): these handlers previously
+    //! ran with NO admin gate. Every handler now calls the shared
+    //! `require_admin` gate from `admin_users` at the very top.
+    use super::*;
+    use crate::auth::{JwtValidator, PermissionLevel, TokenInput};
+    use crate::config::Args;
+    use clap::Parser;
+    use http_body_util::Empty;
+
+    /// dev_mode ON so `require_admin` validates tokens against
+    /// `JwtValidator::new_dev()` (a fixed dev secret) without a configured
+    /// jwt_secret. dev_mode does NOT bypass the gate — `require_admin` always
+    /// demands a valid Admin-level token. There is no conductor_registry in this
+    /// state, so a request that PASSES the gate falls through to the
+    /// empty/unavailable-registry response (200 for list, 503 for assign) —
+    /// never 403.
+    fn test_state() -> Arc<AppState> {
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.dev_mode = true;
+        Arc::new(AppState::new(args))
+    }
+
+    fn mint(level: PermissionLevel) -> String {
+        JwtValidator::new_dev()
+            .generate_token(TokenInput {
+                human_id: "human-1".into(),
+                agent_pub_key: "uhCAk-test".into(),
+                identifier: "test@example.com".into(),
+                permission_level: level,
+                session_id: None,
+                doorway_id: None,
+                doorway_url: None,
+                conductor_id: None,
+                installed_app_id: None,
+                is_steward: false,
+                has_local_conductor: false,
+            })
+            .unwrap()
+    }
+
+    fn req(token: Option<&str>) -> Request<Empty<Bytes>> {
+        let mut b = Request::builder().uri("/admin/conductors");
+        if let Some(t) = token {
+            b = b.header(hyper::header::AUTHORIZATION, format!("Bearer {t}"));
+        }
+        b.body(Empty::<Bytes>::new()).unwrap()
+    }
+
+    // ---- GET /admin/conductors ----
+
+    #[tokio::test]
+    async fn list_conductors_no_token_is_401() {
+        let resp = handle_list_conductors(&req(None), test_state()).await;
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn list_conductors_non_admin_is_403() {
+        let token = mint(PermissionLevel::Authenticated);
+        let resp = handle_list_conductors(&req(Some(&token)), test_state()).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn list_conductors_admin_is_not_403() {
+        let token = mint(PermissionLevel::Admin);
+        let resp = handle_list_conductors(&req(Some(&token)), test_state()).await;
+        assert_ne!(resp.status(), StatusCode::FORBIDDEN);
+        assert_ne!(resp.status(), StatusCode::UNAUTHORIZED);
+        // No conductor registry in the test state ⇒ empty-registry 200.
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    // ---- POST /admin/conductors/assign (the mutation — most important) ----
+
+    #[tokio::test]
+    async fn assign_agent_no_token_is_401() {
+        let resp = handle_assign_agent(req(None), test_state()).await;
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn assign_agent_non_admin_is_403() {
+        let token = mint(PermissionLevel::Authenticated);
+        let resp = handle_assign_agent(req(Some(&token)), test_state()).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn assign_agent_admin_passes_gate() {
+        let token = mint(PermissionLevel::Admin);
+        let resp = handle_assign_agent(req(Some(&token)), test_state()).await;
+        // Admin clears the gate; with no registry in test state the handler
+        // returns 503 SERVICE_UNAVAILABLE — the point is it is NOT rejected as
+        // 401/403 by the auth gate.
+        assert_ne!(resp.status(), StatusCode::FORBIDDEN);
+        assert_ne!(resp.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 }

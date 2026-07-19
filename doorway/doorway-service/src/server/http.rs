@@ -4216,7 +4216,7 @@ async fn handle_request(
 
         // Conductor pool visibility (available on ALL instances)
         (Method::GET, "/admin/conductors") => {
-            to_boxed(routes::handle_list_conductors(Arc::clone(&state)).await)
+            to_boxed(routes::handle_list_conductors(&req, Arc::clone(&state)).await)
         }
 
         // Route registry visibility — which routes are live and from which source
@@ -4246,7 +4246,7 @@ async fn handle_request(
                 .strip_prefix("/admin/conductors/")
                 .and_then(|s| s.strip_suffix("/agents"))
                 .unwrap_or("");
-            to_boxed(routes::handle_conductor_agents(Arc::clone(&state), conductor_id).await)
+            to_boxed(routes::handle_conductor_agents(&req, Arc::clone(&state), conductor_id).await)
         }
 
         // Manual agent→conductor assignment
@@ -4341,7 +4341,7 @@ async fn handle_request(
                 .strip_prefix("/admin/agents/")
                 .and_then(|s| s.strip_suffix("/conductor"))
                 .unwrap_or("");
-            to_boxed(routes::handle_agent_conductor(Arc::clone(&state), agent_key).await)
+            to_boxed(routes::handle_agent_conductor(&req, Arc::clone(&state), agent_key).await)
         }
 
         // List all nodes with detailed resource and social metrics

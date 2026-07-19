@@ -544,7 +544,7 @@ fn error_response(status: StatusCode, error: &str, code: Option<&str>) -> Respon
 // Auth Helpers
 // =============================================================================
 
-fn get_auth_header(req: &Request<Incoming>) -> Option<&str> {
+fn get_auth_header<B>(req: &Request<B>) -> Option<&str> {
     req.headers()
         .get(hyper::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
@@ -573,9 +573,15 @@ fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<FullBody
     }
 }
 
-/// Validate admin access from request
-async fn require_admin(
-    req: &Request<Incoming>,
+/// Validate admin access from request.
+///
+/// Generic over the body type `B` because only request headers are inspected —
+/// a rejected (401/403) request must never have its body consumed. `pub(crate)`
+/// and body-generic so sibling admin surfaces (e.g. `admin_conductors`) reuse
+/// this one gate rather than duplicating the auth logic, and can unit-test it
+/// with any body type. See conductor-visibility.feature:35.
+pub(crate) async fn require_admin<B>(
+    req: &Request<B>,
     state: &AppState,
 ) -> Result<Claims, Response<FullBody>> {
     let auth_header = get_auth_header(req);
