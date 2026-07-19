@@ -2426,19 +2426,17 @@ const EPR_DISPATCH_TIMEOUT_SECS: u64 = 10;
 
 /// Fast-fail response for `dispatch_to_projected_epr` when either (a) the
 /// per-upstream circuit breaker is already open for `storage_url`, or (b) a
-/// dispatch's connect/timeout fails outright. Mirrors
-/// `storage_proxy::catching_up_proxy_response`'s status/body/header shape
-/// (503 + `Retry-After` + `{"status":"catching-up","retryAfter":N}`) — that
-/// helper is private to `storage_proxy.rs`, so this is a local mirror rather
-/// than a shared import. Pure (no IO): the seam this fix's unit test exercises.
-fn epr_dispatch_shed_response(retry_after_secs: u64) -> Response<Full<Bytes>> {
-    let body = serde_json::json!({ "status": "catching-up", "retryAfter": retry_after_secs });
-    Response::builder()
-        .status(StatusCode::SERVICE_UNAVAILABLE)
-        .header("content-type", "application/json")
-        .header("Retry-After", retry_after_secs.to_string())
-        .body(Full::new(Bytes::from(body.to_string())))
-        .expect("infallible 503 response")
+/// dispatch's connect/timeout fails outright. Delegates to the shared
+/// content-negotiated shed responder (`routes::catching_up::shed_response`):
+/// browser navigations get the staged recovery page, everything else keeps
+/// the legacy `{"status":"catching-up","retryAfter":N}` JSON. Pure (no IO):
+/// the seam the unit tests exercise.
+fn epr_dispatch_shed_response(
+    wants_html: bool,
+    retry_after_secs: u64,
+    cause: routes::catching_up::ShedCause,
+) -> Response<Full<Bytes>> {
+    routes::catching_up::shed_response(wants_html, retry_after_secs, cause)
 }
 
 /// Dispatch a request to a projected EPR (B13).
@@ -2465,6 +2463,7 @@ async fn dispatch_to_projected_epr(
     request_path: &str,
     projection: elohim_views::projection::EprProjectionView,
     chrome_context_json: &str,
+    wants_html: bool,
 ) -> Response<Full<Bytes>> {
     use elohim_views::projection::ProjectionMode;
 
@@ -2568,7 +2567,9 @@ async fn dispatch_to_projected_epr(
         );
         crate::metrics::inc_breaker_open();
         return epr_dispatch_shed_response(
+            wants_html,
             crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+            routes::catching_up::upstream_cause(&state.upstream_breakers, &storage_url),
         );
     }
 
@@ -2667,7 +2668,9 @@ async fn dispatch_to_projected_epr(
             );
             state.upstream_breakers.record(&storage_url, false);
             epr_dispatch_shed_response(
+                wants_html,
                 crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+                routes::catching_up::upstream_cause(&state.upstream_breakers, &storage_url),
             )
         }
     }
@@ -2689,9 +2692,17 @@ mod epr_dispatch_breaker_tests {
     // fix returns on both the breaker-open shed and the connect/timeout-error
     // paths, plus the tightened timeout constant.
 
+    fn test_cause() -> routes::catching_up::ShedCause {
+        routes::catching_up::ShedCause::Upstream {
+            endpoint: "http://storage:8090".to_string(),
+            circuit: "open".to_string(),
+            error_streak: 3,
+        }
+    }
+
     #[tokio::test]
     async fn shed_response_is_503_with_retry_after_and_catching_up_body() {
-        let resp = epr_dispatch_shed_response(30);
+        let resp = epr_dispatch_shed_response(false, 30, test_cause());
         assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(
             resp.headers()
@@ -2716,7 +2727,7 @@ mod epr_dispatch_breaker_tests {
         // Distinct from the default test above: proves the value isn't
         // hardcoded — a caller-supplied cooldown (e.g. an upstream Retry-After
         // in a future extension) round-trips into both the header and body.
-        let resp = epr_dispatch_shed_response(7);
+        let resp = epr_dispatch_shed_response(false, 7, test_cause());
         assert_eq!(
             resp.headers()
                 .get("Retry-After")
@@ -2828,12 +2839,13 @@ async fn dispatch_epr_universal(
     state: &AppState,
     original_path: &str,
     chrome_context_json: &str,
+    wants_html: bool,
 ) -> Response<Full<Bytes>> {
     match epr_universal_root(&state.epr_router) {
         Some(root) => {
             tracing::debug!(path = %original_path,
                 "universal /epr address — serving shell (root projection bundle)");
-            dispatch_to_projected_epr(state, "/", root, chrome_context_json).await
+            dispatch_to_projected_epr(state, "/", root, chrome_context_json, wants_html).await
         }
         None => {
             tracing::debug!(path = %original_path,
@@ -3176,6 +3188,8 @@ async fn ssr_fallback_response(
     fallback: SsrFallback,
     reason: SsrFallbackReason,
 ) -> Response<Full<Bytes>> {
+    // Negotiated before `req` is consumed by the proxy/dispatch arms below.
+    let wants_html = routes::catching_up::accepts_html(req.headers());
     match fallback {
         SsrFallback::Registry => match reason {
             SsrFallbackReason::AuthModeUnsupported
@@ -3214,8 +3228,14 @@ async fn ssr_fallback_response(
             // spliced INSIDE dispatch_to_projected_epr (never double-spliced —
             // the SSR-serve inject path is a disjoint branch that never runs on
             // any request that reaches here). Tag for observability.
-            let resp =
-                dispatch_to_projected_epr(state, path, *projection, chrome_context_json).await;
+            let resp = dispatch_to_projected_epr(
+                state,
+                path,
+                *projection,
+                chrome_context_json,
+                wants_html,
+            )
+            .await;
             with_ssr_skipped_header(resp, &reason)
         }
     }
@@ -3813,6 +3833,7 @@ async fn handle_request(
                 );
                 crate::metrics::inc_admission_shed();
                 return Ok(to_boxed(catching_up_response(
+                    routes::catching_up::accepts_html(req.headers()),
                     DOORWAY_ADMISSION_RETRY_AFTER_SECS,
                 )));
             }
@@ -3934,8 +3955,16 @@ async fn handle_request(
             // 302s, and the catch-all. Build the omnibar context once so the HTML
             // serve carries the trust surface.
             let chrome_context_json = build_chrome_context_json(&path, &req);
+            let wants_html = routes::catching_up::accepts_html(req.headers());
             return Ok(to_boxed(
-                dispatch_to_projected_epr(&state, &path, projection, &chrome_context_json).await,
+                dispatch_to_projected_epr(
+                    &state,
+                    &path,
+                    projection,
+                    &chrome_context_json,
+                    wants_html,
+                )
+                .await,
             ));
         }
     }
@@ -4631,8 +4660,9 @@ async fn handle_request(
         // Universal EPR address (§12.1): /epr/{id} → root bundle (shell epr/:id route).
         (Method::GET, p) if p == "/epr" || p.starts_with("/epr/") => {
             let chrome_context_json = build_chrome_context_json(p, &req);
+            let wants_html = routes::catching_up::accepts_html(req.headers());
             return Ok(to_boxed(
-                dispatch_epr_universal(&state, p, &chrome_context_json).await,
+                dispatch_epr_universal(&state, p, &chrome_context_json, wants_html).await,
             ));
         }
 
@@ -5449,19 +5479,16 @@ fn admission_exempt(path: &str, is_upgrade: bool) -> bool {
     )
 }
 
-/// Propagated-backpressure shed response: 503 + Retry-After + a structured
-/// `{status:"catching-up", retryAfter:N}` body. Never a bare drop/hang/502.
-fn catching_up_response(retry_after_secs: u64) -> Response<Full<Bytes>> {
-    let body = serde_json::json!({
-        "status": "catching-up",
-        "retryAfter": retry_after_secs,
-    });
-    Response::builder()
-        .status(StatusCode::SERVICE_UNAVAILABLE)
-        .header("Content-Type", "application/json")
-        .header("Retry-After", retry_after_secs.to_string())
-        .body(Full::new(Bytes::from(body.to_string())))
-        .unwrap()
+/// Propagated-backpressure shed response for the inbound admission gate:
+/// 503 + Retry-After, content-negotiated (browser navigations get the staged
+/// recovery page; everything else the structured
+/// `{status:"catching-up", retryAfter:N}` JSON). Never a bare drop/hang/502.
+fn catching_up_response(wants_html: bool, retry_after_secs: u64) -> Response<Full<Bytes>> {
+    routes::catching_up::shed_response(
+        wants_html,
+        retry_after_secs,
+        routes::catching_up::ShedCause::Admission,
+    )
 }
 
 // ─── Membrane policy stage ────────────────────────────────────────────────────
@@ -6813,10 +6840,27 @@ mod admission_tests {
 
     #[test]
     fn catching_up_is_503_with_retry_after_and_body() {
-        let resp = catching_up_response(2);
+        let resp = catching_up_response(false, 2);
         assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(resp.headers().get("Retry-After").unwrap(), "2");
-        assert!(resp.headers().get("Content-Type").is_some());
+        assert_eq!(
+            resp.headers().get("Content-Type").unwrap(),
+            "application/json"
+        );
+    }
+
+    #[test]
+    fn catching_up_html_variant_for_browser_navigations() {
+        let resp = catching_up_response(true, 2);
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(resp.headers().get("Retry-After").unwrap(), "2");
+        assert!(resp
+            .headers()
+            .get("Content-Type")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("text/html"));
     }
 
     #[test]

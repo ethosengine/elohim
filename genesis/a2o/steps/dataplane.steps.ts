@@ -769,6 +769,30 @@ Then('the surface response status is {int}', function (this: E2EWorld, expectedS
 });
 
 /**
+ * Assert the last queried surface was NOT answered with the doorway's own
+ * catching-up shed body (503 + {"status":"catching-up"}). Diagnostic probe
+ * routes bypass the upstream breaker (doorway-catching-up-page spec §4):
+ * during an upstream incident they must return the upstream's real response
+ * or its real failure — never the doorway's shed. Healthy substrate →
+ * trivially green; incident → pins the self-blinding fix.
+ */
+Then('the surface response is not the doorway shed body', function (this: E2EWorld) {
+  const capture = lastCapture.get(this);
+  assert.ok(capture, 'No surface response captured — run "When I query" first');
+  const body = capture.body;
+  const isShedBody =
+    capture.status === 503 &&
+    typeof body === 'object' &&
+    body !== null &&
+    (body as Record<string, unknown>).status === 'catching-up';
+  assert.ok(
+    !isShedBody,
+    `Surface "${capture.path}" on ${capture.peerName} was breaker-shed by the doorway ` +
+      '(503 catching-up) — diagnostic probes must bypass the breaker'
+  );
+});
+
+/**
  * Assert that the last queried surface response body contains a specific key with a truthy value.
  */
 Then('the surface response has field {string}', function (this: E2EWorld, fieldName: string) {

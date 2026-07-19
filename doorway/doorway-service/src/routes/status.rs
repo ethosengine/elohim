@@ -261,6 +261,33 @@ pub struct StatusResponse {
     /// Federated peer doorways (web2-projection layer) — always measurable.
     #[serde(rename = "federatedPeers")]
     pub federated_peers: usize,
+    /// Per-upstream circuit-breaker snapshots (Cat C operational — feeds the
+    /// catching-up page's recovery poll; read-only, never admits a trial).
+    pub upstreams: Vec<UpstreamStatus>,
+    /// Inbound admission gate state (ceiling, headroom, shed count).
+    pub admission: AdmissionStatus,
+}
+
+/// One upstream's breaker state for `/status.json` (feeds the catching-up
+/// page's recovery poll — see `routes::catching_up`).
+#[derive(Debug, Serialize)]
+pub struct UpstreamStatus {
+    pub endpoint: String,
+    /// "closed" | "half-open" | "open"
+    pub circuit: String,
+    #[serde(rename = "errorStreak")]
+    pub error_streak: u32,
+    pub skipped: bool,
+}
+
+/// Inbound admission gate state for `/status.json`.
+#[derive(Debug, Serialize)]
+pub struct AdmissionStatus {
+    #[serde(rename = "maxInflight")]
+    pub max_inflight: usize,
+    pub available: usize,
+    #[serde(rename = "shedTotal")]
+    pub shed_total: u64,
 }
 
 // =============================================================================
@@ -669,6 +696,26 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
     // Capture before `federation` is moved into the struct below.
     let federated_peers = federation.peer_count;
 
+    // Cat C operational: breaker + admission snapshots for the catching-up
+    // page's recovery poll (same accessors as /admin/self-healing; snapshot()
+    // is read-only and never admits a half-open trial by observation).
+    let upstreams = state
+        .upstream_breakers
+        .snapshot()
+        .into_iter()
+        .map(|b| UpstreamStatus {
+            endpoint: b.endpoint,
+            circuit: b.circuit.to_string(),
+            error_streak: b.error_streak,
+            skipped: b.skipped,
+        })
+        .collect();
+    let admission = AdmissionStatus {
+        max_inflight: crate::metrics::inbound_max() as usize,
+        available: state.inbound_semaphore.available_permits(),
+        shed_total: crate::metrics::admission_shed_total(),
+    };
+
     StatusResponse {
         service: "doorway",
         version: env!("CARGO_PKG_VERSION"),
@@ -692,6 +739,8 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
         // The doorway's projection of substrate content — always measurable here.
         content_available: Some(projection_documents),
         federated_peers,
+        upstreams,
+        admission,
     }
 }
 
@@ -1253,6 +1302,17 @@ mod tests {
             humans_served: Some(42),
             content_available: Some(1234),
             federated_peers: 1,
+            upstreams: vec![UpstreamStatus {
+                endpoint: "http://localhost:8090".to_string(),
+                circuit: "closed".to_string(),
+                error_streak: 0,
+                skipped: false,
+            }],
+            admission: AdmissionStatus {
+                max_inflight: 256,
+                available: 256,
+                shed_total: 0,
+            },
             compute: elohim_compute::ComputeReport {
                 service_id: "doorway".to_string(),
                 build: elohim_compute::BuildInfo {

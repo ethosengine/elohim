@@ -66,16 +66,21 @@ impl ProxyOutcome {
     }
 }
 
-/// Proxy-side catching-up shed (mirrors server::http::catching_up_response but
-/// returns Response<Full<Bytes>> for the forwarder return type).
-fn catching_up_proxy_response(retry_after_secs: u64) -> Response<Full<Bytes>> {
-    let body = serde_json::json!({ "status": "catching-up", "retryAfter": retry_after_secs });
-    Response::builder()
-        .status(StatusCode::SERVICE_UNAVAILABLE)
-        .header("Content-Type", "application/json")
-        .header("Retry-After", retry_after_secs.to_string())
-        .body(Full::new(Bytes::from(body.to_string())))
-        .unwrap()
+/// Proxy-side catching-up shed (returns Response<Full<Bytes>> for the
+/// forwarder return type). Content-negotiated: a browser navigation gets the
+/// staged HTML recovery page, every other client keeps the legacy JSON body
+/// (see `routes::catching_up`).
+fn catching_up_proxy_response(
+    wants_html: bool,
+    retry_after_secs: u64,
+    endpoint: &str,
+    breakers: &UpstreamBreakers,
+) -> Response<Full<Bytes>> {
+    crate::routes::catching_up::shed_response(
+        wants_html,
+        retry_after_secs,
+        crate::routes::catching_up::upstream_cause(breakers, endpoint),
+    )
 }
 
 /// Bundle of doorway-resolved context that the forwarder injects as headers on the
@@ -151,6 +156,13 @@ where
     let method = req.method().clone();
     debug!(method = %method, url = %full_url, "Forwarding request to elohim-storage");
 
+    // Negotiate the shed shape once, before the request body is consumed.
+    let wants_html = crate::routes::catching_up::accepts_html(req.headers());
+    // Read-only diagnostic probes bypass the breaker entirely (never shed,
+    // never recorded): the doorway must not blind its own probes during
+    // exactly the upstream incident they exist to explain.
+    let diag_probe = method == Method::GET && crate::routes::catching_up::is_diagnostic_probe(path);
+
     let mut builder = match method {
         Method::GET => client.get(&full_url),
         Method::POST => client.post(&full_url),
@@ -219,7 +231,7 @@ where
     // exactly one outcome per terminal path (no double-record, no half-open
     // wedge). Circuit-open sheds WITHOUT calling storage. Keyed by storage_url
     // (per-upstream, single-target dispatch).
-    if breakers.is_open(storage_url) {
+    if !diag_probe && breakers.is_open(storage_url) {
         warn!(
             target: "upstream_shed",
             counter = "doorway_upstream_breaker_open_total",
@@ -229,7 +241,10 @@ where
         );
         crate::metrics::inc_breaker_open();
         return catching_up_proxy_response(
+            wants_html,
             crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+            storage_url,
+            breakers,
         );
     }
 
@@ -242,7 +257,9 @@ where
             // catching-up to the browser, preserving the upstream Retry-After
             // (else the breaker cooldown) so the client does not hammer.
             if matches!(status_u16, 429 | 503) {
-                breakers.record(storage_url, false);
+                if !diag_probe {
+                    breakers.record(storage_url, false);
+                }
                 let upstream_ra = response
                     .headers()
                     .get(reqwest::header::RETRY_AFTER)
@@ -259,7 +276,7 @@ where
                     "honoring upstream backpressure — surfacing catching-up to client"
                 );
                 crate::metrics::inc_backpressure_honored();
-                return catching_up_proxy_response(retry_after);
+                return catching_up_proxy_response(wants_html, retry_after, storage_url, breakers);
             }
 
             let content_type = response
@@ -275,10 +292,12 @@ where
                     // readable body — classify it (404/4xx = neutral/ok, 5xx =
                     // failure). 429/503 already recorded+returned in the honor
                     // branch above.
-                    breakers.record(
-                        storage_url,
-                        ProxyOutcome::classify(status_u16) != ProxyOutcome::Failure,
-                    );
+                    if !diag_probe {
+                        breakers.record(
+                            storage_url,
+                            ProxyOutcome::classify(status_u16) != ProxyOutcome::Failure,
+                        );
+                    }
                     Response::builder()
                         .status(StatusCode::from_u16(status_u16).unwrap_or(StatusCode::OK))
                         .header("Content-Type", content_type)
@@ -288,9 +307,14 @@ where
                 }
                 Err(e) => {
                     warn!(error = %e, "Failed to read storage response body");
-                    breakers.record(storage_url, false);
+                    if !diag_probe {
+                        breakers.record(storage_url, false);
+                    }
                     catching_up_proxy_response(
+                        wants_html,
                         crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+                        storage_url,
+                        breakers,
                     )
                 }
             }
@@ -298,9 +322,14 @@ where
         Err(e) => {
             warn!(error = %e, path = %path, storage_url = %storage_url,
                 "storage forward failed (connect/timeout) — recording breaker failure");
-            breakers.record(storage_url, false);
+            if !diag_probe {
+                breakers.record(storage_url, false);
+            }
             catching_up_proxy_response(
+                wants_html,
                 crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+                storage_url,
+                breakers,
             )
         }
     }
@@ -390,8 +419,13 @@ where
             "upstream circuit OPEN — shedding blob without calling storage (503 + Retry-After)"
         );
         crate::metrics::inc_breaker_open();
+        // Blob fetches are sub-resource requests (img/script/fetch), never a
+        // browser navigation — they keep the JSON shed shape.
         return catching_up_proxy_response(
+            false,
             crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+            storage_url,
+            breakers,
         );
     }
 
@@ -449,7 +483,7 @@ where
                     "honoring upstream blob backpressure — surfacing catching-up"
                 );
                 crate::metrics::inc_backpressure_honored();
-                return catching_up_proxy_response(retry_after);
+                return catching_up_proxy_response(false, retry_after, storage_url, breakers);
             }
 
             let content_type = upstream
@@ -518,7 +552,10 @@ where
                     warn!(error = %e, hash = %hash, "Failed to read blob response body from storage");
                     breakers.record(storage_url, false);
                     catching_up_proxy_response(
+                        false,
                         crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+                        storage_url,
+                        breakers,
                     )
                 }
             }
@@ -528,7 +565,10 @@ where
                 "blob forward failed (connect/timeout) — recording breaker failure");
             breakers.record(storage_url, false);
             catching_up_proxy_response(
+                false,
                 crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+                storage_url,
+                breakers,
             )
         }
     }

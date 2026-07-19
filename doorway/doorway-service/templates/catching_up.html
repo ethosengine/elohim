@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Catching up — Doorway</title>
+  <style>
+{% include "_theme.css" %}
+    /* Catching-up page (staged recovery loader) */
+    .stage { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+    .stage:last-child { border-bottom: none; }
+    .stage .dot { margin-top: 0.55rem; }
+    .stage .title { font-size: 0.9rem; font-weight: 600; }
+    .stage .detail { font-size: 0.75rem; color: var(--text-muted); }
+    .pulse { animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(1.4); } }
+    .countdown { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Catching up <span class="badge badge-degraded" id="page-badge">Syncing</span></h1>
+      <div class="meta" id="page-meta">
+        {% if cause_kind == "admission" %}
+        This doorway is at capacity and holding your request while load drains.
+        {% else %}
+        This doorway is holding your request while its data connection recovers.
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Recovery progress</h2>
+      <div class="stage">
+        <span class="dot dot-green"></span>
+        <div>
+          <div class="title">Doorway online</div>
+          <div class="detail">You are connected to this doorway.</div>
+        </div>
+      </div>
+      <div class="stage">
+        <span class="dot dot-gray pulse" id="dot-peer"></span>
+        <div>
+          <div class="title">Storage peer</div>
+          <div class="detail" id="detail-peer">Checking the peer that holds this content&hellip;</div>
+        </div>
+      </div>
+      <div class="stage">
+        <span class="dot dot-gray" id="dot-circuit"></span>
+        <div>
+          <div class="title">Data circuit</div>
+          <div class="detail" id="detail-circuit">Waiting for the connection to storage to stabilize&hellip;</div>
+        </div>
+      </div>
+      <div class="stage">
+        <span class="dot dot-gray" id="dot-serve"></span>
+        <div>
+          <div class="title">Serving</div>
+          <div class="detail" id="detail-serve">This page retries automatically — no need to refresh.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="label">Next retry</div>
+        <div class="value countdown" id="countdown">{{ retry_after }}s</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Failed attempts</div>
+        <div class="value" id="streak">{{ error_streak }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Circuit</div>
+        <div class="value" id="circuit">{{ circuit }}</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span>Doorway v{{ version }}</span>
+      <a href="/status">Full status</a>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+      var retryAfter = Number("{{ retry_after }}") || 30;
+      var causeKind = "{{ cause_kind }}";
+      var deadline = Date.now() + retryAfter * 1000;
+      var reloading = false;
+
+      function el(id) { return document.getElementById(id); }
+      function setDot(id, color, pulsing) {
+        var d = el(id);
+        d.className = "dot dot-" + color + (pulsing ? " pulse" : "");
+      }
+
+      // Countdown to the next half-open retry trial. When it hits zero the
+      // doorway admits one trial upstream; we restart the window and let the
+      // poll observe the outcome.
+      setInterval(function () {
+        var left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+        el("countdown").textContent = left + "s";
+        if (left === 0) { deadline = Date.now() + retryAfter * 1000; }
+      }, 1000);
+
+      // When the doorway reports a healthy path again, re-request the original
+      // URL; only reload into it if it stopped shedding (anything below 500).
+      function tryRecover() {
+        if (reloading) { return; }
+        reloading = true;
+        fetch(window.location.href, { method: "HEAD", cache: "no-store" })
+          .then(function (r) {
+            if (r.status < 500) { window.location.reload(); } else { reloading = false; }
+          })
+          .catch(function () { reloading = false; });
+      }
+
+      function applyStatus(s) {
+        el("page-badge").textContent = "Syncing";
+        var storage = s.storage || {};
+        var peerUp = storage.reachable === true && storage.healthy !== false;
+        setDot("dot-peer", peerUp ? "green" : "red", !peerUp);
+        el("detail-peer").textContent = peerUp
+          ? "Peer is answering health checks."
+          : "Peer is unreachable or unhealthy — the network is reconnecting.";
+
+        var ups = s.upstreams || [];
+        var up = ups.length > 0 ? ups[0] : null;
+        var circuit = up ? up.circuit : "unknown";
+        var streak = up ? up.errorStreak : 0;
+        el("circuit").textContent = circuit;
+        el("streak").textContent = String(streak);
+        if (circuit === "closed") {
+          setDot("dot-circuit", "green", false);
+          el("detail-circuit").textContent = "Circuit closed — traffic is flowing again.";
+          setDot("dot-serve", "yellow", true);
+          el("detail-serve").textContent = "Reloading your page…";
+          tryRecover();
+        } else if (circuit === "half-open") {
+          setDot("dot-circuit", "yellow", true);
+          el("detail-circuit").textContent = "Trial request in flight — testing the connection.";
+        } else {
+          setDot("dot-circuit", "red", true);
+          el("detail-circuit").textContent = "Circuit " + circuit + " after " + streak +
+            " failed attempts. Retrying on the countdown.";
+        }
+
+        if (causeKind === "admission") {
+          var adm = s.admission || {};
+          var free = adm.available || 0;
+          el("detail-circuit").textContent = "Doorway admission: " + free + " of " +
+            (adm.maxInflight || "?") + " slots free.";
+          if (free > 0) { tryRecover(); }
+        }
+      }
+
+      function poll() {
+        fetch("/status.json", { cache: "no-store" })
+          .then(function (r) { return r.json(); })
+          .then(applyStatus)
+          .catch(function () {
+            el("page-badge").textContent = "Busy";
+            el("detail-peer").textContent = "Doorway is busy — still retrying.";
+          });
+      }
+
+      poll();
+      setInterval(poll, 5000);
+    })();
+  </script>
+</body>
+</html>

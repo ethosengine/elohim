@@ -10,6 +10,7 @@ pub mod apps;
 pub mod auth_routes;
 pub mod blob;
 pub mod bootstrap_coherence;
+pub mod catching_up;
 pub mod chrome;
 pub mod coherence;
 pub mod collectives;
