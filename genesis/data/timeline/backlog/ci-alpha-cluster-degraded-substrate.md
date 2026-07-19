@@ -10,7 +10,7 @@ author: "ci-failure-triage"
 status: "backlog"
 priority: "high"
 ci_status: blocked
-fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4, 79748fd505af, ab55feadd29c, 8a0ee37aaa17, 39f396758ede, 9f60eb44561d, 43ba8b15ffeb, 63dd3437bede, 2e09854ec226, 1eda1f5d27e0, b4303a6d852e, 2d1b82ad175f, 1714722d9dab, 63ecdda7a81e, e9b60b28964c, 5d74b506f389, dc60d64b875f, ccdacb3bdf10, db7030259d93]
+fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4, 79748fd505af, ab55feadd29c, 8a0ee37aaa17, 39f396758ede, 9f60eb44561d, 43ba8b15ffeb, 63dd3437bede, 2e09854ec226, 1eda1f5d27e0, b4303a6d852e, 2d1b82ad175f, 1714722d9dab, 63ecdda7a81e, e9b60b28964c, 5d74b506f389, dc60d64b875f, ccdacb3bdf10, db7030259d93, cb5b9adffb69]
 jobs: [elohim, elohim-edge, elohim-genesis]
 relatedNodeIds: []
 tags: [ci, infra, alpha-cluster-6peer, shem, substrate-degraded, reduced-scope, host-green-not-ci-green, museum-trap-1, requires-env, per-peer-rollout, cache-db-pool-saturation, lamad-deep-link, seed-substrate, call-zome-saturation, storm-heal-landed]
@@ -27,6 +27,8 @@ cites:
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1504/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1518/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1522/
+  - https://jenkins.ethosengine.com/job/elohim/job/dev/1623/
+  - scripts/ci/stage-spa-blob.sh
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1042/
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1051/
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1053/
@@ -571,3 +573,38 @@ stabilizes OR the tags hold the scenarios out of the degraded run.
   in-flight exception documented here. No museum edit — this remains the
   already-cited availability-≠-regression / museum-trap-1 mirror, not a novel
   trap.
+
+- **2026-07-19 extension — the lamad-spa SSR head-author facet (1 fingerprint,
+  `cb5b9adffb69`, elohim #1623 UNSTABLE, blocked).** The App pipeline's
+  `stageSpaBlobs`/`authorHeadOnce` step for the newly-integrating **lamad-spa**
+  SSR surface is the same degraded-alpha 503 wall as facet #4
+  (`7bbfcf8928b9`, Upload SPA Blob), one surface further along. In #1623 the blob
+  **bytes** upload fine to both hosts (`/admin/seed/blob` → `success:true`,
+  content-addressable), but the head-author `DO_PATCH` phase — which needs a live
+  conductor bridge to notarize the single head — gets persistent 503s:
+
+  ```
+  curl: (22) The requested URL returned error: 503
+  ⚠ [lamad-spa] attempt 1/3 against https://alpha.elohim.host failed — retrying in 5s
+  … attempt 2/3 … attempt 3/3 …
+  ERROR: [lamad-spa] stage failed after 3 attempt(s) against https://alpha.elohim.host — host left STALE
+  authorHeadOnce: alpha.elohim.host could not author lamad-spa (browser)
+    (no live conductor bridge / persistent 503) — failing over to next doorway
+  ```
+
+  The failover to `elohim.host` **also** 503'd (same signature), so both doorways
+  refused the head-author. `stage-spa-blob.sh` already runs TOLERANT-but-LOUD
+  (catchError → UNSTABLE, 3-attempt retry, cross-doorway failover) — the pipeline
+  handling is correct; the root is substrate unavailability at the conductor-bridge
+  write path, operator-owned. This is the **first SSR deploy of lamad-spa** (forced
+  by `f8de79f79` "force App pipeline to seed lamad-spa serverBlobHash for SSR" +
+  `c04c7310c` "force edge redeploy to materialize lamad-spa SSR bundle"); the
+  serverBlobHash byte-seed lands but the head never gets authored, so the SSR
+  materialization (per the seed-then-restart pattern in
+  `project_ssr_first_deploy_seed_then_restart`) cannot complete while alpha is
+  down. **Disposition: `blocked`** — no in-tree mover; unblocks on alpha-substrate
+  return (the same operator move that clears the SPA-503 availability-gate facets
+  `79748fd505af`/`9f60eb44561d`), at which point the forced lamad-spa reseed
+  re-authors the head. Ledger `cb5b9adffb69` set `status: blocked`. No
+  `decompose_on_confirm` (shared umbrella entry, as above). No museum edit —
+  host-503-≠-regression is the already-cited museum-trap-1 mirror.

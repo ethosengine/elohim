@@ -579,17 +579,32 @@ Then(
     for (const [, human] of this.humans) {
       for (const device of human.devices) {
         if (device instanceof PlaywrightDevice) {
-          // Either stewards-count OR retry button is visible — both prove the
-          // tab rendered against the topology endpoint (success or error path).
+          // Either stewards-count (success) OR retry button (error) proves the
+          // tab settled against the topology endpoint. The panel container
+          // (operator-topology) renders immediately in its loading state, so the
+          // previous step passes while GET /admin/dashboard/topology is still in
+          // flight. Poll for whichever terminal testid appears first rather than
+          // snapshotting point-in-time — a bare isVisible() races the fetch and
+          // reads the loading spinner as "neither present." If neither settles
+          // within the timeout the endpoint genuinely hung, which is a real
+          // failure worth surfacing.
           const stewards = device.page.locator(
             `[data-testid="${DOORWAY_DASHBOARD.TOPOLOGY_STEWARDS_COUNT}"]`
           );
           const retry = device.page.locator(`[data-testid="${DOORWAY_DASHBOARD.TOPOLOGY_RETRY}"]`);
-          const stewardsVisible = await stewards.isVisible().catch(() => false);
-          const retryVisible = await retry.isVisible().catch(() => false);
+          const settled = await Promise.race([
+            stewards
+              .waitFor({ state: 'visible', timeout: 15_000 })
+              .then(() => true)
+              .catch(() => false),
+            retry
+              .waitFor({ state: 'visible', timeout: 15_000 })
+              .then(() => true)
+              .catch(() => false),
+          ]);
 
           assert.ok(
-            stewardsVisible || retryVisible,
+            settled,
             'Topology panel rendered but neither stewards-count nor retry button is visible'
           );
           return;
