@@ -361,16 +361,37 @@ async fn fetch_projection_stats(state: &Arc<AppState>) -> (u64, u64) {
             .count_documents(bson::doc! {})
             .await
             .unwrap_or(0);
-        // Byte size is best-effort via collStats (no count_documents equivalent);
-        // 0 when collStats is unavailable on 6.2+.
-        let bytes = match db
-            .run_command(bson::doc! { "collStats": "projected_entries" })
-            .await
-        {
-            Ok(doc) => doc.get_i64("size").unwrap_or(0).max(0) as u64,
-            Err(e) => {
-                tracing::warn!("collStats size query failed (deprecated in MongoDB 6.2+): {e}");
-                0
+        // Byte size is best-effort via the $collStats aggregation stage
+        // (storageStats) — the supported replacement for the collStats database
+        // command, which is deprecated on MongoDB 6.2+ (the command silently
+        // returned 0 there; the aggregation stage reports a real size). 0 when
+        // the stage is unavailable; storageStats.size may arrive as any BSON
+        // number, so accept i64/i32/f64.
+        let bytes = {
+            use futures_util::TryStreamExt;
+            let coll = db.collection::<bson::Document>("projected_entries");
+            match coll
+                .aggregate(vec![bson::doc! { "$collStats": { "storageStats": {} } }])
+                .await
+            {
+                Ok(mut cursor) => match cursor.try_next().await {
+                    Ok(Some(doc)) => doc
+                        .get_document("storageStats")
+                        .ok()
+                        .and_then(|s| {
+                            s.get_i64("size")
+                                .ok()
+                                .or_else(|| s.get_i32("size").ok().map(i64::from))
+                                .or_else(|| s.get_f64("size").ok().map(|f| f as i64))
+                        })
+                        .unwrap_or(0)
+                        .max(0) as u64,
+                    _ => 0,
+                },
+                Err(e) => {
+                    tracing::warn!("$collStats storageStats query failed: {e}");
+                    0
+                }
             }
         };
         (bytes, docs)
