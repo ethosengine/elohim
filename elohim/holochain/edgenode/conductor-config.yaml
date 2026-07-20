@@ -33,6 +33,20 @@ network:
     ice_servers:
       - urls: ["stun:stun.cloudflare.com:3478"]
       - urls: ["stun:stun.l.google.com:19302"]
+  # Slow-WAN peer resilience (2026-07-20): a production node on a slow link
+  # was timing out kitsune2 gossip rounds at the 15s default and
+  # thrash-retrying, while up to 10 concurrently accepted rounds piled up
+  # write pressure on the conductor's SQLite write guard (PTxnGuard held
+  # 500-1500ms at ~45/min, a ~50% write-guard duty cycle). Let slow rounds
+  # run to completion instead of retrying, and bound concurrent accepted
+  # rounds so gossip write pressure stays sane. Do not "clean up" these away
+  # from their upstream defaults without re-checking WAN conditions on the
+  # affected nodes. Leave initiate intervals at defaults — only round
+  # completion and accepted-round concurrency need tuning here.
+  advanced:
+    k2Gossip:
+      roundTimeoutMs: 60000
+      maxConcurrentAcceptedRounds: 4
 
 # Data storage
 data_root_path: "/var/local/lib/holochain"
