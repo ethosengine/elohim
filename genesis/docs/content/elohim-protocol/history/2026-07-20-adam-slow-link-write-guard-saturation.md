@@ -127,6 +127,25 @@ re-pointing the edge image build from the prebuilt holo-host binary to the fork-
 config pacing attacks the same duty cycle without code risk. Revisit if the probes below stay hot
 after this fix deploys.
 
+## Post-deploy measurements (2026-07-20 ~20:30 UTC, ~75min after fleet restart on the fix)
+
+| Probe | Pre-fix | Post-deploy | Verdict |
+|---|---|---|---|
+| elohim.host serving | 503 catching-up storm, breaker flap | 200 + `x-ssr-rendered: 1` at 31–48ms; circuit closed; errorStreak 0 | healed |
+| kitsune2 round timeouts (adam, 15min) | 43 | **3** | k2Gossip config active + effective |
+| Outbound sync/shard failures (15min) | storm | 34 (~2/min, backing off) | storage backoff effective |
+| `PTxnGuard was held` (15min) | 984 | **2,147** | see below |
+| adam CPU | ~5 cores flat | ~5 cores flat | unchanged |
+
+The guard-rate *increase* alongside the 14× round-timeout drop has one coherent reading: rounds now
+COMPLETE and deliver ops, so kitsune2's historical catch-up (`store_slice_hash` write-per-slice-update)
+is finally doing productive work against the divergence backlog it previously could never finish.
+**A/B discriminator, decided by the trend:** (A) guard rate decays over hours = finite backlog drain —
+no conductor patch needed; (B) guard rate still ~2k/15min a day later = the `store_slice_hash`
+unconditional-write amplification is steady-state cost on a full-arc node → execute the deferred
+conductor-fork patch. Either way the serving layer stays insulated (breaker + doorway hot cache carry
+elohim.host at full speed; only the first cold fetch shows a multi-second tail while the storm runs).
+
 ## Verification probes (after any fix lands)
 
 - adam-0 CPU falls to matthew's band (~0.3–0.6 cores), not just post-restart dip.
