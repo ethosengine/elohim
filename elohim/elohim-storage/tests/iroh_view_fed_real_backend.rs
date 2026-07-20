@@ -79,6 +79,7 @@ async fn owning_agent_request_via_iroh_returns_signed_live_slice() -> Result<()>
                 view_kind: ViewKind::Cluster,
                 agent_cid: agent_cid.clone(),
                 request_id: "req-owning".into(),
+                inventory_offset: None,
             },
         )
         .await?;
@@ -118,6 +119,7 @@ async fn non_owning_agent_request_via_iroh_returns_offline_signed_slice() -> Res
                 view_kind: ViewKind::Cluster,
                 agent_cid: "different-agent-cid".into(),
                 request_id: "req-non-owning".into(),
+                inventory_offset: None,
             },
         )
         .await?;
@@ -156,6 +158,7 @@ async fn peer_topology_request_via_iroh_returns_empty_connected_peers() -> Resul
                 view_kind: ViewKind::PeerTopology,
                 agent_cid: agent_cid.clone(),
                 request_id: "req-topo".into(),
+                inventory_offset: None,
             },
         )
         .await?;

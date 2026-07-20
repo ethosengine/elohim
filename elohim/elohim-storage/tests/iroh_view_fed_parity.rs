@@ -62,6 +62,7 @@ async fn view_fed_request_round_trips_over_iroh_quic() -> Result<()> {
         view_kind: ViewKind::Cluster,
         agent_cid: "agent-phase8".into(),
         request_id: "req-001".into(),
+        inventory_offset: None,
     };
 
     let client = IrohViewFederationClient::new(fixture.fetcher.endpoint());

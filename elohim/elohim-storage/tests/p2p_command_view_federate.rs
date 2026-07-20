@@ -66,6 +66,7 @@ fn test_request() -> ViewFederationRequest {
         view_kind: ViewKind::Cluster,
         agent_cid: "bafkreibmzonpj42xk5vxltpl2h3mj5qnxmvprsnwkl3uml7yzhbpqu7c4a".to_string(),
         request_id: "test-req-001".to_string(),
+        inventory_offset: None,
     }
 }
 
@@ -185,6 +186,7 @@ async fn responder_signs_slice_with_agent_key_when_agent_matches() {
             connected_peers: &[],
             keypair: &keypair,
             pool: None, // pool=None → stub json!({}) payload
+            inventory_offset: None,
         },
     )
     .await
@@ -244,6 +246,7 @@ async fn responder_returns_offline_for_unknown_agent_cid() {
             connected_peers: &[],
             keypair: &keypair,
             pool: None, // pool=None; non-matching agent always returns Null regardless
+            inventory_offset: None,
         },
     )
     .await
@@ -298,6 +301,7 @@ async fn responder_echoes_view_kind_and_request_id() {
             connected_peers: &[],
             keypair: &keypair,
             pool: None, // pool=None
+            inventory_offset: None,
         },
     )
     .await

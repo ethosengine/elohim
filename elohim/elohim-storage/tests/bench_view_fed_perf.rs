@@ -287,6 +287,7 @@ mod iroh_bench {
                 view_kind: ViewKind::PeerTopology,
                 agent_cid: "agent-bench".into(),
                 request_id: rid.clone(),
+                inventory_offset: None,
             };
             let res = send_one(&conn, &req).await;
             assert_eq!(&res.request_id, rid);
@@ -299,6 +300,7 @@ mod iroh_bench {
                 view_kind: ViewKind::PeerTopology,
                 agent_cid: "agent-bench".into(),
                 request_id: rid.clone(),
+                inventory_offset: None,
             };
             let t0 = Instant::now();
             let res = send_one(&conn, &req).await;
@@ -360,6 +362,7 @@ mod iroh_bench {
                 view_kind: ViewKind::PeerTopology,
                 agent_cid: "agent-bench".into(),
                 request_id: rid.clone(),
+                inventory_offset: None,
             };
             let conn = fetcher
                 .endpoint()
@@ -378,6 +381,7 @@ mod iroh_bench {
                 view_kind: ViewKind::PeerTopology,
                 agent_cid: "agent-bench".into(),
                 request_id: rid.clone(),
+                inventory_offset: None,
             };
             let t0 = Instant::now();
             let conn = fetcher
@@ -640,6 +644,7 @@ mod libp2p_bench {
                 view_kind: ViewKind::PeerTopology,
                 agent_cid: "agent-bench".into(),
                 request_id: rid.clone(),
+                inventory_offset: None,
             };
             let res = request(&fetcher, provider.peer_id, req).await;
             assert_eq!(&res.request_id, rid);
@@ -652,6 +657,7 @@ mod libp2p_bench {
                 view_kind: ViewKind::PeerTopology,
                 agent_cid: "agent-bench".into(),
                 request_id: rid.clone(),
+                inventory_offset: None,
             };
             let t0 = Instant::now();
             let res = request(&fetcher, provider.peer_id, req).await;
@@ -693,6 +699,7 @@ mod libp2p_bench {
                 view_kind: ViewKind::PeerTopology,
                 agent_cid: "agent-bench".into(),
                 request_id: rid.clone(),
+                inventory_offset: None,
             };
             let res = request(&fetcher, provider.peer_id, req).await;
             assert_eq!(&res.request_id, rid);
@@ -707,6 +714,7 @@ mod libp2p_bench {
                 view_kind: ViewKind::PeerTopology,
                 agent_cid: "agent-bench".into(),
                 request_id: rid.clone(),
+                inventory_offset: None,
             };
             let t0 = Instant::now();
             let fetcher = spawn_node(serde_json::Value::Null).await;
