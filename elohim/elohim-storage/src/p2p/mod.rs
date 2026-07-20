@@ -57,6 +57,7 @@ pub mod recovery_invitation;
 pub mod recovery_revocation;
 pub mod recovery_rotation;
 pub mod replication;
+pub mod replication_schedule;
 pub mod revocation_attestation_message;
 pub mod salvage_gossip;
 pub mod shamir_transport;
@@ -139,6 +140,31 @@ type DocListCursorMap =
 /// opener (`initiate_sync_round`, page 0) and the `DocumentList` follow-up
 /// (next pages), so the cursor arithmetic and the request size can't drift.
 const SYNC_LIST_PAGE_LIMIT: u32 = 1000;
+
+/// Client-side page cursors for in-flight `ListContent` replication chains:
+/// request ID → (peer, offset that page was requested at). The `ListContent`
+/// analogue of [`DocListCursorMap`]. A `ContentList` response with `has_more`
+/// requests the next page at `offset + items.len()` from the SAME peer
+/// (`sync_protocol::next_doc_list_offset`), so content past the first page is
+/// never silently unsyncable — the pre-fix cycle hard-limited 5000 rows and
+/// never honored `has_more`, so a corpus over the page size left its tail
+/// permanently undiscovered by this arm. Entries are removed on the `ContentList`
+/// response AND on `OutboundFailure`, bounding the map by in-flight chains; the
+/// removed `(peer, _)` is what tells the [`replication_schedule::ReplicationScheduler`]
+/// which peer's chain just completed or failed.
+type ListContentCursorMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<request_response::OutboundRequestId, (PeerId, u32)>,
+    >,
+>;
+
+/// Page size for `ListContent` replication-discovery enumeration. Dropped from
+/// the pre-fix 5000 so a single page fits a slow WAN link inside libp2p's fixed
+/// 30s request timeout — an oversized page was the trigger for the timeout storm
+/// this scheduling arm exists to prevent. Paired with the `has_more` cursor
+/// (`ListContentCursorMap`), a larger corpus is enumerated across pages rather
+/// than in one over-large, timeout-prone response.
+const REPLICATION_LIST_PAGE_LIMIT: u32 = 1000;
 
 /// Map of pending EPR resolve requests: request ID → (requested content ID, reply sender)
 type PendingEprMap = Arc<
@@ -540,6 +566,14 @@ pub struct P2PNode {
     doc_list_cursors: DocListCursorMap,
     /// Identity-driven replication state
     replication_state: replication::ReplicationState,
+    /// Per-peer `ListContent` scheduling: in-flight guard + exponential backoff.
+    /// Stops a slow/timing-out peer from re-arming a fixed-cost timeout storm on
+    /// every 60s tick (see `replication_schedule`).
+    replication_scheduler: replication_schedule::ReplicationScheduler,
+    /// Client-side page cursors for in-flight `ListContent` discovery chains —
+    /// see [`ListContentCursorMap`]. Drives `has_more` pagination and tells the
+    /// scheduler which peer's chain completed/failed.
+    list_content_cursors: ListContentCursorMap,
     /// Maps in-flight replication GetContent request IDs to content IDs.
     /// Used to clean up replication state when requests fail.
     pending_replication_fetches: PendingReplicationFetchMap,
@@ -1835,6 +1869,10 @@ impl P2PNode {
             )),
             doc_list_cursors: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
             replication_state: replication::ReplicationState::new(),
+            replication_scheduler: replication_schedule::ReplicationScheduler::new(),
+            list_content_cursors: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
             pending_replication_fetches: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
@@ -4156,6 +4194,16 @@ impl P2PNode {
                                             has_more = has_more,
                                             "Received content inventory from peer"
                                         );
+                                        // Reclaim this page's cursor: (peer, offset).
+                                        // Its presence identifies this as a scheduled
+                                        // ListContent chain (vs an ad-hoc list) and
+                                        // tells the scheduler which peer to settle.
+                                        let page_cursor = self
+                                            .list_content_cursors
+                                            .lock()
+                                            .await
+                                            .remove(&request_id);
+                                        let page_len = items.len();
                                         let remote_ids: Vec<String> =
                                             items.into_iter().map(|i| i.id).collect();
                                         let new_gaps =
@@ -4172,6 +4220,55 @@ impl P2PNode {
                                             // Enqueue — drain_gap_queue() dispatches adaptively
                                             // on the 5s interval, bounded by MAX_REPLICATION_INFLIGHT.
                                             self.gap_queue.lock().await.extend(new_gaps);
+                                        }
+
+                                        // Follow the has_more page cursor (mirrors the
+                                        // ListDocuments continuation): a corpus larger
+                                        // than one page is enumerated across pages, so
+                                        // its cold tail is no longer invisible to this
+                                        // arm. The chain stays in-flight until the final
+                                        // page; only then does the peer settle to base
+                                        // cadence. A response with no tracked cursor is a
+                                        // pre-fix / raced list — handled as before, no
+                                        // scheduler transition.
+                                        if let Some((cursor_peer, offset)) = page_cursor {
+                                            match crate::p2p::sync_protocol::next_doc_list_offset(
+                                                offset, page_len, has_more,
+                                            ) {
+                                                Some(next_offset) => {
+                                                    let next_request = ShardRequest::ListContent {
+                                                        reach_filter: None,
+                                                        offset: next_offset,
+                                                        limit: REPLICATION_LIST_PAGE_LIMIT,
+                                                    };
+                                                    let mut swarm = self.swarm.write().await;
+                                                    let next_id = swarm
+                                                        .behaviour_mut()
+                                                        .shard_protocol
+                                                        .send_request(&cursor_peer, next_request);
+                                                    drop(swarm);
+                                                    // Keep the chain in-flight; record the
+                                                    // next page's cursor. No mark_started —
+                                                    // the peer is already in flight.
+                                                    self.list_content_cursors.lock().await.insert(
+                                                        next_id,
+                                                        (cursor_peer, next_offset),
+                                                    );
+                                                    debug!(
+                                                        peer = %cursor_peer,
+                                                        offset = next_offset,
+                                                        request_id = ?next_id,
+                                                        "Requested next ListContent page"
+                                                    );
+                                                }
+                                                None => {
+                                                    // Chain complete — settle the peer to
+                                                    // base cadence (backoff reset).
+                                                    self.replication_scheduler
+                                                        .mark_success(cursor_peer)
+                                                        .await;
+                                                }
+                                            }
                                         }
                                     }
                                     ShardResponse::Content(record) => {
@@ -4372,6 +4469,20 @@ impl P2PNode {
                 },
             ) => {
                 warn!(peer = %peer, request_id = ?request_id, error = ?error, "Outbound shard request failed");
+                // Settle a failed ListContent discovery chain: drop its page
+                // cursor and back the peer off (interval doubles up to the cap).
+                // This is the arm that breaks the timeout storm — a Timeout here
+                // no longer lets the next tick re-fire the same request; the peer
+                // is deferred until its (now longer) backoff elapses.
+                if let Some((cursor_peer, offset)) =
+                    self.list_content_cursors.lock().await.remove(&request_id)
+                {
+                    debug!(
+                        peer = %cursor_peer, offset = offset, error = ?error,
+                        "ListContent chain failed at transport level — backing off peer"
+                    );
+                    self.replication_scheduler.mark_failure(cursor_peer).await;
+                }
                 // Clean up any pending shard fetch so the caller gets None instead of hanging
                 if let Some(tx) = self.pending_shard_fetches.lock().await.remove(&request_id) {
                     let _ = tx.send(None);
@@ -5205,6 +5316,7 @@ impl P2PNode {
                         let swarm = self.swarm.read().await;
                         swarm.connected_peers().cloned().collect()
                     };
+                    let inventory_offset = request.inventory_offset;
                     match build_response_slice(
                         request.view_kind,
                         crate::p2p::view_federation::SliceContext {
@@ -5215,6 +5327,7 @@ impl P2PNode {
                             connected_peers: &connected_peers,
                             keypair,
                             pool: pool_ref,
+                            inventory_offset,
                         },
                     )
                     .await
@@ -6826,14 +6939,31 @@ impl P2PNode {
             return;
         }
 
-        // Query ALL connected peers for content inventory so we discover
-        // content regardless of which peer holds it. The response handler
-        // (ContentList branch) deduplicates via replication_state.discover().
-        for peer in &peers {
+        // Bound the scheduler map to the connected set (prunes churned peers),
+        // then ask only peers eligible to START a new chain: not already
+        // mid-chain (in-flight guard) and past their backoff gate. A slow/
+        // timing-out peer is deferred here instead of being re-hammered every
+        // tick — the structural fix for the fixed-30s-timeout storm.
+        self.replication_scheduler.retain(&peers).await;
+        let eligible = self.replication_scheduler.eligible_peers(&peers).await;
+        if eligible.is_empty() {
+            debug!(
+                connected = peers.len(),
+                "Replication cycle: all connected peers in-flight or backing off, skipping"
+            );
+            return;
+        }
+
+        // Query each eligible peer for content inventory so we discover content
+        // regardless of which peer holds it. The response handler (ContentList
+        // branch) deduplicates via replication_state.discover() and follows the
+        // has_more page cursor. Page 0 at REPLICATION_LIST_PAGE_LIMIT so the
+        // response fits a slow link inside the 30s request timeout.
+        for peer in &eligible {
             let request = ShardRequest::ListContent {
                 reach_filter: None,
                 offset: 0,
-                limit: 5000,
+                limit: REPLICATION_LIST_PAGE_LIMIT,
             };
 
             let mut swarm = self.swarm.write().await;
@@ -6842,6 +6972,15 @@ impl P2PNode {
                 .shard_protocol
                 .send_request(peer, request);
             drop(swarm);
+
+            // Record the page cursor (peer, offset=0) so a has_more response can
+            // continue the chain, and mark the peer in-flight so the next tick
+            // does not open a second concurrent chain to it.
+            self.list_content_cursors
+                .lock()
+                .await
+                .insert(request_id, (*peer, 0));
+            self.replication_scheduler.mark_started(*peer).await;
 
             debug!(peer = %peer, request_id = ?request_id, "Sent ListContent for replication discovery");
         }

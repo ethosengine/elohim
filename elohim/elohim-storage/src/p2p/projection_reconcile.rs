@@ -67,7 +67,8 @@ use crate::db::DbPool;
 use crate::hc_client::HcClient;
 use crate::p2p::reconcile_rails::GapTracker;
 use crate::p2p::view_federation::{
-    PROJECTION_INVENTORY_TABLE_CONTENT, PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
+    PROJECTION_INVENTORY_CAP, PROJECTION_INVENTORY_TABLE_CONTENT,
+    PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
 };
 use crate::p2p::P2PHandle;
 use crate::services::provide_loop_status::ProvideLoopState;
@@ -240,14 +241,196 @@ pub fn heal_decision(bridge_up: bool, heal_in_flight: bool) -> HealAction {
     }
 }
 
+/// Ceiling on the peer-reported inventory total the rotating window trusts.
+///
+/// A buggy or adversarial peer that reports a huge `total` would otherwise pin the
+/// window offset ever upward: `requested + page` (bounded by `u32`) can never
+/// reach a `u64::MAX`-ish claim, so the wrap-to-0 test never fires — the offset
+/// climbs to the `u32::MAX` saturation plateau and every peer is queried past its
+/// real corpus forever, silently recreating the whole-table invisibility this
+/// cursor exists to close. Clamping `max_total` to this ceiling bounds window
+/// progress independent of any single peer's claim, and the wrap still fires at
+/// the clamp. Mirrors [`crate::p2p::sync_protocol::MAX_SYNC_LIST_OFFSET`], which
+/// bounds a lying always-`has_more` peer on the ListDocuments chain. A genuine
+/// corpus larger than this windows its first N rows per rotation (raise
+/// deliberately if a real projection ever approaches it).
+const MAX_INVENTORY_WINDOW_TOTAL: u64 = 100_000;
+
+/// Rotating per-table window cursor for the `ProjectionInventory` reconcile.
+///
+/// The responder caps each inventory at [`PROJECTION_INVENTORY_CAP`] rows ordered
+/// hot-set-first; a corpus larger than the cap needs successive sweeps to advance
+/// a window across the whole table, or its cold tail past the cap stays
+/// permanently invisible to this arm (the structural non-convergence the honest
+/// `total` exposes and this cursor closes). Lives for the discovery task's
+/// lifetime (one per process, owned by the single discovery loop — no locking).
+/// Advances by one page each sweep and wraps at the largest peer-reported total
+/// (clamped by [`MAX_INVENTORY_WINDOW_TOTAL`]), so a modest corpus that fits one
+/// page never leaves offset 0 and no single peer's claim can strand the window.
+#[derive(Debug, Default)]
+pub struct InventoryWindow {
+    /// table → next offset to request on the coming sweep.
+    offsets: std::collections::HashMap<String, u32>,
+}
+
+impl InventoryWindow {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The offset to request for `table` this sweep (0 until advanced).
+    fn offset_for(&self, table: &str) -> u32 {
+        self.offsets.get(table).copied().unwrap_or(0)
+    }
+
+    /// Advance the window for `table` after a sweep that requested `requested` and
+    /// saw `max_total` as the largest peer-reported corpus size. Advances by one
+    /// page ([`PROJECTION_INVENTORY_CAP`]); wraps to 0 once the window has covered
+    /// the whole corpus (or no peer reported a corpus larger than one page — the
+    /// common small-corpus case, which then stays pinned at offset 0).
+    ///
+    /// `max_total` is clamped to [`MAX_INVENTORY_WINDOW_TOTAL`] BEFORE the wrap
+    /// test, so a single peer's inflated `total` can never push the offset onto
+    /// the `u32` saturation plateau where it would never wrap (see the const).
+    fn advance(&mut self, table: &str, requested: u32, max_total: u64) {
+        let page = u32::try_from(PROJECTION_INVENTORY_CAP).unwrap_or(u32::MAX);
+        let bounded_total = max_total.min(MAX_INVENTORY_WINDOW_TOTAL);
+        let next = requested.saturating_add(page);
+        let wrapped = if u64::from(next) >= bounded_total {
+            0
+        } else {
+            next
+        };
+        self.offsets.insert(table.to_string(), wrapped);
+    }
+}
+
+#[cfg(test)]
+mod inventory_window_tests {
+    use super::*;
+
+    /// The documented page size the conversion path must yield (Fix 2b review).
+    #[test]
+    fn page_size_conversion_matches_cap() {
+        let page = u32::try_from(PROJECTION_INVENTORY_CAP).unwrap_or(u32::MAX);
+        assert_eq!(
+            page, 2000,
+            "the CAP→u32 conversion yields the documented page"
+        );
+        let mut w = InventoryWindow::new();
+        // A corpus of many pages advances by exactly one page.
+        w.advance("content", 0, u64::from(page) * 10);
+        assert_eq!(w.offset_for("content"), page);
+    }
+
+    #[test]
+    fn new_window_starts_at_zero() {
+        let w = InventoryWindow::new();
+        assert_eq!(w.offset_for("content"), 0);
+        assert_eq!(w.offset_for("rea_commitments"), 0);
+    }
+
+    #[test]
+    fn advances_by_page_then_wraps_at_corpus_end() {
+        let mut w = InventoryWindow::new();
+        let page = u32::try_from(PROJECTION_INVENTORY_CAP).unwrap();
+        let total = u64::from(page) * 2 + 5; // just over two pages
+        w.advance("content", 0, total);
+        assert_eq!(w.offset_for("content"), page, "0 -> one page");
+        w.advance("content", page, total);
+        assert_eq!(w.offset_for("content"), page * 2, "page -> two pages");
+        // next (3*page) >= total -> wrap to 0 (whole corpus covered).
+        w.advance("content", page * 2, total);
+        assert_eq!(w.offset_for("content"), 0, "past corpus end -> wrap");
+    }
+
+    #[test]
+    fn small_corpus_stays_pinned_at_zero() {
+        let mut w = InventoryWindow::new();
+        // Fits one page: next(=page) >= total -> stays at 0 forever.
+        w.advance("content", 0, 10);
+        assert_eq!(w.offset_for("content"), 0);
+    }
+
+    #[test]
+    fn zero_total_peer_never_advances() {
+        let mut w = InventoryWindow::new();
+        // No peer answered (max_total 0): bounded_total 0, next >= 0 -> wrap to 0.
+        w.advance("content", 0, 0);
+        assert_eq!(w.offset_for("content"), 0);
+        // Even from a non-zero offset, a zero-total sweep resets to 0.
+        w.advance("content", 4000, 0);
+        assert_eq!(w.offset_for("content"), 0);
+    }
+
+    #[test]
+    fn adversarial_huge_total_is_clamped_so_window_still_wraps() {
+        let mut w = InventoryWindow::new();
+        let page = u32::try_from(PROJECTION_INVENTORY_CAP).unwrap();
+        let clamp = u32::try_from(MAX_INVENTORY_WINDOW_TOTAL).unwrap();
+        // Two pages below the ceiling with a u64::MAX claim: still advances (the
+        // clamp does not wrap us early inside the trusted window).
+        let below = clamp - page - page;
+        w.advance("content", below, u64::MAX);
+        assert_eq!(
+            w.offset_for("content"),
+            below + page,
+            "a clamped huge total still advances below the ceiling"
+        );
+        // At the ceiling boundary the clamp forces the wrap a lying peer's raw
+        // total would otherwise prevent (the u32-plateau bug this const fixes).
+        w.advance("content", clamp - page, u64::MAX);
+        assert_eq!(
+            w.offset_for("content"),
+            0,
+            "clamp forces wrap-to-0 at the ceiling despite a u64::MAX claim"
+        );
+    }
+
+    #[test]
+    fn saturating_add_plateau_self_heals_via_clamp() {
+        let mut w = InventoryWindow::new();
+        // Simulate an offset already stuck near the u32 plateau (e.g. from a
+        // pre-clamp binary). A huge claim now WRAPS instead of pinning, because
+        // saturating_add lands at u32::MAX which is >= the clamped total.
+        w.advance("content", u32::MAX - 1, u64::MAX);
+        assert_eq!(
+            w.offset_for("content"),
+            0,
+            "a plateaued offset self-heals to 0 under the clamp"
+        );
+    }
+
+    #[test]
+    fn separate_tables_have_independent_offsets() {
+        let mut w = InventoryWindow::new();
+        let page = u32::try_from(PROJECTION_INVENTORY_CAP).unwrap();
+        w.advance("content", 0, u64::from(page) * 3);
+        assert_eq!(w.offset_for("content"), page);
+        assert_eq!(
+            w.offset_for("rea_commitments"),
+            0,
+            "advancing one table must not move another"
+        );
+    }
+}
+
 /// One discovery pass over BOTH reconcile arms (REA + content). Conductor-free:
 /// this is the per-tick outbound view-federation ask that must fire from boot,
 /// independent of the lamad bridge. Returns the [`SweepPlan`] the heal leg
 /// consumes; the heal leg is scheduled separately (single-flight) so a multi-hour
 /// heal never starves this cadence.
-pub async fn run_discovery(p2p: &P2PHandle, pool: &DbPool) -> SweepPlan {
-    let rea = discover_rea(p2p, pool).await;
-    let content = discover_content(p2p, pool).await;
+///
+/// `window` carries the rotating per-table inventory offset ACROSS sweeps (owned
+/// by the caller's discovery loop), so successive sweeps window across a corpus
+/// larger than the responder's page cap rather than re-diffing only the hot set.
+pub async fn run_discovery(
+    p2p: &P2PHandle,
+    pool: &DbPool,
+    window: &mut InventoryWindow,
+) -> SweepPlan {
+    let rea = discover_rea(p2p, pool, window).await;
+    let content = discover_content(p2p, pool, window).await;
 
     tracing::info!(
         target: "elohim_storage::projection_reconcile",
@@ -424,8 +607,16 @@ async fn witness_bootstrap(hc: &Arc<HcClient>, pool: &DbPool, provide_state: &Pr
 /// `ProjectionInventory { rea_commitments }`, and diff into a per-sweep
 /// [`GapTracker`] (an id missing locally, OR present with a different anchor, is a
 /// gap). No conductor call happens here — [`heal_rea`] owns that.
-async fn discover_rea(p2p: &P2PHandle, pool: &DbPool) -> ReaDiscovery {
+async fn discover_rea(
+    p2p: &P2PHandle,
+    pool: &DbPool,
+    window: &mut InventoryWindow,
+) -> ReaDiscovery {
     let app_ctx = crate::db::AppContext::default_lamad();
+    // Rotating window offset for this sweep (advanced after the peer loop).
+    let sweep_offset = window.offset_for(PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS);
+    // Largest peer-reported corpus size this sweep — drives the wrap decision.
+    let mut max_peer_total: u64 = 0;
 
     // (1) Local inventory: id → anchor (anchor "" when un-anchored).
     let (local_pairs, local_total) = {
@@ -436,7 +627,10 @@ async fn discover_rea(p2p: &P2PHandle, pool: &DbPool) -> ReaDiscovery {
                 return ReaDiscovery::empty();
             }
         };
-        match crate::db::rea_commitments::inventory_for_reconcile(&mut conn, &app_ctx, i64::MAX) {
+        // Offset 0 / i64::MAX: the LOCAL diff needs the WHOLE local set (the
+        // rotating window only bounds the PEER ask below).
+        match crate::db::rea_commitments::inventory_for_reconcile(&mut conn, &app_ctx, 0, i64::MAX)
+        {
             Ok(v) => v,
             Err(e) => {
                 tracing::warn!(error = %e, "projection-reconcile: local inventory failed; skipping sweep");
@@ -477,6 +671,9 @@ async fn discover_rea(p2p: &P2PHandle, pool: &DbPool) -> ReaDiscovery {
             // ProjectionInventory (it returns what IT holds, not an agent view).
             agent_cid: p2p.agent_pubkey().to_string(),
             request_id: uuid::Uuid::new_v4().to_string(),
+            // Rotating window: this sweep asks for the page at `sweep_offset` so
+            // successive sweeps cover a corpus larger than the responder's cap.
+            inventory_offset: Some(sweep_offset),
         };
         let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
             Ok(r) => r,
@@ -502,13 +699,29 @@ async fn discover_rea(p2p: &P2PHandle, pool: &DbPool) -> ReaDiscovery {
                 }
             };
 
+        // Track the largest corpus any peer reports so the window knows when it
+        // has covered the whole table and should wrap. Honesty (Fix 2c): when
+        // `total > entries.len()` the peer's inventory is WINDOWED — ids outside
+        // this page are unknown-this-sweep, NOT absent. This arm only classifies
+        // ADVERTISED ids (see below), so it never concludes absence/in-sync about
+        // a non-advertised id; the rotating window guarantees eventual coverage.
+        max_peer_total = max_peer_total.max(payload.total as u64);
+        // Offset-aware: rows remain BEYOND this page only when
+        // offset + served < total. Without the offset term the FINAL page of a
+        // rotating window (which reaches the corpus end) would false-log
+        // "windowed" merely because served < total.
+        let windowed =
+            (sweep_offset as usize).saturating_add(payload.entries.len()) < payload.total;
+
         // Per-peer INFO: makes the discovery leg observable end-to-end
-        // (which peers answered, and with how much).
+        // (which peers answered, and with how much, and whether truncated).
         tracing::info!(
             target: "elohim_storage::projection_reconcile",
             peer = %peer.peer_id,
             entries = payload.entries.len(),
             peer_total = payload.total,
+            offset = sweep_offset,
+            windowed = windowed,
             "projection-reconcile: peer inventory received"
         );
 
@@ -530,6 +743,13 @@ async fn discover_rea(p2p: &P2PHandle, pool: &DbPool) -> ReaDiscovery {
             }
         }
     }
+
+    // Advance the rotating window for the next sweep (wraps at the largest total).
+    window.advance(
+        PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
+        sweep_offset,
+        max_peer_total,
+    );
 
     // Build the tracker: local set EXCLUDES anchor-divergent ids so `discover()`
     // admits them alongside genuinely-absent ids. All discovered ids flow
@@ -748,12 +968,20 @@ fn classify_content_gap(
 /// persists in SQL is recomputed from the inventory diff on the NEXT sweep and
 /// re-enqueued afresh. `MAX_RETRIES` only bounds within-sweep churn (and the heal
 /// leg attempts each gap once per sweep, so it is effectively a floor).
-async fn discover_content(p2p: &P2PHandle, pool: &DbPool) -> ContentDiscovery {
+async fn discover_content(
+    p2p: &P2PHandle,
+    pool: &DbPool,
+    window: &mut InventoryWindow,
+) -> ContentDiscovery {
     let app_ctx = crate::db::AppContext::default_lamad();
+    // Rotating window offset for this sweep (advanced after the peer loop).
+    let sweep_offset = window.offset_for(PROJECTION_INVENTORY_TABLE_CONTENT);
+    let mut max_peer_total: u64 = 0;
 
     // (1) Local anchored inventory: id → anchor. Only anchored + distribution-
     // safe rows (the same set this node advertises). Absent / un-anchored rows
-    // are resolved via presence below.
+    // are resolved via presence below. Offset 0 / i64::MAX: the LOCAL diff needs
+    // the WHOLE local set (the rotating window only bounds the PEER ask).
     let local_anchors: std::collections::HashMap<String, String> = {
         let mut conn = match pool.get() {
             Ok(c) => c,
@@ -765,9 +993,10 @@ async fn discover_content(p2p: &P2PHandle, pool: &DbPool) -> ContentDiscovery {
         match crate::db::content_diesel::list_content_anchor_inventory(
             &mut conn,
             &app_ctx,
+            0,
             i64::MAX,
         ) {
-            Ok(v) => v.into_iter().collect(),
+            Ok((rows, _total)) => rows.into_iter().collect(),
             Err(e) => {
                 tracing::warn!(error = %e, "projection-reconcile[content]: local inventory failed; skipping sweep");
                 return ContentDiscovery::empty(0);
@@ -799,6 +1028,8 @@ async fn discover_content(p2p: &P2PHandle, pool: &DbPool) -> ContentDiscovery {
             },
             agent_cid: p2p.agent_pubkey().to_string(),
             request_id: uuid::Uuid::new_v4().to_string(),
+            // Rotating window: this sweep asks for the page at `sweep_offset`.
+            inventory_offset: Some(sweep_offset),
         };
         let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
             Ok(r) => r,
@@ -821,11 +1052,25 @@ async fn discover_content(p2p: &P2PHandle, pool: &DbPool) -> ContentDiscovery {
             }
         };
 
+        // Honest total (Fix 2a) drives the window and truncation observability:
+        // when `total > entries.len()` the peer inventory is WINDOWED — ids
+        // outside this page are unknown-this-sweep, not absent. This arm classifies
+        // only ADVERTISED ids (classify_content_gap below), so it never concludes
+        // absence/in-sync about a non-advertised id; the window covers the rest.
+        max_peer_total = max_peer_total.max(payload.total as u64);
+        // Offset-aware (see discover_rea): rows remain beyond this page only when
+        // offset + served < total, so the final page of a window is not
+        // mislabelled "windowed".
+        let windowed =
+            (sweep_offset as usize).saturating_add(payload.entries.len()) < payload.total;
+
         tracing::info!(
             target: "elohim_storage::projection_reconcile",
             peer = %peer.peer_id,
             entries = payload.entries.len(),
             peer_total = payload.total,
+            offset = sweep_offset,
+            windowed = windowed,
             "projection-reconcile[content]: peer inventory received"
         );
 
@@ -841,6 +1086,13 @@ async fn discover_content(p2p: &P2PHandle, pool: &DbPool) -> ContentDiscovery {
             }
         }
     }
+
+    // Advance the rotating window for the next sweep (wraps at the largest total).
+    window.advance(
+        PROJECTION_INVENTORY_TABLE_CONTENT,
+        sweep_offset,
+        max_peer_total,
+    );
 
     // (3) One presence query for the whole advertised union (reach-agnostic).
     let advertised_ids: Vec<String> = discovered_by.keys().cloned().collect();

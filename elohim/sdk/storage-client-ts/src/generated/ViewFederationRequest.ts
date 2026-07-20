@@ -8,4 +8,26 @@ import type { ViewKind } from "./ViewKind";
  * F-T16: wire envelope only. The codec lands in F-T17 and the responder
  * handler in F-T20.
  */
-export type ViewFederationRequest = { viewKind: ViewKind, agentCid: string, requestId: string, };
+export type ViewFederationRequest = { viewKind: ViewKind, agentCid: string, requestId: string, 
+/**
+ * Rotating window offset for `ProjectionInventory` requests: the responder
+ * serves its inventory starting at this offset (0 / absent = the hot set, as
+ * before), so successive reconcile sweeps advance a window across the whole
+ * corpus rather than re-advertising only the capped hot set forever. Ignored
+ * for non-inventory view kinds.
+ *
+ * ## Wire compatibility (MANDATORY — mixed-version peers during rolling
+ * deploys)
+ *
+ * Additive and optional. MessagePack via `to_vec_named` is map-keyed and this
+ * struct is NOT `deny_unknown_fields`, so:
+ * - a NEW peer sending this key to an OLD responder: the old struct lacks the
+ *   field and ignores the unknown key → serves offset 0 (yesterday's behavior);
+ * - an OLD peer sending no key to a NEW responder: `#[serde(default)]` yields
+ *   `None` → offset 0 (yesterday's behavior).
+ *
+ * `skip_serializing_if` keeps the `None` wire bytes byte-identical to the
+ * pre-field encoding, so the `canonical_bytes` dedup key is unchanged for
+ * every existing caller.
+ */
+inventoryOffset: number | null, };

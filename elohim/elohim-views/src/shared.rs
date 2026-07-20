@@ -233,6 +233,27 @@ pub struct ViewFederationRequest {
     pub view_kind: ViewKind,
     pub agent_cid: String,
     pub request_id: String,
+    /// Rotating window offset for `ProjectionInventory` requests: the responder
+    /// serves its inventory starting at this offset (0 / absent = the hot set, as
+    /// before), so successive reconcile sweeps advance a window across the whole
+    /// corpus rather than re-advertising only the capped hot set forever. Ignored
+    /// for non-inventory view kinds.
+    ///
+    /// ## Wire compatibility (MANDATORY — mixed-version peers during rolling
+    /// deploys)
+    ///
+    /// Additive and optional. MessagePack via `to_vec_named` is map-keyed and this
+    /// struct is NOT `deny_unknown_fields`, so:
+    /// - a NEW peer sending this key to an OLD responder: the old struct lacks the
+    ///   field and ignores the unknown key → serves offset 0 (yesterday's behavior);
+    /// - an OLD peer sending no key to a NEW responder: `#[serde(default)]` yields
+    ///   `None` → offset 0 (yesterday's behavior).
+    ///
+    /// `skip_serializing_if` keeps the `None` wire bytes byte-identical to the
+    /// pre-field encoding, so the `canonical_bytes` dedup key is unchanged for
+    /// every existing caller.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inventory_offset: Option<u32>,
 }
 
 /// Response envelope for `/elohim/view-federation/1.0.0` — peer B returns the
@@ -280,5 +301,95 @@ impl ViewSlice {
             payload: &self.payload,
         })
         .expect("canonical slice msgpack should not fail")
+    }
+}
+
+#[cfg(test)]
+mod inventory_offset_wire_compat_tests {
+    use super::*;
+
+    /// The pre-field shape of the request — a stand-in for an OLD (not-yet-updated)
+    /// peer's struct during a rolling deploy. It has NO `inventory_offset` and is
+    /// NOT `deny_unknown_fields`, exactly like the real struct was yesterday.
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+    #[serde(rename_all = "camelCase")]
+    struct OldViewFederationRequest {
+        view_kind: ViewKind,
+        agent_cid: String,
+        request_id: String,
+    }
+
+    #[test]
+    fn none_offset_is_byte_identical_to_pre_field_encoding() {
+        // `skip_serializing_if` means a `None` offset adds no wire bytes, so every
+        // existing caller's `canonical_bytes` (dedup key) is unchanged.
+        let new = ViewFederationRequest {
+            view_kind: ViewKind::Cluster,
+            agent_cid: "agent".into(),
+            request_id: "r".into(),
+            inventory_offset: None,
+        };
+        let old = OldViewFederationRequest {
+            view_kind: ViewKind::Cluster,
+            agent_cid: "agent".into(),
+            request_id: "r".into(),
+        };
+        assert_eq!(
+            rmp_serde::to_vec_named(&new).unwrap(),
+            rmp_serde::to_vec_named(&old).unwrap(),
+            "None offset must serialize byte-identically to the pre-field struct"
+        );
+    }
+
+    #[test]
+    fn old_peer_decodes_new_bytes_ignoring_the_unknown_key() {
+        // NEW peer emits a request carrying inventory_offset; an OLD peer must
+        // decode it at yesterday's behavior (offset 0), ignoring the extra key.
+        let new = ViewFederationRequest {
+            view_kind: ViewKind::ProjectionInventory {
+                table: "content".into(),
+            },
+            agent_cid: "agent".into(),
+            request_id: "r".into(),
+            inventory_offset: Some(1000),
+        };
+        let bytes = rmp_serde::to_vec_named(&new).unwrap();
+        let old: OldViewFederationRequest =
+            rmp_serde::from_slice(&bytes).expect("old struct tolerates the unknown offset key");
+        assert_eq!(old.agent_cid, "agent");
+        assert_eq!(old.request_id, "r");
+    }
+
+    #[test]
+    fn new_peer_decodes_old_bytes_defaulting_offset_to_none() {
+        // OLD peer emits a request without inventory_offset; a NEW peer must
+        // decode it with the field defaulting to None (offset 0).
+        let old = OldViewFederationRequest {
+            view_kind: ViewKind::ProjectionInventory {
+                table: "content".into(),
+            },
+            agent_cid: "agent".into(),
+            request_id: "r".into(),
+        };
+        let bytes = rmp_serde::to_vec_named(&old).unwrap();
+        let new: ViewFederationRequest =
+            rmp_serde::from_slice(&bytes).expect("new struct defaults the missing offset");
+        assert_eq!(new.inventory_offset, None, "missing key defaults to None");
+        assert_eq!(new.agent_cid, "agent");
+    }
+
+    #[test]
+    fn offset_round_trips_when_present() {
+        let req = ViewFederationRequest {
+            view_kind: ViewKind::ProjectionInventory {
+                table: "content".into(),
+            },
+            agent_cid: "agent".into(),
+            request_id: "r".into(),
+            inventory_offset: Some(2000),
+        };
+        let bytes = rmp_serde::to_vec_named(&req).unwrap();
+        let back: ViewFederationRequest = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(back, req);
     }
 }

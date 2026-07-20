@@ -239,6 +239,11 @@ pub struct SliceContext<'a> {
     pub keypair: &'a libp2p::identity::Keypair,
     /// DB pool for local-slice queries, or `None` in test contexts.
     pub pool: Option<&'a crate::db::DbPool>,
+    /// Rotating-window offset for a `ProjectionInventory` request (from
+    /// `ViewFederationRequest.inventory_offset`; `None` ⇒ 0). Ignored for other
+    /// view kinds. Lets successive reconcile sweeps window across the whole
+    /// corpus instead of re-serving only the capped hot set.
+    pub inventory_offset: Option<u32>,
 }
 
 /// Build a signed [`ViewFederationResponse`] for an inbound request.
@@ -272,7 +277,8 @@ pub async fn build_response_slice(
 ) -> Result<ViewFederationResponse, libp2p::identity::SigningError> {
     // ProjectionInventory: not agent-scoped. Build from local SQL directly.
     if let ViewKind::ProjectionInventory { table } = &view_kind {
-        let (payload, state) = build_inventory_payload(ctx.pool, table);
+        let (payload, state) =
+            build_inventory_payload(ctx.pool, table, ctx.inventory_offset.unwrap_or(0));
         let mut slice = ViewSlice {
             peer_id: ctx.local_peer_id,
             view_kind: view_kind.clone(),
@@ -408,6 +414,7 @@ fn fit_inventory_to_budget(payload: &mut ProjectionInventoryPayload, budget: usi
 fn build_inventory_payload(
     pool: Option<&crate::db::DbPool>,
     table: &str,
+    offset: u32,
 ) -> (serde_json::Value, FreshnessState) {
     let empty = || {
         (
@@ -441,16 +448,21 @@ fn build_inventory_payload(
         return match crate::db::content_diesel::list_content_anchor_inventory(
             &mut conn,
             &app_ctx,
+            i64::from(offset),
             PROJECTION_INVENTORY_CAP,
         ) {
-            Ok(rows) => {
-                // `list_content_anchor_inventory` returns pairs only (no separate
-                // count), so `total` reports what we ACTUALLY serve. When the row
-                // set fills the cap the inventory may be truncated — surface it as
-                // a WARN so a cap is never silent (the requester otherwise cannot
-                // tell a full-cap page from an exact-cap corpus).
-                let cap_truncated = rows.len() as i64 >= PROJECTION_INVENTORY_CAP;
-                let total = rows.len();
+            Ok((rows, db_total)) => {
+                // HONEST total: the true whole-corpus count (offset-invariant), NOT
+                // the served page length. This is what lets the requester detect
+                // truncation on the wire and window the cold tail across sweeps.
+                let total = usize::try_from(db_total).unwrap_or(usize::MAX);
+                let served = rows.len();
+                // Truncated only when rows remain BEYOND this page: offset + served
+                // < total. Accounting for the offset means the final page of a
+                // rotating window (which reaches the corpus end) is NOT mislabelled
+                // "windowed" just because served < total. Surfaced as a WARN so a
+                // genuine mid-window truncation is never silent.
+                let cap_truncated = (offset as usize).saturating_add(served) < total;
                 let entries = rows
                     .into_iter()
                     .map(|(id, dht_anchor_hash)| ProjectionInventoryEntry {
@@ -474,9 +486,12 @@ fn build_inventory_payload(
                         target: "elohim_storage::view_federation",
                         table = %table,
                         cap = PROJECTION_INVENTORY_CAP,
+                        offset = offset,
                         served = payload.entries.len(),
-                        "ProjectionInventory: content inventory truncated at cap \
-                         (advertising the hot set first by updated_at-desc; true count exceeds cap)"
+                        total,
+                        "ProjectionInventory: content inventory windowed \
+                         (this page does not carry the whole corpus; honest total on the wire \
+                         lets the requester window the remainder across sweeps)"
                     );
                 }
                 if byte_dropped > 0 {
@@ -518,6 +533,7 @@ fn build_inventory_payload(
     match crate::db::rea_commitments::inventory_for_reconcile(
         &mut conn,
         &app_ctx,
+        i64::from(offset),
         PROJECTION_INVENTORY_CAP,
     ) {
         Ok((rows, total)) => {
@@ -595,6 +611,7 @@ mod tests {
             view_kind: ViewKind::Cluster,
             agent_cid: "agent_abc".to_string(),
             request_id: "req_001".to_string(),
+            inventory_offset: None,
         };
         let bytes = rmp_serde::to_vec_named(&req).unwrap();
         let back: ViewFederationRequest = rmp_serde::from_slice(&bytes).unwrap();
@@ -612,6 +629,7 @@ mod tests {
             view_kind: ViewKind::PeerTopology,
             agent_cid: "agent_xyz".to_string(),
             request_id: "req_002".to_string(),
+            inventory_offset: None,
         };
         let mut buf: Vec<u8> = Vec::new();
         {
@@ -713,7 +731,7 @@ mod tests {
         // Poolless/conductor-less context: the content table is KNOWN, but with
         // no pool the responder must return an honest empty inventory (Offline),
         // never a fabricated one.
-        let (val, state) = build_inventory_payload(None, PROJECTION_INVENTORY_TABLE_CONTENT);
+        let (val, state) = build_inventory_payload(None, PROJECTION_INVENTORY_TABLE_CONTENT, 0);
         assert_eq!(state, FreshnessState::Offline);
         let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
         assert_eq!(payload.table, "content");
@@ -724,7 +742,7 @@ mod tests {
     #[test]
     fn unknown_table_still_empty_after_content_added() {
         // Adding the `content` table must not make an UNKNOWN table serve rows.
-        let (val, state) = build_inventory_payload(None, "agreements");
+        let (val, state) = build_inventory_payload(None, "agreements", 0);
         assert_eq!(state, FreshnessState::Offline);
         let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
         assert_eq!(payload.table, "agreements");
@@ -763,7 +781,8 @@ mod tests {
             create_content(&mut conn, &ctx, mk("wf:noanchor", "commons", None)).unwrap();
         }
 
-        let (val, state) = build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_CONTENT);
+        let (val, state) =
+            build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_CONTENT, 0);
         assert_eq!(state, FreshnessState::Live);
         let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
         assert_eq!(payload.table, "content");
@@ -775,6 +794,62 @@ mod tests {
         );
         assert_eq!(payload.entries[0].dht_anchor_hash, "anc-1");
         assert_eq!(payload.total, 1);
+    }
+
+    #[test]
+    fn content_inventory_offset_windows_across_corpus_with_honest_total() {
+        // Structural non-convergence fix (Fix 2a + 2b): a corpus larger than one
+        // page must (a) advertise the HONEST whole-corpus total (not the served
+        // count) so truncation is visible on the wire, and (b) advance a window
+        // via the request offset so the cold tail is eventually served.
+        use crate::db::content_diesel::{create_content, CreateContentInput};
+        let pool = crate::test_util::test_pool();
+        let ctx = crate::db::AppContext::default_lamad();
+        // Three anchored commons rows. Ordering across pages is deterministic via
+        // the (updated_at desc, id asc) tiebreak in the query; the assertions here
+        // only need the counts, so exact identities are not pinned.
+        for id in ["cw:a", "cw:b", "cw:c"] {
+            let mut conn = pool.get().expect("pool conn");
+            create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: id.to_string(),
+                    title: id.to_string(),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash: None,
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: None,
+                    dht_anchor_hash: Some(format!("anc-{id}")),
+                },
+            )
+            .unwrap();
+        }
+
+        // Page 0 (offset 0). The honest total is 3 regardless of how many rows a
+        // single page carries — the requester can always detect the remainder.
+        let (val0, _) = build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_CONTENT, 0);
+        let p0: ProjectionInventoryPayload = serde_json::from_value(val0).unwrap();
+        assert_eq!(p0.total, 3, "honest total = whole corpus, not served count");
+
+        // A window past the first row (offset 2) reaches the cold tail — proving
+        // successive sweeps cover the corpus rather than re-serving the hot set.
+        let (val2, _) = build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_CONTENT, 2);
+        let p2: ProjectionInventoryPayload = serde_json::from_value(val2).unwrap();
+        assert_eq!(p2.total, 3, "total is offset-invariant");
+        let tail_ids: Vec<&str> = p2.entries.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(
+            tail_ids.len(),
+            1,
+            "offset 2 over a 3-row corpus serves exactly the cold tail row"
+        );
     }
 
     /// A realistic content entry: ~68-char id + 53-char anchor. Mirrors the live

@@ -1245,13 +1245,30 @@ const DISTRIBUTION_SAFE_REACH: [&str; 3] = ["community", "public", "commons"];
 pub fn list_content_anchor_inventory(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
+    offset: i64,
     cap: i64,
-) -> Result<Vec<(String, String)>, StorageError> {
+) -> Result<(Vec<(String, String)>, i64), StorageError> {
+    // Honest total: the TRUE count of anchored + distribution-safe rows (the same
+    // predicates the page query below filters on), NOT the served page length.
+    // A responder that reports served-count as total makes truncation invisible on
+    // the wire — the requester cannot tell a full window from the whole corpus, so
+    // the cold tail past the cap stays permanently undiscovered.
+    let total: i64 = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::dht_anchor_hash.is_not_null())
+        .filter(content::reach.eq_any(DISTRIBUTION_SAFE_REACH))
+        .count()
+        .get_result(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!("content anchor inventory count failed: {e}"))
+        })?;
+
     let rows: Vec<(String, Option<String>)> = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::dht_anchor_hash.is_not_null())
         .filter(content::reach.eq_any(DISTRIBUTION_SAFE_REACH))
         .order((content::updated_at.desc(), content::id.asc()))
+        .offset(offset.max(0))
         .limit(cap)
         .select((content::id, content::dht_anchor_hash))
         .load(conn)
@@ -1262,10 +1279,11 @@ pub fn list_content_anchor_inventory(
     // `IS NOT NULL` guarantees `Some`; `filter_map` discards defensively rather
     // than unwrap. An empty-string anchor (`""`, distinct from NULL) is admitted
     // as-is — the consumer's diff treats an empty peer anchor as non-divergence.
-    Ok(rows
+    let entries = rows
         .into_iter()
         .filter_map(|(id, anchor)| anchor.map(|a| (id, a)))
-        .collect())
+        .collect();
+    Ok((entries, total))
 }
 
 /// Get content count for an app
@@ -1794,7 +1812,7 @@ mod tests {
         )
         .unwrap();
 
-        let inv = list_content_anchor_inventory(&mut conn, &ctx, i64::MAX).unwrap();
+        let (inv, total) = list_content_anchor_inventory(&mut conn, &ctx, 0, i64::MAX).unwrap();
         let ids: Vec<&str> = inv.iter().map(|(id, _)| id.as_str()).collect();
 
         // Exactly the three anchored distribution-safe rows, ordered updated_at
@@ -1804,6 +1822,8 @@ mod tests {
             vec!["c:public", "c:community", "c:commons"],
             "only anchored distribution-safe rows, ordered by updated_at desc (hot set first)"
         );
+        // Honest total counts exactly the anchored distribution-safe rows.
+        assert_eq!(total, 3, "total counts the anchored distribution-safe rows");
         // Anchor value carried through verbatim (discovery pair).
         let map: std::collections::HashMap<String, String> = inv.into_iter().collect();
         assert_eq!(map.get("c:public").map(String::as_str), Some("anc-public"));
@@ -1815,13 +1835,35 @@ mod tests {
         assert!(!map.contains_key("c:public-noanchor"));
 
         // Cap is respected (LIMIT) AND truncation surfaces the hot set: capping
-        // at 2 keeps the two most-recently-updated rows, drops the cold tail.
-        let capped = list_content_anchor_inventory(&mut conn, &ctx, 2).unwrap();
+        // at 2 keeps the two most-recently-updated rows, drops the cold tail —
+        // but the honest `total` still reports the full 3 so truncation is
+        // visible on the wire (the structural non-convergence fix).
+        let (capped, capped_total) = list_content_anchor_inventory(&mut conn, &ctx, 0, 2).unwrap();
         let capped_ids: Vec<&str> = capped.iter().map(|(id, _)| id.as_str()).collect();
         assert_eq!(
             capped_ids,
             vec!["c:public", "c:community"],
             "cap limits the rows AND surfaces the hot set (drops the coldest tail)"
+        );
+        assert_eq!(
+            capped_total, 3,
+            "honest total exceeds the served page count under a cap (truncation is visible)"
+        );
+
+        // Offset advances a rotating window: page (offset=2, cap=2) covers the
+        // cold tail the first page dropped — so successive sweeps see the whole
+        // corpus, not just the perpetual hot set.
+        let (windowed, windowed_total) =
+            list_content_anchor_inventory(&mut conn, &ctx, 2, 2).unwrap();
+        let windowed_ids: Vec<&str> = windowed.iter().map(|(id, _)| id.as_str()).collect();
+        assert_eq!(
+            windowed_ids,
+            vec!["c:commons"],
+            "offset window reaches the cold tail beyond the first page"
+        );
+        assert_eq!(
+            windowed_total, 3,
+            "total is offset-invariant (whole-corpus count)"
         );
     }
 
@@ -1859,7 +1901,7 @@ mod tests {
                 .unwrap();
         }
 
-        let inv = list_content_anchor_inventory(&mut conn, &ctx, i64::MAX).unwrap();
+        let (inv, _total) = list_content_anchor_inventory(&mut conn, &ctx, 0, i64::MAX).unwrap();
         let ids: Vec<&str> = inv.iter().map(|(id, _)| id.as_str()).collect();
         assert_eq!(
             ids,

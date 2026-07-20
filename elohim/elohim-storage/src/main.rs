@@ -3452,7 +3452,7 @@ async fn async_main(
 
                 tokio::spawn(async move {
                     use elohim_storage::p2p::projection_reconcile::{
-                        heal_decision, run_discovery, run_heal, HealAction,
+                        heal_decision, run_discovery, run_heal, HealAction, InventoryWindow,
                     };
                     use std::sync::atomic::Ordering;
                     use tokio::time::{interval, Duration, MissedTickBehavior};
@@ -3469,12 +3469,18 @@ async fn async_main(
 
                     let mut ticker = interval(Duration::from_secs(secs));
                     ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                    // Rotating inventory window, owned by this single discovery
+                    // loop (no locking). Carries the per-table offset across sweeps
+                    // so a corpus larger than the responder's page cap is windowed
+                    // over successive sweeps instead of re-diffing only the hot set.
+                    let mut inventory_window = InventoryWindow::new();
                     loop {
                         tokio::select! {
                             _ = ticker.tick() => {
                                 // Discovery is conductor-free and bounded (peer
                                 // asks capped by PEER_TIMEOUT) — runs EVERY tick.
-                                let plan = run_discovery(&handle, &pool).await;
+                                let plan =
+                                    run_discovery(&handle, &pool, &mut inventory_window).await;
 
                                 let bridge_up = hc_cell.get().is_some();
                                 let in_flight = heal_inflight.load(Ordering::Acquire);

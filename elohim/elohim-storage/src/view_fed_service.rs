@@ -85,6 +85,7 @@ impl ViewFedService {
             connected_peers,
             keypair: &self.keypair,
             pool: self.db_pool.as_ref(),
+            inventory_offset: request.inventory_offset,
         };
         build_response_slice(request.view_kind, ctx).await
     }
@@ -129,6 +130,7 @@ mod tests {
             view_kind: ViewKind::Cluster,
             agent_cid: "agent-cid-self".into(),
             request_id: "req-1".into(),
+            inventory_offset: None,
         };
         let res = svc.handle(req, &[]).await.expect("signs");
         assert_eq!(res.agent_cid, "agent-cid-self");
@@ -144,6 +146,7 @@ mod tests {
             view_kind: ViewKind::Cluster,
             agent_cid: "some-other-agent".into(),
             request_id: "req-2".into(),
+            inventory_offset: None,
         };
         let res = svc.handle(req, &[]).await.expect("signs");
         assert_eq!(res.slice.freshness.state, FreshnessState::Offline);

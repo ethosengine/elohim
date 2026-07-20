@@ -106,6 +106,9 @@ impl Federator {
                     view_kind: vk,
                     agent_cid: agent_cid_owned,
                     request_id,
+                    // Federator fetches non-inventory view kinds; the rotating
+                    // inventory window is driven only by projection_reconcile.
+                    inventory_offset: None,
                 };
 
                 match p2p.view_federate(peer_id, request, per_peer_timeout).await {

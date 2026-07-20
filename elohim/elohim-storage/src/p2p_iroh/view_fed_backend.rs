@@ -167,6 +167,7 @@ mod tests {
                 view_kind: ViewKind::Cluster,
                 agent_cid: "agent-cid-self".into(),
                 request_id: "r1".into(),
+                inventory_offset: None,
             })
             .await;
         assert_eq!(res.agent_cid, "agent-cid-self");
@@ -182,6 +183,7 @@ mod tests {
                 view_kind: ViewKind::Cluster,
                 agent_cid: "some-other-agent".into(),
                 request_id: "r2".into(),
+                inventory_offset: None,
             })
             .await;
         assert_eq!(res.slice.freshness.state, FreshnessState::Offline);

@@ -353,8 +353,11 @@ pub fn list_commitments(
 pub fn inventory_for_reconcile(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
+    offset: i64,
     cap: i64,
 ) -> Result<(Vec<(String, String)>, usize), StorageError> {
+    // `total` is already the honest whole-corpus count (offset-invariant), so the
+    // requester can always tell a windowed page from the full inventory.
     let total: i64 = rea_commitments::table
         .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
         .count()
@@ -364,6 +367,7 @@ pub fn inventory_for_reconcile(
     let rows: Vec<(String, Option<String>)> = rea_commitments::table
         .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
         .order(rea_commitments::created_at.desc())
+        .offset(offset.max(0))
         .limit(cap)
         .select((rea_commitments::id, rea_commitments::dht_anchor_hash))
         .load(conn)
