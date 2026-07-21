@@ -1,0 +1,350 @@
+//! `epr flow seal | reseal | hold` (spec §2–§3) — the three deliberate acts that write
+//! `DepEdge` records into the `.eprfs/status/` sidecar. `seal` blesses a fresh edge,
+//! `reseal` supersedes this file's stale outgoing cite-seal edges, `hold` records a
+//! declared deviation. All timestamps are git-derived — never a wall-clock read.
+
+use std::path::{Path, PathBuf};
+
+use elohim_epr_rea::{DepEdge, EdgeStatus, FlowRecord, FlowStore, Governor, SidecarFlowStore};
+use serde::Serialize;
+
+use super::edges::{edge_verdict, governor_label, EdgeIndex, Verdict};
+use super::{body_cid_of_file, head_commit_epoch, rel_to_root, repo_agent, FlowError, FlowResult};
+
+/// The machine-facing result of one seal/reseal/hold act (`--json` consumers read this).
+#[derive(Debug, Serialize)]
+pub struct SealOutcome {
+    /// `seal` | `reseal` | `hold`.
+    pub action: String,
+    pub from: String,
+    pub to: String,
+    pub governor: String,
+    /// Full sealed CIDv1 string — `Some` only for cite-seal (and hold) edges.
+    pub sealed_cid: Option<String>,
+    pub sealed_at: i64,
+    /// The declared-deviation reason, for `hold`.
+    pub held_reason: Option<String>,
+    /// The atom CID of the appended `FlowRecord::Edge`.
+    pub record_cid: String,
+}
+
+impl SealOutcome {
+    pub fn render(&self) {
+        let seal = self
+            .sealed_cid
+            .as_deref()
+            .map(short)
+            .unwrap_or_else(|| "—".to_string());
+        match self.action.as_str() {
+            "hold" => println!(
+                "held    {} → {}  [{}] {}  (reason: {})",
+                self.from,
+                self.to,
+                self.governor,
+                seal,
+                self.held_reason.as_deref().unwrap_or("")
+            ),
+            action => println!(
+                "{action:<7} {} → {}  [{}] {}",
+                self.from, self.to, self.governor, seal
+            ),
+        }
+    }
+}
+
+fn short(cid: &str) -> String {
+    if cid.len() > 12 {
+        format!("{}…{}", &cid[..8], &cid[cid.len() - 4..])
+    } else {
+        cid.to_string()
+    }
+}
+
+/// `--governor` value → `Governor` (default cite-seal). Non-seal governors carry a payload
+/// after the first colon (`compiler:elohim-storage`, `test:schema_contract.rs`).
+fn parse_governor(spec: &str) -> FlowResult<Governor> {
+    if spec == "cite-seal" {
+        return Ok(Governor::CiteSeal);
+    }
+    let (kind, value) = spec.split_once(':').ok_or_else(|| {
+        FlowError::InvalidArguments(format!(
+            "governor `{spec}` must be cite-seal or <class>:<payload> \
+             (compiler|codegen|schema-contract|test)"
+        ))
+    })?;
+    let value = value.to_string();
+    match kind {
+        "compiler" => Ok(Governor::Compiler(value)),
+        "codegen" => Ok(Governor::Codegen(value)),
+        "schema-contract" => Ok(Governor::SchemaContract(value)),
+        "test" => Ok(Governor::Test(value)),
+        other => Err(FlowError::InvalidArguments(format!(
+            "unknown governor class `{other}`"
+        ))),
+    }
+}
+
+/// Resolve a CLI path argument to a repo-relative path under `root`.
+fn rel_under(root: &Path, arg: &str) -> String {
+    let abs = if Path::new(arg).is_absolute() {
+        PathBuf::from(arg)
+    } else {
+        root.join(arg)
+    };
+    rel_to_root(root, &abs)
+}
+
+/// The full upstream body CIDv1 required by a cite-seal edge; an unreadable upstream is a
+/// dangling-at-birth error (spec §3 — a cite-seal must seal something).
+fn seal_upstream(root: &Path, to: &str) -> FlowResult<cid::Cid> {
+    body_cid_of_file(&root.join(to)).ok_or_else(|| {
+        FlowError::InvalidArguments(format!(
+            "cannot cite-seal `{to}`: upstream unreadable (dangling at birth)"
+        ))
+    })
+}
+
+/// `epr flow seal <file> --on <upstream> [--governor …] [--desc …]`.
+pub fn seal(
+    root: &Path,
+    file: &str,
+    on: &str,
+    governor_spec: &str,
+    desc: Option<String>,
+) -> FlowResult<SealOutcome> {
+    let from = rel_under(root, file);
+    let to = rel_under(root, on);
+    let governor = parse_governor(governor_spec)?;
+
+    // Only a cite-seal edge seals a CID; every governed edge records none (the invariant
+    // `sealed_cid.is_some() ⇔ CiteSeal` is enforced by `DepEdge::new`).
+    let sealed_cid = if matches!(governor, Governor::CiteSeal) {
+        Some(seal_upstream(root, &to)?)
+    } else {
+        None
+    };
+    let sealed_at = head_commit_epoch(root).unwrap_or(0);
+
+    let edge = DepEdge::new(
+        from,
+        to,
+        desc,
+        governor,
+        sealed_cid,
+        repo_agent(),
+        sealed_at,
+        None,
+    )?;
+    append_edge(root, "seal", edge)
+}
+
+/// `epr flow reseal <file> [--on <upstream>] [--all-stale]` — the deliberate re-bless.
+/// Supersedes SIDECAR cite-seal edges only (doc `cites:` are cite-gen-managed and stay
+/// untouched). With `--on`, reseals that one edge; with `--all-stale`, every stale outgoing
+/// cite-seal sidecar edge of `file`.
+pub fn reseal(
+    root: &Path,
+    file: &str,
+    on: Option<&str>,
+    all_stale: bool,
+) -> FlowResult<Vec<SealOutcome>> {
+    let from = rel_under(root, file);
+    let store = SidecarFlowStore::open(root)?;
+    let index = EdgeIndex::build(root, &store)?;
+
+    // Candidate slots: this file's outgoing sidecar cite-seal edges (skip governed/held/doc).
+    let candidates: Vec<(String, Option<String>)> = index
+        .outgoing(&from)
+        .filter(|e| {
+            e.plane == super::edges::EdgePlane::Sidecar
+                && matches!(e.governor, Governor::CiteSeal)
+                && e.held.is_none()
+        })
+        .filter(|e| match on {
+            Some(target) => e.to == rel_under(root, target),
+            None => all_stale && matches!(edge_verdict(root, e), Verdict::Stale),
+        })
+        .map(|e| (e.to.clone(), e.desc.clone()))
+        .collect();
+
+    if candidates.is_empty() {
+        let hint = match on {
+            Some(t) => format!("no sidecar cite-seal edge {from} → {}", rel_under(root, t)),
+            None => {
+                format!("no stale outgoing cite-seal edge for {from} (use --on or --all-stale)")
+            }
+        };
+        return Err(FlowError::InvalidArguments(hint));
+    }
+
+    let sealed_at = head_commit_epoch(root).unwrap_or(0);
+    let mut store = store;
+    let mut outcomes = Vec::new();
+    for (to, desc) in candidates {
+        let sealed_cid = seal_upstream(root, &to)?;
+        let edge = DepEdge::new(
+            from.clone(),
+            to,
+            desc,
+            Governor::CiteSeal,
+            Some(sealed_cid),
+            repo_agent(),
+            sealed_at,
+            None,
+        )?;
+        outcomes.push(append_edge_to(&mut store, "reseal", edge)?);
+    }
+    Ok(outcomes)
+}
+
+/// `epr flow hold <file> --on <upstream> --reason <text> [--valid-from <iso8601>]` — record
+/// a declared deviation. Hold applies to the cite-seal class (only that class goes stale);
+/// it still seals the current upstream CID so the invariant holds, then marks it `Held`.
+pub fn hold(
+    root: &Path,
+    file: &str,
+    on: &str,
+    reason: String,
+    valid_from: Option<&str>,
+) -> FlowResult<SealOutcome> {
+    let from = rel_under(root, file);
+    let to = rel_under(root, on);
+    let sealed_cid = seal_upstream(root, &to)?;
+    let sealed_at = head_commit_epoch(root).unwrap_or(0);
+    let valid_from = match valid_from {
+        Some(iso) => iso8601_to_epoch(iso)?,
+        None => sealed_at,
+    };
+
+    let edge = DepEdge::new(
+        from,
+        to,
+        None,
+        Governor::CiteSeal,
+        Some(sealed_cid),
+        repo_agent(),
+        sealed_at,
+        Some(EdgeStatus::Held {
+            reason: reason.clone(),
+            valid_from,
+            superseded_by: None,
+        }),
+    )?;
+    let mut outcome = append_edge(root, "hold", edge)?;
+    outcome.held_reason = Some(reason);
+    Ok(outcome)
+}
+
+fn append_edge(root: &Path, action: &str, edge: DepEdge) -> FlowResult<SealOutcome> {
+    let mut store = SidecarFlowStore::open(root)?;
+    append_edge_to(&mut store, action, edge)
+}
+
+fn append_edge_to(
+    store: &mut SidecarFlowStore,
+    action: &str,
+    edge: DepEdge,
+) -> FlowResult<SealOutcome> {
+    let outcome = SealOutcome {
+        action: action.to_string(),
+        from: edge.from.clone(),
+        to: edge.to.clone(),
+        governor: governor_label(&edge.governor),
+        sealed_cid: edge.sealed_cid.map(|c| c.to_string()),
+        sealed_at: edge.sealed_at,
+        held_reason: edge
+            .status
+            .as_ref()
+            .map(|EdgeStatus::Held { reason, .. }| reason.clone()),
+        record_cid: String::new(),
+    };
+    let record_cid = store.append(FlowRecord::Edge(edge))?;
+    Ok(SealOutcome {
+        record_cid: record_cid.to_string(),
+        ..outcome
+    })
+}
+
+/// Parse an ISO-8601 date/datetime (`YYYY-MM-DD` or `YYYY-MM-DDThh:mm:ss[Z]`, UTC) into a
+/// Unix epoch. Offset suffixes beyond `Z` are ignored (treated as UTC) — enough for the
+/// `--valid-from` override; the default path never touches this (it uses the git epoch).
+fn iso8601_to_epoch(s: &str) -> FlowResult<i64> {
+    let s = s.trim();
+    let (date, time) = match s.split_once(['T', ' ']) {
+        Some((d, t)) => (d, t),
+        None => (s, ""),
+    };
+    let mut dp = date.split('-');
+    let year = parse_field(dp.next(), "year", s)?;
+    let month = parse_field(dp.next(), "month", s)?;
+    let day = parse_field(dp.next(), "day", s)?;
+
+    let (h, mi, se) = if time.is_empty() {
+        (0, 0, 0)
+    } else {
+        // Strip a trailing `Z` or a `±hh:mm` offset — treat the wall time as UTC.
+        let core = time.trim_end_matches('Z');
+        let core = core
+            .split_once(['+'])
+            .map(|(t, _)| t)
+            .unwrap_or(core)
+            .trim();
+        let mut tp = core.split(':');
+        (
+            parse_field(tp.next(), "hour", s)?,
+            parse_field(tp.next(), "minute", s).unwrap_or(0),
+            parse_field(tp.next(), "second", s).unwrap_or(0),
+        )
+    };
+    Ok(days_from_civil(year, month, day) * 86_400 + h * 3600 + mi * 60 + se)
+}
+
+fn parse_field(part: Option<&str>, name: &str, whole: &str) -> FlowResult<i64> {
+    part.and_then(|p| p.trim().parse::<i64>().ok())
+        .ok_or_else(|| FlowError::InvalidArguments(format!("bad {name} in --valid-from `{whole}`")))
+}
+
+/// Days since the Unix epoch for a civil date (Howard Hinnant's algorithm; proleptic
+/// Gregorian, valid for any year). No wall-clock, no external date dependency.
+fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_governor_specs() {
+        assert_eq!(parse_governor("cite-seal").unwrap(), Governor::CiteSeal);
+        assert_eq!(
+            parse_governor("compiler:elohim-storage").unwrap(),
+            Governor::Compiler("elohim-storage".into())
+        );
+        assert_eq!(
+            parse_governor("test:schema_contract.rs").unwrap(),
+            Governor::Test("schema_contract.rs".into())
+        );
+        assert!(parse_governor("bogus").is_err());
+        assert!(parse_governor("weird:x").is_err());
+    }
+
+    #[test]
+    fn iso8601_epoch_golden() {
+        // 1970-01-01 is the epoch.
+        assert_eq!(iso8601_to_epoch("1970-01-01").unwrap(), 0);
+        // A known UTC instant: 2026-07-21T00:00:00Z.
+        assert_eq!(
+            iso8601_to_epoch("2026-07-21T00:00:00Z").unwrap(),
+            1_784_592_000
+        );
+        // Date-only defaults to midnight UTC.
+        assert_eq!(iso8601_to_epoch("2026-07-21").unwrap(), 1_784_592_000);
+        assert!(iso8601_to_epoch("not-a-date").is_err());
+    }
+}

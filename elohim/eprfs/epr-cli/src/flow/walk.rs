@@ -12,6 +12,7 @@ use elohim_epr_rea::{
 };
 use serde::Serialize;
 
+use super::edges::{edge_verdict, governor_label, EdgeIndex, IndexedEdge, Verdict};
 use super::{body_cid_of_file, rel_to_root, short_cid, FlowError, FlowResult, Labels};
 
 /// A resolved CID reference: the address plus its operational label.
@@ -66,6 +67,38 @@ pub struct FrontierView {
     pub outputs: Vec<Ref>,
     pub unfulfilled_commitments: Vec<CommitmentView>,
     pub scoped_intents: Vec<IntentView>,
+    /// Downstream cite-seal edges that reference the target and have gone stale — the work
+    /// a change here leaves open, surfaced from the seal-aware edge index.
+    pub stale_edges: Vec<EdgeView>,
+}
+
+/// One edge in the seal-aware walk's Edges section — `verdict · governor · desc`.
+#[derive(Debug, Clone, Serialize)]
+pub struct EdgeView {
+    pub from: String,
+    pub to: String,
+    pub verdict: String,
+    pub governor: String,
+    pub desc: Option<String>,
+}
+
+fn edge_view(edge: &IndexedEdge, verdict: &Verdict) -> EdgeView {
+    EdgeView {
+        from: edge.from.clone(),
+        to: edge.to.clone(),
+        verdict: verdict.word().to_string(),
+        governor: governor_label(&edge.governor),
+        desc: edge.desc.clone(),
+    }
+}
+
+/// The target's sealed edges, both directions (spec §2 one-graph index).
+#[derive(Debug, Serialize)]
+pub struct EdgeSection {
+    /// What the target depends on (edges `from` the target).
+    pub outgoing: Vec<EdgeView>,
+    /// Who depends on the target (edges `to` the target).
+    pub incoming: Vec<EdgeView>,
 }
 
 #[derive(Debug, Serialize)]
@@ -74,6 +107,7 @@ pub struct WalkResult {
     pub target_cid: String,
     pub lineage: LineageView,
     pub frontier: FrontierView,
+    pub edges: EdgeSection,
 }
 
 fn resolve(labels: &Labels, cid: &Cid) -> Ref {
@@ -192,6 +226,29 @@ pub fn walk(root: &Path, rel_path: &str) -> FlowResult<WalkResult> {
             .collect(),
     };
 
+    // Seal-aware edge surfaces (spec §2): the one-graph index, both directions.
+    let index = EdgeIndex::build(root, &store)?;
+    let outgoing: Vec<(EdgeView, Verdict)> = index
+        .outgoing(&target)
+        .map(|e| {
+            let verdict = edge_verdict(root, e);
+            (edge_view(e, &verdict), verdict)
+        })
+        .collect();
+    let incoming: Vec<(EdgeView, Verdict)> = index
+        .incoming(&target)
+        .map(|e| {
+            let verdict = edge_verdict(root, e);
+            (edge_view(e, &verdict), verdict)
+        })
+        .collect();
+    // walk-forward: the dependents that reference the target and have gone stale.
+    let stale_edges: Vec<EdgeView> = incoming
+        .iter()
+        .filter(|(_, v)| matches!(v, Verdict::Stale))
+        .map(|(view, _)| view.clone())
+        .collect();
+
     let frontier_view = FrontierView {
         dependents: frontier
             .dependents
@@ -205,6 +262,12 @@ pub fn walk(root: &Path, rel_path: &str) -> FlowResult<WalkResult> {
             .collect(),
         unfulfilled_commitments: scoped_unfulfilled,
         scoped_intents,
+        stale_edges,
+    };
+
+    let edges = EdgeSection {
+        outgoing: outgoing.into_iter().map(|(v, _)| v).collect(),
+        incoming: incoming.into_iter().map(|(v, _)| v).collect(),
     };
 
     Ok(WalkResult {
@@ -212,6 +275,7 @@ pub fn walk(root: &Path, rel_path: &str) -> FlowResult<WalkResult> {
         target_cid: cid.to_string(),
         lineage: lineage_view,
         frontier: frontier_view,
+        edges,
     })
 }
 
@@ -293,7 +357,29 @@ impl WalkResult {
         {
             println!("    (frontier clear — nothing downstream is open)");
         }
+
+        println!("\n  EDGES (sealed contract edges touching this artifact)");
+        if self.edges.outgoing.is_empty() && self.edges.incoming.is_empty() {
+            println!("    (no sealed edges reference this artifact)");
+        }
+        if !self.edges.outgoing.is_empty() {
+            println!("    outgoing (what this depends on):");
+            for e in &self.edges.outgoing {
+                print_edge_line(e);
+            }
+        }
+        if !self.edges.incoming.is_empty() {
+            println!("    incoming (who depends on this):");
+            for e in &self.edges.incoming {
+                print_edge_line(e);
+            }
+        }
     }
+}
+
+fn print_edge_line(e: &EdgeView) {
+    let desc = e.desc.as_deref().unwrap_or("");
+    println!("      {} · {} · {}", e.verdict, e.governor, desc);
 }
 
 // ---------------------------------------------------------------------------
@@ -308,6 +394,12 @@ pub struct StatusResult {
     pub commitments_active: usize,
     pub unfulfilled_total: usize,
     pub top_unfulfilled: Vec<CommitmentView>,
+    /// Sealed-edge health, partitioned by verdict (spec §2 one-graph index).
+    pub edges_sealed: usize,
+    pub edges_governed: usize,
+    pub edges_stale: usize,
+    pub edges_held: usize,
+    pub edges_dangling: usize,
 }
 
 pub fn status(root: &Path) -> FlowResult<StatusResult> {
@@ -350,6 +442,19 @@ pub fn status(root: &Path) -> FlowResult<StatusResult> {
     let unfulfilled_total = unfulfilled.len();
     unfulfilled.truncate(10);
 
+    // Seal-aware edge totals over the one-graph index, partitioned by verdict.
+    let index = EdgeIndex::build(root, &store)?;
+    let (mut sealed, mut governed, mut stale, mut held, mut dangling) = (0, 0, 0, 0, 0);
+    for edge in &index.edges {
+        match edge_verdict(root, edge) {
+            Verdict::Ok => sealed += 1,
+            Verdict::Governed(_) => governed += 1,
+            Verdict::Stale => stale += 1,
+            Verdict::Held(_) => held += 1,
+            Verdict::Dangling => dangling += 1,
+        }
+    }
+
     Ok(StatusResult {
         resources_labeled: labels.len(),
         events,
@@ -357,6 +462,11 @@ pub fn status(root: &Path) -> FlowResult<StatusResult> {
         commitments_active,
         unfulfilled_total,
         top_unfulfilled: unfulfilled,
+        edges_sealed: sealed,
+        edges_governed: governed,
+        edges_stale: stale,
+        edges_held: held,
+        edges_dangling: dangling,
     })
 }
 
@@ -368,6 +478,14 @@ impl StatusResult {
         println!("  intents:             {}", self.intents);
         println!("  active commitments:  {}", self.commitments_active);
         println!("  unfulfilled (total): {}", self.unfulfilled_total);
+        println!(
+            "  edges: {} sealed · {} governed · {} stale · {} held · {} dangling",
+            self.edges_sealed,
+            self.edges_governed,
+            self.edges_stale,
+            self.edges_held,
+            self.edges_dangling
+        );
         if !self.top_unfulfilled.is_empty() {
             println!("  top unfulfilled:");
             for c in &self.top_unfulfilled {

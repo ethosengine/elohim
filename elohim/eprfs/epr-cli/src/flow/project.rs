@@ -436,5 +436,8 @@ fn kind_name(record: &FlowRecord) -> &'static str {
         FlowRecord::Event(_) => "event",
         FlowRecord::Intent(_) => "intent",
         FlowRecord::Commitment(_) => "commitment",
+        // `project` never stages an Edge (those come from the seal verbs), but the match
+        // must stay exhaustive over `FlowRecord`.
+        FlowRecord::Edge(_) => "edge",
     }
 }

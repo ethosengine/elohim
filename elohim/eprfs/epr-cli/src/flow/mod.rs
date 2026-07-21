@@ -6,8 +6,10 @@
 //! CID (frontmatter excluded, matching the Python cite oracle), all timestamps come from
 //! git, and records are deduped by CID against the existing sidecar before append.
 
+pub mod edges;
 pub mod project;
 pub mod registry;
+pub mod seal;
 pub mod walk;
 
 use std::collections::BTreeMap;
@@ -135,11 +137,88 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
             }
             Ok(ExitCode::SUCCESS)
         }
+        "seal" => run_seal(&args[1..]),
+        "reseal" => run_reseal(&args[1..]),
+        "hold" => run_hold(&args[1..]),
         other => Err(FlowError::InvalidArguments(format!(
             "unknown flow subcommand `{other}`\n{}",
             usage()
         ))),
     }
+}
+
+/// The positional `<file>` (first non-flag argument) plus the remaining args untouched.
+fn positional_file(args: &[String]) -> FlowResult<(&str, &[String])> {
+    match args.first() {
+        Some(first) if !first.starts_with("--") => Ok((first.as_str(), &args[1..])),
+        _ => Err(FlowError::InvalidArguments(
+            "expected a <file> argument".into(),
+        )),
+    }
+}
+
+/// Pull a `--key <value>` option out of `rest`, erroring on a missing value.
+fn take_opt(rest: &[String], key: &str) -> FlowResult<Option<String>> {
+    let mut i = 0;
+    while i < rest.len() {
+        if rest[i] == key {
+            let value = rest
+                .get(i + 1)
+                .ok_or_else(|| FlowError::InvalidArguments(format!("{key} needs a value")))?;
+            return Ok(Some(value.clone()));
+        }
+        i += 1;
+    }
+    Ok(None)
+}
+
+fn run_seal(args: &[String]) -> FlowResult<ExitCode> {
+    let (file, tail) = positional_file(args)?;
+    let (opts, rest) = parse_global(tail)?;
+    let on = take_opt(&rest, "--on")?
+        .ok_or_else(|| FlowError::InvalidArguments("seal needs --on <upstream>".into()))?;
+    let governor = take_opt(&rest, "--governor")?.unwrap_or_else(|| "cite-seal".into());
+    let desc = take_opt(&rest, "--desc")?;
+    let outcome = seal::seal(&opts.root, file, &on, &governor, desc)?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&outcome)?);
+    } else {
+        outcome.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn run_reseal(args: &[String]) -> FlowResult<ExitCode> {
+    let (file, tail) = positional_file(args)?;
+    let (opts, rest) = parse_global(tail)?;
+    let on = take_opt(&rest, "--on")?;
+    let all_stale = rest.iter().any(|a| a == "--all-stale");
+    let outcomes = seal::reseal(&opts.root, file, on.as_deref(), all_stale)?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&outcomes)?);
+    } else {
+        for outcome in &outcomes {
+            outcome.render();
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn run_hold(args: &[String]) -> FlowResult<ExitCode> {
+    let (file, tail) = positional_file(args)?;
+    let (opts, rest) = parse_global(tail)?;
+    let on = take_opt(&rest, "--on")?
+        .ok_or_else(|| FlowError::InvalidArguments("hold needs --on <upstream>".into()))?;
+    let reason = take_opt(&rest, "--reason")?
+        .ok_or_else(|| FlowError::InvalidArguments("hold needs --reason <text>".into()))?;
+    let valid_from = take_opt(&rest, "--valid-from")?;
+    let outcome = seal::hold(&opts.root, file, &on, reason, valid_from.as_deref())?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&outcome)?);
+    } else {
+        outcome.render();
+    }
+    Ok(ExitCode::SUCCESS)
 }
 
 /// Pull `--root` and `--json` out of `args`, returning the remainder untouched.
@@ -171,7 +250,7 @@ fn parse_global(args: &[String]) -> FlowResult<(GlobalOpts, Vec<String>)> {
     Ok((GlobalOpts { root, json }, rest))
 }
 
-fn default_recipes(root: &Path) -> PathBuf {
+pub fn default_recipes(root: &Path) -> PathBuf {
     root.join(".claude/epr-meta/recipes.yaml")
 }
 
@@ -185,8 +264,15 @@ fn resolve_under(root: &Path, value: &str) -> PathBuf {
 }
 
 fn usage() -> String {
-    "usage: epr flow <project [--root DIR] [--recipes PATH] | walk <path> [--json] [--root DIR] \
-     | status [--root DIR] [--json]>"
+    "usage: epr flow <\n  \
+     project [--root DIR] [--recipes PATH]\n  \
+     | walk <path> [--json] [--root DIR]\n  \
+     | status [--root DIR] [--json]\n  \
+     | seal <file> --on <upstream> \
+     [--governor compiler:<unit>|codegen:<pipeline>|schema-contract:<test>|test:<id>|cite-seal] \
+     [--desc <text>] [--json] [--root DIR]\n  \
+     | reseal <file> [--on <upstream>] [--all-stale] [--json] [--root DIR]\n  \
+     | hold <file> --on <upstream> --reason <text> [--valid-from <iso8601>] [--json] [--root DIR]\n>"
         .to_string()
 }
 
@@ -362,6 +448,28 @@ pub fn cite_fingerprint(entry: &str) -> Option<String> {
     None
 }
 
+/// The `slug` (ref) of a cite envelope — the first `|`-delimited segment. `None` for an
+/// empty entry. Mirrors `_lib/cite_graph.parse_cite`'s `parts[0]`.
+pub fn cite_slug(entry: &str) -> Option<String> {
+    let slug = entry.split('|').next()?.trim();
+    if slug.is_empty() {
+        None
+    } else {
+        Some(slug.to_string())
+    }
+}
+
+/// Extract the tool-managed `status:` hint from a cite envelope line, if present.
+pub fn cite_status(entry: &str) -> Option<String> {
+    for segment in entry.split('|') {
+        let seg = segment.trim();
+        if let Some(rest) = seg.strip_prefix("status:") {
+            return Some(rest.trim().to_string());
+        }
+    }
+    None
+}
+
 // ---------------------------------------------------------------------------
 // Git provenance
 // ---------------------------------------------------------------------------
@@ -377,6 +485,22 @@ pub fn producing_commit(root: &Path, rel_path: &str) -> Option<(String, String)>
         return Some(pair);
     }
     git_log_pairs(root, &["-1"], rel_path).into_iter().next()
+}
+
+/// The committer-date Unix timestamp of `HEAD` — the git-derived clock the flow family
+/// uses for seal/hold records (`%ct`), never a wall-clock read. `None` when git has no
+/// history (a fresh, uncommitted tree). Reuses the same `git log` provenance source as
+/// [`producing_commit`].
+pub fn head_commit_epoch(root: &Path) -> Option<i64> {
+    let out = Command::new("git")
+        .args(["log", "-1", "--format=%ct"])
+        .current_dir(root)
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    String::from_utf8_lossy(&out.stdout).trim().parse().ok()
 }
 
 fn git_log_pairs(root: &Path, extra: &[&str], rel_path: &str) -> Vec<(String, String)> {
