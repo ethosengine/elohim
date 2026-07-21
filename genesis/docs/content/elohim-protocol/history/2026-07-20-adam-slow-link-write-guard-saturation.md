@@ -2,7 +2,7 @@
 title: "History/Finding: adam slow-link melt — gossip storm saturates the conductor write guard (composition defect, not placement)"
 id: adam-slow-link-write-guard-saturation
 type: incident-analysis
-status: Resolved (structural fix landed 2026-07-20; conductor-fork patch deferred)
+status: Resolved — serving layer (structural + breaker fix landed 2026-07-20/21); A/B trend decided 2026-07-21 → verdict B (steady-state), conductor-fork patch now CONFIRMED-WARRANTED (teed up, not yet executed)
 tier: history
 created: 2026-07-20
 topic: [dataplane, kitsune2, gossip, holochain-sqlite, ptxnguard, doorway-breaker, shem, wireguard, inventory-sync]
@@ -125,7 +125,8 @@ opens an unconditional write txn per historical slice-hash update with no change
 re-pointing the edge image build from the prebuilt holo-host binary to the fork-source build
 (`Dockerfile.zombie-fix` pattern, proven by the tx5 zombie-leak precedent) — a separate lift, and the
 config pacing attacks the same duty cycle without code risk. Revisit if the probes below stay hot
-after this fix deploys.
+after this fix deploys. **→ Revisit fired: the probes stayed hot a day later; see the Trend verdict
+(2026-07-21) below — verdict B, this patch is now confirmed-warranted.**
 
 ## Post-deploy measurements (2026-07-20 ~20:30 UTC, ~75min after fleet restart on the fix)
 
@@ -169,6 +170,45 @@ the fix deploy, breaker closed, SSR at ~20ms.
 contract — trial admission and outcome recording must live in the same hands. Any `is_open()` caller
 that can't record is a future latch. The `/status` snapshot correctly stays read-only for exactly
 this reason.
+
+## Trend verdict (2026-07-21 ~12:00 UTC): B — steady-state, execute the conductor-fork patch
+
+The A/B discriminator is decided. ~16h of post-fix data (fleet-restart on the fix ~19:00 UTC
+2026-07-20; measured now 2026-07-21 12:00 UTC), hourly-sampled `PTxnGuard was held` counts per
+15-min window on adam vs matthew:
+
+| Signal (a day after the fix) | adam (shem/WAN) | matthew (LAN baseline) |
+|---|---|---|
+| `PTxnGuard was held` /15min, post-fix trend | 1857 (20:00 spike) → **settled ~1000/15min, no decay** (708·996·1137·1341·1173·1002·1043·964·1002·951·951·966·981·1554·1218·1698) | **flat 45/15min all day** (two blips to 114/126) |
+| vs pre-incident level (~45–66/min ≈ 675–990/15min) | **unchanged** — back at the original ~50% duty cycle | n/a |
+| Conductor CPU (instant, now) | **5.05 cores** | 0.73 cores |
+| Doorway upstream circuit (elohim.host/status.json) | **closed, errorStreak 0, shedTotal 0** on `f5e22ba` | closed |
+
+**Reading:** the 20:00 post-deploy spike (the `2,147/15min` this doc recorded at 20:30) was the
+transient "rounds now complete and deliver the backlog" burst — but it did **not** drain to
+baseline. It settled straight back to the pre-incident ~1000/15min saturation and stayed there for
+16h with zero downward slope; CPU is pinned at ~5 cores against matthew's 0.73. This **refutes A
+(finite backlog drain)** and **confirms B**: the storage-layer backoff + k2Gossip pacing fixed the
+round *frequency* and fully insulated the serving layer (breaker closes, users unaffected on both
+hosts), but each completed round still delivers ops, and kitsune2's `store_slice_hash` still opens
+an **unconditional** write txn per historical slice-hash update — so adam's write-guard duty cycle
+is a **steady-state cost**, not a draining transient. The config pacing was the right no-code-risk
+first move; it has now demonstrably plateaued short of healing the conductor itself.
+
+**Decision:** the deferred conductor-fork patch (below) is now warranted — the doc's own "revisit if
+the probes stay hot" gate has fired. It is **teed up, not executed**: it re-points the edge image
+build to the fork-source build (image/build lift, no user urgency since serving is insulated), so it
+belongs in a dedicated authorized edge shift, not a silent infra change on the integration branch.
+
+**Turnkey brief for that shift:**
+- **Change:** add a change-check to `HolochainOpStore::store_slice_hash` (`op_store.rs` ~354–391) —
+  skip the write txn when the stored slice hash is byte-identical to the incoming one (the
+  `inform_ops_stored` catch-up path re-writes unchanged slices).
+- **Build:** re-point the edge image from the prebuilt holo-host binary to the fork-source build,
+  `Dockerfile.zombie-fix` pattern (proven by the tx5 zombie-leak precedent).
+- **Verify (probes below):** adam CPU falls to matthew's ~0.3–0.6 band (not just a post-restart dip)
+  and `PTxnGuard was held` drops to single-digits/15min. The serving-layer probes already pass and
+  stay independent of this — this patch heals the node, not the doorway.
 
 ## Verification probes (after any fix lands)
 
