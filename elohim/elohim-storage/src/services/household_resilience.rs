@@ -207,18 +207,14 @@ pub fn snapshot(
         .collect::<HashSet<String>>()
         .len() as i32;
 
-    // diversity_score: min(stewarding_collectives, max(commitment_backed,1)) / desired
-    // RS 4+3 baseline target = 7. Per-content override deferred to Plan 3.
-    let desired = 7_i32;
-    let diversity_score = if desired == 0 {
-        0.0_f32
-    } else {
-        (base
-            .households_stewarding
-            .min(commitment_backed_collectives.max(1)) as f32
-            / desired as f32)
-            .clamp(0.0, 1.0)
-    };
+    // diversity_score: the REAL fault-domain diversity over the SAME holder-relation
+    // (replaces the prior ad-hoc coverage proxy that falsely capped the score by the
+    // count of commitment records). The fault domain is the household (`hub_id`); the
+    // fold also surfaces the region axis for the distribution facing. The scalar score
+    // normalizes the distinct household fault-domain count against the RS 4+3 baseline
+    // (7). Empty/unmeasured relation → 0 distinct households → 0.0 (honest, never fake).
+    let fault_domains = resiliency::fault_domain_diversity(&relation);
+    let diversity_score = resiliency::diversity_score(fault_domains.distinct_household_count);
 
     // regional_distribution: fold the SAME relation by region, relative to the
     // viewer's region (the only extra read is the viewer's own region). Pure +
@@ -353,6 +349,11 @@ pub fn snapshot(
 /// because it takes `&mut conn`; returns the crate's `HolderRow`.
 ///
 /// Design: `genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md` §3.
+/// Raw join row: (shard_hash, peer_id, household_id, human_id, region).
+type HolderJoinRow = (String, String, Option<String>, String, Option<String>);
+/// Winning row per (shard_hash, peer_id) after dedup: (human_id, household_id, region).
+type BestHolder = (String, Option<String>, Option<String>);
+
 pub(crate) fn load_holder_relation(
     conn: &mut diesel::SqliteConnection,
     h_app_id: &str,
@@ -366,7 +367,7 @@ pub(crate) fn load_holder_relation(
 
     // shard_locations → humans (canonical agent join) → collectives (left join;
     // a holder without a collective gets NULL region → unknown bucket).
-    let rows: Vec<(Option<String>, String, Option<String>)> = shard_locations::table
+    let rows: Vec<HolderJoinRow> = shard_locations::table
         .inner_join(
             humans::table.on(humans::agent_pub_key
                 .nullable()
@@ -376,6 +377,8 @@ pub(crate) fn load_holder_relation(
         .filter(shard_locations::h_app_id.eq(h_app_id))
         .filter(shard_locations::shard_hash.eq_any(shard_hashes))
         .select((
+            shard_locations::shard_hash,
+            shard_locations::peer_id,
             humans::household_id,
             humans::id,
             collectives::region.nullable(),
@@ -383,14 +386,52 @@ pub(crate) fn load_holder_relation(
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("holder relation: {e}")))?;
 
-    Ok(rows
-        .into_iter()
-        .map(|(hub_id, agent_id, region)| HolderRow {
+    // Dedup against duplicate-`agent_pub_key` inflation. `humans.agent_pub_key` is
+    // only non-uniquely indexed (idx_humans_agent_pub_key, NOT UNIQUE), so a
+    // CID-keyed fallback human row can coexist with the canonical slug-keyed row
+    // (controller.rs tolerates the shape, and membership projection can stamp the
+    // SAME key onto both). Left un-deduped, ONE physical shard_location fans out
+    // into multiple HolderRows and silently inflates distinct-household /
+    // intra-hub / diversity counts for what is physically ONE holder. Collapse to
+    // one row per (shard_hash, peer_id) using the SAME last-write-wins-by-humans.id
+    // discipline salvage_commitment_author applies (the lexicographically-greatest
+    // `id` wins) so the choice is deterministic and consistent across the crate.
+    let mut best: std::collections::HashMap<(String, String), BestHolder> =
+        std::collections::HashMap::new();
+    for (shard_hash, peer_id, household_id, human_id, region) in rows {
+        let key = (shard_hash, peer_id);
+        match best.get(&key) {
+            Some((existing_id, _, _)) if *existing_id >= human_id => {}
+            _ => {
+                best.insert(key, (human_id, household_id, region));
+            }
+        }
+    }
+
+    let mut out: Vec<HolderRow> = best
+        .into_values()
+        .map(|(agent_id, hub_id, region)| HolderRow {
             hub_id,
             agent_id,
             region,
         })
-        .collect())
+        .collect();
+    // Deterministic order (HashMap iteration is not). The resiliency folds are all
+    // set/sorted-based so order never affects the view, but a stable relation keeps
+    // load_holder_relation itself reproducible for any future order-sensitive fold.
+    out.sort_by(|a, b| {
+        (
+            a.hub_id.as_deref(),
+            a.agent_id.as_str(),
+            a.region.as_deref(),
+        )
+            .cmp(&(
+                b.hub_id.as_deref(),
+                b.agent_id.as_str(),
+                b.region.as_deref(),
+            ))
+    });
+    Ok(out)
 }
 
 fn count_online_peers_in_households(
