@@ -11,9 +11,15 @@ publish = ["elohim"]
 
 # Kept deliberately light: bridges/valueflows (an isolated workspace) is expected to
 # path-dep this crate — nothing beyond the epr codec + serde family may land here.
+# multihash-codetable(sha2) is already pulled in transitively via elohim-epr; naming it
+# directly (same version/feature as elohim-epr and eprfs-core::BlobCid) costs nothing new
+# in the dep graph and reuses the one canonical sha2-256 primitive for edge_fp — a plain
+# string hash deliberately NOT routed through atom_cid/dag-cbor (that mints a content
+# address; edge_fp is only an index/dedup key over a path pair, never an address).
 [dependencies]
 elohim-epr = { path = "../epr" }
 cid = { version = "0.11", features = ["serde-codec"] }
+multihash-codetable = { version = "0.2", features = ["sha2"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 serde_ipld_dagcbor = "0.6"

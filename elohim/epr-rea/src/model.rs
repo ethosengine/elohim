@@ -4,6 +4,7 @@
 
 use cid::Cid;
 use elohim_epr::witness::{Magnitude, ReaVerb};
+use multihash_codetable::{Code, MultihashDigest};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{FabricError, Result};
@@ -144,4 +145,231 @@ pub struct Process {
     pub in_scope_of: Cid,
     pub inputs: Vec<Cid>,
     pub outputs: Vec<Cid>,
+}
+
+/// The conformance mechanism a [`DepEdge`] carries — exactly one per edge (spec §2). Every
+/// variant except [`Governor::CiteSeal`] is a citation of a STRONGER system already enforcing
+/// the edge elsewhere (a compiler, a codegen pipeline, a schema contract test, a named test) —
+/// those edges are `Governed` and NEVER enter the derived stale set. Only `CiteSeal` carries a
+/// `sealed_cid` and can go stale (the seal-aware walk, gap #2, recomputes and compares it).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Governor {
+    /// Enforced by a compiler/typechecker; payload names the unit (crate, tsconfig project…).
+    Compiler(String),
+    /// Enforced by a codegen pipeline; payload names the pipeline.
+    Codegen(String),
+    /// Enforced by a schema-contract test; payload names the test.
+    SchemaContract(String),
+    /// Enforced by a named test.
+    Test(String),
+    /// No stronger external system — the edge's own claim is the conformance mechanism,
+    /// sealed against an upstream CID and re-verified by recomputing it.
+    CiteSeal,
+}
+
+/// The only DECLARED edge state — staleness is always derived (recompute vs `sealed_cid`),
+/// never stored as truth (spec §2). `superseded_by` optionally points at the record (its CID)
+/// that resolves the hold, once one exists.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EdgeStatus {
+    Held {
+        reason: String,
+        valid_from: i64,
+        superseded_by: Option<Cid>,
+    },
+}
+
+/// A sealed dependency edge: downstream `from` conforms to upstream `to` under `governor`.
+/// Source of truth: the `.eprfs/status/` sidecar (local observation floor, append-only; B2 —
+/// graduates to the existing Attestation entry type at push, gap #11). Never a DHT write here.
+/// `from`/`to` are repo-relative paths (v1 floor — slug identity for code artifacts is an open
+/// question tracked in the spec, not resolved by this record).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DepEdge {
+    pub from: String,
+    pub to: String,
+    /// The announcement — why this edge exists.
+    pub desc: Option<String>,
+    pub governor: Governor,
+    /// Full CIDv1 raw of the upstream body at conformance time. `Some` iff
+    /// `governor == Governor::CiteSeal` — enforced by [`DepEdge::new`]/[`DepEdge::validate`].
+    pub sealed_cid: Option<Cid>,
+    pub sealed_by: AgentRef,
+    /// git/appended timestamp — never a wall-clock read in this lib.
+    pub sealed_at: i64,
+    /// `None` = healthy claim at seal time.
+    pub status: Option<EdgeStatus>,
+}
+
+impl DepEdge {
+    /// Construct a `DepEdge`, enforcing the invariant
+    /// `sealed_cid.is_some() ⇔ governor == Governor::CiteSeal`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        from: String,
+        to: String,
+        desc: Option<String>,
+        governor: Governor,
+        sealed_cid: Option<Cid>,
+        sealed_by: AgentRef,
+        sealed_at: i64,
+        status: Option<EdgeStatus>,
+    ) -> Result<Self> {
+        let edge = Self {
+            from,
+            to,
+            desc,
+            governor,
+            sealed_cid,
+            sealed_by,
+            sealed_at,
+            status,
+        };
+        edge.validate()?;
+        Ok(edge)
+    }
+
+    /// Re-check the seal invariant on an already-built value (e.g. one deserialized from the
+    /// sidecar). Never panics — callers decide what to do with a rejected edge.
+    pub fn validate(&self) -> Result<()> {
+        let is_cite_seal = matches!(self.governor, Governor::CiteSeal);
+        if is_cite_seal != self.sealed_cid.is_some() {
+            return Err(FabricError::InvalidEdge(format!(
+                "sealed_cid.is_some()={} must equal governor==CiteSeal={} (from={:?} to={:?})",
+                self.sealed_cid.is_some(),
+                is_cite_seal,
+                self.from,
+                self.to
+            )));
+        }
+        Ok(())
+    }
+}
+
+/// Index/dedup key for a `(from, to)` edge slot: first 12 hex chars of sha2-256 over the
+/// literal bytes `"{from}|{to}"`. Deliberately NOT a content address — `edge_fp` hashes the
+/// PATH PAIR (an index key over an append-only log so reseal/hold can find "the same slot"),
+/// never the sealed payload; it must never be used where an address/fingerprint is expected.
+/// Reuses the same sha2-256 primitive as `elohim_epr::cid::compute_cid` (via
+/// `multihash-codetable`), not a fresh hashing implementation.
+pub fn edge_fp(from: &str, to: &str) -> String {
+    let key = format!("{from}|{to}");
+    let digest = Code::Sha2_256.digest(key.as_bytes());
+    let mut out = String::with_capacity(12);
+    for byte in digest.digest().iter().take(6) {
+        out.push_str(&format!("{byte:02x}"));
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn agent(name: &str) -> AgentRef {
+        AgentRef(format!("uhCAk-test-{name}"))
+    }
+
+    /// A fixed CID standing in for "the upstream body at seal time" — built the same way
+    /// the crate's own tests do (`atom_cid` of a labeled atom), never hand-parsed.
+    fn upstream_cid(label: &str) -> Cid {
+        atom_cid(&label.to_string()).expect("cid")
+    }
+
+    fn fixed_edge() -> DepEdge {
+        DepEdge::new(
+            "app/elohim-app/src/app/lamad/services/content.service.ts".into(),
+            "genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md".into(),
+            Some("content.service mirrors the frontier verdict shape".into()),
+            Governor::CiteSeal,
+            Some(upstream_cid("golden-upstream-body")),
+            agent("claude"),
+            1_753_084_800,
+            None,
+        )
+        .expect("fixed golden edge must be valid")
+    }
+
+    // ── Invariant enforcement ────────────────────────────────────────────────────
+
+    #[test]
+    fn constructor_rejects_sealed_cid_on_non_citeseal_governor() {
+        let err = DepEdge::new(
+            "a".into(),
+            "b".into(),
+            None,
+            Governor::Compiler("tsc".into()),
+            Some(upstream_cid("b")),
+            agent("claude"),
+            1,
+            None,
+        )
+        .expect_err("a Compiler governor must never carry a sealed_cid");
+        assert!(matches!(err, FabricError::InvalidEdge(_)));
+    }
+
+    #[test]
+    fn constructor_rejects_missing_sealed_cid_on_citeseal_governor() {
+        let err = DepEdge::new(
+            "a".into(),
+            "b".into(),
+            None,
+            Governor::CiteSeal,
+            None,
+            agent("claude"),
+            1,
+            None,
+        )
+        .expect_err("CiteSeal must always carry a sealed_cid");
+        assert!(matches!(err, FabricError::InvalidEdge(_)));
+    }
+
+    #[test]
+    fn constructor_accepts_governed_edge_with_no_seal() {
+        let edge = DepEdge::new(
+            "a".into(),
+            "b".into(),
+            None,
+            Governor::Test("cargo test export_bindings".into()),
+            None,
+            agent("claude"),
+            1,
+            None,
+        )
+        .expect("a non-CiteSeal governor with no sealed_cid is valid");
+        assert!(edge.sealed_cid.is_none());
+    }
+
+    #[test]
+    fn constructor_accepts_citeseal_edge_with_seal() {
+        let edge = fixed_edge();
+        assert_eq!(edge.governor, Governor::CiteSeal);
+        assert!(edge.sealed_cid.is_some());
+    }
+
+    // ── CID stability golden ─────────────────────────────────────────────────────
+    // Pinned so canonical dag-cbor encoding of `DepEdge` can never silently drift.
+
+    #[test]
+    fn depedge_cid_is_stable() {
+        let cid = atom_cid(&fixed_edge()).expect("cid");
+        assert_eq!(
+            cid.to_string(),
+            "bafyreigyvgxxtwtsowy7j2nstjaapzfjcwhvixp5o4a4v3xlsxym7x7wzi"
+        );
+    }
+
+    // ── edge_fp golden ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn edge_fp_is_golden_and_order_sensitive() {
+        assert_eq!(edge_fp("a", "b"), "0eab8a0a3380");
+        // Never symmetric — it hashes the literal ordered "from|to" pair.
+        assert_ne!(edge_fp("a", "b"), edge_fp("b", "a"));
+        // Deterministic across calls.
+        assert_eq!(edge_fp("a", "b"), edge_fp("a", "b"));
+    }
 }

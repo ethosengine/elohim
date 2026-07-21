@@ -28,8 +28,9 @@ pub mod walk;
 pub use error::{FabricError, Result};
 pub use fold::{fulfillment, resource_state, FulfillmentStatus, ResourceState};
 pub use model::{
-    atom_cid, AgentRef, Commitment, CommitmentState, EdgeSpec, FlowEvent, Intent, PinnedRef,
-    Process, ProcessSpec, ResourceSpec, StageSpec, ValidatorRef,
+    atom_cid, edge_fp, AgentRef, Commitment, CommitmentState, DepEdge, EdgeSpec, EdgeStatus,
+    FlowEvent, Governor, Intent, PinnedRef, Process, ProcessSpec, ResourceSpec, StageSpec,
+    ValidatorRef,
 };
 pub use store::{FlowRecord, FlowStore, MemoryFlowStore, SidecarFlowStore};
 pub use walk::{FlowWalk, Frontier, Lineage};

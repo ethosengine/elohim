@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{FabricError, Result};
 use crate::model::{
-    atom_cid, Commitment, CommitmentState, FlowEvent, Intent, Process, ProcessSpec,
+    atom_cid, edge_fp, Commitment, CommitmentState, DepEdge, FlowEvent, Intent, Process,
+    ProcessSpec,
 };
 
 /// One appended fabric record. Append-only everywhere; corrections are new records.
@@ -24,6 +25,7 @@ pub enum FlowRecord {
     Event(FlowEvent),
     Process(Process),
     Spec(ProcessSpec),
+    Edge(DepEdge),
 }
 
 impl FlowRecord {
@@ -36,6 +38,7 @@ impl FlowRecord {
             FlowRecord::Event(e) => atom_cid(e),
             FlowRecord::Process(p) => atom_cid(p),
             FlowRecord::Spec(s) => atom_cid(s),
+            FlowRecord::Edge(e) => atom_cid(e),
         }
     }
 }
@@ -77,6 +80,35 @@ pub trait FlowStore {
                 FlowRecord::Process(p) => Some((cid, p)),
                 _ => None,
             })
+            .collect())
+    }
+
+    /// `DepEdge` records collapsed to latest-per-`(from, to)`: the winner is the highest
+    /// `sealed_at`, ties broken by later file/append order (the reseal/hold semantics —
+    /// a later record always wins a same-timestamp tie because it is appended after).
+    /// `records()` is already in append order, so a plain forward fold with `>=` on
+    /// `sealed_at` gives exactly that: a strictly-later timestamp always wins, and an
+    /// equal timestamp is won by whichever copy is folded in last (the later one).
+    fn edges(&self) -> Result<Vec<(Cid, DepEdge)>> {
+        let mut latest: Vec<(String, Cid, DepEdge)> = Vec::new();
+        for (cid, record) in self.records()? {
+            let FlowRecord::Edge(edge) = record else {
+                continue;
+            };
+            let key = edge_fp(&edge.from, &edge.to);
+            match latest.iter_mut().find(|(k, _, _)| *k == key) {
+                Some(slot) => {
+                    if edge.sealed_at >= slot.2.sealed_at {
+                        slot.1 = cid;
+                        slot.2 = edge;
+                    }
+                }
+                None => latest.push((key, cid, edge)),
+            }
+        }
+        Ok(latest
+            .into_iter()
+            .map(|(_, cid, edge)| (cid, edge))
             .collect())
     }
 
@@ -187,5 +219,109 @@ impl FlowStore for SidecarFlowStore {
             records.push((computed, parsed.record));
         }
         Ok(records)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{atom_cid, AgentRef, Governor};
+
+    fn agent(name: &str) -> AgentRef {
+        AgentRef(format!("uhCAk-test-{name}"))
+    }
+
+    /// A CiteSeal edge sealed against a distinct upstream body per `seal_label`, so two
+    /// "resealings" of the same `(from, to)` slot carry genuinely different sealed_cids.
+    fn edge(from: &str, to: &str, sealed_at: i64, seal_label: &str) -> DepEdge {
+        let sealed_cid = atom_cid(&seal_label.to_string()).expect("cid");
+        DepEdge::new(
+            from.into(),
+            to.into(),
+            None,
+            Governor::CiteSeal,
+            Some(sealed_cid),
+            agent("claude"),
+            sealed_at,
+            None,
+        )
+        .expect("valid edge")
+    }
+
+    #[test]
+    fn edges_round_trips_append_records_and_edges() {
+        let mut store = MemoryFlowStore::new();
+        let e = edge("app/foo.ts", "spec/bar.md", 100, "bar-v1");
+        let cid = store.append(FlowRecord::Edge(e.clone())).unwrap();
+
+        let records = store.records().unwrap();
+        assert_eq!(records.len(), 1);
+        assert!(matches!(&records[0].1, FlowRecord::Edge(got) if got == &e));
+
+        let edges = store.edges().unwrap();
+        assert_eq!(edges, vec![(cid, e)]);
+    }
+
+    #[test]
+    fn edges_latest_wins_after_a_superseding_reseal() {
+        let mut store = MemoryFlowStore::new();
+        let older = edge("app/foo.ts", "spec/bar.md", 100, "bar-v1");
+        let newer = edge("app/foo.ts", "spec/bar.md", 200, "bar-v2");
+        store.append(FlowRecord::Edge(older)).unwrap();
+        let newer_cid = store.append(FlowRecord::Edge(newer.clone())).unwrap();
+
+        let edges = store.edges().unwrap();
+        assert_eq!(edges, vec![(newer_cid, newer)]);
+    }
+
+    #[test]
+    fn edges_tie_at_equal_sealed_at_is_won_by_later_append_order() {
+        let mut store = MemoryFlowStore::new();
+        let first = edge("app/foo.ts", "spec/bar.md", 100, "bar-v1");
+        let second = edge("app/foo.ts", "spec/bar.md", 100, "bar-v2");
+        store.append(FlowRecord::Edge(first)).unwrap();
+        let second_cid = store.append(FlowRecord::Edge(second.clone())).unwrap();
+
+        let edges = store.edges().unwrap();
+        assert_eq!(edges, vec![(second_cid, second)]);
+    }
+
+    #[test]
+    fn edges_a_lower_sealed_at_appended_later_does_not_win() {
+        let mut store = MemoryFlowStore::new();
+        let higher = edge("app/foo.ts", "spec/bar.md", 200, "bar-v2");
+        let lower_but_later_append = edge("app/foo.ts", "spec/bar.md", 50, "bar-v0");
+        let higher_cid = store.append(FlowRecord::Edge(higher.clone())).unwrap();
+        store
+            .append(FlowRecord::Edge(lower_but_later_append))
+            .unwrap();
+
+        let edges = store.edges().unwrap();
+        assert_eq!(edges, vec![(higher_cid, higher)]);
+    }
+
+    #[test]
+    fn edges_filters_out_non_edge_records_and_keeps_distinct_slots() {
+        let mut store = MemoryFlowStore::new();
+        let e1 = edge("app/foo.ts", "spec/bar.md", 1, "bar-v1");
+        let e2 = edge("app/baz.ts", "spec/qux.md", 1, "qux-v1");
+        let e1_cid = store.append(FlowRecord::Edge(e1.clone())).unwrap();
+        let e2_cid = store.append(FlowRecord::Edge(e2.clone())).unwrap();
+        store
+            .append(FlowRecord::Process(Process {
+                spec: crate::model::PinnedRef {
+                    id: "elohim-dev-pipeline".into(),
+                    version: 1,
+                },
+                in_scope_of: atom_cid(&"epic".to_string()).unwrap(),
+                inputs: vec![],
+                outputs: vec![],
+            }))
+            .unwrap();
+
+        let edges = store.edges().unwrap();
+        assert_eq!(edges.len(), 2);
+        assert!(edges.contains(&(e1_cid, e1)));
+        assert!(edges.contains(&(e2_cid, e2)));
     }
 }

@@ -13,6 +13,9 @@ pub enum FabricError {
 
     #[error("integrity: stored cid {stored} does not match recomputed {computed}")]
     Integrity { stored: String, computed: String },
+
+    #[error("invalid edge: {0}")]
+    InvalidEdge(String),
 }
 
 pub type Result<T> = std::result::Result<T, FabricError>;
