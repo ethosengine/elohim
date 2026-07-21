@@ -170,6 +170,103 @@ fn cite_seal_on_missing_upstream_is_an_error() {
 }
 
 #[test]
+fn reseal_on_a_currently_ok_edge_is_an_error() {
+    let dir = fixture();
+    let root = dir.path();
+    seal::seal(
+        root,
+        "app/foo.ts",
+        "spec/bar.md",
+        "cite-seal",
+        Some("foo conforms to bar".into()),
+    )
+    .expect("seal runs");
+    // The edge is freshly sealed — Ok, not Stale. `reseal --on` must refuse a redundant
+    // re-bless rather than silently appending a second identical-in-substance record.
+    let s = walk::status(root).expect("status");
+    assert_eq!(s.edges_sealed, 1);
+    assert_eq!(s.edges_stale, 0);
+
+    let err = seal::reseal(root, "app/foo.ts", Some("spec/bar.md"), false)
+        .expect_err("reseal --on a currently-Ok edge must error, not silently re-append");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("not stale"),
+        "error should explain the edge is not stale, got: {msg}"
+    );
+
+    // And no redundant record was appended — still exactly one sealed edge.
+    let s = walk::status(root).expect("status");
+    assert_eq!(s.edges_sealed, 1, "no redundant append happened");
+    assert_eq!(s.edges_stale, 0);
+}
+
+#[test]
+fn reseal_path_confinement_rejects_escaping_on_and_file_args() {
+    let dir = fixture();
+    let root = dir.path();
+    seal::seal(
+        root,
+        "app/foo.ts",
+        "spec/bar.md",
+        "cite-seal",
+        Some("foo conforms to bar".into()),
+    )
+    .expect("seal runs");
+    mutate(
+        root,
+        "spec/bar.md",
+        "The upstream contract, version TWO — drifted.\n",
+    );
+
+    // A file created OUTSIDE the fixture root, in its parent directory.
+    let outside = root.parent().expect("tempdir has a parent");
+    std::fs::write(outside.join("outside.md"), "not part of this repo\n").unwrap();
+
+    // `--on ../outside.md` must be rejected — it resolves outside the confined root.
+    let err = seal::reseal(root, "app/foo.ts", Some("../outside.md"), false)
+        .expect_err("--on escaping the root must error");
+    assert!(
+        err.to_string().contains("escapes"),
+        "expected a path-confinement error, got: {err}"
+    );
+
+    // An absolute path outside the root must be rejected too.
+    let abs_outside = outside.join("outside.md");
+    let err = seal::reseal(
+        root,
+        "app/foo.ts",
+        Some(abs_outside.to_str().unwrap()),
+        false,
+    )
+    .expect_err("an absolute --on path outside the root must error");
+    assert!(
+        err.to_string().contains("escapes"),
+        "expected a path-confinement error, got: {err}"
+    );
+
+    // The legitimate stale edge is still resealable after the rejected attempts.
+    let resealed = seal::reseal(root, "app/foo.ts", Some("spec/bar.md"), false)
+        .expect("the real, in-root edge still reseals fine");
+    assert_eq!(resealed.len(), 1);
+}
+
+#[test]
+fn seal_path_confinement_rejects_escaping_file_arg() {
+    let dir = fixture();
+    let root = dir.path();
+    let outside = root.parent().expect("tempdir has a parent");
+    std::fs::write(outside.join("escaper.ts"), "// outside the repo\n").unwrap();
+
+    let err = seal::seal(root, "../escaper.ts", "spec/bar.md", "cite-seal", None)
+        .expect_err("a <file> arg escaping the root must error");
+    assert!(
+        err.to_string().contains("escapes"),
+        "expected a path-confinement error, got: {err}"
+    );
+}
+
+#[test]
 fn reseal_all_stale_supersedes_every_stale_outgoing_edge() {
     let dir = fixture();
     let root = dir.path();

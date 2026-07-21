@@ -539,6 +539,43 @@ pub fn rel_to_root(root: &Path, path: &Path) -> String {
         .join("/")
 }
 
+/// Confine `path` under an already-canonical `root` — the gate for CLI-supplied
+/// `<file>`/`--on` arguments (`epr flow seal|reseal|hold`). Canonicalizes `path`; when it
+/// doesn't exist yet (a `--on` upstream being sealed for the first time, or a `<file>` not
+/// yet on disk), canonicalizes its parent directory instead and rejoins the file name, so a
+/// legitimately fresh target under the tree is still accepted. Errors — never silently
+/// truncates or writes outside the tree — when the canonical result does not fall under
+/// `root` (`--on ../outside.md`, an absolute path elsewhere, a `..`-laden argument).
+pub fn confine_under(root: &Path, path: &Path) -> FlowResult<PathBuf> {
+    let canonical = if path.exists() {
+        std::fs::canonicalize(path).map_err(|source| FlowError::Read {
+            path: path.to_path_buf(),
+            source,
+        })?
+    } else {
+        let parent = match path.parent() {
+            Some(p) if !p.as_os_str().is_empty() => p,
+            _ => Path::new("."),
+        };
+        let canonical_parent = std::fs::canonicalize(parent).map_err(|source| FlowError::Read {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+        match path.file_name() {
+            Some(name) => canonical_parent.join(name),
+            None => canonical_parent,
+        }
+    };
+    if !canonical.starts_with(root) {
+        return Err(FlowError::InvalidArguments(format!(
+            "path `{}` escapes the repo root `{}`",
+            path.display(),
+            root.display()
+        )));
+    }
+    Ok(canonical)
+}
+
 /// A short, human-glanceable rendering of a CID for fallback labels.
 pub fn short_cid(cid: &Cid) -> String {
     let s = cid.to_string();

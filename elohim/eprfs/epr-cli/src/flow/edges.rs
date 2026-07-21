@@ -432,6 +432,25 @@ mod tests {
     }
 
     #[test]
+    fn citeseal_edge_with_no_seal_is_dangling() {
+        // A malformed cite-seal edge (no seal at all) must not panic on the match in
+        // `derive_verdict` — it degrades to Dangling, same as an unresolvable upstream, even
+        // though the upstream itself resolves fine here.
+        let current = blob("the current upstream body");
+        let edge = IndexedEdge {
+            from: "a".into(),
+            to: "b".into(),
+            desc: None,
+            governor: Governor::CiteSeal,
+            seal: SealForm::None,
+            held: None,
+            plane: EdgePlane::Sidecar,
+            target_exists: true,
+        };
+        assert_eq!(derive_verdict(&edge, Some(&current)), Verdict::Dangling);
+    }
+
+    #[test]
     fn cite_desc_extracts_the_first_unkeyed_segment() {
         let entry = "my-slug | the human description | sha256:1234567890abcdef | path: docs/x.md";
         assert_eq!(cite_desc(entry).as_deref(), Some("the human description"));

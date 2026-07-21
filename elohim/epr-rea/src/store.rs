@@ -89,12 +89,24 @@ pub trait FlowStore {
     /// `records()` is already in append order, so a plain forward fold with `>=` on
     /// `sealed_at` gives exactly that: a strictly-later timestamp always wins, and an
     /// equal timestamp is won by whichever copy is folded in last (the later one).
+    ///
+    /// Read-path invariant validation: each candidate is re-checked against
+    /// [`DepEdge::validate`] before it may win a slot. A record that fails validation (the
+    /// `sealed_cid.is_some() ⇔ CiteSeal` invariant broken — a hand-built struct literal, a
+    /// tampered sidecar line) is SKIPPED, not surfaced as a read error — one poisoned record
+    /// must not fail the whole `edges()` call. This crate stays deliberately dependency-light
+    /// (no `log`/`tracing`, see `Cargo.toml`), so the skip carries no runtime-visible signal
+    /// beyond this doc comment; a caller that needs to enumerate rejects can walk `records()`
+    /// and call `DepEdge::validate` itself.
     fn edges(&self) -> Result<Vec<(Cid, DepEdge)>> {
         let mut latest: Vec<(String, Cid, DepEdge)> = Vec::new();
         for (cid, record) in self.records()? {
             let FlowRecord::Edge(edge) = record else {
                 continue;
             };
+            if edge.validate().is_err() {
+                continue;
+            }
             let key = edge_fp(&edge.from, &edge.to);
             match latest.iter_mut().find(|(k, _, _)| *k == key) {
                 Some(slot) => {
@@ -225,7 +237,7 @@ impl FlowStore for SidecarFlowStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{atom_cid, AgentRef, Governor};
+    use crate::model::{atom_cid, AgentRef, DepEdge, Governor};
 
     fn agent(name: &str) -> AgentRef {
         AgentRef(format!("uhCAk-test-{name}"))
@@ -298,6 +310,39 @@ mod tests {
 
         let edges = store.edges().unwrap();
         assert_eq!(edges, vec![(higher_cid, higher)]);
+    }
+
+    #[test]
+    fn edges_skips_invalid_records_without_erroring_the_read() {
+        let mut store = MemoryFlowStore::new();
+        let valid = edge("app/foo.ts", "spec/bar.md", 100, "bar-v1");
+        let valid_cid = store.append(FlowRecord::Edge(valid.clone())).unwrap();
+
+        // Hand-construct an invalid edge via the struct literal (fields are `pub`), bypassing
+        // `DepEdge::new`'s invariant check entirely — CiteSeal governor with no `sealed_cid`,
+        // exactly the invariant `validate()` rejects.
+        let invalid = DepEdge {
+            from: "app/other.ts".into(),
+            to: "spec/other.md".into(),
+            desc: None,
+            governor: Governor::CiteSeal,
+            sealed_cid: None,
+            sealed_by: agent("claude"),
+            sealed_at: 1,
+            status: None,
+        };
+        assert!(
+            invalid.validate().is_err(),
+            "fixture must actually violate the invariant"
+        );
+        store.append(FlowRecord::Edge(invalid)).unwrap();
+
+        let edges = store.edges().unwrap();
+        assert_eq!(
+            edges,
+            vec![(valid_cid, valid)],
+            "the invalid record is skipped, not surfaced as a read error"
+        );
     }
 
     #[test]

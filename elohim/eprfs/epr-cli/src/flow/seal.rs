@@ -9,7 +9,10 @@ use elohim_epr_rea::{DepEdge, EdgeStatus, FlowRecord, FlowStore, Governor, Sidec
 use serde::Serialize;
 
 use super::edges::{edge_verdict, governor_label, EdgeIndex, Verdict};
-use super::{body_cid_of_file, head_commit_epoch, rel_to_root, repo_agent, FlowError, FlowResult};
+use super::{
+    body_cid_of_file, confine_under, head_commit_epoch, rel_to_root, repo_agent, FlowError,
+    FlowResult,
+};
 
 /// The machine-facing result of one seal/reseal/hold act (`--json` consumers read this).
 #[derive(Debug, Serialize)]
@@ -84,14 +87,21 @@ fn parse_governor(spec: &str) -> FlowResult<Governor> {
     }
 }
 
-/// Resolve a CLI path argument to a repo-relative path under `root`.
-fn rel_under(root: &Path, arg: &str) -> String {
+/// Resolve a CLI path argument to a repo-relative path under `root` — confined (fix: path
+/// confinement): a `--on`/`<file>` argument that resolves outside `root` (`../outside.md`,
+/// an absolute path elsewhere) is a clear error, never a silent write outside the tree.
+fn rel_under(root: &Path, arg: &str) -> FlowResult<String> {
+    let canonical_root = std::fs::canonicalize(root).map_err(|source| FlowError::Read {
+        path: root.to_path_buf(),
+        source,
+    })?;
     let abs = if Path::new(arg).is_absolute() {
         PathBuf::from(arg)
     } else {
-        root.join(arg)
+        canonical_root.join(arg)
     };
-    rel_to_root(root, &abs)
+    let confined = confine_under(&canonical_root, &abs)?;
+    Ok(rel_to_root(&canonical_root, &confined))
 }
 
 /// The full upstream body CIDv1 required by a cite-seal edge; an unreadable upstream is a
@@ -112,8 +122,8 @@ pub fn seal(
     governor_spec: &str,
     desc: Option<String>,
 ) -> FlowResult<SealOutcome> {
-    let from = rel_under(root, file);
-    let to = rel_under(root, on);
+    let from = rel_under(root, file)?;
+    let to = rel_under(root, on)?;
     let governor = parse_governor(governor_spec)?;
 
     // Only a cite-seal edge seals a CID; every governed edge records none (the invariant
@@ -148,11 +158,14 @@ pub fn reseal(
     on: Option<&str>,
     all_stale: bool,
 ) -> FlowResult<Vec<SealOutcome>> {
-    let from = rel_under(root, file);
+    let from = rel_under(root, file)?;
+    let on_rel = on.map(|target| rel_under(root, target)).transpose()?;
     let store = SidecarFlowStore::open(root)?;
     let index = EdgeIndex::build(root, &store)?;
 
     // Candidate slots: this file's outgoing sidecar cite-seal edges (skip governed/held/doc).
+    // Both selection modes gate on staleness (fix: `--on` on a currently-Ok edge must error,
+    // never silently re-append) — `--on` narrows to one slot, `--all-stale` takes every one.
     let candidates: Vec<(String, Option<String>)> = index
         .outgoing(&from)
         .filter(|e| {
@@ -160,16 +173,28 @@ pub fn reseal(
                 && matches!(e.governor, Governor::CiteSeal)
                 && e.held.is_none()
         })
-        .filter(|e| match on {
-            Some(target) => e.to == rel_under(root, target),
+        .filter(|e| match &on_rel {
+            Some(target) => &e.to == target && matches!(edge_verdict(root, e), Verdict::Stale),
             None => all_stale && matches!(edge_verdict(root, e), Verdict::Stale),
         })
         .map(|e| (e.to.clone(), e.desc.clone()))
         .collect();
 
     if candidates.is_empty() {
-        let hint = match on {
-            Some(t) => format!("no sidecar cite-seal edge {from} → {}", rel_under(root, t)),
+        let hint = match &on_rel {
+            Some(target) => {
+                let slot_exists = index.outgoing(&from).any(|e| {
+                    e.plane == super::edges::EdgePlane::Sidecar
+                        && matches!(e.governor, Governor::CiteSeal)
+                        && e.held.is_none()
+                        && &e.to == target
+                });
+                if slot_exists {
+                    format!("edge {from} → {target} is not stale; nothing to reseal")
+                } else {
+                    format!("no sidecar cite-seal edge {from} → {target}")
+                }
+            }
             None => {
                 format!("no stale outgoing cite-seal edge for {from} (use --on or --all-stale)")
             }
@@ -178,10 +203,30 @@ pub fn reseal(
     }
 
     let sealed_at = head_commit_epoch(root).unwrap_or(0);
-    let mut store = store;
-    let mut outcomes = Vec::new();
+
+    // Phase 1 — resolve EVERY candidate's upstream seal before appending anything. A
+    // resolve failure on one candidate must not leave earlier candidates already appended
+    // (fix: no partial-write window) — collect every failure, then append nothing at all.
+    let mut resolved = Vec::with_capacity(candidates.len());
+    let mut failures = Vec::new();
     for (to, desc) in candidates {
-        let sealed_cid = seal_upstream(root, &to)?;
+        match seal_upstream(root, &to) {
+            Ok(sealed_cid) => resolved.push((to, desc, sealed_cid)),
+            Err(err) => failures.push(format!("{to}: {err}")),
+        }
+    }
+    if !failures.is_empty() {
+        return Err(FlowError::InvalidArguments(format!(
+            "reseal aborted, nothing appended — {} upstream(s) failed to resolve: {}",
+            failures.len(),
+            failures.join("; ")
+        )));
+    }
+
+    // Phase 2 — every candidate resolved; append.
+    let mut store = store;
+    let mut outcomes = Vec::with_capacity(resolved.len());
+    for (to, desc, sealed_cid) in resolved {
         let edge = DepEdge::new(
             from.clone(),
             to,
@@ -207,8 +252,8 @@ pub fn hold(
     reason: String,
     valid_from: Option<&str>,
 ) -> FlowResult<SealOutcome> {
-    let from = rel_under(root, file);
-    let to = rel_under(root, on);
+    let from = rel_under(root, file)?;
+    let to = rel_under(root, on)?;
     let sealed_cid = seal_upstream(root, &to)?;
     let sealed_at = head_commit_epoch(root).unwrap_or(0);
     let valid_from = match valid_from {

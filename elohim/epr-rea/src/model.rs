@@ -195,7 +195,12 @@ pub struct DepEdge {
     pub desc: Option<String>,
     pub governor: Governor,
     /// Full CIDv1 raw of the upstream body at conformance time. `Some` iff
-    /// `governor == Governor::CiteSeal` — enforced by [`DepEdge::new`]/[`DepEdge::validate`].
+    /// `governor == Governor::CiteSeal` — enforced at CONSTRUCTION by [`DepEdge::new`]
+    /// (which calls [`DepEdge::validate`]). That is the only enforcement point: a value
+    /// built via this struct's public fields (a hand-rolled literal, a deserialized sidecar
+    /// line) can still violate the invariant, so read paths that fold stored records — e.g.
+    /// `FlowStore::edges()` — re-check `validate()` per record and SKIP a failing one rather
+    /// than erroring the whole read or trusting the invariant blindly.
     pub sealed_cid: Option<Cid>,
     pub sealed_by: AgentRef,
     /// git/appended timestamp — never a wall-clock read in this lib.
