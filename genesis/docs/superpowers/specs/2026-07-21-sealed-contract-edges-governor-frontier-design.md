@@ -121,8 +121,10 @@ A governed edge is still an *edge* (the walk traverses it; impact summaries incl
 delegates enforcement and never goes stale in the ledger — its red arrives from the stronger
 system, faster.
 
-**Governor assignment is policy, and mostly derived.** `.claude/epr-meta/policies.yaml` gains
-governor-mapping policies (Precedent-shaped, `id@version`-pinned, bound per scope via `.epr-meta`).
+**Governor assignment is policy, and mostly derived.** `.claude/epr-meta/governors.yaml` (sibling
+registry, same Precedent conventions + `id@version` pins; separate file because policies.yaml's
+fail-loud validation rightly rejects non-enforcement classes) carries the versioned detector list,
+consumed by `epr flow seal` rather than the resolver hook.
 The resolver auto-derives defaults mechanically — both endpoints in one cargo workspace →
 `compiler`; `.rs` ↔ `generated/*.ts` → `codegen`; struct named in a view schema → `schema-contract`;
 doc ↔ doc → `cite-seal` — so agents hand-author only the residual cross-boundary edges. A wrong
@@ -254,7 +256,7 @@ rows (not hook-private state) is what keeps that migration a re-homing, not a re
 - [x] Sidecar edge-record schema (dag-cbor: from/to/sealed_cid/governor/sealed_by/sealed_at/status) + the one-vocabulary mapping to the cite envelope; full-CID seal via `eprfs cid` (Python never encodes) (§2).
 - [x] Edge index: project doc `cites:` + sidecar records into one graph the `epr-rea` walk consumes (`FlowStore`/brit-graph adapter); staleness derivation `body_cid(to) ≠ sealed_cid` (§2).
 - [x] `epr flow seal <file> --on <upstream>` + `epr flow reseal` + `epr flow hold --reason --valid-from` in epr-cli (mirror cite-gen `--seal`/`--refresh` UX) (§2).
-- [ ] Governor vocabulary + governor-mapping policies in `.claude/epr-meta/policies.yaml` (define-once-bind-many, `id@version` pins) + mechanical auto-derivation (workspace/codegen/schema-contract/test detection) (§3).
+- [ ] Governor vocabulary + the `edge-governor-defaults@1` registry (`.claude/epr-meta/governors.yaml`, Precedent-shaped, `id@version` pins) + mechanical auto-derivation at seal time (workspace/codegen/view-schema/doc-doc detection; test:<id> always explicit) (§3).
 - [ ] File-leave hook: PostToolUse resolver leg — recompute CID, partition forward edges by governor, stamp stale, surface frontier summary, offer seal one-liner for undeclared read-set deps; debounced via epr-meta advice store (§4).
 - [ ] Dirty-set ledger `.claude/data/edge-findings.jsonl` (fp = sha256(from|to)[:12]) + sentinel dispatch directive on bound-exceeded/authority-crossed; suppression on already-filed (§4).
 - [ ] Push-gate leg: red while cite-seal-class stale edges touching pushed paths are neither resealed nor held (BACK-hard) (§4).

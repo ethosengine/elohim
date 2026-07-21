@@ -1,0 +1,34 @@
+# .claude/epr-meta/governors.yaml — governor auto-derivation registry (sealed-contract-edges spec §3).
+#
+# Sibling of policies.yaml, same conventions (Precedent-shaped, id@version pins, supersession
+# lineage; graduates to Mishpat::Precedent identically) — but NOT an edit-gate enforcement
+# policy: this tier is consumed by `epr flow seal` (epr-cli), not the epr-meta-resolver hook.
+# It lives in its own file because policies.yaml's fail-loud validation (rightly) rejects
+# non-enforcement classes, and a fake predicate would corrupt that discipline.
+#
+# Changing the mapping = a NEW version entry; sidecar edges keep the governor they recorded.
+
+edge-governors-version: 1
+policies:
+  - id: edge-governor-defaults
+    version: 1
+    title: Sealed-edge governor auto-derivation — seal only the governance gap
+    status: active
+    established_by: operator-2026-07-21
+    # Ordered detector list consumed by `epr flow seal` when --governor is absent. Rust
+    # implements the detectors; this row owns WHICH run and in WHAT order. Unknown rule keys
+    # are warn-and-skip in the consumer (a silently vanished detector would misclassify).
+    derive:
+      - same-cargo-workspace   # both endpoints .rs under one cargo workspace root -> compiler:<root>
+      - generated-ts           # generated .ts <-> its generator source -> codegen:<generated dir>
+      - view-schema            # .rs <-> elohim/sdk/schemas/v1/views/*.schema.json -> schema-contract:schema_contract.rs
+      - doc-doc                # both doc-plane (.md/.feature) -> cite-seal
+      - residual               # everything else -> cite-seal (the honest governance gap)
+    why: >
+      Governor assignment is policy, and mostly derived (sealed-contract-edges spec 2026-07-21
+      §3): an edge already enforced by a stronger mechanism (compiler, codegen byte-identity,
+      schema-contract test) must CITE that mechanism, never duplicate it with a fingerprint
+      seal — seal only the governance gap. Auto-derivation keeps agents from hand-classifying
+      the bulk; a wrong default is overridden at the seal (--governor), never by editing this
+      policy. test:<id> governors are always explicit (no mechanical detector in v1); tsconfig
+      project detection deferred to v2.
