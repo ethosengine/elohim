@@ -155,6 +155,13 @@ push gate is red while cite-seal-class stale edges touching the pushed paths are
 nor held** — BACK-hard, exactly where the semantic-links spec put the dissolution gate. Agents of
 any vendor converge on the same cascade because the gate, not agent judgment, defines done.
 
+**Cold-start pickup is by-construction, not by-reading:** the process teaches itself at the
+moment of relevance — the file-leave hook hands an agent the frontier *and the exact verb*
+in-context; the SessionStart headline carries the `edges:` gauge beside every other pressure;
+`--json` on all three verbs makes the frontier machine-consumable. An agent that has read
+nothing still meets the governance in flight, the same way the cite-seal and compose-gate hooks
+already govern this repo's own authoring.
+
 ## 5. The triage — everything already written is unsealed edges
 
 The existing corpus is the backlog: contracts living in CLAUDE.md prose, the
@@ -172,10 +179,29 @@ big-bang:
   which is itself the signal to promote it).
 - **Third: recipe edges** — `EdgeSpec.validators` entries become governor citations.
 
+**The drain is memory governance, not mechanical cleanup (decided 2026-07-21).** A stale edge
+is the re-verify queue; the two verbs are two different kinds of act and route differently:
+*reseal* is a re-verification judgment ("the downstream claim still holds against the moved-on
+upstream") — librarian/ceremony work, delegable, drained on the memory-stasis-loop cadence;
+*hold* is a **governance decision** — a declared deviation with reason + validity window, policy
+not hygiene — surfaced by the ceremony as a menu with the **operator confirming holds**. Nothing
+auto-blesses drift by construction (reseal is stale-gated and explicit). Contested or
+precedent-heavy edges get the four-lens read (historian: has this drift shape appeared before;
+storyteller: did the lesson already graduate).
+
+**Legacy-corpus doctrine:** never big-bang. Governor auto-derivation (#4) first — a pre-#4
+`0 governed` count is an artifact, not reality; compiler/codegen absorb the bulk mechanically —
+then author/seal only the residual cross-boundary edges tranche-wise, holding (with reasons)
+what genuinely deviates. Stasis = 0 stale · unsealed only shrinking · every hold reasoned and
+time-windowed with a re-check sweep. New debt stays zero because edges are born-governed at
+emission (§4) while the stock drains as a measured budget — self-cleaning going forward, clear
+and concise: FRONT-soft at authoring, BACK-hard at the push gate (#7).
+
 Scoreboard: `placement-audit.py` headline gains `edges: N unsealed · M stale · K held`;
-`memory-stasis-loop` gains the matching discipline (stasis = 0 stale, unsealed draining). New
-edges are born-governed by §4, so the backlog only shrinks — development *keeps* stasis instead
-of re-earning it.
+`memory-stasis-loop` gains the matching discipline (stasis = 0 stale, unsealed draining), and
+the memory-ceremony's librarian phase owns the judgment tier of the drain. New edges are
+born-governed by §4, so the backlog only shrinks — development *keeps* stasis instead of
+re-earning it.
 
 ## 6. Above the filesystem — how policy aggregates, translates, adapts upward
 
@@ -234,7 +260,7 @@ rows (not hook-private state) is what keeps that migration a re-homing, not a re
 - [ ] Push-gate leg: red while cite-seal-class stale edges touching pushed paths are neither resealed nor held (BACK-hard) (§4).
 - [ ] Triage tranche 1 — author + govern the input edges of every perpetually-UNSTABLE genesis stage; each stage red names its edge or is visibly held (§5).
 - [ ] Triage tranche 2/3 — prose-contract edges from gospel surfaces; recipe `validators:` → governor citations (§5).
-- [ ] Scoreboard: `placement-audit.py` `edges:` headline + `memory-stasis-loop` discipline (stasis = 0 stale) (§5).
+- [ ] Scoreboard + governance wiring: `placement-audit.py` `edges:` headline + `memory-stasis-loop` edges discipline (stasis = 0 stale) + memory-ceremony connection — librarian drives mechanical re-verify, ceremony menus contested edges, operator confirms holds (§5).
 - [ ] Graduation leg: push crystallizes the sealed edge-set into an Attestation (B2; granular seals stay sidecar); deviation → `Mishpat::Commitment` (cid = entry_hash); policy standing → `Mishpat::Precedent` — existing types only, verify headroom before ANY mint (§6).
 
 ## 9. Open questions
