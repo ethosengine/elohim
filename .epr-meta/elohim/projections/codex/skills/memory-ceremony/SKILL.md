@@ -64,6 +64,8 @@ Surface the top-5 by total drift to the operator. **Operator picks 1-2 surfaces*
 
 If the operator picks 0 (audit numbers are clean, or all top-ranked surfaces are bare-filename-heavy noise): announce that the ceremony has no work this cycle, surface the audit summary, and exit.
 
+**Edges gauge (sealed contract edges — spec 2026-07-21 §5):** alongside the audit, read `epr flow status --json` (`edges: sealed · governed · stale · held · dangling`). The stale/dangling set is ceremony work, not mechanical cleanup: the librarian drives the mechanical re-verify tier (reseal what still holds — stale-gated, never auto-blessed), and **contested or deviating edges go to the Phase-3 holds menu** for the operator. Governed edges are never stale; ignore them.
+
 ### Phase 1b — PATH + PRIORITIZATION currency readout (~3 min)
 
 Alongside the gospel-tier drift triage, the ceremony carries two **standing canonical-surface
@@ -151,6 +153,8 @@ Surface each storyteller rewrite to the operator as ONE single gate per picked s
 - **Decline**: discard the rewrite; file a backlog entry naming what went wrong (operator's call) so the next ceremony picks differently
 
 This is the only operator gate in the ceremony. Surface only the rewrites, not the lens reports — the operator reviews the deliverable, not the process. Per `[[feedback_no_menu_punt_in_auto_mode]]`, no four-option ritual menus; one decision per surface.
+
+**Holds menu (operator-confirmed governance):** any edge the drain proposes to HOLD (`epr flow hold` — a declared deviation with reason + valid_from) is presented here as a menu item with the librarian's rationale, historian precedent if any, and the storyteller's graduation check. **The operator confirms each hold**; a hold is policy, never hygiene — no agent declares a deviation unilaterally.
 
 ## Phase 4 — Apply + downstream-coherence verification (~10 min)
 
