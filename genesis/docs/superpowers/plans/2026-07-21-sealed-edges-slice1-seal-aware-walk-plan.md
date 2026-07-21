@@ -13,7 +13,7 @@ topic: [sealed-edges, edge-record, edge-index, seal, reseal, hold, governor, epr
 refines:
   - genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md
 cites:
-  - sealed-contract-edges-governor-frontier | the spec this plan implements — slice 1 of its gap-items (#1 edge record, #2 one-graph index, #3 seal/reseal/hold verbs) | sha256:fbc33bbdea594efe | path: genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md
+  - sealed-contract-edges-governor-frontier | the spec this plan implements — slice 1 of its gap-items (#1 edge record, #2 one-graph index, #3 seal/reseal/hold verbs) | sha256:a69385ebc82e8036 | path: genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md
   - cite-fingerprint-cid-convergence | binds the verdict logic — sidecar edges compare full CIDv1, doc envelopes compare the short-form rendering of the same digest; Rust stays the single encoder | sha256:0a657c9c1b0c43e7 | path: genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md
   - epr-rea-valueflow-fabric | the parent fabric — FlowRecord/FlowStore/walk this slice extends with the Edge record and seal-aware Frontier | sha256:1cec32527dbff6d7 | path: genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md
   - elohim/epr-rea/src/store.rs
@@ -166,8 +166,7 @@ rename-propagation stay on the spec's open questions — v1 edge targets are pat
 
 ## Tasks (decompose targets)
 
-- [ ] Task 1: `DepEdge` + `Governor` + `EdgeStatus::Held` + `FlowRecord::Edge` + `edges()` latest-wins + `edge_fp` + invariant, with unit tests (elohim/epr-rea)
-- [ ] Task 2: `EdgeIndex::build` (doc envelopes + sidecar, one graph) + verdict derivation (Ok/Stale/Held/Governed/Dangling) + seal-aware `flow walk`/`flow status` surfaces + dogfood parity check (epr-cli)
-- [ ] Task 3: `epr flow seal/reseal/hold` verbs + `--json` + run() wiring, with CLI integration test on a temp fixture repo (epr-cli)
+- [x] Task 1: `DepEdge` + `Governor` + `EdgeStatus::Held` + `FlowRecord::Edge` + `edges()` latest-wins + `edge_fp` + invariant, with unit tests (elohim/epr-rea)
+- [x] Task 2: `EdgeIndex::build` (doc envelopes + sidecar, one graph) + verdict derivation (Ok/Stale/Held/Governed/Dangling) + seal-aware `flow walk`/`flow status` surfaces + dogfood parity check (epr-cli)
+- [x] Task 3: `epr flow seal/reseal/hold` verbs + `--json` + run() wiring, with CLI integration test on a temp fixture repo (epr-cli)
 - [ ] Task 4: end-to-end stale→reseal/hold proof green + fmt/clippy/test gates on epr-rea + eprfs workspace + flip gap-items #1–#3 to CLAIMED
-

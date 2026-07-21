@@ -225,9 +225,9 @@ rows (not hook-private state) is what keeps that migration a re-homing, not a re
 
 ## 8. Decomposition (gap-items)
 
-- [ ] Sidecar edge-record schema (dag-cbor: from/to/sealed_cid/governor/sealed_by/sealed_at/status) + the one-vocabulary mapping to the cite envelope; full-CID seal via `eprfs cid` (Python never encodes) (§2).
-- [ ] Edge index: project doc `cites:` + sidecar records into one graph the `epr-rea` walk consumes (`FlowStore`/brit-graph adapter); staleness derivation `body_cid(to) ≠ sealed_cid` (§2).
-- [ ] `epr flow seal <file> --on <upstream>` + `epr flow reseal` + `epr flow hold --reason --valid-from` in epr-cli (mirror cite-gen `--seal`/`--refresh` UX) (§2).
+- [x] Sidecar edge-record schema (dag-cbor: from/to/sealed_cid/governor/sealed_by/sealed_at/status) + the one-vocabulary mapping to the cite envelope; full-CID seal via `eprfs cid` (Python never encodes) (§2).
+- [x] Edge index: project doc `cites:` + sidecar records into one graph the `epr-rea` walk consumes (`FlowStore`/brit-graph adapter); staleness derivation `body_cid(to) ≠ sealed_cid` (§2).
+- [x] `epr flow seal <file> --on <upstream>` + `epr flow reseal` + `epr flow hold --reason --valid-from` in epr-cli (mirror cite-gen `--seal`/`--refresh` UX) (§2).
 - [ ] Governor vocabulary + governor-mapping policies in `.claude/epr-meta/policies.yaml` (define-once-bind-many, `id@version` pins) + mechanical auto-derivation (workspace/codegen/schema-contract/test detection) (§3).
 - [ ] File-leave hook: PostToolUse resolver leg — recompute CID, partition forward edges by governor, stamp stale, surface frontier summary, offer seal one-liner for undeclared read-set deps; debounced via epr-meta advice store (§4).
 - [ ] Dirty-set ledger `.claude/data/edge-findings.jsonl` (fp = sha256(from|to)[:12]) + sentinel dispatch directive on bound-exceeded/authority-crossed; suppression on already-filed (§4).
