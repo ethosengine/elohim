@@ -13,7 +13,7 @@ topic: [sealed-edges, edge-record, edge-index, seal, reseal, hold, governor, epr
 refines:
   - genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md
 cites:
-  - sealed-contract-edges-governor-frontier | the spec this plan implements — slice 1 of its gap-items (#1 edge record, #2 one-graph index, #3 seal/reseal/hold verbs) | sha256:a4c898b732df4564 | path: genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md
+  - sealed-contract-edges-governor-frontier | the spec this plan implements — slice 1 of its gap-items (#1 edge record, #2 one-graph index, #3 seal/reseal/hold verbs) | sha256:ace1788fa44a293f | path: genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md
   - cite-fingerprint-cid-convergence | binds the verdict logic — sidecar edges compare full CIDv1, doc envelopes compare the short-form rendering of the same digest; Rust stays the single encoder | sha256:0a657c9c1b0c43e7 | path: genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md
   - epr-rea-valueflow-fabric | the parent fabric — FlowRecord/FlowStore/walk this slice extends with the Edge record and seal-aware Frontier | sha256:1cec32527dbff6d7 | path: genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md
   - elohim/epr-rea/src/store.rs
