@@ -644,6 +644,34 @@
       }
     },
     {
+      "id": "presence-caleb-spouse",
+      "displayName": "Caleb",
+      "presenceType": "person",
+      "standing": "resident",
+      "bio": "Susan's husband, envisioned as the second peer in household-susan (Seattle WA metro) — the narrative role he'd step into at claim is Shamir-share custody and content projection, extending household resilience into the Pacific Northwest.",
+      "observations": [
+        {
+          "observerId": "human-susan-household",
+          "observedAt": "2026-07-21T00:00:00Z",
+          "context": "Witnessed household residency: household-susan (Stage-1 contributor-presence bootstrap — residency is a steward-witnessed ascription, not a self-claim; spec 2026-07-21-contributor-presence-commons-stewardship-design)",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-susan-household",
+      "stewardshipStartedAt": "2026-07-21T00:00:00Z",
+      "suggestedCollectiveIds": [
+        "household-susan"
+      ],
+      "tags": [
+        "substrate-resident"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
       "id": "presence-calm-technology",
       "displayName": "Calm Technology",
       "presenceType": "organization",
@@ -929,6 +957,34 @@
         "local": "images/presence-conversence-39-s-idealoom-platform.webp",
         "placeholder": false,
         "sourceUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQAO3cGuhig9EZLutOthl_VS5rEKMH1Bgd_VRuw-WP54rhLhA"
+      }
+    },
+    {
+      "id": "presence-daniel-brother",
+      "displayName": "Daniel",
+      "presenceType": "person",
+      "standing": "resident",
+      "bio": "Jessica's brother (Matthew's brother-in-law) in the Tulsa OK metro — envisioned as the fifth replicator in the reciprocal-backup chain, anchoring the Plains-region leg of the household network.",
+      "observations": [
+        {
+          "observerId": "human-jessica-spouse",
+          "observedAt": "2026-07-21T00:00:00Z",
+          "context": "Witnessed household residency: household-daniel (Stage-1 contributor-presence bootstrap — residency is a steward-witnessed ascription, not a self-claim; spec 2026-07-21-contributor-presence-commons-stewardship-design)",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-jessica-spouse",
+      "stewardshipStartedAt": "2026-07-21T00:00:00Z",
+      "suggestedCollectiveIds": [
+        "household-daniel"
+      ],
+      "tags": [
+        "substrate-resident"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
       }
     },
     {
@@ -1273,6 +1329,34 @@
       }
     },
     {
+      "id": "presence-emma-spouse",
+      "displayName": "Emma",
+      "presenceType": "person",
+      "standing": "resident",
+      "bio": "Daniel's wife, envisioned as the second peer in household-daniel (Tulsa OK metro) — intra-household redundancy for the Plains-region leg, mirroring the Susan+Caleb pattern in Seattle.",
+      "observations": [
+        {
+          "observerId": "human-jessica-spouse",
+          "observedAt": "2026-07-21T00:00:00Z",
+          "context": "Witnessed household residency: household-daniel (Stage-1 contributor-presence bootstrap — residency is a steward-witnessed ascription, not a self-claim; spec 2026-07-21-contributor-presence-commons-stewardship-design)",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-jessica-spouse",
+      "stewardshipStartedAt": "2026-07-21T00:00:00Z",
+      "suggestedCollectiveIds": [
+        "household-daniel"
+      ],
+      "tags": [
+        "substrate-resident"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
       "id": "presence-esther-perel",
       "displayName": "Esther Perel",
       "presenceType": "person",
@@ -1354,6 +1438,34 @@
       "tags": [
         "fct",
         "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-ezra-newcomer",
+      "displayName": "Ezra",
+      "presenceType": "person",
+      "standing": "resident",
+      "bio": "New to the network — eager to contribute, still building trust and understanding the community's norms.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2026-07-21T00:00:00Z",
+          "context": "Witnessed household residency: household-ezra (Stage-1 contributor-presence bootstrap — residency is a steward-witnessed ascription, not a self-claim; spec 2026-07-21-contributor-presence-commons-stewardship-design)",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2026-07-21T00:00:00Z",
+      "suggestedCollectiveIds": [
+        "household-ezra"
+      ],
+      "tags": [
+        "substrate-resident"
       ],
       "image": {
         "local": "images/placeholder-person.webp",
@@ -3456,6 +3568,34 @@
       }
     },
     {
+      "id": "presence-nancy-neighbor",
+      "displayName": "Nancy",
+      "presenceType": "person",
+      "standing": "resident",
+      "bio": "Long-time resident of Tech Valley — community organizer, block captain, and Matthew's neighbor.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2026-07-21T00:00:00Z",
+          "context": "Witnessed household residency: household-nancy (Stage-1 contributor-presence bootstrap — residency is a steward-witnessed ascription, not a self-claim; spec 2026-07-21-contributor-presence-commons-stewardship-design)",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2026-07-21T00:00:00Z",
+      "suggestedCollectiveIds": [
+        "household-nancy"
+      ],
+      "tags": [
+        "substrate-resident"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
       "id": "presence-nassim-taleb",
       "displayName": "Nassim Taleb",
       "presenceType": "person",
@@ -3847,6 +3987,34 @@
       "tags": [
         "fct",
         "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-pete-pastor",
+      "displayName": "Pete",
+      "presenceType": "person",
+      "standing": "resident",
+      "bio": "Shepherd of Community Church, trusted congregation-elder to Matthew and Susan — committed to helping people grow in faith and community.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2026-07-21T00:00:00Z",
+          "context": "Witnessed household residency: household-pete (Stage-1 contributor-presence bootstrap — residency is a steward-witnessed ascription, not a self-claim; spec 2026-07-21-contributor-presence-commons-stewardship-design)",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2026-07-21T00:00:00Z",
+      "suggestedCollectiveIds": [
+        "household-pete"
+      ],
+      "tags": [
+        "substrate-resident"
       ],
       "image": {
         "local": "images/placeholder-person.webp",
@@ -4607,6 +4775,34 @@
       "tags": [
         "fct",
         "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-terrance-tutor",
+      "displayName": "Terrance",
+      "presenceType": "person",
+      "standing": "resident",
+      "bio": "Educator and learning facilitator at the Valley Learning Collective — Jessica's learning-partner and James's mentor.",
+      "observations": [
+        {
+          "observerId": "human-jessica-spouse",
+          "observedAt": "2026-07-21T00:00:00Z",
+          "context": "Witnessed household residency: household-terrance (Stage-1 contributor-presence bootstrap — residency is a steward-witnessed ascription, not a self-claim; spec 2026-07-21-contributor-presence-commons-stewardship-design)",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-jessica-spouse",
+      "stewardshipStartedAt": "2026-07-21T00:00:00Z",
+      "suggestedCollectiveIds": [
+        "household-terrance"
+      ],
+      "tags": [
+        "substrate-resident"
       ],
       "image": {
         "local": "images/placeholder-person.webp",

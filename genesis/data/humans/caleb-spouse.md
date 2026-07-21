@@ -1,6 +1,5 @@
 ---
 id: "human-caleb-spouse"
-householdId: "household-susan"
 displayName: "Caleb"
 category: "core-family"
 profileReach: "community"

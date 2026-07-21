@@ -1,6 +1,5 @@
 ---
 id: "human-emma-spouse"
-householdId: "household-daniel"
 displayName: "Emma"
 category: "core-family"
 profileReach: "community"

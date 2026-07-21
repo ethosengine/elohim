@@ -1,6 +1,5 @@
 ---
 id: "human-terrance-tutor"
-householdId: "household-terrance"
 displayName: "Terrance"
 agencyPhase: "device"
 category: "affinity"
