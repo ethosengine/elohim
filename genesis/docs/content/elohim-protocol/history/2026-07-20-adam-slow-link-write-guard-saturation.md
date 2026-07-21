@@ -146,6 +146,30 @@ unconditional-write amplification is steady-state cost on a full-arc node → ex
 conductor-fork patch. Either way the serving layer stays insulated (breaker + doorway hot cache carry
 elohim.host at full speed; only the first cold fetch shows a multi-second tail while the storm runs).
 
+## Second defect discovered during verification (2026-07-21): the breaker half-open latch
+
+What read as "flapping" was actually TWO defects masquerading as each other. Overnight, the alpha
+doorway parked in `circuit: half-open, errorStreak: 50` for 3+ hours with every render shed as
+`x-ssr-skipped: shell-breaker-open` — not flapping, **deadlocked**. Root cause (proven live + in
+source): `compose_render_with_shell` consumed the upstream breaker's single half-open trial via the
+side-effecting `is_open()` (`should_skip` admits exactly one trial; `HalfOpen => true` for everyone
+else "awaiting outcome" — `elohim-compute/src/peers.rs:186`) but had **no `record()` on any terminal
+path**. The breaker waited forever for a verdict no code path could deliver, while shedding the
+storage-proxy paths that COULD have recorded one. An absorbing state whose only exit was a process
+restart — which is why yesterday's deploys kept "clearing" it and it kept coming back.
+
+Fixed same night (`f5e22baa2`): record the trial outcome on all four terminal paths of the shell
+fetch (never on the gate-shed path — no attempt, no outcome); call-site audit confirmed every other
+`is_open()` consumer (generic proxy, blob proxy, EPR dispatch) already recorded correctly; two
+regression tests pin the class (`halfopen_without_record_deadlocks_forever`,
+`halfopen_record_false_reopens_then_cooldown_readmits_a_trial`). Verified live: alpha unlatched on
+the fix deploy, breaker closed, SSR at ~20ms.
+
+**Lesson for the runtime ledger (self-heal-exhaustion class):** a side-effecting breaker gate is a
+contract — trial admission and outcome recording must live in the same hands. Any `is_open()` caller
+that can't record is a future latch. The `/status` snapshot correctly stays read-only for exactly
+this reason.
+
 ## Verification probes (after any fix lands)
 
 - adam-0 CPU falls to matthew's band (~0.3–0.6 cores), not just post-restart dip.
