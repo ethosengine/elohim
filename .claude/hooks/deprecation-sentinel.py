@@ -120,20 +120,29 @@ ECHO_LEDGER_PATH = re.compile(r"deprecations\.jsonl", re.IGNORECASE)
 #     - .superpowers/**                                  (the SDD working tree:
 #       progress.md task-checkbox ledgers, per-task reports, review diffs —
 #       "- [x] Task 1: complete … DEPRECATED comment removed …")
+#     - CLAUDE.md (root + per-project, e.g. bridges/CLAUDE.md)  (the gospel
+#       instruction docs, which narrate deprecated APIs in their Gotchas
+#       sections by design — e.g. the root CLAUDE.md line "Swarm event loop
+#       uses `StreamExt::next()` (not the deprecated `select_next_event()`)").
 #   These narrate (or canonicalize) deprecations; reading them back is never a
 #   NEW in-flight finding.  fp-dedupe cannot suppress the class: each new
 #   backlog/chronicle/plan/progress edit mints a fresh fingerprint on the next
 #   cat/grep/tail, so only a structural guard collapses it (cf. the 2026-06-17
 #   + 2026-06-20 backlog-frontmatter captures, and the 2026-06-25 SDD-ledger
-#   c4c3eccc7e05 + plan-header d09bbe4004a6 captures during the P6 sprint).
+#   c4c3eccc7e05 + plan-header d09bbe4004a6 captures during the P6 sprint; and
+#   the 2026-07-21 CLAUDE.md-prose capture 97d4865837a9 — a scope grep of the
+#   root CLAUDE.md libp2p gotcha matched its prose "the deprecated
+#   `select_next_event()`", which is a doc narrating a *past* upstream API
+#   deprecation, not a live toolchain warning).
 #   They appear in grep-with-filename output as a leading file path, or the
-#   command itself directly reads such a file (cat/head/tail/sed output has no
-#   path prefix — the command gate below covers that case).
+#   command itself directly reads such a file (cat/head/tail/sed/awk of a
+#   single doc has no path prefix — the command gate below covers that case).
 ECHO_HISTORY_PATH_RE = re.compile(
     r"genesis/docs/content/elohim-protocol/history/"
     r"|genesis/data/timeline/(?:backlog|chronicle)/"
     r"|genesis/docs/superpowers/"
-    r"|\.superpowers/",
+    r"|\.superpowers/"
+    r"|(?:^|/)CLAUDE\.md\b",
     re.IGNORECASE,
 )
 
@@ -265,7 +274,8 @@ _CMD_HISTORY_TREE_RE = re.compile(
     r"genesis/docs/content/elohim-protocol/history/"
     r"|genesis/data/timeline/(?:backlog|chronicle)/"
     r"|genesis/docs/superpowers/"
-    r"|\.superpowers/",
+    r"|\.superpowers/"
+    r"|(?:^|/|\s)CLAUDE\.md\b",
     re.IGNORECASE,
 )
 
