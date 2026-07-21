@@ -3292,10 +3292,14 @@ async fn compose_render_with_shell(
         .storage_url
         .as_deref()
         .ok_or(SsrFallbackReason::ShellNoProjection)?;
-    if state
-        .upstream_breakers
-        .is_open(storage_url.trim_end_matches('/'))
-    {
+    // Endpoint key shared with the gate below — is_open() consumes a
+    // half-open trial when it admits one, and whoever consumes a trial MUST
+    // record its outcome on every terminal path or the breaker parks in
+    // HalfOpen forever (no further trial is ever admitted). Do NOT record on
+    // the ShellBreakerOpen return just below — the gate shed the request; no
+    // attempt was made, so there is no outcome to record.
+    let endpoint = storage_url.trim_end_matches('/');
+    if state.upstream_breakers.is_open(endpoint) {
         return Err(SsrFallbackReason::ShellBreakerOpen);
     }
     let shell_url = projected_shell_url(storage_url, projection);
@@ -3308,7 +3312,10 @@ async fn compose_render_with_shell(
         .await
     {
         Ok(resp) if resp.status().is_success() => match resp.text().await {
-            Ok(text) => text,
+            Ok(text) => {
+                state.upstream_breakers.record(endpoint, true);
+                text
+            }
             Err(e) => {
                 tracing::warn!(
                     target: "doorway::ssr",
@@ -3317,6 +3324,7 @@ async fn compose_render_with_shell(
                     error = %e,
                     "SSR shell fetch: body read failed"
                 );
+                state.upstream_breakers.record(endpoint, false);
                 return Err(SsrFallbackReason::ShellFetchFailed);
             }
         },
@@ -3328,6 +3336,7 @@ async fn compose_render_with_shell(
                 elapsed_ms = fetch_started.elapsed().as_millis() as u64,
                 "SSR shell fetch: non-success status"
             );
+            state.upstream_breakers.record(endpoint, false);
             return Err(SsrFallbackReason::ShellFetchFailed);
         }
         Err(e) => {
@@ -3341,6 +3350,7 @@ async fn compose_render_with_shell(
                 error = %e,
                 "SSR shell fetch failed"
             );
+            state.upstream_breakers.record(endpoint, false);
             return Err(SsrFallbackReason::ShellFetchFailed);
         }
     };
