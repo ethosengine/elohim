@@ -55,8 +55,16 @@ pub struct RaceFetchKicker {
     /// Local blob store; bytes-on-hit are persisted here (filesystem first,
     /// then SQL — see `finalize_fetch_success` ordering contract).
     pub blob_store: Arc<BlobStore>,
-    /// CID of this peer's steward; written into the `serve-blob` REA event.
+    /// This peer's TRANSPORT id (`Config::self_cid`, libp2p/iroh). Legacy
+    /// fallback for the `serve-blob` receiver when the agent_cid is unresolvable.
     pub self_cid: String,
+    /// This peer's resolved holochain `agent_cid` (`uhCAk…`), when available.
+    /// PREFERRED as the `serve-blob` REA event receiver so the delivery-attribution
+    /// row keys on the canonical identity namespace (`humans.agent_pub_key`),
+    /// never a transport id. `None` at boot when the conductor cell key was not
+    /// resolvable — the write then falls back to `self_cid` (the pre-existing
+    /// behavior; a transition, not a regression). See `identity_namespace`.
+    pub self_agent_cid: Option<String>,
     /// Per-batch parallelism bound for `race_fetch`.
     pub fetch_blob_parallelism: usize,
     /// Per-peer timeout for `race_fetch` (seconds).
@@ -108,7 +116,13 @@ impl FetchKicker for RaceFetchKicker {
         let connected = self.connected_peers.clone();
         let pool = self.db_pool.clone();
         let blob_store = self.blob_store.clone();
-        let self_cid = self.self_cid.clone();
+        // Prefer the resolved agent_cid for the serve-blob receiver; fall back to
+        // the transport self_cid only when the agent_cid is unresolvable. Never
+        // NULL — a receiver is always written.
+        let self_cid = self
+            .self_agent_cid
+            .clone()
+            .unwrap_or_else(|| self.self_cid.clone());
         let parallelism = self.fetch_blob_parallelism.max(1);
         let timeout = Duration::from_secs(self.fetch_blob_timeout_seconds.max(1));
         let metrics = self.metrics.clone();
@@ -246,6 +260,7 @@ mod tests {
             db_pool: test_pool(),
             blob_store: Arc::new(BlobStore::new_memory()),
             self_cid: "self-cid-fixture".into(),
+            self_agent_cid: None,
             fetch_blob_parallelism: 2,
             fetch_blob_timeout_seconds: 1,
             metrics: metrics.clone(),
@@ -283,6 +298,7 @@ mod tests {
             db_pool: test_pool(),
             blob_store: Arc::new(BlobStore::new_memory()),
             self_cid: "self-cid-fixture".into(),
+            self_agent_cid: None,
             fetch_blob_parallelism: 2,
             fetch_blob_timeout_seconds: 1,
             metrics: metrics.clone(),

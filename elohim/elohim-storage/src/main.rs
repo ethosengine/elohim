@@ -1588,9 +1588,18 @@ async fn async_main(
                                                 continue;
                                             }
                                         };
+                                        // Resolve THIS node's canonical agent_cid to
+                                        // WRITE as `provider` (session key → own cell
+                                        // key, agent_cid-gated). `None` → the pass skips
+                                        // authoring this tick rather than write a
+                                        // transport id. Re-resolved per tick so a session
+                                        // that logs in after boot is picked up.
+                                        let salvage_self_agent_cid =
+                                            salvage_author.resolve_self_agent_cid(&mut conn);
                                         match elohim_storage::services::salvage_commitment_author::run_salvage_pass(
                                             &mut conn,
                                             &salvage_self_cid,
+                                            salvage_self_agent_cid.as_deref(),
                                             salvage_author.as_ref(),
                                             true, // enabled (gated by the match arm above)
                                             salvage_target_replicas,
@@ -1936,6 +1945,28 @@ async fn async_main(
             warn!("Invalid relay mode: {}, defaulting to client", e);
             RelayMode::Client
         });
+
+        // Identity-coherence: capture THIS node's boot-time conductor cell-key
+        // agent_cid (uhCAk…) as the STABLE fallback for the custody reconcile pass's
+        // read-side self-matching. Salvage authors `provider = agent_cid`, so
+        // reconcile must recognise the node's own agent_cid rows (not just the
+        // transport self_cid) or the fetch never fires. The cell key is a stable
+        // per-process identity; the ACTIVE-SESSION arm is re-resolved from the DB on
+        // EVERY pass inside `reconcile::custody::resolve_self_agent_cid`, so a session
+        // that logs in AFTER P2P boot is picked up without a restart — keeping the
+        // read side in lockstep with the salvage author's per-tick write identity.
+        // `None` here (no conductor cell key at boot) still matches transport self_cid
+        // + any per-pass session agent_cid (no regression).
+        let self_cellkey_agent_cid: Option<String> = hc_registry_for_http
+            .as_ref()
+            .and_then(|r| r.lamad_client())
+            .map(|hc| hc.agent_key_uhcak());
+        if let Some(ref acid) = self_cellkey_agent_cid {
+            info!(self_cellkey_agent_cid = %acid, "P2P custody reconcile: cell-key agent_cid snapshot for own-row matching (session arm re-resolved per pass)");
+        } else {
+            info!("P2P custody reconcile: no conductor cell key at boot — reconcile matches transport self_cid + any active-session agent_cid (re-resolved per pass)");
+        }
+
         let p2p_config = P2PConfig {
             listen_addresses: if args.p2p_port == 0 {
                 vec!["/ip4/0.0.0.0/tcp/0".to_string()]
@@ -1956,6 +1987,7 @@ async fn async_main(
             // P2PNode::run_custody_reconcile see the same values used by the
             // HTTP-side race-fetch path (config.rs defaults).
             self_cid: config.self_cid.clone(),
+            self_cellkey_agent_cid,
             custody_sweep_seconds: Some(config.custody_sweep_seconds),
             placement_grace_seconds: config.placement_grace_seconds,
             placement_gap_cooldown_seconds: config.placement_gap_cooldown_seconds,

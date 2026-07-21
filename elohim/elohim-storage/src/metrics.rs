@@ -243,6 +243,19 @@ lazy_static! {
         "Provide-loop author calls skipped because no agent_cid provider was resolvable.",
     )
     .unwrap();
+
+    /// Salvage-pass authoring ticks skipped because the node could not resolve a
+    /// truthful `agent_cid` (`uhCAk…`) for itself (neither the active local
+    /// session key nor the pod's own conductor cell key). The salvage author
+    /// refuses to write a transport-id (`12D3Koo…` / iroh NodeId) `provider` into
+    /// `rea_commitments.provider` — the same custody/resilience-card join key the
+    /// provide-loop guards — so it skips this tick rather than mint a junk row.
+    /// Sibling to [`PROVIDE_PROVIDER_UNRESOLVED`] but scoped to the salvage writer.
+    pub static ref SALVAGE_PROVIDER_UNRESOLVED: IntCounter = IntCounter::new(
+        "elohim_salvage_provider_unresolved_total",
+        "Salvage author ticks skipped because no agent_cid self-provider was resolvable.",
+    )
+    .unwrap();
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -275,6 +288,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_INBOUND_SERVED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_AUTHORED.clone()));
         let _ = REGISTRY.register(Box::new(PROVIDE_PROVIDER_UNRESOLVED.clone()));
+        let _ = REGISTRY.register(Box::new(SALVAGE_PROVIDER_UNRESOLVED.clone()));
     });
 }
 
@@ -391,6 +405,12 @@ pub fn add_content_witness_authored(n: u64) {
 /// resolvable (the CID-hardening guard refusing to write a transport id).
 pub fn inc_provide_provider_unresolved() {
     PROVIDE_PROVIDER_UNRESOLVED.inc();
+}
+
+/// Record one salvage author tick skipped because no `agent_cid` self-provider
+/// was resolvable (the salvage writer refusing to write a transport id).
+pub fn inc_salvage_provider_unresolved() {
+    SALVAGE_PROVIDER_UNRESOLVED.inc();
 }
 
 #[cfg(test)]

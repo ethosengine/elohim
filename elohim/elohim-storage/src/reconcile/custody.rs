@@ -113,15 +113,50 @@ pub struct ReconcileConfig {
 
 /// Run one reconcile pass over the custody-blob commitments visible in this
 /// peer's projection. Idempotent.
+/// `self_cid` is this node's TRANSPORT id (`Config::self_cid`); `self_agent_cid`
+/// is its resolved holochain `agent_cid` (`uhCAk…`), when available. Self-matching
+/// (own-provider → fetch-on-miss; own-receiver → placement-gap) matches a
+/// commitment row whose `provider`/`receiver` equals EITHER namespace. This is
+/// the transition semantics: legacy rows (and pre-resolver salvage writes) carry
+/// the transport id, while new salvage/seeder writes carry the agent_cid — so
+/// both must be recognised or the node's own rows are orphaned (the fetch never
+/// fires for an agent_cid-provider row this node authored). `self_agent_cid` is
+/// `None` when the conductor cell key was not resolvable at P2P boot; matching
+/// Resolve THIS node's `agent_cid` for reconcile self-matching, IN LOCKSTEP with
+/// the salvage author's per-tick resolution
+/// (`services::salvage_commitment_author::resolve_self_agent_cid`): the active
+/// session's `agent_pub_key` re-resolved from `conn` on EVERY pass, falling back
+/// to the boot-time conductor cell-key snapshot. Re-resolving the session arm per
+/// pass is what keeps the two in lockstep — otherwise a session that logs in (or
+/// changes) AFTER P2P boot would make salvage author `provider = <session
+/// agent_cid>` rows that a frozen reconcile value could never match (the orphaned
+/// own-row class). Returns `None` only when neither candidate is an `agent_cid`;
+/// matching then degrades to transport-only (the pre-existing behavior).
+pub fn resolve_self_agent_cid(
+    conn: &mut SqliteConnection,
+    cellkey_snapshot: Option<&str>,
+) -> Option<String> {
+    let session_cid = crate::db::local_sessions::get_active_session(conn)
+        .ok()
+        .flatten()
+        .map(|s| s.agent_pub_key);
+    crate::identity_namespace::resolve_agent_cid_write(&[session_cid.as_deref(), cellkey_snapshot])
+}
+
+/// then degrades to transport-only (the pre-existing behavior — no regression).
+#[allow(clippy::too_many_arguments)]
 pub fn reconcile_pass(
     conn: &mut SqliteConnection,
     self_cid: &str,
+    self_agent_cid: Option<&str>,
     local_store: &dyn LocalBlobStore,
     fetch_kicker: &dyn FetchKicker,
     cfg: ReconcileConfig,
     now: DateTime<Utc>,
     connected_peers: &[String],
 ) -> Result<ReconcileOutcome, StorageError> {
+    // Does `s` name THIS node in either identity namespace (transport OR agent)?
+    let is_self = |s: &str| s == self_cid || self_agent_cid == Some(s);
     let placement_grace_seconds = cfg.placement_grace_seconds;
     let placement_gap_cooldown_seconds = cfg.placement_gap_cooldown_seconds;
     let inventory_freshness_seconds = cfg.inventory_freshness_seconds;
@@ -153,7 +188,7 @@ pub fn reconcile_pass(
             continue;
         };
 
-        if commitment.provider == self_cid {
+        if is_self(&commitment.provider) {
             // Own commitment — act if missing.
             if !local_store.has(&blob_hash) {
                 let candidates =
@@ -218,7 +253,7 @@ pub fn reconcile_pass(
                     outcome.fallback_kicks += 1;
                 }
             }
-        } else if commitment.receiver == self_cid {
+        } else if is_self(&commitment.receiver) {
             // Other peer's commitment to me — observe; signal on stale.
             let last_seen: Option<String> = peer_blob_inventory::table
                 .filter(peer_blob_inventory::peer_id.eq(&commitment.provider))
@@ -352,9 +387,21 @@ pub struct SalvageOutcome {
 /// does NOT change [`reconcile_pass`]. Idempotent. The XOR vs intentional choice
 /// lives behind `strategy` (the [`PlacementStrategy`] seam) — see
 /// `2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md`.
+/// ## Self-identity (two namespaces)
+///
+/// `self_read_cid` is the node's TRANSPORT id (`Config::self_cid`) and matches
+/// only existing rows this node authored BEFORE the agent_cid resolver landed.
+/// `self_write_cid` is the resolved holochain `agent_cid` (`uhCAk…`) — the
+/// candidate-pool identity, the placement rank-match, and the `provider` this
+/// pass AUTHORS. The "already a provider" idempotency check matches EITHER (so a
+/// legacy transport-id row and a new agent_cid row both count), but every WRITE
+/// uses `self_write_cid`. `run_salvage_pass` guarantees `self_write_cid` is a
+/// valid agent_cid (it skips the tick otherwise).
+#[allow(clippy::too_many_arguments)]
 pub fn salvage_pass(
     conn: &mut SqliteConnection,
-    self_cid: &str,
+    self_read_cid: &str,
+    self_write_cid: &str,
     strategy: &dyn PlacementStrategy,
     author: &dyn CommitmentAuthor,
     salvage_pool: &[PlacementCandidate],
@@ -421,22 +468,28 @@ pub fn salvage_pass(
             outcome.skipped_opted_out += 1;
             continue; // opt-in consent gate (imago-dei floor; a node is never conscripted)
         }
-        if want.providers.contains(self_cid) {
+        // "Already a provider" is checked in BOTH namespaces: a row this node
+        // authored last tick carries `self_write_cid` (agent_cid), while a legacy
+        // row it authored before the resolver carries `self_read_cid` (transport).
+        // Either means "no duplicate adopt".
+        if want.providers.contains(self_write_cid) || want.providers.contains(self_read_cid) {
             continue; // already a provider for this blob — idempotent, no duplicate adopt
         }
 
         // Deterministic self-selection: adopt iff self is among the closest-N
-        // holders for this blob. Every peer computes the same set over the same
-        // pool, so exactly the intended holders adopt (coordination-free).
+        // holders for this blob. The pool identifies self by its agent_cid, so the
+        // match is against `self_write_cid`. Every peer computes the same set over
+        // the same pool, so exactly the intended holders adopt (coordination-free).
         let closest = strategy.rank(&blob, salvage_pool, cfg.target_replicas);
-        if !closest.iter().any(|cid| cid == self_cid) {
+        if !closest.iter().any(|cid| cid == self_write_cid) {
             outcome.skipped_not_closest += 1;
             continue;
         }
 
-        // Adopt: author the notarized placement intent; the next reconcile_pass
-        // provider branch fetches the bytes.
-        author.author_custody_blob(&blob, self_cid, &want.receiver)?;
+        // Adopt: author the notarized placement intent naming self by agent_cid
+        // (NEVER a transport id); the next reconcile_pass provider branch fetches
+        // the bytes.
+        author.author_custody_blob(&blob, self_write_cid, &want.receiver)?;
         outcome.commitments_authored += 1;
     }
 
@@ -543,6 +596,7 @@ mod tests {
         let outcome = reconcile_pass(
             &mut conn,
             "self_cid",
+            None,
             &StaticStore(vec!["a".repeat(64)]),
             &kicker,
             default_cfg(),
@@ -581,6 +635,7 @@ mod tests {
         let outcome = reconcile_pass(
             &mut conn,
             "self_cid",
+            None,
             &StaticStore(vec![]), // local store empty
             &kicker,
             default_cfg(),
@@ -669,6 +724,7 @@ mod tests {
         let outcome = reconcile_pass(
             &mut conn,
             "self_cid",
+            None,
             &StaticStore(vec![]), // local store empty
             &kicker,
             default_cfg(),
@@ -716,6 +772,7 @@ mod tests {
         let outcome = reconcile_pass(
             &mut conn,
             "self_cid",
+            None,
             &StaticStore(vec![]),
             &kicker,
             default_cfg(),
@@ -741,6 +798,7 @@ mod tests {
         let outcome = reconcile_pass(
             &mut conn,
             "self_cid",
+            None,
             &StaticStore(vec![]),
             &kicker,
             default_cfg(),
@@ -770,6 +828,7 @@ mod tests {
         let outcome = reconcile_pass(
             &mut conn,
             "self_cid",
+            None,
             &StaticStore(vec![]),
             &kicker,
             default_cfg(),
@@ -803,6 +862,7 @@ mod tests {
         let outcome = reconcile_pass(
             &mut conn,
             "self_cid",
+            None,
             &StaticStore(vec![]),
             &kicker,
             default_cfg(),
@@ -844,6 +904,7 @@ mod tests {
         let outcome = reconcile_pass(
             &mut conn,
             "self_cid",
+            None,
             &StaticStore(vec![]),
             &kicker,
             default_cfg(),
@@ -872,6 +933,7 @@ mod tests {
         let outcome = reconcile_pass(
             &mut conn,
             "self_cid",
+            None,
             &StaticStore(vec![]),
             &kicker,
             default_cfg(),
@@ -920,6 +982,7 @@ mod tests {
         let outcome = reconcile_pass(
             &mut conn,
             "self_cid",
+            None,
             &StaticStore(vec![]),
             &kicker,
             default_cfg(),
@@ -947,6 +1010,7 @@ mod tests {
         let _ = reconcile_pass(
             &mut conn,
             "self_cid",
+            None,
             &StaticStore(vec![]),
             &kicker,
             default_cfg(),
@@ -959,6 +1023,7 @@ mod tests {
         let outcome = reconcile_pass(
             &mut conn,
             "self_cid",
+            None,
             &StaticStore(vec![]),
             &kicker,
             default_cfg(),
@@ -968,6 +1033,197 @@ mod tests {
         .unwrap();
 
         assert_eq!(outcome.placement_gaps_emitted, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Identity backward-compat: reconcile matches self in EITHER namespace
+    // -----------------------------------------------------------------------
+
+    /// A NEW salvage-authored row carries `provider = agent_cid`. With the node's
+    /// transport `self_cid` distinct from its `agent_cid`, the own-provider branch
+    /// must still fire (kick on miss) by matching the agent_cid — otherwise the
+    /// node's own salvage rows are orphaned and their bytes never fetched.
+    #[test]
+    fn reconcile_matches_own_agent_cid_provider_row() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        let blob_hash = "a".repeat(64);
+        // provider = agent_cid (NOT the transport self_cid).
+        insert_custody_commitment(&mut conn, "c1", "uhCAk-self", "steward-Z", &blob_hash);
+
+        let now = chrono::Utc::now();
+        let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        apply_snapshot(
+            &mut conn,
+            "peer_X",
+            std::slice::from_ref(&blob_hash),
+            1,
+            &when,
+        )
+        .unwrap();
+
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let outcome = reconcile_pass(
+            &mut conn,
+            "12D3KooTransportSelfId", // transport self_cid
+            Some("uhCAk-self"),       // resolved agent_cid
+            &StaticStore(vec![]),     // blob missing locally
+            &kicker,
+            default_cfg(),
+            now,
+            &[],
+        )
+        .unwrap();
+
+        assert_eq!(
+            outcome.kicks_fired, 1,
+            "own agent_cid-provider row must match and kick"
+        );
+    }
+
+    /// A LEGACY row carries `provider = transport self_cid` (authored before the
+    /// resolver, or an env-pinned transport SELF_CID). Even with an agent_cid now
+    /// resolved, the transport match must still fire — legacy rows are not orphaned.
+    #[test]
+    fn reconcile_still_matches_legacy_transport_provider_row() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        let blob_hash = "a".repeat(64);
+        // provider = transport self_cid (legacy write).
+        insert_custody_commitment(
+            &mut conn,
+            "c1",
+            "12D3KooTransportSelfId",
+            "steward-Z",
+            &blob_hash,
+        );
+
+        let now = chrono::Utc::now();
+        let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        apply_snapshot(
+            &mut conn,
+            "peer_X",
+            std::slice::from_ref(&blob_hash),
+            1,
+            &when,
+        )
+        .unwrap();
+
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let outcome = reconcile_pass(
+            &mut conn,
+            "12D3KooTransportSelfId",
+            Some("uhCAk-self"), // agent_cid resolved, but the row is legacy-transport
+            &StaticStore(vec![]),
+            &kicker,
+            default_cfg(),
+            now,
+            &[],
+        )
+        .unwrap();
+
+        assert_eq!(
+            outcome.kicks_fired, 1,
+            "legacy transport-id provider row must still match (not orphaned)"
+        );
+    }
+
+    /// The receiver-side (placement-gap) branch also matches the agent_cid: a row
+    /// whose `receiver = agent_cid` and provider is a stale peer emits a gap.
+    #[test]
+    fn reconcile_matches_own_agent_cid_receiver_row() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        let blob_hash = "a".repeat(64);
+        insert_custody_commitment(&mut conn, "c1", "other_cid", "uhCAk-self", &blob_hash);
+
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let outcome = reconcile_pass(
+            &mut conn,
+            "12D3KooTransportSelfId",
+            Some("uhCAk-self"),
+            &StaticStore(vec![]),
+            &kicker,
+            default_cfg(),
+            chrono::Utc::now(),
+            &[],
+        )
+        .unwrap();
+
+        assert_eq!(
+            outcome.placement_gaps_emitted, 1,
+            "own agent_cid-receiver row must emit a placement-gap"
+        );
+    }
+
+    /// Seed an active local session with the given agent_cid.
+    fn seed_active_session(conn: &mut SqliteConnection, agent_cid: &str) {
+        crate::db::local_sessions::create_session(
+            conn,
+            crate::db::local_sessions::CreateLocalSessionInput {
+                id: None,
+                human_id: "human-1".into(),
+                agent_pub_key: agent_cid.into(),
+                doorway_url: "http://doorway.test".into(),
+                doorway_id: None,
+                identifier: "tester".into(),
+                display_name: None,
+                profile_image_hash: None,
+                bootstrap_url: None,
+            },
+        )
+        .expect("seed session");
+    }
+
+    /// The lockstep unfreeze: with NO cell-key snapshot at boot (`None`), a session
+    /// that logs in AFTER boot is picked up per pass — so reconcile resolves the
+    /// same agent_cid salvage authors, and the node's own rows are never orphaned.
+    #[test]
+    fn resolve_self_agent_cid_picks_up_post_boot_session() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        // Boot: no conductor cell key, no session → unresolved (transport-only).
+        assert_eq!(resolve_self_agent_cid(&mut conn, None), None);
+
+        // A session logs in after boot.
+        seed_active_session(&mut conn, "uhCAk-session-self");
+        assert_eq!(
+            resolve_self_agent_cid(&mut conn, None).as_deref(),
+            Some("uhCAk-session-self"),
+            "post-boot session agent_cid is resolved without a restart"
+        );
+    }
+
+    /// The cell-key snapshot is the stable fallback when no session is active, and
+    /// a session (candidate a) wins over the cell key (candidate b) when present.
+    #[test]
+    fn resolve_self_agent_cid_prefers_session_then_falls_back_to_cellkey() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        // No session → the boot cell-key snapshot is used.
+        assert_eq!(
+            resolve_self_agent_cid(&mut conn, Some("uhCAk-cellkey")).as_deref(),
+            Some("uhCAk-cellkey")
+        );
+
+        // Session present → it wins over the cell key (lockstep with salvage's
+        // [session → cell key] order).
+        seed_active_session(&mut conn, "uhCAk-session-self");
+        assert_eq!(
+            resolve_self_agent_cid(&mut conn, Some("uhCAk-cellkey")).as_deref(),
+            Some("uhCAk-session-self")
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -1073,6 +1329,7 @@ mod tests {
         let outcome = salvage_pass(
             &mut conn,
             "self",
+            "self",
             &strat,
             &author,
             &pool(&["self", "prov-A", "prov-B"]),
@@ -1107,6 +1364,7 @@ mod tests {
         let outcome = salvage_pass(
             &mut conn,
             "self",
+            "self",
             &strat,
             &author,
             &pool(&["self"]),
@@ -1137,6 +1395,7 @@ mod tests {
         let outcome = salvage_pass(
             &mut conn,
             "self",
+            "self",
             &strat,
             &author,
             &pool(&["self"]),
@@ -1164,6 +1423,7 @@ mod tests {
         let strat = StaticStrategy(vec!["prov-A".into(), "prov-B".into()]); // self NOT closest
         let outcome = salvage_pass(
             &mut conn,
+            "self",
             "self",
             &strat,
             &author,
@@ -1193,6 +1453,7 @@ mod tests {
         let outcome = salvage_pass(
             &mut conn,
             "self",
+            "self",
             &strat,
             &author,
             &pool(&["self"]),
@@ -1204,6 +1465,76 @@ mod tests {
         assert_eq!(
             outcome.commitments_authored, 0,
             "already a provider — no duplicate adopt"
+        );
+        assert!(author.authored.lock().unwrap().is_empty());
+    }
+
+    /// The write/read split: when self's transport id (`self_read`) differs from
+    /// its agent_cid (`self_write`), the authored `provider` is the AGENT_CID, and
+    /// the candidate-pool / rank identity is the agent_cid too. The transport id is
+    /// NEVER written.
+    #[test]
+    fn salvage_authors_agent_cid_not_transport_when_they_differ() {
+        let p = test_pool();
+        let mut conn = p.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = "a".repeat(64);
+        insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
+        mark_hosting(&mut conn, "prov-A", &blob, now);
+
+        let author = RecordingAuthor::new();
+        // Strategy names the agent_cid as closest (the pool identity).
+        let strat = StaticStrategy(vec!["prov-A".into(), "uhCAk-self".into()]);
+        let outcome = salvage_pass(
+            &mut conn,
+            "12D3KooTransportSelf", // self_read (transport)
+            "uhCAk-self",           // self_write (agent_cid)
+            &strat,
+            &author,
+            &pool(&["uhCAk-self", "prov-A"]),
+            salvage_cfg(true, 2),
+            now,
+        )
+        .unwrap();
+
+        assert_eq!(outcome.commitments_authored, 1);
+        let recorded = author.authored.lock().unwrap();
+        assert_eq!(
+            recorded[0],
+            (blob, "uhCAk-self".to_string(), "steward-Z".to_string()),
+            "provider is the agent_cid, never the transport id"
+        );
+    }
+
+    /// Backward-compat idempotency: a LEGACY row whose `provider` is the transport
+    /// `self_read` id must still count as "already a provider" (no duplicate adopt)
+    /// even though the node now writes agent_cid.
+    #[test]
+    fn salvage_already_provider_matches_legacy_transport_row() {
+        let p = test_pool();
+        let mut conn = p.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = "a".repeat(64);
+        // Legacy row: provider is the transport id this node used to write.
+        insert_custody_commitment(&mut conn, "c1", "12D3KooTransportSelf", "steward-Z", &blob);
+
+        let author = RecordingAuthor::new();
+        let strat = StaticStrategy(vec!["uhCAk-self".into()]);
+        let outcome = salvage_pass(
+            &mut conn,
+            "12D3KooTransportSelf", // self_read matches the legacy provider
+            "uhCAk-self",           // self_write (agent_cid)
+            &strat,
+            &author,
+            &pool(&["uhCAk-self"]),
+            salvage_cfg(true, 2),
+            now,
+        )
+        .unwrap();
+
+        assert_eq!(
+            outcome.commitments_authored, 0,
+            "legacy transport-id provider row counts as already-provider (no duplicate)"
         );
         assert!(author.authored.lock().unwrap().is_empty());
     }
