@@ -201,11 +201,27 @@ build to the fork-source build (image/build lift, no user urgency since serving 
 belongs in a dedicated authorized edge shift, not a silent infra change on the integration branch.
 
 **Turnkey brief for that shift:**
-- **Change:** add a change-check to `HolochainOpStore::store_slice_hash` (`op_store.rs` ~354–391) —
-  skip the write txn when the stored slice hash is byte-identical to the incoming one (the
-  `inform_ops_stored` catch-up path re-writes unchanged slices).
-- **Build:** re-point the edge image from the prebuilt holo-host binary to the fork-source build,
-  `Dockerfile.zombie-fix` pattern (proven by the tx5 zombie-leak precedent).
+- **Change — LANDED in the fork (2026-07-21):** `HolochainOpStore::store_slice_hash`
+  (`elohim/holochain-conductor` submodule, branch `elohim-0.6`, `crates/holochain_p2p/src/op_store.rs`)
+  now does a change-check on the **read** pool before taking the write guard — the `SliceHash` PK is
+  `ON CONFLICT REPLACE`, so an unconditional INSERT re-writes a byte-identical row under the guard; the
+  check skips the write when the stored hash already matches. Regression test:
+  `store_slice_hash_change_check_updates_and_is_idempotent` (`crates/holochain_p2p/tests/tests/op_store.rs`)
+  pins that a real change is never swallowed and a redundant re-store is a safe no-op. The parent-repo
+  submodule pointer is bumped to the fork commit. **Code is done; only the image build + deploy remain,
+  and those are operator-gated by design (below).**
+- **Build — the fork-source edge image is NOT the active path.** The live edge image is
+  `FROM ghcr.io/holo-host/edgenode:…` (prebuilt binary + config COPY). The from-source conductor build
+  is the **opt-in, out-of-band** `elohim/holochain/edgenode/build-zombie-fix.sh` + `Dockerfile.zombie-fix`
+  (pushes a distinct `:zombie-fix-canary-<hash>` tag; **deliberately NOT wired into the auto edge
+  pipeline** — a ~30min CGo from-source build that fails would redden edge and block unrelated deploys;
+  do not "fix" that by auto-wiring it). Run it as a manual Jenkins job.
+- **Deploy — gated, cluster-owned; do NOT skip.** Per `.claude/data/conductor-leak-deploy-recipe-2026-06-17.md`
+  the canary image is NOT cleared for deploy until BOTH are verified: (1) exact `go-pion-custom`
+  production feature-set parity vs holo-host's recipe, and (2) kitsune2 `0.3.2 ↔ 0.3.0-dev.3` wire-compat,
+  canaried on one **non-genesis leecher** first. Deploy = re-point `genesis/orchestrator/manifests/edgenode/*.yaml`
+  (`EDGENODE_TAG_PLACEHOLDER`) — operator/cluster territory. Deploying an unverified from-source conductor
+  to the genesis pair risks a DNA/wire mismatch → split DHT (see CLAUDE.md "DNA changes don't redeploy").
 - **Verify (probes below):** adam CPU falls to matthew's ~0.3–0.6 band (not just a post-restart dip)
   and `PTxnGuard was held` drops to single-digits/15min. The serving-layer probes already pass and
   stay independent of this — this patch heals the node, not the doorway.
