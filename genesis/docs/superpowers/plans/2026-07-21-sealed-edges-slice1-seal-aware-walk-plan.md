@@ -169,4 +169,4 @@ rename-propagation stay on the spec's open questions — v1 edge targets are pat
 - [x] Task 1: `DepEdge` + `Governor` + `EdgeStatus::Held` + `FlowRecord::Edge` + `edges()` latest-wins + `edge_fp` + invariant, with unit tests (elohim/epr-rea)
 - [x] Task 2: `EdgeIndex::build` (doc envelopes + sidecar, one graph) + verdict derivation (Ok/Stale/Held/Governed/Dangling) + seal-aware `flow walk`/`flow status` surfaces + dogfood parity check (epr-cli)
 - [x] Task 3: `epr flow seal/reseal/hold` verbs + `--json` + run() wiring, with CLI integration test on a temp fixture repo (epr-cli)
-- [ ] Task 4: end-to-end stale→reseal/hold proof green + fmt/clippy/test gates on epr-rea + eprfs workspace + flip gap-items #1–#3 to CLAIMED
+- [x] Task 4: end-to-end stale→reseal/hold proof green + fmt/clippy/test gates on epr-rea + eprfs workspace + flip gap-items #1–#3 to CLAIMED
