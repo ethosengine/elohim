@@ -72,7 +72,7 @@ fn seal_stale_reseal_hold_and_governed_end_to_end() {
         root,
         "app/foo.ts",
         "spec/bar.md",
-        "cite-seal",
+        Some("cite-seal"),
         Some("foo conforms to bar".into()),
     )
     .expect("seal runs");
@@ -134,7 +134,14 @@ fn seal_stale_reseal_hold_and_governed_end_to_end() {
     assert_eq!(s.edges_stale, 0, "a held edge never enters the stale set");
 
     // ── compiler-governed edge never goes stale under mutation ────────────────────
-    seal::seal(root, "app/gov.ts", "spec/gov-up.md", "compiler:tsc", None).expect("seal governed");
+    seal::seal(
+        root,
+        "app/gov.ts",
+        "spec/gov-up.md",
+        Some("compiler:tsc"),
+        None,
+    )
+    .expect("seal governed");
     mutate(
         root,
         "spec/gov-up.md",
@@ -160,7 +167,7 @@ fn cite_seal_on_missing_upstream_is_an_error() {
         root,
         "app/foo.ts",
         "spec/does-not-exist.md",
-        "cite-seal",
+        Some("cite-seal"),
         None,
     );
     assert!(
@@ -177,7 +184,7 @@ fn reseal_on_a_currently_ok_edge_is_an_error() {
         root,
         "app/foo.ts",
         "spec/bar.md",
-        "cite-seal",
+        Some("cite-seal"),
         Some("foo conforms to bar".into()),
     )
     .expect("seal runs");
@@ -209,7 +216,7 @@ fn reseal_path_confinement_rejects_escaping_on_and_file_args() {
         root,
         "app/foo.ts",
         "spec/bar.md",
-        "cite-seal",
+        Some("cite-seal"),
         Some("foo conforms to bar".into()),
     )
     .expect("seal runs");
@@ -258,8 +265,14 @@ fn seal_path_confinement_rejects_escaping_file_arg() {
     let outside = root.parent().expect("tempdir has a parent");
     std::fs::write(outside.join("escaper.ts"), "// outside the repo\n").unwrap();
 
-    let err = seal::seal(root, "../escaper.ts", "spec/bar.md", "cite-seal", None)
-        .expect_err("a <file> arg escaping the root must error");
+    let err = seal::seal(
+        root,
+        "../escaper.ts",
+        "spec/bar.md",
+        Some("cite-seal"),
+        None,
+    )
+    .expect_err("a <file> arg escaping the root must error");
     assert!(
         err.to_string().contains("escapes"),
         "expected a path-confinement error, got: {err}"
@@ -270,8 +283,15 @@ fn seal_path_confinement_rejects_escaping_file_arg() {
 fn reseal_all_stale_supersedes_every_stale_outgoing_edge() {
     let dir = fixture();
     let root = dir.path();
-    seal::seal(root, "app/foo.ts", "spec/bar.md", "cite-seal", None).expect("seal 1");
-    seal::seal(root, "app/foo.ts", "spec/gov-up.md", "cite-seal", None).expect("seal 2");
+    seal::seal(root, "app/foo.ts", "spec/bar.md", Some("cite-seal"), None).expect("seal 1");
+    seal::seal(
+        root,
+        "app/foo.ts",
+        "spec/gov-up.md",
+        Some("cite-seal"),
+        None,
+    )
+    .expect("seal 2");
     mutate(root, "spec/bar.md", "drifted one\n");
     mutate(root, "spec/gov-up.md", "drifted two\n");
     let s = walk::status(root).expect("status");
@@ -282,4 +302,106 @@ fn reseal_all_stale_supersedes_every_stale_outgoing_edge() {
     let s = walk::status(root).expect("status");
     assert_eq!(s.edges_stale, 0);
     assert_eq!(s.edges_sealed, 2);
+}
+
+// ── Governor auto-derivation (spec §3): seal WITHOUT --governor ────────────────────────────
+
+/// A fixture repo with a real cargo workspace at its root (two member crates) plus a doc
+/// pair — proves governor auto-derivation end-to-end: `same-cargo-workspace` -> compiler,
+/// `doc-doc` -> cite-seal. No `.claude/epr-meta/governors.yaml` here, so this also exercises
+/// the fail-soft built-in default order.
+fn fixture_with_cargo_workspace() -> TempDir {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "Cargo.toml",
+        "[workspace]\nmembers = [\"crate_a\", \"crate_b\"]\n",
+    );
+    write(
+        root,
+        "crate_a/Cargo.toml",
+        "[package]\nname = \"crate_a\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    );
+    write(root, "crate_a/src/lib.rs", "// crate_a lib, version one\n");
+    write(
+        root,
+        "crate_b/Cargo.toml",
+        "[package]\nname = \"crate_b\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    );
+    write(root, "crate_b/src/lib.rs", "// crate_b lib, version one\n");
+    write(root, "docs/downstream.md", "Downstream doc, version one.\n");
+    write(root, "docs/upstream.md", "Upstream doc, version one.\n");
+    git(root, &["init", "-q"]);
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-q", "-m", "fixture"]);
+    dir
+}
+
+#[test]
+fn seal_without_governor_on_same_workspace_rs_pair_derives_compiler_and_never_goes_stale() {
+    let dir = fixture_with_cargo_workspace();
+    let root = dir.path();
+
+    let outcome = seal::seal(root, "crate_a/src/lib.rs", "crate_b/src/lib.rs", None, None)
+        .expect("seal derives a governor");
+    assert!(outcome.derived, "no --governor given — must derive");
+    assert_eq!(outcome.rule.as_deref(), Some("same-cargo-workspace"));
+    assert!(
+        outcome.governor.starts_with("compiler:"),
+        "expected a compiler governor, got {}",
+        outcome.governor
+    );
+    assert!(
+        outcome.sealed_cid.is_none(),
+        "a derived governed edge seals no CID"
+    );
+
+    let s = walk::status(root).expect("status");
+    assert_eq!(s.edges_governed, 1, "the derived compiler edge is governed");
+    assert_eq!(s.edges_stale, 0);
+
+    // A governed edge never goes stale under upstream mutation.
+    mutate(
+        root,
+        "crate_b/src/lib.rs",
+        "// crate_b lib, version TWO — drifted\n",
+    );
+    let s = walk::status(root).expect("status");
+    assert_eq!(s.edges_governed, 1);
+    assert_eq!(
+        s.edges_stale, 0,
+        "a compiler-governed edge never goes stale, derived or explicit"
+    );
+}
+
+#[test]
+fn seal_without_governor_on_two_docs_derives_cite_seal_and_goes_stale_on_mutation() {
+    let dir = fixture_with_cargo_workspace();
+    let root = dir.path();
+
+    let outcome = seal::seal(root, "docs/downstream.md", "docs/upstream.md", None, None)
+        .expect("seal derives cite-seal");
+    assert!(outcome.derived, "no --governor given — must derive");
+    assert_eq!(outcome.rule.as_deref(), Some("doc-doc"));
+    assert_eq!(outcome.governor, "cite-seal");
+    assert!(
+        outcome.sealed_cid.is_some(),
+        "a derived cite-seal edge seals a CID"
+    );
+
+    let s = walk::status(root).expect("status");
+    assert_eq!(s.edges_sealed, 1);
+    assert_eq!(s.edges_stale, 0);
+
+    // Existing behavior preserved: a cite-seal edge goes stale on upstream mutation, derived
+    // or explicit alike.
+    mutate(
+        root,
+        "docs/upstream.md",
+        "Upstream doc, version TWO — drifted.\n",
+    );
+    let s = walk::status(root).expect("status");
+    assert_eq!(s.edges_stale, 1, "the derived cite-seal edge is now stale");
+    assert_eq!(s.edges_sealed, 0);
 }

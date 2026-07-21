@@ -7,6 +7,7 @@
 //! git, and records are deduped by CID against the existing sidecar before append.
 
 pub mod edges;
+pub mod governor;
 pub mod project;
 pub mod registry;
 pub mod seal;
@@ -177,9 +178,11 @@ fn run_seal(args: &[String]) -> FlowResult<ExitCode> {
     let (opts, rest) = parse_global(tail)?;
     let on = take_opt(&rest, "--on")?
         .ok_or_else(|| FlowError::InvalidArguments("seal needs --on <upstream>".into()))?;
-    let governor = take_opt(&rest, "--governor")?.unwrap_or_else(|| "cite-seal".into());
+    // `--governor` absent → auto-derive from `.claude/epr-meta/governors.yaml` (spec §3).
+    // An explicit `--governor` is a binding override that bypasses derivation entirely.
+    let governor = take_opt(&rest, "--governor")?;
     let desc = take_opt(&rest, "--desc")?;
-    let outcome = seal::seal(&opts.root, file, &on, &governor, desc)?;
+    let outcome = seal::seal(&opts.root, file, &on, governor.as_deref(), desc)?;
     if opts.json {
         println!("{}", serde_json::to_string_pretty(&outcome)?);
     } else {
@@ -270,7 +273,8 @@ fn usage() -> String {
      | status [--root DIR] [--json]\n  \
      | seal <file> --on <upstream> \
      [--governor compiler:<unit>|codegen:<pipeline>|schema-contract:<test>|test:<id>|cite-seal] \
-     [--desc <text>] [--json] [--root DIR]\n  \
+     [--desc <text>] [--json] [--root DIR] \
+     (omit --governor to auto-derive from .claude/epr-meta/governors.yaml)\n  \
      | reseal <file> [--on <upstream>] [--all-stale] [--json] [--root DIR]\n  \
      | hold <file> --on <upstream> --reason <text> [--valid-from <iso8601>] [--json] [--root DIR]\n>"
         .to_string()

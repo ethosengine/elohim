@@ -9,6 +9,7 @@ use elohim_epr_rea::{DepEdge, EdgeStatus, FlowRecord, FlowStore, Governor, Sidec
 use serde::Serialize;
 
 use super::edges::{edge_verdict, governor_label, EdgeIndex, Verdict};
+use super::governor::{derive_governor, load_governor_registry};
 use super::{
     body_cid_of_file, confine_under, head_commit_epoch, rel_to_root, repo_agent, FlowError,
     FlowResult,
@@ -29,6 +30,14 @@ pub struct SealOutcome {
     pub held_reason: Option<String>,
     /// The atom CID of the appended `FlowRecord::Edge`.
     pub record_cid: String,
+    /// `true` when `--governor` was absent and the governor was auto-derived (spec §3).
+    pub derived: bool,
+    /// The rule key that fired (`same-cargo-workspace`, `generated-ts`, …). `Some` only when
+    /// `derived`.
+    pub rule: Option<String>,
+    /// The registry policy `id@version` consulted (e.g. `edge-governor-defaults@1`). `Some`
+    /// only when `derived`.
+    pub policy: Option<String>,
 }
 
 impl SealOutcome {
@@ -51,6 +60,14 @@ impl SealOutcome {
                 "{action:<7} {} → {}  [{}] {}",
                 self.from, self.to, self.governor, seal
             ),
+        }
+        if self.derived {
+            let rule = self.rule.as_deref().unwrap_or("?");
+            let policy = self.policy.as_deref().unwrap_or("?");
+            println!(
+                "governor derived: {} (rule {rule}, {policy}) — override with --governor",
+                self.governor
+            );
         }
     }
 }
@@ -114,23 +131,44 @@ fn seal_upstream(root: &Path, to: &str) -> FlowResult<cid::Cid> {
     })
 }
 
-/// `epr flow seal <file> --on <upstream> [--governor …] [--desc …]`.
+/// `epr flow seal <file> --on <upstream> [--governor …] [--desc …]`. When `governor_spec` is
+/// `None` (no `--governor` on the CLI), the governor is AUTO-DERIVED from
+/// `.claude/epr-meta/governors.yaml` (spec §3) — an explicit `--governor` is a binding
+/// override that bypasses derivation entirely (no registry read).
 pub fn seal(
     root: &Path,
     file: &str,
     on: &str,
-    governor_spec: &str,
+    governor_spec: Option<&str>,
     desc: Option<String>,
 ) -> FlowResult<SealOutcome> {
     let from = rel_under(root, file)?;
     let to = rel_under(root, on)?;
-    let governor = parse_governor(governor_spec)?;
+
+    let (governor, derivation) = match governor_spec {
+        Some(spec) => (parse_governor(spec)?, None),
+        None => {
+            let registry = load_governor_registry(root)?;
+            let (governor, rule) = derive_governor(root, &from, &to, &registry);
+            let policy = registry.policy.clone();
+            (governor, Some((rule, policy)))
+        }
+    };
 
     // Only a cite-seal edge seals a CID; every governed edge records none (the invariant
-    // `sealed_cid.is_some() ⇔ CiteSeal` is enforced by `DepEdge::new`).
+    // `sealed_cid.is_some() ⇔ CiteSeal` is enforced by `DepEdge::new`). A governed edge still
+    // needs a real upstream target — pointing a compiler/codegen/schema-contract/test
+    // citation at a nonexistent file is a user error, just one that carries no seal.
     let sealed_cid = if matches!(governor, Governor::CiteSeal) {
         Some(seal_upstream(root, &to)?)
     } else {
+        if !root.join(&to).is_file() {
+            return Err(FlowError::InvalidArguments(format!(
+                "cannot seal `{to}` as governor `{}`: upstream target does not exist \
+                 (a governed edge to a nonexistent target is still a user error)",
+                governor_label(&governor)
+            )));
+        }
         None
     };
     let sealed_at = head_commit_epoch(root).unwrap_or(0);
@@ -145,7 +183,13 @@ pub fn seal(
         sealed_at,
         None,
     )?;
-    append_edge(root, "seal", edge)
+    let mut outcome = append_edge(root, "seal", edge)?;
+    if let Some((rule, policy)) = derivation {
+        outcome.derived = true;
+        outcome.rule = Some(rule.to_string());
+        outcome.policy = Some(policy);
+    }
+    Ok(outcome)
 }
 
 /// `epr flow reseal <file> [--on <upstream>] [--all-stale]` — the deliberate re-bless.
@@ -302,6 +346,9 @@ fn append_edge_to(
             .as_ref()
             .map(|EdgeStatus::Held { reason, .. }| reason.clone()),
         record_cid: String::new(),
+        derived: false,
+        rule: None,
+        policy: None,
     };
     let record_cid = store.append(FlowRecord::Edge(edge))?;
     Ok(SealOutcome {
