@@ -34,6 +34,33 @@ fn seed_human(conn: &mut diesel::SqliteConnection, id: &str, household_id: Optio
         .unwrap();
 }
 
+/// Seed a human with an EXPLICIT `agent_pub_key` distinct from its `id` — needed
+/// to reproduce the duplicate-key shape (two humans rows sharing one
+/// `agent_pub_key`). `seed_human` sets `agent_pub_key == id`, so it cannot express
+/// this case.
+fn seed_human_with_key(
+    conn: &mut diesel::SqliteConnection,
+    id: &str,
+    agent_pub_key: &str,
+    household_id: Option<&str>,
+) {
+    diesel::insert_into(db::diesel_schema::humans::table)
+        .values(&NewHuman {
+            id: id.into(),
+            agent_pub_key: Some(agent_pub_key.into()),
+            display_name: id.into(),
+            bio: None,
+            affinities: "[]".into(),
+            profile_reach: "commons".into(),
+            location: None,
+            profile_photo_url: None,
+            h_app_id: "lamad".into(),
+            household_id: household_id.map(str::to_string),
+        })
+        .execute(conn)
+        .unwrap();
+}
+
 fn seed_shard_location(conn: &mut diesel::SqliteConnection, shard_hash: &str, peer_id: &str) {
     let loc = NewShardLocation {
         shard_hash,
@@ -619,8 +646,13 @@ fn d3b_null_household_id_counts_zero() {
 }
 
 // =============================================================================
-// D4 — Diversity score: min(stewarding, max(commitment_backed, 1)) / 7,
-// clamped 0..1.
+// D4 — Diversity score: REAL fault-domain diversity — the distinct household
+// fault-domain count over the same holder-relation, normalized against the RS
+// 4+3 baseline (7), clamped 0..1. This REPLACES the prior ad-hoc coverage proxy
+// (min(stewarding, max(commitment_backed, 1)) / 7), which falsely capped the
+// score by the count of commitment records. The truthful measure counts the
+// independent fault domains actually holding the content — commitment paperwork
+// no longer gates it.
 // =============================================================================
 
 #[test]
@@ -633,44 +665,146 @@ fn d4_zero_stewarding_is_zero_diversity() {
 }
 
 #[test]
-fn d4_commitment_floor_clamps_to_one_seventh() {
-    // stewarding=3, commitment_backed=0 → min(3, max(0,1)) = 1 → 1/7.
+fn d4_three_household_fault_domains_is_three_sevenths() {
+    // NEW truthful semantics: 3 distinct household fault domains hold the content
+    // → 3/7. Under the OLD commitment-clamped proxy this same case (0 commitments)
+    // read 1/7 — the falsely-low value the fault-domain fold corrects. No
+    // commitment rows are seeded here on purpose: the score no longer depends on
+    // them.
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
     let content_id = seed_protection_case(
         &mut conn,
-        "d4-floor",
+        "d4-fault-domains",
         &[("home-a", 0), ("home-b", 0), ("home-c", 0)],
     );
     let snapshot = household_resilience::snapshot(&pool, &ctx(), &content_id, None).unwrap();
     assert!(
-        (snapshot.diversity_score - 1.0 / 7.0).abs() < 1e-6,
-        "expected 1/7, got {}",
+        (snapshot.diversity_score - 3.0 / 7.0).abs() < 1e-6,
+        "expected 3/7 (3 household fault domains, commitment-independent), got {}",
+        snapshot.diversity_score
+    );
+}
+
+#[test]
+fn d4_commitment_count_does_not_lower_diversity() {
+    // Explicit regression against the old proxy: 3 household fault domains with
+    // ZERO commitment rows must still read 3/7 (not the old 1/7). The diversity
+    // score is a function of fault domains, not commitment paperwork.
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let content_id = seed_protection_case(
+        &mut conn,
+        "d4-no-commit",
+        &[("home-a", 0), ("home-b", 0), ("home-c", 0)],
+    );
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), &content_id, None).unwrap();
+    assert_eq!(
+        snapshot.commitment_backed_collectives, 0,
+        "no commitments seeded"
+    );
+    assert!(
+        snapshot.diversity_score > 1.0 / 7.0 + 1e-6,
+        "commitment-free content must NOT be clamped to the old 1/7 floor: got {}",
         snapshot.diversity_score
     );
 }
 
 #[test]
 fn d4_full_breadth_clamps_at_one() {
-    // stewarding=8, commitment_backed=8 → min(8,8)/7 clamps to 1.0.
+    // 8 distinct household fault domains → 8/7 clamps to 1.0 (never over-full).
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
     let households: Vec<String> = (0..8).map(|i| format!("home-{i}")).collect();
     let pairs: Vec<(&str, usize)> = households.iter().map(|h| (h.as_str(), 0)).collect();
     let content_id = seed_protection_case(&mut conn, "d4-clamp", &pairs);
-    for (i, h) in households.iter().enumerate() {
-        let agent = format!("agent-d4-clamp-{h}");
-        seed_commitment(
-            &mut conn,
-            &format!("c-clamp-{i}"),
-            &agent,
-            "provide",
-            "active",
-            "content:commons",
-        );
-    }
     let snapshot = household_resilience::snapshot(&pool, &ctx(), &content_id, None).unwrap();
     assert_eq!(snapshot.diversity_score, 1.0);
+}
+
+// =============================================================================
+// DUP — duplicate agent_pub_key must NOT inflate the holder relation.
+// `humans.agent_pub_key` is only non-uniquely indexed (idx_humans_agent_pub_key,
+// NOT UNIQUE). A CID-keyed fallback human row can coexist with the canonical
+// slug-keyed row (reconcile/controller.rs tolerates the shape), and membership
+// projection can stamp the SAME key onto both. One shard_location matching two
+// such humans rows must collapse to ONE physical holder (last-write-wins by
+// humans.id, consistent with salvage_commitment_author) — never two — or
+// distinct_household / intra_hub / diversity silently inflate.
+// =============================================================================
+
+#[test]
+fn dup_agent_pub_key_different_households_does_not_inflate_diversity() {
+    // Worst case for household + diversity inflation: two humans rows, SAME
+    // agent_pub_key, different ids AND different households.
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let shared_key = "uhCAkDUP";
+    seed_shard_manifest(&mut conn, "content-dup", r#"["shard-dup"]"#);
+    seed_human_with_key(
+        &mut conn,
+        "human-canonical-slug",
+        shared_key,
+        Some("home-real"),
+    );
+    seed_human_with_key(
+        &mut conn,
+        "cid-keyed-fallback",
+        shared_key,
+        Some("home-phantom"),
+    );
+    // ONE physical holder (one shard_location keyed by the shared agent key).
+    seed_shard_location(&mut conn, "shard-dup", shared_key);
+
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), "content-dup", None).unwrap();
+    assert_eq!(
+        snapshot.stewarding_collectives,
+        1,
+        "one physical holder must not inflate to two households: {:?}",
+        snapshot.details.as_ref().map(|d| &d.stewarding_collectives)
+    );
+    assert!(
+        (snapshot.diversity_score - 1.0 / 7.0).abs() < 1e-6,
+        "diversity must reflect ONE household fault domain (1/7), not two: got {}",
+        snapshot.diversity_score
+    );
+}
+
+#[test]
+fn dup_agent_pub_key_same_household_does_not_inflate_intra_hub() {
+    // Worst case for intra-hub distinct-agent inflation: two humans rows, SAME
+    // agent_pub_key + SAME household, different ids.
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let shared_key = "uhCAkDUP2";
+    seed_shard_manifest(&mut conn, "content-dup2", r#"["shard-dup2"]"#);
+    seed_human_with_key(
+        &mut conn,
+        "human-canonical-2",
+        shared_key,
+        Some("home-shared"),
+    );
+    seed_human_with_key(&mut conn, "cid-fallback-2", shared_key, Some("home-shared"));
+    seed_shard_location(&mut conn, "shard-dup2", shared_key);
+
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), "content-dup2", None).unwrap();
+    assert_eq!(
+        snapshot.stewarding_collectives, 1,
+        "same household, one physical key — still one collective"
+    );
+    let details = snapshot.details.expect("details present");
+    let intra = details
+        .stewarding_collectives
+        .iter()
+        .find(|e| e.id == "home-shared")
+        .and_then(|e| e.intra_hub_peers);
+    assert_eq!(
+        intra,
+        Some(1),
+        "one physical agent (shared key across two humans rows) must count as 1 \
+         intra-hub peer, not 2: {:?}",
+        details.stewarding_collectives
+    );
 }
 
 // =============================================================================
@@ -1114,7 +1248,11 @@ fn golden_resilience_snapshot_json_baseline() {
     // refactor must reproduce these EXACT serializations; any drift fails here.
     const GOLDEN_LIT_CARD: &str = r#"{"contentId":"lit-card-content","distributionState":"measured","stewardingCollectives":3,"commitmentBackedCollectives":3,"diversityScore":0.42857143,"regionalDistribution":{"local":0,"regional":0,"global":3,"unknown":0},"placementGaps":[],"protectionStatus":"protected","reciprocatingCollectives":0,"details":{"stewardingCollectives":[{"id":"church-bethel","kind":"household","label":"church-bethel","intraHubPeers":1},{"id":"home-dowell","kind":"household","label":"home-dowell","intraHubPeers":1},{"id":"home-ruth","kind":"household","label":"home-ruth","intraHubPeers":1}],"onlinePeers":{"live":3,"known":3},"healthScore":1.0},"feltStatus":{"headline":"Held by 3 households: church-bethel, home-dowell, home-ruth","reassurance":"protected","heldBy":[{"id":"church-bethel","kind":"household","label":"church-bethel","intraHubPeers":1},{"id":"home-dowell","kind":"household","label":"home-dowell","intraHubPeers":1},{"id":"home-ruth","kind":"household","label":"home-ruth","intraHubPeers":1}],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":3}}}"#;
     const GOLDEN_UNMEASURED: &str = r#"{"contentId":"content-never-seeded","distributionState":"unmeasured","stewardingCollectives":0,"commitmentBackedCollectives":0,"diversityScore":0.0,"regionalDistribution":{"local":0,"regional":0,"global":0,"unknown":0},"placementGaps":[],"protectionStatus":"at-risk","reciprocatingCollectives":0,"details":{"stewardingCollectives":[],"onlinePeers":{"live":0,"known":0},"healthScore":0.0},"feltStatus":{"headline":"We can't confirm these are backed up yet","reassurance":"not-yet-seen","heldBy":[],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":0},"suggestedAction":"Invite a household to help hold these"}}"#;
-    const GOLDEN_INTRA: &str = r#"{"contentId":"content-intra","distributionState":"measured","stewardingCollectives":2,"commitmentBackedCollectives":0,"diversityScore":0.14285715,"regionalDistribution":{"local":0,"regional":0,"global":0,"unknown":2},"placementGaps":[],"protectionStatus":"partial","reciprocatingCollectives":0,"details":{"stewardingCollectives":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"onlinePeers":{"live":0,"known":0},"healthScore":0.0},"feltStatus":{"headline":"Held by 2 of the 3 households this should live in","reassurance":"watching","heldBy":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":2}}}"#;
+    // diversityScore = 2/7 (0.2857143): the intra case has 2 distinct household
+    // fault domains (home-multi, home-solo). Under the OLD commitment-clamped proxy
+    // this read 1/7 (0.14285715) — 0 commitments capped it; the fault-domain fold
+    // corrects it to the real distinct-household count over the RS baseline.
+    const GOLDEN_INTRA: &str = r#"{"contentId":"content-intra","distributionState":"measured","stewardingCollectives":2,"commitmentBackedCollectives":0,"diversityScore":0.2857143,"regionalDistribution":{"local":0,"regional":0,"global":0,"unknown":2},"placementGaps":[],"protectionStatus":"partial","reciprocatingCollectives":0,"details":{"stewardingCollectives":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"onlinePeers":{"live":0,"known":0},"healthScore":0.0},"feltStatus":{"headline":"Held by 2 of the 3 households this should live in","reassurance":"watching","heldBy":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":2}}}"#;
 
     assert_eq!(
         lit, GOLDEN_LIT_CARD,

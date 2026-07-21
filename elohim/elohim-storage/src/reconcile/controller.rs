@@ -1109,6 +1109,61 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         } else {
             use crate::db::diesel_schema::humans;
 
+            // Stamp humans.agent_pub_key from the membership signal BEFORE the
+            // household_id stamp below — this is the fix for the documented
+            // all-zeros-resilience-card root cause (NULL humans.agent_pub_key;
+            // see elohim-storage/CLAUDE.md "Identity & Transport-Identity
+            // Coherence" and the coherent-transport-identity-resolver design
+            // §3.4 "stopgap"). Two guards make this production-correct:
+            //
+            //  - NULL-only + matched by `humans::id` only (never the
+            //    `agent_pub_key` OR-arm the household_id stamp below uses — we
+            //    cannot match on the very column we are about to write).
+            //    Overwriting a set key is exclusively `rekey_human_agent_key`'s
+            //    job (db/humans.rs); this stamp must never block a later
+            //    key-supersede, so it only ever fills a NULL.
+            //  - Namespace guard: only write when `member_agent_key` is
+            //    agent_cid-shaped (`uhCAk…`) per `identity_namespace`. A
+            //    transport id (libp2p `12D3Koo…`, iroh hex) landing in this
+            //    join-key column is exactly the raw-string cross-namespace
+            //    join bug the CLAUDE.md doc warns about — skip and observe
+            //    instead of writing it.
+            if crate::identity_namespace::is_agent_cid(member_agent_key) {
+                match diesel::update(
+                    humans::table
+                        .filter(humans::id.eq(&signal.member_cid))
+                        .filter(humans::agent_pub_key.is_null()),
+                )
+                .set(humans::agent_pub_key.eq(Some(member_agent_key)))
+                .execute(&mut conn)
+                {
+                    Ok(n) if n > 0 => {
+                        debug!(
+                            member_cid = %signal.member_cid,
+                            collective_cid = %signal.collective_cid,
+                            "on_membership_projected: stamped humans.agent_pub_key"
+                        );
+                    }
+                    Ok(_) => {
+                        // No-op: human row absent (no row keyed by member_cid)
+                        // or agent_pub_key already set. Honest.
+                    }
+                    Err(e) => {
+                        warn!(
+                            member_cid = %signal.member_cid,
+                            collective_cid = %signal.collective_cid,
+                            error = %e,
+                            "on_membership_projected: agent_pub_key stamp failed (non-fatal)"
+                        );
+                    }
+                }
+            } else {
+                crate::identity_namespace::observe_agent_cid_write(
+                    "humans.agent_pub_key",
+                    Some(member_agent_key),
+                );
+            }
+
             match diesel::update(
                 humans::table
                     .filter(
@@ -2604,6 +2659,417 @@ mod tests {
         assert_eq!(
             dave_household, None,
             "a DEPARTED membership must NOT stamp humans.household_id"
+        );
+    }
+
+    /// N1-d: MembershipProjected ALSO backfills `humans.agent_pub_key` from the
+    /// signal's `member_cid` (stripped of the `agent:` vocabulary prefix) when
+    /// the human row's `agent_pub_key` is NULL. This closes the documented
+    /// all-zeros-resilience-card root cause: the handler previously stamped
+    /// `household_id` only and DROPPED the agent key it already held.
+    ///
+    /// The stamp cannot match on the column it is writing (invariant: never
+    /// match on the key being stamped), so it matches by `humans::id` — the
+    /// row is keyed directly by the CID here (the same fallback shape the
+    /// household_id stamp's `id`-arm already tolerates). Idempotent on
+    /// re-delivery.
+    #[tokio::test]
+    async fn n1d_membership_projection_stamps_null_agent_pub_key() {
+        use crate::db::diesel_schema::humans;
+        use crate::db::models::NewHuman;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        {
+            let mut conn = pool.get().expect("conn");
+            diesel::insert_into(humans::table)
+                .values(&NewHuman {
+                    id: "agent:uhCAkEveN1d".to_string(),
+                    agent_pub_key: None,
+                    display_name: "Eve N1d".to_string(),
+                    bio: None,
+                    affinities: "[]".to_string(),
+                    profile_reach: "commons".to_string(),
+                    location: None,
+                    profile_photo_url: None,
+                    h_app_id: "lamad".to_string(),
+                    household_id: None,
+                })
+                .execute(&mut conn)
+                .expect("insert eve");
+        }
+
+        let coll_signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkCollectiveN1d".to_string(),
+            collective_cid: "collective:uhCkkCollectiveN1d".to_string(),
+            display_name: "N1d Household".to_string(),
+            founder_agent_cid: "agent:uhCAkFounderN1d".to_string(),
+            anchor_agreement_cid: None,
+            charter: Some(r#"{"kind":"household"}"#.to_string()),
+        };
+        let eve_signal = MembershipProjectedSignal {
+            action_hash: "uhCkkMembershipN1dEve".to_string(),
+            collective_cid: "collective:uhCkkCollectiveN1d".to_string(),
+            member_cid: "agent:uhCAkEveN1d".to_string(),
+            member_kind: "person".to_string(),
+            role_context: "contributor".to_string(),
+            departed_at: None,
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::CollectiveProjected(coll_signal),
+            DnaSignal::MembershipProjected(eve_signal.clone()),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+        controller.run_one_pass().await.expect("collective pass");
+        controller.run_one_pass().await.expect("eve pass");
+
+        let mut conn = pool.get().expect("conn");
+        let eve_key: Option<String> = humans::table
+            .filter(humans::id.eq("agent:uhCAkEveN1d"))
+            .select(humans::agent_pub_key)
+            .first(&mut conn)
+            .expect("eve query");
+        assert_eq!(
+            eve_key.as_deref(),
+            Some("uhCAkEveN1d"),
+            "eve's NULL agent_pub_key must be stamped from member_cid (agent: prefix stripped)"
+        );
+
+        // Idempotency: re-delivering the same membership must not error or change it.
+        let stream2 =
+            InMemoryDnaSignalStream::with_signals(vec![DnaSignal::MembershipProjected(eve_signal)]);
+        let mut controller2 =
+            ReconcileController::new_with_storage(stream2, Arc::clone(&pool), Arc::clone(&cache));
+        controller2.run_one_pass().await.expect("eve re-delivery");
+
+        let eve_key_again: Option<String> = humans::table
+            .filter(humans::id.eq("agent:uhCAkEveN1d"))
+            .select(humans::agent_pub_key)
+            .first(&mut conn)
+            .expect("eve re-query");
+        assert_eq!(
+            eve_key_again.as_deref(),
+            Some("uhCAkEveN1d"),
+            "re-delivery must be idempotent (agent_pub_key stays the same)"
+        );
+    }
+
+    /// N1-e: an existing (different) `humans.agent_pub_key` must NEVER be
+    /// overwritten by the membership-projection stamp. Overwriting a set key is
+    /// exclusively `rekey_human_agent_key`'s job (src/db/humans.rs) — this
+    /// handler is NULL-only so it can never block a later key-supersede.
+    #[tokio::test]
+    async fn n1e_membership_projection_never_overwrites_existing_agent_pub_key() {
+        use crate::db::diesel_schema::humans;
+        use crate::db::models::NewHuman;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        {
+            let mut conn = pool.get().expect("conn");
+            diesel::insert_into(humans::table)
+                .values(&NewHuman {
+                    id: "agent:uhCAkFrankN1e".to_string(),
+                    agent_pub_key: Some("uhCAkFrankOldKeyN1e".to_string()),
+                    display_name: "Frank N1e".to_string(),
+                    bio: None,
+                    affinities: "[]".to_string(),
+                    profile_reach: "commons".to_string(),
+                    location: None,
+                    profile_photo_url: None,
+                    h_app_id: "lamad".to_string(),
+                    household_id: None,
+                })
+                .execute(&mut conn)
+                .expect("insert frank");
+        }
+
+        let coll_signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkCollectiveN1e".to_string(),
+            collective_cid: "collective:uhCkkCollectiveN1e".to_string(),
+            display_name: "N1e Household".to_string(),
+            founder_agent_cid: "agent:uhCAkFounderN1e".to_string(),
+            anchor_agreement_cid: None,
+            charter: Some(r#"{"kind":"household"}"#.to_string()),
+        };
+        let frank_signal = MembershipProjectedSignal {
+            action_hash: "uhCkkMembershipN1eFrank".to_string(),
+            collective_cid: "collective:uhCkkCollectiveN1e".to_string(),
+            member_cid: "agent:uhCAkFrankN1e".to_string(),
+            member_kind: "person".to_string(),
+            role_context: "contributor".to_string(),
+            departed_at: None,
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::CollectiveProjected(coll_signal),
+            DnaSignal::MembershipProjected(frank_signal),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+        controller.run_one_pass().await.expect("collective pass");
+        controller.run_one_pass().await.expect("frank pass");
+
+        let mut conn = pool.get().expect("conn");
+        let frank_key: Option<String> = humans::table
+            .filter(humans::id.eq("agent:uhCAkFrankN1e"))
+            .select(humans::agent_pub_key)
+            .first(&mut conn)
+            .expect("frank query");
+        assert_eq!(
+            frank_key.as_deref(),
+            Some("uhCAkFrankOldKeyN1e"),
+            "an existing agent_pub_key must never be overwritten by membership projection"
+        );
+    }
+
+    /// N1-f: a COMMUNITY (non-household) collective membership must NOT stamp
+    /// `humans.agent_pub_key`, mirroring the household_id discipline in n1b —
+    /// only households populate identity-coherence columns via this handler.
+    #[tokio::test]
+    async fn n1f_community_membership_does_not_stamp_agent_pub_key() {
+        use crate::db::diesel_schema::humans;
+        use crate::db::models::NewHuman;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        {
+            let mut conn = pool.get().expect("conn");
+            diesel::insert_into(humans::table)
+                .values(&NewHuman {
+                    id: "agent:uhCAkGraceN1f".to_string(),
+                    agent_pub_key: None,
+                    display_name: "Grace N1f".to_string(),
+                    bio: None,
+                    affinities: "[]".to_string(),
+                    profile_reach: "commons".to_string(),
+                    location: None,
+                    profile_photo_url: None,
+                    h_app_id: "lamad".to_string(),
+                    household_id: None,
+                })
+                .execute(&mut conn)
+                .expect("insert grace");
+        }
+
+        let coll_signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkCommunityN1f".to_string(),
+            collective_cid: "collective:uhCkkCommunityN1f".to_string(),
+            display_name: "Book Club N1f".to_string(),
+            founder_agent_cid: "agent:uhCAkFounderN1f".to_string(),
+            anchor_agreement_cid: None,
+            charter: Some(r#"{"kind":"interest"}"#.to_string()),
+        };
+        let grace_signal = MembershipProjectedSignal {
+            action_hash: "uhCkkMembershipN1fGrace".to_string(),
+            collective_cid: "collective:uhCkkCommunityN1f".to_string(),
+            member_cid: "agent:uhCAkGraceN1f".to_string(),
+            member_kind: "person".to_string(),
+            role_context: "contributor".to_string(),
+            departed_at: None,
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::CollectiveProjected(coll_signal),
+            DnaSignal::MembershipProjected(grace_signal),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+        controller.run_one_pass().await.expect("collective pass");
+        controller.run_one_pass().await.expect("grace pass");
+
+        let mut conn = pool.get().expect("conn");
+        let grace_key: Option<String> = humans::table
+            .filter(humans::id.eq("agent:uhCAkGraceN1f"))
+            .select(humans::agent_pub_key)
+            .first(&mut conn)
+            .expect("grace query");
+        assert_eq!(
+            grace_key, None,
+            "a COMMUNITY membership must NOT stamp humans.agent_pub_key"
+        );
+    }
+
+    /// N1-g: a DEPARTED membership must NOT stamp `humans.agent_pub_key`, even
+    /// for a household collective — mirrors n1c's household_id discipline.
+    #[tokio::test]
+    async fn n1g_departed_membership_does_not_stamp_agent_pub_key() {
+        use crate::db::diesel_schema::humans;
+        use crate::db::models::NewHuman;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        {
+            let mut conn = pool.get().expect("conn");
+            diesel::insert_into(humans::table)
+                .values(&NewHuman {
+                    id: "agent:uhCAkHenryN1g".to_string(),
+                    agent_pub_key: None,
+                    display_name: "Henry N1g".to_string(),
+                    bio: None,
+                    affinities: "[]".to_string(),
+                    profile_reach: "commons".to_string(),
+                    location: None,
+                    profile_photo_url: None,
+                    h_app_id: "lamad".to_string(),
+                    household_id: None,
+                })
+                .execute(&mut conn)
+                .expect("insert henry");
+        }
+
+        let coll_signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkHouseholdN1g".to_string(),
+            collective_cid: "collective:uhCkkHouseholdN1g".to_string(),
+            display_name: "Henry Household".to_string(),
+            founder_agent_cid: "agent:uhCAkFounderN1g".to_string(),
+            anchor_agreement_cid: None,
+            charter: Some(r#"{"kind":"household"}"#.to_string()),
+        };
+        let henry_departed = MembershipProjectedSignal {
+            action_hash: "uhCkkMembershipN1gHenry".to_string(),
+            collective_cid: "collective:uhCkkHouseholdN1g".to_string(),
+            member_cid: "agent:uhCAkHenryN1g".to_string(),
+            member_kind: "person".to_string(),
+            role_context: "contributor".to_string(),
+            departed_at: Some("2026-06-15T00:00:00Z".to_string()),
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::CollectiveProjected(coll_signal),
+            DnaSignal::MembershipProjected(henry_departed),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+        controller.run_one_pass().await.expect("collective pass");
+        controller
+            .run_one_pass()
+            .await
+            .expect("henry departure pass");
+
+        let mut conn = pool.get().expect("conn");
+        let henry_key: Option<String> = humans::table
+            .filter(humans::id.eq("agent:uhCAkHenryN1g"))
+            .select(humans::agent_pub_key)
+            .first(&mut conn)
+            .expect("henry query");
+        assert_eq!(
+            henry_key, None,
+            "a DEPARTED membership must NOT stamp humans.agent_pub_key"
+        );
+    }
+
+    /// N1-h: a `member_cid` that is NOT agent_cid-shaped (e.g. a raw libp2p
+    /// transport id, `12D3Koo…`, with no `agent:` prefix) must be SKIPPED for
+    /// the agent_pub_key stamp — never write a transport id into the
+    /// agent_cid-only join column — and observed via
+    /// `identity_namespace::observe_agent_cid_write`. The household_id stamp
+    /// (which does not carry this guard) must be unaffected by the skip.
+    #[tokio::test]
+    async fn n1h_non_agent_cid_member_key_skips_agent_pub_key_stamp_and_is_observed() {
+        use crate::db::diesel_schema::humans;
+        use crate::db::models::NewHuman;
+        use crate::identity_namespace::namespace_violation_count;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        // Row keyed directly by the (transport-shaped) member_cid so the
+        // household_id stamp's `id`-arm can still light it — isolating the
+        // assertion to "agent_pub_key stays NULL" without also depending on
+        // the (irrelevant here) agent_pub_key OR-arm.
+        {
+            let mut conn = pool.get().expect("conn");
+            diesel::insert_into(humans::table)
+                .values(&NewHuman {
+                    id: "12D3KooWIvanTransportN1h".to_string(),
+                    agent_pub_key: None,
+                    display_name: "Ivan N1h".to_string(),
+                    bio: None,
+                    affinities: "[]".to_string(),
+                    profile_reach: "commons".to_string(),
+                    location: None,
+                    profile_photo_url: None,
+                    h_app_id: "lamad".to_string(),
+                    household_id: None,
+                })
+                .execute(&mut conn)
+                .expect("insert ivan");
+        }
+
+        let coll_signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkCollectiveN1h".to_string(),
+            collective_cid: "collective:uhCkkCollectiveN1h".to_string(),
+            display_name: "N1h Household".to_string(),
+            founder_agent_cid: "agent:uhCAkFounderN1h".to_string(),
+            anchor_agreement_cid: None,
+            charter: Some(r#"{"kind":"household"}"#.to_string()),
+        };
+        // member_cid is a raw libp2p transport id — NOT agent_cid-shaped.
+        let ivan_signal = MembershipProjectedSignal {
+            action_hash: "uhCkkMembershipN1hIvan".to_string(),
+            collective_cid: "collective:uhCkkCollectiveN1h".to_string(),
+            member_cid: "12D3KooWIvanTransportN1h".to_string(),
+            member_kind: "person".to_string(),
+            role_context: "contributor".to_string(),
+            departed_at: None,
+        };
+
+        let before = namespace_violation_count();
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::CollectiveProjected(coll_signal),
+            DnaSignal::MembershipProjected(ivan_signal),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+        controller.run_one_pass().await.expect("collective pass");
+        controller.run_one_pass().await.expect("ivan pass");
+
+        let after = namespace_violation_count();
+        assert!(
+            after > before,
+            "a non-agent_cid member_cid must be observed as an identity-namespace \
+             violation (before={before}, after={after})"
+        );
+
+        let mut conn = pool.get().expect("conn");
+        let ivan_key: Option<String> = humans::table
+            .filter(humans::id.eq("12D3KooWIvanTransportN1h"))
+            .select(humans::agent_pub_key)
+            .first(&mut conn)
+            .expect("ivan key query");
+        assert_eq!(
+            ivan_key, None,
+            "a non-agent_cid member_cid must NEVER be written into humans.agent_pub_key"
+        );
+
+        let ivan_household: Option<String> = humans::table
+            .filter(humans::id.eq("12D3KooWIvanTransportN1h"))
+            .select(humans::household_id)
+            .first(&mut conn)
+            .expect("ivan household query");
+        assert_eq!(
+            ivan_household.as_deref(),
+            Some("collective:uhCkkCollectiveN1h"),
+            "the household_id stamp must be unaffected by the agent_pub_key skip \
+             (it matches via the id-arm independent of the namespace guard)"
         );
     }
 }

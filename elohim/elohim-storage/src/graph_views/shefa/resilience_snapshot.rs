@@ -4,10 +4,20 @@
 //! for a content atom.
 //! Source of truth: CozoDB graph projection (Operational, Category C).
 //!
-//! Composition note: `diversity_score`, `regional_distribution`, `placement_gaps`,
-//! and `protection_status` require placement-gap relational data. Zero-filled here
-//! as composition placeholders. The graph contribution is the stewarding collective
-//! count from STEWARDS edges.
+//! Composition note (honesty boundary — what the Cozo graph context CAN and
+//! CANNOT reach):
+//! - `stewarding_collectives` / `commitment_backed_collectives` / `protection_status`
+//!   / `diversity_score`: DERIVED from STEWARDS + MEMBER_OF edges. Each distinct
+//!   steward CID is an independent fault domain, so `diversity_score` is the real
+//!   distinct-steward-collective count normalized against the RS baseline — keyed
+//!   on the SAME `resiliency::diversity_score` definition the relational path uses.
+//! - `regional_distribution`: the graph carries no region binding, so every distinct
+//!   steward buckets `unknown`. This is an HONEST unknown (region unreachable), not a
+//!   fake zero — the diagnostic tell (`unknown == stewarding_count`) is preserved.
+//! - `placement_gaps`: the relational placement-gap projection is NOT reachable from
+//!   the Cozo graph context (no `shard_hash` / timestamps here to synthesize an
+//!   honest `PlacementGapView`). The deficit against the diversity floor is surfaced
+//!   instead as `coverage_shortfall` (below) — the graph-native gap signal.
 //!
 //! ## CoverageRollup first-caller (recursive-architecture §2.1)
 //!
@@ -26,14 +36,16 @@ use crate::graph::engine::{GraphEngine, GraphError};
 use crate::graph_views::data_value::str_at;
 use crate::views::{RegionalDistributionView, ResilienceSnapshotView};
 use cozo::DataValue;
-use elohim_facings::folds::resiliency::floor_for_tier;
+use elohim_facings::folds::resiliency::{diversity_score, floor_for_tier};
 
 /// Build a graph-backed `ResilienceSnapshotView` for the given content `cid`.
 ///
 /// Counts distinct collectives reachable via STEWARDS edges from the content node.
 /// Steward agents that have MEMBER_OF edges contribute to `commitment_backed_collectives`.
-/// Regional distribution, placement gaps, and diversity scores are zero-filled
-/// composition placeholders requiring relational placement-gap data.
+/// `diversity_score` is derived from the distinct steward-collective fault-domain
+/// count. `regional_distribution` is honestly all-`unknown` (region unreachable from
+/// the graph), and `placement_gaps` is empty because the relational placement-gap
+/// projection is unreachable here — the deficit rides `coverage_shortfall` instead.
 pub fn build(engine: &GraphEngine, cid: &str) -> Result<ResilienceSnapshotView, GraphError> {
     // Count distinct steward nodes reachable via STEWARDS edges.
     let steward_result = engine.run_script(
@@ -87,14 +99,23 @@ pub fn build(engine: &GraphEngine, cid: &str) -> Result<ResilienceSnapshotView, 
         },
         stewarding_collectives: stewarding_count,
         commitment_backed_collectives: commitment_backed_count,
-        // Composition placeholders — require relational placement-gap + peer diversity reads
-        diversity_score: 0.0,
+        // REAL: each distinct steward CID is an independent fault domain. Normalize
+        // the distinct steward-collective count against the RS baseline via the SAME
+        // definition the relational path uses (no denominator drift). Zero stewards →
+        // 0.0 honestly.
+        diversity_score: diversity_score(stewarding_count.max(0) as u32),
+        // Honest unknown: the graph carries no region binding, so every distinct
+        // steward buckets `unknown` (region unreachable ≠ fake zero). The
+        // `unknown == stewarding_count` tell is preserved for the renderer.
         regional_distribution: RegionalDistributionView {
             local: 0,
             regional: 0,
             global: 0,
             unknown: stewarding_count,
         },
+        // Unreachable from the graph context (no shard_hash/timestamps to build an
+        // honest PlacementGapView). The floor deficit is surfaced as
+        // `coverage_shortfall` below — the graph-native gap signal.
         placement_gaps: vec![],
         protection_status: if stewarding_count >= 3 {
             "protected".to_string()

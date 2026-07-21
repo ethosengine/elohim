@@ -453,6 +453,19 @@ pub struct P2PConfig {
     /// (kick on miss) or "other" (emit placement-gap), and any guess would
     /// emit spurious events.
     pub self_cid: Option<String>,
+    /// Identity-coherence: this node's boot-time conductor cell-key `agent_cid`
+    /// (`uhCAk…`) SNAPSHOT, when the conductor was connected at P2P construction.
+    /// It is the stable FALLBACK candidate for the custody reconcile pass's
+    /// self-matching; each pass ALSO re-resolves the active-session arm from its
+    /// DB connection (`reconcile::custody::resolve_self_agent_cid`) so the read
+    /// side stays in lockstep with the salvage author's per-tick write identity.
+    /// A `custody-blob` row whose `provider`/`receiver` is this node in EITHER
+    /// namespace (transport `self_cid` OR the resolved `agent_cid`) counts as
+    /// "own" — salvage authors `provider = agent_cid`, so without this the node's
+    /// own salvage rows would never trigger their fetch. `None` (conductor not
+    /// connected at boot AND no session) degrades to transport-only matching (the
+    /// pre-existing behavior, no regression).
+    pub self_cellkey_agent_cid: Option<String>,
     /// T23: periodic custody reconcile cadence in seconds. `Some(0)` disables
     /// the timer arm (event-driven sweeps via `ConnectionEstablished` still
     /// fire when the trigger is enabled). `None` falls back to the
@@ -505,6 +518,7 @@ impl Default for P2PConfig {
             device_archetype: None,
             inventory_broadcast_seconds: None,
             self_cid: None,
+            self_cellkey_agent_cid: None,
             // T23 defaults mirror `config.rs::default_*`. Production callers
             // override via `main.rs::p2p_config` from top-level Config.
             custody_sweep_seconds: None,
@@ -2174,6 +2188,16 @@ impl P2PNode {
             }
         };
 
+        // Resolve THIS node's agent_cid for self-matching IN LOCKSTEP with the
+        // salvage author: re-resolve the active-session arm from `conn` every pass,
+        // falling back to the boot-time cell-key snapshot. Frozen-at-boot would
+        // reintroduce the orphaned own-row class when a session logs in (or the
+        // conductor connects) after P2P boot.
+        let self_agent_cid: Option<String> = crate::reconcile::custody::resolve_self_agent_cid(
+            &mut conn,
+            self.config.self_cellkey_agent_cid.as_deref(),
+        );
+
         let snapshot = match BlobStoreSnapshot::from_store(&self.blob_store) {
             Ok(s) => s,
             Err(e) => {
@@ -2218,6 +2242,7 @@ impl P2PNode {
             db_pool: pool.clone(),
             blob_store: self.blob_store.clone(),
             self_cid: self_cid.clone(),
+            self_agent_cid: self_agent_cid.clone(),
             fetch_blob_parallelism: self.config.fetch_blob_parallelism,
             fetch_blob_timeout_seconds: self.config.fetch_blob_timeout_seconds,
             metrics: self.reconciliation_metrics.clone(),
@@ -2248,6 +2273,7 @@ impl P2PNode {
         match reconcile_pass(
             &mut conn,
             &self_cid,
+            self_agent_cid.as_deref(),
             &snapshot,
             &kicker,
             cfg,

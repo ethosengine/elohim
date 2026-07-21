@@ -112,6 +112,31 @@ pub fn is_libp2p_peer_id(s: &str) -> bool {
     s.trim().starts_with(LIBP2P_PEER_ID_PREFIX)
 }
 
+/// Resolve the canonical `agent_cid` (`uhCAk…`) to WRITE for self from an
+/// ordered candidate list, returning the FIRST candidate that is a valid
+/// `agent_cid`. NEVER falls back to a non-`agent_cid`: writing a transport id
+/// (`12D3Koo…` / an iroh NodeId) into an `agent_cid` join-key column mints a row
+/// that can never join the resilience-card / custody joins (a junk row is worse
+/// than absence), so a caller that gets `None` MUST skip the write this tick.
+///
+/// This is the pure core of the salvage/custody self-identity resolver; it
+/// mirrors the provide-loop's `conductor_commitment_author::resolve_provider`
+/// (kept as a separate ~5-line fn by sprint decision — that file is not edited).
+/// PURE.
+pub fn resolve_agent_cid_write(candidates: &[Option<&str>]) -> Option<String> {
+    candidates
+        .iter()
+        .flatten()
+        .map(|s| s.trim())
+        .find(|s| is_agent_cid(s))
+        // Normalize to the BARE `uhCAk…` form: `is_agent_cid` tolerates an
+        // `agent:` prefix, but the join-key columns (`rea_commitments.provider`,
+        // `humans.agent_pub_key`) and the reconcile controller's join hold the
+        // stripped form. Returning the raw (possibly-prefixed) candidate would
+        // let `agent:uhCAk…` land in a bare column and silently miss the join.
+        .map(|s| strip_agent_prefix(s).to_string())
+}
+
 /// Best-effort: does `s` look like an iroh `NodeId` (a 64-char lowercase-hex
 /// ed25519 public key)? Conservative — only used to LABEL a non-`agent_cid`
 /// value, never to authorize a join.
@@ -244,6 +269,53 @@ mod tests {
             before,
             "NULL/empty is design-gap, not a namespace violation"
         );
+    }
+
+    #[test]
+    fn resolve_agent_cid_write_takes_first_agent_cid() {
+        // Session key (candidate a) wins when it is a valid agent_cid.
+        assert_eq!(
+            resolve_agent_cid_write(&[Some(AGENT_CID), Some(AGENT_CID_PREFIXED)]).as_deref(),
+            Some(AGENT_CID)
+        );
+        // Falls through a None / transport-id first candidate to the cell key.
+        assert_eq!(
+            resolve_agent_cid_write(&[None, Some(AGENT_CID)]).as_deref(),
+            Some(AGENT_CID)
+        );
+        assert_eq!(
+            resolve_agent_cid_write(&[Some(LIBP2P_ID), Some(AGENT_CID)]).as_deref(),
+            Some(AGENT_CID)
+        );
+    }
+
+    #[test]
+    fn resolve_agent_cid_write_normalizes_agent_prefix_to_bare() {
+        // An `agent:uhCAk…` candidate validates (is_agent_cid strips the prefix)
+        // but MUST be returned bare so it lands in a bare-uhCAk join-key column
+        // and matches the reconcile controller's stripped join.
+        assert_eq!(
+            resolve_agent_cid_write(&[Some(AGENT_CID_PREFIXED)]).as_deref(),
+            Some(AGENT_CID_PREFIXED.strip_prefix("agent:").unwrap()),
+            "agent:-prefixed input must yield the bare stripped agent_cid"
+        );
+        // A bare candidate is returned unchanged.
+        assert_eq!(
+            resolve_agent_cid_write(&[Some(AGENT_CID)]).as_deref(),
+            Some(AGENT_CID)
+        );
+    }
+
+    #[test]
+    fn resolve_agent_cid_write_returns_none_when_no_agent_cid() {
+        // Only transport ids / empties → None (caller SKIPS the write rather
+        // than minting a transport-id provider that can never join).
+        assert_eq!(
+            resolve_agent_cid_write(&[Some(LIBP2P_ID), Some(IROH_ID)]),
+            None
+        );
+        assert_eq!(resolve_agent_cid_write(&[None, None]), None);
+        assert_eq!(resolve_agent_cid_write(&[Some(""), Some("   ")]), None);
     }
 
     #[test]

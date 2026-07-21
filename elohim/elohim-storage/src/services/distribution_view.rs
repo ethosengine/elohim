@@ -110,28 +110,16 @@ pub fn compute_projection_tier(projector_count: u32, distinct_regions: u32) -> P
 /// Compute fault-domain diversity from the known replica peers.
 ///
 /// Each `ReplicaPeer` carries `household_id` and `region_tier`; collective
-/// binding is not yet on the peer row (Sprint-3 follow-up).
+/// binding is not yet on the peer row (Sprint-3 follow-up). Delegates to the
+/// pure fault-domain fold in `elohim-facings` so the household/region counting
+/// definition lives in ONE place, shared with the holder-relation path
+/// (`services::household_resilience::snapshot`).
 pub fn compute_fault_domain_diversity(replica_peers: &[ReplicaPeer]) -> FaultDomainDiversity {
-    use std::collections::HashSet;
-    let households: HashSet<&str> = replica_peers
-        .iter()
-        .filter_map(|p| p.household_id.as_deref())
-        .collect();
-    let regions: HashSet<&str> = replica_peers
-        .iter()
-        .filter_map(|p| p.region_tier.as_deref())
-        .collect();
-    let distinct_household_count = households.len() as u32;
-    let distinct_region_count = regions.len() as u32;
-    FaultDomainDiversity {
-        distinct_household_count,
-        // ReplicaPeer carries no collective binding yet — Sprint-3 follow-up.
-        distinct_collective_count: 0,
-        distinct_region_count,
-        // Risk when all known replicas share a single household fault domain.
-        single_fault_domain_risk: distinct_household_count <= 1,
-        fault_modes_evaluated: vec!["household".to_string(), "region".to_string()],
-    }
+    elohim_facings::folds::resiliency::fault_domain_diversity_from(
+        replica_peers
+            .iter()
+            .map(|p| (p.household_id.as_deref(), p.region_tier.as_deref())),
+    )
 }
 
 // ============================================================================

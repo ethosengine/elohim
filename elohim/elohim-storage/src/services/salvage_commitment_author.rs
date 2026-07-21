@@ -22,6 +22,7 @@
 //! (`P2PNode::run_salvage_pass` / the reconcile task) is already on a tokio
 //! runtime, so a current `Handle` is always available there.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use sha2::{Digest, Sha256};
@@ -41,6 +42,81 @@ impl SalvageCommitmentAuthor {
     pub fn new(hc: Arc<HcClient>) -> Self {
         Self { hc }
     }
+
+    /// Resolve the node's own canonical `agent_cid` (`uhCAk…`) to WRITE as the
+    /// salvage `provider`, mirroring the provide-loop's candidate order
+    /// (`conductor_commitment_author::resolve_provider`): (a) the active local
+    /// session's `agent_pub_key`, then (b) this pod's own conductor cell key
+    /// (`HcClient::agent_key_uhcak`, the truthful `uhCAk…` source
+    /// `genesis_self_heal` fills the humans row from). Returns `None` when
+    /// NEITHER is a valid `agent_cid` — the caller then SKIPS authoring this tick
+    /// rather than writing a transport id (`12D3Koo…` / iroh NodeId) that could
+    /// never join `humans.agent_pub_key = rea_commitments.provider`.
+    pub fn resolve_self_agent_cid(&self, conn: &mut diesel::SqliteConnection) -> Option<String> {
+        resolve_self_agent_cid(conn, &self.hc)
+    }
+}
+
+/// Free-function form of [`SalvageCommitmentAuthor::resolve_self_agent_cid`] so
+/// callers holding an [`HcClient`] + connection (boot-time P2P wiring) resolve
+/// the same way the per-tick salvage author does. See that method for the
+/// candidate order + the never-write-a-transport-id contract.
+pub fn resolve_self_agent_cid(
+    conn: &mut diesel::SqliteConnection,
+    hc: &HcClient,
+) -> Option<String> {
+    let session_cid = crate::db::local_sessions::get_active_session(conn)
+        .ok()
+        .flatten()
+        .map(|s| s.agent_pub_key);
+    let cell_key = hc.agent_key_uhcak();
+    crate::identity_namespace::resolve_agent_cid_write(&[
+        session_cid.as_deref(),
+        Some(cell_key.as_str()),
+    ])
+}
+
+/// Process-wide count of salvage authoring ticks skipped because no `agent_cid`
+/// self-provider was resolvable. Monotonic for process lifetime (mirrors
+/// `conductor_commitment_author::PROVIDER_UNRESOLVED_SKIPS`). Read by
+/// [`self_unresolved_skip_count`] (unit tests + introspection).
+static SALVAGE_SELF_UNRESOLVED_SKIPS: AtomicU64 = AtomicU64::new(0);
+
+/// Read the running total of salvage ticks skipped for an unresolvable
+/// `agent_cid` self-provider. Monotonic; reset only by restart.
+pub fn self_unresolved_skip_count() -> u64 {
+    SALVAGE_SELF_UNRESOLVED_SKIPS.load(Ordering::Relaxed)
+}
+
+/// Record one skipped salvage tick (no `agent_cid` self-provider resolvable) and
+/// emit a rate-sane signal: the process-wide counter + the scrapeable metric bump
+/// on every skip, but the WARN fires only on the FIRST occurrence per process
+/// (the salvage tick retries on a timer, so an unresolved-identity node would
+/// otherwise WARN-storm). Subsequent skips log at DEBUG. Mirrors
+/// `conductor_commitment_author::record_provider_unresolved_skip`. Returns the new
+/// running total (for tests).
+fn record_self_unresolved_skip(self_cid: &str) -> u64 {
+    let prior = SALVAGE_SELF_UNRESOLVED_SKIPS.fetch_add(1, Ordering::Relaxed);
+    crate::metrics::inc_salvage_provider_unresolved();
+    if prior == 0 {
+        tracing::warn!(
+            target: "identity_coherence",
+            counter = "elohim_salvage_provider_unresolved_total",
+            self_cid = %self_cid,
+            "salvage author: no agent_cid self-provider resolvable (session + own cell key \
+             both non-agent_cid) — SKIPPING author this tick rather than writing a transport-id \
+             provider that could never join the resilience card (rate-sane: first occurrence)"
+        );
+    } else {
+        tracing::debug!(
+            target: "identity_coherence",
+            counter = "elohim_salvage_provider_unresolved_total",
+            self_cid = %self_cid,
+            skips = prior + 1,
+            "salvage author: agent_cid self-provider still unresolvable — skip (throttled)"
+        );
+    }
+    prior + 1
 }
 
 /// Deterministic commitment id matching the seeder's custody-blob shape
@@ -147,7 +223,7 @@ impl CommitmentAuthor for SalvageCommitmentAuthor {
 /// `genesis/data/timeline/backlog/resilience-card-membership-humans-projection-gap-2026-06-19.md`.
 fn build_salvage_candidates(
     conn: &mut diesel::SqliteConnection,
-    self_cid: &str,
+    self_write_cid: &str,
     fresh_after: &str,
 ) -> Result<Vec<crate::reconcile::placement::PlacementCandidate>, StorageError> {
     use crate::db::diesel_schema::humans;
@@ -165,9 +241,14 @@ fn build_salvage_candidates(
         })
         .collect();
     // Include self so it can self-select even before its own capacity ad has
-    // round-tripped back through gossip (first-tick convergence).
-    if !candidates.iter().any(|c| c.agent_cid == self_cid) {
-        candidates.push(PlacementCandidate::from_agent_cid(self_cid.to_string()));
+    // round-tripped back through gossip (first-tick convergence). Self is
+    // identified by its resolved `agent_cid` (NOT a transport `self_cid`) so the
+    // candidate pool, the humans household-join (`agent_pub_key = agent_cid`), the
+    // placement rank-match, and the authored `provider` all key on ONE namespace.
+    if !candidates.iter().any(|c| c.agent_cid == self_write_cid) {
+        candidates.push(PlacementCandidate::from_agent_cid(
+            self_write_cid.to_string(),
+        ));
     }
 
     // Enrich household_id from the humans projection (mirror of the ingest
@@ -246,10 +327,24 @@ fn build_salvage_candidates(
 /// place [`crate::services::conductor_commitment_author::ConductorCommitmentAuthor`]
 /// is wired for the provide loop. Returns the
 /// [`crate::reconcile::custody::SalvageOutcome`] for logging/metrics.
+/// ## Self-identity (namespace-coherent authoring)
+///
+/// `self_cid` is the node's TRANSPORT id (libp2p `12D3Koo…` / iroh NodeId, from
+/// `Config::self_cid`) and is used ONLY for read-side matching against existing
+/// rows (legacy rows this node authored before this resolver landed carry the
+/// transport id as `provider`). `self_agent_cid` is the resolved holochain
+/// `agent_cid` (`uhCAk…`) and is the ONLY identity ever WRITTEN — into the
+/// candidate pool, the placement rank-match, and the authored `provider`. When
+/// `self_agent_cid` is `None` (or somehow not an `agent_cid`) the pass SKIPS all
+/// authoring this tick (records a rate-sane skip signal) rather than writing a
+/// transport id that could never join `humans.agent_pub_key =
+/// rea_commitments.provider`. This is the salvage half of the CID-hardening the
+/// provide loop (`conductor_commitment_author`) already applies.
 #[allow(clippy::too_many_arguments)]
 pub fn run_salvage_pass(
     conn: &mut diesel::SqliteConnection,
     self_cid: &str,
+    self_agent_cid: Option<&str>,
     author: &dyn CommitmentAuthor,
     enabled: bool,
     target_replicas: usize,
@@ -259,11 +354,33 @@ pub fn run_salvage_pass(
 ) -> Result<crate::reconcile::custody::SalvageOutcome, StorageError> {
     use crate::reconcile::custody::{salvage_pass, SalvageConfig};
 
+    // Resolve the WRITE identity. Never mint a transport-id `provider`: if no
+    // truthful agent_cid is available, skip authoring this tick (rate-sane
+    // signal) and let a later tick retry once the conductor cell key / a session
+    // is present. Reconcile still moves bytes for existing rows meanwhile.
+    let self_write_cid = match self_agent_cid {
+        Some(cid) if crate::identity_namespace::is_agent_cid(cid) => cid,
+        _ => {
+            if enabled {
+                record_self_unresolved_skip(self_cid);
+            }
+            return Ok(crate::reconcile::custody::SalvageOutcome::default());
+        }
+    };
+
+    // Regression tripwire (never rejects): `self_write_cid` is guaranteed an
+    // agent_cid here, so this stays silent on the correct path — but it would flag
+    // any future edit that reintroduced a non-agent_cid provider write.
+    crate::identity_namespace::observe_agent_cid_write(
+        "rea_commitments.provider",
+        Some(self_write_cid),
+    );
+
     let fresh_after = (now - chrono::Duration::seconds(inventory_freshness_seconds as i64))
         .format("%Y-%m-%dT%H:%M:%SZ")
         .to_string();
 
-    let candidates = build_salvage_candidates(conn, self_cid, &fresh_after)?;
+    let candidates = build_salvage_candidates(conn, self_write_cid, &fresh_after)?;
 
     let strategy = select_placement_strategy(diversity_placement);
     let cfg = SalvageConfig {
@@ -274,6 +391,7 @@ pub fn run_salvage_pass(
     salvage_pass(
         conn,
         self_cid,
+        self_write_cid,
         strategy.as_ref(),
         author,
         &candidates,
@@ -682,10 +800,21 @@ mod tests {
             authored: std::sync::Mutex::new(Vec::new()),
         };
 
-        // enabled=false → the gate short-circuits; nothing authored.
-        let gated =
-            super::run_salvage_pass(&mut conn, "uhCAk-self", &author, false, 2, 600, true, now)
-                .unwrap();
+        // enabled=false → the gate short-circuits; nothing authored. Self resolves
+        // to its agent_cid (Some) so the gate — not the identity guard — is what
+        // suppresses authoring.
+        let gated = super::run_salvage_pass(
+            &mut conn,
+            "uhCAk-self",
+            Some("uhCAk-self"),
+            &author,
+            false,
+            2,
+            600,
+            true,
+            now,
+        )
+        .unwrap();
         assert_eq!(
             gated.commitments_authored, 0,
             "disabled pass authors nothing"
@@ -693,9 +822,18 @@ mod tests {
         assert!(author.authored.lock().unwrap().is_empty());
 
         // enabled=true → self is among the closest-2 → authors exactly once.
-        let outcome =
-            super::run_salvage_pass(&mut conn, "uhCAk-self", &author, true, 2, 600, true, now)
-                .unwrap();
+        let outcome = super::run_salvage_pass(
+            &mut conn,
+            "uhCAk-self",
+            Some("uhCAk-self"),
+            &author,
+            true,
+            2,
+            600,
+            true,
+            now,
+        )
+        .unwrap();
         assert_eq!(
             outcome.commitments_authored, 1,
             "self self-selects and authors"
@@ -706,5 +844,85 @@ mod tests {
             [(blob, "uhCAk-self".to_string(), "uhCAk-steward".to_string())],
             "authors provider=self, receiver=the content steward"
         );
+    }
+
+    /// Identity guard: when self's agent_cid is UNRESOLVABLE (None), an opted-in
+    /// salvage tick authors NOTHING and records a skip signal — it must NEVER
+    /// write a transport-id provider. This is the core hole this task closes.
+    #[test]
+    fn run_salvage_pass_skips_authoring_when_agent_cid_unresolvable() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = "a".repeat(64);
+        // A transport-id self_cid (the production hazard): self_cid is a libp2p id
+        // but no agent_cid is resolvable.
+        seed_under_replicated_blob(&mut conn, "uhCAk-prov", "uhCAk-steward", &blob, now);
+        seed_capacity(&mut conn, "uhCAk-prov");
+
+        let author = RecordingAuthor {
+            authored: std::sync::Mutex::new(Vec::new()),
+        };
+
+        let before = super::self_unresolved_skip_count();
+        let outcome = super::run_salvage_pass(
+            &mut conn,
+            "12D3KooTransportSelfId", // transport id — must NEVER be written as provider
+            None,                     // agent_cid unresolvable → SKIP authoring
+            &author,
+            true, // opted in
+            2,
+            600,
+            true,
+            now,
+        )
+        .unwrap();
+
+        assert_eq!(
+            outcome.commitments_authored, 0,
+            "unresolvable agent_cid must author nothing"
+        );
+        assert!(
+            author.authored.lock().unwrap().is_empty(),
+            "no transport-id provider row may be written"
+        );
+        assert_eq!(
+            super::self_unresolved_skip_count(),
+            before + 1,
+            "the skip must be recorded (rate-sane visibility signal)"
+        );
+    }
+
+    /// A non-agent_cid `self_agent_cid` (defensive: a caller passing a stray
+    /// transport id where an agent_cid was expected) is treated as unresolvable —
+    /// the is_agent_cid gate refuses it, nothing is authored.
+    #[test]
+    fn run_salvage_pass_rejects_non_agent_cid_write_identity() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = "a".repeat(64);
+        seed_under_replicated_blob(&mut conn, "uhCAk-prov", "uhCAk-steward", &blob, now);
+        seed_capacity(&mut conn, "uhCAk-prov");
+
+        let author = RecordingAuthor {
+            authored: std::sync::Mutex::new(Vec::new()),
+        };
+
+        let outcome = super::run_salvage_pass(
+            &mut conn,
+            "12D3KooTransportSelfId",
+            Some("12D3KooNotAnAgentCid"), // not uhCAk… → refused by the gate
+            &author,
+            true,
+            2,
+            600,
+            true,
+            now,
+        )
+        .unwrap();
+
+        assert_eq!(outcome.commitments_authored, 0);
+        assert!(author.authored.lock().unwrap().is_empty());
     }
 }

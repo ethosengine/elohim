@@ -12,8 +12,8 @@
 use std::collections::{BTreeMap, HashSet};
 
 use elohim_views::{
-    FeltFloorView, FeltStatusView, PlacementGapView, RegionalDistributionView,
-    StewardingCollectiveEntry,
+    FaultDomainDiversity, FeltFloorView, FeltStatusView, PlacementGapView,
+    RegionalDistributionView, StewardingCollectiveEntry,
 };
 
 use crate::fold::{bucket_by, distinct_count_by};
@@ -73,6 +73,78 @@ pub fn regional_distribution(
         }
     }
     dist
+}
+
+/// The RS(4,3) baseline fault-domain target (7 = data + parity shards) — the
+/// denominator that normalizes a distinct fault-domain count into a [0,1]
+/// diversity score. Owner-declarable per content is deferred (the resilience-tier
+/// primitive, genesis/data/timeline/backlog/resilience-tier-content-declared-floor.md);
+/// until then this is the baseline. Deliberately NOT derived from reach.
+pub const FAULT_DOMAIN_TARGET: u32 = 7;
+
+/// Normalize a distinct fault-domain count into a [0,1] diversity score against
+/// the RS baseline target. Pure. Both the relational snapshot (household fault
+/// domains) and the graph branch (steward-collective fault domains) key on this
+/// single definition, so the denominator cannot drift between the two paths.
+///
+/// This replaces the prior ad-hoc coverage proxy
+/// (`min(stewarding, max(commitment_backed, 1)) / 7`), which falsely capped the
+/// score by the count of commitment records — penalizing content that is
+/// genuinely spread across many household fault domains but lacks commitment
+/// paperwork. The truthful measure is the count of independent fault domains
+/// actually holding the content.
+pub fn diversity_score(distinct_fault_domains: u32) -> f32 {
+    if FAULT_DOMAIN_TARGET == 0 {
+        return 0.0;
+    }
+    (distinct_fault_domains as f32 / FAULT_DOMAIN_TARGET as f32).clamp(0.0, 1.0)
+}
+
+/// Core fault-domain diversity fold: distinct household + region fault domains
+/// over an iterator of `(household, region)` optionals. Pure. Both the
+/// holder-relation path (`fault_domain_diversity`) and the replica-peer path
+/// (`elohim_storage::services::distribution_view::compute_fault_domain_diversity`)
+/// delegate here, so the fault-domain definition lives in ONE place (no
+/// duplicated household/region counting across the two facings).
+///
+/// `distinct_collective_count` stays 0: neither the holder-relation nor the
+/// replica-peer row carries a collective binding distinct from the household.
+pub fn fault_domain_diversity_from<'a>(
+    domains: impl Iterator<Item = (Option<&'a str>, Option<&'a str>)>,
+) -> FaultDomainDiversity {
+    let mut households: HashSet<&str> = HashSet::new();
+    let mut regions: HashSet<&str> = HashSet::new();
+    for (household, region) in domains {
+        if let Some(h) = household {
+            households.insert(h);
+        }
+        if let Some(r) = region {
+            regions.insert(r);
+        }
+    }
+    let distinct_household_count = households.len() as u32;
+    let distinct_region_count = regions.len() as u32;
+    FaultDomainDiversity {
+        distinct_household_count,
+        distinct_collective_count: 0,
+        distinct_region_count,
+        // Risk when all known holders share a single household fault domain.
+        single_fault_domain_risk: distinct_household_count <= 1,
+        fault_modes_evaluated: vec!["household".to_string(), "region".to_string()],
+    }
+}
+
+/// Fold the holder-relation into a `FaultDomainDiversity` — distinct household
+/// (`hub_id`) and region fault domains that hold the content. Pure. The scalar
+/// diversity score (`diversity_score`) keys on the household fault-domain count
+/// (the file's primary failure domain, matching `single_fault_domain_risk`); the
+/// region axis is surfaced for the distribution detail view.
+pub fn fault_domain_diversity(relation: &[HolderRow]) -> FaultDomainDiversity {
+    fault_domain_diversity_from(
+        relation
+            .iter()
+            .map(|r| (r.hub_id.as_deref(), r.region.as_deref())),
+    )
 }
 
 /// Resilience FLOOR (households wanted) for a tier — the content-relative
@@ -223,6 +295,45 @@ mod fold_tests {
     }
 
     #[test]
+    fn fault_domain_diversity_counts_distinct_households_and_regions() {
+        // 3 distinct hubs across 2 distinct regions; duplicate agents/hub rows
+        // collapse. A null-hub / null-region row contributes to neither set.
+        let rel = vec![
+            row(Some("h1"), "a", Some("us-east")),
+            row(Some("h1"), "b", Some("us-east")), // same hub + region — collapses
+            row(Some("h2"), "c", Some("us-west")),
+            row(Some("h3"), "d", None), // null region — not counted
+            row(None, "e", Some("eu")), // null hub — not counted as household
+        ];
+        let fdd = fault_domain_diversity(&rel);
+        assert_eq!(fdd.distinct_household_count, 3, "h1,h2,h3");
+        assert_eq!(fdd.distinct_region_count, 3, "us-east,us-west,eu");
+        assert_eq!(fdd.distinct_collective_count, 0);
+        assert!(!fdd.single_fault_domain_risk, "3 households > 1");
+    }
+
+    #[test]
+    fn fault_domain_diversity_empty_relation_is_honest_zero() {
+        let fdd = fault_domain_diversity(&[]);
+        assert_eq!(fdd.distinct_household_count, 0);
+        assert_eq!(fdd.distinct_region_count, 0);
+        assert!(
+            fdd.single_fault_domain_risk,
+            "zero fault domains is a single-fault-domain risk (<=1)"
+        );
+    }
+
+    #[test]
+    fn diversity_score_is_fault_domains_over_target_clamped() {
+        assert_eq!(diversity_score(0), 0.0, "no fault domains → 0");
+        // 3 household fault domains / 7 baseline.
+        assert!((diversity_score(3) - 3.0 / 7.0).abs() < 1e-6);
+        // Beyond the target clamps at 1.0 (never > full).
+        assert_eq!(diversity_score(FAULT_DOMAIN_TARGET + 1), 1.0);
+        assert_eq!(diversity_score(100), 1.0);
+    }
+
+    #[test]
     fn regional_distribution_no_viewer_buckets_global_and_unknown() {
         // No viewer region: a hub with a known region → global; a hub with no
         // region → unknown. Dedupe by hub (two peers in h1 count once).
@@ -273,7 +384,11 @@ mod fold_tests {
 
         // intra-hub resiliency: the dowell mesh shows 3 distinct holders.
         let intra = intra_hub_peers(&rel);
-        assert_eq!(intra.get("household-dowell"), Some(&3), "M/J/J = 3 distinct agents");
+        assert_eq!(
+            intra.get("household-dowell"),
+            Some(&3),
+            "M/J/J = 3 distinct agents"
+        );
         assert_eq!(intra.get("household-eden"), Some(&1));
 
         // regional distribution lights (not all-unknown) for a us-west viewer.

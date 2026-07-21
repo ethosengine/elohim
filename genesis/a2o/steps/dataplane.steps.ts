@@ -14,6 +14,7 @@
  *   Then /sync doc {string} is present on peer {string}
  *   Then blob {string} is byte-present on peer {string}
  *   Then EPR {string} blobHash is non-null on peer {string}
+ *   Then no HOUSEHOLD-member human on peer {string} is missing its agentPubKey
  *   Then resolving {string} on peer {string} does NOT return App-not-found
  *   Then metric {string} on peer {string} {word} {float}
  *
@@ -516,6 +517,57 @@ Then(
       [401, 403].includes(moveStatus),
       `Non-author move of HEAD on ${peerName}: expected 401/403 (authority refusal), got ` +
         `${moveStatus} — a non-author was able to move the declared HEAD (authority not enforced).`
+    );
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Then — /db/humans assertions (identity coherence)
+// ---------------------------------------------------------------------------
+
+/**
+ * Assert that no human carrying a household_id (already placed in a household by
+ * on_membership_projected) is missing its agent_pub_key.
+ *
+ * This is the LIVE-OBSERVABLE consequence of the identity-coherence stamp
+ * (reconcile/controller.rs on_membership_projected — unit-anchored in
+ * reconcile::controller::tests::n1d..n1h): a human with household_id set but
+ * agent_pub_key NULL is exactly the shape that empties the household-resilience
+ * snapshot's `humans.agent_pub_key = peer_id` join (the documented all-zeros-
+ * resilience-card root cause). Zero matching rows is an honest pass, not a
+ * fabricated one — the invariant is an implication (household_id set ⇒
+ * agent_pub_key set), always checkable regardless of how many households are
+ * currently seeded on the peer.
+ */
+Then(
+  'no HOUSEHOLD-member human on peer {string} is missing its agentPubKey',
+  async function (this: E2EWorld, peerName: string) {
+    const url = getPeerUrl(this, peerName);
+    const { status, text } = await getRaw(`${url}/db/humans`);
+    assert.strictEqual(
+      status,
+      200,
+      `GET /db/humans on ${peerName}: expected HTTP 200, got ${status} (body: ${text.slice(0, 120)})`
+    );
+    let body: { items?: Record<string, unknown>[] };
+    try {
+      body = JSON.parse(text) as { items?: Record<string, unknown>[] };
+    } catch {
+      throw new Error(`GET /db/humans on ${peerName}: response is not valid JSON`);
+    }
+    const items = body.items ?? [];
+    const offenders = items
+      .filter(h => h['householdId'] !== null && h['householdId'] !== undefined)
+      .filter(
+        h => h['agentPubKey'] === null || h['agentPubKey'] === undefined || h['agentPubKey'] === ''
+      )
+      .map(h => h['id']);
+    assert.strictEqual(
+      offenders.length,
+      0,
+      `${offenders.length} human(s) on ${peerName} carry a household_id but a NULL ` +
+        `agent_pub_key (the all-zeros-resilience-card gap: ${JSON.stringify(offenders)}) — ` +
+        `the household-resilience snapshot's agent_pub_key join silently empties for these rows.`
     );
   }
 );
