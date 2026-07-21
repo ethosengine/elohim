@@ -1,0 +1,110 @@
+---
+epr-meta-version: 1
+id: lvi-devspace-runtime-governance
+covers: subtree
+purpose: >
+  lvi — the Elohim Protocol devspace peer-runtime (P2P-sharable development environments:
+  openvscode-server, doorway-projected preview URLs, semi-ephemeral peer stewardship). A
+  self-contained module designed to graduate to its own ethosengine/lvi repository — it roots
+  its own governance so the discipline travels with the module across submodule extraction. lvi
+  COMPOSES its siblings and must never re-implement them: content addressing → eprfs-core::BlobCid
+  + elohim/epr; mount/materialization → eprfs ProjectionManifest + LocalMaterializer; build-graph
+  → rakia; covenant/source-closures → brit; ingress → doorway HostRegistry. The rules below surface
+  lvi's load-bearing invariants at edit-time. Full discipline: CLAUDE.md. Governing spec:
+  docs/specs/2026-07-20-elohim-native-devspace-design.md.
+rules:
+  - id: co-resident-safety-on-sandbox-edits
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["podman", "rootless", "cgroup", "seccomp", "pids-limit", "spawn", "Command::new",
+                     "ResourceQuota", "sandbox", "ActionKind::Devspace", "supervise", "reap"]
+    validator: epr:validator-lvi-invariants
+    why: >
+      CO-RESIDENT SAFETY IS THE LOAD-BEARING INVARIANT. A devspace runs a trusted peer's UNVETTED
+      code on a host that is also a live conductor/DHT participant. The sandbox MUST carry a hard
+      resource quota (--memory --cpus --pids-limit, disk ceiling, --network=none by default) that
+      isolates the devspace from the co-resident conductor. A fork-bomb / disk-filler / memory-hog
+      must be quota-killed WITHOUT endangering the host's protocol participation — this is the floor
+      the containment scenario proves. And do not conflate the layers: the trust graph ADMITS (reach
+      + attestation + delegates-compute), the sandbox CONTAINS, the TTL BOUNDS. Revocation is
+      lease-expiry, NOT interrupt — never design it as SIGKILL-on-DHT-signal.
+  - id: mount-dont-ship-on-materialization-edits
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["LocalMaterializer", "ProjectionManifest", "MaterializationPolicy", "FetchMissing",
+                     "materialize", "image", "layer", "tarball", "docker", "OCI"]
+    validator: epr:validator-lvi-invariants
+    why: >
+      MOUNT, DON'T SHIP. The image dies as a unit. Consume eprfs ProjectionManifest +
+      LocalMaterializer (Sparse / FetchMissing) — do NOT re-implement image/layer/pull/tarball
+      machinery. The closure converges onto disk exactly as far as execution demands (hydrate on
+      touch, verify-by-content-hash before it lands, discard on teardown). If you are writing an
+      "image builder" or a "pull" path in lvi, stop: that concept is not lvi's to own.
+  - id: authorization-reuse-on-grant-edits
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["delegates-compute", "delegates_compute", "bounds_validator", "Commitment",
+                     "X-API-Key", "api_key", "authorize", "grant"]
+    validator: epr:validator-lvi-invariants
+    why: >
+      AUTHORIZATION IS A Mishpat::Commitment `delegates-compute`, validated by the copy-of-
+      `replicates-commons` bounds_validator (the 7 generic checks) — never a bespoke token or grant.
+      "matthew stewards THIS devspace for THIS agent, bounded by THESE epr scopes, until THIS TTL"
+      is a single notarized, walkable commitment that DISPLACES the X-API-Key pattern. Do not
+      invent a parallel access-control primitive.
+  - id: no-derived-bytes-in-commons-on-state-edits
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["persistent", "checkpoint", "cache", "target_dir", "node_modules", "sccache",
+                     "NodeSeed", "seal", "custody"]
+    validator: epr:validator-lvi-invariants
+    why: >
+      DERIVED BYTES NEVER ENTER COMMONS CUSTODY (the discipline the wider project corrected 3x).
+      Source edits seal to a brit NodeSeed (authority-free checkpoint that replays on rematerialize).
+      Build caches (target/, node_modules, sccache) are a steward-affinity LEASE or re-derived —
+      never commons blobs. Stateful-service data is REFUSE-BY-DEFAULT unless an explicit `persistent`
+      set is declared in the seed AND verified on teardown; the author-declared-but-unverified path
+      is the silent-data-loss mode and does not ship.
+validators:
+  - ref: epr:validator-lvi-invariants
+    fuel: 200
+---
+
+# lvi/ — devspace peer-runtime (self-contained governance region)
+
+lvi is a `covers: subtree` governance region: it claims and governs its own subtree, and it carries
+its full governance *inside* the module (`.epr-meta` + `CLAUDE.md` + `docs/`) so that when it
+graduates to its own `ethosengine/lvi` repository the `.git` boundary makes it self-governing
+automatically — the same way the vendored submodules (`brit`, `rakia`) do. It deliberately does
+**not** set `root: true`: while in-tree, the `elohim/.epr-meta` interface-first-reuse gate must keep
+cascading over lvi (lvi consumes the canonical CID/codec interfaces and must never re-implement
+them). This manifest ADDS the four lvi-specific invariants on top of that inherited gate.
+
+## The four invariants (reminders, not gates)
+
+The rules above are **inject advisories** — they teach, they never block. Each fires only when an
+edit touches the code surface it guards (a `contains-any` smell), so ordinary edits are untouched.
+`epr:validator-lvi-invariants` is intentionally **not registered** in v1 (`REFERENCE_VALIDATORS`),
+so every rule degrades to an inject nudge that surfaces the invariant and its rationale. When a real
+semantic validator-EPR is wired under this name, the rules graduate to live checks with no manifest
+edit — the `why:` already carries the destination.
+
+Unlike the `bridges/did` conformance rules (which exist for drifts that happened at birth), lvi's
+invariants are **design-known sharp edges** — they come from the adversarial verdicts in the
+governing spec (co-resident containment; mount-don't-ship; authorization reuse; no-derived-bytes-
+in-commons), planted proactively before the first line of the actuator is written. The intent is
+that the runtime is *born* honoring them.
+
+| Invariant | Guarded surface | Canonical home it routes to |
+|---|---|---|
+| Co-resident safety (hard quota; admit≠contain≠bound; lease-not-interrupt) | sandbox / supervision / reap code | `lvi-actuator`; the containment a2o scenario |
+| Mount, don't ship | materialization code | eprfs `LocalMaterializer` + `ProjectionManifest` |
+| Authorization reuse | grant/auth code | `delegates-compute` + copy-of-`replicates-commons` `bounds_validator` |
+| No derived bytes in commons | state/cache/checkpoint code | brit `NodeSeed` seal; steward-affinity lease |
+
+Full narrative discipline and the dependency-direction boundary live in `CLAUDE.md`; the dated
+design and the two-slice scope live in `docs/specs/2026-07-20-elohim-native-devspace-design.md`.
