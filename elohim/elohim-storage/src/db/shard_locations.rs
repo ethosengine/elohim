@@ -116,3 +116,174 @@ pub fn update_verified(
     .execute(conn)?;
     Ok(())
 }
+
+/// REKEY CASCADE (membership-truth identity supersede): re-attribute every
+/// shard-holder row from a stale `old_peer_id` (an `agent_cid`) to `new_peer_id`
+/// within an app scope. Called INSIDE the supersede transaction
+/// (`services::membership_identity_reconcile`) alongside the human-row supersede,
+/// so the resilience holder join (`shard_locations.peer_id ==
+/// humans.agent_pub_key`, both `agent_cid`) stays aligned after the human's key
+/// moves — healing the human alone would otherwise strand its shard rows under
+/// the dead key.
+///
+/// `peer_id` is part of the `(shard_hash, peer_id)` primary key, so a blind
+/// `UPDATE peer_id = new` can violate the UNIQUE PK when the SAME shard is already
+/// recorded under `new_peer_id` (the peer re-distributed under its live key while
+/// the fossil row lingered). We therefore move only non-colliding rows and DROP
+/// the colliding remainder — the new row already covers that shard, so the two
+/// keys collapse to one physical holder (no coverage lost).
+///
+/// Returns the number of rows re-attributed (moved). Colliding rows that were
+/// dropped are not counted as moves. `h_app_id` scopes to the dataplane the
+/// resilience card reads (`lamad`); a key belongs to exactly one agent, so
+/// matching by key within that scope never touches another agent's rows.
+pub fn rekey_peer_id(
+    conn: &mut SqliteConnection,
+    h_app_id: &str,
+    old_peer_id: &str,
+    new_peer_id: &str,
+) -> Result<usize, StorageError> {
+    if new_peer_id.is_empty() || old_peer_id == new_peer_id {
+        return Ok(0);
+    }
+
+    // Shards already held under the NEW key — a move onto these would collide.
+    let existing_new: std::collections::HashSet<String> = shard_locations::table
+        .filter(shard_locations::h_app_id.eq(h_app_id))
+        .filter(shard_locations::peer_id.eq(new_peer_id))
+        .select(shard_locations::shard_hash)
+        .load::<String>(conn)?
+        .into_iter()
+        .collect();
+
+    let old_shards: Vec<String> = shard_locations::table
+        .filter(shard_locations::h_app_id.eq(h_app_id))
+        .filter(shard_locations::peer_id.eq(old_peer_id))
+        .select(shard_locations::shard_hash)
+        .load::<String>(conn)?;
+
+    let mut moved = 0usize;
+    for shard_hash in old_shards {
+        if existing_new.contains(&shard_hash) {
+            // Collision: the shard is already covered under the new key — drop
+            // the stale duplicate rather than violate the PK.
+            diesel::delete(
+                shard_locations::table
+                    .filter(shard_locations::h_app_id.eq(h_app_id))
+                    .filter(shard_locations::shard_hash.eq(&shard_hash))
+                    .filter(shard_locations::peer_id.eq(old_peer_id)),
+            )
+            .execute(conn)?;
+        } else {
+            moved += diesel::update(
+                shard_locations::table
+                    .filter(shard_locations::h_app_id.eq(h_app_id))
+                    .filter(shard_locations::shard_hash.eq(&shard_hash))
+                    .filter(shard_locations::peer_id.eq(old_peer_id)),
+            )
+            .set(shard_locations::peer_id.eq(new_peer_id))
+            .execute(conn)?;
+        }
+    }
+    Ok(moved)
+}
+
+#[cfg(test)]
+mod rekey_tests {
+    use super::*;
+    use crate::db::models::NewShardLocation;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    fn setup() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory DB");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    fn seed(conn: &mut SqliteConnection, shard: &str, peer: &str, app: &str) {
+        upsert_location(
+            conn,
+            &NewShardLocation {
+                shard_hash: shard,
+                peer_id: peer,
+                h_app_id: app,
+                status: "verified",
+            },
+        )
+        .expect("seed shard location");
+    }
+
+    #[test]
+    fn rekey_moves_all_holder_rows_in_scope() {
+        let mut conn = setup();
+        seed(&mut conn, "shard-a", "uhCAkOLD", "lamad");
+        seed(&mut conn, "shard-b", "uhCAkOLD", "lamad");
+        // A different-scope row (distinct shard — the PK is (shard_hash, peer_id),
+        // no h_app_id, so a same-shard row would collide) must be untouched by a
+        // lamad-scoped rekey. A different peer likewise.
+        seed(&mut conn, "shard-q", "uhCAkOLD", "qahal");
+        seed(&mut conn, "shard-c", "uhCAkOTHER", "lamad");
+
+        let moved = rekey_peer_id(&mut conn, "lamad", "uhCAkOLD", "uhCAkNEW").expect("rekey");
+        assert_eq!(moved, 2, "both lamad rows under the old key moved");
+
+        assert_eq!(
+            get_locations_for_peer(&mut conn, "uhCAkNEW").unwrap().len(),
+            2
+        );
+        // Out-of-scope + other-peer rows untouched.
+        let old = get_locations_for_peer(&mut conn, "uhCAkOLD").unwrap();
+        assert_eq!(old.len(), 1, "the qahal-scope row stays under the old key");
+        assert_eq!(old[0].h_app_id, "qahal");
+        assert_eq!(
+            get_locations_for_peer(&mut conn, "uhCAkOTHER")
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn rekey_collapses_colliding_shard_rows() {
+        let mut conn = setup();
+        // shard-a is held under BOTH keys (a re-distribute after the re-key).
+        seed(&mut conn, "shard-a", "uhCAkOLD", "lamad");
+        seed(&mut conn, "shard-a", "uhCAkNEW", "lamad");
+        // shard-b only under the old key.
+        seed(&mut conn, "shard-b", "uhCAkOLD", "lamad");
+
+        let moved = rekey_peer_id(&mut conn, "lamad", "uhCAkOLD", "uhCAkNEW").expect("rekey");
+        assert_eq!(
+            moved, 1,
+            "only shard-b moved; shard-a collided and collapsed"
+        );
+
+        // No rows left under the old key.
+        assert!(get_locations_for_peer(&mut conn, "uhCAkOLD")
+            .unwrap()
+            .is_empty());
+        // New key now covers both shards, exactly once each.
+        let new = get_locations_for_peer(&mut conn, "uhCAkNEW").unwrap();
+        assert_eq!(new.len(), 2);
+    }
+
+    #[test]
+    fn rekey_noop_when_old_equals_new_or_empty() {
+        let mut conn = setup();
+        seed(&mut conn, "shard-a", "uhCAkOLD", "lamad");
+        assert_eq!(
+            rekey_peer_id(&mut conn, "lamad", "uhCAkOLD", "uhCAkOLD").unwrap(),
+            0
+        );
+        assert_eq!(
+            rekey_peer_id(&mut conn, "lamad", "uhCAkOLD", "").unwrap(),
+            0
+        );
+        assert_eq!(
+            get_locations_for_peer(&mut conn, "uhCAkOLD").unwrap().len(),
+            1
+        );
+    }
+}

@@ -185,6 +185,56 @@ pub fn rekey_human_agent_key(
         .ok_or_else(|| StorageError::Internal("Human not found after rekey".to_string()))
 }
 
+/// MEMBERSHIP-TRUTH SUPERSEDE (rekey-drift for NON-self humans): overwrite a
+/// human row's SET-but-stale `agent_pub_key` from `old_key` to `new_key` when DHT
+/// membership truth carries a newer key than the local projection holds.
+///
+/// This is the NON-self analogue of [`rekey_human_agent_key`] (which is SELF-only,
+/// matches only by `human_id`, and blindly overwrites toward the pod's own cell
+/// key). The two are deliberately distinct functions:
+///
+/// - `rekey_human_agent_key` — genesis_self_heal's SELF row, from the pod's OWN
+///   cell key. LEFT UNTOUCHED by this change.
+/// - `supersede_human_agent_key` — any membership-backed row, from DHT membership
+///   truth, guarded by a COMPARE-AND-SWAP on `old_key`.
+///
+/// The CAS (`agent_pub_key == old_key` in the WHERE) is load-bearing: the caller
+/// resolves `(human_id, old_key)` from a household-scoped read that may be stale
+/// by the time the write lands. Matching on `old_key` means a concurrent write
+/// that already moved the key aborts this supersede (0 rows) instead of clobbering
+/// a fresher value — it never regresses a key it did not itself observe.
+///
+/// The caller MUST have already established `new_key` is a valid `agent_cid`
+/// (`identity_namespace::is_agent_cid`) — this fn additionally refuses an empty
+/// `new_key` or a no-op (`old_key == new_key`) as defense in depth.
+///
+/// Returns the number of rows updated (0 = the CAS precondition no longer holds;
+/// a benign, idempotent outcome — never an error).
+pub fn supersede_human_agent_key(
+    conn: &mut SqliteConnection,
+    human_id: &str,
+    old_key: &str,
+    new_key: &str,
+) -> Result<usize, StorageError> {
+    if new_key.is_empty() || old_key == new_key {
+        return Ok(0);
+    }
+
+    let now = current_timestamp();
+    diesel::update(
+        humans::table
+            .filter(humans::id.eq(human_id))
+            // COMPARE-AND-SWAP: only move the key we actually observed.
+            .filter(humans::agent_pub_key.eq(old_key)),
+    )
+    .set((
+        humans::agent_pub_key.eq(Some(new_key)),
+        humans::updated_at.eq(&now),
+    ))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Failed to supersede human agent key: {}", e)))
+}
+
 /// Retrieve a human by its stable ID.
 pub fn get_human_by_id(
     conn: &mut SqliteConnection,
@@ -432,5 +482,113 @@ mod tests {
         let mut conn = pool.get().unwrap();
         let err = heal_human_identity(&mut conn, "human-ghost", Some("uhCAkX"), None);
         assert!(matches!(err, Err(StorageError::NotFound(_))));
+    }
+
+    /// Insert a slug-keyed human with a SET agent_pub_key — the post-rekey fossil
+    /// shape for a NON-self human (a membership stamp landed the then-live key,
+    /// then the peer re-keyed and nothing overwrote it).
+    fn insert_keyed_human(conn: &mut SqliteConnection, id: &str, agent_key: &str, household: &str) {
+        create_human(
+            conn,
+            CreateHumanInput {
+                id: id.to_string(),
+                agent_pub_key: Some(agent_key.to_string()),
+                display_name: id.to_string(),
+                bio: None,
+                affinities: "[]".to_string(),
+                profile_reach: "commons".to_string(),
+                location: None,
+                profile_photo_url: None,
+                h_app_id: "imagodei".to_string(),
+                household_id: Some(household.to_string()),
+            },
+        )
+        .expect("insert keyed human");
+    }
+
+    /// SUPERSEDE moves a SET-but-stale key to the membership key when the CAS
+    /// precondition (current key == old_key) holds. Other fields are preserved.
+    #[test]
+    fn supersede_moves_set_key_via_cas() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_keyed_human(
+            &mut conn,
+            "human-adam-firstman",
+            "uhCAkOLD",
+            "collective:eden",
+        );
+
+        let n = supersede_human_agent_key(&mut conn, "human-adam-firstman", "uhCAkOLD", "uhCAkNEW")
+            .expect("supersede");
+        assert_eq!(n, 1, "the CAS matched and moved exactly one row");
+
+        let row = get_human_by_id(&mut conn, "human-adam-firstman")
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.agent_pub_key.as_deref(), Some("uhCAkNEW"));
+        assert_eq!(
+            row.household_id.as_deref(),
+            Some("collective:eden"),
+            "household_id preserved through supersede"
+        );
+    }
+
+    /// SUPERSEDE is a no-op when the row's CURRENT key differs from the observed
+    /// `old_key` — a concurrent write already moved it, so this stale supersede
+    /// must NOT clobber the fresher value.
+    #[test]
+    fn supersede_cas_aborts_when_current_key_differs() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        // The row already holds a THIRD key (someone moved it after we read).
+        insert_keyed_human(
+            &mut conn,
+            "human-adam-firstman",
+            "uhCAkFRESH",
+            "collective:eden",
+        );
+
+        let n = supersede_human_agent_key(&mut conn, "human-adam-firstman", "uhCAkOLD", "uhCAkNEW")
+            .expect("supersede");
+        assert_eq!(n, 0, "CAS precondition failed → no write");
+
+        let row = get_human_by_id(&mut conn, "human-adam-firstman")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.agent_pub_key.as_deref(),
+            Some("uhCAkFRESH"),
+            "a fresher key must never be regressed by a stale supersede"
+        );
+    }
+
+    /// SUPERSEDE refuses a no-op (`old == new`) and an empty `new_key` — defense
+    /// in depth so a degenerate call never touches the row.
+    #[test]
+    fn supersede_rejects_noop_and_empty() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_keyed_human(
+            &mut conn,
+            "human-adam-firstman",
+            "uhCAkOLD",
+            "collective:eden",
+        );
+
+        assert_eq!(
+            supersede_human_agent_key(&mut conn, "human-adam-firstman", "uhCAkOLD", "uhCAkOLD")
+                .expect("noop"),
+            0
+        );
+        assert_eq!(
+            supersede_human_agent_key(&mut conn, "human-adam-firstman", "uhCAkOLD", "")
+                .expect("empty"),
+            0
+        );
+        let row = get_human_by_id(&mut conn, "human-adam-firstman")
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.agent_pub_key.as_deref(), Some("uhCAkOLD"));
     }
 }

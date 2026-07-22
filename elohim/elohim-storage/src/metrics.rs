@@ -256,6 +256,24 @@ lazy_static! {
         "Salvage author ticks skipped because no agent_cid self-provider was resolvable.",
     )
     .unwrap();
+
+    /// Membership-truth key supersede + rekey cascade outcomes. A boot-time pass
+    /// (`services::membership_identity_reconcile`) converges a SET-but-stale
+    /// `humans.agent_pub_key` (a NON-self row a peer re-key fossilised) to the live
+    /// membership key and cascades the holder rows so the resilience stewarding
+    /// join re-aligns. labels: kind = "supersede" (human rows moved) |
+    /// "shard_locations" (holder rows re-attributed) | "rea_commitments"
+    /// (commitments re-attributed) | "ambiguous_skip" (a household whose
+    /// fossil↔membership pairing was not 1:1 — never guessed) | "non_agent_cid_skip"
+    /// (a membership member_cid that was not agent_cid-shaped).
+    pub static ref IDENTITY_KEY_SUPERSEDE: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_identity_key_supersede_total",
+            "Membership-truth human agent-key supersedes + rekey-cascade re-attributions, by kind.",
+        ),
+        &["kind"],
+    )
+    .unwrap();
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -289,6 +307,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_AUTHORED.clone()));
         let _ = REGISTRY.register(Box::new(PROVIDE_PROVIDER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(SALVAGE_PROVIDER_UNRESOLVED.clone()));
+        let _ = REGISTRY.register(Box::new(IDENTITY_KEY_SUPERSEDE.clone()));
     });
 }
 
@@ -411,6 +430,18 @@ pub fn inc_provide_provider_unresolved() {
 /// was resolvable (the salvage writer refusing to write a transport id).
 pub fn inc_salvage_provider_unresolved() {
     SALVAGE_PROVIDER_UNRESOLVED.inc();
+}
+
+/// Record one membership-truth human key supersede and its rekey cascade. `kind`
+/// is one of the labels documented on [`IDENTITY_KEY_SUPERSEDE`]. Row-count kinds
+/// (`shard_locations`, `rea_commitments`) are incremented by their re-attributed
+/// row counts; single-event kinds (`supersede`, `ambiguous_skip`,
+/// `non_agent_cid_skip`) by 1.
+pub fn inc_identity_key_supersede(kind: &str, n: u64) {
+    if n == 0 {
+        return;
+    }
+    IDENTITY_KEY_SUPERSEDE.with_label_values(&[kind]).inc_by(n);
 }
 
 #[cfg(test)]

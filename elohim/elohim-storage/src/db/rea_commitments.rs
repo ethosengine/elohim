@@ -887,6 +887,41 @@ pub fn update_commitment_state(
         .ok_or_else(|| StorageError::Internal("Failed to retrieve updated commitment".into()))
 }
 
+/// REKEY CASCADE (membership-truth identity supersede): re-attribute every
+/// commitment authored by a stale `old_provider` (an `agent_cid`) to
+/// `new_provider` within an app scope. Called INSIDE the supersede transaction
+/// (`services::membership_identity_reconcile`) alongside the human-row supersede,
+/// so the resilience commitment-backed join (`rea_commitments.provider ==
+/// humans.agent_pub_key`, both `agent_cid`) re-aligns after the human's key moves.
+///
+/// `provider` is NOT part of the primary key (`id` is), so a blind update is
+/// collision-safe. It is idempotent by construction: rows already authored under
+/// `new_provider` (the live provide-loop already writes the current key) do not
+/// match `provider == old_provider` and are left untouched. `h_app_id` scopes to
+/// the dataplane the resilience card reads (`lamad`); a key belongs to exactly one
+/// agent, so matching by provider within that scope never touches another agent's
+/// commitments.
+///
+/// Returns the number of commitment rows re-attributed.
+pub fn rekey_provider(
+    conn: &mut SqliteConnection,
+    h_app_id: &str,
+    old_provider: &str,
+    new_provider: &str,
+) -> Result<usize, StorageError> {
+    if new_provider.is_empty() || old_provider == new_provider {
+        return Ok(0);
+    }
+    diesel::update(
+        rea_commitments::table
+            .filter(rea_commitments::h_app_id.eq(h_app_id))
+            .filter(rea_commitments::provider.eq(old_provider)),
+    )
+    .set(rea_commitments::provider.eq(new_provider))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Failed to rekey rea_commitments provider: {}", e)))
+}
+
 /// Upsert a commitment with DHT anchor hash — insert or update anchor if it already exists.
 /// Used by REA projection signal handler to anchor commitments onto the DHT.
 pub fn upsert_with_anchor(

@@ -75,6 +75,7 @@ pub mod limit_gradient_registry;
 pub mod manifest_registry;
 pub mod mastery_depth;
 pub mod measure;
+pub mod membership_identity_reconcile; // membership-truth agent-key supersede + rekey cascade (NON-self rows)
 pub mod mishpat_commitment_facing;
 pub mod mutuality_audit_service;
 pub mod operation_authorization; // Che op-gate Slice 1 §14 — core op-gate gate over mishpat_commitments
