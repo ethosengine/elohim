@@ -87,7 +87,7 @@ The closest external mirror of the doorway's job is **Distributed Press** (Hypha
 
 ## The Trust Substrate
 
-Why Holochain and not a blockchain? Because agent-centric architecture means your data lives with you, validation is intrinsic to the data type, and there's no global consensus bottleneck. But the DHT brings its own questions — gossip protocol tuning, sharding strategies for content-heavy networks, entry validation patterns that enforce constitutional constraints without central authority. The research here is about making the substrate invisible while keeping it trustworthy.
+Why Holochain and not a blockchain? Because agent-centric architecture means your data lives with you, validation is intrinsic to the data type, and there's no global consensus bottleneck. But the DHT brings its own questions — gossip protocol tuning, sharding strategies for content-heavy networks, entry validation patterns that enforce constitutional constraints without central authority. The research here is about making the substrate invisible while keeping it trustworthy. On modeling reach/visibility as a derived, evidence-backed ontology (Palantir Foundry, REA/ValueFlows lineage, Zanzibar/ReBAC, semantic-web survivorship, Cyc's centralized-reasoner failure re-read for distributed inference): [July 2026 ontology-systems survey →](epr:ontology-systems-survey-reach-reconciliation-2026-07-22).
 
 [elohim/holochain/research/](../../elohim/holochain/research/)
 
