@@ -274,6 +274,17 @@ lazy_static! {
         &["kind"],
     )
     .unwrap();
+
+    /// Shard-push targets SKIPPED because the selected `agent_cid` had no known
+    /// libp2p transport binding (`peer_transport_manifest` + `peer_identity_bindings`
+    /// both missed). Before the push-side resolver, distribution errored on EVERY
+    /// peer (an `agent_cid` never parses as a libp2p PeerId); this counter surfaces
+    /// the remaining, honest gap — a peer we selected but cannot dial yet.
+    pub static ref SHARD_PUSH_PEER_UNRESOLVED: IntCounter = IntCounter::new(
+        "elohim_shard_push_peer_unresolved_total",
+        "Shard-push targets skipped because the selected agent_cid had no libp2p transport binding.",
+    )
+    .unwrap();
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -308,6 +319,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(PROVIDE_PROVIDER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(SALVAGE_PROVIDER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_KEY_SUPERSEDE.clone()));
+        let _ = REGISTRY.register(Box::new(SHARD_PUSH_PEER_UNRESOLVED.clone()));
     });
 }
 
@@ -442,6 +454,12 @@ pub fn inc_identity_key_supersede(kind: &str, n: u64) {
         return;
     }
     IDENTITY_KEY_SUPERSEDE.with_label_values(&[kind]).inc_by(n);
+}
+
+/// Record one shard-push target skipped because its `agent_cid` had no resolvable
+/// libp2p transport binding (`services::transport_resolve` returned `None`).
+pub fn inc_shard_push_peer_unresolved() {
+    SHARD_PUSH_PEER_UNRESOLVED.inc();
 }
 
 #[cfg(test)]

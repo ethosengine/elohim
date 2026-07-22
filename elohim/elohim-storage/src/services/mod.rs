@@ -133,6 +133,7 @@ pub mod tending;
 pub mod token_decay_service;
 pub mod token_ledger_service;
 pub mod token_mint_service;
+pub mod transport_resolve; // agent_cid → libp2p PeerId resolution for the shard PUSH path
 pub mod viewer_lens_facing; // imagodei viewer-relative disclosure lens (pure fold in elohim-facings)
 pub mod vulnerability;
 pub mod weather;

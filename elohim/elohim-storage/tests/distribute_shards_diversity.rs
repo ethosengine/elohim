@@ -12,16 +12,26 @@ use elohim_storage::test_util::{spawn_p2p_with_peers, test_pool};
 ///
 /// **This test is `#[ignore]`'d.**
 ///
-/// With the stub P2PHandle, `push_shard` always returns
-/// `Err("stub: no P2P swarm in test")`, so `shard_locations` is never
-/// populated and the household-diversity assertion on shard locations cannot
-/// be verified.  Full live coverage — including verifying that at least two
-/// distinct households receive shards — requires a running libp2p swarm.
+/// The push-side identity bridge is now fixed (slice 2): `distribute_shards`
+/// resolves each selected `agent_cid` → libp2p `PeerId` via
+/// `services::transport_resolve` BEFORE dialing, and skips peers with no
+/// transport binding. But two things still keep this test from running under the
+/// stub harness:
+///   1. The stub `P2PHandle` returns `Err("stub: no P2P swarm in test")` from
+///      `push_shard`, so `shard_locations` is never populated even for a
+///      resolvable peer — the household-diversity assertion cannot be verified.
+///   2. The seeded peers carry non-`uhCAk` agent keys and NO `peer_transport_manifest`
+///      / `peer_identity_bindings` rows, so the new resolver returns `None` and
+///      they are skipped (distributed == 0) by design.
 ///
-/// TODO(task-17): implement live P2P integration harness and re-enable this
-/// test with a `spawn_live_p2p_cluster` fixture.
+/// A live re-enable therefore needs a `spawn_live_p2p_cluster` fixture that (a)
+/// runs a real libp2p swarm and (b) seeds transport bindings for the peers so the
+/// resolver can dial them.
+///
+/// TODO(task-17): implement live P2P integration harness + transport-binding seed,
+/// then re-enable.
 #[tokio::test]
-#[ignore = "Requires live libp2p swarm — stub handle cannot push shards to shard_locations. See Task 17."]
+#[ignore = "Requires live libp2p swarm + seeded transport bindings — stub handle cannot push, and unbound peers are (correctly) skipped by the slice-2 resolver. See Task 17."]
 async fn distribute_picks_diverse_households() {
     let pool = test_pool();
     let harness = spawn_p2p_with_peers(
