@@ -59,9 +59,9 @@
 //! renderer count is bounded by the configured slug list, and the shared
 //! render semaphore still bounds CONCURRENT renders across all of them.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 /// Lifecycle status of a served bundle head. Serialized lowercase on the
 /// `servedBundleHeads` health field.
@@ -187,6 +187,72 @@ struct RegistryInner {
     /// Per-slug bundle-head attestations, keyed by slug. Only slugs whose
     /// server bundle materialized successfully at boot appear here.
     heads: HashMap<String, BundleHead>,
+    /// Slugs with an in-progress re-materialize. The per-slug concurrency guard:
+    /// a concurrent reconcile (background tick + admin refresh, or two admin
+    /// calls) must not double-enter the Stale branch and race two materialize
+    /// passes into the same deterministic `.reconcile/<slug>/<hash16>` dir.
+    refreshing: HashSet<String>,
+}
+
+/// A holding pen for renderers displaced by a hot-swap. A displaced
+/// `AngularRenderer` owns a V8 isolate whose `Drop` closes its channel and
+/// **joins** the worker thread (`angular.rs`), which can BLOCK if a render is
+/// still in flight — so the drop must never run on a tokio worker (the
+/// 2026-06-13 freeze class). The graveyard keeps `strong_count >= 1` on every
+/// displaced renderer, so an in-flight request holding its own `Arc` clone is
+/// NEVER the last owner; a dedicated off-runtime reaper drops each one only
+/// once it is the sole remaining owner (`strong_count == 1`), guaranteeing the
+/// terminal `Drop` (the join) runs off the async runtime.
+#[derive(Clone)]
+struct Graveyard {
+    plots: Arc<Mutex<Vec<Arc<dyn elohim_render::Renderer>>>>,
+}
+
+impl Graveyard {
+    fn new() -> Self {
+        Self {
+            plots: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    /// Bury a displaced renderer. The graveyard now holds a strong ref, so the
+    /// request path can never be the renderer's last owner.
+    fn bury(&self, renderer: Arc<dyn elohim_render::Renderer>) {
+        self.plots
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(renderer);
+    }
+
+    /// Drop every buried renderer whose ONLY remaining owner is the graveyard
+    /// (`strong_count == 1`); leave the rest (still referenced by an in-flight
+    /// request) for a later pass. MUST run off the async runtime — the terminal
+    /// drop runs `AngularRenderer::Drop`, which joins a worker thread. The Arcs
+    /// are drained under the lock but DROPPED after releasing it, so a join can
+    /// never block `bury`. Returns the count reaped.
+    fn reap(&self) -> usize {
+        let to_drop: Vec<Arc<dyn elohim_render::Renderer>> = {
+            let mut plots = self.plots.lock().unwrap_or_else(|e| e.into_inner());
+            let mut drained = Vec::new();
+            let mut i = 0;
+            while i < plots.len() {
+                if Arc::strong_count(&plots[i]) == 1 {
+                    drained.push(plots.swap_remove(i));
+                } else {
+                    i += 1; // still referenced by an in-flight render — reap next pass
+                }
+            }
+            drained
+        };
+        let n = to_drop.len();
+        drop(to_drop); // terminal Drops (the joins) run here, lock already released
+        n
+    }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.plots.lock().unwrap_or_else(|e| e.into_inner()).len()
+    }
 }
 
 /// Renderers keyed by the app (EPR node slug) they can produce markup for.
@@ -194,6 +260,8 @@ pub struct RendererRegistry {
     inner: Arc<RwLock<RegistryInner>>,
     /// Boot context for reconcile; `None` disables reconcile for this registry.
     reconcile_ctx: Option<ReconcileCtx>,
+    /// Off-runtime teardown queue for renderers displaced by a hot-swap.
+    graveyard: Graveyard,
 }
 
 impl RendererRegistry {
@@ -206,8 +274,10 @@ impl RendererRegistry {
                 default_renderer: None,
                 default_app: None,
                 heads: HashMap::new(),
+                refreshing: HashSet::new(),
             })),
             reconcile_ctx: None,
+            graveyard: Graveyard::new(),
         }
     }
 
@@ -228,8 +298,10 @@ impl RendererRegistry {
                 default_renderer,
                 default_app,
                 heads: HashMap::new(),
+                refreshing: HashSet::new(),
             })),
             reconcile_ctx: None,
+            graveyard: Graveyard::new(),
         }
     }
 
@@ -437,8 +509,10 @@ impl RendererRegistry {
                 default_renderer,
                 default_app,
                 heads,
+                refreshing: HashSet::new(),
             })),
             reconcile_ctx,
+            graveyard: Graveyard::new(),
         }
     }
 
@@ -447,7 +521,7 @@ impl RendererRegistry {
     /// allow-through default. `None` — a no-projection legacy Registry route:
     /// the default renderer.
     pub fn select(&self, app: Option<&str>) -> Option<Arc<dyn elohim_render::Renderer>> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         match app {
             Some(app) => inner.by_app.get(app).cloned().or_else(|| {
                 if inner.default_app.is_none() {
@@ -470,14 +544,14 @@ impl RendererRegistry {
     /// Whether any renderer is loaded at all (the registry-level analog of the
     /// old `state.renderer.is_some()`).
     pub fn any_loaded(&self) -> bool {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.default_renderer.is_some() || !inner.by_app.is_empty()
     }
 
     /// Loaded app names for observability lines (`<unknown>` marks an
     /// app-unknown image-baked default).
     pub fn app_names(&self) -> String {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         if inner.default_renderer.is_none() && inner.by_app.is_empty() {
             return "<none>".to_string();
         }
@@ -494,7 +568,7 @@ impl RendererRegistry {
     /// Snapshot of every served bundle head (for the `servedBundleHeads` health
     /// field), sorted by slug for stable output.
     pub fn heads_snapshot(&self) -> Vec<BundleHead> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         let mut heads: Vec<BundleHead> = inner.heads.values().cloned().collect();
         heads.sort_by(|a, b| a.slug.cmp(&b.slug));
         heads
@@ -533,7 +607,7 @@ impl RendererRegistry {
         // whether this slug is the default app) without holding the lock across
         // the async work below.
         let targets: Vec<(String, String, bool)> = {
-            let inner = self.inner.read().unwrap();
+            let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
             inner
                 .heads
                 .values()
@@ -576,6 +650,28 @@ impl RendererRegistry {
                     });
                 }
                 ReconcileDecision::Stale(declared_hash) => {
+                    // Per-slug in-progress guard: a concurrent reconcile (the
+                    // background tick + POST /admin/ssr-bundle/refresh, or two
+                    // admin calls) must not double-enter this branch and race two
+                    // materialize passes writing the SAME deterministic
+                    // `.reconcile/<slug>/<hash16>` directory. try_begin_refresh
+                    // checks-and-sets under the write lock; the loser skips.
+                    if !self.try_begin_refresh(&slug, &declared_hash) {
+                        tracing::debug!(
+                            target: "doorway::ssr",
+                            slug = %slug,
+                            "bundle reconcile: already refreshing — skipping concurrent pass"
+                        );
+                        outcomes.push(SlugOutcome {
+                            slug,
+                            outcome: "refreshing".into(),
+                            server_blob_hash: Some(materialized_hash),
+                            declared_server_blob_hash: Some(declared_hash),
+                            error: None,
+                        });
+                        continue;
+                    }
+
                     tracing::info!(
                         target: "doorway::ssr",
                         slug = %slug,
@@ -583,7 +679,6 @@ impl RendererRegistry {
                         to = %declared_hash,
                         "bundle reconcile: declared head moved — re-materializing"
                     );
-                    self.set_refreshing(&slug, &declared_hash);
                     let built = tokio::task::spawn_blocking({
                         let storage_url = ctx.storage_url.clone();
                         let bundle_parent = ctx.bundle_parent.clone();
@@ -601,34 +696,82 @@ impl RendererRegistry {
                         }
                     })
                     .await;
-                    match built {
+                    let outcome = match built {
                         Ok(Ok(new_renderer)) => {
-                            let old =
-                                self.swap_renderer(&slug, new_renderer, &declared_hash, is_default);
-                            // Clear the SSR render-result cache so no pre-swap
-                            // HTML leaks (keys are `ssr-<hash>` and not
-                            // slug-recoverable, so clear the whole SSR namespace
-                            // — a superset, safe: it only forces re-renders).
-                            let cleared = cache.invalidate_pattern("ssr-");
-                            tracing::info!(
-                                target: "doorway::ssr",
-                                slug = %slug,
-                                head = %declared_hash,
-                                cache_entries_cleared = cleared,
-                                "bundle reconcile: hot-swapped to declared head"
-                            );
-                            // Tear the old isolate down off the runtime — its
-                            // Drop joins a worker thread.
-                            if let Some(old) = old {
-                                tokio::task::spawn_blocking(move || drop(old));
+                            // Attestation TOCTOU guard: materialize_server_bundle
+                            // did its OWN independent resolve+verify of the bytes.
+                            // Re-resolve the declared head now; ONLY if it is
+                            // unchanged across the entire materialize window can we
+                            // be sure the hash we are about to attest is the one
+                            // the bytes verified against. If it moved, discard this
+                            // build and converge next tick — never attest a hash we
+                            // did not verify against (the exact drift this feature
+                            // exists to catch).
+                            let post = resolve_declared(&ctx.storage_url, &slug).await;
+                            match post {
+                                Ok(ref h2) if h2 == &declared_hash => {
+                                    let old = self.swap_renderer(
+                                        &slug,
+                                        new_renderer,
+                                        &declared_hash,
+                                        is_default,
+                                    );
+                                    // Clear the SSR render-result cache so no
+                                    // pre-swap HTML leaks (keys are `ssr-<hash>`
+                                    // and not slug-recoverable, so clear the whole
+                                    // SSR namespace — a superset, safe: it only
+                                    // forces re-renders).
+                                    let cleared = cache.invalidate_pattern("ssr-");
+                                    tracing::info!(
+                                        target: "doorway::ssr",
+                                        slug = %slug,
+                                        head = %declared_hash,
+                                        cache_entries_cleared = cleared,
+                                        "bundle reconcile: hot-swapped to declared head"
+                                    );
+                                    // Retire the old isolate via the graveyard so
+                                    // its blocking Drop (join) never runs on a
+                                    // tokio worker — a later reap drops it off the
+                                    // runtime once no request still holds it.
+                                    if let Some(old) = old {
+                                        self.graveyard.bury(old);
+                                    }
+                                    SlugOutcome {
+                                        slug: slug.clone(),
+                                        outcome: "refreshed".into(),
+                                        server_blob_hash: Some(declared_hash.clone()),
+                                        declared_server_blob_hash: Some(declared_hash.clone()),
+                                        error: None,
+                                    }
+                                }
+                                other => {
+                                    // Head moved during materialize (or the re-read
+                                    // failed): the freshly-built renderer may not
+                                    // match declared_hash, so we cannot attest it.
+                                    // Discard the build (bury — it too owns an
+                                    // isolate) and leave the slug Stale; the next
+                                    // tick converges to the settled head.
+                                    self.graveyard.bury(new_renderer);
+                                    let observed = other.ok();
+                                    let declared_for_status =
+                                        observed.clone().unwrap_or_else(|| declared_hash.clone());
+                                    self.mark_stale(&slug, &declared_for_status);
+                                    tracing::info!(
+                                        target: "doorway::ssr",
+                                        slug = %slug,
+                                        "bundle reconcile: declared head moved during \
+                                         materialize — deferring attestation to next tick"
+                                    );
+                                    SlugOutcome {
+                                        slug: slug.clone(),
+                                        outcome: "stale".into(),
+                                        server_blob_hash: Some(materialized_hash.clone()),
+                                        declared_server_blob_hash: observed
+                                            .or(Some(declared_hash.clone())),
+                                        error: None,
+                                    }
+                                }
                             }
-                            outcomes.push(SlugOutcome {
-                                slug,
-                                outcome: "refreshed".into(),
-                                server_blob_hash: Some(declared_hash.clone()),
-                                declared_server_blob_hash: Some(declared_hash),
-                                error: None,
-                            });
                         }
                         Ok(Err(e)) => {
                             tracing::warn!(
@@ -638,29 +781,43 @@ impl RendererRegistry {
                                 e
                             );
                             self.mark_failed(&slug, &e);
-                            outcomes.push(SlugOutcome {
-                                slug,
+                            SlugOutcome {
+                                slug: slug.clone(),
                                 outcome: "failed".into(),
-                                server_blob_hash: Some(materialized_hash),
-                                declared_server_blob_hash: Some(declared_hash),
+                                server_blob_hash: Some(materialized_hash.clone()),
+                                declared_server_blob_hash: Some(declared_hash.clone()),
                                 error: Some(e),
-                            });
+                            }
                         }
                         Err(join_e) => {
                             let e = format!("reconcile task panicked: {join_e}");
                             self.mark_failed(&slug, &e);
-                            outcomes.push(SlugOutcome {
-                                slug,
+                            SlugOutcome {
+                                slug: slug.clone(),
                                 outcome: "failed".into(),
-                                server_blob_hash: Some(materialized_hash),
-                                declared_server_blob_hash: Some(declared_hash),
+                                server_blob_hash: Some(materialized_hash.clone()),
+                                declared_server_blob_hash: Some(declared_hash.clone()),
                                 error: Some(e),
-                            });
+                            }
                         }
-                    }
+                    };
+                    // Release the in-progress guard in EVERY terminal arm (the
+                    // status was set by the swap/mark helper above; end_refresh
+                    // only clears the concurrency marker).
+                    self.end_refresh(&slug);
+                    outcomes.push(outcome);
                 }
             }
         }
+
+        // Reap isolates displaced this pass (and any whose in-flight requests
+        // have since drained) off the async runtime — the terminal Drop joins a
+        // worker thread and must never run on a tokio worker.
+        let graveyard = self.graveyard.clone();
+        tokio::task::spawn_blocking(move || {
+            graveyard.reap();
+        });
+
         outcomes
     }
 
@@ -668,7 +825,7 @@ impl RendererRegistry {
 
     /// Record that a slug's declared head matches what we serve.
     fn mark_current(&self, slug: &str, declared: &str) {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if let Some(h) = inner.heads.get_mut(slug) {
             h.status = HeadStatus::Current;
             h.declared_server_blob_hash = Some(declared.to_string());
@@ -676,18 +833,45 @@ impl RendererRegistry {
         }
     }
 
-    /// Mark a slug as actively re-materializing toward `declared`.
-    fn set_refreshing(&self, slug: &str, declared: &str) {
-        let mut inner = self.inner.write().unwrap();
+    /// Try to claim the per-slug refresh guard. Returns `true` if THIS caller
+    /// may proceed to re-materialize, `false` if a concurrent reconcile already
+    /// holds it (the loser skips). On success also sets status `Refreshing` and
+    /// records the declared head. The check-and-set is atomic under the write
+    /// lock, so two concurrent callers can never both proceed.
+    fn try_begin_refresh(&self, slug: &str, declared: &str) -> bool {
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
+        if inner.refreshing.contains(slug) {
+            return false;
+        }
+        inner.refreshing.insert(slug.to_string());
         if let Some(h) = inner.heads.get_mut(slug) {
             h.status = HeadStatus::Refreshing;
+            h.declared_server_blob_hash = Some(declared.to_string());
+        }
+        true
+    }
+
+    /// Release the per-slug refresh guard. Clears ONLY the in-progress marker —
+    /// the terminal status is set by the swap/mark helper. Called in every
+    /// terminal arm of the Stale branch so the guard cannot leak.
+    fn end_refresh(&self, slug: &str) {
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
+        inner.refreshing.remove(slug);
+    }
+
+    /// Record that a newer declared head exists but is not yet materialized
+    /// (e.g. the head moved mid-materialize) — the next tick converges to it.
+    fn mark_stale(&self, slug: &str, declared: &str) {
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
+        if let Some(h) = inner.heads.get_mut(slug) {
+            h.status = HeadStatus::Stale;
             h.declared_server_blob_hash = Some(declared.to_string());
         }
     }
 
     /// Mark a slug's last re-materialize as failed (old renderer retained).
     fn mark_failed(&self, slug: &str, error: &str) {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if let Some(h) = inner.heads.get_mut(slug) {
             h.status = HeadStatus::Failed;
             h.last_error = Some(error.to_string());
@@ -704,7 +888,7 @@ impl RendererRegistry {
         new_hash: &str,
         is_default: bool,
     ) -> Option<Arc<dyn elohim_render::Renderer>> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         let old = inner
             .by_app
             .insert(slug.to_string(), Arc::clone(&new_renderer));
@@ -725,7 +909,7 @@ impl RendererRegistry {
     /// exercised without a live storage backend or a V8 isolate.
     #[cfg(test)]
     fn insert_head_for_test(&self, head: BundleHead) {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         inner.heads.insert(head.slug.clone(), head);
     }
 }
@@ -793,7 +977,8 @@ fn materialize_and_build(
     let short = declared_hash
         .strip_prefix("sha256-")
         .unwrap_or(declared_hash);
-    let short = &short[..short.len().min(16)];
+    // Panic-proof slice: `get(..16)` yields None (→ full string) if shorter.
+    let short = short.get(..16).unwrap_or(short);
     let dir = bundle_parent.join(".reconcile").join(slug).join(short);
     std::fs::create_dir_all(&dir).map_err(|e| format!("reconcile dir create failed: {e}"))?;
 
@@ -1084,5 +1269,54 @@ mod tests {
         let cache = crate::cache::ContentCache::default();
         let outcomes = reg.reconcile(&cache).await;
         assert!(outcomes.is_empty(), "disabled reconcile must be a no-op");
+    }
+
+    // ── graveyard: displaced isolates never drop on the request path ─────────
+
+    #[test]
+    fn graveyard_reaps_only_when_sole_owner_and_drains() {
+        let gy = Graveyard::new();
+
+        // Simulate an in-flight request still holding its own Arc clone of a
+        // displaced renderer (strong_count == 2 after burying).
+        let in_flight = stub("still-rendering");
+        gy.bury(Arc::clone(&in_flight));
+        // A fully-displaced renderer whose only owner is the graveyard.
+        gy.bury(stub("displaced"));
+        assert_eq!(gy.len(), 2);
+
+        // First reap: only the sole-owner (count == 1) entry drains; the one an
+        // in-flight request still references is retained (its terminal Drop must
+        // never run on the request path).
+        assert_eq!(gy.reap(), 1);
+        assert_eq!(gy.len(), 1);
+
+        // Once the in-flight request releases its clone, the next reap drains
+        // it — the terminal Drop runs here (off-runtime by contract), never on
+        // the request thread that dropped its clone.
+        drop(in_flight);
+        assert_eq!(gy.reap(), 1);
+        assert_eq!(gy.len(), 0);
+        // Idempotent: reaping an empty graveyard is a no-op.
+        assert_eq!(gy.reap(), 0);
+    }
+
+    // ── in-progress guard: concurrent reconcile passes don't double-enter ────
+
+    #[test]
+    fn try_begin_refresh_is_exclusive_until_end_refresh() {
+        let reg = RendererRegistry::with_entries(Some(stub("v1")), Some("app".into()), vec![]);
+        reg.insert_head_for_test(test_head("app", "sha256-old", HeadStatus::Current));
+
+        // First caller claims the guard and sets Refreshing.
+        assert!(reg.try_begin_refresh("app", "sha256-new"));
+        assert_eq!(reg.heads_snapshot()[0].status, HeadStatus::Refreshing);
+        // A concurrent caller is refused while the first holds it.
+        assert!(!reg.try_begin_refresh("app", "sha256-new"));
+
+        // After the first releases, a subsequent pass may claim it again.
+        reg.end_refresh("app");
+        assert!(reg.try_begin_refresh("app", "sha256-new"));
+        reg.end_refresh("app");
     }
 }
