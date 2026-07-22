@@ -349,9 +349,13 @@ export const REACH_OPENNESS: Record<Reach, number> = {
   commons: 8,
 } as const;
 
-export function reachOpenness(r: Reach): number { return REACH_OPENNESS[r]; }
+export function reachOpenness(r: Reach): number {
+  return REACH_OPENNESS[r];
+}
 
-export function isReach(v: string): v is Reach { return Object.hasOwn(REACH_OPENNESS, v); }
+export function isReach(v: string): v is Reach {
+  return Object.hasOwn(REACH_OPENNESS, v);
+}
 
 export const CORE_SESSION_LIFECYCLE_STATES = [
   'Anonymous',

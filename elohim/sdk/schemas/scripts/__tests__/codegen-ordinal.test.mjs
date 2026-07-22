@@ -15,8 +15,17 @@ test('formatTsOrdinal emits a Record + openness fn matching schema order', () =>
   assert.match(out, /export const REACH_OPENNESS: Record<Reach, number> = \{/);
   assert.match(out, /private: 1/);
   assert.match(out, /commons: 8/);
-  assert.match(out, /export function reachOpenness\(r: Reach\): number \{ return REACH_OPENNESS\[r\]; \}/);
-  assert.match(out, /export function isReach\(v: string\): v is Reach \{ return Object\.hasOwn\(REACH_OPENNESS, v\); \}/);
+  // Multi-line bodies are Prettier's canonical form, and the enum-constants file
+  // bypasses the codegen Prettier pass — so the emitter must produce them directly.
+  // These assertions therefore pin the exact wrapped shape, not just the identifiers.
+  assert.match(
+    out,
+    /export function reachOpenness\(r: Reach\): number \{\n {2}return REACH_OPENNESS\[r\];\n\}/,
+  );
+  assert.match(
+    out,
+    /export function isReach\(v: string\): v is Reach \{\n {2}return Object\.hasOwn\(REACH_OPENNESS, v\);\n\}/,
+  );
 });
 
 // Ordinal codegen is gated on the schema's explicit `_ordinal: true` marker, NOT a
