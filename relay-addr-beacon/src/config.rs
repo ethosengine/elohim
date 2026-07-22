@@ -7,6 +7,7 @@
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
+use anyhow::{anyhow, Result};
 use clap::{Parser, ValueEnum};
 
 /// The sinks a single beacon process can drive. `--sink` is repeatable and the
@@ -91,6 +92,32 @@ pub struct Config {
     #[arg(long, env = "CF_API_TOKEN_FILE")]
     pub cf_token_file: Option<PathBuf>,
 
+    /// Shared "logical anycast" DNS record name (e.g. `doorways.elohim.host`)
+    /// that multiple beacon instances — one per WAN — each contribute their OWN
+    /// A/AAAA record under, sibling-safe (address-set contribution with
+    /// ownership + freshness). Requires `--record-owner`. This runs ALONGSIDE
+    /// the exclusive `--record-name` lane, which is unaffected.
+    #[arg(long, env = "BEACON_SHARED_RECORD_NAME")]
+    pub shared_record_name: Option<String>,
+
+    /// This instance's owner slug for the shared record set (e.g. `operations`,
+    /// `shem`). Required when `--shared-record-name` is set.
+    #[arg(long, env = "BEACON_RECORD_OWNER")]
+    pub record_owner: Option<String>,
+
+    /// Max age (seconds) of our OWN freshness stamp on the shared record before
+    /// we re-PATCH it even though our IP is unchanged. Keeps our record from
+    /// ever looking abandoned to a sibling.
+    #[arg(long, env = "BEACON_SHARED_REFRESH_SECS", default_value_t = 300)]
+    pub shared_refresh_secs: u64,
+
+    /// Age (seconds) beyond which a SIBLING's shared record is considered
+    /// abandoned and reaped (DELETEd). Must be greater than
+    /// `--shared-refresh-secs`, else a live sibling could be reaped before its
+    /// own refresh cycle runs.
+    #[arg(long, env = "BEACON_SHARED_STALE_SECS", default_value_t = 900)]
+    pub shared_stale_secs: u64,
+
     // ---- pkarr sink -----------------------------------------------------
     /// Dedicated pkarr secret-key file (hex, 0600). Generated if absent. Do NOT
     /// reuse an iroh/libp2p key here.
@@ -123,6 +150,28 @@ pub struct Config {
     pub on_change_exec: Option<String>,
 }
 
+impl Config {
+    /// Cross-field validation clap's declarative attributes can't express.
+    /// Called once at startup, independent of which sinks are enabled — these
+    /// are shared-mode invariants, not per-sink construction concerns.
+    pub fn validate(&self) -> Result<()> {
+        if self.shared_record_name.is_some() && self.record_owner.is_none() {
+            return Err(anyhow!(
+                "--shared-record-name requires --record-owner / BEACON_RECORD_OWNER"
+            ));
+        }
+        if self.shared_stale_secs <= self.shared_refresh_secs {
+            return Err(anyhow!(
+                "--shared-stale-secs ({}) must be greater than --shared-refresh-secs ({}) — \
+                 otherwise a live sibling's stamp could go stale-reaped before its own refresh cycle runs",
+                self.shared_stale_secs,
+                self.shared_refresh_secs
+            ));
+        }
+        Ok(())
+    }
+}
+
 impl std::fmt::Debug for Config {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Preserve whether each token field is set (Some/None) while never
@@ -142,6 +191,10 @@ impl std::fmt::Debug for Config {
             .field("cf_zone", &self.cf_zone)
             .field("cf_token", &redact(&self.cf_token))
             .field("cf_token_file", &redact(&self.cf_token_file))
+            .field("shared_record_name", &self.shared_record_name)
+            .field("record_owner", &self.record_owner)
+            .field("shared_refresh_secs", &self.shared_refresh_secs)
+            .field("shared_stale_secs", &self.shared_stale_secs)
             .field("pkarr_key_file", &self.pkarr_key_file)
             .field("pkarr_relay", &self.pkarr_relay)
             .field("coturn_base_conf", &self.coturn_base_conf)

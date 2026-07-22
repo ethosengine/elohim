@@ -16,7 +16,8 @@ use tracing::{error, info, warn};
 
 use config::{Config, SinkName};
 use sinks::{
-    cloudflare::CloudflareSink, coturn::CoturnSink, pkarr::PkarrSink, ActiveSink, AddrUpdate,
+    cloudflare, cloudflare::CloudflareSink, coturn::CoturnSink, pkarr::PkarrSink, ActiveSink,
+    AddrUpdate, Sink,
 };
 
 #[tokio::main]
@@ -72,12 +73,25 @@ fn build_sinks(cfg: &Config, client: &reqwest::Client) -> Result<Vec<ActiveSink>
                     anyhow!("cloudflare sink requires --record-name / BEACON_RECORD_NAME")
                 })?;
                 let token = resolve_cf_token(cfg)?;
+                // `Config::validate` (called before `build_sinks`) already
+                // guarantees shared_record_name.is_some() => record_owner.is_some();
+                // the match stays defensive rather than asserting/unwrapping.
+                let shared = match (&cfg.shared_record_name, &cfg.record_owner) {
+                    (Some(name), Some(owner)) => Some(cloudflare::SharedRecordConfig {
+                        record_name: name.clone(),
+                        owner: owner.clone(),
+                        refresh_secs: cfg.shared_refresh_secs,
+                        stale_secs: cfg.shared_stale_secs,
+                    }),
+                    _ => None,
+                };
                 sinks.push(ActiveSink::Cloudflare(CloudflareSink::new(
                     client.clone(),
                     token,
                     zone,
                     record_name,
                     cfg.enable_v6,
+                    shared,
                 )));
             }
             SinkName::Pkarr => {
@@ -173,8 +187,50 @@ async fn run_sinks(sinks: &[ActiveSink], update: &AddrUpdate) -> bool {
     all_ok
 }
 
+/// Run ONLY the Cloudflare sink's shared "logical anycast" lane (skips its
+/// exclusive `--record-name` lane and every other sink entirely). Used on an
+/// unchanged-address cycle when shared mode is configured, so the periodic
+/// freshness-stamp refresh (and stale-sibling reap) doesn't starve — without
+/// re-touching sinks that have nothing to do. See `cycle`'s doc comment for
+/// why this is the least-churn structure.
+async fn run_shared_refresh_only(sinks: &[ActiveSink], update: &AddrUpdate) -> bool {
+    let mut all_ok = true;
+    for sink in sinks {
+        if let ActiveSink::Cloudflare(cf) = sink {
+            match cf.publish_shared_only(update).await {
+                Ok(()) => info!(sink = cf.name(), "shared-lane freshness refresh ok"),
+                Err(e) => {
+                    all_ok = false;
+                    error!(
+                        sink = cf.name(),
+                        error = %format!("{e:#}"),
+                        "shared-lane freshness refresh failed"
+                    );
+                }
+            }
+        }
+    }
+    all_ok
+}
+
 /// One detect->(maybe publish)->persist cycle. `force` runs sinks regardless of
 /// change (used by `--once`). Returns true if the cycle is fully healthy.
+///
+/// Unchanged-address branching: with NO shared mode configured, this is
+/// unchanged legacy behavior — a no-op cycle skips every sink. With shared
+/// mode configured, a global skip would starve the shared lane's periodic
+/// freshness-stamp refresh and stale-sibling reap (a beacon whose WAN IP
+/// never changes must still periodically re-stamp, or a sibling would
+/// eventually reap it as abandoned). The alternative — running every sink
+/// unconditionally every cycle — was rejected: the pkarr sink re-signs and
+/// PUTs on every call with no idempotency check, and the Cloudflare exclusive
+/// lane's `upsert` unconditionally PATCHes/POSTs with no content-diff guard,
+/// so both would needlessly hammer their APIs every poll interval forever
+/// (coturn's sink *does* already no-op on an identical rendered config, but
+/// that alone doesn't make "run everything" churn-free). So on an unchanged
+/// cycle with shared mode configured, only the Cloudflare shared lane runs;
+/// state is not persisted (the address itself is unchanged, so there is
+/// nothing new to persist) and no other sink is touched.
 async fn cycle(
     cfg: &Config,
     client: &reqwest::Client,
@@ -199,6 +255,12 @@ async fn cycle(
     );
 
     if !changed && !force {
+        if cfg.shared_record_name.is_some() {
+            info!(
+                "no change since last publish — running cloudflare shared-lane freshness refresh only"
+            );
+            return Ok(run_shared_refresh_only(sinks, &update).await);
+        }
         info!("no change since last publish — skipping sinks");
         return Ok(true);
     }
@@ -219,6 +281,7 @@ async fn cycle(
 }
 
 async fn run(cfg: Config) -> Result<()> {
+    cfg.validate()?;
     let client = build_http_client()?;
     let sinks = build_sinks(&cfg, &client)?;
     let enabled: Vec<&str> = sinks.iter().map(ActiveSink::name).collect();

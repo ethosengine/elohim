@@ -221,3 +221,46 @@ will have its browser-issued cross-origin requests rejected by the doorway it fe
 designed failover into a silent CORS wall. This is a one-time operator checklist item, not a code gap:
 the failover logic in ElohimClient/the interceptor does not touch CORS at all, it is purely a client
 decision about which origin to call next.
+
+### 2026-07-22 addendum — bench topology correction
+
+A live-DNS probe run today (verified 2026-07-22 by live probe) corrects the coverage claim implied
+above. **All** current alpha/prod HTTP hostnames — `doorway-alpha.elohim.host`, `elohim.host`,
+`doorway.elohim.host` — resolve to the single operations-WAN address (136.51.77.49). Only
+`turn-shem.elohim.host` (the RELAY plane's shem leg) resolves to shem's WAN (136.50.16.133). In
+other words: today there is **one HTTP front door**, not two — the §7 client-failover leg shipped
+earlier is real and useful, but it does not yet do what a first read of §7 could suggest.
+
+**What the shipped client-failover leg actually protects against, precisely stated:** per-host
+staleness (a doorway pod or its projection cache falling behind) and pod/Service-level failure
+(a doorway Deployment crash-looping while the underlying node and WAN stay up). It does **not**
+yet protect against a WAN outage on this bench, because every fallback address a client can fail
+over to currently resolves through the same one front door.
+
+**What closes the WAN-outage gap: `doorways.elohim.host`.** Landed the same day (2026-07-22) in
+`genesis/orchestrator/manifests/doorway/alpha.yaml` (Ingress `tls.hosts` + a `rules[]` host entry)
+and in both coturn beacon manifests (`alpha-coturn-operations.yaml`, `alpha-coturn-shem.yaml`,
+`--shared-record-name doorways.elohim.host --record-owner <operations|shem>`). This is a shared
+doorway-set hostname maintained by `relay-addr-beacon`'s shared-record contribution mode: each
+beacon instance contributes its own A record under an owner slug, so the name resolves multi-A
+across **both** alpha WANs — the piece that actually extends coverage to WAN loss for first-load
+and API traffic, not just per-host staleness.
+
+**Why ACME HTTP-01 still works for a multi-A name on this bench (it would not in general).** The
+challenge for a multi-A hostname can land at either address, so a naive multi-A cert-issuance setup
+usually fails unless every address terminates at a controller holding the cert. That failure mode
+does not apply here: shem's WAN already answers 443 and serves `elohim.host` with the identical
+valid Let's Encrypt cert as the operations entry, because both WANs front the *same* shared
+ingress-nginx data plane (one cluster; shem is WireGuard-joined) — verified 2026-07-22 by live
+probe. This is a same-controller-both-WANs bench fact, not a property of DNS or ACME in general; a
+genuinely separate second cluster would need DNS-01 or pkarr-native naming instead, which is exactly
+why that's the filed exit below rather than "just add more A records."
+
+**k8s-as-bench framing.** None of the above is architecture — it is test-bench wiring (Cloudflare
+DNS + these Kubernetes manifests) standing in for the durable primitive: **address-set contribution
+with ownership + freshness** (an owner slug contributes one address; freshness is beacon-maintained;
+the set is read as a whole). The peer-native home for that primitive is the **pkarr-resolved
+doorway set / DoorwayRegistration multi-address design** — deliberately NOT designed in this
+addendum. When that design is taken up, it mints entities (a doorway-set record, address ownership,
+freshness attestation) and MUST pass the `p2p-design-gate` skill before any DHT entry type or route
+is proposed for it.
