@@ -306,19 +306,27 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map 
 def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map outcomes) {
     def kind = bundle.kind ?: 'browser'
     def authorKey = "author|${bundle.slug}|${kind}".toString()
+    // Hand-off file for verifyProjectedHeads (Track-4 T4-2): stage-spa-blob.sh
+    // writes the content hash it just computed here so the Jenkinsfile can read
+    // it back as the EXPECTED hash for the served-vs-declared propagation probe,
+    // without a second independent zip/hash (see stage-spa-blob.sh comment).
+    def hashFile = "${env.WORKSPACE}/.ci-authored-hash-${bundle.slug}-${kind}.txt"
     for (int i = 0; i < doorwayEprUrls.size(); i++) {
         def doorwayEprUrl = doorwayEprUrls[i]
         def host = doorwayEprUrl.replaceFirst(/^https?:\/\//, '')
         def rc = 1
         // returnStatus (not throw): a 503 here is EXPECTED on a bridgeless
         // backend and means "try the next doorway", not "fail the build".
-        withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=1"]) {
+        withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=1", "HASH_OUTPUT_FILE=${hashFile}"]) {
             rc = sh(returnStatus: true,
                     script: "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '${bundle.distDir}' '${bundle.slug}' '${doorwayEprUrl}' '${kind}'")
         }
         if (rc == 0) {
             echo "authorHeadOnce: ${bundle.slug} (${kind}) — head authored via ${host}'s conductor bridge; DHT witnesses it, converges to all peers"
             outcomes[authorKey] = host
+            if (fileExists(hashFile)) {
+                outcomes["hash|${bundle.slug}|${kind}".toString()] = readFile(hashFile).trim()
+            }
             // Propagate the canonical-head declaration to the OTHER doorways
             // (DECLARE_ONLY leg in the script; advisory, idempotent-by-content —
             // cross-peer link gossip can lag/degrade, so each peer's conductor
@@ -357,6 +365,37 @@ def verifyEprMounts(String doorwayUrl, List<String> mounts) {
     // CPS 64KB limit — see stageSpaBlobs note). Keep helpers heredoc-free.
     for (mount in mounts) {
         sh "bash '${env.WORKSPACE}/scripts/ci/verify-epr-mount.sh' '${doorwayUrl}${mount}'"
+    }
+}
+
+// Served-vs-declared propagation probe (Track-4 T4-2). verifyEprMounts (above)
+// proves a routed mount answers 200; stageSpaBlobs/authorHeadOnce prove the
+// content ROW's declared head was PATCHed. Neither proves the running doorway
+// PROCESS has actually materialized that head — a stale-but-200 host passes
+// both. This leg asks each doorway's health surface directly what server
+// bundle head it has served and compares it to the hash authorHeadOnce just
+// authored (outcomes["hash|slug|kind"]). Only server-kind bundles are probed:
+// the T4-1 health-surface contract (servedBundleHeads[].serverBlobHash) only
+// attests the SSR bundle — see verify-projected-head.sh header for the
+// browser-bundle limitation. Records one outcome per (host, slug, kind) so
+// emitAppDeployJunit can name each host's leg individually. Bash body lives in
+// scripts/ci/verify-projected-head.sh (CPS 64KB limit — see stageSpaBlobs
+// note; helpers stay heredoc-free).
+def verifyProjectedHeads(List<String> doorwayEprUrls, List<Map> bundles, String gitCommitHash, Map outcomes) {
+    for (bundle in bundles) {
+        def kind = bundle.kind ?: 'browser'
+        if (kind != 'server') { continue }
+        def expectedHash = outcomes["hash|${bundle.slug}|${kind}".toString()]
+        if (!expectedHash) {
+            echo "verifyProjectedHeads: no authored hash recorded for ${bundle.slug} (${kind}) — skipping probe (author leg did not succeed)"
+            continue
+        }
+        for (doorwayEprUrl in doorwayEprUrls) {
+            def host = doorwayEprUrl.replaceFirst(/^https?:\/\//, '')
+            def rc = sh(returnStatus: true,
+                    script: "bash '${env.WORKSPACE}/scripts/ci/verify-projected-head.sh' '${doorwayEprUrl}' '${bundle.slug}' '${expectedHash}' '${gitCommitHash ?: ''}'")
+            outcomes["projhead|${host}|${bundle.slug}|${kind}".toString()] = (rc == 0)
+        }
     }
 }
 
@@ -440,7 +479,7 @@ def resolveStorageAdminKey() {
     return adminKey
 }
 
-def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey) {
+def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, String gitCommitHash) {
     // Two-phase deploy of the pillar-EPR bundles (Task B21). Deploy-seed is
     // post-build and transient-prone (conductor/doorway 503 during cluster
     // churn); the orchestrator runs this pipeline wait-for-result at Level 0, so
@@ -485,8 +524,6 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey) {
         }
     }
 
-    emitAppDeployJunit((env.BRANCH_NAME ?: 'dev'), doorwayEprUrls, bundles, outcomes)
-
     // End-to-end serving seatbelt: probe the EPR-routed mounts a human actually
     // visits. Each host serves 200 via its own converged head OR via doorway
     // failover during the convergence window. Skipped on STORAGE_URL override (a
@@ -498,7 +535,21 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey) {
                 verifyEprMounts(doorwayEprUrls[i], ['/', '/lamad'])
             }
         }
+
+        // Phase 4 (Track-4 T4-2) — served-vs-declared propagation probe: does the
+        // running doorway PROCESS actually serve the head just authored above,
+        // not merely a 200'ing mount over a stale materialization? Skipped on
+        // STORAGE_URL override for the same reason verifyEprMounts is (a raw
+        // storage backend has no health-surface EPR attestation either).
+        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+            verifyProjectedHeads(doorwayEprUrls, bundles, gitCommitHash, outcomes)
+        }
     }
+
+    // Moved to the END (was previously emitted before verifyEprMounts/
+    // verifyProjectedHeads ran): both later legs now feed named outcomes into
+    // this report, so it must run after every leg has populated `outcomes`.
+    emitAppDeployJunit((env.BRANCH_NAME ?: 'dev'), doorwayEprUrls, bundles, outcomes)
 }
 
 // Emit a junit-style report for the per-(host,slug) SPA-blob deploy (Part B,
@@ -532,6 +583,25 @@ def emitAppDeployJunit(String envName, List<String> doorwayEprUrls, List<Map> bu
                   kind: 'author',
                   passed: outcomes["author|${b.slug}|${kind}".toString()] != null]
     }
+    // Projected-head legs (Track-4 T4-2): one per (host, server-bundle). Passed
+    // => this host's health surface (/health/startup or /health) served the
+    // just-authored serverBlobHash, OR the T4-1 attestation isn't deployed
+    // there yet (verify-projected-head.sh's FIELD-ABSENT reads as exit 0 —
+    // an honest skip, not a failure). Only server-kind bundles carry a
+    // servedBundleHeads entry in the contract; a leg is only emitted when the
+    // author leg actually recorded a hash to check against (outcomes["hash|…"]).
+    doorwayEprUrls.each { url ->
+        def host = url.replaceFirst(/^https?:\/\//, '')
+        bundles.each { b ->
+            def kind = b.kind ?: 'browser'
+            if (kind != 'server') { return }
+            def key = "projhead|${host}|${b.slug}|${kind}".toString()
+            if (!outcomes.containsKey(key)) { return }
+            cases << [name: "projected-head ${host} ${b.slug} (${kind})".toString(),
+                      kind: 'projhead',
+                      passed: outcomes[key] == true]
+        }
+    }
     def failed = cases.count { !it.passed }
     def lines = cases.collect { c ->
         def attrs = "classname=\"elohim-app.deploy.${safeEnv}\" name=\"${c.name}\" time=\"0\""
@@ -541,6 +611,8 @@ def emitAppDeployJunit(String envName, List<String> doorwayEprUrls, List<Map> bu
             def msg
             if (c.kind == 'author') {
                 msg = "Head author '${c.name}' failed: NO doorway in the fabric reached a live conductor bridge to author (witness) this bundle's single notarized head. The head cannot green or converge until a conductor bridge is live. Check the alpha peers' conductor health (storage /health, conductor app-WS)."
+            } else if (c.kind == 'projhead') {
+                msg = "Projected-head probe '${c.name}' failed: this host's health surface (/health/startup or /health) served a serverBlobHash that does NOT match the just-authored declared head, or the host was unreachable after retries. The running doorway PROCESS has not materialized the current SSR bundle (a stale-but-200 host) — check its logs / trigger a restart to pick up the hot-swap. (T4-1 attestation absence alone never fails this leg — see scripts/ci/verify-projected-head.sh.)"
             } else {
                 msg = "Blob byte-seed '${c.name}' failed after retries (PUT /admin/seed/blob): this backend did not receive the bundle bytes. A transient 503 during cluster churn is the usual cause (now retried in stage-spa-blob.sh); a persistent failure means the backend is down. Re-run the App pipeline, or check the host storage /health."
             }
@@ -1232,7 +1304,11 @@ VEOF
                         def doorwayEprUrls = resolveDoorwayEprUrls()
                         echo "stageSpaBlobs doorwayEprUrls: ${doorwayEprUrls}"
                         def adminKey = resolveStorageAdminKey()
-                        stageAndVerifyAllBundles(doorwayEprUrls, adminKey)
+                        // gitCommitHash: only for verifyProjectedHeads' cheap, non-gating
+                        // browser-bundle /version.json liveness signal (Track-4 T4-2).
+                        def buildProps = loadBuildVars()
+                        def gitCommitHash = buildProps.GIT_COMMIT_HASH ?: ''
+                        stageAndVerifyAllBundles(doorwayEprUrls, adminKey, gitCommitHash)
                     }
                 }
             }

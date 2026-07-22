@@ -125,6 +125,16 @@ SPA_SIZE="$(du -h spa-bundle.zip | cut -f1)"
 echo "[${SLUG}] blob hash: ${SPA_HASH}"
 echo "[${SLUG}] blob size: ${SPA_SIZE}"
 
+# Optional hand-off for the caller (Track-4 T4-2 verify-projected-head.sh):
+# writes the just-computed content hash to a file so the Jenkinsfile can read
+# it back (via readFile) and pass it as the EXPECTED hash to the served-vs-
+# declared propagation probe, without re-deriving/re-zipping (which the
+# authoring host already established is byte-reproducible across calls given
+# an unchanged dist dir — see authorHeadOnce/stageSpaBlobs commentary).
+if [ -n "${HASH_OUTPUT_FILE:-}" ]; then
+    echo "${SPA_HASH}" > "${HASH_OUTPUT_FILE}"
+fi
+
 # Field-by-kind (SSR row collapse): KIND=server PATCHes/reads serverBlobHash on
 # the ONE elohim-host-landing EPR node (not a separate -ssr row); KIND=browser
 # stays blobHash. Both ride db/content/{slug} with identical partial-update
