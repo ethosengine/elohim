@@ -4,7 +4,7 @@
 
 use clap::Parser;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use doorway::{
@@ -1173,6 +1173,51 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             info!(
                 "Federation enabled: doorway_id={}, heartbeat every {}s",
                 fed_config.doorway_id, fed_config.heartbeat_interval_secs,
+            );
+        }
+    }
+
+    // SSR bundle-head reconcile tick (Track-4 T4-1): converge each served SSR
+    // slug toward its declared serverBlobHash without a restart. Interval is
+    // DOORWAY_BUNDLE_RECONCILE_SECS (default 300; 0 disables). Only spawned when
+    // the registry actually has a declared-head source (an SSR doorway with at
+    // least one configured slug) — an image-baked / SSR-disabled registry has
+    // nothing to reconcile.
+    {
+        let reconcile_secs = std::env::var("DOORWAY_BUNDLE_RECONCILE_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(300);
+        if reconcile_secs > 0 && state.renderer_registry.reconcile_enabled() {
+            let reconcile_state = Arc::clone(&state);
+            tokio::spawn(async move {
+                let period = std::time::Duration::from_secs(reconcile_secs);
+                loop {
+                    tokio::time::sleep(period).await;
+                    let outcomes = reconcile_state
+                        .renderer_registry
+                        .reconcile(&reconcile_state.cache)
+                        .await;
+                    let refreshed = outcomes.iter().filter(|o| o.outcome == "refreshed").count();
+                    let failed = outcomes.iter().filter(|o| o.outcome == "failed").count();
+                    if refreshed > 0 || failed > 0 {
+                        info!(
+                            "SSR bundle reconcile: {} refreshed, {} failed ({} slugs checked)",
+                            refreshed,
+                            failed,
+                            outcomes.len()
+                        );
+                    } else {
+                        debug!(
+                            "SSR bundle reconcile: all {} slug(s) current",
+                            outcomes.len()
+                        );
+                    }
+                }
+            });
+            info!(
+                "SSR bundle-head reconcile tick started: every {}s",
+                reconcile_secs
             );
         }
     }
