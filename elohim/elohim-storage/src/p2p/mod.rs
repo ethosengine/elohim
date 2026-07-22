@@ -1609,6 +1609,34 @@ impl P2PHandle {
         let mut distributed = 0usize;
         let now = chrono::Utc::now().to_rfc3339();
 
+        // Pre-resolve each SELECTED peer's `agent_cid` → dialable libp2p `PeerId`
+        // ONCE. `peer_selection` yields `agent_cid`s (`uhCAk…`, == `agent_pub_key`);
+        // `push_shard` must dial a libp2p `PeerId`. An `agent_cid` NEVER parses as
+        // a `PeerId`, so without this every push errored and `shard_locations` was
+        // never populated by distribution. Resolution is transport-layer-only: the
+        // dial target is translated, but `shard_locations.peer_id` below stays the
+        // `agent_cid` (the resilience card's join key). A peer with no known
+        // transport binding is dropped from dialing (skip + metric), never a hard
+        // error. See `services::transport_resolve`.
+        let dial_ids: std::collections::HashMap<String, String> = {
+            let mut map = std::collections::HashMap::new();
+            if let Ok(mut conn) = pool.get() {
+                for p in &selected {
+                    if map.contains_key(&p.peer_id) {
+                        continue;
+                    }
+                    if let Some(libp2p_id) =
+                        crate::services::transport_resolve::resolve_agent_cid_to_libp2p(
+                            &mut conn, &p.peer_id,
+                        )
+                    {
+                        map.insert(p.peer_id.clone(), libp2p_id);
+                    }
+                }
+            }
+            map
+        };
+
         for (i, shard_data) in shards.iter().enumerate() {
             let hash = &manifest.shard_hashes[i];
             if selected.is_empty() {
@@ -1616,21 +1644,36 @@ impl P2PHandle {
             }
             let peer = &selected[i % selected.len()];
 
-            match self
-                .push_shard(&peer.peer_id, hash, shard_data.clone())
-                .await
-            {
+            // Resolve the dial target. An unresolvable peer (no transport binding
+            // yet) is skipped with a log + metric — the shard stays unplaced this
+            // pass, exactly as a push failure does today (no hard error).
+            let Some(dial_id) = dial_ids.get(&peer.peer_id) else {
+                crate::metrics::inc_shard_push_peer_unresolved();
+                tracing::warn!(
+                    content_id,
+                    shard_index = i,
+                    peer = %peer.peer_id,
+                    "Shard push skipped: agent_cid has no known libp2p transport binding \
+                     (peer_transport_manifest + peer_identity_bindings both miss)"
+                );
+                continue;
+            };
+
+            match self.push_shard(dial_id, hash, shard_data.clone()).await {
                 Ok(()) => {
                     tracing::info!(
                         content_id,
                         shard_index = i,
                         peer = %peer.peer_id,
+                        dial = %dial_id,
                         household = ?peer.household_id,
                         "Shard distributed"
                     );
                     if let Ok(mut conn) = pool.get() {
                         let location = crate::db::models::NewShardLocation {
                             shard_hash: hash,
+                            // Store the AGENT key, not the transport dial id — the
+                            // resilience join is agent_cid == agent_cid.
                             peer_id: &peer.peer_id,
                             h_app_id,
                             status: "announced",
@@ -1644,6 +1687,7 @@ impl P2PHandle {
                         content_id,
                         shard_index = i,
                         peer = %peer.peer_id,
+                        dial = %dial_id,
                         error = %e,
                         "Shard push failed"
                     );

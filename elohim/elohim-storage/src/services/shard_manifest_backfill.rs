@@ -74,7 +74,20 @@ pub struct BackfillReport {
     pub missing_blob: usize,
     /// Candidates that errored during encode/persist (non-fatal, logged).
     pub failed: usize,
+    /// Part B: content with a manifest but ZERO shard_locations selected for a
+    /// re-distribution attempt (measured-but-never-distributed remediation).
+    pub redistribute_candidates: usize,
+    /// Part B: re-distribution ATTEMPTS made (not necessarily placements — a
+    /// still-unresolvable peer set leaves shards unplaced; honest attempt count).
+    pub redistribute_attempts: usize,
 }
+
+/// Part B cap: the most re-distribution attempts a single boot sweep will make.
+/// Bounds the boot-time distribution work when the push-side identity fix
+/// (slice 2) first lands and a backlog of dark content becomes distributable.
+/// Excess candidates are picked up on subsequent boots (idempotent — a content
+/// that gains shard_locations is no longer a candidate).
+const REDISTRIBUTE_CAP_PER_BOOT: usize = 50;
 
 /// Select content rows that have a blob but no shard manifest for `h_app_id`.
 ///
@@ -133,6 +146,101 @@ pub fn select_candidates(
         .collect();
 
     Ok(candidates)
+}
+
+/// Part B — select content that HAS a manifest but whose shards have ZERO
+/// `shard_locations` rows: measured (manifest present) yet never-distributed (no
+/// holder rows). This is the exact dark shape the push-side identity fix (slice 2)
+/// unblocks — on the next boot after the fix these re-attempt distribution instead
+/// of needing a manual per-content re-seed. It is measurement-driven REMEDIATION,
+/// NOT a stewardship claim: distribution still has to succeed + be acked to write
+/// `shard_locations`.
+///
+/// Output is capped at `cap` (see [`REDISTRIBUTE_CAP_PER_BOOT`]). The per-content
+/// `shard_locations` existence check is one small query per manifest content — an
+/// alpha-scale corpus, and the cap bounds the *result*; the scan stops once `cap`
+/// candidates are found.
+///
+/// A blob present-but-absent-locally is NOT excluded here (the byte load happens
+/// at distribution time in `distribute_one`, which skips-and-returns on absence).
+pub fn select_redistribution_candidates(
+    conn: &mut SqliteConnection,
+    h_app_id: &str,
+    cap: usize,
+) -> Result<Vec<BackfillCandidate>, StorageError> {
+    use crate::db::diesel_schema::{content, shard_locations, shard_manifests};
+
+    if cap == 0 {
+        return Ok(Vec::new());
+    }
+
+    // (content_id, blob_hash, blob_cid, content_format, reach, shard_hashes_json)
+    type Row = (
+        String,
+        Option<String>,
+        Option<String>,
+        String,
+        String,
+        String,
+    );
+
+    let rows: Vec<Row> = content::table
+        .inner_join(
+            shard_manifests::table.on(shard_manifests::content_id
+                .eq(content::id)
+                .and(shard_manifests::h_app_id.eq(h_app_id))),
+        )
+        .filter(content::h_app_id.eq(h_app_id))
+        .filter(content::blob_hash.is_not_null())
+        .select((
+            content::id,
+            content::blob_hash,
+            content::blob_cid,
+            content::content_format,
+            content::reach,
+            shard_manifests::shard_hashes_json,
+        ))
+        .load::<Row>(conn)
+        .map_err(StorageError::from)?;
+
+    let mut out: Vec<BackfillCandidate> = Vec::new();
+    for (content_id, blob_hash, blob_cid, content_format, reach, shard_hashes_json) in rows {
+        if out.len() >= cap {
+            break;
+        }
+        let Some(blob_hash) = blob_hash else { continue };
+        if blob_hash.trim().is_empty() {
+            continue;
+        }
+        // The manifest's shard hashes are the join key into shard_locations.
+        let shard_hashes: Vec<String> =
+            serde_json::from_str(&shard_hashes_json).unwrap_or_default();
+        if shard_hashes.is_empty() {
+            continue;
+        }
+
+        // Does ANY shard_location exist for these shards under this app? A single
+        // present row means distribution already reached at least one peer — leave
+        // partially-placed content alone (only fully-dark content re-attempts).
+        let location_count: i64 = shard_locations::table
+            .filter(shard_locations::h_app_id.eq(h_app_id))
+            .filter(shard_locations::shard_hash.eq_any(&shard_hashes))
+            .count()
+            .get_result(conn)
+            .map_err(StorageError::from)?;
+
+        if location_count == 0 {
+            out.push(BackfillCandidate {
+                content_id,
+                blob_hash,
+                blob_cid,
+                content_format,
+                reach,
+            });
+        }
+    }
+
+    Ok(out)
 }
 
 /// Encode + persist the manifest for one candidate. Returns `Ok(true)` if a
@@ -275,10 +383,47 @@ pub async fn run_once(
         }
     }
 
+    // Part B — measurement-driven re-distribution: content that HAS a manifest
+    // but ZERO shard_locations (measured yet never-distributed). This makes the
+    // slice-2 push-side identity fix self-deploying on alpha — dark content
+    // re-attempts distribution at the next restart instead of a manual re-seed.
+    // Bounded by REDISTRIBUTE_CAP_PER_BOOT + the same per-item pacing. Gated on a
+    // live p2p handle (no handle = nothing to distribute to).
+    #[cfg(feature = "p2p")]
+    if let Some(ref handle) = p2p_handle {
+        let redistribute = {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(e.to_string()))?;
+            select_redistribution_candidates(&mut conn, h_app_id, REDISTRIBUTE_CAP_PER_BOOT)?
+        };
+        report.redistribute_candidates = redistribute.len();
+
+        if !redistribute.is_empty() {
+            tracing::info!(
+                redistribute_candidates = report.redistribute_candidates,
+                h_app_id,
+                "shard_manifest_backfill: re-attempting distribution for measured-but-dark content"
+            );
+            for (idx, candidate) in redistribute.iter().enumerate() {
+                distribute_one(handle, pool, blob_store, candidate, h_app_id).await;
+                report.redistribute_attempts += 1;
+
+                if (idx + 1) % config.batch_size == 0 {
+                    tokio::time::sleep(config.batch_pause).await;
+                } else {
+                    tokio::time::sleep(config.item_delay).await;
+                }
+            }
+        }
+    }
+
     tracing::info!(
         recorded = report.recorded,
         missing_blob = report.missing_blob,
         failed = report.failed,
+        redistribute_candidates = report.redistribute_candidates,
+        redistribute_attempts = report.redistribute_attempts,
         "shard_manifest_backfill: sweep complete"
     );
 
@@ -331,6 +476,94 @@ mod tests {
             reach: "commons",
         };
         crate::db::shard_manifests::upsert_manifest(conn, &new_manifest).expect("insert manifest");
+    }
+
+    fn insert_manifest_with_shards(
+        conn: &mut SqliteConnection,
+        content_id: &str,
+        blob_hash: &str,
+        shards: &[&str],
+    ) {
+        let json = serde_json::to_string(shards).expect("encode shard hashes");
+        let new_manifest = NewShardManifest {
+            content_id,
+            h_app_id: "lamad",
+            blob_hash,
+            blob_cid: None,
+            encoding: "rs",
+            data_shard_count: shards.len() as i32,
+            parity_shard_count: 0,
+            shard_hashes_json: &json,
+            total_size_bytes: 0,
+            shard_size_bytes: 0,
+            mime_type: "html5-app",
+            reach: "commons",
+        };
+        crate::db::shard_manifests::upsert_manifest(conn, &new_manifest).expect("insert manifest");
+    }
+
+    fn seed_location(conn: &mut SqliteConnection, shard_hash: &str, peer_id: &str) {
+        crate::db::shard_locations::upsert_location(
+            conn,
+            &crate::db::models::NewShardLocation {
+                shard_hash,
+                peer_id,
+                h_app_id: "lamad",
+                status: "announced",
+            },
+        )
+        .expect("seed location");
+    }
+
+    /// Part B: only content with a manifest AND zero shard_locations is selected
+    /// for re-distribution. Partially-placed (≥1 location) and no-manifest content
+    /// are excluded.
+    #[test]
+    fn redistribution_selects_only_manifest_with_zero_locations() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        // dark: manifest, no locations → candidate.
+        insert_content(&mut conn, "dark", Some("sha256-dark"));
+        insert_manifest_with_shards(&mut conn, "dark", "sha256-dark", &["s-dark-1", "s-dark-2"]);
+
+        // lit: manifest + a location present → NOT a candidate.
+        insert_content(&mut conn, "lit", Some("sha256-lit"));
+        insert_manifest_with_shards(&mut conn, "lit", "sha256-lit", &["s-lit-1"]);
+        seed_location(&mut conn, "s-lit-1", "uhCAkHolder");
+
+        // no-manifest: Part A territory, never a redistribution candidate.
+        insert_content(&mut conn, "no-manifest", Some("sha256-nm"));
+
+        // empty-shards manifest: nothing to place → skipped.
+        insert_content(&mut conn, "empty-shards", Some("sha256-es"));
+        insert_manifest(&mut conn, "empty-shards", "sha256-es");
+
+        let cands = select_redistribution_candidates(&mut conn, "lamad", 50).expect("select");
+        let ids: Vec<&str> = cands.iter().map(|c| c.content_id.as_str()).collect();
+        assert_eq!(ids, vec!["dark"]);
+    }
+
+    /// Part B: the per-boot cap bounds the result.
+    #[test]
+    fn redistribution_respects_cap() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        for i in 0..3 {
+            let id = format!("dark-{i}");
+            let bh = format!("sha256-{i}");
+            insert_content(&mut conn, &id, Some(&bh));
+            insert_manifest_with_shards(&mut conn, &id, &bh, &[&format!("s-{i}")]);
+        }
+        let cands = select_redistribution_candidates(&mut conn, "lamad", 2).expect("select");
+        assert_eq!(cands.len(), 2, "cap bounds the result");
+
+        assert!(
+            select_redistribution_candidates(&mut conn, "lamad", 0)
+                .expect("select")
+                .is_empty(),
+            "cap 0 yields nothing"
+        );
     }
 
     #[test]
