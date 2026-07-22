@@ -162,6 +162,12 @@ pub fn rekey_peer_id(
         .select(shard_locations::shard_hash)
         .load::<String>(conn)?;
 
+    // Per-row (N+1): one UPDATE/DELETE per shard the old key held. This runs at
+    // boot, once per superseded human, over a single household's shard set — a
+    // handful of rows — so the N+1 is acceptable here. If this ever moves to a
+    // hot/bulk path, replace the loop with two set statements: an
+    // `UPDATE … SET peer_id=new WHERE peer_id=old AND shard_hash NOT IN (<new's shards>)`
+    // followed by a `DELETE … WHERE peer_id=old` to collapse the colliding remainder.
     let mut moved = 0usize;
     for shard_hash in old_shards {
         if existing_new.contains(&shard_hash) {

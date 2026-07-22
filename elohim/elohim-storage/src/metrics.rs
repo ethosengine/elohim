@@ -265,7 +265,9 @@ lazy_static! {
     /// "shard_locations" (holder rows re-attributed) | "rea_commitments"
     /// (commitments re-attributed) | "ambiguous_skip" (a household whose
     /// fossil↔membership pairing was not 1:1 — never guessed) | "non_agent_cid_skip"
-    /// (a membership member_cid that was not agent_cid-shaped).
+    /// (a membership member_cid that was not agent_cid-shaped) | "incomplete_read_skip"
+    /// (a household whose membership read dropped/failed a record — abstained so a
+    /// missing member cannot force a false 1:1).
     pub static ref IDENTITY_KEY_SUPERSEDE: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_identity_key_supersede_total",

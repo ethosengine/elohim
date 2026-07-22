@@ -126,7 +126,7 @@ impl MembershipReader for ConductorMembershipReader {
 }
 
 /// Pure extraction: turn a household's membership `Record`s into
-/// `(member_cid, household_cid)` pairs.
+/// `(member_cid, household_cid)` pairs, plus an INCOMPLETE-read flag.
 ///
 /// - Only `MemberKind::Person` members are emitted (collectives-of-collectives
 ///   and elohim-agent members never carry a household_id).
@@ -134,10 +134,26 @@ impl MembershipReader for ConductorMembershipReader {
 /// - `household_cid` is the caller-supplied `collective_cid` — the exact value
 ///   the controller stamps — NOT re-derived from the entry, so a malformed
 ///   entry collective_cid cannot drift the stamp.
-/// - A record whose entry is absent or fails to decode is skipped with a warn;
-///   one bad row never poisons the rest (per-row degradation, fail-open).
-fn extract_household_pairs(collective_cid: &str, records: &[Record]) -> Vec<(String, String)> {
+/// - A record whose entry is absent (a delete/tombstone — structurally not a
+///   current membership) is skipped silently.
+///
+/// # Returns `(pairs, incomplete)`
+///
+/// `incomplete` is `true` when ≥1 record was present-but-UNDECODABLE
+/// (`rmp_serde` failed). This is load-bearing for the key-supersede reconcile:
+/// its forced-bijection guard assumes the membership set for a household is
+/// COMPLETE. A dropped-undecodable record can hide a REAL member, collapsing
+/// `2-unmatched / 1-orphan` (safe abstain) into a FALSE `1-unmatched / 1-orphan`
+/// that mis-attributes one human's fossil onto another's live key. So a household
+/// with any decode failure is reported incomplete and the reconcile abstains.
+/// (Non-Person / withdrawn drops are CORRECT exclusions — they are genuinely not
+/// household members — and do NOT mark incompleteness.)
+fn extract_household_pairs(
+    collective_cid: &str,
+    records: &[Record],
+) -> (Vec<(String, String)>, bool) {
     let mut pairs = Vec::new();
+    let mut incomplete = false;
     for record in records {
         let Some(Entry::App(eb)) = record.entry.as_option() else {
             // Membership entries are always App entries with a body; an absent
@@ -147,10 +163,14 @@ fn extract_household_pairs(collective_cid: &str, records: &[Record]) -> Vec<(Str
         let membership: MembershipWire = match rmp_serde::from_slice(eb.bytes()) {
             Ok(m) => m,
             Err(e) => {
+                // A record we could NOT read: it may be a Person membership we are
+                // now silently missing. Mark the household incomplete so supersede
+                // abstains rather than risk a false forced-bijection.
+                incomplete = true;
                 tracing::warn!(
                     collective_cid = %collective_cid,
                     error = %e,
-                    "household replayer: skipping membership record that failed to decode"
+                    "household replayer: undecodable membership record — marking household read INCOMPLETE (supersede will abstain)"
                 );
                 continue;
             }
@@ -163,7 +183,7 @@ fn extract_household_pairs(collective_cid: &str, records: &[Record]) -> Vec<(Str
         }
         pairs.push((membership.member_cid, collective_cid.to_string()));
     }
-    pairs
+    (pairs, incomplete)
 }
 
 /// Source the set of household collective cids from the local `collectives`
@@ -191,12 +211,31 @@ fn household_collective_cids(pool: &DbPool, ctx: &AppContext) -> Result<Vec<Stri
         .collect())
 }
 
+/// Result of a boot membership snapshot: the `(member_cid, household_cid)` pairs
+/// AND the set of `household_cid`s whose membership read was INCOMPLETE.
+///
+/// A household is INCOMPLETE when its list read failed entirely OR ≥1 of its
+/// membership records failed to decode — in either case a REAL member may be
+/// absent from `pairs`. The key-supersede reconcile
+/// (`membership_identity_reconcile`) treats an incomplete household as ambiguous
+/// and abstains, because a missing member can collapse its forced-bijection guard
+/// into a FALSE 1:1 (mis-attributing one human's fossil onto another's live key).
+/// The NULL-only `household_backfill` is unaffected — it consumes `pairs` directly
+/// (a missing member just leaves a `household_id` NULL, never a wrong attribution).
+#[derive(Debug, Default, Clone)]
+pub struct MembershipSnapshot {
+    pub pairs: Vec<(String, String)>,
+    pub incomplete_households: std::collections::HashSet<String>,
+}
+
 /// Boot-time snapshot of `(member_cid, household_cid)` pairs from the current
-/// DHT household memberships, for the `household_backfill` startup pass.
+/// DHT household memberships, plus the set of households whose read was
+/// incomplete (see [`MembershipSnapshot`]).
 ///
 /// Tolerant of DHT unavailability: a missing/unreachable conductor or a
-/// malformed record degrades to a smaller mapping and a warning, never an error
-/// that fails startup. An empty mapping is a valid, idempotent-safe outcome.
+/// malformed record degrades to a smaller mapping (and marks that household
+/// incomplete), never an error that fails startup. An empty mapping is a valid,
+/// idempotent-safe outcome.
 ///
 /// `ctx` scopes the household-collective projection lookup to the right app
 /// (`humans`/`collectives` are h_app_id-scoped). `reader` is the conductor seam.
@@ -204,7 +243,7 @@ pub async fn snapshot_household_ids(
     pool: &DbPool,
     ctx: &AppContext,
     reader: &dyn MembershipReader,
-) -> Result<Vec<(String, String)>, StorageError> {
+) -> Result<MembershipSnapshot, StorageError> {
     let cids = match household_collective_cids(pool, ctx) {
         Ok(cids) => cids,
         Err(e) => {
@@ -213,7 +252,7 @@ pub async fn snapshot_household_ids(
                 error = %e,
                 "household replayer: could not read household collectives from projection; empty snapshot"
             );
-            return Ok(vec![]);
+            return Ok(MembershipSnapshot::default());
         }
     };
 
@@ -221,23 +260,32 @@ pub async fn snapshot_household_ids(
         tracing::debug!(
             "household replayer: no household collectives in projection; empty snapshot"
         );
-        return Ok(vec![]);
+        return Ok(MembershipSnapshot::default());
     }
 
-    let mut mapping: Vec<(String, String)> = Vec::new();
+    let mut snapshot = MembershipSnapshot::default();
     for cid in &cids {
         match reader.list_memberships(cid).await {
             Ok(records) => {
-                mapping.extend(extract_household_pairs(cid, &records));
+                let (pairs, incomplete) = extract_household_pairs(cid, &records);
+                if incomplete {
+                    snapshot.incomplete_households.insert(cid.clone());
+                }
+                snapshot.pairs.extend(pairs);
             }
             Err(e) => {
                 // Per-collective tolerance: one unreachable/failed read does not
                 // abandon the others (a household whose steward is offline must
-                // not block backfill for the rest of the node's households).
+                // not block backfill for the rest of the node's households). But
+                // it IS an incomplete read — mark it so key-supersede abstains
+                // rather than act on a partial member set. (With zero pairs the
+                // household won't even reach the reconcile's per-household loop;
+                // marking it is belt-and-suspenders and future-proof.)
+                snapshot.incomplete_households.insert(cid.clone());
                 tracing::warn!(
                     collective_cid = %cid,
                     error = %e,
-                    "household replayer: membership read failed; skipping this household"
+                    "household replayer: membership read failed; skipping this household (marked incomplete)"
                 );
             }
         }
@@ -245,10 +293,11 @@ pub async fn snapshot_household_ids(
 
     tracing::info!(
         households = cids.len(),
-        pairs = mapping.len(),
+        pairs = snapshot.pairs.len(),
+        incomplete = snapshot.incomplete_households.len(),
         "household replayer: snapshot complete"
     );
-    Ok(mapping)
+    Ok(snapshot)
 }
 
 #[cfg(test)]
@@ -313,7 +362,8 @@ mod tests {
             membership_record("agent:uhCAkAlice", "Person", cid, None),
             membership_record("agent:uhCAkBob", "Person", cid, None),
         ];
-        let pairs = extract_household_pairs(cid, &records);
+        let (pairs, incomplete) = extract_household_pairs(cid, &records);
+        assert!(!incomplete, "all records decoded → complete read");
         assert_eq!(
             pairs,
             vec![
@@ -331,7 +381,11 @@ mod tests {
             membership_record("agent:uhCAkAgent", "ElohimAgent", cid, None),
             membership_record("agent:uhCAkPerson", "Person", cid, None),
         ];
-        let pairs = extract_household_pairs(cid, &records);
+        let (pairs, incomplete) = extract_household_pairs(cid, &records);
+        assert!(
+            !incomplete,
+            "non-Person exclusions are correct, not incompleteness"
+        );
         assert_eq!(
             pairs,
             vec![("agent:uhCAkPerson".to_string(), cid.to_string())]
@@ -345,7 +399,11 @@ mod tests {
             membership_record("agent:uhCAkGone", "Person", cid, Some(42)),
             membership_record("agent:uhCAkStays", "Person", cid, None),
         ];
-        let pairs = extract_household_pairs(cid, &records);
+        let (pairs, incomplete) = extract_household_pairs(cid, &records);
+        assert!(
+            !incomplete,
+            "withdrawn exclusions are correct, not incompleteness"
+        );
         assert_eq!(
             pairs,
             vec![("agent:uhCAkStays".to_string(), cid.to_string())]
@@ -364,7 +422,8 @@ mod tests {
             "collective:uhCkkDriftedInEntry",
             None,
         )];
-        let pairs = extract_household_pairs(queried, &records);
+        let (pairs, incomplete) = extract_household_pairs(queried, &records);
+        assert!(!incomplete);
         assert_eq!(
             pairs,
             vec![("agent:uhCAkAlice".to_string(), queried.to_string())]
@@ -383,10 +442,17 @@ mod tests {
         bad.entry = RecordEntry::Present(bad_entry);
 
         let good = membership_record("agent:uhCAkGood", "Person", cid, None);
-        let pairs = extract_household_pairs(cid, &[bad, good]);
+        let (pairs, incomplete) = extract_household_pairs(cid, &[bad, good]);
+        // The good row still comes through (per-row degradation)…
         assert_eq!(
             pairs,
             vec![("agent:uhCAkGood".to_string(), cid.to_string())]
+        );
+        // …but the household is flagged INCOMPLETE: the undecodable row could have
+        // been a real Person member, so key-supersede must abstain for it.
+        assert!(
+            incomplete,
+            "an undecodable membership record must mark the household read incomplete"
         );
     }
 
@@ -453,9 +519,14 @@ mod tests {
         );
         let reader = MockReader { by_cid };
 
-        let mut pairs = snapshot_household_ids(&pool, &ctx, &reader)
+        let snap = snapshot_household_ids(&pool, &ctx, &reader)
             .await
             .expect("snapshot");
+        assert!(
+            snap.incomplete_households.is_empty(),
+            "all reads succeeded and decoded → no incomplete households"
+        );
+        let mut pairs = snap.pairs;
         pairs.sort();
         assert_eq!(
             pairs,
@@ -496,16 +567,23 @@ mod tests {
         by_cid.insert("collective:uhCkkDown".to_string(), Err(()));
         let reader = MockReader { by_cid };
 
-        let pairs = snapshot_household_ids(&pool, &ctx, &reader)
+        let snap = snapshot_household_ids(&pool, &ctx, &reader)
             .await
             .expect("snapshot must not fail when one household is unreachable");
         assert_eq!(
-            pairs,
+            snap.pairs,
             vec![(
                 "agent:uhCAkAlive".to_string(),
                 "collective:uhCkkUp".to_string()
             )]
         );
+        // The unreachable household's read failed → marked incomplete so
+        // key-supersede would abstain for it (even though it contributes no pairs).
+        assert!(
+            snap.incomplete_households.contains("collective:uhCkkDown"),
+            "a failed household read must be marked incomplete"
+        );
+        assert!(!snap.incomplete_households.contains("collective:uhCkkUp"));
     }
 
     #[tokio::test]
@@ -515,9 +593,10 @@ mod tests {
         let reader = MockReader {
             by_cid: std::collections::HashMap::new(),
         };
-        let pairs = snapshot_household_ids(&pool, &ctx, &reader)
+        let snap = snapshot_household_ids(&pool, &ctx, &reader)
             .await
             .expect("snapshot");
-        assert!(pairs.is_empty());
+        assert!(snap.pairs.is_empty());
+        assert!(snap.incomplete_households.is_empty());
     }
 }
