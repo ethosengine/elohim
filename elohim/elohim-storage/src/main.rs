@@ -3090,13 +3090,48 @@ async fn async_main(
             };
             match snapshot_household_ids(&pool_clone, &ctx, &reader).await {
                 Ok(mapping) => {
+                    // (1) NULL-only household_id backfill FIRST — populates
+                    // `humans.household_id` so the key-supersede pass below can
+                    // scope humans to their household. Consumes a clone; the
+                    // reconcile below reuses the same snapshot.
                     if let Err(e) =
                         elohim_storage::services::household_backfill::run_once_by_membership(
                             &pool_clone,
-                            mapping,
+                            mapping.clone(),
                         )
                     {
                         warn!(error = %e, "household_backfill failed (non-fatal)");
+                    }
+
+                    // (2) Membership-truth key SUPERSEDE + rekey cascade: converge
+                    // SET-but-stale `humans.agent_pub_key` (NON-self rows a peer
+                    // re-key fossilised) to the live membership key, cascading
+                    // `shard_locations.peer_id` + `rea_commitments.provider` so the
+                    // resilience stewarding join re-aligns. Boot-only is acceptable
+                    // for this slice: re-keys happen at deploy = restart, and this
+                    // runs on every boot. The cascade is scoped to `lamad` (the
+                    // dataplane the resilience card reads); humans are matched
+                    // h_app_id-agnostically. See the module docs for the safe-
+                    // pairing constraint (the membership entry carries no stable
+                    // human_id, so supersede fires only on an unambiguous 1:1).
+                    match elohim_storage::services::membership_identity_reconcile::reconcile_membership_keys(
+                        &pool_clone,
+                        &ctx.h_app_id,
+                        mapping,
+                    ) {
+                        Ok(stats) if stats.superseded > 0 || stats.ambiguous_skipped > 0 => {
+                            info!(
+                                superseded = stats.superseded,
+                                shard_locations = stats.shard_locations_reattributed,
+                                commitments = stats.commitments_reattributed,
+                                ambiguous_skipped = stats.ambiguous_skipped,
+                                "membership_identity_reconcile: key-supersede pass applied"
+                            );
+                        }
+                        Ok(_) => {}
+                        Err(e) => {
+                            warn!(error = %e, "membership_identity_reconcile failed (non-fatal)")
+                        }
                     }
                 }
                 Err(e) => {
