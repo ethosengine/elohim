@@ -81,6 +81,11 @@ pub struct ReconcileStats {
     pub ambiguous_skipped: usize,
     /// Membership `member_cid`s skipped because they were not `agent_cid`-shaped.
     pub non_agent_cid_skipped: usize,
+    /// Households skipped because their membership READ was incomplete (a
+    /// dropped/undecodable record could hide a member, so the visible sets might
+    /// form a FALSE forced 1:1). Distinct from `ambiguous_skipped`, which is a
+    /// complete read that is genuinely ≥2 either side.
+    pub incomplete_read_skipped: usize,
 }
 
 /// Short, log-safe prefix of an agent key for the transition record (mirrors
@@ -97,13 +102,21 @@ fn key_prefix(key: &str) -> String {
 /// the dataplane the resilience card reads (`lamad`). Humans are matched
 /// `h_app_id`-agnostically (see module docs).
 ///
+/// `incomplete_households` is the set of `household_cid`s whose membership READ
+/// was incomplete (from [`crate::services::holochain_humans_replayer::MembershipSnapshot`]).
+/// Any household in this set is treated as ambiguous and ABSTAINED — a
+/// dropped/undecodable member could otherwise collapse the forced-bijection guard
+/// into a FALSE 1:1. Pass an empty set when completeness is guaranteed.
+///
 /// Best-effort and idempotent: it never errors on "nothing to do", and a second
-/// run over the same mapping is a no-op (the fossils are gone). A genuine DB
-/// failure surfaces as `Err` so the caller can WARN (non-fatal at boot).
+/// run over the same mapping is a no-op (the fossils are gone). A DB failure on
+/// ONE household is logged and skipped — it never aborts the remaining households
+/// in the pass (arbitrary HashMap order must not pick victims).
 pub fn reconcile_membership_keys(
     pool: &DbPool,
     cascade_h_app_id: &str,
     mapping: Vec<(String, String)>,
+    incomplete_households: &HashSet<String>,
 ) -> Result<ReconcileStats, StorageError> {
     let mut stats = ReconcileStats::default();
     if mapping.is_empty() {
@@ -140,22 +153,38 @@ pub fn reconcile_membership_keys(
         .map_err(|e| StorageError::Internal(e.to_string()))?;
 
     for (household_cid, membership_keys) in &by_household {
-        reconcile_one_household(
+        // Per-household error ISOLATION: a DB failure on one household must not
+        // abort the rest of the pass (HashMap order is arbitrary — propagating
+        // the first Err would pick arbitrary victims that boot). Warn + continue,
+        // consistent with this module's per-item degradation elsewhere.
+        if let Err(e) = reconcile_one_household(
             &mut conn,
             cascade_h_app_id,
             household_cid,
             membership_keys,
+            incomplete_households,
             &mut stats,
-        )?;
+        ) {
+            tracing::warn!(
+                household_cid = %household_cid,
+                error = %e,
+                "membership_identity_reconcile: household reconcile failed (non-fatal, skipping this household)"
+            );
+        }
     }
 
-    if stats.superseded > 0 || stats.ambiguous_skipped > 0 || stats.non_agent_cid_skipped > 0 {
+    if stats.superseded > 0
+        || stats.ambiguous_skipped > 0
+        || stats.non_agent_cid_skipped > 0
+        || stats.incomplete_read_skipped > 0
+    {
         tracing::info!(
             superseded = stats.superseded,
             shard_locations_reattributed = stats.shard_locations_reattributed,
             commitments_reattributed = stats.commitments_reattributed,
             ambiguous_skipped = stats.ambiguous_skipped,
             non_agent_cid_skipped = stats.non_agent_cid_skipped,
+            incomplete_read_skipped = stats.incomplete_read_skipped,
             "membership_identity_reconcile: key-supersede pass complete"
         );
     }
@@ -168,9 +197,26 @@ fn reconcile_one_household(
     cascade_h_app_id: &str,
     household_cid: &str,
     membership_keys: &HashSet<String>,
+    incomplete_households: &HashSet<String>,
     stats: &mut ReconcileStats,
 ) -> Result<(), StorageError> {
     use crate::db::diesel_schema::humans;
+
+    // INCOMPLETE READ → ABSTAIN. If this household's membership read dropped a
+    // record (undecodable) or failed, `membership_keys` may be MISSING a real
+    // member — the visible sets could form a FALSE forced 1:1 that supersedes one
+    // human's fossil onto another's live key. The forced-bijection guard is only
+    // sound over a COMPLETE member set, so an incomplete household is treated
+    // exactly like an ambiguous one: observe + skip, never guess.
+    if incomplete_households.contains(household_cid) {
+        stats.incomplete_read_skipped += 1;
+        crate::metrics::inc_identity_key_supersede("incomplete_read_skip", 1);
+        tracing::warn!(
+            household_cid = %household_cid,
+            "membership_identity_reconcile: incomplete membership read — supersede skipped (a dropped member could force a false 1:1)"
+        );
+        return Ok(());
+    }
 
     // Humans stamped into this household. NO h_app_id filter — mirrors every
     // other consumer of `humans` (see module docs).
@@ -419,7 +465,8 @@ mod tests {
         )];
         drop(conn);
 
-        let stats = reconcile_membership_keys(&p, "lamad", mapping).expect("reconcile");
+        let stats =
+            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new()).expect("reconcile");
         assert_eq!(stats.superseded, 1);
         assert_eq!(stats.shard_locations_reattributed, 2);
         // The provide was already under the new key → idempotent no-op on rea.
@@ -489,7 +536,8 @@ mod tests {
             "12D3KooWtransportNotAnAgent".to_string(),
             "collective:h".to_string(),
         )];
-        let stats = reconcile_membership_keys(&p, "lamad", mapping).expect("reconcile");
+        let stats =
+            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new()).expect("reconcile");
         assert_eq!(stats.non_agent_cid_skipped, 1);
         assert_eq!(stats.superseded, 0);
 
@@ -512,7 +560,8 @@ mod tests {
         drop(conn);
 
         let mapping = vec![("agent:uhCAkLIVE".to_string(), "collective:h".to_string())];
-        let stats = reconcile_membership_keys(&p, "lamad", mapping).expect("reconcile");
+        let stats =
+            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new()).expect("reconcile");
         assert_eq!(stats.superseded, 0, "NULL is the fill path, not supersede");
 
         let mut conn = p.get().unwrap();
@@ -552,7 +601,8 @@ mod tests {
                 "collective:eden".to_string(),
             ),
         ];
-        let stats = reconcile_membership_keys(&p, "lamad", mapping).expect("reconcile");
+        let stats =
+            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new()).expect("reconcile");
         assert_eq!(stats.superseded, 0);
         assert_eq!(stats.ambiguous_skipped, 1);
 
@@ -608,7 +658,8 @@ mod tests {
                 "collective:eden".to_string(),
             ),
         ];
-        let stats = reconcile_membership_keys(&p, "lamad", mapping).expect("reconcile");
+        let stats =
+            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new()).expect("reconcile");
         assert_eq!(
             stats.superseded, 1,
             "the lone fossil pairs to the lone unmatched key"
@@ -654,10 +705,73 @@ mod tests {
             "agent:uhCAkNEWadam".to_string(),
             "collective:eden".to_string(),
         )];
-        let first = reconcile_membership_keys(&p, "lamad", mapping.clone()).expect("first");
+        let first = reconcile_membership_keys(&p, "lamad", mapping.clone(), &HashSet::new())
+            .expect("first");
         assert_eq!(first.superseded, 1);
-        let second = reconcile_membership_keys(&p, "lamad", mapping).expect("second");
+        let second =
+            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new()).expect("second");
         assert_eq!(second.superseded, 0);
         assert_eq!(second.ambiguous_skipped, 0);
+    }
+
+    /// REVIEWER TRACE (mis-attribution surface): household `hh` has a real fossil
+    /// A (rekeyed, humans row on the OLD key) + a same-boot new-join B (no humans
+    /// row). If A's OWN membership record fails to decode this boot, the visible
+    /// set collapses to `{B_new}` unmatched / `{A_fossil}` orphan — a FALSE forced
+    /// 1:1 that would supersede A's fossil onto B's LIVE key. Marking `hh`
+    /// incomplete makes reconcile abstain. This test proves BOTH halves: the bug
+    /// fires without the guard, and the guard prevents it.
+    #[test]
+    fn incomplete_read_abstains_on_decode_dropped_member_plus_new_join() {
+        let hh = "collective:eden";
+
+        // (contrast) WITHOUT the completeness guard the false 1:1 FIRES — proving
+        // the guard is load-bearing, not decorative. A's fossil is mis-attributed
+        // onto B's live key (the exact mis-attribution the fix prevents).
+        {
+            let p = pool();
+            {
+                let mut conn = p.get().unwrap();
+                seed_human(&mut conn, "human-adam", Some("uhCAkOLDadam"), Some(hh));
+            }
+            // Only B's membership survived decode (A's was dropped).
+            let mapping = vec![("agent:uhCAkNEWbob".to_string(), hh.to_string())];
+            let stats = reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new())
+                .expect("reconcile without completeness guard");
+            assert_eq!(stats.superseded, 1, "without the guard the false 1:1 fires");
+            let adam = get_human_by_id(&mut p.get().unwrap(), "human-adam")
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                adam.agent_pub_key.as_deref(),
+                Some("uhCAkNEWbob"),
+                "the bug: A's fossil mis-attributed onto B's live key"
+            );
+        }
+
+        // (fix) WITH `hh` marked incomplete, reconcile ABSTAINS — A keeps its
+        // fossil, no mis-attribution; the skip is counted + observable.
+        {
+            let p = pool();
+            {
+                let mut conn = p.get().unwrap();
+                seed_human(&mut conn, "human-adam", Some("uhCAkOLDadam"), Some(hh));
+            }
+            let mapping = vec![("agent:uhCAkNEWbob".to_string(), hh.to_string())];
+            let incomplete: HashSet<String> = std::iter::once(hh.to_string()).collect();
+            let stats = reconcile_membership_keys(&p, "lamad", mapping, &incomplete)
+                .expect("reconcile with completeness guard");
+            assert_eq!(stats.superseded, 0);
+            assert_eq!(stats.incomplete_read_skipped, 1);
+            assert_eq!(stats.ambiguous_skipped, 0);
+            let adam = get_human_by_id(&mut p.get().unwrap(), "human-adam")
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                adam.agent_pub_key.as_deref(),
+                Some("uhCAkOLDadam"),
+                "the fix: an incomplete read abstains — A keeps its fossil"
+            );
+        }
     }
 }

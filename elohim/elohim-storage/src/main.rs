@@ -3089,15 +3089,17 @@ async fn async_main(
                 hc_client: imagodei,
             };
             match snapshot_household_ids(&pool_clone, &ctx, &reader).await {
-                Ok(mapping) => {
+                Ok(snapshot) => {
                     // (1) NULL-only household_id backfill FIRST — populates
                     // `humans.household_id` so the key-supersede pass below can
-                    // scope humans to their household. Consumes a clone; the
-                    // reconcile below reuses the same snapshot.
+                    // scope humans to their household. Consumes a clone of the
+                    // pairs; the reconcile below reuses the same snapshot. Backfill
+                    // is NULL-only so an incomplete read is harmless here (a missing
+                    // member just leaves a household_id NULL, never a wrong write).
                     if let Err(e) =
                         elohim_storage::services::household_backfill::run_once_by_membership(
                             &pool_clone,
-                            mapping.clone(),
+                            snapshot.pairs.clone(),
                         )
                     {
                         warn!(error = %e, "household_backfill failed (non-fatal)");
@@ -3117,14 +3119,20 @@ async fn async_main(
                     match elohim_storage::services::membership_identity_reconcile::reconcile_membership_keys(
                         &pool_clone,
                         &ctx.h_app_id,
-                        mapping,
+                        snapshot.pairs,
+                        &snapshot.incomplete_households,
                     ) {
-                        Ok(stats) if stats.superseded > 0 || stats.ambiguous_skipped > 0 => {
+                        Ok(stats)
+                            if stats.superseded > 0
+                                || stats.ambiguous_skipped > 0
+                                || stats.incomplete_read_skipped > 0 =>
+                        {
                             info!(
                                 superseded = stats.superseded,
                                 shard_locations = stats.shard_locations_reattributed,
                                 commitments = stats.commitments_reattributed,
                                 ambiguous_skipped = stats.ambiguous_skipped,
+                                incomplete_read_skipped = stats.incomplete_read_skipped,
                                 "membership_identity_reconcile: key-supersede pass applied"
                             );
                         }
