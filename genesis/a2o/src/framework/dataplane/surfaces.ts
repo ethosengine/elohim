@@ -263,44 +263,61 @@ export interface ConductorDiagnosticsSurface {
 }
 
 /**
- * Normalize a base64-ish string for cross-variant comparison: base64url
- * ('-'/'_') and standard base64 ('+'/'/') characters are unified, and any
- * trailing '=' padding is stripped. Cheap defense against the diagnostics
- * surface and the humans view happening to serialize the same bytes via
- * different base64 alphabets.
+ * Decode a base64/base64url string to bytes, tolerating either alphabet and
+ * missing '=' padding. Returns null on anything that is not clean base64 —
+ * a decode that silently drops invalid characters would defeat the byte-exact
+ * comparison below.
  */
-function normalizeBase64ish(s: string): string {
-  // '=' is exclusively trailing padding in base64 — stripping every occurrence
-  // (not just a trailing run) is equivalent here and avoids an anchored
-  // trailing-quantifier regex.
-  return s.replace(/-/g, '+').replace(/_/g, '/').replace(/=/g, '');
+function base64ishToBytes(s: string): Buffer | null {
+  // Unify to the url-safe alphabet; '=' is exclusively trailing padding, so a
+  // global strip is equivalent to trimming the tail.
+  const normalized = s.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  if (normalized.length === 0 || !/^[\w-]+$/.test(normalized)) return null;
+  return Buffer.from(normalized, 'base64url');
 }
 
 /**
  * True when a `humans.agentPubKey` (uhCAk-prefixed multibase form) refers to
- * the SAME live agent as a conductor-diagnostics `agent` entry (raw, unprefixed
- * base64 core). See `ConductorDiagnosticsAgentEntry` doc for why this can't be
- * a raw string-equality check: the multibase 'u' + type-prefix ('hCAk' for
- * Agent) bytes on the humans side have no counterpart on the diagnostics side.
+ * the SAME live agent as a conductor-diagnostics `agent` entry (raw base64 of
+ * the 32-byte key core). String containment can NEVER establish this — the two
+ * encodings are byte-misaligned:
  *
- * Uses bidirectional containment (rather than a fixed prefix/suffix slice)
- * because the exact split point between the stripped multibase header and the
- * comparable hash bytes is a documented-but-unverified relationship — safer to
- * accept either string containing the other than to hardcode an offset that
- * could silently stop matching on a future encoding tweak.
+ *   humans.agentPubKey  = 'u' + base64url(0x84 0x20 0x24 ‖ core[32] ‖ loc[4])
+ *   diagnostics agent   =       base64url(core[32])
+ *
+ * The 3-byte holo type-prefix shifts every subsequent base64 character on the
+ * humans side, and the diagnostics string's LAST character encodes only the
+ * core's final bits (zero-padded at the 32-byte boundary) while the humans
+ * string continues into the 4 DHT-location bytes — so even the shared 32-byte
+ * core yields divergent character tails. Worked example (real alpha keys):
+ *
+ *   human uhCAkQte6fxZXuJtHlLBb8L87RjsVdKimUsQhdYVAMMLGZG2bt69n
+ *              → strip 'u', base64url-decode → 39 bytes; bytes[3..35] = core
+ *   diag        Qte6fxZXuJtHlLBb8L87RjsVdKimUsQhdYVAMMLGZG0
+ *              → base64url-decode → exactly those 32 core bytes
+ *   (tails diverge: …GZG0 vs …GZG2bt69n — string containment is FALSE while
+ *   byte equality of the core HOLDS)
+ *
+ * So: decode BOTH sides and compare bytes — humanBytes[3..35] === diagBytes.
+ * Unit-pinned with the real key pair above in
+ * src/framework/dataplane/__tests__/surfaces.test.ts.
  */
 export function agentKeyMatchesDiagnosticAgent(
   humanAgentPubKey: string,
   diagnosticAgent: string
 ): boolean {
   if (!humanAgentPubKey || !diagnosticAgent) return false;
-  const humanSuffix = humanAgentPubKey.startsWith('uhCAk')
-    ? humanAgentPubKey.slice(5)
-    : humanAgentPubKey;
-  const a = normalizeBase64ish(humanSuffix);
-  const b = normalizeBase64ish(diagnosticAgent);
-  if (a.length === 0 || b.length === 0) return false;
-  return a.includes(b) || b.includes(a);
+  // Multibase: leading 'u' = base64url-no-padding. Strip ONLY the marker —
+  // the 3-byte holo type-prefix is part of the decoded payload, not the string.
+  const humanB64 = humanAgentPubKey.startsWith('u') ? humanAgentPubKey.slice(1) : humanAgentPubKey;
+  const humanBytes = base64ishToBytes(humanB64);
+  const diagBytes = base64ishToBytes(diagnosticAgent);
+  if (!humanBytes || !diagBytes) return false;
+  // AgentPubKey = 3-byte type prefix + 32-byte core + 4-byte DHT location (39
+  // bytes); diagnostics carries exactly the 32-byte core. Guard both shapes
+  // before slicing so a malformed value can never alias into a false match.
+  if (humanBytes.length < 35 || diagBytes.length !== 32) return false;
+  return humanBytes.subarray(3, 35).equals(diagBytes);
 }
 
 // ---------------------------------------------------------------------------
