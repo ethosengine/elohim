@@ -16,6 +16,7 @@
  *   /api/v1/diagnostics/inventory-parity → raw JSON
  *   /api/v1/status/arc-policy       → raw JSON
  *   /metrics                        → ParsedMetrics (Prometheus text parse)
+ *   /db/p2p/conductor-diagnostics   → ConductorDiagnosticsSurface (live agent set)
  *
  * Peer resolution:
  *   'alpha-A'    → E2E_DOORWAY_ALPHA (default https://doorway-alpha.elohim.host)
@@ -222,6 +223,84 @@ export interface ContentItemSurface {
   /** Present and non-null when the content has an associated blob (sha256-… format) */
   blobHash?: string | null;
   [key: string]: unknown;
+}
+
+// ---------------------------------------------------------------------------
+// /db/p2p/conductor-diagnostics surface types
+// ---------------------------------------------------------------------------
+
+/**
+ * One entry from GET /db/p2p/conductor-diagnostics `agents[]` — a projection
+ * of an AgentInfoSigned the embedded conductor's peer store currently holds.
+ * Source: elohim/elohim-storage/src/http.rs `project_agent_info`.
+ *
+ * IMPORTANT: `agent` is the RAW base64 core of the Holochain AgentPubKey —
+ * it does NOT carry the `uhCAk` multibase prefix that `humans.agentPubKey`
+ * (HumanView) carries. `uhCAk` = the multibase 'u' marker + the base64
+ * encoding of the 3-byte Agent type-prefix; the conductor's admin API returns
+ * only the remaining hash+loc bytes. Matching a `humans.agentPubKey` against
+ * a diagnostics `agent` therefore needs `agentKeyMatchesDiagnosticAgent()`
+ * below, never raw string equality.
+ */
+export interface ConductorDiagnosticsAgentEntry {
+  agent: string | null;
+  space?: string | null;
+  url?: string | null;
+  createdAt?: string | number | null;
+  expiresAt?: string | number | null;
+  isTombstone?: boolean | null;
+  storageArc?: unknown;
+  [key: string]: unknown;
+}
+
+/** Response from GET /db/p2p/conductor-diagnostics */
+export interface ConductorDiagnosticsSurface {
+  agentCount: number;
+  agents: ConductorDiagnosticsAgentEntry[];
+  transportStats?: unknown;
+  networkMetrics?: unknown;
+  [key: string]: unknown;
+}
+
+/**
+ * Normalize a base64-ish string for cross-variant comparison: base64url
+ * ('-'/'_') and standard base64 ('+'/'/') characters are unified, and any
+ * trailing '=' padding is stripped. Cheap defense against the diagnostics
+ * surface and the humans view happening to serialize the same bytes via
+ * different base64 alphabets.
+ */
+function normalizeBase64ish(s: string): string {
+  // '=' is exclusively trailing padding in base64 — stripping every occurrence
+  // (not just a trailing run) is equivalent here and avoids an anchored
+  // trailing-quantifier regex.
+  return s.replace(/-/g, '+').replace(/_/g, '/').replace(/=/g, '');
+}
+
+/**
+ * True when a `humans.agentPubKey` (uhCAk-prefixed multibase form) refers to
+ * the SAME live agent as a conductor-diagnostics `agent` entry (raw, unprefixed
+ * base64 core). See `ConductorDiagnosticsAgentEntry` doc for why this can't be
+ * a raw string-equality check: the multibase 'u' + type-prefix ('hCAk' for
+ * Agent) bytes on the humans side have no counterpart on the diagnostics side.
+ *
+ * Uses bidirectional containment (rather than a fixed prefix/suffix slice)
+ * because the exact split point between the stripped multibase header and the
+ * comparable hash bytes is a documented-but-unverified relationship — safer to
+ * accept either string containing the other than to hardcode an offset that
+ * could silently stop matching on a future encoding tweak.
+ */
+export function agentKeyMatchesDiagnosticAgent(
+  humanAgentPubKey: string,
+  diagnosticAgent: string
+): boolean {
+  if (!humanAgentPubKey || !diagnosticAgent) return false;
+  const humanSuffix = humanAgentPubKey.startsWith('uhCAk')
+    ? humanAgentPubKey.slice(5)
+    : humanAgentPubKey;
+  const a = normalizeBase64ish(humanSuffix);
+  const b = normalizeBase64ish(diagnosticAgent);
+  if (a.length === 0 || b.length === 0) return false;
+  return a.includes(b) || b.includes(a);
 }
 
 // ---------------------------------------------------------------------------
@@ -437,6 +516,19 @@ export async function probeArcPolicy(
   peerUrl: string
 ): Promise<ProbeResult<Record<string, unknown>>> {
   return getJson<Record<string, unknown>>(`${peerUrl}/api/v1/status/arc-policy`);
+}
+
+/**
+ * GET /db/p2p/conductor-diagnostics on the given peer.
+ * Proxied by doorway (same class as other /db/p2p/* diagnostic routes); use
+ * the doorway peer URL. Returns 503 when the peer's embedded conductor admin
+ * connection is unavailable — callers should treat that as "not observable"
+ * rather than a hard failure (mirrors the /p2p/status pending convention).
+ */
+export async function probeConductorDiagnostics(
+  peerUrl: string
+): Promise<ProbeResult<ConductorDiagnosticsSurface>> {
+  return getJson<ConductorDiagnosticsSurface>(`${peerUrl}/db/p2p/conductor-diagnostics`);
 }
 
 /**

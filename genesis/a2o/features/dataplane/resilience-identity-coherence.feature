@@ -33,3 +33,37 @@ Feature: Membership projection stamps the member's agent key — household resil
     # placed humans on the peer is an honest pass, not a fabricated one — the
     # invariant is an implication (household_id set => agent_pub_key set).
     Then no HOUSEHOLD-member human on peer "alpha-A" is missing its agentPubKey
+
+  # Landed with the boot-time membership-truth key-supersede pass
+  # (elohim-storage/src/services/membership_identity_reconcile.rs, commit
+  # 9378519cb). Unit-anchored by membership_identity_reconcile::tests::
+  # single_fossil_with_one_current_member_supersedes (the realistic post-signal
+  # shape: one member already on its live key, one lone orphan fossil pairs
+  # unambiguously to the one unmatched live key),
+  # ambiguous_multi_fossil_household_is_skipped (≥2 orphans / ≥2 unmatched keys
+  # is a forced abstention — mis-pairing would attribute one human's identity
+  # AND shards to another, so the pass logs + skips rather than guesses), and
+  # fossil_household_supersede_cascade_lights_the_card (the supersede cascades
+  # to shard_locations.peer_id and rea_commitments.provider in the SAME
+  # transaction, so the resilience-card holder/commitment joins re-light
+  # together instead of realigning one side while stranding the other). This
+  # scenario pins the LIVE-OBSERVABLE consequence: a household-placed human's
+  # agent_pub_key must never be left pointing at a dead (fossil) key once the
+  # DHT membership truth for that household is observable on this peer — a
+  # lone resolvable fossil surviving past boot is exactly the regression this
+  # reconcile pass exists to prevent.
+  Scenario: No household-member human on alpha-A carries a fossil agentPubKey
+    # A fossil survives only when the boot-time reconcile pass never ran, or
+    # ran but found a genuinely ambiguous (≥2-orphan) household — the
+    # documented abstention, which converges as more members get re-projected
+    # on later deploys. A household with NO live membership key observable at
+    # all (e.g. this peer isn't hosting any of its members yet) is out of
+    # scope for this check — the invariant only applies where live membership
+    # truth is actually visible on this peer. Zero observable households, or
+    # every observable household's members all matching their live keys, is
+    # an honest pass; a household with exactly ONE member's key unresolved
+    # against an otherwise-observable live set is the FAIL this scenario
+    # exists to catch — that is precisely the forced-bijection case
+    # single_fossil_with_one_current_member_supersedes covers, and it must
+    # never survive a boot past the reconcile pass.
+    Then every observable HOUSEHOLD-member human on peer "alpha-A" has a non-fossil agentPubKey

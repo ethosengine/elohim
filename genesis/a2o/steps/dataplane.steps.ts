@@ -15,6 +15,7 @@
  *   Then blob {string} is byte-present on peer {string}
  *   Then EPR {string} blobHash is non-null on peer {string}
  *   Then no HOUSEHOLD-member human on peer {string} is missing its agentPubKey
+ *   Then every observable HOUSEHOLD-member human on peer {string} has a non-fossil agentPubKey
  *   Then resolving {string} on peer {string} does NOT return App-not-found
  *   Then metric {string} on peer {string} {word} {float}
  *
@@ -49,6 +50,8 @@ import {
   probeP2PStatus,
   probeEprNavContext,
   probeMetrics,
+  probeConductorDiagnostics,
+  agentKeyMatchesDiagnosticAgent,
   type ParsedMetrics,
 } from '../src/framework/dataplane/surfaces.js';
 import { E2EWorld } from '../src/framework/world.js';
@@ -568,6 +571,114 @@ Then(
       `${offenders.length} human(s) on ${peerName} carry a household_id but a NULL ` +
         `agent_pub_key (the all-zeros-resilience-card gap: ${JSON.stringify(offenders)}) — ` +
         `the household-resilience snapshot's agent_pub_key join silently empties for these rows.`
+    );
+  }
+);
+
+/**
+ * Assert that no household-placed human's SET agent_pub_key is a FOSSIL — a stale
+ * key no longer present in the peer's live conductor membership (DHT-observable
+ * agent set), where "observable" means at least one member of that same household
+ * DOES resolve to a live key (otherwise this peer simply isn't hosting any of that
+ * household's members yet, and the check is out of scope for it).
+ *
+ * This is the LIVE-OBSERVABLE consequence of the boot-time key-supersede pass
+ * (services/membership_identity_reconcile.rs — unit-anchored by
+ * single_fossil_with_one_current_member_supersedes,
+ * ambiguous_multi_fossil_household_is_skipped, and
+ * fossil_household_supersede_cascade_lights_the_card): a re-key (non-prod DNA
+ * reinstall minting a new AgentPubKey) leaves the OTHER writers (the NULL-only
+ * signal path, the NULL-only household backfill) unable to touch a SET-but-stale
+ * key, so only this reconcile pass converges it. The pairing is a forced
+ * bijection — safe to assert ONLY when exactly one household member's key is
+ * unresolved against an otherwise-observable live set (the case the reconcile
+ * pass makes unambiguous and therefore must clear); TWO OR MORE unresolved
+ * members in the same household is the documented ambiguous-abstention shape
+ * (mis-pairing would attribute one human's identity AND shards to another), so
+ * it is an honest pass that converges over further deploys, not a violation.
+ *
+ * `/db/p2p/conductor-diagnostics` returning non-200 (no embedded conductor admin
+ * connection on this peer) makes NOTHING observable — an honest pass, not a
+ * failure to probe.
+ */
+Then(
+  'every observable HOUSEHOLD-member human on peer {string} has a non-fossil agentPubKey',
+  async function (this: E2EWorld, peerName: string) {
+    const url = getPeerUrl(this, peerName);
+
+    const { status: humansStatus, text: humansText } = await getRaw(`${url}/db/humans`);
+    assert.strictEqual(
+      humansStatus,
+      200,
+      `GET /db/humans on ${peerName}: expected HTTP 200, got ${humansStatus} (body: ${humansText.slice(0, 120)})`
+    );
+    let humansBody: { items?: Record<string, unknown>[] };
+    try {
+      humansBody = JSON.parse(humansText) as { items?: Record<string, unknown>[] };
+    } catch {
+      throw new Error(`GET /db/humans on ${peerName}: response is not valid JSON`);
+    }
+    const householdMembers = (humansBody.items ?? []).filter(
+      h =>
+        h['householdId'] !== null &&
+        h['householdId'] !== undefined &&
+        typeof h['agentPubKey'] === 'string' &&
+        h['agentPubKey'] !== ''
+    );
+    if (householdMembers.length === 0) {
+      return; // Nothing SET yet on this peer — nothing observable, honest pass.
+    }
+
+    const { status: diagStatus, body: diagBody } = await probeConductorDiagnostics(url);
+    if (diagStatus !== 200) {
+      // No embedded conductor admin connection on this peer (e.g. a doorway-only
+      // node) — live membership truth is not observable here at all.
+      return;
+    }
+    const liveAgents = (diagBody.agents ?? [])
+      .filter(a => a.isTombstone !== true)
+      .map(a => a.agent)
+      .filter((a): a is string => typeof a === 'string' && a.length > 0);
+
+    // Group household members by householdId, and classify each as
+    // resolved (its key matches a live conductor agent) or unresolved.
+    const byHousehold = new Map<string, Record<string, unknown>[]>();
+    for (const h of householdMembers) {
+      const householdId = String(h['householdId']);
+      const list = byHousehold.get(householdId) ?? [];
+      list.push(h);
+      byHousehold.set(householdId, list);
+    }
+
+    const loneFossils: { householdId: string; humanId: unknown; agentPubKey: unknown }[] = [];
+    for (const [householdId, members] of byHousehold) {
+      const unresolved = members.filter(
+        h =>
+          !liveAgents.some(live => agentKeyMatchesDiagnosticAgent(h['agentPubKey'] as string, live))
+      );
+      const resolvedCount = members.length - unresolved.length;
+      if (resolvedCount === 0) {
+        continue; // No live member observed for this household — not observable here.
+      }
+      if (unresolved.length === 1) {
+        // Forced bijection: exactly this household's shape the reconcile pass
+        // makes unambiguous — a survivor here is the regression.
+        loneFossils.push({
+          householdId,
+          humanId: unresolved[0]['id'],
+          agentPubKey: unresolved[0]['agentPubKey'],
+        });
+      }
+      // unresolved.length >= 2: documented ambiguous-abstention shape — honest pass.
+    }
+
+    assert.strictEqual(
+      loneFossils.length,
+      0,
+      `${loneFossils.length} household(s) on ${peerName} carry a lone resolvable fossil ` +
+        `agentPubKey (${JSON.stringify(loneFossils)}) — the boot-time membership-truth ` +
+        `key-supersede pass (services/membership_identity_reconcile.rs) should have converged ` +
+        `this unambiguous single-fossil case to the live membership key.`
     );
   }
 );
