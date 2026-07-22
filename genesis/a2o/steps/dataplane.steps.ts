@@ -14,6 +14,7 @@
  *   Then /sync doc {string} is present on peer {string}
  *   Then blob {string} is byte-present on peer {string}
  *   Then EPR {string} blobHash is non-null on peer {string}
+ *   Then the served head for EPR {string} matches the declared head on peer {string}
  *   Then no HOUSEHOLD-member human on peer {string} is missing its agentPubKey
  *   Then every observable HOUSEHOLD-member human on peer {string} has a non-fossil agentPubKey
  *   Then resolving {string} on peer {string} does NOT return App-not-found
@@ -51,6 +52,7 @@ import {
   probeEprNavContext,
   probeMetrics,
   probeConductorDiagnostics,
+  probeServedBundleHead,
   agentKeyMatchesDiagnosticAgent,
   type ParsedMetrics,
 } from '../src/framework/dataplane/surfaces.js';
@@ -384,6 +386,70 @@ Then(
     assert.ok(
       body.blobHash !== null && body.blobHash !== undefined && body.blobHash !== '',
       `EPR "${eprId}" on ${peerName}: blobHash is ${JSON.stringify(body.blobHash)} — blob not yet attached`
+    );
+  }
+);
+
+/**
+ * Track-4 T4-2 — served-vs-declared projected-head propagation.
+ *
+ * DECLARED: GET /db/content/{slug}.serverBlobHash — the content row's SSR
+ * bundle pointer, the same field elohim-storage/src/ssr.rs
+ * parse_server_blob_hash() reads to render the page.
+ *
+ * SERVED: GET /health/startup (falling back to /health) servedBundleHeads[]
+ * — what the RUNNING doorway process has actually materialized. This is the
+ * gap CI's verify-projected-head.sh also closes: a mount can answer 200 and
+ * a content row can carry the right declared hash while the process behind
+ * it still serves a STALE materialization (a stale-but-200 host).
+ *
+ * Two honest, non-failing outcomes exist alongside the pass/fail comparison:
+ *   - No declared serverBlobHash at all yet (nothing has been authored) → 'pending'.
+ *   - The T4-1 attestation (servedBundleHeads) is absent from BOTH health
+ *     surfaces, or carries no entry for this slug → 'pending' (mirrors the
+ *     CI probe's FIELD-ABSENT = SKIP semantics — forward-compatible until
+ *     every doorway ships the health surface).
+ * An UNREACHABLE peer (neither health surface answers 200) IS a failure —
+ * we cannot even ask the question.
+ */
+Then(
+  'the served head for EPR {string} matches the declared head on peer {string}',
+  async function (this: E2EWorld, eprId: string, peerName: string) {
+    const url = getPeerUrl(this, peerName);
+
+    const { status: contentStatus, body: contentBody } = await probeContent(url, eprId);
+    assert.strictEqual(
+      contentStatus,
+      200,
+      `EPR "${eprId}" on ${peerName}: GET /db/content returned ${contentStatus} — no declared head to compare against`
+    );
+    const declared = contentBody.serverBlobHash;
+    if (!declared) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `  PENDING: EPR "${eprId}" on ${peerName} has no declared serverBlobHash yet — nothing authored to compare against`
+      );
+      return 'pending';
+    }
+
+    const probe = await probeServedBundleHead(url, eprId);
+    assert.ok(
+      probe.reachable,
+      `${peerName}: neither /health/startup nor /health was reachable — cannot verify the served head for "${eprId}"`
+    );
+    if (!probe.entry?.serverBlobHash) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `  PENDING: ${peerName} servedBundleHeads absent or missing an entry for "${eprId}" (source: ${probe.source}) — T4-1 attestation not yet deployed here`
+      );
+      return 'pending';
+    }
+    assert.strictEqual(
+      probe.entry.serverBlobHash,
+      declared,
+      `EPR "${eprId}" on ${peerName}: served serverBlobHash "${probe.entry.serverBlobHash}" != declared "${declared}" ` +
+        `(materializedAt=${probe.entry.materializedAt ?? 'unknown'}, status=${probe.entry.status ?? 'unknown'}) ` +
+        `— the running doorway process has not materialized the current declared head.`
     );
   }
 );
