@@ -17,6 +17,9 @@
  *   /api/v1/status/arc-policy       → raw JSON
  *   /metrics                        → ParsedMetrics (Prometheus text parse)
  *   /db/p2p/conductor-diagnostics   → ConductorDiagnosticsSurface (live agent set)
+ *   /health/startup (→ /health fallback) → ServedHeadProbeResult (T4-1 servedBundleHeads
+ *                                     attestation — Track-4 T4-2's "served" side, compared
+ *                                     against ContentItemSurface.serverBlobHash, the "declared" side)
  *
  * Peer resolution:
  *   'alpha-A'    → E2E_DOORWAY_ALPHA (default https://doorway-alpha.elohim.host)
@@ -129,6 +132,25 @@ export interface HealthConductor {
 }
 
 /**
+ * One entry from the T4-1 `servedBundleHeads[]` attestation (Track-4 T4-2
+ * contract — deployed in parallel with this file; written to the CONTRACT,
+ * not to whatever doorway code exists at write-time). Reports what the
+ * RUNNING doorway process has actually materialized, distinct from the
+ * content row's DECLARED head (`/db/content/{slug}.serverBlobHash` —
+ * ContentItemSurface below). Absence of this field, or of an entry for a
+ * given slug, means the T4-1 attestation is not deployed on that host yet —
+ * see probeServedBundleHead()'s forward-compatible SKIP semantics.
+ */
+export interface ServedBundleHead {
+  slug: string;
+  serverBlobHash?: string;
+  materializedAt?: string;
+  status?: 'current' | 'stale' | 'refreshing' | 'failed' | string;
+  declaredServerBlobHash?: string;
+  [key: string]: unknown;
+}
+
+/**
  * Shape of the doorway GET /health response.
  * Source: doorway/doorway-service/src/routes/health.rs HealthResponse.
  * Note: node_id is serialised as "node_id" (no rename attr on that field).
@@ -145,6 +167,9 @@ export interface HealthSurface {
   p2p?: HealthP2P;
   discoveryComplete: boolean;
   error?: string;
+  /** T4-1 served-bundle-head attestation (see ServedBundleHead) — carried by
+   *  /health/startup and, potentially, /health. Absent until T4-1 deploys. */
+  servedBundleHeads?: ServedBundleHead[];
 }
 
 // ---------------------------------------------------------------------------
@@ -222,6 +247,14 @@ export interface ContentItemSurface {
   id: string;
   /** Present and non-null when the content has an associated blob (sha256-… format) */
   blobHash?: string | null;
+  /**
+   * The DECLARED server (SSR) bundle hash — elohim-storage/src/ssr.rs
+   * parse_server_blob_hash() reads this exact field from the same GET
+   * /db/content/{slug} response. This is the "declared" side of the
+   * served-vs-declared T4-2 comparison; ServedBundleHead.serverBlobHash
+   * (from the health surface) is the "served" side.
+   */
+  serverBlobHash?: string | null;
   [key: string]: unknown;
 }
 
@@ -563,4 +596,72 @@ export async function probeMetrics(metricsBaseUrl: string): Promise<ParsedMetric
     throw new Error(`GET ${metricsBaseUrl}/metrics returned ${status}`);
   }
   return parsePrometheusMetrics(text);
+}
+
+// ---------------------------------------------------------------------------
+// Served-vs-declared projected-head probe (Track-4 T4-2)
+// ---------------------------------------------------------------------------
+
+/** Result of probing a peer for its T4-1 served-bundle-head attestation. */
+export interface ServedHeadProbeResult {
+  /** Which health surface answered 200, or 'unreachable' if neither did. */
+  source: 'startup' | 'health' | 'unreachable';
+  /** True once ANY health surface responded 200 (independent of whether the
+   *  servedBundleHeads field, or an entry for the requested slug, was present). */
+  reachable: boolean;
+  /**
+   * The matching servedBundleHeads[] entry for the requested slug, or
+   * undefined when the T4-1 attestation is not deployed on this peer yet
+   * (servedBundleHeads absent, or no entry for this slug). Forward-compatible:
+   * callers must treat `entry === undefined` as a SKIP, not a failure —
+   * mirrors scripts/ci/verify-projected-head.sh's FIELD-ABSENT semantics.
+   */
+  entry?: ServedBundleHead;
+}
+
+/** GET a URL and parse as JSON, never throwing — non-200 or invalid JSON both yield a null body. */
+async function tryHealthSurface(
+  url: string
+): Promise<{ status: number; body: HealthSurface | null }> {
+  try {
+    const { status, text } = await getRaw(url);
+    if (status !== 200) return { status, body: null };
+    try {
+      return { status, body: JSON.parse(text) as HealthSurface };
+    } catch {
+      return { status, body: null };
+    }
+  } catch {
+    return { status: 0, body: null };
+  }
+}
+
+/**
+ * Probe the T4-1 served-bundle-head attestation for one slug on a peer.
+ * Tries GET /health/startup first, falling back to GET /health — mirrors
+ * the CI probe (scripts/ci/verify-projected-head.sh) exactly, so the same
+ * "servedBundleHeads absent = not yet deployed, not broken" semantics hold
+ * in both the a2o world and CI. Never throws.
+ */
+export async function probeServedBundleHead(
+  peerUrl: string,
+  slug: string
+): Promise<ServedHeadProbeResult> {
+  const startup = await tryHealthSurface(`${peerUrl}/health/startup`);
+  if (startup.body) {
+    return {
+      source: 'startup',
+      reachable: true,
+      entry: startup.body.servedBundleHeads?.find(h => h.slug === slug),
+    };
+  }
+  const health = await tryHealthSurface(`${peerUrl}/health`);
+  if (health.body) {
+    return {
+      source: 'health',
+      reachable: true,
+      entry: health.body.servedBundleHeads?.find(h => h.slug === slug),
+    };
+  }
+  return { source: 'unreachable', reachable: false, entry: undefined };
 }
