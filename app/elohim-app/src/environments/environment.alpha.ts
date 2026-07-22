@@ -21,6 +21,12 @@ export const environment: Environment = {
   // Browser mode: all content via doorway proxy
   client: {
     doorwayUrl: DOORWAY_ALPHA_HTTPS,
+    // Doorway-B apex on the same alpha substrate — multi-host failover
+    // ("logical anycast", 2026-07-16 dual-WAN utility-plane failover design
+    // §3a). The apiBaseUrlInterceptor retries GET/HEAD against this host on
+    // a status-0 (network-level) failure of the primary; writes are never
+    // auto-retried. See genesis/orchestrator/manifests/doorway/alpha-b.yaml.
+    doorwayFallbacks: ['https://elohim.host'],
     apiKey: DEV_API_KEY,
     nodeUrls: [], // No personal nodes in alpha
     holochainHAppId: 'elohim',

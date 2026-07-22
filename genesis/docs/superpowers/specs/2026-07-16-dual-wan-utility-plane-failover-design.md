@@ -173,3 +173,51 @@ deferred to the point it is actually scheduled.
 | RELAY (TURN) | ICE tries every listed server natively | **Already built** (2026-07-16, dual coturn + relay-addr-beacon) | Free — solved |
 | Bootstrap/Signal/SPA (HTTP/WSS) | None — single DNS name per doorway | 3a multi-A+retry (free, imperfect) / 3b Cloudflare LB (low-cost, new filed dependency) / 3c BGP anycast (high-cost, council-held commons) | Deferred — this doc is the design horizon |
 | Cross-WAN correlated risk | N/A | Diversify ISPs/households, not just links | Structural — solved only by the N-node commons, not by engineering the 2-node pair harder |
+
+## 7. 2026-07-22 — §3a browser leg shipped; conductor-leg verdict
+
+**Browser leg of §3a (multi-A + client retry) shipped.** The client-side retry logic §3a named as
+the missing piece is now written in both HTTP-facing clients that a household's browser session
+depends on:
+
+- **ElohimClient SDK**: reads fail over on a network error across `mode.doorway.fallbacks`, sticking
+  to whichever address last succeeded (sticky preferred host) rather than re-trying the full list on
+  every call. Writes never auto-retry across addresses — a write either succeeds against the address
+  the client currently holds or fails honestly; only a subsequent successful read is allowed to
+  advance which address is sticky-preferred.
+- **Angular `apiBaseUrlInterceptor`**: the same read-fails-over / write-never-auto-retries semantics
+  for all `HttpClient` traffic, configured via `environment.client.doorwayFallbacks`. The alpha
+  environment sets a fallback of `https://elohim.host` (doorway-B's apex) so a household session on
+  doorway-alpha survives an outage on that WAN by moving to doorway-B. Prod/staging are left unset —
+  an explicit operator decision, not an oversight, until an operator opts a given environment into a
+  named second address.
+
+This is deliberately the cheap, imperfect half of §3a honestly graded above: it is a client-side fix
+wearing a DNS-adjacent costume, not a load balancer or anycast. It closes the specific gap this spec
+called out — "most HTTP clients do NOT automatically retry across multiple addresses" — for the two
+clients that matter for the browser-visible experience, without taking on §3b's borrowed-LB
+dependency or §3c's far-horizon infrastructure commitment.
+
+**Conductor-plane verdict: does not get this treatment, and the reason is upstream, not a choice.**
+`holochain_conductor_api::NetworkConfig.bootstrap_url` / `.signal_url` are single-typed `url2::Url2`
+fields (vendored at `elohim/holochain-conductor/crates/holochain_conductor_api/src/config/conductor.rs:240-256`)
+— there is no list-shaped config surface to add fallbacks to, and the clients that consume those URLs
+(`kitsune2_bootstrap_client`, `tx5`) are themselves upstream single-URL with no multi-URL support built
+in. Multi-address failover for the conductor plane is therefore not a config change; it requires
+patching one of those upstream crates. The actionable far path, recorded here rather than re-derived
+next time this is asked: patch our existing tx5 fork, the same fork already carrying the
+zombie-PeerConnection patch (`elohim/holochain-conductor/Cargo.toml:100-106`) — precedent that this
+fork is where conductor-plane wire-level fixes land. This is explicitly deferred, not scheduled; it is
+recorded so the next design pass starts from "patch the tx5 fork" instead of re-discovering that
+`bootstrap_url`/`signal_url` are single-typed.
+
+**CORS note for operators adopting a fallback address.** Doorway's CORS layer
+(`doorway/doorway-service/src/cors.rs`) reflects any request `Origin` back in dev mode, and — when
+`CORS_ORIGINS` is unset — defaults to `*` in production too (the pre-middleware permissive behaviour,
+kept as the default so operators opt into restriction rather than being silently broken by it). An
+operator who DOES set `CORS_ORIGINS` to lock a doorway down must include every sibling doorway origin
+a browser client might fail over to in that allowlist — a fallback address left out of the allowlist
+will have its browser-issued cross-origin requests rejected by the doorway it fell over to, turning a
+designed failover into a silent CORS wall. This is a one-time operator checklist item, not a code gap:
+the failover logic in ElohimClient/the interceptor does not touch CORS at all, it is purely a client
+decision about which origin to call next.
