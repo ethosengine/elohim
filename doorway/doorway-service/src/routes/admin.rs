@@ -927,6 +927,42 @@ pub async fn handle_steward_peers_refresh(state: Arc<AppState>) -> Response<Full
     )
 }
 
+/// Response for POST /admin/ssr-bundle/refresh — per-slug reconcile outcomes.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SsrBundleRefreshResponse {
+    /// True when the registry has a declared-head source (reconcile is
+    /// possible). False on an image-baked / SSR-disabled registry — `slugs`
+    /// is then empty and the call is a no-op.
+    pub reconcile_enabled: bool,
+    /// Per-slug outcome: `current` (already matched), `refreshed` (hot-swapped
+    /// to a new head), `failed` (re-materialize failed, old kept), or
+    /// `unreachable` (declared-head read failed, old kept).
+    pub slugs: Vec<crate::render::registry::SlugOutcome>,
+}
+
+/// Handle POST /admin/ssr-bundle/refresh — run ONE bundle-head reconcile pass
+/// immediately (the actuation twin of the background reconcile tick).
+///
+/// For every served SSR slug, re-resolve its declared `serverBlobHash` from
+/// storage; on a mismatch, re-materialize the bundle into a fresh directory,
+/// build a new isolate, and hot-swap the registry entry in place — converge to
+/// the declared head without a doorway restart. Idempotent and safe to repeat:
+/// an already-current slug re-reports `current` and does no work. Same Cat-C
+/// operator-seat class as `/admin/steward-peers/refresh` (its route-registry
+/// sibling); no auth (operator-only is an ingress property).
+pub async fn handle_ssr_bundle_refresh(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let reconcile_enabled = state.renderer_registry.reconcile_enabled();
+    let slugs = state.renderer_registry.reconcile(&state.cache).await;
+    json_response(
+        StatusCode::OK,
+        SsrBundleRefreshResponse {
+            reconcile_enabled,
+            slugs,
+        },
+    )
+}
+
 // ============================================================================
 // Capabilities
 // ============================================================================

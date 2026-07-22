@@ -525,6 +525,13 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         serde_json::json!(null)
     };
 
+    // Served SSR bundle-head attestations (Track-4 T4-1). Each entry:
+    // {slug, serverBlobHash, materializedAt (rfc3339), status (current|stale|
+    // refreshing|failed)} plus declaredServerBlobHash when a reconcile check has
+    // observed it. Empty on a non-SSR doorway. A parallel CI/probe consumes this
+    // exact camelCase shape — see render::registry::BundleHead::to_json.
+    let served_bundle_heads = state.renderer_registry.heads_json();
+
     let body = serde_json::json!({
         "identity": {
             "ready": true,
@@ -541,6 +548,7 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         },
         "rootProjection": root_projection,
         "warmup": warmup,
+        "servedBundleHeads": served_bundle_heads,
     })
     .to_string();
 

@@ -2165,6 +2165,14 @@ mod shakeout_tests {
         assert!(is_service_path("/chrome/omni-element.abc123.js"));
     }
     #[test]
+    fn shakeout_service_path_guards_ssr_bundle_refresh() {
+        // POST /admin/ssr-bundle/refresh (Track-4 T4-1) is covered as a service
+        // path via the "/admin" prefix, so a registered root projection can
+        // never shadow the admin surface. (It is POST-only, so the GET-only EPR
+        // router would not shadow it regardless — this locks the coverage.)
+        assert!(is_service_path("/admin/ssr-bundle/refresh"));
+    }
+    #[test]
     fn shakeout_service_path_identity_narrowed_to_did() {
         // The imagodei SPA pillar must fall through to the EPR router / SPA shell,
         // exactly like /community and /account. Only the DID service endpoints are
@@ -4269,6 +4277,17 @@ async fn handle_request(
         // longer needs a doorway restart to become reachable through it.
         (Method::POST, "/admin/steward-peers/refresh") => {
             to_boxed(routes::handle_steward_peers_refresh(Arc::clone(&state)).await)
+        }
+
+        // SSR bundle-head reconcile actuation (Track-4 T4-1): run one pass that
+        // re-resolves each served slug's declared serverBlobHash and hot-swaps
+        // the isolate on a mismatch — converge-to-declared-head without a
+        // doorway restart. Actuation twin of the background reconcile tick;
+        // same operator-seat class as /admin/steward-peers/refresh. Covered by
+        // is_service_path via the "/admin" prefix (POST, so the GET-only EPR
+        // router never shadows it regardless).
+        (Method::POST, "/admin/ssr-bundle/refresh") => {
+            to_boxed(routes::handle_ssr_bundle_refresh(Arc::clone(&state)).await)
         }
 
         // Kitsune2 bootstrap coherence read-model (Cat-C node-local Operational
