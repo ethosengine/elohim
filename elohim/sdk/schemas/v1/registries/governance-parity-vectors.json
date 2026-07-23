@@ -1,0 +1,87 @@
+{
+  "$id": "epr:registry:governance-parity-vectors",
+  "version": 1,
+  "description": "Golden-vector corpus for .epr-meta evaluator parity — the governance correspondence theorem. Every evaluator (Python PreToolUse hook, Python git-gate, Rust eprfs-meta/epr-cli, any future Codex-side gate) MUST derive these exact outcomes from these cascades. Two runtimes deriving different verdicts from the same manifests is a forked governance plane. Source of truth: this file; runners project it into temp fixture trees. Decision vocabulary: epr:schema:enum:decision (permit|refuse|refer). Severity law: deny > ask > inject; measure/dispatch never block. Ceiling law: ask-class outcomes are REFER (first-class, routed), never a collapsed warn.",
+  "vectors": [
+    {
+      "name": "no-rule-clean-allow",
+      "manifests": {},
+      "write": { "path": "docs/note.md", "new": true },
+      "expect": { "decision": "permit", "winning_class": null, "rule_id": null, "witnessed": false },
+      "law": "Silence when no rule fired is clean; nothing to witness."
+    },
+    {
+      "name": "deny-fires-refuse",
+      "manifests": {
+        ".epr-meta": "rules:\n  - id: no-new-md\n    class: deny\n    when: { write: \"*.md\", new: true }\n    require-frontmatter: [title]\n    why: test"
+      },
+      "write": { "path": "orphan.md", "new": true, "content": "no frontmatter here" },
+      "expect": { "decision": "refuse", "winning_class": "deny", "rule_id": "no-new-md", "witnessed": true },
+      "law": "Deny-class refusal on the deterministic floor."
+    },
+    {
+      "name": "ask-fires-refer",
+      "manifests": {
+        "notes/.epr-meta": "rules:\n  - id: confirm-notes\n    class: ask\n    when: { write: \"*.md\", new: true }\n    require-frontmatter: [title]\n    why: test"
+      },
+      "write": { "path": "notes/draft.md", "new": true, "content": "bare" },
+      "expect": { "decision": "refer", "winning_class": "ask", "rule_id": "confirm-notes", "witnessed": true },
+      "law": "Ask IS the ceiling marker at authoring time — a routed referral, never a collapsed warn and never conflated with deny."
+    },
+    {
+      "name": "deny-beats-ask-severity",
+      "manifests": {
+        ".epr-meta": "rules:\n  - id: root-deny\n    class: deny\n    when: { write: \"*.md\", new: true }\n    require-frontmatter: [title]\n    why: test",
+        "sub/.epr-meta": "rules:\n  - id: sub-ask\n    class: ask\n    when: { write: \"*.md\", new: true }\n    require-frontmatter: [title]\n    why: test"
+      },
+      "write": { "path": "sub/x.md", "new": true, "content": "bare" },
+      "expect": { "decision": "refuse", "winning_class": "deny", "rule_id": "root-deny", "witnessed": true },
+      "law": "Severity single-winner: deny > ask. Cascade merges root-first; both fire; deny wins."
+    },
+    {
+      "name": "inject-only-permits-with-advice",
+      "manifests": {
+        "adv/.epr-meta": "rules:\n  - id: advise-only\n    class: inject\n    when: { write: \"*.md\", new: true }\n    require-frontmatter: [title]\n    why: test"
+      },
+      "write": { "path": "adv/y.md", "new": true, "content": "bare" },
+      "expect": { "decision": "permit", "winning_class": "inject", "rule_id": "advise-only", "witnessed": true },
+      "law": "Inject narrows nothing — permit carrying advisory witness."
+    },
+    {
+      "name": "measure-never-blocks",
+      "manifests": {
+        "m/.epr-meta": "rules:\n  - id: observe-md\n    class: measure\n    when: { write: \"*.md\", new: true }\n    require-frontmatter: [title]\n    why: test"
+      },
+      "write": { "path": "m/z.md", "new": true, "content": "bare" },
+      "expect": { "decision": "permit", "winning_class": "measure", "rule_id": "observe-md", "witnessed": true },
+      "law": "Observation tier: fires, is witnessed, never blocks."
+    },
+    {
+      "name": "dispatch-permits-and-directs",
+      "manifests": {
+        "d/.epr-meta": "rules:\n  - id: dispatch-review\n    class: dispatch\n    when: { write: \"*.md\", new: true }\n    require-frontmatter: [title]\n    parameters: { dispatch-agent: code-reviewer, dispatch-prompt: \"review the governance registry edit\" }\n    why: test"
+      },
+      "write": { "path": "d/w.md", "new": true, "content": "bare" },
+      "expect": { "decision": "permit", "winning_class": "dispatch", "rule_id": "dispatch-review", "witnessed": true, "directive": "dispatch" },
+      "law": "Dispatch never blocks; it witnesses and directs a background agent. A silently-dropped dispatch verdict is a defect (pre-slice behavior)."
+    },
+    {
+      "name": "unresolvable-validator-refers",
+      "manifests": {
+        "v/.epr-meta": "rules:\n  - id: ghost-validator\n    class: deny\n    when: { write: \"*.md\", new: true }\n    validator: epr:validator-does-not-exist\n    why: test"
+      },
+      "write": { "path": "v/q.md", "new": true, "content": "bare" },
+      "expect": { "decision": "refer", "winning_class": "ask", "rule_id": "ghost-validator", "witnessed": true, "refer_reason": "unresolvable-validator" },
+      "law": "An unresolvable reference must never soften to inject (the pre-slice soundness inversion) and must not hard-deny at authoring polarity: it routes. Declared runtime-scoped validators (e.g. rust-only) are NOT unresolvable — they are Unavailable-by-declaration and skip without downgrading the rule."
+    },
+    {
+      "name": "malformed-manifest-refers",
+      "manifests": {
+        "bad/.epr-meta": "rules:\n  - id: broken\n    class: deny\n    when: { write: \"*.md\" }\n    unknown-predicate-key: true"
+      },
+      "write": { "path": "bad/f.md", "new": false, "content": "x" },
+      "expect": { "decision": "refer", "winning_class": "ask", "rule_id": null, "witnessed": true, "refer_reason": "governance-manifest-malformed" },
+      "law": "Rule-integrity failure is a ceiling event: the gate cannot know what governance intended, so it routes rather than guessing — unless the write TARGETS the manifest itself (fixing is never blocked)."
+    }
+  ]
+}
