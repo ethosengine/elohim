@@ -310,13 +310,33 @@ impl ReaCommitmentService {
             .map(|v| v.into_iter().map(ReaCommitmentView::from).collect())
     }
 
+    /// Whether an update actually changes the commitment's lifecycle state.
+    ///
+    /// A PATCH to the state the row already holds (finished unchanged) is an
+    /// idempotent no-op. Re-notarizing it through the conductor churns a fresh
+    /// ActionHash for no semantic gain and, under projector back-pressure, sheds
+    /// as 503 {"status":"catching-up"} — the genesis "Seed Custody Commitments"
+    /// stage went Unstable on exactly this, a reseed re-activating already-active
+    /// rows. When this returns `false` the update skips the conductor round-trip
+    /// and takes the cheap diesel-direct path, which still applies any
+    /// `metadata_json` reconcile and returns the row (idempotent success).
+    fn state_transition_changes(
+        existing_state: &str,
+        existing_finished: bool,
+        update: &UpdateReaCommitmentState,
+    ) -> bool {
+        existing_state != update.state || update.finished.is_some_and(|f| f != existing_finished)
+    }
+
     /// Update commitment state.
     ///
     /// Like `create`, branches on the underlying commitment's action: for
     /// project-epr we round-trip through the conductor's
     /// content_store::update_rea_commitment_state coordinator (Task 6 of
     /// the substrate-rea-replication-fix plan); other actions take the
-    /// legacy diesel-direct path.
+    /// legacy diesel-direct path. A no-op transition (same state, finished
+    /// unchanged) always takes the diesel-direct path — see
+    /// `state_transition_changes`.
     pub async fn update_state(
         conn: &mut SqliteConnection,
         ctx: &AppContext,
@@ -329,7 +349,15 @@ impl ReaCommitmentService {
         let existing = rea_commitments::get_commitment(conn, ctx, id)?
             .ok_or_else(|| StorageError::NotFound(format!("commitment {} not found", id)))?;
 
-        if existing.action == PROJECT_EPR_ACTION {
+        // Idempotency: only round-trip the conductor when the state genuinely
+        // changes. A PATCH to the state the row already holds falls through to
+        // the diesel-direct path below — cheap, non-sheddable, and still applies
+        // any metadata_json reconcile. This is the server-side root fix for the
+        // 503 catching-up shed on redundant re-activation.
+        let state_changes =
+            Self::state_transition_changes(&existing.state, existing.finished == 1, update);
+
+        if existing.action == PROJECT_EPR_ACTION && state_changes {
             return Self::update_state_via_conductor(conn, ctx, id, update, events, hc_lamad).await;
         }
         // Soft gate mirrors the create path: custody-blob round-trips the conductor
@@ -342,14 +370,17 @@ impl ReaCommitmentService {
         // conductor-created (anchored). A rung-1 diesel row has NO DHT entry —
         // routing its update to the zome would error "no commitment found";
         // SQL stays authoritative for unanchored rows.
+        // The `state_changes` conjunct routes an idempotent no-op to the
+        // diesel-direct path below, never the sheddable conductor write.
         if CONDUCTOR_SOFT_ACTIONS.contains(&existing.action.as_str())
             && existing.dht_anchor_hash.is_some() // correctness: unanchored rows have no DHT entry
             && hc_lamad.is_some()
+            && state_changes
         {
             return Self::update_state_via_conductor(conn, ctx, id, update, events, hc_lamad).await;
         }
 
-        // Legacy diesel-direct path.
+        // Legacy diesel-direct path (also the idempotent no-op path).
         let commitment = rea_commitments::update_commitment_state(conn, ctx, id, update)?;
         if let Some(bus) = events {
             if commitment.action == PROJECT_EPR_ACTION && update.state == "cancelled" {
@@ -858,6 +889,59 @@ mod tests {
         assert!((input.resource_quantity_value.unwrap() - 1.5_f32).abs() < 1e-5);
         assert_eq!(input.note.as_deref(), Some("test note"));
         assert_eq!(input.medium_of_exchange_id, None);
+    }
+
+    // -------------------------------------------------------------------------
+    // Idempotent state-transition detection — a PATCH to the state the row
+    // already holds must NOT re-enter the conductor notarization write path
+    // (which churns a fresh ActionHash for no gain and, under projector
+    // back-pressure, sheds as 503 catching-up — the genesis custody-seed
+    // Unstable). `state_transition_changes` is the guard that routes no-op
+    // updates to the cheap diesel-direct path instead.
+    // -------------------------------------------------------------------------
+
+    fn upd(state: &str, finished: Option<bool>) -> UpdateReaCommitmentState {
+        UpdateReaCommitmentState {
+            state: state.to_string(),
+            finished,
+            metadata_json: None,
+        }
+    }
+
+    #[test]
+    fn same_state_no_finished_change_is_a_noop() {
+        assert!(!ReaCommitmentService::state_transition_changes(
+            "active",
+            false,
+            &upd("active", None)
+        ));
+    }
+
+    #[test]
+    fn different_state_is_a_real_change() {
+        assert!(ReaCommitmentService::state_transition_changes(
+            "proposed",
+            false,
+            &upd("active", None)
+        ));
+    }
+
+    #[test]
+    fn same_state_with_finished_flip_is_a_real_change() {
+        assert!(ReaCommitmentService::state_transition_changes(
+            "active",
+            false,
+            &upd("active", Some(true))
+        ));
+    }
+
+    #[test]
+    fn same_state_and_same_finished_is_a_noop() {
+        assert!(!ReaCommitmentService::state_transition_changes(
+            "active",
+            false,
+            &upd("active", Some(false))
+        ));
     }
 }
 

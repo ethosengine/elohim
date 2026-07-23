@@ -718,7 +718,11 @@ pub fn affirm_membership(input: AffirmMembershipInput) -> ExternResult<ActionHas
 
     // 3. Signature over the canonical payload.
     let payload = invite_payload_of(&token);
-    let valid = verify_signature(token.issuer_pubkey.clone(), token.signature.clone(), &payload)?;
+    let valid = verify_signature(
+        token.issuer_pubkey.clone(),
+        token.signature.clone(),
+        &payload,
+    )?;
     if !valid {
         return Err(wasm_error!("invite token signature invalid"));
     }

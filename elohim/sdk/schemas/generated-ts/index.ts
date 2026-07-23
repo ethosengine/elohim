@@ -164,6 +164,7 @@ export * from './views/stability-status-view';
 export * from './views/standing-score-view';
 export * from './views/topology-overview-view';
 export * from './views/upgrade-prompt-view';
+export * from './views/verdict-view';
 export * from './views/view-slice';
 export * from './views/weave-view';
 export * from './views/wisdom-invocation-response';

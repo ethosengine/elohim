@@ -265,13 +265,19 @@ export function defaultCustodyPairs(): CustodyPair[] {
 // Client
 // =============================================================================
 
-class CommitmentClient extends DoorwayClient {
+export class CommitmentClient extends DoorwayClient {
   async createCommitment(body: CommitmentBody): Promise<Response> {
     return this.fetch('/api/v1/commitments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+  }
+
+  /** Read one commitment by id (200 with the row, or 404). A pure read — used
+   * to recognize an already-active row before touching the write path. */
+  async getCommitment(id: string): Promise<Response> {
+    return this.fetch(`/api/v1/commitments/${id}`, { method: 'GET' });
   }
 
   async patchCommitmentState(
@@ -338,43 +344,97 @@ export async function seedCustodyCommitments(
 }
 
 /**
- * Transition every seeded custody-blob commitment from its creation-time
- * `proposed` state to `active` via PATCH /api/v1/commitments/{id}.
+ * Idempotency rule for the activation phase, given a commitment's currently
+ * stored state (or `null` when GET returned 404).
  *
- * Why: POST inserts `state = "proposed"` unconditionally (storage lifecycle
- * discipline — `db/rea_commitments.rs` `create_commitment`), but custody is
- * only live once active: the a2o reciprocity scenarios (and any real reader)
- * list `?action=custody-blob&state=active`. A seed row that never activates
- * satisfies the insert but is silently filtered by the view predicate — the
- * seed-row-shape lesson (history/2026-06-02-seed-row-shape-satisfies-view-
- * sql-predicates.md). Idempotent: ids are content-addressed, PATCH active →
- * active is a no-op write; runs after both fresh creates and 409 re-runs.
+ * Re-submitting a commitment that is ALREADY in the target state is a
+ * meaningful success, not a redundant write: a PATCH active→active still routes
+ * through the conductor/projection write path (`project-epr` is unconditional)
+ * and gets SHED under seed back-pressure with 503 {"status":"catching-up"}. The
+ * genesis "Seed Custody Commitments" stage went Unstable on exactly this — a
+ * reseed re-activating rows a prior run had already activated, exhausting the
+ * catching-up retry budget on no-op writes. Recognizing "already active" from a
+ * plain read keeps the row green without touching the shed path.
+ *
+ * `''`/unknown states fall through to `activate` (fail toward the write, never
+ * silently skip a row that isn't demonstrably active).
+ */
+export function activationDecision(
+  currentState: string | null | undefined,
+): 'skip-active' | 'activate' | 'missing' {
+  if (currentState == null) return 'missing';
+  return currentState === 'active' ? 'skip-active' : 'activate';
+}
+
+/**
+ * Transition every seeded custody-blob commitment to `active`, idempotently.
+ *
+ * Why activation at all: POST inserts `state = "proposed"` unconditionally
+ * (storage lifecycle discipline — `db/rea_commitments.rs` `create_commitment`),
+ * but custody is only live once active: the a2o reciprocity scenarios (and any
+ * real reader) list `?action=custody-blob&state=active`. A seed row that never
+ * activates satisfies the insert but is silently filtered by the view predicate
+ * — the seed-row-shape lesson (history/2026-06-02-seed-row-shape-satisfies-
+ * view-sql-predicates.md).
+ *
+ * The idempotency: read each row FIRST and only PATCH the ones that are still
+ * `proposed`. An already-`active` row (a re-seed, the common case on a live
+ * alpha) is recognized and skipped — the redundant PATCH that used to get shed
+ * as 503 catching-up never happens (see `activationDecision`).
+ *
+ * `opts` is forwarded to the peer-id resolver so the flow is testable offline;
+ * the live seed path passes none (real pod probes via global fetch).
  */
 export async function activateCustodyCommitments(
   client: CommitmentClient,
   pairs: CustodyPair[],
+  opts: ResolvePeerIdOptions = {},
 ): Promise<void> {
   console.log(`[seed-commitments] Activating ${pairs.length} custody-blob commitments...`);
 
   let activated = 0;
+  let alreadyActive = 0;
   let missing = 0;
 
   for (const pair of pairs) {
     // Same resolver as the seed phase — the per-host cache (peer-id.ts)
     // guarantees an identical id even if a pod flapped between phases.
-    const body = buildCustodyCommitmentBody(pair, await resolveCustodyPeerIds(pair));
+    const body = buildCustodyCommitmentBody(pair, await resolveCustodyPeerIds(pair, opts));
     const label = `${pair.providerHumanId.replace(/^human-/, '')}→${pair.receiverHumanId.replace(/^human-/, '')}`;
+
+    // Read-first idempotency check: recognize the same commitment already active
+    // and treat that as a valid success — no redundant, sheddable write.
+    const getResp = await client.getCommitment(body.id);
+    const decision =
+      getResp.status === 404
+        ? 'missing'
+        : getResp.ok
+          ? activationDecision(((await getResp.json()) as { state?: string }).state ?? null)
+          : 'activate'; // non-404 read failure: fall through to the write (which retries/reports)
+
+    if (decision === 'missing') {
+      // The POST for this pair never landed — loud but non-fatal so one
+      // missing row doesn't mask the activation of the rest.
+      console.warn(`  [?] ${label}: commitment ${body.id} not found — POST never landed?`);
+      missing += 1;
+      continue;
+    }
+
+    if (decision === 'skip-active') {
+      console.log(`  [=] ${label}: already active (idempotent — no write)`);
+      alreadyActive += 1;
+      continue;
+    }
 
     const response = await client.patchCommitmentState(body.id, 'active', body.metadata);
 
     if (response.ok) {
+      console.log(`  [+] ${label}: activated`);
       activated += 1;
       continue;
     }
 
     if (response.status === 404) {
-      // The POST for this pair never landed — loud but non-fatal so one
-      // missing row doesn't mask the activation of the rest.
       console.warn(`  [?] ${label}: commitment ${body.id} not found — POST never landed?`);
       missing += 1;
       continue;
@@ -388,7 +448,7 @@ export async function activateCustodyCommitments(
   }
 
   console.log(
-    `[seed-commitments] Activation done. active=${activated} missing=${missing} total=${pairs.length}`,
+    `[seed-commitments] Activation done. activated=${activated} already-active=${alreadyActive} missing=${missing} total=${pairs.length}`,
   );
 }
 

@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import {
+  activateCustodyCommitments,
+  activationDecision,
   buildCustodyCommitmentBody,
   defaultCustodyPairs,
   resolveCustodyPeerIds,
+  type CommitmentClient,
   type CustodyPair,
 } from '../seed-commitments.js';
 import { clearPeerIdCache, deterministicPeerId, resolvePeerId, storageUrlForHuman } from '../peer-id.js';
@@ -159,6 +162,96 @@ describe('resolvePeerId (Stage 2)', () => {
     );
     expect(resolved.provider).toBe(REAL_ID);
     expect(resolved.receiver).toBe('12D3KooWBhYqzhQ8XK2v9PqQ7TZxGw7vM1nRkLs5uJcDeFgHiJkL');
+  });
+});
+
+// =============================================================================
+// Idempotent activation — recognize an already-active commitment as a
+// meaningful success instead of re-submitting it (a PATCH active→active still
+// routes through the conductor/projection write path and gets shed under seed
+// back-pressure with 503 {"status":"catching-up"} — the genesis stage went
+// Unstable on exactly this no-op re-activation of rows a prior run had already
+// activated).
+// =============================================================================
+
+describe('activationDecision (idempotent activation rule)', () => {
+  it('an already-active row is a meaningful success — skip the redundant write', () => {
+    expect(activationDecision('active')).toBe('skip-active');
+  });
+
+  it('a proposed row still needs the activation write', () => {
+    expect(activationDecision('proposed')).toBe('activate');
+  });
+
+  it('a missing row (404 → null state) is reported missing, never activated', () => {
+    expect(activationDecision(null)).toBe('missing');
+  });
+
+  it('an unknown/empty state falls through to activate (fail toward the write, not silent skip)', () => {
+    expect(activationDecision('')).toBe('activate');
+  });
+});
+
+describe('activateCustodyCommitments (offline, injected client + peer probe)', () => {
+  const REAL = '12D3KooWQAaKDy1JkpBNLHEP7KjazhAmDCSUzVyLUQ62eftF73N4';
+  const pair: CustodyPair = {
+    providerHumanId: 'human-matthew-manager',
+    providerArchetype: 'desktop',
+    receiverHumanId: 'human-jessica-spouse',
+    receiverArchetype: 'desktop',
+    blobHash: 'sha256-deadbeef',
+    blobSizeBytes: 1,
+  };
+
+  beforeEach(() => clearPeerIdCache());
+  afterEach(() => vi.restoreAllMocks());
+
+  // Every /p2p/status probe returns the same real id → deterministic body ids
+  // computed offline; no live pods touched.
+  const peerFetch = () =>
+    vi.fn(async () => new Response(JSON.stringify({ peerId: REAL }), { status: 200 }));
+
+  it('already-active commitment: recognized via GET, NOT re-PATCHed', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const expectedId = buildCustodyCommitmentBody(pair, { provider: REAL, receiver: REAL }).id;
+
+    const getCommitment = vi.fn(
+      async (id: string) => new Response(JSON.stringify({ id, state: 'active' }), { status: 200 })
+    );
+    const patchCommitmentState = vi.fn();
+    const client = { getCommitment, patchCommitmentState } as unknown as CommitmentClient;
+
+    await activateCustodyCommitments(client, [pair], { fetchImpl: peerFetch() });
+
+    expect(getCommitment).toHaveBeenCalledWith(expectedId);
+    expect(patchCommitmentState).not.toHaveBeenCalled();
+  });
+
+  it('proposed commitment: PATCHed to active exactly once', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const getCommitment = vi.fn(
+      async (id: string) => new Response(JSON.stringify({ id, state: 'proposed' }), { status: 200 })
+    );
+    const patchCommitmentState = vi.fn(
+      async (_id: string, _state: string) => new Response('{}', { status: 200 })
+    );
+    const client = { getCommitment, patchCommitmentState } as unknown as CommitmentClient;
+
+    await activateCustodyCommitments(client, [pair], { fetchImpl: peerFetch() });
+
+    expect(patchCommitmentState).toHaveBeenCalledTimes(1);
+    expect(patchCommitmentState.mock.calls[0][1]).toBe('active');
+  });
+
+  it('missing commitment (GET 404): non-fatal, no PATCH attempted', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const getCommitment = vi.fn(async () => new Response('not found', { status: 404 }));
+    const patchCommitmentState = vi.fn();
+    const client = { getCommitment, patchCommitmentState } as unknown as CommitmentClient;
+
+    await activateCustodyCommitments(client, [pair], { fetchImpl: peerFetch() });
+
+    expect(patchCommitmentState).not.toHaveBeenCalled();
   });
 });
 
