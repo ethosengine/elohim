@@ -9,6 +9,10 @@ pub enum FindingStatus {
     Pass,
     Info,
     Warn,
+    /// Ceiling law: a routed referral to judgment. Distinct from `Warn`/`Fail`
+    /// so an `ask`-class governance outcome can never be presented as merely a
+    /// warn-level refusal. Blocking is carried separately by `blocks_reach`.
+    Refer,
     Fail,
 }
 

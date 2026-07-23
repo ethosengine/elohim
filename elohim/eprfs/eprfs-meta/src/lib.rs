@@ -7,8 +7,9 @@
 mod evaluation;
 
 pub use evaluation::{
-    evaluate_path, evaluate_path_with, GovernanceEvaluation, GovernanceVerdict, GovernanceWrite,
-    NoValidators, PolicyDiagnostic, ValidatorOutcome, ValidatorProvider, ValidatorRequest,
+    evaluate_path, evaluate_path_with, policy_established_by, resolve_decision,
+    GovernanceEvaluation, GovernanceVerdict, GovernanceWrite, NoValidators, PolicyDiagnostic,
+    ResolvedDecision, ValidatorOutcome, ValidatorProvider, ValidatorRequest,
 };
 
 use std::{

@@ -131,14 +131,17 @@ fn run_with_revisions(
                     );
                 }
                 for verdict in evaluation.verdicts {
+                    // Ceiling law: `ask` is a routed referral (`Refer`), never
+                    // collapsed into the `Warn`-level refusal that `deny` carries.
+                    // Both still block reach, but they are no longer the same
+                    // status — a caller can distinguish "refused" from "routed to
+                    // judgment".
                     let (status, blocks_reach) = match verdict.class {
-                        GovernanceRuleClass::Deny | GovernanceRuleClass::Ask => {
-                            (FindingStatus::Warn, true)
-                        }
-                        GovernanceRuleClass::Inject => (FindingStatus::Info, false),
-                        GovernanceRuleClass::Measure | GovernanceRuleClass::Dispatch => {
-                            (FindingStatus::Info, false)
-                        }
+                        GovernanceRuleClass::Deny => (FindingStatus::Warn, true),
+                        GovernanceRuleClass::Ask => (FindingStatus::Refer, true),
+                        GovernanceRuleClass::Inject
+                        | GovernanceRuleClass::Measure
+                        | GovernanceRuleClass::Dispatch => (FindingStatus::Info, false),
                     };
                     let mut finding = Finding::new(
                         format!("governance.rule.{}", verdict.rule_id),
@@ -146,6 +149,9 @@ fn run_with_revisions(
                         verdict.reason,
                     )
                     .path(&normalized);
+                    if let Some(refer_reason) = verdict.refer_reason {
+                        finding = finding.detail(format!("routed to judgment: {refer_reason}"));
+                    }
                     if blocks_reach {
                         finding = finding.blocking();
                     }

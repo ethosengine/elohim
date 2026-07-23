@@ -11,6 +11,7 @@ use std::{collections::BTreeMap, fs, path::Path};
 use eprfs_core::{EprMetaResolution, GovernanceRule, GovernanceRuleClass, GovernanceRulePredicate};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 
 use crate::{flow_depth_ok, resolve_path, Result, MAX_MANIFEST_BYTES};
 
@@ -45,6 +46,101 @@ pub struct GovernanceVerdict {
     pub reason: String,
     pub rule_id: String,
     pub policy_ref: Option<String>,
+    /// Ceiling-law vocabulary for `ask`-class (refer) verdicts: why the
+    /// deterministic floor routed to judgment rather than deciding. One of
+    /// `rule-fired`, `unresolvable-validator`, `policy-pin-mismatch`,
+    /// `governance-manifest-malformed`, `escalation-requires-ratification`.
+    /// `None` for non-referral classes (deny/inject/measure/dispatch).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refer_reason: Option<String>,
+}
+
+/// The single-winner projection of a set of verdicts onto the keel decision
+/// spine. `eprfs-meta` mirrors the keel `Decision` vocabulary as strings
+/// (`permit`/`refuse`/`refer`) rather than depending on `elohim-epr`, which is
+/// deliberately unreachable from this publishable, runtime-agnostic crate.
+///
+/// **Severity law.** `deny > ask > inject`; `measure`/`dispatch` never block.
+/// **Ceiling law.** An `ask`-class winner is `refer` (routed), never a
+/// collapsed `refuse`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResolvedDecision {
+    /// `permit` | `refuse` | `refer` — the keel decision vocabulary.
+    pub decision: String,
+    /// The kebab-case class of the highest-severity verdict, or `None` when
+    /// nothing fired (a clean allow).
+    pub winning_class: Option<String>,
+    /// The rule id of the winning verdict, or `None` when nothing fired.
+    pub rule_id: Option<String>,
+    /// The refer reason carried by the winner when `decision == "refer"`.
+    pub refer_reason: Option<String>,
+}
+
+/// Severity rank for the single-winner cascade. `deny` is the hardest floor;
+/// `measure` is the softest observation tier. `measure`/`dispatch` never block.
+fn class_severity(class: &GovernanceRuleClass) -> u8 {
+    match class {
+        GovernanceRuleClass::Deny => 4,
+        GovernanceRuleClass::Ask => 3,
+        GovernanceRuleClass::Inject => 2,
+        GovernanceRuleClass::Dispatch => 1,
+        GovernanceRuleClass::Measure => 0,
+    }
+}
+
+fn class_str(class: &GovernanceRuleClass) -> &'static str {
+    match class {
+        GovernanceRuleClass::Deny => "deny",
+        GovernanceRuleClass::Ask => "ask",
+        GovernanceRuleClass::Inject => "inject",
+        GovernanceRuleClass::Measure => "measure",
+        GovernanceRuleClass::Dispatch => "dispatch",
+    }
+}
+
+/// Collapse fired verdicts to one keel decision by severity single-winner.
+///
+/// The semantics live here in the library (not the parity test) so every
+/// consumer — Rust runners, the parity corpus, future hosts — narrows the same
+/// way. `deny` → `refuse`, `ask` → `refer`, everything else → `permit`. Empty
+/// input is a clean allow (`permit`, no winner).
+pub fn resolve_decision(verdicts: &[GovernanceVerdict]) -> ResolvedDecision {
+    let winner = verdicts
+        .iter()
+        .enumerate()
+        .max_by_key(|(index, verdict)| {
+            // Highest severity wins; earliest position breaks ties (negate the
+            // index so `max_by_key` prefers the earlier verdict).
+            (class_severity(&verdict.class), std::cmp::Reverse(*index))
+        })
+        .map(|(_, verdict)| verdict);
+
+    match winner {
+        None => ResolvedDecision {
+            decision: "permit".into(),
+            winning_class: None,
+            rule_id: None,
+            refer_reason: None,
+        },
+        Some(verdict) => {
+            let decision = match verdict.class {
+                GovernanceRuleClass::Deny => "refuse",
+                GovernanceRuleClass::Ask => "refer",
+                GovernanceRuleClass::Inject
+                | GovernanceRuleClass::Measure
+                | GovernanceRuleClass::Dispatch => "permit",
+            };
+            ResolvedDecision {
+                decision: decision.into(),
+                winning_class: Some(class_str(&verdict.class).into()),
+                rule_id: Some(verdict.rule_id.clone()),
+                refer_reason: (decision == "refer")
+                    .then(|| verdict.refer_reason.clone())
+                    .flatten(),
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -115,19 +211,65 @@ pub fn evaluate_path_with(
     let resolution = resolve_path(repo_root, target)?;
     let (policies, mut diagnostics) = load_policies(repo_root);
     let mut rules = resolution.effective_rules.clone();
+    // Verdicts a tampered content pin injects directly, bypassing rule expansion.
+    let mut pin_verdicts: Vec<GovernanceVerdict> = Vec::new();
 
     for binding in &resolution.effective_policies {
         match policies.get(&binding.policy) {
-            Some(policy) => match policy.expand(binding) {
-                Some(rule) => rules.push(rule),
-                None => diagnostics.push(PolicyDiagnostic {
-                    code: "policy.invalid".into(),
-                    message: format!(
-                        "policy `{}` has no evaluable predicate and was not applied",
-                        binding.policy
-                    ),
-                }),
-            },
+            Some(policy) => {
+                // Content-pin verification (authoring polarity): a tampered
+                // registry row routes to judgment rather than applying its
+                // unverified semantics — never bricks the repo, never proceeds
+                // silently.
+                if let Some(declared) = policy.content_hash.as_deref() {
+                    let pin_ok = compute_row_hash(&policy.raw_row)
+                        .as_deref()
+                        .map(|actual| actual == declared)
+                        .unwrap_or(false);
+                    if !pin_ok {
+                        diagnostics.push(PolicyDiagnostic {
+                            code: "policy.pin-mismatch".into(),
+                            message: format!(
+                                "policy `{}` failed its content pin; routing to judgment instead of applying it",
+                                binding.policy
+                            ),
+                        });
+                        let when = binding
+                            .when
+                            .clone()
+                            .or_else(|| policy.scope.clone())
+                            .unwrap_or(Value::Null);
+                        if matches_when(&when, write) {
+                            let why = binding
+                                .why
+                                .clone()
+                                .or_else(|| policy.why.clone())
+                                .unwrap_or_default();
+                            pin_verdicts.push(GovernanceVerdict {
+                                class: GovernanceRuleClass::Ask,
+                                reason: format!(
+                                    "policy `{}` failed its content pin. {why}",
+                                    binding.policy
+                                ),
+                                rule_id: binding.id.clone(),
+                                policy_ref: Some(binding.policy.clone()),
+                                refer_reason: Some("policy-pin-mismatch".into()),
+                            });
+                        }
+                        continue;
+                    }
+                }
+                match policy.expand(binding) {
+                    Some(rule) => rules.push(rule),
+                    None => diagnostics.push(PolicyDiagnostic {
+                        code: "policy.invalid".into(),
+                        message: format!(
+                            "policy `{}` has no evaluable predicate and was not applied",
+                            binding.policy
+                        ),
+                    }),
+                }
+            }
             None => diagnostics.push(PolicyDiagnostic {
                 code: "policy.unknown".into(),
                 message: format!(
@@ -139,10 +281,11 @@ pub fn evaluate_path_with(
     }
 
     rules.sort_by(|left, right| left.id.cmp(&right.id));
-    let verdicts = rules
+    let mut verdicts: Vec<GovernanceVerdict> = rules
         .iter()
         .filter_map(|rule| evaluate_rule(repo_root, rule, write, validators))
         .collect();
+    verdicts.extend(pin_verdicts);
 
     Ok(GovernanceEvaluation {
         resolution,
@@ -185,6 +328,17 @@ struct RegistryPolicy {
     max_files: Option<Value>,
     measure: Option<Value>,
     validator: Option<String>,
+    /// Content pin over the canonical row body (`sha256:<hex>`), when present.
+    #[serde(rename = "contentHash")]
+    content_hash: Option<String>,
+    /// Ratification provenance. Operator ratification is `operator-*`; the
+    /// escalation ladder reads this to gate agent-authored `ask`/`deny`.
+    #[serde(rename = "established_by")]
+    established_by: Option<String>,
+    /// The authored row, verbatim, captured for content-pin verification.
+    /// Not deserialized from the typed schema — populated during load.
+    #[serde(skip)]
+    raw_row: Value,
 }
 
 impl RegistryPolicy {
@@ -306,9 +460,17 @@ fn load_policies(repo_root: &Path) -> (BTreeMap<String, RegistryPolicy>, Vec<Pol
         );
     }
 
+    // Re-parse the raw rows in file order so each typed policy can carry its
+    // authored body verbatim for content-pin verification. The typed and raw
+    // sequences are 1:1 by position.
+    let raw_rows: Vec<Value> = serde_yaml::from_str::<RawRegistry>(&text)
+        .map(|raw| raw.policies)
+        .unwrap_or_default();
+
     let mut policies = BTreeMap::new();
     let mut diagnostics = Vec::new();
-    for policy in registry.policies {
+    for (index, mut policy) in registry.policies.into_iter().enumerate() {
+        policy.raw_row = raw_rows.get(index).cloned().unwrap_or(Value::Null);
         let key = policy.key();
         if policy.predicate_and_parameters().is_none() {
             diagnostics.push(PolicyDiagnostic {
@@ -325,6 +487,42 @@ fn load_policies(repo_root: &Path) -> (BTreeMap<String, RegistryPolicy>, Vec<Pol
         }
     }
     (policies, diagnostics)
+}
+
+#[derive(Debug, Deserialize)]
+struct RawRegistry {
+    #[serde(default)]
+    policies: Vec<Value>,
+}
+
+/// Recompute the canonical content pin over an authored policy row: canonical
+/// JSON (sorted keys, no whitespace) of the row minus the `contentHash`,
+/// `status`, and `superseded` fields, hashed with SHA-256. This must match the
+/// Python `epr-meta-pin` canonicalization byte-for-byte.
+fn compute_row_hash(raw_row: &Value) -> Option<String> {
+    let obj = raw_row.as_object()?;
+    let mut filtered = Map::new();
+    for (key, value) in obj {
+        if matches!(key.as_str(), "contentHash" | "status" | "superseded") {
+            continue;
+        }
+        filtered.insert(key.clone(), value.clone());
+    }
+    // serde_json's default `Map` is a `BTreeMap`, so serialization is sorted by
+    // key and compact — exactly the canonical form.
+    let canonical = serde_json::to_string(&Value::Object(filtered)).ok()?;
+    let digest = Sha256::digest(canonical.as_bytes());
+    Some(format!("sha256:{}", hex::encode(digest)))
+}
+
+/// Ratification provenance for a registry policy (`id@version`), or `None` when
+/// the policy is unknown or unratified. Host validators (the escalation ladder)
+/// read this without re-implementing registry parsing.
+pub fn policy_established_by(repo_root: impl AsRef<Path>, policy_key: &str) -> Option<String> {
+    let (policies, _diagnostics) = load_policies(repo_root.as_ref());
+    policies
+        .get(policy_key)
+        .and_then(|policy| policy.established_by.clone())
 }
 
 fn evaluate_rule(
@@ -393,14 +591,21 @@ fn evaluate_rule(
                     format!("validator `{reference}` flagged this write: {reason}. {why}")
                 }
                 ValidatorOutcome::Unavailable => {
+                    // Ceiling law: an unresolvable validator reference must NOT
+                    // soften to `inject` (the pre-slice soundness inversion) and
+                    // must not hard-deny at authoring polarity — it routes to
+                    // judgment. A validator declared for another runtime is
+                    // implemented (Pass/Flag) in the host that owns it, so it
+                    // never reaches this arm there; only genuinely unknown refs do.
                     return Some(GovernanceVerdict {
-                        class: GovernanceRuleClass::Inject,
+                        class: GovernanceRuleClass::Ask,
                         reason: format!(
-                            "validator `{reference}` has no provider in this host (advisory). {why}"
+                            "validator `{reference}` is unresolvable in this host; routing to judgment. {why}"
                         ),
                         rule_id: rule.id.clone(),
                         policy_ref: rule.policy_ref.clone(),
-                    })
+                        refer_reason: Some("unresolvable-validator".into()),
+                    });
                 }
             }
         }
@@ -419,6 +624,7 @@ fn evaluate_rule(
                     ),
                     rule_id: rule.id.clone(),
                     policy_ref: rule.policy_ref.clone(),
+                    refer_reason: None,
                 });
             }
             if soft.is_some_and(|ceiling| lines >= ceiling) {
@@ -431,6 +637,7 @@ fn evaluate_rule(
                     ),
                     rule_id: rule.id.clone(),
                     policy_ref: rule.policy_ref.clone(),
+                    refer_reason: None,
                 });
             }
             return None;
@@ -441,11 +648,15 @@ fn evaluate_rule(
         | GovernanceRulePredicate::Unknown => return None,
     };
 
+    // A plain `ask` rule firing is a routed referral at authoring time; mark it
+    // `rule-fired` per the ceiling-law vocabulary. Non-referral classes carry none.
+    let refer_reason = (rule.class == GovernanceRuleClass::Ask).then(|| "rule-fired".to_string());
     Some(GovernanceVerdict {
         class: rule.class.clone(),
         reason,
         rule_id: rule.id.clone(),
         policy_ref: rule.policy_ref.clone(),
+        refer_reason,
     })
 }
 

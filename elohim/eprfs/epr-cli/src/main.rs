@@ -164,6 +164,7 @@ fn print_human(report: &Report) {
             FindingStatus::Pass => "✓",
             FindingStatus::Info => "·",
             FindingStatus::Warn => "!",
+            FindingStatus::Refer => "→",
             FindingStatus::Fail => "✗",
         };
         let reach = if finding.blocks_reach { " [reach]" } else { "" };

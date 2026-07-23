@@ -5,9 +5,10 @@
 //! can resolve the same references to content-addressed WASM without changing
 //! `.epr-meta` parsing or policy evaluation.
 
-use std::{fs, path::Path};
+use std::{collections::HashSet, fs, path::Path};
 
 use eprfs_meta::{ValidatorOutcome, ValidatorProvider, ValidatorRequest};
+use serde::Deserialize;
 use serde_json::Value;
 
 const ARCHETYPE_BUDGETS: &str = "genesis/data/devices/archetype-resource-budgets.json";
@@ -25,6 +26,7 @@ impl ValidatorProvider for ElohimRepositoryValidators {
             "epr:validator-archetype-resource-alignment" => archetype_resource_alignment(request),
             "epr:validator-test-bench-aggregate-capacity" => test_bench_aggregate_capacity(request),
             "epr:validator-eprfs-meta-domain-neutrality" => eprfs_meta_domain_neutrality(request),
+            "epr:validator-escalation-ladder" => escalation_ladder(request),
             _ => return ValidatorOutcome::Unavailable,
         };
         detail.map_or(ValidatorOutcome::Pass, |reason| ValidatorOutcome::Flag {
@@ -42,6 +44,105 @@ fn eprfs_meta_domain_neutrality(request: &ValidatorRequest<'_>) -> Option<String
         "net-new concrete validator identity in eprfs-meta; implement it behind ValidatorProvider"
             .into()
     })
+}
+
+/// Agency charter — the escalation ladder. Agents may self-grant `measure` /
+/// `inject` / `dispatch` freely (observation cannot harm), but authoring or
+/// raising a rule to `ask` / `deny` requires a policy pin carrying deliberation
+/// provenance — ratified by the deliberating community (today operator+agents;
+/// tomorrow a qahal), never agent self-declaration. Ratification completes at
+/// the branch rung: the dev-merge acceptance is the CanonizationRef of repo
+/// governance.
+///
+/// Fires on writes to `.epr-meta` governance files: any rule that introduces or
+/// raises to `ask`/`deny` (relative to prior content) without binding a
+/// `policy:` whose registry row carries `established_by: deliberated-*` (or the
+/// legacy `operator-*` form) is flagged. The canonical flag token is
+/// `escalation-requires-ratification`, which the host surfaces as a refer.
+fn escalation_ladder(request: &ValidatorRequest<'_>) -> Option<String> {
+    if !is_epr_meta_file(&request.write.path) {
+        return None;
+    }
+    let post_rules = parse_epr_meta_rules(request.write.content.as_deref());
+    let prior_escalated: HashSet<String> =
+        parse_epr_meta_rules(request.write.prior_content.as_deref())
+            .into_iter()
+            .filter(|rule| is_escalation_class(rule.class.as_deref()))
+            .map(|rule| rule.id)
+            .collect();
+
+    let mut offenders = Vec::new();
+    for rule in &post_rules {
+        if !is_escalation_class(rule.class.as_deref()) {
+            continue;
+        }
+        // Already at ask/deny in the prior content — not a new escalation.
+        if prior_escalated.contains(&rule.id) {
+            continue;
+        }
+        let ratified = rule
+            .policy
+            .as_deref()
+            .and_then(|policy| eprfs_meta::policy_established_by(request.repo_root, policy))
+            .is_some_and(|established_by| {
+                // Deliberation provenance (the "us" convention, 2026-07-23): `deliberated-*`
+                // records the deliberating community (today operator+agents; tomorrow a qahal);
+                // ratification completes at dev-merge acceptance. `operator-*` is the legacy
+                // pre-convention form on rows predating it.
+                established_by.starts_with("operator-")
+                    || established_by.starts_with("deliberated-")
+            });
+        if !ratified {
+            offenders.push(format!(
+                "{}({})",
+                rule.id,
+                rule.class.as_deref().unwrap_or("inject")
+            ));
+        }
+    }
+    (!offenders.is_empty())
+        .then(|| format!("escalation-requires-ratification: {}", offenders.join(", ")))
+}
+
+#[derive(Debug, Deserialize)]
+struct LadderRule {
+    id: String,
+    #[serde(default)]
+    class: Option<String>,
+    #[serde(default)]
+    policy: Option<String>,
+}
+
+fn parse_epr_meta_rules(content: Option<&str>) -> Vec<LadderRule> {
+    let Some(content) = content else {
+        return Vec::new();
+    };
+    #[derive(Debug, Deserialize)]
+    struct Doc {
+        #[serde(default)]
+        rules: Vec<LadderRule>,
+    }
+    serde_yaml::from_str::<Doc>(frontmatter_or_whole(content))
+        .map(|doc| doc.rules)
+        .unwrap_or_default()
+}
+
+fn frontmatter_or_whole(text: &str) -> &str {
+    if let Some(rest) = text.strip_prefix("---\n") {
+        if let Some(end) = rest.find("\n---") {
+            return &rest[..end];
+        }
+    }
+    text
+}
+
+fn is_escalation_class(class: Option<&str>) -> bool {
+    matches!(class, Some("ask") | Some("deny"))
+}
+
+fn is_epr_meta_file(path: &str) -> bool {
+    let base = basename(path);
+    base == ".epr-meta" || (base == "manifest.md" && path.contains(".epr-meta/"))
 }
 
 fn p2p_design_gate(request: &ValidatorRequest<'_>) -> Option<String> {
@@ -358,6 +459,96 @@ fn basename(path: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use eprfs_core::{GovernanceRule, GovernanceRuleClass, GovernanceRulePredicate};
+    use eprfs_meta::GovernanceWrite;
+    use tempfile::TempDir;
+
+    fn dummy_rule() -> GovernanceRule {
+        GovernanceRule {
+            id: "ladder".into(),
+            class: GovernanceRuleClass::Ask,
+            when: Value::Null,
+            predicate: GovernanceRulePredicate::Validator,
+            parameters: Value::String("epr:validator-escalation-ladder".into()),
+            policy_ref: None,
+            why: None,
+        }
+    }
+
+    fn write_charter_registry(dir: &TempDir) {
+        fs::create_dir_all(dir.path().join(".claude/epr-meta")).unwrap();
+        fs::write(
+            dir.path().join(".claude/epr-meta/policies.yaml"),
+            "epr-meta-policies-version: 1\npolicies:\n  - id: governance-escalation-ladder\n    version: 1\n    class: ask\n    validator: epr:validator-escalation-ladder\n    established_by: operator-ratification-pending-2026-07-23\n",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn escalation_ladder_flags_unratified_ask_or_deny() {
+        let dir = TempDir::new().unwrap();
+        write_charter_registry(&dir);
+        let rule = dummy_rule();
+        let mut write = GovernanceWrite::new(".claude/epr-meta/.epr-meta");
+        write.content = Some(
+            "---\nepr-meta-version: 1\nid: local\nrules:\n  - id: bound-ask\n    class: ask\n    policy: governance-escalation-ladder@1\n  - id: bare-deny\n    class: deny\n  - id: obs\n    class: measure\n---\n"
+                .into(),
+        );
+        let request = ValidatorRequest {
+            repo_root: dir.path(),
+            reference: "epr:validator-escalation-ladder",
+            rule: &rule,
+            write: &write,
+        };
+
+        let flag = escalation_ladder(&request).expect("bare deny must be flagged");
+        assert!(flag.starts_with("escalation-requires-ratification"));
+        assert!(flag.contains("bare-deny"), "{flag}");
+        // The operator-ratified ask is not an offender.
+        assert!(!flag.contains("bound-ask"), "{flag}");
+    }
+
+    #[test]
+    fn escalation_ladder_permits_prior_escalation_and_ratified_pins() {
+        let dir = TempDir::new().unwrap();
+        write_charter_registry(&dir);
+        let rule = dummy_rule();
+        let mut write = GovernanceWrite::new(".claude/epr-meta/.epr-meta");
+        // bare-deny was already deny in prior content — not a NEW escalation.
+        write.prior_content = Some(
+            "---\nepr-meta-version: 1\nrules:\n  - id: bare-deny\n    class: deny\n---\n".into(),
+        );
+        write.content = Some(
+            "---\nepr-meta-version: 1\nrules:\n  - id: bound-ask\n    class: ask\n    policy: governance-escalation-ladder@1\n  - id: bare-deny\n    class: deny\n---\n"
+                .into(),
+        );
+        let request = ValidatorRequest {
+            repo_root: dir.path(),
+            reference: "epr:validator-escalation-ladder",
+            rule: &rule,
+            write: &write,
+        };
+
+        assert!(escalation_ladder(&request).is_none());
+    }
+
+    #[test]
+    fn escalation_ladder_ignores_non_meta_writes() {
+        let dir = TempDir::new().unwrap();
+        write_charter_registry(&dir);
+        let rule = dummy_rule();
+        let mut write = GovernanceWrite::new("docs/note.md");
+        write.content = Some("---\nrules:\n  - id: x\n    class: deny\n---\n".into());
+        let request = ValidatorRequest {
+            repo_root: dir.path(),
+            reference: "epr:validator-escalation-ladder",
+            rule: &rule,
+            write: &write,
+        };
+
+        assert!(escalation_ladder(&request).is_none());
+    }
 
     #[test]
     fn aggregate_replaces_observed_humans_before_checking_ceiling() {
