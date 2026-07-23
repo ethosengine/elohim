@@ -22,17 +22,17 @@ export interface DistributionSummary {
    */
   projectorCount: number;
   /**
-   * Reach band the content is authored at — drives target replica count.
+   * Reach band the content is authored at — drives target replica count. Schema-8 vocabulary (elohim/sdk/schemas/v1/enums/reach.schema.json); see reach-vocabulary-frontend-strand backlog for the multi-vocabulary reconciliation history.
    */
   reachClass:
     | 'private'
+    | 'self'
     | 'intimate'
-    | 'household'
-    | 'neighborhood'
-    | 'collective'
+    | 'trusted'
+    | 'familiar'
     | 'community'
-    | 'district'
-    | 'public';
+    | 'public'
+    | 'commons';
   diversityHint: DiversityHint;
   /**
    * Where the bytes for this fetch came from.

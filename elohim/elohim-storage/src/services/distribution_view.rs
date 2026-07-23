@@ -52,19 +52,21 @@ pub enum DistributionViewError {
 /// Map a reach class to a sensible target replica count.
 ///
 /// Defaults are operator-tunable in a later sprint; T23 ships these as
-/// hard-coded structural floors. The relative ordering (Public > District >
+/// hard-coded structural floors. The relative ordering (Commons > Public >
 /// ... > Private) reflects "broader reach => more replicas needed for
-/// resilience under wider distribution."
+/// resilience under wider distribution." Schema-8 ladder (reach-vocab slice 2):
+/// Private/SelfScope both floor at 2 (both are single-viewer-scoped reach
+/// bands; SelfScope is not "broader" than Private for distribution purposes).
 pub fn replica_target_for(reach: &ReachClass) -> u32 {
     match reach {
         ReachClass::Private => 2,
+        ReachClass::SelfScope => 2,
         ReachClass::Intimate => 4,
-        ReachClass::Household => 6,
-        ReachClass::Neighborhood => 8,
-        ReachClass::Collective => 10,
+        ReachClass::Trusted => 6,
+        ReachClass::Familiar => 8,
         ReachClass::Community => 12,
-        ReachClass::District => 14,
-        ReachClass::Public => 16,
+        ReachClass::Public => 14,
+        ReachClass::Commons => 16,
     }
 }
 
@@ -285,16 +287,44 @@ pub async fn compose_distribution_summary(
 // ============================================================================
 
 /// Parse a reach string from the `content.reach` column into `ReachClass`.
+///
+/// Accepts the canonical schema-8 vocabulary
+/// (`elohim/sdk/schemas/v1/enums/reach.schema.json`) plus legacy kebab-8-era
+/// aliases for the five retired class names, because `content.reach` is
+/// STORED declared-reach data that may predate the slice-1 schema-8
+/// migration: `personal`→`SelfScope`, `household`→`Trusted`,
+/// `neighborhood`→`Familiar`, `collective`→`Community`, `district`→`Public`.
+///
+/// **Divergence from `services::epr_kind::parse_reach_key`, deliberate:**
+/// `parse_reach_key` also maps legacy `"public"` (the OLD top rung, 16
+/// replicas under the retired ladder) forward to `Reach::Commons`, because it
+/// is reconstructing authoring-time intent from a fixed historical vocabulary
+/// snapshot. This function instead reads `"public"` as canonical schema-8
+/// `Public` (14 replicas) — a bare stored `"public"` string is genuinely
+/// ambiguous post-slice-1 (old top rung vs. new canonical Public), and we
+/// resolve that ambiguity toward the canonical reading because replica
+/// targets are *minimums*: under-reading a genuine old top-rung row costs
+/// only a 2-replica delta on content that is already maximally open, while
+/// over-reading canonical `Public` as `Commons` would spend replication
+/// budget content doesn't need. `"commons"` is unambiguous (schema-8 only —
+/// no legacy vocabulary ever wrote that string) and always maps to
+/// `Commons`. See `genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md`.
 fn parse_reach_class(s: &str) -> Option<ReachClass> {
     match s {
         "private" => Some(ReachClass::Private),
+        "self" => Some(ReachClass::SelfScope),
         "intimate" => Some(ReachClass::Intimate),
-        "household" => Some(ReachClass::Household),
-        "neighborhood" => Some(ReachClass::Neighborhood),
-        "collective" => Some(ReachClass::Collective),
+        "trusted" => Some(ReachClass::Trusted),
+        "familiar" => Some(ReachClass::Familiar),
         "community" => Some(ReachClass::Community),
-        "district" => Some(ReachClass::District),
         "public" => Some(ReachClass::Public),
+        "commons" => Some(ReachClass::Commons),
+        // Legacy kebab-8-era aliases (STORED pre-migration data only).
+        "personal" => Some(ReachClass::SelfScope),
+        "household" => Some(ReachClass::Trusted),
+        "neighborhood" => Some(ReachClass::Familiar),
+        "collective" => Some(ReachClass::Community),
+        "district" => Some(ReachClass::Public),
         _ => None,
     }
 }
@@ -609,4 +639,66 @@ fn compute_reciprocity(
     };
 
     Ok((outflow - inflow).floor() as i64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `ReachClass::SelfScope` must serialize to exactly `"self"` — `self` is a
+    /// Rust reserved word so the variant is named `SelfScope` with an explicit
+    /// `#[serde(rename = "self")]`; a drifted rename here would silently break
+    /// every schema-8 "self" reach declaration.
+    #[test]
+    fn self_scope_serializes_as_self() {
+        let json = serde_json::to_value(ReachClass::SelfScope).unwrap();
+        assert_eq!(json, serde_json::Value::String("self".to_string()));
+    }
+
+    /// Pinned replica ladder (reach-vocab slice 2): every schema-8 class in
+    /// declared order, verbatim from the task spec.
+    #[test]
+    fn replica_target_ladder_matches_pinned_spec() {
+        assert_eq!(replica_target_for(&ReachClass::Private), 2);
+        assert_eq!(replica_target_for(&ReachClass::SelfScope), 2);
+        assert_eq!(replica_target_for(&ReachClass::Intimate), 4);
+        assert_eq!(replica_target_for(&ReachClass::Trusted), 6);
+        assert_eq!(replica_target_for(&ReachClass::Familiar), 8);
+        assert_eq!(replica_target_for(&ReachClass::Community), 12);
+        assert_eq!(replica_target_for(&ReachClass::Public), 14);
+        assert_eq!(replica_target_for(&ReachClass::Commons), 16);
+    }
+
+    /// `parse_reach_class` accepts schema-8 canonical strings.
+    #[test]
+    fn parse_reach_class_accepts_schema_eight() {
+        assert_eq!(parse_reach_class("private"), Some(ReachClass::Private));
+        assert_eq!(parse_reach_class("self"), Some(ReachClass::SelfScope));
+        assert_eq!(parse_reach_class("intimate"), Some(ReachClass::Intimate));
+        assert_eq!(parse_reach_class("trusted"), Some(ReachClass::Trusted));
+        assert_eq!(parse_reach_class("familiar"), Some(ReachClass::Familiar));
+        assert_eq!(parse_reach_class("community"), Some(ReachClass::Community));
+        assert_eq!(parse_reach_class("public"), Some(ReachClass::Public));
+        assert_eq!(parse_reach_class("commons"), Some(ReachClass::Commons));
+    }
+
+    /// `parse_reach_class` accepts the five retired kebab-8-era stored aliases.
+    #[test]
+    fn parse_reach_class_accepts_legacy_aliases() {
+        assert_eq!(parse_reach_class("personal"), Some(ReachClass::SelfScope));
+        assert_eq!(parse_reach_class("household"), Some(ReachClass::Trusted));
+        assert_eq!(
+            parse_reach_class("neighborhood"),
+            Some(ReachClass::Familiar)
+        );
+        assert_eq!(parse_reach_class("collective"), Some(ReachClass::Community));
+        assert_eq!(parse_reach_class("district"), Some(ReachClass::Public));
+    }
+
+    /// Unknown strings still fall through to `None` (caller applies the
+    /// conservative `unwrap_or(ReachClass::Private)` fallback).
+    #[test]
+    fn parse_reach_class_rejects_unknown() {
+        assert_eq!(parse_reach_class("nonsense"), None);
+    }
 }

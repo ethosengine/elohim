@@ -1600,18 +1600,27 @@ pub enum ReplicaHealth {
 
 /// Reach class for a CID — mirrors the protocol Reach enum's content-distribution
 /// classes. Drives target replica count and badge tier.
+///
+/// Schema-8 vocabulary (`elohim/sdk/schemas/v1/enums/reach.schema.json`,
+/// mirrored by `elohim_epr::Reach`) — see the reach-vocabulary-frontend-strand
+/// backlog for the multi-vocabulary reconciliation history. `SelfScope`
+/// serializes as exactly `"self"` (verified by
+/// `distribution_view::tests::self_scope_serializes_as_self`), not
+/// `"self_scope"`, because `self` is a Rust reserved word and cannot be a
+/// variant name.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 #[serde(rename_all = "snake_case")]
 pub enum ReachClass {
     Private,
+    #[serde(rename = "self")]
+    SelfScope,
     Intimate,
-    Household,
-    Neighborhood,
-    Collective,
+    Trusted,
+    Familiar,
     Community,
-    District,
     Public,
+    Commons,
 }
 
 /// Where the bytes for the current fetch were sourced from.
