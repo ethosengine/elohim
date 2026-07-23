@@ -1,0 +1,1 @@
+-- irreversible data canonicalization; no down migration

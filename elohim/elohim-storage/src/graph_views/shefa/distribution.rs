@@ -95,24 +95,14 @@ pub fn build_details(engine: &GraphEngine, cid: &str) -> Result<DistributionDeta
     })
 }
 
-/// Schema-8 vocabulary + legacy kebab-8-era aliases — same mapping table as
-/// `services::distribution_view::parse_reach_class` (see its doc comment for
-/// the "public"-ambiguity rationale). Unknown/empty strings keep this
-/// function's pre-existing default (`Public`), unlike the DB-backed sibling's
-/// conservative `Private` fallback — this branch is a composition
-/// placeholder path (see module doc), not the primary distribution surface.
+/// Schema-8 vocabulary + legacy kebab-8-era aliases — delegates to
+/// `services::distribution_view::parse_reach_class` (the single source of
+/// truth for the mapping table) rather than duplicating the match arms.
+/// Unknown/empty strings (including the no-Cozo-row composition-placeholder
+/// case) now fall back to `ReachClass::Private` — the conservative,
+/// most-closed reading — matching the DB-backed sibling's fallback. This
+/// deliberately flips the prior `Public` (most-open) default; see slice-3
+/// task-5 for the rationale.
 fn reach_str_to_class(reach: &str) -> ReachClass {
-    match reach {
-        "private" => ReachClass::Private,
-        "self" | "personal" => ReachClass::SelfScope,
-        "intimate" => ReachClass::Intimate,
-        "trusted" | "household" => ReachClass::Trusted,
-        "familiar" | "neighborhood" => ReachClass::Familiar,
-        "community" | "collective" => ReachClass::Community,
-        "commons" => ReachClass::Commons,
-        // "public" and legacy "district" both land on canonical Public; see
-        // parse_reach_class's doc comment for the divergence from
-        // parse_reach_key's legacy-"public"→Commons reading.
-        _ => ReachClass::Public,
-    }
+    crate::services::distribution_view::parse_reach_class(reach).unwrap_or(ReachClass::Private)
 }

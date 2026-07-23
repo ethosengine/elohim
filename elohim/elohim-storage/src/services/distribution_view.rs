@@ -295,21 +295,11 @@ pub async fn compose_distribution_summary(
 /// migration: `personal`→`SelfScope`, `household`→`Trusted`,
 /// `neighborhood`→`Familiar`, `collective`→`Community`, `district`→`Public`.
 ///
-/// **Divergence from `services::epr_kind::parse_reach_key`, deliberate:**
-/// `parse_reach_key` also maps legacy `"public"` (the OLD top rung, 16
-/// replicas under the retired ladder) forward to `Reach::Commons`, because it
-/// is reconstructing authoring-time intent from a fixed historical vocabulary
-/// snapshot. This function instead reads `"public"` as canonical schema-8
-/// `Public` (14 replicas) — a bare stored `"public"` string is genuinely
-/// ambiguous post-slice-1 (old top rung vs. new canonical Public), and we
-/// resolve that ambiguity toward the canonical reading because replica
-/// targets are *minimums*: under-reading a genuine old top-rung row costs
-/// only a 2-replica delta on content that is already maximally open, while
-/// over-reading canonical `Public` as `Commons` would spend replication
-/// budget content doesn't need. `"commons"` is unambiguous (schema-8 only —
-/// no legacy vocabulary ever wrote that string) and always maps to
-/// `Commons`. See `genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md`.
-fn parse_reach_class(s: &str) -> Option<ReachClass> {
+/// Stored `"public"` is unambiguously canonical schema-8 `Public` as of the
+/// 2026-07-23 `content_reach_canonicalize` migration (every legacy top-rung
+/// `"public"` row was backfilled forward to `"commons"`); this reading now
+/// agrees with `services::epr_kind::parse_reach_key`.
+pub(crate) fn parse_reach_class(s: &str) -> Option<ReachClass> {
     match s {
         "private" => Some(ReachClass::Private),
         "self" => Some(ReachClass::SelfScope),
