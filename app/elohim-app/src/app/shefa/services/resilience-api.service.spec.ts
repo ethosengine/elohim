@@ -1,157 +1,95 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 
+import { firstValueFrom } from 'rxjs';
+
 import { ResilienceApiService } from './resilience-api.service';
-import type { ResilienceProfile } from '../models/resilience-profile.model';
 
 describe('ResilienceApiService', () => {
   let service: ResilienceApiService;
   let httpMock: HttpTestingController;
 
-  const stubProfile: ResilienceProfile = {
-    humanId: 'human-matthew-manager',
-    overallScore: 0.65,
-    protectionStatus: 'partial',
-    shardHealth: {
-      totalBlobs: 42,
-      totalShards: 120,
-      distinctPeers: 3,
-      averageShardsPerBlob: 2.86,
-      encodingBreakdown: { single: 10, chunked: 12, reedSolomon: 20 },
-      singlePointOfFailureCount: 10,
-      lastAccessVerifiedAt: '2026-03-11T10:00:00Z',
-    },
-    commitmentHealth: {
-      activeCommitments: 2,
-      reciprocatedCommitments: 1,
-      expiringSoon: 0,
-      totalPeersCommitted: 2,
-      commitmentCoverage: 0.6,
-    },
-    trustCircleDepth: {
-      householdPeers: 1,
-      friendPeers: 0,
-      communityPeers: 1,
-      institutionalPeers: 0,
-      totalCircles: 2,
-    },
-    contentRiskBreakdown: [
-      {
-        reach: 'private',
-        contentCount: 5,
-        shardDistribution: 1,
-        adequacy: 0.4,
-        exemplar: 'medical records',
-      },
-      {
-        reach: 'neighborhood',
-        contentCount: 30,
-        shardDistribution: 3,
-        adequacy: 0.8,
-        exemplar: 'faith community content',
-      },
-    ],
-    nextAction: {
-      type: 'connect',
-      description:
-        'Connect with a friend or community peer to diversify personal-reach backup',
-      urgency: 'soon',
-    },
-    lastComputedAt: '2026-03-11T10:00:00Z',
-  };
-
-  /** Fetch and flush in one call, returning the result. */
-  async function fetchAndFlush(
-    humanId = 'human-matthew-manager',
-    data: ResilienceProfile = stubProfile
-  ): Promise<ResilienceProfile> {
-    const promise = service.computeProfile(humanId);
-    httpMock.expectOne(`/api/v1/resilience/${humanId}/profile`).flush(data);
-    return promise;
-  }
-
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        ResilienceApiService,
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [ResilienceApiService, provideHttpClient(), provideHttpClientTesting()],
     });
     service = TestBed.inject(ResilienceApiService);
     httpMock = TestBed.inject(HttpTestingController);
   });
 
+  // No backend route exists for a human-scoped resilience profile (see the
+  // class-level comment on ResilienceApiService) — every test below asserts
+  // NO HTTP request is ever issued, in addition to the honestly-empty
+  // profile shape.
   afterEach(() => httpMock.verify());
 
-  it('computeProfile calls GET /api/v1/resilience/{humanId}/profile', async () => {
-    const promise = service.computeProfile('human-matthew-manager');
-    const req = httpMock.expectOne(
+  it('computeProfile never calls the network — returns an honestly-empty profile, no HTTP request', async () => {
+    const profile = await service.computeProfile('human-matthew-manager');
+
+    expect(profile.humanId).toBe('human-matthew-manager');
+    expect(profile.overallScore).toBe(0);
+    expect(profile.protectionStatus).toBe('at-risk');
+    expect(profile.contentRiskBreakdown).toEqual([]);
+    // httpMock.verify() in afterEach fails the test if any request was made.
+  });
+
+  it('computeProfile names the missing backend surface in nextAction.description', async () => {
+    const profile = await service.computeProfile('human-matthew-manager');
+
+    expect(profile.nextAction?.type).toBe('review');
+    expect(profile.nextAction?.description).toContain(
       '/api/v1/resilience/human-matthew-manager/profile'
     );
-    expect(req.request.method).toBe('GET');
-    req.flush(stubProfile);
-    expect(await promise).toEqual(stubProfile);
+    expect(profile.nextAction?.description).toContain('content_id');
   });
 
   it('getProfile returns null before computation', () => {
     expect(service.getProfile()).toBeNull();
   });
 
-  it('getProfile returns cached profile after computation', async () => {
-    await fetchAndFlush();
-    expect(service.getProfile()).toEqual(stubProfile);
+  it('getProfile returns the cached honestly-empty profile after computation', async () => {
+    const profile = await service.computeProfile('human-matthew-manager');
+    expect(service.getProfile()).toEqual(profile);
   });
 
-  it('getProtectionStatus returns status from cached profile', async () => {
+  it('getProtectionStatus returns "at-risk" (fail-closed floor) after computation, null before', async () => {
     expect(service.getProtectionStatus()).toBeNull();
-    await fetchAndFlush();
-    expect(service.getProtectionStatus()).toBe('partial');
+    await service.computeProfile('human-matthew-manager');
+    expect(service.getProtectionStatus()).toBe('at-risk');
   });
 
-  it('getNextAction returns action from cached profile', async () => {
+  it('getNextAction returns the "review" action naming the missing surface', async () => {
     expect(service.getNextAction()).toBeNull();
-    await fetchAndFlush();
-    expect(service.getNextAction()).toEqual(stubProfile.nextAction!);
+    await service.computeProfile('human-matthew-manager');
+    expect(service.getNextAction()?.type).toBe('review');
   });
 
-  it('getContentRiskBreakdown returns buckets from cached profile', async () => {
+  it('getContentRiskBreakdown returns an empty array (no content-risk data available)', async () => {
     expect(service.getContentRiskBreakdown()).toEqual([]);
-    await fetchAndFlush();
-    expect(service.getContentRiskBreakdown()).toEqual(
-      stubProfile.contentRiskBreakdown
-    );
+    await service.computeProfile('human-matthew-manager');
+    expect(service.getContentRiskBreakdown()).toEqual([]);
   });
 
-  it('getElohimAssessment returns null when no assessment', async () => {
-    await fetchAndFlush();
+  it('getElohimAssessment returns null (no assessment data available)', async () => {
+    await service.computeProfile('human-matthew-manager');
     expect(service.getElohimAssessment()).toBeNull();
   });
 
-  it('getElohimAssessment returns assessment when present', async () => {
-    const assessment = {
-      assessedAt: '2026-03-11T10:00:00Z',
-      assessedBy: { agentId: 'elohim-1' },
-      overallAdequacy: 0.7,
-      narrative: 'Your data protection is improving but personal records need attention.',
-      memories: [],
-      concerns: [
-        {
-          severity: 'concerning' as const,
-          description: 'Medical records have single-point-of-failure risk',
-        },
-      ],
-      attestations: ['constitutional-data-sovereignty-1'],
-    };
-    const profileWithAssessment: ResilienceProfile = {
-      ...stubProfile,
-      elohimAssessment: assessment,
-    };
-    await fetchAndFlush('human-matthew-manager', profileWithAssessment);
-    expect(service.getElohimAssessment()).toEqual(assessment);
+  it('getProfile$ emits the honestly-empty profile once, with no HTTP request, and caches it', async () => {
+    const profile = await firstValueFrom(service.getProfile$('human-matthew-manager'));
+
+    expect(profile.humanId).toBe('human-matthew-manager');
+    expect(profile.protectionStatus).toBe('at-risk');
+    expect(service.getProfile()).toEqual(profile);
+  });
+
+  it('getProfile$ unsubscribes any prior polling subscription before starting a new one', async () => {
+    const firstSub = service.getProfile$('human-a').subscribe();
+    expect(firstSub.closed).toBe(true); // `of(...)` completes synchronously.
+
+    // A second call must not throw and must still resolve to an honestly-empty profile.
+    const second = await firstValueFrom(service.getProfile$('human-b'));
+    expect(second.humanId).toBe('human-b');
   });
 });
