@@ -185,3 +185,129 @@ async fn distribute_records_gap_when_households_are_short() {
         gaps.iter().map(|g| &g.gap_kind).collect::<Vec<_>>()
     );
 }
+
+// ---------------------------------------------------------------------------
+// Self-stewardship: the selector can only ever pick THIS node today
+// ---------------------------------------------------------------------------
+//
+// `peer_statuses` is structurally self-only (author-local rows; cross-agent
+// aggregation deferred in the infrastructure zome), so `peer_selection` selects
+// the local node. The old push path treated that as a remote peer, failed to
+// resolve a transport binding to itself, and skipped every shard — the direct
+// cause of `elohim_shard_push_peer_unresolved_total` climbing on the pod that
+// selected itself, and of `shard_locations` staying empty.
+
+/// Self-selected + bytes present locally → exactly ONE `shard_locations` row,
+/// marked `self-held`, and NOT a single P2P command sent (no self-dial).
+#[tokio::test]
+async fn self_selection_records_self_held_location_and_never_pushes() {
+    use std::sync::Arc;
+
+    let pool = test_pool();
+    // The one selectable peer IS this node (agent_cid must be `uhCAk…`-shaped:
+    // `shard_locations.peer_id` is an agent_cid join key).
+    let _seed = spawn_p2p_with_peers(
+        pool.clone(),
+        &[("uhCAkSelfAgent", "home-self", "accepting")],
+    )
+    .await;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let store = Arc::new(
+        elohim_storage::BlobStore::new(tmp.path())
+            .await
+            .expect("blob store"),
+    );
+
+    // 4 KiB ≤ SINGLE_SHARD_MAX → encoding "none" → ONE shard whose hash IS the
+    // blob hash. Stocking the blob locally is therefore exactly "this node holds
+    // the shard's bytes" — the claim the self-held row makes.
+    let blob = vec![7u8; 4096];
+    let stored = store.store(&blob).await.expect("stock blob");
+
+    let (handle, mut cmd_rx) = elohim_storage::p2p::P2PHandle::for_testing_capturing_commands(
+        "uhCAkSelfAgent".to_string(),
+    );
+    let handle = handle.with_blob_store_for_testing(Arc::clone(&store));
+
+    let distributed = handle
+        .distribute_shards("content-self-held", &blob, &pool, "lamad")
+        .await
+        .unwrap();
+    assert_eq!(distributed, 1, "the self-held shard counts as placed");
+
+    let mut conn = pool.get().unwrap();
+    let rows =
+        elohim_storage::db::shard_locations::get_locations_for_shard(&mut conn, &stored.hash)
+            .unwrap();
+    assert_eq!(
+        rows.len(),
+        1,
+        "exactly one shard_locations row, got {rows:?}"
+    );
+    assert_eq!(
+        rows[0].peer_id, "uhCAkSelfAgent",
+        "the row is agent-keyed (agent_cid), never a transport id"
+    );
+    assert_eq!(
+        rows[0].status, "self-held",
+        "a self-held location must be distinguishable from a peer-verified one"
+    );
+
+    assert!(
+        cmd_rx.try_recv().is_err(),
+        "a self-selected shard must NOT produce any P2P command (no self-dial)"
+    );
+}
+
+/// Self-selected + bytes ABSENT locally → NO row. An unverifiable location is
+/// never fabricated; the placement gap stays honestly visible.
+#[tokio::test]
+async fn self_selection_records_nothing_when_bytes_are_absent() {
+    use std::sync::Arc;
+
+    let pool = test_pool();
+    let _seed = spawn_p2p_with_peers(
+        pool.clone(),
+        &[("uhCAkSelfAgent", "home-self", "accepting")],
+    )
+    .await;
+
+    let tmp = tempfile::tempdir().unwrap();
+    // Empty pantry — the blob below is never stocked.
+    let store = Arc::new(
+        elohim_storage::BlobStore::new(tmp.path())
+            .await
+            .expect("blob store"),
+    );
+
+    let blob = vec![9u8; 4096];
+    let expected_shard_hash = elohim_storage::BlobStore::compute_hash(&blob);
+
+    let (handle, mut cmd_rx) = elohim_storage::p2p::P2PHandle::for_testing_capturing_commands(
+        "uhCAkSelfAgent".to_string(),
+    );
+    let handle = handle.with_blob_store_for_testing(Arc::clone(&store));
+
+    let distributed = handle
+        .distribute_shards("content-self-dark", &blob, &pool, "lamad")
+        .await
+        .unwrap();
+    assert_eq!(distributed, 0, "unverifiable bytes place nothing");
+
+    let mut conn = pool.get().unwrap();
+    let rows = elohim_storage::db::shard_locations::get_locations_for_shard(
+        &mut conn,
+        &expected_shard_hash,
+    )
+    .unwrap();
+    assert!(
+        rows.is_empty(),
+        "a location we cannot verify must never be recorded, got {rows:?}"
+    );
+
+    assert!(
+        cmd_rx.try_recv().is_err(),
+        "still no self-dial when the bytes are absent"
+    );
+}

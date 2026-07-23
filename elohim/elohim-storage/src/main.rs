@@ -1893,13 +1893,55 @@ async fn async_main(
     let mut p2p_node = if args.enable_p2p
         && config.transport_backend != elohim_storage::config::TransportBackend::Iroh
     {
-        let agent_pubkey = args.agent_pubkey.clone().unwrap_or_else(|| {
-            // Generate a placeholder agent key if none provided
-            format!(
-                "uhCAk_{}",
-                &uuid::Uuid::new_v4().to_string().replace("-", "")[..32]
-            )
-        });
+        // Identity coherence — the advertised agent_cid MUST be a real Holochain
+        // agent key, never a per-boot random.
+        //
+        // This value is what the libp2p identity handshake broadcasts as its
+        // `agent_cid`, and receiving peers persist it into
+        // `peer_identity_bindings`. The shard push path resolves a selected
+        // holder's agent_cid → libp2p peer id through that table
+        // (`services::transport_resolve::resolve_agent_cid_to_libp2p`). A random
+        // placeholder can NEVER equal a real `uhCAk…` key, so the resolver
+        // returns None for every push, `distribute_shards` silently skips every
+        // shard (metric `elohim_shard_push_peer_unresolved_total`),
+        // `shard_locations` stays empty, and the resilience card reads all zeros.
+        //
+        // Preference: operator override → REAL conductor cell key → placeholder.
+        // `hc_registry_for_http` is assigned above (conductor boot), so the cell
+        // key is available here; the same accessor is used for the custody
+        // reconcile snapshot below.
+        //
+        // Safe for the libp2p peer id: `NodeIdentity::load_or_generate` persists
+        // ONLY the libp2p keypair into `identity.key` — `agent_pubkey` is a fresh
+        // per-boot parameter threaded through `load()`/`from_keypair()` and is
+        // never written to disk. Correcting it leaves `peer_id` byte-identical.
+        let conductor_cell_key: Option<String> = hc_registry_for_http
+            .as_ref()
+            .and_then(|r| r.lamad_client())
+            .map(|hc| hc.agent_key_uhcak());
+        let (agent_pubkey, agent_pubkey_source) = elohim_storage::identity::resolve_agent_pubkey(
+            args.agent_pubkey.clone(),
+            conductor_cell_key,
+        );
+        match agent_pubkey_source {
+            elohim_storage::identity::AgentPubkeySource::RandomPlaceholder => {
+                warn!(
+                    agent_cid = %agent_pubkey,
+                    source = agent_pubkey_source.as_str(),
+                    "P2P identity: NO real agent key at boot (no --agent-pubkey/AGENT_PUBKEY and \
+                     no conductor cell key) — advertising a random per-boot placeholder. Peers \
+                     will record an agent_cid that matches no real agent, so transport bindings \
+                     are unresolvable and outbound shard pushes will be skipped."
+                );
+            }
+            source => {
+                info!(
+                    agent_cid = %agent_pubkey,
+                    source = source.as_str(),
+                    "P2P identity: advertising a real agent_cid (transport bindings resolvable)"
+                );
+            }
+        }
 
         // Load or create P2P identity
         let identity_path = config.storage_dir.join("identity.key");

@@ -341,45 +341,52 @@ pub async fn run_once(
         ..Default::default()
     };
 
+    // Part A — manifest backfill for blob-backed content that has NO manifest.
+    //
+    // An empty Part A skips only Part A's work; it must NEVER short-circuit the
+    // sweep. Part A is the MIGRATION arm (legacy content missing a manifest) and
+    // goes permanently empty once a pod has caught up — which is exactly alpha's
+    // steady state (`distributionState: "measured"`). Returning early here made
+    // Part B (below) unreachable on EVERY boot of a caught-up pod, i.e. the
+    // measured-but-dark remediation never ran where it was needed most.
     if candidates.is_empty() {
         tracing::debug!(h_app_id, "shard_manifest_backfill: no candidates");
-        return Ok(report);
-    }
+    } else {
+        tracing::info!(
+            candidates = report.candidates,
+            h_app_id,
+            "shard_manifest_backfill: starting sweep"
+        );
 
-    tracing::info!(
-        candidates = report.candidates,
-        h_app_id,
-        "shard_manifest_backfill: starting sweep"
-    );
+        for (idx, candidate) in candidates.iter().enumerate() {
+            match record_one(pool, blob_store, candidate, h_app_id).await {
+                Ok(true) => {
+                    report.recorded += 1;
 
-    for (idx, candidate) in candidates.iter().enumerate() {
-        match record_one(pool, blob_store, candidate, h_app_id).await {
-            Ok(true) => {
-                report.recorded += 1;
-
-                // Manifest persisted — now fan shards out so receiving peers
-                // populate shard_locations and light "stewarding collectives".
-                #[cfg(feature = "p2p")]
-                if let Some(ref handle) = p2p_handle {
-                    distribute_one(handle, pool, blob_store, candidate, h_app_id).await;
+                    // Manifest persisted — now fan shards out so receiving peers
+                    // populate shard_locations and light "stewarding collectives".
+                    #[cfg(feature = "p2p")]
+                    if let Some(ref handle) = p2p_handle {
+                        distribute_one(handle, pool, blob_store, candidate, h_app_id).await;
+                    }
+                }
+                Ok(false) => report.missing_blob += 1,
+                Err(e) => {
+                    report.failed += 1;
+                    tracing::warn!(
+                        content_id = %candidate.content_id,
+                        error = %e,
+                        "shard_manifest_backfill: record failed (non-fatal)"
+                    );
                 }
             }
-            Ok(false) => report.missing_blob += 1,
-            Err(e) => {
-                report.failed += 1;
-                tracing::warn!(
-                    content_id = %candidate.content_id,
-                    error = %e,
-                    "shard_manifest_backfill: record failed (non-fatal)"
-                );
-            }
-        }
 
-        // Bound the work: pace per-item, with a longer pause at batch edges.
-        if (idx + 1) % config.batch_size == 0 {
-            tokio::time::sleep(config.batch_pause).await;
-        } else {
-            tokio::time::sleep(config.item_delay).await;
+            // Bound the work: pace per-item, with a longer pause at batch edges.
+            if (idx + 1) % config.batch_size == 0 {
+                tokio::time::sleep(config.batch_pause).await;
+            } else {
+                tokio::time::sleep(config.item_delay).await;
+            }
         }
     }
 
@@ -542,6 +549,63 @@ mod tests {
         let cands = select_redistribution_candidates(&mut conn, "lamad", 50).expect("select");
         let ids: Vec<&str> = cands.iter().map(|c| c.content_id.as_str()).collect();
         assert_eq!(ids, vec!["dark"]);
+    }
+
+    /// REGRESSION (the defect this restructure closes): an EMPTY Part A
+    /// candidate set must skip only Part A — the sweep still runs Part B.
+    ///
+    /// Against the previous control flow (`if candidates.is_empty() { return }`)
+    /// this fails with `redistribute_candidates == 0`: on a caught-up pod (every
+    /// blob-backed content already has a manifest — alpha's steady state) Part A
+    /// is always empty, so the measured-but-dark redistribution never ran on any
+    /// boot.
+    ///
+    /// The blob bytes are deliberately ABSENT from the temp blob store, so
+    /// `distribute_one` returns at its byte-load guard — the sweep is exercised
+    /// end-to-end with zero network work.
+    #[cfg(feature = "p2p")]
+    #[tokio::test]
+    async fn part_b_runs_when_part_a_candidate_set_is_empty() {
+        let pool = test_pool();
+        {
+            let mut conn = pool.get().expect("conn");
+            // Manifest present + zero shard_locations → a Part B candidate,
+            // and (because the manifest exists) NOT a Part A candidate.
+            insert_content(&mut conn, "dark", Some("sha256-dark"));
+            insert_manifest_with_shards(&mut conn, "dark", "sha256-dark", &["s-dark-1"]);
+
+            assert!(
+                select_candidates(&mut conn, "lamad")
+                    .expect("select")
+                    .is_empty(),
+                "precondition: Part A must be empty for this regression"
+            );
+        }
+
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let blob_store = BlobStore::new(tmp.path()).await.expect("blob store");
+        let handle = crate::p2p::P2PHandle::for_testing();
+
+        let config = BackfillConfig {
+            batch_size: 25,
+            item_delay: Duration::from_millis(0),
+            batch_pause: Duration::from_millis(0),
+        };
+
+        let report = run_once(&pool, &blob_store, "lamad", &config, Some(handle))
+            .await
+            .expect("sweep");
+
+        assert_eq!(report.candidates, 0, "Part A is empty");
+        assert_eq!(report.recorded, 0, "nothing to record in Part A");
+        assert_eq!(
+            report.redistribute_candidates, 1,
+            "Part B must still select the measured-but-dark content"
+        );
+        assert_eq!(
+            report.redistribute_attempts, 1,
+            "Part B must still ATTEMPT redistribution (honest attempt count)"
+        );
     }
 
     /// Part B: the per-boot cap bounds the result.

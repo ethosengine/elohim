@@ -1135,6 +1135,10 @@ pub struct P2PHandle {
     /// (which is Arc-backed internally). Used by `acquisition_per_pin()` to
     /// serve GET /api/v1/pins without requiring a p2p command round-trip.
     acquisition: acquisition::AcquisitionState,
+    /// Local pantry, for the self-stewardship bytes probe in
+    /// [`P2PHandle::distribute_shards`]. `None` on stub/test handles (self
+    /// stewardship is then simply not recorded — never fabricated).
+    blob_store: Option<Arc<BlobStore>>,
 }
 
 impl P2PHandle {
@@ -1301,7 +1305,33 @@ impl P2PHandle {
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
             // Stub state — NOT shared with any P2PNode; acquisition_per_pin() always empty here.
             acquisition: acquisition::AcquisitionState::new(),
+            blob_store: None,
         }
+    }
+
+    /// Test-only: replace the stub command channel with one the caller owns, and
+    /// set the advertised `agent_pubkey`.
+    ///
+    /// Returns the receiver so a test can assert which commands were (or were
+    /// NOT) sent — e.g. that a SELF-selected shard never triggers a `PushShard`.
+    /// Intended for test utilities only — not for production use.
+    #[doc(hidden)]
+    pub fn for_testing_capturing_commands(
+        agent_pubkey: String,
+    ) -> (Self, mpsc::Receiver<P2PCommand>) {
+        let (command_tx, command_rx) = mpsc::channel(64);
+        let mut handle = Self::for_testing();
+        handle.command_tx = command_tx;
+        handle.agent_pubkey = agent_pubkey;
+        (handle, command_rx)
+    }
+
+    /// Test-only: attach a local pantry so the self-stewardship bytes probe in
+    /// [`Self::distribute_shards`] has something to read.
+    #[doc(hidden)]
+    pub fn with_blob_store_for_testing(mut self, blob_store: Arc<BlobStore>) -> Self {
+        self.blob_store = Some(blob_store);
+        self
     }
 
     /// Construct a `P2PHandle` from explicit parts for fine-grained unit tests.
@@ -1327,6 +1357,7 @@ impl P2PHandle {
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
             // Stub state — NOT shared with any P2PNode; acquisition_per_pin() always empty here.
             acquisition: acquisition::AcquisitionState::new(),
+            blob_store: None,
         }
     }
 
@@ -1637,12 +1668,113 @@ impl P2PHandle {
             map
         };
 
+        // Self-stewardship seam. `peer_statuses` is structurally SELF-ONLY today
+        // (author-local rows; cross-agent aggregation deferred in the
+        // infrastructure zome), so `peer_selection` can select THIS node. Dialing
+        // yourself is wrong — you have no transport binding to yourself, so the
+        // selection landed on the "unresolvable" arm and every shard was skipped
+        // (`elohim_shard_push_peer_unresolved_total` climbing on exactly the pod
+        // that selected itself).
+        //
+        // Identity: resolved through the EXISTING self-identity seam
+        // (`reconcile::custody::resolve_self_agent_cid` — active session first,
+        // then this handle's boot agent key), which returns an `agent_cid`
+        // (`uhCAk…`) or `None`. The comparison below is agent_cid == agent_cid:
+        // `SelectedPeer::peer_id` is an agent_cid (it is `humans.agent_pub_key`).
+        // NEVER compared against a libp2p/iroh transport id.
+        //
+        // The local pantry snapshot is taken ONCE (same idiom as the custody
+        // reconcile pass) and is the verify-before-record gate: a self-held
+        // location row is written only for shards whose bytes are demonstrably
+        // present locally. See `services::self_stewardship`.
+        let self_agent_cid: Option<String> = pool.get().ok().and_then(|mut conn| {
+            crate::reconcile::custody::resolve_self_agent_cid(
+                &mut conn,
+                Some(self.agent_pubkey.as_str()),
+            )
+        });
+        let self_is_selected = self_agent_cid
+            .as_deref()
+            .is_some_and(|me| selected.iter().any(|p| p.peer_id == me));
+        let local_pantry: Option<crate::reconcile::custody::BlobStoreSnapshot> = if self_is_selected
+        {
+            match self.blob_store.as_ref() {
+                Some(store) => {
+                    match crate::reconcile::custody::BlobStoreSnapshot::from_store(store) {
+                        Ok(snap) => Some(snap),
+                        Err(e) => {
+                            tracing::warn!(
+                                content_id,
+                                error = %e,
+                                "self-stewardship: local pantry snapshot failed; \
+                                 self-held locations not recorded this pass"
+                            );
+                            None
+                        }
+                    }
+                }
+                None => {
+                    tracing::debug!(
+                        content_id,
+                        "self-stewardship: no local pantry on this handle; \
+                             self-held locations not recorded"
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         for (i, shard_data) in shards.iter().enumerate() {
             let hash = &manifest.shard_hashes[i];
             if selected.is_empty() {
                 break;
             }
             let peer = &selected[i % selected.len()];
+
+            // SELF-selected: record what we can verify, never dial ourselves.
+            if self_agent_cid.as_deref() == Some(peer.peer_id.as_str()) {
+                let Some(ref pantry) = local_pantry else {
+                    continue;
+                };
+                let Ok(mut conn) = pool.get() else { continue };
+                match crate::services::self_stewardship::record_self_held_shard(
+                    &mut conn,
+                    pantry,
+                    hash,
+                    &peer.peer_id,
+                    h_app_id,
+                ) {
+                    Ok(crate::services::self_stewardship::SelfHeldOutcome::Recorded) => {
+                        tracing::info!(
+                            content_id,
+                            shard_index = i,
+                            peer = %peer.peer_id,
+                            "Shard recorded as self-held (bytes verified in local pantry; no push)"
+                        );
+                        distributed += 1;
+                    }
+                    Ok(outcome) => {
+                        tracing::debug!(
+                            content_id,
+                            shard_index = i,
+                            peer = %peer.peer_id,
+                            ?outcome,
+                            "Self-held shard NOT recorded (gap left honestly visible)"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            content_id,
+                            shard_index = i,
+                            error = %e,
+                            "Self-held shard recording failed"
+                        );
+                    }
+                }
+                continue;
+            }
 
             // Resolve the dial target. An unresolvable peer (no transport binding
             // yet) is skipped with a log + metric — the shard stays unplaced this
@@ -6965,6 +7097,10 @@ impl P2PNode {
             last_gossiped: Arc::clone(&self.last_gossiped),
             // Clone shares the Arc<RwLock<...>> inside AcquisitionState.
             acquisition: self.acquisition.clone(),
+            // Self-stewardship needs a LOCAL bytes probe: a self-held
+            // shard_locations row is only written after the local pantry is
+            // confirmed to hold the shard. See `services::self_stewardship`.
+            blob_store: Some(Arc::clone(&self.blob_store)),
         }
     }
 

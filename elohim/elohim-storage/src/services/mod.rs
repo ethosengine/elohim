@@ -114,6 +114,7 @@ pub mod salvage_commitment_author; // P3-5 — production CommitmentAuthor (cond
 pub mod schemaref_resolver;
 pub mod sealed_against_self;
 pub mod seed_shard_manifest;
+pub mod self_stewardship; // honest self-held shard_locations recording (verify-before-record)
 pub mod session_exchange;
 pub mod shard_manifest_backfill; // GAP-2b — steward-side portal session exchange (doorway handoff redemption)
 pub mod sidecar_engine;

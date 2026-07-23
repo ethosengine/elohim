@@ -182,6 +182,80 @@ impl NodeCapabilities {
     }
 }
 
+/// Which source supplied the `agent_cid` (Holochain agent key) this node
+/// advertises on the wire. Returned by [`resolve_agent_pubkey`] so the caller
+/// can log the tier — tier 3 is a silent-failure risk and must WARN.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentPubkeySource {
+    /// Tier 1 — explicit operator override (`--agent-pubkey` / `AGENT_PUBKEY`).
+    Explicit,
+    /// Tier 2 — the node's REAL conductor cell key (`HcClient::agent_key_uhcak`).
+    ConductorCellKey,
+    /// Tier 3 — random per-boot placeholder. Nothing can resolve against it.
+    RandomPlaceholder,
+}
+
+impl AgentPubkeySource {
+    /// Stable log/metric label.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AgentPubkeySource::Explicit => "explicit",
+            AgentPubkeySource::ConductorCellKey => "conductor-cell-key",
+            AgentPubkeySource::RandomPlaceholder => "random-placeholder",
+        }
+    }
+}
+
+/// Generate the last-resort placeholder agent key.
+///
+/// Shape is deliberately distinguishable from a real Holochain agent key: a real
+/// key is `uhCAk` immediately followed by base64 (no separator), so the
+/// UNDERSCORE after `uhCAk` marks this value as synthetic on sight.
+pub fn random_placeholder_agent_pubkey() -> String {
+    format!(
+        "uhCAk_{}",
+        &uuid::Uuid::new_v4().to_string().replace('-', "")[..32]
+    )
+}
+
+/// Resolve the `agent_cid` this node advertises, in strict preference order:
+///
+/// 1. `explicit` — operator override (`--agent-pubkey` / `AGENT_PUBKEY`).
+/// 2. `conductor_cell_key` — the node's REAL Holochain cell key (`uhCAk…`).
+/// 3. a random per-boot placeholder ([`random_placeholder_agent_pubkey`]).
+///
+/// **Why the order matters.** The advertised `agent_cid` is what the libp2p
+/// identity handshake broadcasts, and peers persist it into
+/// `peer_identity_bindings`. `services::transport_resolve::
+/// resolve_agent_cid_to_libp2p` reads that table to turn a selected shard
+/// holder's `agent_cid` (which IS a real `uhCAk…` key — see the identity table
+/// in this crate's CLAUDE.md) into a dialable libp2p peer id. A random
+/// placeholder can never equal a real agent key, so the resolver returns `None`
+/// for every push, `distribute_shards` silently skips every shard,
+/// `shard_locations` stays empty, and the resilience card reads all zeros.
+///
+/// Blank/whitespace-only inputs are treated as absent (a `--agent-pubkey ""`
+/// must not advertise an empty key).
+pub fn resolve_agent_pubkey(
+    explicit: Option<String>,
+    conductor_cell_key: Option<String>,
+) -> (String, AgentPubkeySource) {
+    fn non_blank(v: Option<String>) -> Option<String> {
+        v.filter(|s| !s.trim().is_empty())
+    }
+
+    if let Some(explicit) = non_blank(explicit) {
+        return (explicit, AgentPubkeySource::Explicit);
+    }
+    if let Some(cell_key) = non_blank(conductor_cell_key) {
+        return (cell_key, AgentPubkeySource::ConductorCellKey);
+    }
+    (
+        random_placeholder_agent_pubkey(),
+        AgentPubkeySource::RandomPlaceholder,
+    )
+}
+
 /// Node identity linking libp2p PeerId to Holochain AgentPubKey
 #[cfg(feature = "p2p")]
 #[derive(Clone)]
@@ -346,6 +420,68 @@ impl From<&NodeIdentity> for NodeIdentityInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Tier 1: an explicit operator override always wins, even when a real
+    /// conductor cell key is available.
+    #[test]
+    fn resolve_agent_pubkey_prefers_explicit_override() {
+        let (key, source) = resolve_agent_pubkey(
+            Some("uhCAkExplicitOverride".to_string()),
+            Some("uhCAkConductorCellKey".to_string()),
+        );
+        assert_eq!(key, "uhCAkExplicitOverride");
+        assert_eq!(source, AgentPubkeySource::Explicit);
+    }
+
+    /// Tier 2: with no override, the REAL conductor cell key is advertised —
+    /// this is what makes `peer_identity_bindings` rows resolvable by
+    /// `transport_resolve::resolve_agent_cid_to_libp2p`.
+    #[test]
+    fn resolve_agent_pubkey_falls_back_to_conductor_cell_key() {
+        let (key, source) = resolve_agent_pubkey(None, Some("uhCAkConductorCellKey".to_string()));
+        assert_eq!(key, "uhCAkConductorCellKey");
+        assert_eq!(source, AgentPubkeySource::ConductorCellKey);
+        assert!(
+            !key.starts_with("uhCAk_"),
+            "a real cell key never carries the synthetic underscore marker"
+        );
+    }
+
+    /// Tier 3: last resort keeps the historical `uhCAk_<32hex>` placeholder
+    /// shape (underscore marks it synthetic) and is reported as such so the
+    /// caller can WARN about unresolvable transport bindings.
+    #[test]
+    fn resolve_agent_pubkey_last_resort_is_marked_placeholder() {
+        let (key, source) = resolve_agent_pubkey(None, None);
+        assert_eq!(source, AgentPubkeySource::RandomPlaceholder);
+        assert!(
+            key.starts_with("uhCAk_"),
+            "placeholder must keep the synthetic underscore shape, got {key}"
+        );
+        assert_eq!(key.len(), "uhCAk_".len() + 32, "32 hex chars of entropy");
+        assert!(key["uhCAk_".len()..].chars().all(|c| c.is_ascii_hexdigit()));
+
+        // Fresh entropy per call (this is exactly why it cannot be a join key).
+        let (other, _) = resolve_agent_pubkey(None, None);
+        assert_ne!(key, other);
+    }
+
+    /// Blank inputs are absent, not values: `--agent-pubkey ""` must not
+    /// advertise an empty agent_cid, and an empty cell key must not shadow the
+    /// placeholder.
+    #[test]
+    fn resolve_agent_pubkey_treats_blank_as_absent() {
+        let (key, source) = resolve_agent_pubkey(
+            Some("   ".to_string()),
+            Some("uhCAkConductorCellKey".to_string()),
+        );
+        assert_eq!(key, "uhCAkConductorCellKey");
+        assert_eq!(source, AgentPubkeySource::ConductorCellKey);
+
+        let (key, source) = resolve_agent_pubkey(Some(String::new()), Some(String::new()));
+        assert_eq!(source, AgentPubkeySource::RandomPlaceholder);
+        assert!(key.starts_with("uhCAk_"));
+    }
 
     #[test]
     fn test_capabilities_presets() {
