@@ -19,12 +19,17 @@
 //! a fourth REA action enum (reconciliation with the protocol schema enum is tracked in
 //! the spec §8).
 
+pub mod epistemic;
 pub mod error;
 pub mod fold;
 pub mod model;
 pub mod store;
 pub mod walk;
 
+pub use epistemic::{
+    cite_gate, classify, fold_standing, CanonizationRef, EpistemicStanding, EpistemicStatus,
+    EpistemicThresholds, ReviewEvent,
+};
 pub use error::{FabricError, Result};
 pub use fold::{fulfillment, resource_state, FulfillmentStatus, ResourceState};
 pub use model::{
