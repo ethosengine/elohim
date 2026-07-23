@@ -41,18 +41,8 @@
 // Canonical definition: elohim/sdk/storage-client-ts/src/protocol-core.model.ts
 
 import type { LocalityLevel } from '@elohim/storage-client';
-export type {
-  LocalityLevel,
-  // deprecated alias passes through for existing consumers:
-  ReachLevel,
-} from '@elohim/storage-client';
-export {
-  LOCALITY_LEVEL_VALUES,
-  localityEncompasses,
-  // deprecated aliases pass through for existing consumers:
-  REACH_LEVEL_VALUES,
-  reachEncompasses,
-} from '@elohim/storage-client';
+export type { LocalityLevel } from '@elohim/storage-client';
+export { LOCALITY_LEVEL_VALUES, localityEncompasses } from '@elohim/storage-client';
 
 // ============================================================================
 // AFFINITY SCOPE - Interest-Based Community Filtering

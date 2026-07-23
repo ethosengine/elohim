@@ -17,7 +17,7 @@ import { Injectable, signal, computed } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
-import { type ReachLevel, reachEncompasses } from '@elohim/storage-client';
+import { type LocalityLevel, localityEncompasses } from '@elohim/storage-client';
 import { type Attestation } from '@elohim/identity';
 import { type ResearchConsentScope } from '@app/lamad/models/knowledge-map.model';
 
@@ -50,8 +50,8 @@ const STORAGE_KEYS = {
 // Consent Mapping
 // =============================================================================
 
-/** Maps the 4-value visibility enum to protocol ReachLevel. */
-export const VISIBILITY_TO_REACH: Record<DiscoveryAttestation['visibility'], ReachLevel> = {
+/** Maps the 4-value visibility enum to protocol LocalityLevel. */
+export const VISIBILITY_TO_REACH: Record<DiscoveryAttestation['visibility'], LocalityLevel> = {
   private: 'private',
   trusted: 'invited',
   community: 'bioregional',
@@ -332,7 +332,7 @@ export class DiscoveryAttestationService {
 
     for (const attestation of attestations) {
       // Check reach scope
-      if (!reachEncompasses(attestation.reach, context.requiredReach)) continue;
+      if (!localityEncompasses(attestation.reach, context.requiredReach)) continue;
 
       // Check research consent (per-result override or default 'aggregate-only')
       const effectiveConsent = attestation.result.researchConsent ?? 'aggregate-only';

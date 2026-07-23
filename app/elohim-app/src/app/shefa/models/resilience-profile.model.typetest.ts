@@ -19,7 +19,7 @@ import type {
   ResilienceConcern,
 } from './resilience-profile.model';
 import type { AgentRef } from '@app/elohim/models/coordination-envelope.model';
-import type { ReachLevel } from '@elohim/storage-client';
+import type { LocalityLevel } from '@elohim/storage-client';
 
 // =============================================================================
 // 1. ProtectionStatus exhaustiveness
@@ -64,14 +64,14 @@ function assertResilienceActionTypeExhaustive(action: ResilienceActionType): str
 }
 
 // =============================================================================
-// 3. ContentRiskBucket uses ReachLevel from protocol-core
+// 3. ContentRiskBucket uses LocalityLevel from protocol-core
 // =============================================================================
 
-const _privateReach: ReachLevel = 'private';
-const _commonsReach: ReachLevel = 'commons';
+const _privateReach: LocalityLevel = 'private';
+const _commonsReach: LocalityLevel = 'commons';
 
 const _riskBucket: ContentRiskBucket = {
-  reach: 'private' satisfies ReachLevel,
+  reach: 'private' satisfies LocalityLevel,
   contentCount: 12,
   shardDistribution: 3.5,
   adequacy: 0.85,
@@ -79,13 +79,13 @@ const _riskBucket: ContentRiskBucket = {
 };
 
 const _riskBucketNoExemplar: ContentRiskBucket = {
-  reach: 'commons' satisfies ReachLevel,
+  reach: 'commons' satisfies LocalityLevel,
   contentCount: 200,
   shardDistribution: 42,
   adequacy: 0.99,
 };
 
-// All ReachLevel values are valid for ContentRiskBucket.reach
+// All LocalityLevel values are valid for ContentRiskBucket.reach
 const _reachLevels: ContentRiskBucket['reach'][] = [
   'private',
   'invited',
@@ -95,7 +95,7 @@ const _reachLevels: ContentRiskBucket['reach'][] = [
   'bioregional',
   'regional',
   'commons',
-] satisfies ReachLevel[];
+] satisfies LocalityLevel[];
 
 // =============================================================================
 // 4. ElohimResilienceAssessment uses AgentRef from coordination-envelope

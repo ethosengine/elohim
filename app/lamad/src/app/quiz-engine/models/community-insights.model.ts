@@ -6,7 +6,7 @@
  * small cohorts (< 30 responses).
  */
 
-import { type ReachLevel } from '@elohim/storage-client';
+import { type LocalityLevel } from '@elohim/storage-client';
 import { type ResearchConsentScope } from '@app/lamad/models/knowledge-map.model';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ import { type ResearchConsentScope } from '@app/lamad/models/knowledge-map.model
  */
 export interface AggregationContext {
   /** Viewer's reach level - only results at or above this scope are included */
-  requiredReach: ReachLevel;
+  requiredReach: LocalityLevel;
 
   /** Minimum consent level required for inclusion */
   minimumConsent: ResearchConsentScope;

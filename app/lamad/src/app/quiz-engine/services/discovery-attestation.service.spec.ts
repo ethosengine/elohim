@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 
-import type { ReachLevel } from '@elohim/storage-client';
+import type { LocalityLevel } from '@elohim/storage-client';
 import type { Attestation } from '@elohim/identity';
 import type { ResearchConsentScope } from '@app/lamad/models/knowledge-map.model';
 
@@ -583,10 +583,10 @@ describe('DiscoveryAttestationService', () => {
 
     it('should update reach to match visibility', () => {
       service.updateVisibility(resultId, 'public');
-      expect(service.attestations()[0].reach).toBe('commons' as ReachLevel);
+      expect(service.attestations()[0].reach).toBe('commons' as LocalityLevel);
 
       service.updateVisibility(resultId, 'private');
-      expect(service.attestations()[0].reach).toBe('private' as ReachLevel);
+      expect(service.attestations()[0].reach).toBe('private' as LocalityLevel);
     });
 
     it('should persist to localStorage after update', () => {
@@ -601,7 +601,7 @@ describe('DiscoveryAttestationService', () => {
       service.updateVisibility(resultId, 'private');
       const other = service.attestations().find(a => a.result.assessmentId === 'assessment-b');
       expect(other!.visibility).toBe('community');
-      expect(other!.reach).toBe('bioregional' as ReachLevel);
+      expect(other!.reach).toBe('bioregional' as LocalityLevel);
     });
   });
 
@@ -1458,19 +1458,19 @@ describe('DiscoveryAttestationService', () => {
 
   describe('VISIBILITY_TO_REACH', () => {
     it('should map private to private', () => {
-      expect(VISIBILITY_TO_REACH['private']).toBe('private' as ReachLevel);
+      expect(VISIBILITY_TO_REACH['private']).toBe('private' as LocalityLevel);
     });
 
     it('should map trusted to invited', () => {
-      expect(VISIBILITY_TO_REACH['trusted']).toBe('invited' as ReachLevel);
+      expect(VISIBILITY_TO_REACH['trusted']).toBe('invited' as LocalityLevel);
     });
 
     it('should map community to bioregional', () => {
-      expect(VISIBILITY_TO_REACH['community']).toBe('bioregional' as ReachLevel);
+      expect(VISIBILITY_TO_REACH['community']).toBe('bioregional' as LocalityLevel);
     });
 
     it('should map public to commons', () => {
-      expect(VISIBILITY_TO_REACH['public']).toBe('commons' as ReachLevel);
+      expect(VISIBILITY_TO_REACH['public']).toBe('commons' as LocalityLevel);
     });
   });
 
@@ -1641,19 +1641,19 @@ describe('DiscoveryAttestationService', () => {
   describe('reach field', () => {
     it('should set reach to bioregional on new attestation (default community visibility)', () => {
       recordDefault();
-      expect(service.attestations()[0].reach).toBe('bioregional' as ReachLevel);
+      expect(service.attestations()[0].reach).toBe('bioregional' as LocalityLevel);
     });
 
     it('should update reach when updateVisibility is called', () => {
       const result = recordDefault();
       service.updateVisibility(result.id, 'public');
-      expect(service.attestations()[0].reach).toBe('commons' as ReachLevel);
+      expect(service.attestations()[0].reach).toBe('commons' as LocalityLevel);
 
       service.updateVisibility(result.id, 'trusted');
-      expect(service.attestations()[0].reach).toBe('invited' as ReachLevel);
+      expect(service.attestations()[0].reach).toBe('invited' as LocalityLevel);
 
       service.updateVisibility(result.id, 'private');
-      expect(service.attestations()[0].reach).toBe('private' as ReachLevel);
+      expect(service.attestations()[0].reach).toBe('private' as LocalityLevel);
     });
   });
 
@@ -1679,15 +1679,15 @@ describe('DiscoveryAttestationService', () => {
       localStorage.setItem('elohim:discovery-attestations', JSON.stringify([oldAttestation]));
 
       const svc = createService();
-      expect(svc.attestations()[0].reach).toBe('commons' as ReachLevel);
+      expect(svc.attestations()[0].reach).toBe('commons' as LocalityLevel);
     });
 
     it('should preserve reach for attestations that already have it', () => {
-      const att = buildAttestation({ reach: 'municipal' as ReachLevel });
+      const att = buildAttestation({ reach: 'municipal' as LocalityLevel });
       seedStorage([buildResult()], [att]);
 
       const svc = createService();
-      expect(svc.attestations()[0].reach).toBe('municipal' as ReachLevel);
+      expect(svc.attestations()[0].reach).toBe('municipal' as LocalityLevel);
     });
 
     it('should derive bioregional reach for old community-visibility attestations', () => {
@@ -1705,7 +1705,7 @@ describe('DiscoveryAttestationService', () => {
       localStorage.setItem('elohim:discovery-attestations', JSON.stringify([oldAttestation]));
 
       const svc = createService();
-      expect(svc.attestations()[0].reach).toBe('bioregional' as ReachLevel);
+      expect(svc.attestations()[0].reach).toBe('bioregional' as LocalityLevel);
     });
   });
 

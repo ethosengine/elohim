@@ -21,7 +21,7 @@
  */
 
 import type { AgentRef } from '@app/elohim/models/coordination-envelope.model';
-import type { ReachLevel } from '@elohim/storage-client';
+import type { LocalityLevel } from '@elohim/storage-client';
 
 // =============================================================================
 // Core Profile
@@ -122,7 +122,7 @@ export interface TrustCircleDepth {
  * (reach: 'network') is naturally resilient through popularity.
  */
 export interface ContentRiskBucket {
-  reach: ReachLevel; // from protocol-core
+  reach: LocalityLevel; // from protocol-core
   contentCount: number;
   shardDistribution: number;
   adequacy: number; // 0-1

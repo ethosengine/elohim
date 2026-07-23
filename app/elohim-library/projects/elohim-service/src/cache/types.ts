@@ -38,11 +38,6 @@ export const LocalityLevel = {
 
 export type LocalityLevelType = (typeof LocalityLevel)[keyof typeof LocalityLevel];
 
-/** @deprecated Renamed 2026-07-23 — use LocalityLevel. Kept so `cache/index.ts`'s barrel re-export stays green without an out-of-scope edit. */
-export const ReachLevel = LocalityLevel;
-/** @deprecated Renamed 2026-07-23 — use LocalityLevelType. */
-export type ReachLevelType = LocalityLevelType;
-
 // ============================================================================
 // Mastery Levels (Bloom's Taxonomy for content freshness)
 // ============================================================================

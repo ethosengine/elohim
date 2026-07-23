@@ -19,7 +19,7 @@
  * - Are private by default (user controls visibility)
  */
 
-import { type ReachLevel } from '@elohim/storage-client';
+import { type LocalityLevel } from '@elohim/storage-client';
 import { type ResearchConsentScope } from '@app/lamad/models/knowledge-map.model';
 
 import { getDisplayConfigByFramework } from '../instruments/instrument-registry';
@@ -324,7 +324,7 @@ export interface DiscoveryAttestation {
   visibility: 'private' | 'trusted' | 'community' | 'public';
 
   /** Machine-readable reach scope for filtering (derived from visibility) */
-  reach: ReachLevel;
+  reach: LocalityLevel;
 
   /** Whether this attestation is featured on profile */
   featured: boolean;

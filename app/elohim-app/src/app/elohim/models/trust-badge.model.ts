@@ -17,7 +17,7 @@
  * and sorting of all trust-related visual elements.
  */
 
-import { ReachLevel } from './protocol-core.model';
+import { LocalityLevel } from './protocol-core.model';
 import { ATTESTATION_BADGE_CONFIG, REACH_BADGE_CONFIG } from './trust-badge-config';
 
 // @coverage: 88.4% (2026-02-24)
@@ -36,8 +36,11 @@ export type ContentAttestationType =
   | 'accessibility-checked'
   | 'license-cleared';
 
-// Use ReachLevel directly (ContentReach was just an alias)
-export type ContentReach = ReachLevel;
+// NOTE: ContentReach is an app-side homonym of @app/lamad's ContentReach (a
+// distinct type over the same LocalityLevel union) — see reach-vocabulary
+// burn-down (slice 3). Kept as ContentReach (not renamed to ContentLocality)
+// to avoid touching this pillar's many existing consumers.
+export type ContentReach = LocalityLevel;
 
 // ============================================================================
 // Trust Badge Types

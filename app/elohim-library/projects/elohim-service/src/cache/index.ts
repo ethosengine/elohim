@@ -8,7 +8,7 @@
  * ```typescript
  * import {
  *   createReachAwareCache,
- *   ReachLevel,
+ *   LocalityLevel,
  *   calculatePriority
  * } from '@aspect/elohim-service/cache';
  *
@@ -21,7 +21,7 @@
  *
  * // Add content with reach-level isolation
  * const priority = calculatePriority({
- *   reachLevel: ReachLevel.COMMONS,
+ *   reachLevel: LocalityLevel.COMMONS,
  *   proximityScore: 50,
  *   bandwidthClass: 3,
  *   stewardTier: 2,
@@ -29,7 +29,7 @@
  *   agePenalty: 0
  * });
  *
- * cache.put('content-hash', BigInt(1024), ReachLevel.COMMONS, 'elohim', 'governance', priority);
+ * cache.put('content-hash', BigInt(1024), LocalityLevel.COMMONS, 'elohim', 'governance', priority);
  * ```
  *
  * @packageDocumentation
@@ -37,9 +37,9 @@
 
 // Types and constants
 export {
-  // Reach levels
-  ReachLevel,
-  type ReachLevelType,
+  // Locality levels
+  LocalityLevel,
+  type LocalityLevelType,
 
   // Mastery levels
   MasteryLevel,

@@ -6,7 +6,7 @@ import { map, switchMap, shareReplay, catchError } from 'rxjs/operators';
 
 import { Observable, forkJoin, of } from 'rxjs';
 
-import { type ReachLevel } from '@elohim/storage-client';
+import { type LocalityLevel } from '@elohim/storage-client';
 import { DataLoaderService } from './data-loader.service';
 
 import { ContentNode, ContentMetadata } from '../models/content-node.model';
@@ -376,7 +376,7 @@ export class PathGraphService {
   /**
    * Map path visibility to content reach.
    */
-  private mapVisibilityToReach(visibility: string): ReachLevel {
+  private mapVisibilityToReach(visibility: string): LocalityLevel {
     switch (visibility) {
       case 'public':
         return 'commons';

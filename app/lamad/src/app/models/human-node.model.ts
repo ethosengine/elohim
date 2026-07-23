@@ -26,7 +26,7 @@
  * but intimacy requires explicit consent.
  *
  * Protocol Core Integration:
- * - Uses ReachLevel from protocol-core (mapped to HumanReach)
+ * - Uses LocalityLevel from protocol-core (mapped to HumanReach)
  * - Uses IntimacyLevel from protocol-core
  * - Uses GovernanceLayer from protocol-core
  * - Uses ConsentState from protocol-core
@@ -452,7 +452,7 @@ export function isHighTrustRelationship(type: RelationshipType): boolean {
 }
 
 export {
-  type ReachLevel,
+  type LocalityLevel,
   type IntimacyLevel,
   type GeographicContext,
   type ConsentState,

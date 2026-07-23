@@ -75,11 +75,6 @@ export const LOCALITY_LEVEL_VALUES: Record<LocalityLevel, number> = {
   commons: 7,
 };
 
-/** @deprecated Renamed 2026-07-23 — use LocalityLevel. Burn-down tracked in reach-vocabulary-frontend-strand. */
-export type ReachLevel = LocalityLevel;
-/** @deprecated Renamed 2026-07-23 — use LOCALITY_LEVEL_VALUES. */
-export const REACH_LEVEL_VALUES = LOCALITY_LEVEL_VALUES;
-
 // ============================================================================
 // AFFINITY SCOPE - Interest-Based Community Filtering
 // ============================================================================
@@ -132,9 +127,6 @@ export interface ContentVisibility {
 export function localityEncompasses(source: LocalityLevel, target: LocalityLevel): boolean {
   return LOCALITY_LEVEL_VALUES[source] >= LOCALITY_LEVEL_VALUES[target];
 }
-
-/** @deprecated Renamed 2026-07-23 — use localityEncompasses. */
-export const reachEncompasses = localityEncompasses;
 
 // ============================================================================
 // INTIMACY LEVELS - Graduated Relationship Depth

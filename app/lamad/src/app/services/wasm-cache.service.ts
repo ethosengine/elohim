@@ -14,7 +14,7 @@
  *     await this.cacheService.initialize();
  *
  *     // Use reach-aware caching
- *     this.cacheService.put('hash', 1024, ReachLevel.COMMONS, 'elohim', 'governance');
+ *     this.cacheService.put('hash', 1024, LocalityLevel.COMMONS, 'elohim', 'governance');
  *   }
  * }
  * ```
@@ -439,4 +439,4 @@ export class WasmCacheService implements OnDestroy {
   }
 }
 
-export { ReachLevel, MasteryLevel } from '@elohim/service/cache/types';
+export { LocalityLevel, MasteryLevel } from '@elohim/service/cache/types';

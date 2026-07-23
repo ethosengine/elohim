@@ -11,8 +11,8 @@
  * - Content needs attestations to REACH certain audiences
  *
  * Protocol Core Integration:
- * - Uses ContentReach from content-node.model (aliased from ReachLevel)
- * - Uses REACH_LEVEL_VALUES from protocol-core for numeric ordering
+ * - Uses ContentReach from content-node.model (aliased from LocalityLevel)
+ * - Uses LOCALITY_LEVEL_VALUES from protocol-core for numeric ordering
  *
  * Holochain mapping:
  * - Entry type: "content_attestation"
@@ -21,7 +21,7 @@
  * - Revocation: creates new entry with revoked status, doesn't delete
  */
 
-import { REACH_LEVEL_VALUES } from '@elohim/storage-client';
+import { LOCALITY_LEVEL_VALUES } from '@elohim/storage-client';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -37,10 +37,10 @@ export type { ContentReach } from './content-node.model';
 /**
  * ContentReachLevel - Numeric ordering for comparison.
  *
- * Maps to REACH_LEVEL_VALUES from protocol-core.
+ * Maps to LOCALITY_LEVEL_VALUES from protocol-core.
  * Kept for backward compatibility with existing code.
  */
-export const CONTENT_REACH_LEVELS: Record<ContentReach, number> = REACH_LEVEL_VALUES;
+export const CONTENT_REACH_LEVELS: Record<ContentReach, number> = LOCALITY_LEVEL_VALUES;
 
 // ============================================================================
 // Content Attestation Types

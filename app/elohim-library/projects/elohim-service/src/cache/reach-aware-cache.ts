@@ -13,7 +13,7 @@
  *   preferWasm: true
  * });
  *
- * cache.put('content-hash', BigInt(1024), ReachLevel.COMMONS, 'elohim', 'governance', 50);
+ * cache.put('content-hash', BigInt(1024), LocalityLevel.COMMONS, 'elohim', 'governance', 50);
  * ```
  */
 

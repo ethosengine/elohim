@@ -22,7 +22,7 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { ContentBlob } from '../models/content-node.model';
 
-import { WasmCacheService, ReachLevel } from './wasm-cache.service';
+import { WasmCacheService, LocalityLevel } from './wasm-cache.service';
 
 // ============================================================================
 // Types
@@ -625,7 +625,7 @@ export class BlobCacheTiersService {
   setMetadataWithReach(
     hash: string,
     metadata: ContentBlob,
-    reachLevel: number = ReachLevel.COMMONS,
+    reachLevel: number = LocalityLevel.COMMONS,
     domain = '',
     epic = ''
   ): CacheOperationResult {

@@ -21,14 +21,14 @@
  * or governance ratification. See content-attestation.model.ts for details.
  *
  * Protocol Core Integration:
- * - Uses ReachLevel from protocol-core (aliased as ContentReach for compatibility)
+ * - Uses LocalityLevel from protocol-core (aliased as ContentReach for compatibility)
  * - Uses GovernanceLayer from protocol-core
  * - Uses GeographicContext from protocol-core
  * - Uses Attestation patterns from protocol-core
  */
 
 import { JsonLdMetadata } from '@elohim/service';
-import { type ReachLevel, type GeographicContext } from '@elohim/storage-client';
+import { type LocalityLevel, type GeographicContext } from '@elohim/storage-client';
 import {
   CONTENT_TYPES as WIRE_CONTENT_TYPES,
   CONTENT_FORMATS as WIRE_CONTENT_FORMATS,
@@ -300,7 +300,7 @@ export interface ContentNode {
 /**
  * ContentReach - Geographic scope of content visibility.
  *
- * This is an alias for ReachLevel from protocol-core, maintaining
+ * This is an alias for LocalityLevel from protocol-core, maintaining
  * backward compatibility while unifying the reach concept across pillars.
  *
  * Geographic levels (concentric circles):
@@ -316,7 +316,7 @@ export interface ContentNode {
  * Note: For interest-based filtering (professional, faith, etc.),
  * see AffinityScope in protocol-core.model.ts
  */
-export type ContentReach = ReachLevel;
+export type ContentReach = LocalityLevel;
 
 /**
  * ContentFlag - Warning/issue on content (denormalized from trust profile).

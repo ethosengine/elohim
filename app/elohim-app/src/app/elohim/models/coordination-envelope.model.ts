@@ -22,7 +22,7 @@
 import type { ElohimLayer, ElohimCapability } from './elohim-agent.model';
 import type {
   ContentVisibility,
-  ReachLevel,
+  LocalityLevel,
   AffinityScope,
   GeographicContext,
 } from './protocol-core.model';
@@ -121,7 +121,7 @@ export type ScopeTarget =
   | { kind: 'agent'; agentId: string }
   | { kind: 'layer'; layer: ElohimLayer; geography?: GeographicContext }
   | { kind: 'affinity'; scope: AffinityScope; communityIds?: string[] }
-  | { kind: 'broadcast'; reach: ReachLevel }
+  | { kind: 'broadcast'; reach: LocalityLevel }
   | { kind: 'council'; councilId: string };
 
 // ============================================================================
