@@ -5795,3 +5795,63 @@ fn content_graph_view_matches_schema() {
     let json = serde_json::to_value(&view).unwrap();
     validate_against_schema("views/content-graph.schema.json", &json);
 }
+
+// ── Verdict spine (verdict-view, Category C — the gradient answer projection) ──
+
+#[test]
+fn verdict_view_matches_schema() {
+    use elohim_epr::verdict::{
+        CheckOutcome, CheckWitness, Decision, ReferQuestion, ReferReason, Verdict, Witness,
+    };
+
+    // Refer variant (the ceiling marker) with a failed + a passed witness check —
+    // exercises the richest wire shape (decision payload + observed values).
+    let refer = Verdict {
+        axis: "epistemic".to_string(),
+        subject: Some("bafyreisubjectcid0000000000000000000000000000000000000000000".to_string()),
+        decision: Decision::Refer(ReferQuestion {
+            layer: "community".to_string(),
+            reason: ReferReason::ContestedEvidence,
+            note: Some("dissent share over the contest threshold".to_string()),
+        }),
+        witness: Witness {
+            checks: vec![
+                CheckWitness {
+                    check_id: "contest-ratio".to_string(),
+                    outcome: CheckOutcome::Failed,
+                    summary: "dismiss weight over contest threshold".to_string(),
+                    observed: Some(serde_json::json!({ "dissentRatio": 0.4 })),
+                },
+                CheckWitness {
+                    check_id: "review-tally".to_string(),
+                    outcome: CheckOutcome::Passed,
+                    summary: "4 reviews recorded".to_string(),
+                    observed: None,
+                },
+            ],
+        },
+        policy_ref: Some("epr:policy:epistemic:v1".to_string()),
+    };
+    validate_against_schema(
+        "views/verdict-view.schema.json",
+        &serde_json::to_value(&refer).unwrap(),
+    );
+
+    // Permit variant: the decision carries only the discriminator, no subject/policyRef.
+    let permit = Verdict {
+        axis: "reach".to_string(),
+        subject: None,
+        decision: Decision::Permit,
+        witness: Witness { checks: vec![] },
+        policy_ref: None,
+    };
+    validate_against_schema(
+        "views/verdict-view.schema.json",
+        &serde_json::to_value(&permit).unwrap(),
+    );
+
+    assert_source_of_truth_declared(
+        &load_schema("views/verdict-view.schema.json"),
+        "verdict-view.schema.json",
+    );
+}

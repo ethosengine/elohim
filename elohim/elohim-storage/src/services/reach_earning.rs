@@ -69,6 +69,107 @@ pub enum ReachVerdict {
     },
 }
 
+/// Reach joins the verdict spine. A [`ReachVerdict`] is one axis's answer, so it
+/// projects onto the protocol-owned [`elohim_epr::verdict::Verdict`] shape:
+/// `Allowed → Permit`, `Blocked → Refuse`, `Pending → Refer`.
+///
+/// **Ceiling law.** `Pending` is a not-yet-decidable question for the discernment
+/// layer — it maps to [`Decision::Refer`] (escalate to the named layer), NEVER to
+/// [`Decision::Refuse`] (which would silently swallow a question a human was owed).
+/// The [`StandingEvidence`] rides into the witness as `observed` values (positive
+/// evidence), so the verdict carries the standing it was computed from.
+impl From<ReachVerdict> for elohim_epr::verdict::Verdict {
+    fn from(v: ReachVerdict) -> Self {
+        use elohim_epr::verdict::{
+            CheckOutcome, CheckWitness, Decision, ReferQuestion, ReferReason, Verdict, Witness,
+        };
+
+        let axis = "reach".to_string();
+        match v {
+            ReachVerdict::Allowed {
+                floor_class_match,
+                evidence,
+            } => {
+                let checks = vec![
+                    CheckWitness {
+                        check_id: "reach-standing".into(),
+                        outcome: CheckOutcome::Passed,
+                        summary: "author standing meets the requested reach".into(),
+                        observed: serde_json::to_value(evidence.standing).ok(),
+                    },
+                    CheckWitness {
+                        check_id: "floor-class".into(),
+                        outcome: CheckOutcome::Passed,
+                        summary: match floor_class_match {
+                            Some(_) => "allowed under a constitutional floor class".into(),
+                            None => "allowed on earned standing".into(),
+                        },
+                        observed: serde_json::to_value(floor_class_match).ok(),
+                    },
+                ];
+                Verdict {
+                    axis,
+                    subject: None,
+                    decision: Decision::Permit,
+                    witness: Witness { checks },
+                    policy_ref: None,
+                }
+            }
+            ReachVerdict::Blocked { reason, evidence } => {
+                let checks = vec![
+                    CheckWitness {
+                        check_id: "reach-standing".into(),
+                        outcome: CheckOutcome::Failed,
+                        summary: format!("blocked: {reason:?}"),
+                        observed: serde_json::to_value(reason).ok(),
+                    },
+                    CheckWitness {
+                        check_id: "standing-evidence".into(),
+                        outcome: CheckOutcome::Skipped,
+                        summary: "standing snapshot at evaluation time".into(),
+                        observed: serde_json::to_value(evidence.standing).ok(),
+                    },
+                ];
+                Verdict {
+                    axis,
+                    subject: None,
+                    decision: Decision::Refuse,
+                    witness: Witness { checks },
+                    policy_ref: None,
+                }
+            }
+            ReachVerdict::Pending { reason, evidence } => {
+                // Ceiling law: escalate, never collapse. UnknownAuthor lacks the standing
+                // to earn the reach (InsufficientAuthority); a new voice is an unseen
+                // participant the layer must frame (NovelSituation).
+                let refer_reason = match reason {
+                    PendingReason::UnknownAuthorAtNonFloorReach => {
+                        ReferReason::InsufficientAuthority
+                    }
+                    PendingReason::NewVoiceWithoutSponsor => ReferReason::NovelSituation,
+                };
+                let checks = vec![CheckWitness {
+                    check_id: "standing-evidence".into(),
+                    outcome: CheckOutcome::Skipped,
+                    summary: "standing snapshot at evaluation time".into(),
+                    observed: serde_json::to_value(evidence.standing).ok(),
+                }];
+                Verdict {
+                    axis,
+                    subject: None,
+                    decision: Decision::Refer(ReferQuestion {
+                        layer: "community".into(),
+                        reason: refer_reason,
+                        note: Some(format!("{reason:?}")),
+                    }),
+                    witness: Witness { checks },
+                    policy_ref: None,
+                }
+            }
+        }
+    }
+}
+
 /// Pure substrate evaluator. Does not persist; returns ephemeral verdict.
 ///
 /// # Parameters
@@ -358,6 +459,52 @@ mod tests {
             assert_eq!(class, FloorClass::LocalRelationshipReach);
         } else {
             panic!("expected Allowed with LocalRelationshipReach, got {v:?}");
+        }
+    }
+
+    #[test]
+    fn every_reach_verdict_maps_to_spine_and_pending_never_refuses() {
+        use elohim_epr::verdict::{Decision, Verdict};
+
+        let evidence = StandingEvidence {
+            standing: Standing::Unknown,
+        };
+
+        // Allowed → Permit
+        let allowed: Verdict = ReachVerdict::Allowed {
+            floor_class_match: Some(FloorClass::CidTargetedLookup),
+            evidence: evidence.clone(),
+        }
+        .into();
+        assert_eq!(allowed.axis, "reach");
+        assert!(matches!(allowed.decision, Decision::Permit), "{allowed:?}");
+
+        // Blocked → Refuse
+        let blocked: Verdict = ReachVerdict::Blocked {
+            reason: BlockReason::StandingBelowThreshold,
+            evidence: evidence.clone(),
+        }
+        .into();
+        assert!(matches!(blocked.decision, Decision::Refuse), "{blocked:?}");
+
+        // Pending → Refer, NEVER Refuse (the ceiling law) — for every PendingReason.
+        for reason in [
+            PendingReason::UnknownAuthorAtNonFloorReach,
+            PendingReason::NewVoiceWithoutSponsor,
+        ] {
+            let pending: Verdict = ReachVerdict::Pending {
+                reason,
+                evidence: evidence.clone(),
+            }
+            .into();
+            assert!(
+                matches!(pending.decision, Decision::Refer(_)),
+                "Pending must map to Refer, got {pending:?}"
+            );
+            assert!(
+                !matches!(pending.decision, Decision::Refuse),
+                "Pending must NEVER collapse to Refuse"
+            );
         }
     }
 

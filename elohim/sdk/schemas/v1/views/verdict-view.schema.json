@@ -1,0 +1,79 @@
+{
+  "$id": "epr:schema:view:verdict",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Verdict",
+  "description": "One gradient axis's answer about one subject, with the per-check witness backing it — the wire projection of the protocol verdict spine. Reach, epistemic standing, and downstream compute/trust + retention axes all narrow onto this one shape. `decision.type` is the three-valued spine discriminator (permit | refuse | refer); `refer` is the first-class ceiling marker (a routed question for a human/elohim at the named layer), never a fallthrough, timeout, or error. Source of truth: elohim/epr/src/verdict.rs (Verdict) — wire projection of the verdict spine (Operational, Category C — evaluated per request over notarized/witnessed inputs, never persisted). Spec: reach-ontology-vocabulary-split-spec §2a.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["axis", "decision", "witness"],
+  "properties": {
+    "axis": {
+      "type": "string",
+      "description": "The gradient axis id this verdict answers on (e.g. 'reach', 'epistemic')."
+    },
+    "subject": {
+      "type": ["string", "null"],
+      "description": "Opaque content reference the verdict is about — a CID string when content-addressed; null when the axis concerns an actor/context rather than a specific artifact."
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "description": "The spine answer. `permit`/`refuse` carry only `type`; `refer` additionally carries the routed question (layer + reason + note).",
+      "properties": {
+        "type": { "$ref": "../enums/decision.schema.json" },
+        "layer": {
+          "type": ["string", "null"],
+          "description": "For `refer`: the governance layer that should receive the question (subsidiarity routing)."
+        },
+        "reason": {
+          "type": ["string", "null"],
+          "description": "For `refer`: why it escalated — novel-situation | insufficient-authority | contested-evidence."
+        },
+        "note": {
+          "type": ["string", "null"],
+          "description": "For `refer`: optional human-readable context for the receiving layer."
+        }
+      }
+    },
+    "witness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checks"],
+      "description": "Positive per-check evidence backing the decision (stronger than a violations-only report — a passed check with an observed value is positive proof the rule held).",
+      "properties": {
+        "checks": {
+          "type": "array",
+          "description": "The per-check evidence, in evaluation order.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["checkId", "outcome", "summary"],
+            "properties": {
+              "checkId": {
+                "type": "string",
+                "description": "Stable id of the check that ran."
+              },
+              "outcome": {
+                "type": "string",
+                "enum": ["passed", "failed", "skipped"],
+                "description": "How the check resolved."
+              },
+              "summary": {
+                "type": "string",
+                "description": "Human-readable one-line result."
+              },
+              "observed": {
+                "description": "The observed value the check recorded (any JSON value, or null) — the positive evidence."
+              }
+            }
+          }
+        }
+      }
+    },
+    "policyRef": {
+      "type": ["string", "null"],
+      "description": "Reference to the policy/manifest binding that parameterized the check, when one applies."
+    }
+  }
+}
