@@ -152,3 +152,39 @@ Feature: EPR Content Addressing
     Then the EPR Head includes an Ed25519 signature by "agent-author"
     And the signature verifies against the canonical envelope bytes
     And the CID computed from the canonical envelope matches the requested CID
+
+  # ── Harvested 2026-07-23 (shift/reach-vocab-slice1): canonical reach vocabulary ──
+  # Constraint discovered: when threshold lookup migrated to canonical
+  # as_manifest_key(), legacy kebab-8 keys in live standing-policy manifests
+  # ("personal"…"district") became inert dead data — canonical keys govern.
+  # Reach::Commons has no key in the legacy bootstrap policy and falls back
+  # to the conservative "high" standing bar (fail-strict, never fail-open).
+  # Operational parameters: bootstrap-standing-policy.json reachThresholds —
+  # canonical "community"→neutral, "public"→high, commons→(fallback) high;
+  # floor reaches (private/self/intimate/trusted/familiar) bypass standing.
+  # Informs: standing-policy manifest authoring; operator preset docs.
+  # PRECONDITION for future work: parse_reach_key's legacy aliases collapse
+  # district/public→Public — the live policy must be canonicalized BEFORE
+  # wiring parse_reach_key into manifest ingestion, else one key gets two
+  # conflicting thresholds. (Tracked in reach-vocabulary-frontend-strand.)
+
+  @wip @regression
+  Scenario: Legacy standing-policy keys are inert — canonical vocabulary governs composition thresholds
+    # Regression anchor: the aunt_and_rage_bait integration test proved a
+    # debited author composing at public reach is judged against the
+    # canonical "public"→high threshold, NOT the legacy "district"→neutral
+    # rung that pre-migration code consulted. If this stops reproducing,
+    # the lookup path changed — revisit before trusting manifests.
+    Given the bootstrap standing policy still carries legacy kebab-8 reachThresholds keys
+    And Bob's standing was debited below the high bar by moderation signals
+    When Bob attempts to compose content at "public" reach
+    Then the composition is refused against the canonical "public" high threshold
+    And the legacy "district" neutral entry plays no part in the verdict
+
+  @wip
+  Scenario: Floor reaches bypass standing while commons demands the conservative fallback bar
+    Given the bootstrap standing policy has no "commons" reachThresholds entry
+    When Bob composes content at "trusted" reach
+    Then no standing check gates the composition
+    When Bob attempts to compose content at "commons" reach
+    Then the composition is judged against the conservative "high" fallback bar
