@@ -9,7 +9,7 @@
 use diesel::SqliteConnection;
 use serde::{Deserialize, Serialize};
 
-use crate::services::epr_kind::Reach;
+use crate::services::epr_kind::{Reach, ReachStandingExt};
 use crate::services::manifest_registry::{ManifestRegistry, UnknownTreatment};
 use crate::services::standing::{Standing, StandingScore};
 
@@ -88,8 +88,8 @@ pub fn evaluate(
     // 1. Floor class allow: cid-targeted-lookup, local-relationship-reach
     if requested_reach.is_floor_allowed() {
         let floor_class = match requested_reach {
-            Reach::Personal | Reach::Intimate => FloorClass::CidTargetedLookup,
-            Reach::Household | Reach::Neighborhood => FloorClass::LocalRelationshipReach,
+            Reach::Private | Reach::SelfScope | Reach::Intimate => FloorClass::CidTargetedLookup,
+            Reach::Trusted | Reach::Familiar => FloorClass::LocalRelationshipReach,
             _ => FloorClass::CidTargetedLookup,
         };
         return ReachVerdict::Allowed {
@@ -121,12 +121,14 @@ pub fn evaluate(
     };
 
     // 5. Required threshold from manifest (with safe-by-default fallback)
-    let required = match registry.reach_threshold(requested_reach.as_kebab()) {
+    let required = match registry.reach_threshold(requested_reach.as_manifest_key()) {
         Some(t) => t,
         None => {
             // Manifest missing entry — use safe-by-default conservative table.
+            // Both top rungs of the canonical vocabulary (Public, Commons) are
+            // the "maximally open" case the old kebab-8 single top rung meant.
             match requested_reach {
-                Reach::Public => "high".to_string(),
+                Reach::Public | Reach::Commons => "high".to_string(),
                 _ => "neutral".to_string(),
             }
         }
@@ -240,8 +242,8 @@ mod tests {
             },
             "unknownTreatment":{"default":"conservative","evidenceSources":[]},
             "reachThresholds":{
-                "personal":"any","intimate":"any","household":"any","neighborhood":"any",
-                "collective":"neutral","community":"neutral","district":"neutral","public":"high"
+                "private":"any","self":"any","intimate":"any","trusted":"any","familiar":"any",
+                "community":"neutral","public":"high","commons":"high"
             }
         }"#;
         ManifestRegistry::from_payload_json(json).expect("parse")
@@ -252,7 +254,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         let r = registry_with_full_policy();
-        let v = evaluate(&[0; 32], &[1; 32], Reach::Personal, &mut conn, &r);
+        let v = evaluate(&[0; 32], &[1; 32], Reach::SelfScope, &mut conn, &r);
         assert!(matches!(v, ReachVerdict::Allowed { .. }), "{v:?}");
     }
 
@@ -343,11 +345,11 @@ mod tests {
     }
 
     #[test]
-    fn floor_reach_household_returns_local_relationship_reach_class() {
+    fn floor_reach_trusted_returns_local_relationship_reach_class() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         let r = registry_with_full_policy();
-        let v = evaluate(&[0; 32], &[1; 32], Reach::Household, &mut conn, &r);
+        let v = evaluate(&[0; 32], &[1; 32], Reach::Trusted, &mut conn, &r);
         if let ReachVerdict::Allowed {
             floor_class_match: Some(class),
             ..
@@ -357,5 +359,33 @@ mod tests {
         } else {
             panic!("expected Allowed with LocalRelationshipReach, got {v:?}");
         }
+    }
+
+    #[test]
+    fn legacy_vocabulary_manifest_still_evaluates_floor_reach() {
+        // Data-aware migration (spec §7.5): a live standing-policy manifest
+        // payload may still carry the retired kebab-8 key "household" (now
+        // Reach::Trusted) in its reachThresholds map. parse_reach_key covers
+        // legacy manifest ingestion generally, and — independently — the
+        // floor-allowed short-circuit means Reach::Trusted evaluates to
+        // Allowed regardless of how the manifest spells its threshold keys.
+        // Together these prove a legacy-vocabulary manifest keeps evaluating
+        // rather than 404ing or panicking.
+        let json = r#"{"manifestKind":"standing-policy","revision":1,
+            "floor":{"classes":[]},
+            "newVoiceBaseline":{"score":"floor","vulnerableClassLift":"low"},
+            "debitWeights":{"squelch":{"advisory":0,"debit-soft":1,"debit-firm":3},"correction":{"advisory":0,"debit-soft":10,"debit-firm":20},"retraction":{"advisory":0,"debit-soft":-5,"debit-firm":-10},"quarantine":{"advisory":0,"debit-soft":12,"debit-firm":30},"vouch":{"advisory":0,"debit-soft":-3,"debit-firm":-8}},
+            "unknownTreatment":{"default":"conservative","evidenceSources":[]},
+            "reachThresholds":{"household":"any"}
+        }"#;
+        let r = ManifestRegistry::from_payload_json(json).expect("parse");
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let v = evaluate(&[0; 32], &[1; 32], Reach::Trusted, &mut conn, &r);
+        assert!(matches!(v, ReachVerdict::Allowed { .. }), "{v:?}");
+        assert_eq!(
+            crate::services::epr_kind::parse_reach_key("household"),
+            Some(Reach::Trusted)
+        );
     }
 }

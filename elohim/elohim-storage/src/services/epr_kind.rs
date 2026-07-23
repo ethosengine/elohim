@@ -87,19 +87,19 @@ pub use elohim_epr::Reach;
 pub trait ReachStandingExt {
     /// `true` ⇒ manifest floor class "any": bypasses the standing check
     /// (CID-targeted lookup + local-relationship floor classes).
-    fn is_floor_allowed(self) -> bool;
+    fn is_floor_allowed(&self) -> bool;
     /// Canonical manifest key (the serde/schema string).
-    fn as_manifest_key(self) -> &'static str;
+    fn as_manifest_key(&self) -> &'static str;
 }
 
 impl ReachStandingExt for Reach {
-    fn is_floor_allowed(self) -> bool {
+    fn is_floor_allowed(&self) -> bool {
         matches!(
             self,
             Reach::Private | Reach::SelfScope | Reach::Intimate | Reach::Trusted | Reach::Familiar
         )
     }
-    fn as_manifest_key(self) -> &'static str {
+    fn as_manifest_key(&self) -> &'static str {
         match self {
             Reach::Private => "private",
             Reach::SelfScope => "self",

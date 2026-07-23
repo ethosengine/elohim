@@ -87,8 +87,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         let r = ManifestRegistry::default();
-        // Reach::Personal is_floor_allowed → Allowed regardless of standing
-        let result = compose_epr(&[0; 32], &[1; 32], Reach::Personal, &mut conn, &r);
+        // Reach::SelfScope is_floor_allowed → Allowed regardless of standing
+        let result = compose_epr(&[0; 32], &[1; 32], Reach::SelfScope, &mut conn, &r);
         assert!(result.is_ok(), "floor reach should be allowed: {result:?}");
     }
 
