@@ -202,7 +202,12 @@ mod tests {
         ] {
             assert_eq!(parse_reach_key(legacy), Some(canonical));
         }
-        // Legacy "public" meant the top rung → commons; canonical "public" stays public.
+        // Stored "public" reads as canonical Reach::Public (see the "public" |
+        // "district" arm above) — it is NOT remapped to Commons here. The
+        // historical rows where legacy "public" meant the old top rung were
+        // canonicalized to "commons" by the one-time 2026-07-23 content.reach
+        // backfill migration (slice-3), so by the time this parser runs, any
+        // row still spelled "public" genuinely means Public.
         assert_eq!(parse_reach_key("commons"), Some(Reach::Commons));
         assert_eq!(parse_reach_key("self"), Some(Reach::SelfScope));
         assert_eq!(parse_reach_key("nonsense"), None);
