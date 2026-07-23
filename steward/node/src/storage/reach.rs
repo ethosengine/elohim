@@ -1,4 +1,28 @@
-//! Reach-based access control and replication policy
+//! Locality/placement-axis seed — NOT the declared-reach vocabulary.
+//!
+//! This module's `Reach` enum (6 values) and its `replication_policy` matrix
+//! (`ReplicationAction::{FullSync, MetadataOnly, OnDemand, Skip}` over
+//! content-locality × peer-trust) are the earliest seed of the
+//! locality-driven placement engine sequenced *behind* the reach-vocabulary
+//! reconciliation — see
+//! `genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md`
+//! §1 (vocabulary table) and §7 (out-of-scope: "locality-driven placement
+//! engine" is explicitly deferred past the reconciliation sprint).
+//!
+//! Do **not** migrate this enum to schema-8 `Reach` — it answers a different
+//! question ("how should this replicate, given content locality and peer
+//! trust?") than declared reach ("who may see this?"). Per
+//! `steward/node/CLAUDE.md` ("Stubs and not-built"), this is a recorded
+//! **dormant definition site**: `replication_policy` and its
+//! `ReplicationAction` variants have zero production callers (only the unit
+//! tests below), and `can_serve`/`should_replicate` are `#[allow(dead_code)]`.
+//! `sync/coordinator.rs:99` constructs a live `Reach::Local` value as a
+//! `trust_level` default, so this enum is not fully inert — but nothing here
+//! should be read as canon. When the locality/placement engine is actually
+//! built, align this enum's variants to the SDK's `LocalityLevel`
+//! (`elohim/sdk/storage-client-ts/src/protocol-core.model.ts`, the
+//! source-of-record for the locality vocabulary) rather than re-deriving a
+//! third geographic ladder.
 
 use serde::{Deserialize, Serialize};
 

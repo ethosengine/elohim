@@ -273,3 +273,101 @@ concern; it is fully recorded here and in the slice-2 disposition above.
 Reminder carried from slice-2 for the burn-down implementer: SDK edits need `pnpm build` before
 app/lamad tsconfigs see them (both resolve `@elohim/storage-client` via compiled `dist/`, not
 source — the dist-freshness trap).
+
+## Slice-3 dispositions (2026-07-23)
+
+Slice 3 (`shift/reach-vocab-slice3`, six tasks) closes out per
+`reach-ontology-vocabulary-split-spec` §7 Definition-of-Done items 2 and 5. Final dispositions:
+
+- **Library retired-6 strand migrated to canonical** (`c20b64e6f`). The independently-drifted
+  `elohim-library` duplicates flagged at the end of slice-2 (`ContentReach` at
+  `app/elohim-library/projects/elohim-service/src/models/content-node.model.ts:46` and
+  `trust.service.ts`'s own `ReachLevel`) are reconciled onto the canonical vocabulary.
+- **Aliases burned down, then DELETED** (`8a7ec681d`). The ~37 call sites onto
+  `ReachLevel`/`REACH_LEVEL_VALUES`/`reachEncompasses` (slice-2's deliberate migration bridge) are
+  moved onto `LocalityLevel`/`LOCALITY_LEVEL_VALUES`/`localityEncompasses`, and the `@deprecated`
+  alias definitions themselves are deleted from
+  `elohim/sdk/storage-client-ts/src/protocol-core.model.ts`. **The two sentinel fingerprints this
+  strand recorded above — `cad8d5f51f6f` (`REACH_LEVEL_VALUES` alias) and `247dc16fb9d5`
+  (`reachEncompasses()` alias) — are DELETED along with the aliases they tag.** Their ledger lines
+  are gone because the tagged code is gone; the deprecation-sentinel's regression re-fire is
+  **armed**: if either alias (or the sibling `ReachLevel` type alias) is ever reintroduced, it is a
+  NEW fingerprint, not a resurrection of these two, and should be triaged fresh rather than pointed
+  back at this (now-historical) disposition.
+- **`reachIcon` complete** (`c9759c7d8`). The reach→icon presentation mapping is migrated onto the
+  canonical vocabulary alongside the alias burn-down.
+- **Bootstrap standing-policy canonical** (`248c13db5`). `reachThresholds` in the bootstrap policy
+  is the canonical 8-key schema-8 shape (`private/self/intimate/trusted/familiar/community/public/
+  commons`) — no more geographic-8 leakage into standing-policy config.
+- **`content.reach` one-time canonicalization migration** (`d9fcd353c`). Pre-migration rows whose
+  stored `content.reach` value used the old top-rung sense of `"public"` are backfilled to
+  `"commons"` — the durable fix slice-2's `parse_reach_class` follow-up called for (§ "FOLLOW-UP
+  (reviewer-proposed, accepted)" above). Downstream: `elohim/elohim-storage/src/services/epr_kind.rs`'s
+  `legacy_manifest_keys_still_parse` test comment is corrected (comment-only, this task) to state
+  that stored `"public"` now genuinely means canonical `Reach::Public` post-migration, since the
+  ambiguous historical rows have already been moved to `"commons"`.
+- **Steward `reach.rs` documented as locality-seed, not canonized** (this task, comment-only). Its
+  6-value `Reach` enum + `replication_policy` matrix (`FullSync`/`MetadataOnly`/`OnDemand`/`Skip`
+  over content-locality × peer-trust) is recorded, in a new module doc-comment, as the seed of the
+  locality/placement engine the reconciliation spec sequences *behind* itself (§7 out-of-scope),
+  citing the spec and naming SDK `LocalityLevel` as the future alignment target if that engine is
+  ever built. No rename, no deletion, no code change — `sync/coordinator.rs:99` still constructs a
+  live `Reach::Local` default, so the enum is not fully inert, but nothing in it is canon.
+- **SDK `LocalityLevel` source-of-record declaration added** (this task, comment-only). The block
+  in `elohim/sdk/storage-client-ts/src/protocol-core.model.ts` now states explicitly that this file
+  is the single generative source-of-record for the locality vocabulary (drift-prevention law, spec
+  §1), lists the known projections (app `elohim/models/protocol-core.model.ts` re-export, library
+  `cache/types.ts` mirror), and names steward `reach.rs` as a future-alignment target rather than a
+  current projection.
+
+**Two NEWLY-DISCOVERED same-name vocabularies, recorded here so they cannot hide** (found during
+slice-3 closeout; NOT touched by any slice-3 task — future work, not urgent):
+
+- `app/elohim-library/projects/elohim-service/src/client/types.ts:148` — a numeric `ReachLevel`
+  **enum** (`Commons = 0` … `Private = 7`, TypeScript `enum`, not a union type), independent of both
+  the retired-6 library duplicate (migrated above, lived in `cache/types.ts`/`content-node.model.ts`/
+  `trust.service.ts`) and the SDK `LocalityLevel`. Same 8-value geographic ladder, reversed ordinal
+  direction (0=Commons here vs. 7=Commons in `LOCALITY_LEVEL_VALUES`), same name as the now-deleted
+  SDK alias. **Untouched, still live.** Needs its own migration task before it can be called
+  reconciled — do not assume the alias burn-down above swept it; it is a different package,
+  different definition, different file.
+- `elohim/sdk/src/types.ts:1211` — a hand-written schema-8 `ReachLevels` const object +
+  `ReachLevel` type (`private/self/intimate/trusted/familiar/community/public/commons`), living in
+  `elohim/sdk/src/` (the hand-written SDK-helpers directory, NOT `storage-client-ts/generated/` and
+  NOT ts-rs-anchored). Its *values* are already canonical schema-8 — this is not vocabulary drift
+  in the ontological sense slice-1/slice-2/slice-3 fixed — but it is a **second hand-typed
+  definition site** for the same 8 values the schema (`elohim/sdk/schemas/v1/enums/reach.schema.json`)
+  already generates from. Per the drift-prevention law (spec §1: "exactly ONE generative
+  source-of-record per vocabulary; every other appearance is a generated projection or an explicit
+  re-export"), this is a candidate for codegen alignment (re-export from the generated schema enum,
+  or delete in favor of it) in a later pass — not urgent since values agree today, but a latent
+  drift site the moment the schema enum changes and this hand-written copy is not updated in
+  lockstep.
+
+**Remaining slice-4 queue** (per `reach-ontology-vocabulary-split-spec` §7 Definition-of-Done,
+items 3, 4, 6, and the doorway residue of item 5 — none started, no code exists for any of these):
+
+- **Verdict surface** (spec §7.3) — the generalized `verdict(content, viewer?, announcement?,
+  freshness) → { Allowed | Blocked | Pending, evidence, explain? }` route + Rust shape, generalizing
+  today's `ReachVerdict`/`StandingEvidence` (`reach_earning.rs`) and the `reach_authorization`
+  pre-auth stage. Not designed yet beyond the spec's guiding principles.
+- **Fixture harness** (spec §7.4) — offline, deterministic "given these declarations/tuples/
+  commitments, agent A sees exactly {…}" invariant tests for the verdict function (SpiceDB `zed
+  validate` pattern). Blocked on the verdict surface existing to test.
+- **Doorway `can_serve_at_reach` re-keying + `reach:`-named `LocalityLevel` wire-field residue**
+  (spec §7.5 residue) — `doorway/doorway-service/src/cache/access_control.rs`'s `REACH_LEVELS` +
+  `can_serve_at_reach` still speak the geographic-8/locality vocabulary under the name "reach";
+  per this strand's earlier doorway paragraph, the function is also zero-consumer outside
+  `src/cache/` (no live HTTP route gates by it), so this re-keying is a rename-for-honesty pass, not
+  a live-behavior fix. Also unreconciled: any wire field literally named `reach` that carries
+  `LocalityLevel` values (e.g. `ContentVisibility.reach`, `GeographicContext.reach`,
+  `Attestation.reach` in `protocol-core.model.ts` itself) — the *field name* `reach` on a
+  `LocalityLevel`-typed value is itself a small residual name collision the rename didn't chase into
+  every struct.
+- **Composition-law a2o scenarios** (spec §7.6) — regression stories for narrow-never-widen,
+  anonymous→commons, revocation-orders-before-serve. Not written.
+- **`content.reach` schema `DEFAULT 'public'` open-by-default smell** — noted but not fixed in this
+  slice: the column/schema default for `content.reach` is `'public'` (open-by-default) rather than a
+  more conservative floor. Flagging here as a smell for whoever next touches the content-creation
+  path; not a vocabulary-drift item per se, but adjacent enough to record alongside the migration
+  that just ran.

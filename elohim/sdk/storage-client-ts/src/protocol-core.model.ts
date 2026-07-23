@@ -39,6 +39,25 @@
  * elohim/sdk/schemas/v1/enums/reach.schema.json). See spec:
  * reach-ontology-vocabulary-split-spec §1.
  *
+ * SOURCE-OF-RECORD DECLARATION (drift-prevention law, spec §1): this file —
+ * `elohim/sdk/storage-client-ts/src/protocol-core.model.ts` — is the single
+ * generative source-of-record for the locality vocabulary. It is
+ * hand-written (NOT ts-rs-generated, despite living in the SDK next to
+ * generated files). Every other appearance must be a re-export of this
+ * type, never a redefinition. Known projections:
+ *   - `app/elohim-app/src/app/elohim/models/protocol-core.model.ts` — app
+ *     re-export of this block.
+ *   - `app/elohim-library/projects/elohim-service/src/cache/types.ts` — the
+ *     `LOCALITY_LEVEL_VALUES`-shaped cache mirror (numeric const 0-7, same
+ *     vocabulary).
+ *   - `steward/node/src/storage/reach.rs` — future alignment target, NOT a
+ *     current projection: its dormant 6-value `Reach`/`replication_policy`
+ *     locality-seed enum is expected to align its variants to
+ *     `LocalityLevel` if/when the locality-driven placement engine is
+ *     built (see that file's module doc-comment).
+ * A vocabulary value hand-typed anywhere else is a defect — reconcile it
+ * back to a re-export of this block instead.
+ *
  * These represent concentric geographic circles, each containing the previous.
  * Locality answers: "How far can this travel geographically?"
  *
