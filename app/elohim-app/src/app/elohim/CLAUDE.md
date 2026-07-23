@@ -28,7 +28,7 @@ home drifts this gospel STALE for re-verification.
 
 | Model | Purpose |
 |-------|---------|
-| `protocol-core.model.ts` | Shared primitives (ReachLevel, AffinityScope, CrossPillarLinkType, …) |
+| `protocol-core.model.ts` | Shared primitives (LocalityLevel, AffinityScope, CrossPillarLinkType, …) |
 | `elohim-agent.model.ts` | Constitutional AI guardian types |
 | `trust-badge.model.ts` | TrustIndicator/TrustIndicatorSet for UI display |
 | `zome-wire-types.ts` | snake_case Holochain zome wire types (boundary-only) |
@@ -65,14 +65,15 @@ type MasteryLevel =
   | 'not_started' | 'seen' | 'remember' | 'understand'
   | 'apply' | 'analyze' | 'evaluate' | 'create';
 
-// Geographic/jurisdictional visibility scope (models/protocol-core.model.ts:50)
-type ReachLevel =
+// Geographic/placement scope — LOCALITY, not declared reach (models/protocol-core.model.ts)
+type LocalityLevel =
   | 'private' | 'invited' | 'local' | 'neighborhood'
   | 'municipal' | 'bioregional' | 'regional' | 'commons';
-// DRIFT: the DNA-notarized schema enum (elohim/sdk/schemas/v1/enums/reach.schema.json) is a
-// DIFFERENT 8 (private/self/intimate/trusted/familiar/community/public/commons) — known
-// reconciliation backlog (genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md);
-// do not "fix" either side to match the other here.
+// SETTLED (2026-07-23 reach reconciliation): this is the locality/placement vocabulary
+// (dataplane: replication, eviction, caching). Declared reach is the DNA-notarized schema
+// enum (elohim/sdk/schemas/v1/enums/reach.schema.json — private/self/intimate/trusted/
+// familiar/community/public/commons). They are different axes by design — never merge them
+// (genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md).
 
 // Trust indicator for UI (models/trust-badge.model.ts:188)
 interface TrustIndicator {
