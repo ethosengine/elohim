@@ -161,3 +161,34 @@ but source-chain-monotonic and DHT-validated, un-backdatable below a real supers
 - **Tier-1 verification is receiver-local, NOT notarized** — a DHT-direct third party can still be
   fooled by a shape-only forged entry until Tier-2. This is inherent to hash-neutrality; state it,
   don't oversell the coordinator gate as a trust boundary.
+
+---
+
+## Confirmed review finding (2026-07-23) — fallback-dial redirects shard PUSH bytes
+
+A subsequent code review named a concrete consequence of the unsigned binding that this doc's
+"replica-capture / diversity-defeat / eclipse via spoofed `(agent→transport)` gossip" line
+(above, "Durable vs ephemeral is the real safe/unsafe cut") gestures at generally but had not
+pinned to a file:line or traced through to its blast radius. Recording it here as its own
+confirmed finding so it isn't lost inside the general framing:
+
+`elohim/elohim-storage/services/transport_resolve.rs:78` — `resolve_agent_cid_to_libp2p`'s
+source-2 fallback (`peer_identity_bindings::list_active_for_agent`) is, per the module's own
+docs, "the load-bearing fallback when the manifest is empty (as in prod today)" — i.e. the
+common path, not an edge case. Its rows are exactly the self-asserted, `STAGE1_SIGNATURE_SENTINEL`
+bindings this doc is about. Consequence: an attacker who upserts a `peer_identity_bindings` row
+claiming their own libp2p `PeerId` for a victim `agent_cid` gets that `PeerId` dialed by
+`distribute_shards`/`push_shard` the next time that agent is selected as a shard custodian —
+**silently**, because `shard_locations.peer_id` keeps recording the victim's `agent_cid` (per the
+module's "Transport-layer only" contract, the resolver never writes a transport id back into the
+`agent_cid` column). So the resilience card / placement/diversity accounting still shows the
+legitimate steward as custodian while the actual shard bytes were pushed to the attacker's peer —
+the redirect is invisible to every reader of `shard_locations`, not just unauthenticated.
+
+This is the same root cause C2 already fixes (durable placement decisions must gate on
+`cross_signed`, not `unverified` — see "Durable vs ephemeral is the real safe/unsafe cut" above):
+`resolve_agent_cid_to_libp2p`'s source-2 fallback is a durable-decision consumer of
+`peer_identity_bindings` and belongs on the `cross_signed`-only cut (C2-S5's
+`routing_transport_ids()`/`transport_ids()` split), not general re-scoping. No new work item —
+this subsection exists so the shard-push-redirect consequence is named and file:line-anchored
+against the existing plan rather than rediscovered later.
