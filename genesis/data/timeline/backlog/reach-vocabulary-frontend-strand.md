@@ -16,7 +16,7 @@ derived_from:
   - doorway/doorway-service/REACH.md                # retired to git 2026-06-11 (doorway island recompose) — sibling origin-strand; same geographic 8 as its enforcement ladder + access matrix
   - elohim/holochain/docs/REACH.md                  # retired to git 2026-06-11 (holochain docs island recompose) — the SYSTEM-WIDE overview strand; same geographic 8 (pre-reorg holochain/REACH.md — the "../REACH.md" target the doorway + imagodei dead pointers intended)
 cites:
-  - resilience-protocol-spec | the canonical reconciliation home — gap-matrix row :628 + roadmap item 13 :704 name only three of the (now five+) reach vocabularies | sha256:2c832b517c7204cc | path: genesis/docs/content/elohim-protocol/resilience/README.md
+  - resilience-protocol-spec | the canonical reconciliation home — gap-matrix row :628 + roadmap item 13 :704 name only three of the (now five+) reach vocabularies | sha256:b27fc4e09bd6eb33 | path: genesis/docs/content/elohim-protocol/resilience/README.md
   - genesis/data/timeline/backlog/http-reach-enforcement-gap.md
   - app/elohim-app/src/app/elohim/models/protocol-core.model.ts
   - elohim/sdk/storage-client-ts/src/protocol-core.model.ts
@@ -171,3 +171,76 @@ Per `reach-ontology-vocabulary-split-spec` §1: vocabulary **#2 (Rust services k
 `VALID_REACH_LEVELS` definitions deleted (zero consumers). Drift test:
 `elohim-storage/tests/reach_vocabulary_contract.rs` pins Rust↔schema.
 Remaining strands: geographic-8 rename (locality) and Part-V custody rename — later slices.
+
+## Slice-2 disposition (2026-07-23, shift/reach-vocab-slice2)
+
+Per `reach-ontology-vocabulary-split-spec` §1, the two strands slice-1 deferred are now dispositioned:
+
+- **TS geographic-8 RENAMED → `LocalityLevel`** (`afd8ee1c8`). Single edit point stays
+  `elohim/sdk/storage-client-ts/src/protocol-core.model.ts` — `ReachLevel`, `REACH_LEVEL_VALUES`,
+  `reachEncompasses` are kept as `@deprecated` aliases (`/** @deprecated Renamed 2026-07-23 — use
+  LocalityLevel. */`, lines 78/80/136) so the ~37 existing consumers keep compiling; the other
+  three sites (`app/elohim-app/.../protocol-core.model.ts`, `app/lamad/.../trust-badge.model.ts`,
+  `app/elohim-library/.../cache/types.ts`) re-export rather than redefine. Burn-down of the 37
+  call sites onto `LocalityLevel` is **open**, tracked by +23 deprecation-lint findings surfaced
+  once the aliases landed (deprecation-triage backlog, not re-litigated here). Reminder for
+  whoever burns the aliases down: SDK edits need `pnpm build` before app/lamad tsconfigs see them
+  — both resolve `@elohim/storage-client` via compiled `dist/`, not source (dist-freshness trap).
+
+- **Part-V custody 5 NAMED, not renamed.** `resilience/README.md` Part-V's `household /
+  neighborhood / community / organization / commons` ladder is confirmed a distinct **custody**
+  vocabulary — who holds/replicates for whom, anchored on the `CustodianCommitment` /
+  `Mishpat::Commitment` lineage — never a reach vocabulary. No code changed (there was never a
+  drifted implementation to retire, only prose ambiguity); the gap-matrix row and a clarifying
+  sentence at the Part-V ladder occurrence now say so explicitly
+  (`resilience/README.md:290,628`).
+
+**Live-degradation fix folded into this slice:** `ReachClass` (the distribution-view replica
+ladder — `elohim-storage/src/graph_views/shefa/distribution.rs`,
+`services/distribution_view.rs`) now speaks schema-8 directly
+(`private2/self2/intimate4/trusted6/familiar8/community12/public14/commons16`; `07adc0ccc`). This
+**fixed a live degradation**: declared `trusted`/`familiar`/`commons` content was silently
+computing a 2-replica `Private`-floor target instead of its declared 6/8/16-replica ladder.
+`parse_reach_class` (`distribution_view.rs:312`) keeps a legacy-alias heuristic for stored rows —
+old `"public"` (pre-migration top rung) still parses to `Public`/14, deliberately diverging from
+`parse_reach_key`'s legacy `"public"→Commons` mapping (services enum retirement, slice-1), because
+one reads old stored data and the other parses canonical wire keys; both sides are documented at
+their own definition, not reconciled into one function.
+
+**FOLLOW-UP (reviewer-proposed, accepted) — open, not yet scheduled:** stored legacy-ambiguous
+`"public"` rows parse canonically (→`Public`/14) for now; that is a stand-in, not the durable
+state. The durable fix is a **one-time backfill** disambiguating pre-migration `"public"` rows to
+`"commons"` where that was the original intent, after which `parse_reach_class` retires its
+legacy-alias heuristic entirely and reads the column as pure schema-8. Until the backfill runs,
+any pre-migration row whose original `"public"` meant the old top rung (now `commons`) will
+under-replicate at 14 instead of 16 — narrow blast radius (replica count only, not access control)
+but real.
+
+**NEWLY-DISCOVERED live strand (out of scope here, slice-3 territory):** `elohim-library`'s
+`ContentReach` (`app/elohim-library/projects/elohim-service/src/models/content-node.model.ts:46`)
+and `trust.service.ts`'s own `ReachLevel`
+(`app/elohim-library/projects/elohim-service/src/services/trust.service.ts:14`) independently
+duplicate the retired-6 vocabulary (`private/invited/local/community/federated/commons`) —
+missed by both slice-1's `VALID_REACH_LEVELS` deletion (different type name, same values) and
+slice-2's `LocalityLevel` rename (different package, not re-exporting the SDK type). Flagged
+2026-07-23 (`2acb47731`); ~41 identifier refs package-wide including ~40 spec literal usages.
+Needs its own migration task, not swept into this slice.
+
+**CORRECTION to the slice-1 final-review note:** the note that 3 seed rows carried a stray
+`"agent-private"` reach value was a **misdiagnosis**. Those 3 occurrences
+(`elohim/sdk/domains/{infrastructure,lamad}/*.json`) belong to `observation-kind.schema.json`'s
+own live, schema-valid enum — `agent-private / household / community / commons /
+commons-attested` (`elohim/sdk/schemas/v1/manifest/observation-kind.schema.json:30`) — a distinct
+event-observation vocabulary, unrelated to content-declared `Reach`. Confirmed 2026-07-23
+(`2acb47731`); repo-wide `genesis/data` has zero `"agent-private"` matches, so there was never
+drifted data to migrate. **No action needed, ever** — recorded here so a future pass doesn't
+"fix" a vocabulary that was never broken.
+
+**Attestation data migrated** (completing the retired-6→canonical mapping on stored data):
+`federated`→`public` (5 rows, `2acb47731`), `local`→`trusted` (4 rows, `5844682fc`), both in
+`genesis/data/lamad/attestations/index.json`.
+
+**Still open, unchanged from slice-1:** `steward/node/src/storage/reach.rs`'s dormant 6-value
+enum (`#[allow(dead_code)]` `can_serve`) — not reconciled, not scheduled. Verdict surface (spec §7
+item 3) and fixture harness (item 4) remain later slices, as does the a2o composition-law
+scenario suite (item 6).
