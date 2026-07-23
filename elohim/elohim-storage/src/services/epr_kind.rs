@@ -76,51 +76,59 @@ pub(crate) fn pillar_for_kind_provisional(kind: elohim_epr::EprKind) -> String {
 // Reach — EPR distribution scope
 // ---------------------------------------------------------------------------
 
-/// Distribution scope for an EPR. Used by the reach-earning gate to determine
-/// whether an author's standing is sufficient to compose at the requested scope.
-///
-/// The eight variants map to the `reachThresholds` keys in the standing-policy
-/// manifest. Personal/Intimate/Household/Neighborhood map to "any" (floor class;
-/// bypass the standing check). The remaining four require minimum standing.
-///
-/// See: genesis/docs/superpowers/specs/2026-05-01-light-up-the-graph-design.md §Components::ReachVerdict
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Reach {
-    Personal,
-    Intimate,
-    Household,
-    Neighborhood,
-    Collective,
-    Community,
-    District,
-    Public,
+/// Canonical declared-reach vocabulary — re-exported from the protocol crate.
+/// The schema (elohim/sdk/schemas/v1/enums/reach.schema.json) is the source of
+/// record; the local kebab-8 (personal…district/public) is RETIRED
+/// (spec: reach-ontology-vocabulary-split §1). Legacy manifest keys parse via
+/// `parse_reach_key` and map per the spec's pinned table.
+pub use elohim_epr::Reach;
+
+/// Standing/floor semantics for the standing-policy manifest's `reachThresholds`.
+pub trait ReachStandingExt {
+    /// `true` ⇒ manifest floor class "any": bypasses the standing check
+    /// (CID-targeted lookup + local-relationship floor classes).
+    fn is_floor_allowed(self) -> bool;
+    /// Canonical manifest key (the serde/schema string).
+    fn as_manifest_key(self) -> &'static str;
 }
 
-impl Reach {
-    /// Returns `true` when the manifest's `reachThresholds` maps this reach to
-    /// `"any"` — i.e. these reach values bypass standing/floor checks (CID-targeted-
-    /// lookup and local-relationship-reach floor classes).
-    pub fn is_floor_allowed(self) -> bool {
+impl ReachStandingExt for Reach {
+    fn is_floor_allowed(self) -> bool {
         matches!(
             self,
-            Reach::Personal | Reach::Intimate | Reach::Household | Reach::Neighborhood
+            Reach::Private | Reach::SelfScope | Reach::Intimate | Reach::Trusted | Reach::Familiar
         )
     }
-
-    /// Returns the kebab-case identifier matching the manifest key.
-    pub fn as_kebab(self) -> &'static str {
+    fn as_manifest_key(self) -> &'static str {
         match self {
-            Reach::Personal => "personal",
+            Reach::Private => "private",
+            Reach::SelfScope => "self",
             Reach::Intimate => "intimate",
-            Reach::Household => "household",
-            Reach::Neighborhood => "neighborhood",
-            Reach::Collective => "collective",
+            Reach::Trusted => "trusted",
+            Reach::Familiar => "familiar",
             Reach::Community => "community",
-            Reach::District => "district",
             Reach::Public => "public",
+            Reach::Commons => "commons",
         }
     }
+}
+
+/// Parse a manifest/config reach key: canonical schema-8 keys plus the retired
+/// kebab-8 legacy aliases (data-aware migration — spec §7.5: no value removed
+/// while live rows/manifests still carry it).
+pub fn parse_reach_key(key: &str) -> Option<Reach> {
+    Some(match key {
+        "private" => Reach::Private,
+        "self" | "personal" => Reach::SelfScope,
+        "intimate" => Reach::Intimate,
+        "trusted" | "household" => Reach::Trusted,
+        "familiar" | "neighborhood" => Reach::Familiar,
+        "community" | "collective" => Reach::Community,
+        // legacy "district" sat below legacy "public"(top). district→public.
+        "public" | "district" => Reach::Public,
+        "commons" => Reach::Commons,
+        _ => return None,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -164,20 +172,39 @@ mod tests {
         assert_eq!(cases.len(), 12, "expected 12 EprKind variants");
     }
 
-    // T11 — Reach::is_floor_allowed tests
     #[test]
-    fn floor_reaches_bypass() {
-        assert!(Reach::Personal.is_floor_allowed());
-        assert!(Reach::Intimate.is_floor_allowed());
-        assert!(Reach::Household.is_floor_allowed());
-        assert!(Reach::Neighborhood.is_floor_allowed());
+    fn canonical_reach_floor_split() {
+        use super::ReachStandingExt;
+        for r in [
+            Reach::Private,
+            Reach::SelfScope,
+            Reach::Intimate,
+            Reach::Trusted,
+            Reach::Familiar,
+        ] {
+            assert!(r.is_floor_allowed(), "{r:?} must be floor-allowed");
+        }
+        for r in [Reach::Community, Reach::Public, Reach::Commons] {
+            assert!(!r.is_floor_allowed(), "{r:?} must require standing");
+        }
     }
 
     #[test]
-    fn non_floor_reaches_do_not_bypass() {
-        assert!(!Reach::Collective.is_floor_allowed());
-        assert!(!Reach::Community.is_floor_allowed());
-        assert!(!Reach::District.is_floor_allowed());
-        assert!(!Reach::Public.is_floor_allowed());
+    fn legacy_manifest_keys_still_parse() {
+        // Data-aware migration (spec §7.5): live standing-policy manifests may
+        // still carry the retired kebab-8 keys. They map, never 404.
+        for (legacy, canonical) in [
+            ("personal", Reach::SelfScope),
+            ("household", Reach::Trusted),
+            ("neighborhood", Reach::Familiar),
+            ("collective", Reach::Community),
+            ("district", Reach::Public),
+        ] {
+            assert_eq!(parse_reach_key(legacy), Some(canonical));
+        }
+        // Legacy "public" meant the top rung → commons; canonical "public" stays public.
+        assert_eq!(parse_reach_key("commons"), Some(Reach::Commons));
+        assert_eq!(parse_reach_key("self"), Some(Reach::SelfScope));
+        assert_eq!(parse_reach_key("nonsense"), None);
     }
 }
