@@ -2,30 +2,19 @@
  * Trust Badge Model - UI-ready representation of content trust state.
  *
  * P-migrated from @app/elohim/models/trust-badge.model (Slice 2.1c).
- * ReachLevel inlined here (was imported from @app/elohim/models/protocol-core.model,
- * which stays in elohim-app). The type definition is identical.
+ * LocalityLevel now imported directly from @elohim/storage-client (the SDK
+ * canonical definition — see elohim/sdk/storage-client-ts/src/protocol-core.model.ts),
+ * replacing the prior inlined ReachLevel copy (slice 2, 2026-07-23).
  *
  * @app/elohim/models/trust-badge.model re-exports from here for any remaining
  * elohim-app consumers (none at time of migration, but kept for safety).
  */
 
+import type { LocalityLevel } from '@elohim/storage-client';
+
 import { ATTESTATION_BADGE_CONFIG, REACH_BADGE_CONFIG } from './trust-badge-config';
 
 // @coverage: 88.4% (2026-02-24)
-
-/**
- * ReachLevel — geographic/jurisdictional scope of visibility.
- * Inlined from protocol-core.model (canonical: @app/elohim/models/protocol-core.model).
- */
-export type ReachLevel =
-  | 'private'
-  | 'invited'
-  | 'local'
-  | 'neighborhood'
-  | 'municipal'
-  | 'bioregional'
-  | 'regional'
-  | 'commons';
 
 // ContentAttestationType is lamad-specific - defined locally for cross-pillar trust display.
 export type ContentAttestationType =
@@ -40,8 +29,8 @@ export type ContentAttestationType =
   | 'accessibility-checked'
   | 'license-cleared';
 
-// Use ReachLevel directly (ContentReach was just an alias)
-export type ContentReach = ReachLevel;
+// Use LocalityLevel directly (ContentReach was just an alias)
+export type ContentReach = LocalityLevel;
 
 // ============================================================================
 // Trust Badge Types
