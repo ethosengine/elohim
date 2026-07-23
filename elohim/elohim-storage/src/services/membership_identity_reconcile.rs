@@ -43,6 +43,16 @@
 //! - ≥2 on either side → GENUINELY AMBIGUOUS. Superseding the wrong fossil would
 //!   mis-attribute one human's identity AND shards to another — an identity
 //!   violation strictly worse than a still-stale row. We log + skip; never guess.
+//! - ANY WITHDRAWN member in the household's membership history → ABSTAIN. A
+//!   cleanly-departed member contributes NO live key to `membership_keys`
+//!   (the replayer drops withdrawn members), yet its `humans` row lingers with
+//!   `household_id` still set — surfacing as an ORPHAN FOSSIL with no live-key
+//!   partner. A withdrawal + one genuinely-new member then collapses the visible
+//!   sets to a FALSE `1-unmatched / 1-orphan`, re-keying the DEPARTED member's
+//!   shards + commitments onto the NEW member's key. That is the same
+//!   mis-attribution the ambiguity guard forbids; the completeness guard alone
+//!   does NOT catch it (the read is complete). So a household flagged
+//!   `withdrawn` (see [`crate::services::holochain_humans_replayer`]) abstains.
 //!
 //! This is the conservative realisation of the "supersede when the membership key
 //! differs from a set local key" rule: correct-or-abstain, never mis-attribute.
@@ -86,6 +96,13 @@ pub struct ReconcileStats {
     /// form a FALSE forced 1:1). Distinct from `ambiguous_skipped`, which is a
     /// complete read that is genuinely ≥2 either side.
     pub incomplete_read_skipped: usize,
+    /// Households skipped because ≥1 Person member has cleanly WITHDRAWN. A
+    /// departed member's `humans` row lingers as an orphan fossil with no live-key
+    /// partner, so a withdrawal + a new join would collapse the forced-bijection
+    /// guard into a FALSE 1:1 that re-keys the departed member's shards onto the
+    /// new member's key. Distinct from `incomplete_read_skipped` (the read here is
+    /// COMPLETE — the departure is legitimate, not a dropped record).
+    pub withdrawn_abstain_skipped: usize,
 }
 
 /// Short, log-safe prefix of an agent key for the transition record (mirrors
@@ -108,6 +125,13 @@ fn key_prefix(key: &str) -> String {
 /// dropped/undecodable member could otherwise collapse the forced-bijection guard
 /// into a FALSE 1:1. Pass an empty set when completeness is guaranteed.
 ///
+/// `withdrawn_households` is the set of `household_cid`s with ≥1 cleanly-withdrawn
+/// Person member (same snapshot). Any household in this set ABSTAINS too: a
+/// departed member's lingering `humans` row is an orphan fossil with no live-key
+/// partner, so a withdrawal + a new join collapses the guard into a FALSE 1:1 that
+/// mis-attributes the departed member's shards onto the new member's key. Pass an
+/// empty set when no departures are possible.
+///
 /// Best-effort and idempotent: it never errors on "nothing to do", and a second
 /// run over the same mapping is a no-op (the fossils are gone). A DB failure on
 /// ONE household is logged and skipped — it never aborts the remaining households
@@ -117,6 +141,7 @@ pub fn reconcile_membership_keys(
     cascade_h_app_id: &str,
     mapping: Vec<(String, String)>,
     incomplete_households: &HashSet<String>,
+    withdrawn_households: &HashSet<String>,
 ) -> Result<ReconcileStats, StorageError> {
     let mut stats = ReconcileStats::default();
     if mapping.is_empty() {
@@ -163,6 +188,7 @@ pub fn reconcile_membership_keys(
             household_cid,
             membership_keys,
             incomplete_households,
+            withdrawn_households,
             &mut stats,
         ) {
             tracing::warn!(
@@ -177,6 +203,7 @@ pub fn reconcile_membership_keys(
         || stats.ambiguous_skipped > 0
         || stats.non_agent_cid_skipped > 0
         || stats.incomplete_read_skipped > 0
+        || stats.withdrawn_abstain_skipped > 0
     {
         tracing::info!(
             superseded = stats.superseded,
@@ -185,6 +212,7 @@ pub fn reconcile_membership_keys(
             ambiguous_skipped = stats.ambiguous_skipped,
             non_agent_cid_skipped = stats.non_agent_cid_skipped,
             incomplete_read_skipped = stats.incomplete_read_skipped,
+            withdrawn_abstain_skipped = stats.withdrawn_abstain_skipped,
             "membership_identity_reconcile: key-supersede pass complete"
         );
     }
@@ -198,6 +226,7 @@ fn reconcile_one_household(
     household_cid: &str,
     membership_keys: &HashSet<String>,
     incomplete_households: &HashSet<String>,
+    withdrawn_households: &HashSet<String>,
     stats: &mut ReconcileStats,
 ) -> Result<(), StorageError> {
     use crate::db::diesel_schema::humans;
@@ -214,6 +243,25 @@ fn reconcile_one_household(
         tracing::warn!(
             household_cid = %household_cid,
             "membership_identity_reconcile: incomplete membership read — supersede skipped (a dropped member could force a false 1:1)"
+        );
+        return Ok(());
+    }
+
+    // WITHDRAWN MEMBER → ABSTAIN. A cleanly-departed Person contributes NO key to
+    // `membership_keys`, but its `humans` row lingers as an orphan fossil with no
+    // live-key partner. The read is COMPLETE (so the incomplete guard above does
+    // not fire), yet a withdrawal + one genuinely-new member collapses the visible
+    // sets into a FALSE `1-unmatched / 1-orphan` that re-keys the DEPARTED member's
+    // shards + commitments onto the NEW member's key — a mis-attribution strictly
+    // worse than a stale row. Abstain for any household with a departure in its
+    // membership history (degrades to the pre-existing dark state, never a wrong
+    // attribution). See module docs + `holochain_humans_replayer`.
+    if withdrawn_households.contains(household_cid) {
+        stats.withdrawn_abstain_skipped += 1;
+        crate::metrics::inc_identity_key_supersede("withdrawn_abstain_skip", 1);
+        tracing::warn!(
+            household_cid = %household_cid,
+            "membership_identity_reconcile: household has a withdrawn member — supersede skipped (a departed fossil has no live-key partner and would force a false 1:1)"
         );
         return Ok(());
     }
@@ -466,7 +514,8 @@ mod tests {
         drop(conn);
 
         let stats =
-            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new()).expect("reconcile");
+            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new(), &HashSet::new())
+                .expect("reconcile");
         assert_eq!(stats.superseded, 1);
         assert_eq!(stats.shard_locations_reattributed, 2);
         // The provide was already under the new key → idempotent no-op on rea.
@@ -537,7 +586,8 @@ mod tests {
             "collective:h".to_string(),
         )];
         let stats =
-            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new()).expect("reconcile");
+            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new(), &HashSet::new())
+                .expect("reconcile");
         assert_eq!(stats.non_agent_cid_skipped, 1);
         assert_eq!(stats.superseded, 0);
 
@@ -561,7 +611,8 @@ mod tests {
 
         let mapping = vec![("agent:uhCAkLIVE".to_string(), "collective:h".to_string())];
         let stats =
-            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new()).expect("reconcile");
+            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new(), &HashSet::new())
+                .expect("reconcile");
         assert_eq!(stats.superseded, 0, "NULL is the fill path, not supersede");
 
         let mut conn = p.get().unwrap();
@@ -602,7 +653,8 @@ mod tests {
             ),
         ];
         let stats =
-            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new()).expect("reconcile");
+            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new(), &HashSet::new())
+                .expect("reconcile");
         assert_eq!(stats.superseded, 0);
         assert_eq!(stats.ambiguous_skipped, 1);
 
@@ -659,7 +711,8 @@ mod tests {
             ),
         ];
         let stats =
-            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new()).expect("reconcile");
+            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new(), &HashSet::new())
+                .expect("reconcile");
         assert_eq!(
             stats.superseded, 1,
             "the lone fossil pairs to the lone unmatched key"
@@ -705,11 +758,18 @@ mod tests {
             "agent:uhCAkNEWadam".to_string(),
             "collective:eden".to_string(),
         )];
-        let first = reconcile_membership_keys(&p, "lamad", mapping.clone(), &HashSet::new())
-            .expect("first");
+        let first = reconcile_membership_keys(
+            &p,
+            "lamad",
+            mapping.clone(),
+            &HashSet::new(),
+            &HashSet::new(),
+        )
+        .expect("first");
         assert_eq!(first.superseded, 1);
         let second =
-            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new()).expect("second");
+            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new(), &HashSet::new())
+                .expect("second");
         assert_eq!(second.superseded, 0);
         assert_eq!(second.ambiguous_skipped, 0);
     }
@@ -736,8 +796,9 @@ mod tests {
             }
             // Only B's membership survived decode (A's was dropped).
             let mapping = vec![("agent:uhCAkNEWbob".to_string(), hh.to_string())];
-            let stats = reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new())
-                .expect("reconcile without completeness guard");
+            let stats =
+                reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new(), &HashSet::new())
+                    .expect("reconcile without completeness guard");
             assert_eq!(stats.superseded, 1, "without the guard the false 1:1 fires");
             let adam = get_human_by_id(&mut p.get().unwrap(), "human-adam")
                 .unwrap()
@@ -759,8 +820,9 @@ mod tests {
             }
             let mapping = vec![("agent:uhCAkNEWbob".to_string(), hh.to_string())];
             let incomplete: HashSet<String> = std::iter::once(hh.to_string()).collect();
-            let stats = reconcile_membership_keys(&p, "lamad", mapping, &incomplete)
-                .expect("reconcile with completeness guard");
+            let stats =
+                reconcile_membership_keys(&p, "lamad", mapping, &incomplete, &HashSet::new())
+                    .expect("reconcile with completeness guard");
             assert_eq!(stats.superseded, 0);
             assert_eq!(stats.incomplete_read_skipped, 1);
             assert_eq!(stats.ambiguous_skipped, 0);
@@ -773,5 +835,128 @@ mod tests {
                 "the fix: an incomplete read abstains — A keeps its fossil"
             );
         }
+    }
+
+    /// REGRESSION (a) — withdrawal + new join must NOT force-map.
+    ///
+    /// Household `hh` has a WITHDRAWN member A (its `humans` row lingers on key
+    /// `uhCAkOLDadam`, `household_id` still set) plus a genuinely-NEW member B
+    /// (`agent:uhCAkNEWbob`, no `humans` row yet). The replayer drops the withdrawn
+    /// member from `membership_keys`, so the visible sets collapse to
+    /// `{B_new}` unmatched / `{A_fossil}` orphan — a FALSE forced 1:1. WITHOUT the
+    /// withdrawn guard this re-keys A's identity + shards onto B's live key; WITH
+    /// the guard the household abstains. Proves BOTH halves (the completeness guard
+    /// alone does NOT catch this — the read is complete).
+    #[test]
+    fn withdrawn_member_plus_new_join_abstains_not_force_maps() {
+        let hh = "collective:eden";
+
+        // (contrast) WITHOUT the withdrawn flag the false 1:1 FIRES — the departed
+        // member's fossil is mis-attributed onto the new member's live key.
+        {
+            let p = pool();
+            {
+                let mut conn = p.get().unwrap();
+                seed_human(&mut conn, "human-adam", Some("uhCAkOLDadam"), Some(hh));
+            }
+            // Only B (the new join) is in current membership; A withdrew (dropped).
+            let mapping = vec![("agent:uhCAkNEWbob".to_string(), hh.to_string())];
+            let stats =
+                reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new(), &HashSet::new())
+                    .expect("reconcile without withdrawn guard");
+            assert_eq!(
+                stats.superseded, 1,
+                "without the withdrawn guard the false 1:1 fires"
+            );
+            let adam = get_human_by_id(&mut p.get().unwrap(), "human-adam")
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                adam.agent_pub_key.as_deref(),
+                Some("uhCAkNEWbob"),
+                "the bug: the departed member's fossil mis-attributed onto the new member's key"
+            );
+        }
+
+        // (fix) WITH `hh` flagged withdrawn, reconcile ABSTAINS — A keeps its
+        // fossil, no mis-attribution; the skip is counted + observable and is
+        // distinct from the incomplete-read skip.
+        {
+            let p = pool();
+            {
+                let mut conn = p.get().unwrap();
+                seed_human(&mut conn, "human-adam", Some("uhCAkOLDadam"), Some(hh));
+            }
+            let mapping = vec![("agent:uhCAkNEWbob".to_string(), hh.to_string())];
+            let withdrawn: HashSet<String> = std::iter::once(hh.to_string()).collect();
+            let stats =
+                reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new(), &withdrawn)
+                    .expect("reconcile with withdrawn guard");
+            assert_eq!(stats.superseded, 0);
+            assert_eq!(stats.withdrawn_abstain_skipped, 1);
+            assert_eq!(stats.incomplete_read_skipped, 0);
+            assert_eq!(stats.ambiguous_skipped, 0);
+            let adam = get_human_by_id(&mut p.get().unwrap(), "human-adam")
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                adam.agent_pub_key.as_deref(),
+                Some("uhCAkOLDadam"),
+                "the fix: a household with a withdrawal abstains — the departed member keeps its key"
+            );
+        }
+    }
+
+    /// REGRESSION (b) — the clean supersede case still maps when NO household is
+    /// flagged withdrawn (empty withdrawn set). A lone fossil among an already-
+    /// current member pairs unambiguously to the one unmatched live key.
+    #[test]
+    fn clean_supersede_still_maps_with_empty_withdrawn_set() {
+        let p = pool();
+        let mut conn = p.get().unwrap();
+        seed_human(
+            &mut conn,
+            "human-eve",
+            Some("uhCAkNEWeve"),
+            Some("collective:eden"),
+        );
+        seed_human(
+            &mut conn,
+            "human-adam",
+            Some("uhCAkOLDadam"),
+            Some("collective:eden"),
+        );
+        seed_shard(&mut conn, "shard-1", "uhCAkOLDadam");
+        drop(conn);
+
+        let mapping = vec![
+            (
+                "agent:uhCAkNEWeve".to_string(),
+                "collective:eden".to_string(),
+            ),
+            (
+                "agent:uhCAkNEWadam".to_string(),
+                "collective:eden".to_string(),
+            ),
+        ];
+        let stats =
+            reconcile_membership_keys(&p, "lamad", mapping, &HashSet::new(), &HashSet::new())
+                .expect("reconcile");
+        assert_eq!(
+            stats.superseded, 1,
+            "no withdrawal flagged → the clean forced-bijection supersede still fires"
+        );
+        assert_eq!(stats.withdrawn_abstain_skipped, 0);
+        assert_eq!(stats.shard_locations_reattributed, 1);
+
+        let mut conn = p.get().unwrap();
+        assert_eq!(
+            get_human_by_id(&mut conn, "human-adam")
+                .unwrap()
+                .unwrap()
+                .agent_pub_key
+                .as_deref(),
+            Some("uhCAkNEWadam"),
+        );
     }
 }

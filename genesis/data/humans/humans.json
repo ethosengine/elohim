@@ -62,7 +62,6 @@
     },
     {
       "id": "human-caleb-spouse",
-      "householdId": "household-susan",
       "displayName": "Caleb",
       "category": "core-family",
       "profileReach": "community",
@@ -137,7 +136,6 @@
     },
     {
       "id": "human-daniel-brother",
-      "householdId": "household-daniel",
       "displayName": "Daniel",
       "category": "core-family",
       "profileReach": "community",
@@ -188,7 +186,6 @@
     },
     {
       "id": "human-emma-spouse",
-      "householdId": "household-daniel",
       "displayName": "Emma",
       "category": "core-family",
       "profileReach": "community",
@@ -229,7 +226,6 @@
     },
     {
       "id": "human-ezra-newcomer",
-      "householdId": "household-ezra",
       "displayName": "Ezra",
       "category": "newcomer",
       "profileReach": "private",
@@ -660,7 +656,6 @@
     },
     {
       "id": "human-nancy-neighbor",
-      "householdId": "household-nancy",
       "displayName": "Nancy",
       "agencyPhase": "hosted",
       "category": "community",
@@ -705,7 +700,6 @@
     },
     {
       "id": "human-pete-pastor",
-      "householdId": "household-pete",
       "displayName": "Pete",
       "agencyPhase": "device",
       "category": "affinity",
@@ -847,7 +841,6 @@
     },
     {
       "id": "human-terrance-tutor",
-      "householdId": "household-terrance",
       "displayName": "Terrance",
       "agencyPhase": "device",
       "category": "affinity",

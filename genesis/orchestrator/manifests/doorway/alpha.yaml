@@ -525,17 +525,55 @@ metadata:
       proxy_set_header Upgrade $http_upgrade;
       proxy_set_header Connection "upgrade";
     cert-manager.io/cluster-issuer: letsencrypt-production
+# doorways.elohim.host — shared doorway-set name (added 2026-07-22).
+# Multi-A: relay-addr-beacon's shared-record contribution mode maintains this
+# name with one A record per owner (operations + shem), so it resolves to
+# BOTH alpha WANs instead of the single-WAN front door every other hostname
+# here has today (verified 2026-07-22 by live probe: doorway-alpha.elohim.host,
+# elohim.host, doorway.elohim.host all resolve to 136.51.77.49/operations
+# only; turn-shem.elohim.host is the sole shem-WAN-resolving name).
+# ACME HTTP-01 works unmodified for this multi-A name because both WANs
+# terminate at the SAME shared ingress-nginx controller (shem is WireGuard-
+# joined into the one cluster, and already answers 443 with the identical
+# LE cert for elohim.host) — the usual multi-origin cert-issuance failure
+# mode (challenge landing on a peer that doesn't hold the cert) does not
+# apply on this single-cluster bench. It WOULD apply across genuinely
+# separate clusters, which is why the durable answer is DNS-01 or
+# pkarr-native naming, not more multi-A entries — see the exit-doctrine
+# ledger and the 2026-07-22 addendum in the dual-WAN utility-plane spec.
+# EXACTLY ONE ingress object may claim this host — same rule as the
+# doorway.elohim.host apex collision hazard documented in prod.yaml's
+# 2026-05-22 migration comment (two ingress objects racing for one
+# hostname is an unresolved-owner failure mode, not a load-balance).
+# k8s is the TEST BENCH here, not the architecture: this Ingress host entry
+# is bench wiring for the address-set-contribution primitive, which later
+# graduates to a pkarr-resolved doorway set / DoorwayRegistration
+# multi-address (peer-native, deliberately not designed on this bench).
 spec:
   ingressClassName: public
   tls:
     - hosts:
         - doorway-alpha.elohim.host
         - signal.doorway-alpha.elohim.host
+        - doorways.elohim.host
       secretName: doorway-alpha-tls
   rules:
     - host: doorway-alpha.elohim.host
       http:
         paths:
+          # All traffic through doorway gateway
+          # Doorway handles routing: /threshold/* -> doorway-app, /hc/* -> conductor
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: elohim-doorway-alpha
+                port:
+                  number: 8080
+    - host: doorways.elohim.host
+      http:
+        paths:
+          # Shared doorway-set name — same routing as doorway-alpha.elohim.host.
           # All traffic through doorway gateway
           # Doorway handles routing: /threshold/* -> doorway-app, /hc/* -> conductor
           - path: /

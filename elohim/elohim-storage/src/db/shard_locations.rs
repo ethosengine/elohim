@@ -148,8 +148,18 @@ pub fn rekey_peer_id(
     }
 
     // Shards already held under the NEW key — a move onto these would collide.
+    //
+    // The collision pre-check MUST match the actual PK scope, which is
+    // `(shard_hash, peer_id)` with NO `h_app_id` (see the initial migration).
+    // A same-shard row already held under `new_peer_id` in a DIFFERENT app scope
+    // is still a PK collision for the `SET peer_id = new_peer_id` UPDATE below —
+    // scoping this probe by `h_app_id` (as an earlier version did) hid such rows,
+    // so the UPDATE hit a UNIQUE violation and aborted the whole supersede
+    // transaction. Probe h_app_id-agnostically. (The move itself stays scoped to
+    // `h_app_id` — a key belongs to exactly one agent, so we only ever re-attribute
+    // this scope's rows; a cross-scope collision just means the shard is already
+    // covered under the new key somewhere and the stale old-scope row is dropped.)
     let existing_new: std::collections::HashSet<String> = shard_locations::table
-        .filter(shard_locations::h_app_id.eq(h_app_id))
         .filter(shard_locations::peer_id.eq(new_peer_id))
         .select(shard_locations::shard_hash)
         .load::<String>(conn)?
@@ -273,6 +283,44 @@ mod rekey_tests {
         // New key now covers both shards, exactly once each.
         let new = get_locations_for_peer(&mut conn, "uhCAkNEW").unwrap();
         assert_eq!(new.len(), 2);
+    }
+
+    #[test]
+    fn rekey_survives_cross_scope_collision_on_new_key() {
+        // The PK is (shard_hash, peer_id) with NO h_app_id: a same-shard row held
+        // under the NEW key in a DIFFERENT app scope is still a PK collision for a
+        // move onto the new key. An earlier h_app_id-scoped collision probe missed
+        // it, so the UPDATE hit a UNIQUE violation and aborted the whole supersede
+        // transaction. This proves the probe now sees the cross-scope row.
+        let mut conn = setup();
+        // shard-x already held by the NEW key, but in the `qahal` scope.
+        seed(&mut conn, "shard-x", "uhCAkNEW", "qahal");
+        // The same shard held by the OLD key in the `lamad` scope (the fossil row
+        // the cascade wants to re-attribute).
+        seed(&mut conn, "shard-x", "uhCAkOLD", "lamad");
+        // A genuinely-movable lamad row (new key holds it nowhere) — must still move.
+        seed(&mut conn, "shard-y", "uhCAkOLD", "lamad");
+
+        let moved = rekey_peer_id(&mut conn, "lamad", "uhCAkOLD", "uhCAkNEW")
+            .expect("rekey must not violate the cross-scope PK");
+        assert_eq!(
+            moved, 1,
+            "only shard-y moved; shard-x collided cross-scope and its stale lamad row was dropped"
+        );
+
+        // The cross-scope new-key row is untouched.
+        let qahal = get_locations_for_shard(&mut conn, "shard-x").unwrap();
+        assert_eq!(qahal.len(), 1, "shard-x collapses to one physical holder");
+        assert_eq!(qahal[0].peer_id, "uhCAkNEW");
+        assert_eq!(qahal[0].h_app_id, "qahal");
+
+        // No lamad row lingers under the old key.
+        assert!(get_locations_for_peer(&mut conn, "uhCAkOLD")
+            .unwrap()
+            .is_empty());
+        // shard-y now lives under the new key in lamad scope.
+        let new_rows = get_locations_for_peer(&mut conn, "uhCAkNEW").unwrap();
+        assert_eq!(new_rows.len(), 2, "qahal shard-x + moved lamad shard-y");
     }
 
     #[test]

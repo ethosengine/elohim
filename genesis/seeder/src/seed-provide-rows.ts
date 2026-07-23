@@ -71,6 +71,9 @@
  */
 
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DoorwayClient } from './doorway-client.js';
 import { storageUrlForHuman } from './peer-id.js';
 
@@ -362,14 +365,127 @@ async function seedProvideForHuman(
 // Main
 // =============================================================================
 
-// Humans to seed provide rows for.  Mirrors the getHumanStorageUrls()
-// fallback in genesis/Jenkinsfile (matthew + adam + jessica are the live
-// alpha cluster peers; PEER_STORAGE_URLS overrides this).
-const DEFAULT_HUMAN_IDS = [
+// Last-resort humans to seed provide rows for, used ONLY when
+// deployments.json cannot be read/parsed (see resolveTargetHumanIds below).
+// Mirrors the historical getHumanStorageUrls() fallback that used to live in
+// genesis/Jenkinsfile (matthew + adam + jessica were the live alpha cluster
+// peers at the time this trio was hardcoded).
+const FALLBACK_HUMAN_IDS = [
   'human-matthew-manager',
   'human-adam-firstman',
   'human-jessica-spouse',
 ];
+
+/** Humans known to be actively deployed today — used only for a sanity WARN
+ *  (not an enforcement), so a topology change doesn't silently go unnoticed. */
+const EXPECTED_ACTIVE_HUMAN_IDS = [
+  'human-adam-firstman',
+  'human-matthew-manager',
+  'human-jessica-spouse',
+];
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DEFAULT_DEPLOYMENTS_JSON_PATH = resolve(
+  __dirname,
+  '../../orchestrator/data/deployments.json'
+);
+
+// =============================================================================
+// Derive the active-human set from deployments.json
+// =============================================================================
+
+export interface DeploymentHumanRecord {
+  humanId?: string;
+  suspended?: boolean;
+}
+
+export interface DeploymentsRegistryFile {
+  humans?: DeploymentHumanRecord[];
+}
+
+/**
+ * Pure derivation: humans declared in deployments.json whose `suspended`
+ * flag is NOT `true` (absent/false = deployed and active). Mirrors the
+ * suspended-filtering semantics documented in CLAUDE.md's "Substrate scope
+ * trigger" section — `suspended` is the deploy-render/seed/a2o gate, and a
+ * human with `suspended: true` has no live conductor to seed provide rows
+ * against.
+ *
+ * Order-preserving (matches deployments.json's `humans` array order) so
+ * output is deterministic across runs.
+ */
+export function deriveActiveHumanIds(data: DeploymentsRegistryFile): string[] {
+  if (!data || !Array.isArray(data.humans)) return [];
+  const ids: string[] = [];
+  for (const h of data.humans) {
+    if (h && typeof h.humanId === 'string' && h.suspended !== true) {
+      ids.push(h.humanId);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Reads + parses deployments.json and derives the active-human set. Throws
+ * on any read/parse failure — callers decide the fallback behavior (this
+ * function stays pure-ish and testable; resolveTargetHumanIds is where the
+ * WARN + fallback policy lives).
+ */
+export function loadActiveHumanIdsFromDeployments(path: string = DEFAULT_DEPLOYMENTS_JSON_PATH): string[] {
+  const raw = readFileSync(path, 'utf-8');
+  const parsed = JSON.parse(raw) as DeploymentsRegistryFile;
+  return deriveActiveHumanIds(parsed);
+}
+
+/**
+ * Resolve the target human-id set, in precedence order:
+ *   1. PROVIDE_HUMAN_IDS env (explicit override — always wins)
+ *   2. deployments.json-derived active set (suspended !== true)
+ *   3. FALLBACK_HUMAN_IDS (only if deployments.json is unreadable/unparsable
+ *      or yields an empty set) — logged as a WARN, never silent.
+ *
+ * Exported for tests; accepts an optional deploymentsPath override so tests
+ * don't need to touch the real genesis/orchestrator/data/deployments.json.
+ */
+export function resolveTargetHumanIds(deploymentsPath?: string): string[] {
+  const envIds = (process.env.PROVIDE_HUMAN_IDS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  if (envIds.length > 0) {
+    return envIds;
+  }
+
+  try {
+    const derived = loadActiveHumanIdsFromDeployments(deploymentsPath);
+    if (derived.length === 0) {
+      console.warn(
+        'WARN: deployments.json parsed but yielded zero active (suspended!==true) humans — ' +
+          `falling back to the hardcoded trio: ${FALLBACK_HUMAN_IDS.join(', ')}`
+      );
+      return FALLBACK_HUMAN_IDS;
+    }
+    for (const expected of EXPECTED_ACTIVE_HUMAN_IDS) {
+      if (!derived.includes(expected)) {
+        console.warn(
+          `WARN: expected active human "${expected}" not found in the deployments.json-derived ` +
+            `set (${derived.join(', ')}) — topology may have changed; verify deployments.json`
+        );
+      }
+    }
+    console.log(
+      `Derived ${derived.length} active humans from deployments.json (suspended!==true): ${derived.join(', ')}`
+    );
+    return derived;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `WARN: could not read/parse deployments.json (${msg}) — falling back to the hardcoded trio: ` +
+        `${FALLBACK_HUMAN_IDS.join(', ')}`
+    );
+    return FALLBACK_HUMAN_IDS;
+  }
+}
 
 // Extra reaches to seed beyond commons.  'commons' is always seeded;
 // PROVIDE_REACHES env extends it (comma-separated, e.g. "commons,household").
@@ -379,11 +495,7 @@ function reachesToSeed(): string[] {
 }
 
 async function main(): Promise<void> {
-  const humanIds: string[] = (process.env.PROVIDE_HUMAN_IDS || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
-  const targetHumans = humanIds.length > 0 ? humanIds : DEFAULT_HUMAN_IDS;
+  const targetHumans = resolveTargetHumanIds();
   const reaches = reachesToSeed();
 
   console.log('='.repeat(60));

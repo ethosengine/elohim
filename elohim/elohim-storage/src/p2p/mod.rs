@@ -1695,14 +1695,39 @@ impl P2PHandle {
             }
         }
 
-        // Record placement gaps when selection was short — one row per shard hash
-        // so the shefa signal reflects per-shard reality.
-        if let Some(gap_kind) = gap_kind_opt {
+        // Placement-gap disposition reflects BOTH peer SELECTION and PUSH reality.
+        // A selection that returned `Ok` does NOT mean bytes moved: the
+        // unresolvable-peer skip path (no transport binding) and push errors can
+        // leave `distributed < total_shards` — even ZERO pushed — while
+        // `gap_kind_opt` is `None`. Clearing gaps on selection-success alone
+        // fabricates a green placement (observed on alpha: an empty `placementGaps`
+        // beside zero real placements). Gaps therefore clear ONLY when selection was
+        // full AND every shard's push landed; any push shortfall records/leaves the
+        // gap instead.
+        //
+        // `gap_kind` must stay within the `placement-gap-view.schema.json` enum
+        // (`under-committed` | `contracts-short` | `peers-unavailable`), which lives
+        // outside this crate. A push shortfall on a full selection is surfaced as
+        // `peers-unavailable` — the selected peer could not be reached to receive the
+        // push (missing transport binding / push failure), the closest honest fit.
+        let gap_to_record: Option<(&'static str, i32, i32)> = match gap_kind_opt {
+            // Selection came up short — report the selection shortfall as before.
+            Some(gap_kind) => Some((gap_kind, achieved, requested)),
+            // Selection met the target, but not every shard's push landed.
+            None if distributed < total_shards => {
+                Some(("peers-unavailable", distributed as i32, total_shards as i32))
+            }
+            // Full selection AND all shards pushed — nothing to record.
+            None => None,
+        };
+
+        if let Some((gap_kind, gap_achieved, gap_requested)) = gap_to_record {
+            // One row per shard hash so the shefa signal reflects per-shard reality.
             if let Ok(mut conn) = pool.get() {
-                let coverage = if requested == 0 {
+                let coverage = if gap_requested == 0 {
                     0.0_f32
                 } else {
-                    achieved as f32 / requested as f32
+                    gap_achieved as f32 / gap_requested as f32
                 };
                 for hash in &manifest.shard_hashes {
                     let id = uuid::Uuid::new_v4().to_string();
@@ -1711,8 +1736,8 @@ impl P2PHandle {
                         content_id,
                         shard_hash: hash,
                         h_app_id,
-                        requested_steward_count: requested,
-                        achieved_steward_count: achieved,
+                        requested_steward_count: gap_requested,
+                        achieved_steward_count: gap_achieved,
                         contract_coverage: coverage,
                         gap_kind,
                         first_seen_at: &now,
@@ -1722,7 +1747,7 @@ impl P2PHandle {
                 }
             }
         } else {
-            // Full placement — clear any stale gaps for this content.
+            // Full placement backed by successful pushes — clear any stale gaps.
             if let Ok(mut conn) = pool.get() {
                 let _ =
                     crate::db::placement_gaps::clear_for_content(&mut conn, h_app_id, content_id);

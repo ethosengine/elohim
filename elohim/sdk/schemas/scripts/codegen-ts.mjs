@@ -559,9 +559,18 @@ export function formatTsOrdinal(baseName, title, allValues) {
     entries,
     `} as const;`,
     ``,
-    `export function ${fnName}(r: ${title}): number { return ${ordinalName}[r]; }`,
+    // Emitted in Prettier's canonical multi-line form. The enum-constants file is
+    // built in memory (Part 2) and distributed straight to ENUM_OUTPUT_PATHS (Part 3),
+    // so it never passes through the Part-1 Prettier pass over OUTPUT_DIR. Same
+    // philosophy as collapseUnionAliases: format deterministically in-script so the
+    // emitted file is byte-identical whether or not a downstream Prettier runs.
+    `export function ${fnName}(r: ${title}): number {`,
+    `  return ${ordinalName}[r];`,
+    `}`,
     ``,
-    `export function is${title}(v: string): v is ${title} { return Object.hasOwn(${ordinalName}, v); }`,
+    `export function is${title}(v: string): v is ${title} {`,
+    `  return Object.hasOwn(${ordinalName}, v);`,
+    `}`,
   ].join('\n');
 }
 

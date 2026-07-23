@@ -186,3 +186,22 @@ left to the deterministic-layer owner, out of scope for this ELEVATE triage.
   `b7b25f86fe13` by disappearance once the circuit stops sitting Open. Regression
   signature to watch: `divergentAnchor` climbing again after any genesis-pair conductor
   restart/rekey.
+
+## Recurrence — 2026-07-23 deploy window (fingerprint cross-contamination note)
+
+The same breaker/saturation class fired during elohim/dev #1630's deploy window
+(13:35–15:17 UTC) and wore ANOTHER concern's fingerprints: ci-harvest reopened the
+projected-head probe fingerprints `15133508b92b` and `7569d2b6e0c6` (backlog
+`ci-projected-head-convergence-race.md`) when the alpha-only probe legs failed. The
+ci-investigator pass on #1630 grounded the split: the NEW convergence-window probe ran
+correctly (14 re-probes over 420s, honest failure), served hash == #1629's declared
+(alpha stuck one build behind), and the mechanism was matthew-conductor saturation —
+`elohim-matthew-alpha-0` alive/0-restarts but zome-call + gossip-round timeouts
+(`projection-reconcile[content]: conductor resolve failed … Websocket error: Timeout`),
+doorway-alpha `upstream circuit OPEN — shedding without calling storage` — so all 24×4
+DECLARE_ONLY attempts got `HTTP 503 {"status":"catching-up"}`. elohim.host passed all
+legs instantly the same build. Reads for the triage owner: a projected-head fingerprint
+reopen on alpha-only legs with `served == previous build's declared` is THIS concern,
+not the probe race — split before re-triaging. The edge #1220 deploy (16:0x UTC,
+storage+doorway image roll, conductor restarts) cleared the saturation; alpha
+`/health/startup` back to 200/warmup-complete/circuits-closed at 16:22 UTC.

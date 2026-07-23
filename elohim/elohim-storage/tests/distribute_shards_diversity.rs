@@ -8,6 +8,63 @@
 use elohim_storage::db::placement_gaps;
 use elohim_storage::test_util::{spawn_p2p_with_peers, test_pool};
 
+/// Regression: selection SUCCESS must not fabricate a green placement.
+///
+/// A small blob → single "none"-encoded shard → `desired_count == 1`. One
+/// ACCEPTING peer makes `PeerSelection` return `Ok` (`gap_kind_opt == None`).
+/// But that peer carries no `peer_transport_manifest` / `peer_identity_bindings`
+/// row, so `distribute_shards` cannot resolve its `agent_cid` to a dialable
+/// libp2p id and SKIPS the push (`distributed == 0`). The old code cleared
+/// `placement_gaps` on selection-success alone — an empty gap set beside zero
+/// real placements (fabricated green). The fix records a gap whenever the pushes
+/// behind a full selection did not land.
+#[tokio::test]
+async fn distribute_records_gap_when_selection_ok_but_zero_pushed() {
+    let pool = test_pool();
+    let harness = spawn_p2p_with_peers(
+        pool.clone(),
+        &[("agent-alpha-1", "home-alpha", "accepting")], // selection succeeds…
+    )
+    .await;
+
+    // …but the peer has no transport binding, so the push is skipped.
+    let blob = vec![7u8; 4096]; // <= single_shard_max → 1 shard, desired_count == 1
+    let distributed = harness
+        .p2p
+        .distribute_shards("content-zero-push", &blob, &pool, "lamad")
+        .await
+        .unwrap();
+    assert_eq!(
+        distributed, 0,
+        "unresolvable peer → zero shards actually pushed despite selection success"
+    );
+
+    let mut conn = pool.get().unwrap();
+    let gaps = placement_gaps::list_gaps(
+        &mut conn,
+        "lamad",
+        placement_gaps::GapQuery {
+            content_id: Some("content-zero-push".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    assert!(
+        !gaps.is_empty(),
+        "zero pushed shards must leave/record a placement gap, not a fabricated-green empty set"
+    );
+    // gap_kind must stay within the placement-gap-view schema enum.
+    assert!(
+        gaps.iter()
+            .all(|g| g.achieved_steward_count == 0 && g.gap_kind == "peers-unavailable"),
+        "the recorded gap must reflect the zero-push reality: {:?}",
+        gaps.iter()
+            .map(|g| (&g.gap_kind, g.achieved_steward_count))
+            .collect::<Vec<_>>()
+    );
+}
+
 /// Seeds three peers across two households and calls `distribute_shards`.
 ///
 /// **This test is `#[ignore]`'d.**

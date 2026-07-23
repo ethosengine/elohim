@@ -12,10 +12,15 @@
 //! - The connection loop exits when its owning [`ConductorConnection`] handle
 //!   is dropped. Detached loops used to outlive their handles and reconnect
 //!   forever, so every pool-worker reconnect leaked one immortal spammer.
-//! - On unstable authenticated sessions the loop re-mints its app-auth token
-//!   via the injected [`TokenMinter`] (rate-limited): a conductor restart
-//!   invalidates previously issued tokens, and without re-minting the pool
-//!   stayed broken until the doorway itself was restarted.
+//! - When the conductor REJECTS the app-auth token — a Close/transport error
+//!   inside the [`AUTH_ACK_WINDOW`], or a Close frame ending a short session —
+//!   the loop re-mints via the injected [`TokenMinter`] (rate-limited): a
+//!   conductor restart invalidates previously issued tokens, and without
+//!   re-minting the pool stayed broken until the doorway itself was restarted.
+//!   A transient stall (transport blip, GC pause) is NOT treated as a rejection,
+//!   so it can no longer amplify into a mint/reconnect storm. Authentication is
+//!   confirmed by *watching for a rejection* over the official wire encoding —
+//!   never by optimistically logging success after a blind sleep.
 
 use futures_util::future::BoxFuture;
 use futures_util::{SinkExt, StreamExt};
@@ -51,6 +56,16 @@ const STABLE_SESSION_THRESHOLD: Duration = Duration::from_secs(10);
 
 /// Minimum interval between token re-mint attempts.
 const REMINT_MIN_INTERVAL: Duration = Duration::from_secs(30);
+
+/// How long to watch the conductor socket for an auth rejection after sending
+/// the authenticate frame. Holochain's app-interface auth is fire-and-forget on
+/// success (no positive ack); a rejection surfaces as a Close frame, a transport
+/// error, or stream-end. So a terminal frame inside this window is auth FAILURE,
+/// while the window elapsing clean is success. Tunable: widen it if a conductor's
+/// reject latency exceeds it (a stale token then self-heals one reconnect later
+/// via the re-mint path). Replaces the old blind `sleep(50ms)` that logged
+/// success optimistically and produced the ~10s reconnect/re-mint storm.
+const AUTH_ACK_WINDOW: Duration = Duration::from_millis(500);
 
 /// Exponential reconnect backoff that only resets after a stable session.
 struct ReconnectBackoff {
@@ -232,37 +247,45 @@ async fn connection_loop(
         info!("Connecting to conductor at {}", conductor_url);
 
         let reconnect_delay = match connect_to_conductor(&conductor_url).await {
-            Ok((mut ws_sink, ws_stream)) => {
-                // Authenticate if a token is configured (Holochain 0.6 app interface)
+            Ok((mut ws_sink, mut ws_stream)) => {
+                // Authenticate if a token is configured (Holochain app interface).
                 let token = token_slot.read().await.clone();
                 if let Some(ref token) = token {
-                    if let Err(e) = send_authenticate(&mut ws_sink, token).await {
-                        error!("Failed to authenticate with conductor: {}", e);
-                        *connected.write().await = false;
-                        // The socket died under the auth send — same unstable
-                        // signature as an accept-then-drop session, so the
-                        // token may be stale here too.
-                        crate::metrics::inc_reconnect(crate::metrics::REASON_WS_ERROR);
-                        remint_if_due(&token_minter, &token_slot, &mut last_remint).await;
-                        Some(backoff.next_after_connect_failure())
-                    } else {
-                        debug!("Authenticated with conductor");
-                        run_session(
-                            ws_sink,
-                            ws_stream,
-                            &mut rx,
-                            &connected,
-                            &mut backoff,
-                            &token_slot,
-                            &token_minter,
-                            &mut last_remint,
-                        )
-                        .await
+                    match authenticate(&mut ws_sink, &mut ws_stream, token).await {
+                        Ok(buffered) => {
+                            // Confirmed: the ack window elapsed with no rejection.
+                            debug!("Authenticated with conductor");
+                            run_session(
+                                ws_sink,
+                                ws_stream,
+                                buffered,
+                                &mut rx,
+                                &connected,
+                                &mut backoff,
+                                &token_slot,
+                                &token_minter,
+                                &mut last_remint,
+                            )
+                            .await
+                        }
+                        Err(e) => {
+                            error!("Failed to authenticate with conductor: {}", e);
+                            *connected.write().await = false;
+                            // A rejection inside the auth window is the
+                            // stale/invalid-token signature (a conductor restart
+                            // invalidates issued tokens): re-mint (rate-limited)
+                            // so the next reconnect uses a fresh token, and
+                            // escalate the backoff like any unstable session.
+                            crate::metrics::inc_reconnect(crate::metrics::REASON_WS_ERROR);
+                            remint_if_due(&token_minter, &token_slot, &mut last_remint).await;
+                            Some(backoff.next_after_connect_failure())
+                        }
                     }
                 } else {
                     run_session(
                         ws_sink,
                         ws_stream,
+                        Vec::new(),
                         &mut rx,
                         &connected,
                         &mut backoff,
@@ -301,6 +324,7 @@ async fn connection_loop(
 async fn run_session(
     ws_sink: WsSink,
     ws_stream: WsStream,
+    buffered: Vec<Message>,
     rx: &mut mpsc::Receiver<(Vec<u8>, oneshot::Sender<Vec<u8>>)>,
     connected: &Arc<RwLock<bool>>,
     backoff: &mut ReconnectBackoff,
@@ -313,7 +337,7 @@ async fn run_session(
     info!("Connected to conductor");
     let session_start = Instant::now();
 
-    let session_end = handle_messages(ws_sink, ws_stream, rx).await;
+    let session_end = handle_messages(ws_sink, ws_stream, buffered, rx).await;
 
     *connected.write().await = false;
     crate::metrics::dec_sessions(); // M5: session ended.
@@ -339,10 +363,20 @@ async fn run_session(
         return None;
     }
 
-    // An unstable session with auth configured is the stale/invalid-token
-    // signature (a conductor restart invalidates issued tokens): re-mint,
-    // rate-limited so a dead admin interface doesn't get hammered either.
-    if session_len < STABLE_SESSION_THRESHOLD {
+    // Re-mint ONLY on a confirmed auth-reject signal: a Close FRAME ending a
+    // short session is a rejection that landed AFTER the `authenticate` ack
+    // window (a slow conductor) — re-mint (rate-limited) so a token invalidated
+    // by a restart self-heals. A transport error / stream-end is a transient
+    // stall, NOT an auth signal: it escalates the backoff below but must not
+    // amplify into a mint/reconnect storm. The fast path (rejection inside the
+    // window) already re-minted in `connection_loop`.
+    if session_len < STABLE_SESSION_THRESHOLD
+        && matches!(
+            session_end,
+            SessionEnd::ConnectionClosed { reason, .. }
+                if reason == crate::metrics::REASON_CLOSE_FRAME
+        )
+    {
         remint_if_due(token_minter, token_slot, last_remint).await;
     }
 
@@ -372,43 +406,98 @@ async fn remint_if_due(
     }
 }
 
-/// Send authenticate message after WebSocket connect.
+/// Build the official Holochain app-interface authenticate frame for `token`.
 ///
-/// Holochain 0.6 app interface format: { type: "authenticate", data: <binary {token: <bytes>}> }
-async fn send_authenticate(ws_sink: &mut WsSink, token: &[u8]) -> Result<()> {
-    let inner = rmpv::Value::Map(vec![(
-        rmpv::Value::String("token".into()),
-        rmpv::Value::Binary(token.to_vec()),
-    )]);
+/// Byte-identical to what `projection::subscriber::send_auth_request` sends:
+/// `WireMessage::Authenticate { data: AppAuthenticationRequest { token } }`,
+/// serialized via `holochain_serialized_bytes` — NOT a hand-rolled rmpv
+/// `{type:"authenticate", data:{token}}` map. The conductor never recognized
+/// that legacy shape, so it left every pool worker unauthenticated and dropped
+/// the socket at its ~10s auth-timeout: the optimistic-auth reconnect storm.
+fn encode_authenticate(token: &[u8]) -> Result<Vec<u8>> {
+    use holochain_conductor_api::AppAuthenticationRequest;
+    use holochain_serialized_bytes::prelude::*;
+    use holochain_websocket::WireMessage;
 
-    let mut inner_buf = Vec::new();
-    rmpv::encode::write_value(&mut inner_buf, &inner)
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to encode auth: {e}")))?;
+    let auth_request = AppAuthenticationRequest {
+        token: token.to_vec(),
+    };
+    let inner: SerializedBytes = auth_request.try_into().map_err(|e: SerializedBytesError| {
+        DoorwayError::Holochain(format!("Failed to serialize auth request: {e}"))
+    })?;
+    let wire_msg = WireMessage::Authenticate {
+        data: UnsafeBytes::from(inner).into(),
+    };
+    let outer: SerializedBytes = wire_msg.try_into().map_err(|e: SerializedBytesError| {
+        DoorwayError::Holochain(format!("Failed to serialize wire message: {e}"))
+    })?;
+    Ok(outer.bytes().to_vec())
+}
 
-    let envelope = rmpv::Value::Map(vec![
-        (
-            rmpv::Value::String("type".into()),
-            rmpv::Value::String("authenticate".into()),
-        ),
-        (
-            rmpv::Value::String("data".into()),
-            rmpv::Value::Binary(inner_buf),
-        ),
-    ]);
-
-    let mut buf = Vec::new();
-    rmpv::encode::write_value(&mut buf, &envelope)
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to encode auth envelope: {e}")))?;
-
+/// Send the authenticate frame, then watch the socket for a rejection.
+///
+/// Holochain's app-interface authenticate is fire-and-forget on success: the
+/// conductor only reacts to a *bad* auth by closing the socket. So we send the
+/// official frame ([`encode_authenticate`]) and read from the stream for up to
+/// [`AUTH_ACK_WINDOW`]:
+/// - a Close frame, a transport error, or stream-end in-window => auth FAILURE
+///   (return `Err` — the caller re-mints and escalates backoff);
+/// - the window elapsing with no terminal frame => success.
+///
+/// This replaces the old blind `sleep(50ms); Ok(())` that logged success
+/// optimistically even as the conductor was about to drop the socket.
+///
+/// Any non-terminal frames observed during the window (a Ping to answer, an
+/// early signal) are returned so [`run_session`] / [`handle_messages`] can
+/// replay them — buffered conductor messages are never dropped.
+async fn authenticate(
+    ws_sink: &mut WsSink,
+    ws_stream: &mut WsStream,
+    token: &[u8],
+) -> Result<Vec<Message>> {
+    let frame = encode_authenticate(token)?;
     ws_sink
-        .send(Message::Binary(buf))
+        .send(Message::Binary(frame))
         .await
         .map_err(|e| DoorwayError::Holochain(format!("Failed to send auth: {e}")))?;
+    debug!("Sent authentication request to conductor");
 
-    // Brief pause — if conductor rejects, it closes the connection
-    tokio::time::sleep(Duration::from_millis(50)).await;
-
-    Ok(())
+    let deadline = Instant::now() + AUTH_ACK_WINDOW;
+    let mut buffered: Vec<Message> = Vec::new();
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            // Window elapsed with no rejection — as confirmed as fire-and-forget
+            // auth gets.
+            return Ok(buffered);
+        }
+        match timeout(remaining, ws_stream.next()).await {
+            // Window expired mid-read — success.
+            Err(_elapsed) => return Ok(buffered),
+            // Conductor closed the socket — auth rejection.
+            Ok(Some(Ok(Message::Close(_)))) => {
+                return Err(DoorwayError::Holochain(
+                    "Conductor closed connection during authentication".into(),
+                ));
+            }
+            // Transport error — the socket died under us; treat as auth failure.
+            Ok(Some(Err(e))) => {
+                return Err(DoorwayError::Holochain(format!(
+                    "WebSocket error during authentication: {e}"
+                )));
+            }
+            // Stream ended — the conductor went away during auth.
+            Ok(None) => {
+                return Err(DoorwayError::Holochain(
+                    "Conductor stream ended during authentication".into(),
+                ));
+            }
+            // A non-terminal frame (signal/ping): buffer it and keep watching —
+            // a single non-close frame does not prove success (a Close may
+            // still follow inside the window).
+            Ok(Some(Ok(frame))) => buffered.push(frame),
+        }
+    }
 }
 
 type WsSink = futures_util::stream::SplitSink<
@@ -475,6 +564,7 @@ fn extract_message_id(data: &[u8]) -> Option<u64> {
 async fn handle_messages(
     ws_sink: WsSink,
     mut ws_stream: WsStream,
+    buffered: Vec<Message>,
     rx: &mut mpsc::Receiver<(Vec<u8>, oneshot::Sender<Vec<u8>>)>,
 ) -> SessionEnd {
     // Pending responses keyed by request ID
@@ -488,6 +578,23 @@ async fn handle_messages(
     // Wrap sink in Arc<Mutex> for sharing
     let ws_sink = Arc::new(Mutex::new(ws_sink));
     let ws_sink_for_rx = Arc::clone(&ws_sink);
+
+    // Replay any frames buffered during the auth ack window so none are dropped.
+    // `pending` is empty at session start, so a buffered Binary is an
+    // unsolicited signal (skipped, matching the no-id path in the response
+    // handler below); a buffered Ping is answered with a Pong.
+    for msg in buffered {
+        match msg {
+            Message::Ping(data) => {
+                let mut sink = ws_sink.lock().await;
+                let _ = sink.send(Message::Pong(data)).await;
+            }
+            Message::Binary(_) => {
+                debug!("Replayed conductor signal from auth window (skipping)");
+            }
+            _ => {}
+        }
+    }
 
     // Task to handle incoming requests
     let request_handler = async {
@@ -751,6 +858,136 @@ mod tests {
         assert!(
             mint_calls.load(Ordering::SeqCst) >= 1,
             "an unstable authenticated session must trigger a token re-mint"
+        );
+    }
+
+    // --- Auth wire encoding ---
+
+    /// The pre-fix hand-rolled rmpv envelope, kept ONLY as a negative fixture so
+    /// the encoding test can prove the fix actually changed the wire bytes (the
+    /// conductor never recognized this shape — the optimistic-auth storm bug).
+    fn legacy_rmpv_authenticate(token: &[u8]) -> Vec<u8> {
+        let inner = rmpv::Value::Map(vec![(
+            rmpv::Value::String("token".into()),
+            rmpv::Value::Binary(token.to_vec()),
+        )]);
+        let mut inner_buf = Vec::new();
+        rmpv::encode::write_value(&mut inner_buf, &inner).unwrap();
+        let envelope = rmpv::Value::Map(vec![
+            (
+                rmpv::Value::String("type".into()),
+                rmpv::Value::String("authenticate".into()),
+            ),
+            (
+                rmpv::Value::String("data".into()),
+                rmpv::Value::Binary(inner_buf),
+            ),
+        ]);
+        let mut buf = Vec::new();
+        rmpv::encode::write_value(&mut buf, &envelope).unwrap();
+        buf
+    }
+
+    #[test]
+    fn authenticate_encoding_matches_official_wire_format() {
+        use holochain_conductor_api::AppAuthenticationRequest;
+        use holochain_serialized_bytes::prelude::*;
+        use holochain_websocket::WireMessage;
+
+        let token = vec![7u8, 8, 9, 10, 11, 12, 13];
+
+        // The production encoder — exactly what the worker pool now sends.
+        let produced = encode_authenticate(&token).expect("encode auth frame");
+
+        // Independent reconstruction via the official Holochain wire types — the
+        // SAME path `projection::subscriber::send_auth_request` uses, built here
+        // from the real types (NOT a copied byte literal). A regression to a
+        // hand-rolled rmpv shape would make these diverge and fail the test.
+        let auth_request = AppAuthenticationRequest {
+            token: token.clone(),
+        };
+        let inner: SerializedBytes = auth_request.try_into().expect("serialize auth request");
+        let wire_msg = WireMessage::Authenticate {
+            data: UnsafeBytes::from(inner).into(),
+        };
+        let outer: SerializedBytes = wire_msg.try_into().expect("serialize wire message");
+        let expected = outer.bytes().to_vec();
+
+        assert_eq!(
+            produced, expected,
+            "auth frame must be the official WireMessage::Authenticate encoding"
+        );
+
+        // Anti-tautology guard: the official frame must NOT equal the legacy
+        // rmpv envelope — i.e. the fix genuinely changed the wire bytes.
+        assert_ne!(
+            produced,
+            legacy_rmpv_authenticate(&token),
+            "encoder must not regress to the legacy rmpv envelope the conductor rejected"
+        );
+    }
+
+    // --- Re-mint discipline: clean shutdown vs. auth rejection ---
+
+    #[tokio::test]
+    async fn clean_shutdown_does_not_remint() {
+        // Part 1: a stable authenticated session that ends because the OWNER
+        // dropped the handle (ChannelClosed) must NOT re-mint — re-minting on a
+        // clean shutdown was never the intent and would hammer the admin
+        // interface. The Hold server keeps the socket open, so the auth ack
+        // window elapses clean (success) and the session is stable.
+        let (addr, _count) = ws_test_server(ServerBehavior::Hold).await;
+        let url = format!("ws://{addr}");
+
+        let mint_calls = Arc::new(AtomicUsize::new(0));
+        let mint_calls_for_minter = Arc::clone(&mint_calls);
+        let minter: TokenMinter = Arc::new(move || {
+            let calls = Arc::clone(&mint_calls_for_minter);
+            Box::pin(async move {
+                calls.fetch_add(1, Ordering::SeqCst);
+                Some(vec![9, 9, 9])
+            })
+        });
+
+        let conn =
+            ConductorConnection::connect_with_auth_minter(&url, Some(vec![1, 2, 3]), Some(minter))
+                .await
+                .expect("authenticated connect");
+        assert!(conn.is_connected().await);
+
+        // Clean shutdown: drop the only handle → ChannelClosed.
+        drop(conn);
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        assert_eq!(
+            mint_calls.load(Ordering::SeqCst),
+            0,
+            "a clean ChannelClosed shutdown must not trigger a token re-mint"
+        );
+
+        // Part 2 (contrast): a conductor that drops the socket at auth time is a
+        // rejection, which MUST re-mint so a stale token self-heals.
+        let (addr2, _count2) = ws_test_server(ServerBehavior::DropImmediately).await;
+        let url2 = format!("ws://{addr2}");
+
+        let reject_calls = Arc::new(AtomicUsize::new(0));
+        let reject_calls_for_minter = Arc::clone(&reject_calls);
+        let reject_minter: TokenMinter = Arc::new(move || {
+            let calls = Arc::clone(&reject_calls_for_minter);
+            Box::pin(async move {
+                calls.fetch_add(1, Ordering::SeqCst);
+                Some(vec![5, 5, 5])
+            })
+        });
+
+        let _conn2 = ConductorConnection::spawn_with_auth_minter(
+            &url2,
+            Some(vec![1, 2, 3]),
+            Some(reject_minter),
+        );
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+        assert!(
+            reject_calls.load(Ordering::SeqCst) >= 1,
+            "a windowed auth rejection must trigger a token re-mint"
         );
     }
 }

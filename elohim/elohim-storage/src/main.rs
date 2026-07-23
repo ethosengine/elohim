@@ -3121,11 +3121,13 @@ async fn async_main(
                         &ctx.h_app_id,
                         snapshot.pairs,
                         &snapshot.incomplete_households,
+                        &snapshot.withdrawn_households,
                     ) {
                         Ok(stats)
                             if stats.superseded > 0
                                 || stats.ambiguous_skipped > 0
-                                || stats.incomplete_read_skipped > 0 =>
+                                || stats.incomplete_read_skipped > 0
+                                || stats.withdrawn_abstain_skipped > 0 =>
                         {
                             info!(
                                 superseded = stats.superseded,
@@ -3133,6 +3135,7 @@ async fn async_main(
                                 commitments = stats.commitments_reattributed,
                                 ambiguous_skipped = stats.ambiguous_skipped,
                                 incomplete_read_skipped = stats.incomplete_read_skipped,
+                                withdrawn_abstain_skipped = stats.withdrawn_abstain_skipped,
                                 "membership_identity_reconcile: key-supersede pass applied"
                             );
                         }

@@ -28,6 +28,7 @@ export const STANDING_VALUES = [
   'prior-art',
   'interlocutor',
   'operator-persona',
+  'resident',
 ] as const;
 
 export const EXTERNAL_ID_TYPES = [

@@ -1,6 +1,5 @@
 ---
 id: "human-daniel-brother"
-householdId: "household-daniel"
 displayName: "Daniel"
 category: "core-family"
 profileReach: "community"

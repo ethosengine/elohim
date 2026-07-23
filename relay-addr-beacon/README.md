@@ -74,6 +74,67 @@ UDP, so a proxied record would break STUN/TURN).
 Flow: `GET /zones?name=<zone>` → zone id; `GET /zones/{zid}/dns_records?type=A&name=<rec>`
 → PATCH if it exists else POST create.
 
+##### Shared doorway-set mode (sibling-safe multi-A "logical anycast")
+
+The exclusive lane above assumes ONE beacon owns `--record-name` outright. The
+shared lane lets **multiple beacon instances — one per WAN — each maintain
+their OWN A/AAAA record under one shared hostname**, so a doorway set (e.g.
+`doorways.elohim.host`) resolves to several relays without any instance ever
+clobbering a sibling's record. This is the protocol primitive "address-set
+contribution with ownership + freshness"; Cloudflare DNS is its current
+projection. It runs **alongside** the exclusive lane, not instead of it — the
+exclusive `--record-name` upsert is unaffected and stays byte-identical (no
+`comment` field on that wire body).
+
+| Flag | Env | Default | Meaning |
+|------|-----|---------|---------|
+| `--shared-record-name` | `BEACON_SHARED_RECORD_NAME` | — | The shared doorway-set hostname (e.g. `doorways.elohim.host`). Requires `--record-owner`. |
+| `--record-owner` | `BEACON_RECORD_OWNER` | — | This instance's owner slug (e.g. `operations`, `shem`). Required when `--shared-record-name` is set. |
+| `--shared-refresh-secs` | `BEACON_SHARED_REFRESH_SECS` | `300` | Max age of our own freshness stamp before we re-PATCH even with an unchanged IP. |
+| `--shared-stale-secs` | `BEACON_SHARED_STALE_SECS` | `900` | Age beyond which a SIBLING's record is considered abandoned and reaped (DELETEd). Must be greater than `--shared-refresh-secs` (validated at startup). |
+
+**Ownership rides the Cloudflare record `comment` field** —
+`beacon-owner=<slug>; ts=<unix-seconds>`, tolerant-parsed (unknown keys
+ignored; a missing/garbled stamp never resolves to an owner). Our OWN
+freshness check (whether to re-`PATCH` an unchanged IP) also uses that
+comment `ts`, since it's compared against our own local clock — same-clock
+by construction. A **sibling's** reap-staleness is judged differently: from
+Cloudflare's server-side `modified_on` on the record, never the sibling's
+self-reported comment `ts`. Fleet clocks skew by hours, so trusting a
+sibling's own `ts` would reap a live-but-behind-clock sibling every cycle
+(permanent flap) while never reaping an ahead-clock dead one; `modified_on`
+is a clock every instance agrees on.
+
+For each enabled record type (A, and AAAA with `--enable-v6`), every cycle
+`GET`s all records at the shared name and partitions them:
+
+- **mine** (comment parses with `owner == --record-owner`) — absent: `POST`
+  create with a fresh stamp. Present: `PATCH` iff the content changed OR our
+  stamp is older than `--shared-refresh-secs` (this is what keeps a beacon
+  whose WAN IP never changes from ever looking abandoned); otherwise left
+  untouched. Every record whose comment parses to OUR OWN owner slug is
+  skipped in the reap pass below, not just the one record chosen as "mine".
+- **siblings** (comment parses with a *different* owner) — **never patched**.
+  Reaped (`DELETE`) only once the sibling record's `modified_on` is older
+  than `--shared-stale-secs`; a reap is logged at `warn` with the owner and
+  age. Below that age, left strictly alone. A sibling with a missing or
+  unparseable `modified_on` is treated as fail-safe **not reapable** (logged
+  at `warn`) — a garbled/absent Cloudflare timestamp must never be mistaken
+  for staleness.
+- **unowned** (missing/garbled comment) — **never touched** automatically;
+  its presence is logged at `warn` so an operator can investigate. This is
+  the safety rule that makes the mode sibling-safe: a beacon only ever
+  mutates the record it can prove is its own, and only ever deletes a record
+  it can prove is a stale peer's.
+
+**Main-loop interaction.** The address-detect loop normally skips every sink
+when the WAN address is unchanged. When shared mode is configured, an
+unchanged cycle instead runs *only* the Cloudflare sink's shared lane (not
+its exclusive lane, and not the other sinks) — enough to let the periodic
+freshness-stamp refresh and stale-sibling reap keep happening without
+reintroducing churn elsewhere (see the `cycle` doc comment in `src/main.rs`
+for why "just run every sink every cycle" was rejected).
+
 #### `pkarr` (Tier-2 — published, not yet consumed) — OFF by default
 
 Signs a `SignedPacket` with an `A` (+ `AAAA` when `--enable-v6`) record at the
@@ -156,6 +217,22 @@ relay-addr-beacon --once --sink coturn \
   --coturn-out-conf  /config/turnserver.conf
 ```
 
+Two beacons contributing to a shared doorway set, each behind its own WAN —
+`operations` and `shem` both publish under `doorways.elohim.host` alongside
+their own exclusive record, without clobbering each other:
+
+```
+# instance A
+relay-addr-beacon --sink cloudflare \
+  --record-name turn.elohim.host --cf-zone elohim.host \
+  --shared-record-name doorways.elohim.host --record-owner operations
+
+# instance B (different WAN, different owner slug)
+relay-addr-beacon --sink cloudflare \
+  --record-name turn-shem.elohim.host --cf-zone elohim.host \
+  --shared-record-name doorways.elohim.host --record-owner shem
+```
+
 ## Build & gate
 
 Native crate (no Holochain WASM flag). In constrained environments point the
@@ -173,8 +250,22 @@ just gate    # cargo fmt --check && cargo clippy -D warnings && cargo test
   this environment.
 - Unit tests cover: IP parse/validation, egress-endpoint resolution,
   change-detection state (save/load/diff), Cloudflare request-body shape
-  (`proxied=false`, `ttl=60`), and coturn config rendering (`<wan>/<lan>`, bare
-  `<wan>`, newline handling). Tests do **not** touch the network.
+  (`proxied=false`, `ttl=60`, and — shared lane — `comment`), the owner-comment
+  parse/format round-trip (tolerant of unknown keys, reordering, and garbled
+  input), and coturn config rendering (`<wan>/<lan>`, bare `<wan>`, newline
+  handling). Tests do **not** touch the real network.
+- The Cloudflare shared lane additionally has `wiremock`-backed integration
+  tests (a `dev-dependency` only) driving a local mock HTTP server: create when
+  absent, patch-only-mine among mine/fresh-sibling/unowned, zero mutating
+  calls on unchanged-IP-plus-fresh-stamp, stamp-refresh on unchanged-IP-plus
+  stale-stamp, exact-record reap of a stale sibling (per `modified_on`), no
+  reap of a fresh sibling, a garbled-comment record never touched, a
+  clock-skew regression proving an hours-stale comment `ts` with a FRESH
+  `modified_on` is not reaped, a missing-`modified_on` sibling treated as
+  fail-safe not-reapable, a same-owner duplicate record never reaped, an
+  AAAA-lane create proving the shared list call is type-scoped with a
+  correct AAAA body, and a regression proving the legacy exclusive-lane
+  request body carries no `comment` key at all.
 - The `Dockerfile` and live DNS/coturn integration are **not** exercised by the
   test gate; they are provided for the operator to build and deploy.
 
@@ -182,5 +273,9 @@ just gate    # cargo fmt --check && cargo clippy -D warnings && cargo test
 
 crates.io only (via the Nexus mirror): `tokio`, `reqwest` (rustls-tls, json),
 `serde`/`serde_json`, `clap`, `tracing`/`tracing-subscriber`, `anyhow`,
-`pkarr` (`default-features = false`, `features = ["signed_packet"]`), `bytes`.
+`pkarr` (`default-features = false`, `features = ["signed_packet"]`), `bytes`,
+`time` (`default-features = false`, `features = ["parsing"]` — RFC3339
+parsing of Cloudflare's `modified_on`, used for clock-skew-safe sibling reap
+staleness; no `chrono`/hand-rolled date parsing).
+Dev-only: `wiremock` (Cloudflare shared-lane HTTP-mock tests).
 Zero internal path-deps; own `[workspace]` stanza and `Cargo.lock`.

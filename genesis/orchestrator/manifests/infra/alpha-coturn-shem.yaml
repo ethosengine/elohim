@@ -198,6 +198,14 @@ spec:
             - "/etc/coturn-run/turnserver.conf"
             - "--state-file"
             - "/var/lib/relay-addr-beacon/state.json"
+            # Shared doorway-set mode (2026-07-22): this beacon instance also
+            # contributes its own A record under the "shem" owner slug toward
+            # doorways.elohim.host — the shared multi-A doorway-set name (see
+            # manifests/doorway/alpha.yaml Ingress comment).
+            - "--shared-record-name"
+            - "doorways.elohim.host"
+            - "--record-owner"
+            - "shem"
           env:
             # The one-shot DNS sync at pod start needs the CF token too — without it
             # (and without the cloudflare sink above) beacon-init published only the
@@ -287,6 +295,14 @@ spec:
             - "/etc/coturn-run/turnserver.conf"
             - "--state-file"
             - "/var/lib/relay-addr-beacon/state.json"
+            # Shared doorway-set mode (2026-07-22): this beacon instance also
+            # contributes its own A record under the "shem" owner slug toward
+            # doorways.elohim.host — the shared multi-A doorway-set name (see
+            # manifests/doorway/alpha.yaml Ingress comment).
+            - "--shared-record-name"
+            - "doorways.elohim.host"
+            - "--record-owner"
+            - "shem"
             # coturn has no config-reload signal for external-ip; the sidecar
             # shares the pod's process namespace (shareProcessNamespace: true
             # above), so SIGTERM-ing the turnserver process is enough — the

@@ -163,6 +163,20 @@ export class ElohimClient {
   private readonly writeBuffer: WriteBuffer;
   private readonly reachEnforcer: ReachEnforcer;
   private readonly holochain?: HolochainConnection;
+  /**
+   * Sticky-preferred doorway host for this client instance (multi-host
+   * failover, spec: dual-wan-utility-plane-failover-design §3a). Set when a
+   * fallback host proves reachable; reset to null when the primary doorway
+   * URL proves reachable again. Never mutates `mode.doorway`.
+   */
+  private activeDoorwayUrl: string | null = null;
+
+  /**
+   * Default per-attempt abort timeout (ms) for idempotent GET/HEAD failover
+   * probing — NOT applied to non-retriable writes (see
+   * `withPerAttemptTimeout` / code-review finding on flushWriteBuffer).
+   */
+  private static readonly DEFAULT_ATTEMPT_TIMEOUT_MS = 8000;
 
   constructor(config: ElohimClientConfig) {
     this.mode = config.mode;
@@ -382,20 +396,41 @@ export class ElohimClient {
     path: string,
     options?: RequestInit
   ): Promise<T | null> {
-    // Use storageUrl directly for /db/* routes if configured (local dev bypass)
-    const baseUrl = path.startsWith('/db/') && mode.storageUrl ? mode.storageUrl : mode.doorway.url;
-    const url = `${baseUrl}${path}`;
-
     const headers: Record<string, string> = {
       ...(options?.headers as Record<string, string>),
     };
-    // Only include auth header when using doorway (storage doesn't need it in dev)
-    const usingStorage = path.startsWith('/db/') && mode.storageUrl;
-    if (!usingStorage && mode.doorway.apiKey) {
-      headers['Authorization'] = `Bearer ${mode.doorway.apiKey}`;
-    }
 
-    const response = await fetch(url, { ...options, headers });
+    // Use storageUrl directly for /db/* routes if configured (local dev bypass).
+    // Direct connection to local storage, not the public doorway plane — no
+    // multi-host failover applies here.
+    const usingStorage = path.startsWith('/db/') && !!mode.storageUrl;
+    let response: Response;
+    if (usingStorage) {
+      response = await fetch(`${mode.storageUrl}${path}`, { ...options, headers });
+    } else {
+      // Only include auth header when using doorway (storage doesn't need it in dev)
+      if (mode.doorway.apiKey) {
+        headers['Authorization'] = `Bearer ${mode.doorway.apiKey}`;
+      }
+      // Write-shaped methods (POST/PUT/etc.) must not auto-retry on network
+      // failure — duplicate-write risk. GET/HEAD fail over across hosts.
+      const method = (options?.method ?? 'GET').toUpperCase();
+      const allowFailover = method === 'GET' || method === 'HEAD';
+      // Only idempotent GET/HEAD failover-probing gets the default per-attempt
+      // timeout — a non-retriable write (POST/PUT/etc.) is tried exactly once
+      // and must be allowed to run to completion; injecting an abort here
+      // could cancel an in-flight non-idempotent write that would otherwise
+      // have succeeded, with no safe retry available.
+      response = await this.fetchWithFailover(
+        mode,
+        baseUrl => `${baseUrl}${path}`,
+        { ...options, headers },
+        {
+          allowFailover,
+          timeoutMs: allowFailover ? ElohimClient.DEFAULT_ATTEMPT_TIMEOUT_MS : undefined,
+        }
+      );
+    }
 
     if (response.status === 404) {
       return null;
@@ -407,6 +442,119 @@ export class ElohimClient {
     }
 
     return response.json() as Promise<T>;
+  }
+
+  /**
+   * Failover-aware fetch across the sticky-preferred host, the configured
+   * doorway, and any configured fallbacks (spec:
+   * dual-wan-utility-plane-failover-design §3a).
+   *
+   * Only a network-level failure (the `fetch` promise rejecting — DNS,
+   * connection-refused, CORS-network class — or a per-attempt timeout)
+   * advances to the next candidate host. Any HTTP response, including
+   * 4xx/5xx, means the host is reachable and is returned as-is.
+   *
+   * Read-shaped calls (`allowFailover: true`) try every candidate in order.
+   * Write-shaped calls (`allowFailover: false`) try only the first candidate
+   * — retrying a write on a different host risks a duplicate — but still
+   * advance the sticky preference on failure so the NEXT call skips the
+   * unreachable host.
+   *
+   * `opts.timeoutMs` controls the per-attempt abort injected when the caller
+   * supplies no signal (see `withPerAttemptTimeout`). Pass `undefined` for
+   * non-retriable writes — a single-shot, non-idempotent request must be
+   * allowed to run to completion rather than risk an 8s abort killing an
+   * in-flight write that would otherwise have succeeded.
+   */
+  private async fetchWithFailover(
+    mode: BrowserMode,
+    buildUrl: (baseUrl: string) => string,
+    init: RequestInit | undefined,
+    opts: { allowFailover: boolean; timeoutMs?: number }
+  ): Promise<Response> {
+    const hosts = this.candidateDoorwayHosts(mode);
+
+    for (let i = 0; i < hosts.length; i++) {
+      const host = hosts[i];
+      const attemptInit = this.withPerAttemptTimeout(init, opts.timeoutMs);
+
+      // .then/.catch attached synchronously on the fetch() call itself, not
+      // via await + try/catch — zone.js checks for unhandled rejections at
+      // drain-end, before a native `await`'s thenable job attaches its
+      // handler, and can false-flag an otherwise-handled rejection.
+      const outcome = await fetch(buildUrl(host), attemptInit).then(
+        (response): { kind: 'response'; response: Response } => ({ kind: 'response', response }),
+        (error: unknown): { kind: 'error'; error: unknown } => ({ kind: 'error', error })
+      );
+
+      if (outcome.kind === 'response') {
+        // Reachable — sticky-prefer this host (or reset to primary) for the next call.
+        this.activeDoorwayUrl = host === this.normalizeHost(mode.doorway.url) ? null : host;
+        return outcome.response;
+      }
+
+      // Caller-initiated cancellation must never trigger failover or mutate
+      // stickiness — rethrow immediately. The caller signal's `.aborted` flag
+      // is the primary discriminator (robust across environments); the
+      // error's DOMException 'AbortError' name is a secondary signal, since
+      // some environments (Node/undici) may surface the abort as a plain
+      // rejection without a caller-visible `.aborted` flip in every path.
+      // `AbortSignal.timeout()`-produced 'TimeoutError' rejections are NOT
+      // caller cancellation and remain failover triggers, as do TypeError
+      // network failures.
+      const callerAborted = init?.signal?.aborted === true;
+      const isAbortError =
+        outcome.error instanceof DOMException && outcome.error.name === 'AbortError';
+      if (callerAborted || isAbortError) {
+        throw outcome.error;
+      }
+
+      const hasMoreCandidates = i < hosts.length - 1;
+      if (opts.allowFailover && hasMoreCandidates) {
+        continue;
+      }
+
+      // Out of candidates, or a write-shaped call that must not auto-retry:
+      // advance the sticky preference so the NEXT call skips this unreachable host.
+      this.activeDoorwayUrl = hasMoreCandidates ? hosts[i + 1] : null;
+      throw outcome.error;
+    }
+
+    // Unreachable in practice — candidateDoorwayHosts() always includes mode.doorway.url.
+    throw new Error('fetchWithFailover: no candidate hosts configured');
+  }
+
+  /** Ordered, deduped candidate hosts: sticky-preferred, then primary, then configured fallbacks. */
+  private candidateDoorwayHosts(mode: BrowserMode): string[] {
+    const ordered = [
+      ...(this.activeDoorwayUrl ? [this.activeDoorwayUrl] : []),
+      mode.doorway.url,
+      ...(mode.doorway.fallbacks ?? []),
+    ].map(host => this.normalizeHost(host));
+    return Array.from(new Set(ordered));
+  }
+
+  /**
+   * Strip trailing slashes so a fallback configured as 'https://host/' joins
+   * cleanly with a leading-slash path (no 'host//db/...' double slash) and
+   * compares/dedupes correctly against other candidate hosts.
+   */
+  private normalizeHost(url: string): string {
+    return url.replace(/\/+$/, '');
+  }
+
+  /**
+   * Respect a caller-supplied AbortSignal; otherwise cap each attempt at
+   * `timeoutMs` so a black-holing host can't stall failover. When
+   * `timeoutMs` is `undefined` (non-retriable writes), NO abort is injected
+   * — the request runs to natural completion instead of risking cancellation
+   * of an in-flight, non-idempotent write.
+   */
+  private withPerAttemptTimeout(init?: RequestInit, timeoutMs?: number): RequestInit {
+    if (init?.signal || timeoutMs === undefined) {
+      return { ...init };
+    }
+    return { ...init, signal: AbortSignal.timeout(timeoutMs) };
   }
 
   private async fetchFromTauri<T>(
@@ -451,17 +599,26 @@ export class ElohimClient {
     id: string
   ): Promise<T | null> {
     // All content (including paths) lives in /db/content
-    // Use storageUrl directly for /db/* routes if configured (local dev bypass)
-    const baseUrl = mode.storageUrl ?? mode.doorway.url;
-    const url = `${baseUrl}/db/content/${id}`;
-
     const headers: Record<string, string> = {};
-    // Only include auth header when using doorway (storage doesn't need it in dev)
-    if (!mode.storageUrl && mode.doorway.apiKey) {
-      headers['Authorization'] = `Bearer ${mode.doorway.apiKey}`;
-    }
 
-    const response = await fetch(url, { headers });
+    // Use storageUrl directly for /db/* routes if configured (local dev bypass).
+    // Direct connection to local storage, not the public doorway plane — no
+    // multi-host failover applies here.
+    let response: Response;
+    if (mode.storageUrl) {
+      response = await fetch(`${mode.storageUrl}/db/content/${id}`, { headers });
+    } else {
+      // Only include auth header when using doorway (storage doesn't need it in dev)
+      if (mode.doorway.apiKey) {
+        headers['Authorization'] = `Bearer ${mode.doorway.apiKey}`;
+      }
+      response = await this.fetchWithFailover(
+        mode,
+        baseUrl => `${baseUrl}/db/content/${id}`,
+        { headers },
+        { allowFailover: true, timeoutMs: ElohimClient.DEFAULT_ATTEMPT_TIMEOUT_MS }
+      );
+    }
 
     if (response.status === 404) {
       return null;
@@ -488,17 +645,26 @@ export class ElohimClient {
     if (query.limit) params.set('limit', String(query.limit));
     if (query.offset) params.set('offset', String(query.offset));
 
-    // Use storageUrl directly for /db/* routes if configured (local dev bypass)
-    const baseUrl = mode.storageUrl ?? mode.doorway.url;
-    const url = `${baseUrl}/db/content?${params}`;
-
     const headers: Record<string, string> = {};
-    // Only include auth header when using doorway (storage doesn't need it in dev)
-    if (!mode.storageUrl && mode.doorway.apiKey) {
-      headers['Authorization'] = `Bearer ${mode.doorway.apiKey}`;
-    }
 
-    const response = await fetch(url, { headers });
+    // Use storageUrl directly for /db/* routes if configured (local dev bypass).
+    // Direct connection to local storage, not the public doorway plane — no
+    // multi-host failover applies here.
+    let response: Response;
+    if (mode.storageUrl) {
+      response = await fetch(`${mode.storageUrl}/db/content?${params}`, { headers });
+    } else {
+      // Only include auth header when using doorway (storage doesn't need it in dev)
+      if (mode.doorway.apiKey) {
+        headers['Authorization'] = `Bearer ${mode.doorway.apiKey}`;
+      }
+      response = await this.fetchWithFailover(
+        mode,
+        baseUrl => `${baseUrl}/db/content?${params}`,
+        { headers },
+        { allowFailover: true, timeoutMs: ElohimClient.DEFAULT_ATTEMPT_TIMEOUT_MS }
+      );
+    }
     if (!response.ok) {
       const body = await response.text();
       throw new Error(`HTTP ${response.status} - ${body}`);
@@ -526,19 +692,37 @@ export class ElohimClient {
       headers['Authorization'] = `Bearer ${mode.doorway.apiKey}`;
     }
 
-    // Use storageUrl directly for /db/* routes if configured (local dev bypass)
-    const baseUrl = mode.storageUrl ?? mode.doorway.url;
-
     for (const [_contentType, ops] of byType) {
       // All content (including paths) goes to /db/content/bulk
-      const url = `${baseUrl}/db/content/bulk`;
       const items = ops.map(op => op.data);
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(items),
-      });
+      // Use storageUrl directly for /db/* routes if configured (local dev bypass).
+      // Direct connection to local storage, not the public doorway plane — no
+      // multi-host failover applies here.
+      let response: Response;
+      if (mode.storageUrl) {
+        response = await fetch(`${mode.storageUrl}/db/content/bulk`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(items),
+        });
+      } else {
+        // Write-shaped: no auto-retry on network failure (duplicate-write
+        // risk) — the error propagates, but the sticky preference still
+        // advances so the NEXT flush skips the unreachable host.
+        //
+        // No `timeoutMs` (no default abort injected): this is a non-retriable
+        // bulk write — an 8s abort could kill an in-flight, non-idempotent
+        // write that would otherwise have succeeded, with no safe retry.
+        // Callers that need a bound on this request must supply their own
+        // `signal` via `options`/`init`.
+        response = await this.fetchWithFailover(
+          mode,
+          baseUrl => `${baseUrl}/db/content/bulk`,
+          { method: 'POST', headers, body: JSON.stringify(items) },
+          { allowFailover: false }
+        );
+      }
 
       if (!response.ok) {
         console.error(`Failed to flush ${ops.length} items: HTTP ${response.status}`);

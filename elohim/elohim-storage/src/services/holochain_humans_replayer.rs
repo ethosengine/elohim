@@ -126,18 +126,20 @@ impl MembershipReader for ConductorMembershipReader {
 }
 
 /// Pure extraction: turn a household's membership `Record`s into
-/// `(member_cid, household_cid)` pairs, plus an INCOMPLETE-read flag.
+/// `(member_cid, household_cid)` pairs, plus an INCOMPLETE-read flag and a
+/// HAD-WITHDRAWN flag.
 ///
 /// - Only `MemberKind::Person` members are emitted (collectives-of-collectives
 ///   and elohim-agent members never carry a household_id).
-/// - Withdrawn members (`withdrawn_at_block_height` set) are dropped.
+/// - Withdrawn Person members (`withdrawn_at_block_height` set) are dropped from
+///   `pairs` AND flag `withdrawn_seen`.
 /// - `household_cid` is the caller-supplied `collective_cid` — the exact value
 ///   the controller stamps — NOT re-derived from the entry, so a malformed
 ///   entry collective_cid cannot drift the stamp.
 /// - A record whose entry is absent (a delete/tombstone — structurally not a
 ///   current membership) is skipped silently.
 ///
-/// # Returns `(pairs, incomplete)`
+/// # Returns `(pairs, incomplete, withdrawn_seen)`
 ///
 /// `incomplete` is `true` when ≥1 record was present-but-UNDECODABLE
 /// (`rmp_serde` failed). This is load-bearing for the key-supersede reconcile:
@@ -146,14 +148,26 @@ impl MembershipReader for ConductorMembershipReader {
 /// `2-unmatched / 1-orphan` (safe abstain) into a FALSE `1-unmatched / 1-orphan`
 /// that mis-attributes one human's fossil onto another's live key. So a household
 /// with any decode failure is reported incomplete and the reconcile abstains.
-/// (Non-Person / withdrawn drops are CORRECT exclusions — they are genuinely not
-/// household members — and do NOT mark incompleteness.)
+///
+/// `withdrawn_seen` is `true` when ≥1 Person member of this household has cleanly
+/// WITHDRAWN. This is a DIFFERENT abstention trigger from `incomplete`: the read
+/// is complete, but a withdrawn member's `humans` row lingers with `household_id`
+/// still set, so it surfaces to the reconcile as an ORPHAN FOSSIL that has NO live
+/// membership-key partner (the departed member contributes no key to `pairs`). A
+/// withdrawn member plus one genuinely-new member then collapses the forced
+/// bijection into a FALSE `1-unmatched / 1-orphan`, re-keying the departed member's
+/// shards + commitments onto the new member's key — a mis-attribution strictly
+/// worse than a stale row. So a household with any withdrawal is reported and the
+/// reconcile abstains for it (correct-or-abstain; degrades to the pre-existing dark
+/// state, never a wrong attribution). Non-Person / withdrawn-non-Person drops are
+/// CORRECT exclusions and do NOT flag either signal.
 fn extract_household_pairs(
     collective_cid: &str,
     records: &[Record],
-) -> (Vec<(String, String)>, bool) {
+) -> (Vec<(String, String)>, bool, bool) {
     let mut pairs = Vec::new();
     let mut incomplete = false;
+    let mut withdrawn_seen = false;
     for record in records {
         let Some(Entry::App(eb)) = record.entry.as_option() else {
             // Membership entries are always App entries with a body; an absent
@@ -179,11 +193,19 @@ fn extract_household_pairs(
             continue;
         }
         if membership.withdrawn_at_block_height.is_some() {
+            // A departed Person member: its `humans` row lingers as an orphan
+            // fossil with no live-key partner. Flag the household so supersede
+            // abstains (a withdrawal + a new join is exactly the false-1:1 shape).
+            withdrawn_seen = true;
+            tracing::debug!(
+                collective_cid = %collective_cid,
+                "household replayer: withdrawn Person member — marking household so supersede abstains (departed fossil has no live-key partner)"
+            );
             continue;
         }
         pairs.push((membership.member_cid, collective_cid.to_string()));
     }
-    (pairs, incomplete)
+    (pairs, incomplete, withdrawn_seen)
 }
 
 /// Source the set of household collective cids from the local `collectives`
@@ -212,20 +234,29 @@ fn household_collective_cids(pool: &DbPool, ctx: &AppContext) -> Result<Vec<Stri
 }
 
 /// Result of a boot membership snapshot: the `(member_cid, household_cid)` pairs
-/// AND the set of `household_cid`s whose membership read was INCOMPLETE.
+/// AND the sets of `household_cid`s the key-supersede reconcile must ABSTAIN on.
 ///
 /// A household is INCOMPLETE when its list read failed entirely OR ≥1 of its
 /// membership records failed to decode — in either case a REAL member may be
-/// absent from `pairs`. The key-supersede reconcile
-/// (`membership_identity_reconcile`) treats an incomplete household as ambiguous
-/// and abstains, because a missing member can collapse its forced-bijection guard
-/// into a FALSE 1:1 (mis-attributing one human's fossil onto another's live key).
-/// The NULL-only `household_backfill` is unaffected — it consumes `pairs` directly
-/// (a missing member just leaves a `household_id` NULL, never a wrong attribution).
+/// absent from `pairs`. A household is WITHDRAWN-flagged when ≥1 Person member has
+/// cleanly departed — a departed member's `humans` row lingers as an orphan fossil
+/// with no live-key partner in `pairs`. Both are abstention triggers for the
+/// key-supersede reconcile (`membership_identity_reconcile`), because either shape
+/// can collapse its forced-bijection guard into a FALSE 1:1 (mis-attributing one
+/// human's fossil onto another's live key). They are tracked SEPARATELY so the two
+/// abstention reasons stay observable (undecodable read vs legitimate departure).
+///
+/// The NULL-only `household_backfill` is unaffected by either — it consumes `pairs`
+/// directly (a missing/departed member just leaves a `household_id` NULL, never a
+/// wrong attribution).
 #[derive(Debug, Default, Clone)]
 pub struct MembershipSnapshot {
     pub pairs: Vec<(String, String)>,
     pub incomplete_households: std::collections::HashSet<String>,
+    /// Households with ≥1 cleanly-withdrawn Person member — the reconcile abstains
+    /// (the departed fossil has no live-key partner, so a forced 1:1 would
+    /// mis-attribute it onto a new member's key).
+    pub withdrawn_households: std::collections::HashSet<String>,
 }
 
 /// Boot-time snapshot of `(member_cid, household_cid)` pairs from the current
@@ -267,9 +298,12 @@ pub async fn snapshot_household_ids(
     for cid in &cids {
         match reader.list_memberships(cid).await {
             Ok(records) => {
-                let (pairs, incomplete) = extract_household_pairs(cid, &records);
+                let (pairs, incomplete, withdrawn_seen) = extract_household_pairs(cid, &records);
                 if incomplete {
                     snapshot.incomplete_households.insert(cid.clone());
+                }
+                if withdrawn_seen {
+                    snapshot.withdrawn_households.insert(cid.clone());
                 }
                 snapshot.pairs.extend(pairs);
             }
@@ -362,8 +396,9 @@ mod tests {
             membership_record("agent:uhCAkAlice", "Person", cid, None),
             membership_record("agent:uhCAkBob", "Person", cid, None),
         ];
-        let (pairs, incomplete) = extract_household_pairs(cid, &records);
+        let (pairs, incomplete, withdrawn) = extract_household_pairs(cid, &records);
         assert!(!incomplete, "all records decoded → complete read");
+        assert!(!withdrawn, "no departures → no withdrawn flag");
         assert_eq!(
             pairs,
             vec![
@@ -381,11 +416,12 @@ mod tests {
             membership_record("agent:uhCAkAgent", "ElohimAgent", cid, None),
             membership_record("agent:uhCAkPerson", "Person", cid, None),
         ];
-        let (pairs, incomplete) = extract_household_pairs(cid, &records);
+        let (pairs, incomplete, withdrawn) = extract_household_pairs(cid, &records);
         assert!(
             !incomplete,
             "non-Person exclusions are correct, not incompleteness"
         );
+        assert!(!withdrawn, "no withdrawn Person → no withdrawn flag");
         assert_eq!(
             pairs,
             vec![("agent:uhCAkPerson".to_string(), cid.to_string())]
@@ -399,10 +435,39 @@ mod tests {
             membership_record("agent:uhCAkGone", "Person", cid, Some(42)),
             membership_record("agent:uhCAkStays", "Person", cid, None),
         ];
-        let (pairs, incomplete) = extract_household_pairs(cid, &records);
+        let (pairs, incomplete, withdrawn) = extract_household_pairs(cid, &records);
         assert!(
             !incomplete,
             "withdrawn exclusions are correct, not incompleteness"
+        );
+        // …but a withdrawn PERSON DOES flag the household: the departed member's
+        // `humans` row lingers as an orphan fossil with no live-key partner, so
+        // the key-supersede reconcile must abstain (else a withdrawal + a new join
+        // collapses the forced bijection into a mis-attributing false 1:1).
+        assert!(
+            withdrawn,
+            "a withdrawn Person member must flag the household for supersede abstention"
+        );
+        assert_eq!(
+            pairs,
+            vec![("agent:uhCAkStays".to_string(), cid.to_string())]
+        );
+    }
+
+    #[test]
+    fn extract_withdrawn_non_person_does_not_flag() {
+        // A withdrawn non-Person (a sub-collective / elohim-agent) has no `humans`
+        // row and so never becomes an orphan fossil — it must NOT flag the household.
+        let cid = "collective:uhCkkHousehold1";
+        let records = vec![
+            membership_record("collective:uhCkkSub", "Collective", cid, Some(9)),
+            membership_record("agent:uhCAkStays", "Person", cid, None),
+        ];
+        let (pairs, incomplete, withdrawn) = extract_household_pairs(cid, &records);
+        assert!(!incomplete);
+        assert!(
+            !withdrawn,
+            "a withdrawn non-Person member is not an orphan-fossil risk"
         );
         assert_eq!(
             pairs,
@@ -422,8 +487,9 @@ mod tests {
             "collective:uhCkkDriftedInEntry",
             None,
         )];
-        let (pairs, incomplete) = extract_household_pairs(queried, &records);
+        let (pairs, incomplete, withdrawn) = extract_household_pairs(queried, &records);
         assert!(!incomplete);
+        assert!(!withdrawn);
         assert_eq!(
             pairs,
             vec![("agent:uhCAkAlice".to_string(), queried.to_string())]
@@ -442,7 +508,7 @@ mod tests {
         bad.entry = RecordEntry::Present(bad_entry);
 
         let good = membership_record("agent:uhCAkGood", "Person", cid, None);
-        let (pairs, incomplete) = extract_household_pairs(cid, &[bad, good]);
+        let (pairs, incomplete, withdrawn) = extract_household_pairs(cid, &[bad, good]);
         // The good row still comes through (per-row degradation)…
         assert_eq!(
             pairs,
@@ -454,6 +520,7 @@ mod tests {
             incomplete,
             "an undecodable membership record must mark the household read incomplete"
         );
+        assert!(!withdrawn, "an undecodable record is not a withdrawal");
     }
 
     // -----------------------------------------------------------------------
@@ -584,6 +651,62 @@ mod tests {
             "a failed household read must be marked incomplete"
         );
         assert!(!snap.incomplete_households.contains("collective:uhCkkUp"));
+    }
+
+    #[tokio::test]
+    async fn snapshot_flags_household_with_withdrawn_member() {
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+        seed_household_collective(&pool, &ctx, "family-left", "collective:uhCkkLeft");
+        seed_household_collective(&pool, &ctx, "family-stable", "collective:uhCkkStable");
+
+        let mut by_cid = std::collections::HashMap::new();
+        // uhCkkLeft has a withdrawn Person + a genuinely-new active member.
+        by_cid.insert(
+            "collective:uhCkkLeft".to_string(),
+            Ok(vec![
+                membership_record("agent:uhCAkGone", "Person", "collective:uhCkkLeft", Some(7)),
+                membership_record("agent:uhCAkNew", "Person", "collective:uhCkkLeft", None),
+            ]),
+        );
+        by_cid.insert(
+            "collective:uhCkkStable".to_string(),
+            Ok(vec![membership_record(
+                "agent:uhCAkAlice",
+                "Person",
+                "collective:uhCkkStable",
+                None,
+            )]),
+        );
+        let reader = MockReader { by_cid };
+
+        let snap = snapshot_household_ids(&pool, &ctx, &reader)
+            .await
+            .expect("snapshot");
+        // The withdrawn member contributes no pair; the new member does.
+        let mut pairs = snap.pairs.clone();
+        pairs.sort();
+        assert_eq!(
+            pairs,
+            vec![
+                (
+                    "agent:uhCAkAlice".to_string(),
+                    "collective:uhCkkStable".to_string()
+                ),
+                (
+                    "agent:uhCAkNew".to_string(),
+                    "collective:uhCkkLeft".to_string()
+                ),
+            ]
+        );
+        // The household with a departure is flagged for supersede abstention; the
+        // stable household is not. Neither is an incomplete read.
+        assert!(snap.incomplete_households.is_empty());
+        assert!(
+            snap.withdrawn_households.contains("collective:uhCkkLeft"),
+            "a withdrawn Person must flag its household for supersede abstention"
+        );
+        assert!(!snap.withdrawn_households.contains("collective:uhCkkStable"));
     }
 
     #[tokio::test]

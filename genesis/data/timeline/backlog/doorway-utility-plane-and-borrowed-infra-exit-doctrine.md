@@ -89,6 +89,7 @@ sovereign coturn replacement the same hour.
 | shem (rented compute) | provider action | household/hub redistribution — hub-optional floor already doctrine | partially covered |
 | GitHub/Jenkins/Harbor (dev plane) | account/org action | self-hosted already (Jenkins/Harbor/Nexus); GitHub exit = git's native distribution | mostly real |
 | TURN relay mechanism (coturn, external C, WebRTC-specific) | separate process, per-relay op burden | native Rust relay: libp2p Circuit Relay v2 + iroh relay, as the conductor DHT migrates off tx5 | filed: this row + 2026-07-16 dual-wan design |
+| HTTP/bootstrap/signal utility plane (single DNS name per doorway) | one WAN outage strands the plane — no protocol-level multi-trial like ICE gets for free | browser-plane logical-anycast: multi-A + client-side retry (2026-07-16 spec §3a) | browser leg shipped 2026-07-22 (ElohimClient + apiBaseUrlInterceptor `doorwayFallbacks` read-failover/write-sticky); doorway-set multi-A leg added 2026-07-22 — `doorways.elohim.host` (relay-addr-beacon shared-record contribution mode, owners `operations`+`shem`) closes the WAN-outage gap the browser leg alone didn't, bench-scoped (see 2026-07-16 spec §7 2026-07-22 addendum); conductor-plane leg open — `bootstrap_url`/`signal_url` are single-typed upstream, tx5-fork path filed in the 2026-07-16 spec §7; pkarr-native doorway-set naming remains the filed exit |
 
 ## Deliverable
 
