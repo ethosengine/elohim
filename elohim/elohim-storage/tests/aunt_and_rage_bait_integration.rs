@@ -373,7 +373,7 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
     // =========================================================================
     // Phase 5: Reach-earning gate — deferred to after Phase 8.
     //
-    // compose_epr(District) requires Bob's standing to be evaluated.
+    // compose_epr(Public) requires Bob's standing to be evaluated.
     // Bob's standing row is written in Phase 8 (project_signal). The gate
     // check is placed there, immediately after the standing projection, where
     // it can assert Blocked(StandingBelowThreshold) rather than Pending
@@ -524,8 +524,15 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
     //
     // Now that Bob's standing row is projected (Computed { score: Floor }),
     // the reach-earning gate can return a definitive verdict:
-    //   - Reach::District threshold = "neutral" per bootstrap-standing-policy.
-    //   - Bob's score (Floor) < Neutral → Blocked(StandingBelowThreshold).
+    //   - Reach::Public's manifest key is the canonical "public", which the
+    //     live bootstrap-standing-policy resolves to threshold "high". (The
+    //     policy's "district":"neutral" entry is a dead legacy-kebab-8 key —
+    //     Reach::as_manifest_key() always emits canonical spellings going
+    //     forward, and "district" is not one of them, so no Reach variant's
+    //     lookup ever reaches it. parse_reach_key("district") still aliases
+    //     INTO Reach::Public on manifest *ingest*, but that's the opposite
+    //     direction from this outbound lookup.)
+    //   - Bob's score (Floor) < High → Blocked(StandingBelowThreshold).
     //
     // The ManifestRegistry is loaded from Sarah's db (bootstrap standing-policy
     // manifest seeded in Phase 2 via seed_if_empty).
@@ -546,7 +553,7 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
         let gate_result = compose_epr(
             &SARAH_EVALUATOR_BYTES,
             &BOB_SUBJECT_BYTES,
-            Reach::District,
+            Reach::Public,
             &mut sarah_conn,
             &registry,
         );
@@ -557,7 +564,7 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
             })) => {}
             other => panic!(
                 "Phase 5: expected ReachDenied(Blocked(StandingBelowThreshold)) for Bob at \
-                 District reach after Correction, got: {other:?}"
+                 Public reach after Correction, got: {other:?}"
             ),
         }
     }
@@ -683,15 +690,20 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
     //
     // The Vouch primitive is a FeedbackSignal with signal_kind = Vouch and
     // vouch_kind = AcceptCorrection. Sarah (the third-party voucher) issues
-    // two Vouch(DebitSoft) signals targeting BOB_CONTENT_CID. Each carries
+    // three Vouch(DebitSoft) signals targeting BOB_CONTENT_CID. Each carries
     // DefaultDebitWeightPolicy weight = -3.
     //
     // Starting debit_weight_sum = 8 (from Phase 8 Correction(DebitFirm)):
-    //   vouch 1: sum = 8 + (-3) = 5  → Low
-    //   vouch 2: sum = 5 + (-3) = 2  → Neutral
+    //   vouch 1: sum = 8 + (-3) = 5   → Low
+    //   vouch 2: sum = 5 + (-3) = 2   → Neutral
+    //   vouch 3: sum = 2 + (-3) = -1  → High
     //
-    // Neutral satisfies the District threshold ("neutral" in bootstrap policy),
-    // so Bob's subsequent compose_epr(District) must return Ok.
+    // Reach::Public's real threshold is "high" (see the Phase 5 gate-check
+    // comment above), not the retired kebab-8 "district":"neutral" entry —
+    // two vouches (landing at Neutral) would NOT clear that bar. A third
+    // vouch is required to cross into High, which satisfies it (score_rank
+    // comparison is >=), so Bob's subsequent compose_epr(Public) must
+    // return Ok.
     //
     // No-self-vouch constraint: signed_by is set to BOB_SUBJECT_BYTES (same
     // HONEST DEVIATION as Phase 6) so that project_signal targets Bob's
@@ -769,7 +781,42 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
     assert_eq!(
         score_after_vouch_2,
         StandingScore::Neutral,
-        "Vouch(DebitSoft) #2: sum = 5 + (-3) = 2 → Neutral (District threshold)"
+        "Vouch(DebitSoft) #2: sum = 5 + (-3) = 2 → Neutral (not yet enough for Public/high)"
+    );
+
+    // Vouch #3: sum = 2 → -1 (High). A second vouch only recovers Bob to
+    // Neutral, which is short of Reach::Public's real "high" threshold — a
+    // third is required to cross the -2..=-1 → High boundary.
+    let vouch_signal_3 = FeedbackSignal {
+        target_cid: BOB_CONTENT_CID.to_string(),
+        signal_kind: SignalKind::Vouch,
+        vouch_kind: Some(VouchKind::AcceptCorrection),
+        evidence_cid: None,
+        standing_impact: StandingImpact::DebitSoft,
+        signed_by: bob_subject_b64.clone(),
+        signature: BASE64.encode([0xACu8; 64]),
+    };
+    vouch_signal_3
+        .validate()
+        .expect("vouch_signal_3 must pass validate()");
+
+    let score_after_vouch_3 = {
+        let mut sarah_conn = sarah.db_pool.get().expect("sarah db conn");
+        project_signal(
+            &mut sarah_conn,
+            &DefaultDebitWeightPolicy,
+            &SARAH_EVALUATOR_BYTES,
+            &vouch_signal_3,
+            "bootstrap:standing-policy:v1",
+        )
+        .expect("project_signal (vouch 3) must succeed")
+    };
+
+    // sum = 2 + (-3) = -1 → High (boundary: -2..=-1 → High)
+    assert_eq!(
+        score_after_vouch_3,
+        StandingScore::High,
+        "Vouch(DebitSoft) #3: sum = 2 + (-3) = -1 → High (Public threshold)"
     );
 
     // Verify via Standing::evaluate.
@@ -780,18 +827,20 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
         assert_eq!(
             standing,
             Standing::Computed {
-                score: StandingScore::Neutral
+                score: StandingScore::High
             },
-            "after two Vouch(DebitSoft) signals, Standing::evaluate must return Computed(Neutral)"
+            "after three Vouch(DebitSoft) signals, Standing::evaluate must return Computed(High)"
         );
     }
 
     // =========================================================================
-    // Phase 12: COMPOSE RECOVERY — Bob's District compose now succeeds.
+    // Phase 12: COMPOSE RECOVERY — Bob's Public compose now succeeds.
     //
-    // After the two vouch signals, Bob's debit_weight_sum = 2 → Neutral.
-    // The District threshold is "neutral" in the bootstrap standing-policy.
-    // Neutral ≥ Neutral → compose_epr must return Ok.
+    // After the three vouch signals, Bob's debit_weight_sum = -1 → High.
+    // Reach::Public's canonical manifest key ("public") resolves to threshold
+    // "high" in the live bootstrap-standing-policy — the retired kebab-8
+    // "district":"neutral" entry never enters this lookup (see the Phase 5
+    // gate-check comment above). High ≥ High → compose_epr must return Ok.
     //
     // Direct service call: services::epr_compose::compose_epr.
     // =========================================================================
@@ -811,13 +860,13 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
         let recovery_result = compose_epr(
             &SARAH_EVALUATOR_BYTES,
             &BOB_SUBJECT_BYTES,
-            Reach::District,
+            Reach::Public,
             &mut sarah_conn,
             &registry,
         );
         assert!(
             recovery_result.is_ok(),
-            "after Vouch recovery (sum=2 → Neutral), compose_epr(District) must return Ok; \
+            "after Vouch recovery (sum=-1 → High), compose_epr(Public) must return Ok; \
              got: {recovery_result:?}"
         );
     }
