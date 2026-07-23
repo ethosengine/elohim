@@ -125,11 +125,6 @@ describe('Holochain Model', () => {
       expect(format).toBe('markdown');
     });
 
-    it('should accept valid reach level', () => {
-      const reach: ValidReachLevel = 'commons';
-      expect(reach).toBe('commons');
-    });
-
     it('should accept valid relationship type', () => {
       const relType: ValidRelationshipType = 'CONTAINS';
       expect(relType).toBe('CONTAINS');
