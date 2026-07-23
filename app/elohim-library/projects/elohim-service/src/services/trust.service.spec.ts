@@ -15,7 +15,6 @@ import {
   enrichWithTrust,
   enrichContentDirectory,
   updateContentIndexWithTrust,
-  ReachLevel,
   Attestation
 } from './trust.service';
 
@@ -239,14 +238,14 @@ describe('Trust Service', () => {
           contentId: 'content-1',
           attestationType: 'author-verified',
           status: 'active',
-          reachGranted: 'local'
+          reachGranted: 'trusted'
         },
         {
           id: 'att-2',
           contentId: 'content-1',
           attestationType: 'peer-reviewed',
           status: 'active',
-          reachGranted: 'federated'
+          reachGranted: 'public'
         },
         {
           id: 'att-3',
@@ -259,7 +258,7 @@ describe('Trust Service', () => {
 
       const reach = getEffectiveReach(attestations);
 
-      expect(reach).toBe('federated'); // highest level
+      expect(reach).toBe('public'); // highest level
     });
 
     it('should ignore revoked attestations', () => {
@@ -269,7 +268,7 @@ describe('Trust Service', () => {
           contentId: 'content-1',
           attestationType: 'author-verified',
           status: 'active',
-          reachGranted: 'local'
+          reachGranted: 'trusted'
         },
         {
           id: 'att-2',
@@ -282,7 +281,7 @@ describe('Trust Service', () => {
 
       const reach = getEffectiveReach(attestations);
 
-      expect(reach).toBe('local');
+      expect(reach).toBe('trusted');
     });
 
     it('should return private for attestations without reachGranted', () => {
@@ -316,7 +315,7 @@ describe('Trust Service', () => {
           contentId: 'content-1',
           attestationType: 'author-verified',
           status: 'active',
-          reachGranted: 'local'
+          reachGranted: 'trusted'
         }
       ];
 
@@ -393,7 +392,7 @@ describe('Trust Service', () => {
           contentId: 'content-1',
           attestationType: 'peer-reviewed',
           status: 'active',
-          reachGranted: 'federated'
+          reachGranted: 'public'
         }
       ];
 
@@ -404,7 +403,7 @@ describe('Trust Service', () => {
       expect(enriched.id).toBe('content-1');
       expect(enriched.title).toBe('Test Content');
       expect(enriched.authorId).toBe('author-123'); // preserved
-      expect(enriched.reach).toBe('federated');
+      expect(enriched.reach).toBe('public');
       expect(enriched.trustScore).toBeDefined();
       expect(enriched.activeAttestationIds).toEqual(['att-1']);
       expect(enriched.trustComputedAt).toBeDefined();
@@ -542,7 +541,7 @@ describe('Trust Service', () => {
               contentId: 'content-1',
               attestationType: 'peer-reviewed',
               status: 'active',
-              reachGranted: 'federated'
+              reachGranted: 'public'
             }
           ]
         ]
@@ -552,7 +551,7 @@ describe('Trust Service', () => {
 
       const updated = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
 
-      expect(updated.nodes[0].reach).toBe('federated');
+      expect(updated.nodes[0].reach).toBe('public');
       expect(updated.nodes[0].trustScore).toBeDefined();
       expect(updated.nodes[0].hasAttestations).toBe(true);
 

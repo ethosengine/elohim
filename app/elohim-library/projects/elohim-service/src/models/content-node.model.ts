@@ -7,6 +7,8 @@
  * When writing output, the generated JSON matches the lamad schema exactly.
  */
 
+import type { Reach } from '../generated/schema-enums';
+
 /**
  * Content types supported by the lamad platform
  */
@@ -41,9 +43,13 @@ export type ContentFormat =
   | 'perseus-quiz-json'; // Khan Academy Perseus quiz format
 
 /**
- * Content reach level - visibility scope
+ * Content reach level - visibility scope.
+ *
+ * Alias to the canonical schema-8 `Reach` vocabulary (see
+ * `../generated/schema-enums.ts`). Kept as a distinct exported name for
+ * backward-compatible imports across this package.
  */
-export type ContentReach = 'private' | 'invited' | 'local' | 'community' | 'federated' | 'commons';
+export type ContentReach = Reach;
 
 /**
  * Relationship types between content nodes

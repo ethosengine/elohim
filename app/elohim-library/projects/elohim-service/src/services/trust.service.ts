@@ -8,22 +8,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-/**
- * Reach levels for content visibility
- */
-export type ReachLevel = 'private' | 'invited' | 'local' | 'community' | 'federated' | 'commons';
+import { reachOpenness, type Reach } from '../generated/schema-enums';
+export type { Reach } from '../generated/schema-enums';
 
 /**
- * Reach level ordering (higher = more visible)
+ * Reach level ordering (higher = more visible). Delegates to the generated
+ * `reachOpenness()` — the canonical schema-8 ordering — rather than
+ * maintaining a second, divergence-prone ordinal map.
  */
-const REACH_ORDER: Record<ReachLevel, number> = {
-  private: 0,
-  invited: 1,
-  local: 2,
-  community: 3,
-  federated: 4,
-  commons: 5,
-};
+const REACH_ORDER = reachOpenness;
 
 /**
  * Attestation types and their weight for trust scoring
@@ -45,7 +38,7 @@ const ATTESTATION_WEIGHTS: Record<string, number> = {
  * Default trust values for content without attestations
  */
 const DEFAULT_AUTHOR = 'system';
-const DEFAULT_REACH: ReachLevel = 'commons';
+const DEFAULT_REACH: Reach = 'commons';
 const DEFAULT_TRUST_SCORE = 0.8;
 
 /**
@@ -56,7 +49,7 @@ export interface Attestation {
   contentId: string;
   attestationType: string;
   status: 'active' | 'revoked' | 'expired';
-  reachGranted?: ReachLevel;
+  reachGranted?: Reach;
   attesterId?: string;
   createdAt?: string;
   expiresAt?: string;
@@ -75,7 +68,7 @@ export interface AttestationsIndex {
  */
 export interface TrustFields {
   authorId: string;
-  reach: ReachLevel;
+  reach: Reach;
   trustScore: number;
   activeAttestationIds: string[];
   trustComputedAt: string;
@@ -134,17 +127,17 @@ export function calculateTrustScore(attestations: Attestation[]): number {
 /**
  * Determine effective reach level from attestations
  */
-export function getEffectiveReach(attestations: Attestation[]): ReachLevel {
+export function getEffectiveReach(attestations: Attestation[]): Reach {
   if (!attestations || attestations.length === 0) {
     return DEFAULT_REACH;
   }
 
-  let highestReach: ReachLevel = 'private';
+  let highestReach: Reach = 'private';
   let highestLevel = 0;
 
   for (const att of attestations) {
     if (att.status === 'active' && att.reachGranted) {
-      const level = REACH_ORDER[att.reachGranted] || 0;
+      const level = REACH_ORDER(att.reachGranted) || 0;
       if (level > highestLevel) {
         highestLevel = level;
         highestReach = att.reachGranted;
@@ -182,7 +175,7 @@ export function generateTrustFields(
 export interface ContentWithTrust {
   id: string;
   authorId?: string;
-  reach?: ReachLevel;
+  reach?: Reach;
   trustScore?: number;
   activeAttestationIds?: string[];
   trustComputedAt?: string;
@@ -278,7 +271,7 @@ export function updateContentIndexWithTrust(
 
   try {
     const index = JSON.parse(fs.readFileSync(indexPath, 'utf-8')) as {
-      nodes?: { id: string; reach?: ReachLevel; trustScore?: number; hasAttestations?: boolean }[];
+      nodes?: { id: string; reach?: Reach; trustScore?: number; hasAttestations?: boolean }[];
       lastUpdated?: string;
     };
 
