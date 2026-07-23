@@ -41,6 +41,7 @@ export type LocalityLevelType = (typeof LocalityLevel)[keyof typeof LocalityLeve
 /** @deprecated Renamed 2026-07-23 — use LocalityLevel. Kept so `cache/index.ts`'s barrel re-export stays green without an out-of-scope edit. */
 export const ReachLevel = LocalityLevel;
 /** @deprecated Renamed 2026-07-23 — use LocalityLevelType. */
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- deliberate deprecation shim, not redundancy; burns down with the ReachLevel alias
 export type ReachLevelType = LocalityLevelType;
 
 // ============================================================================
