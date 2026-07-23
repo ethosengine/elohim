@@ -40,11 +40,22 @@
 #
 # Usage: verify-projected-head.sh <doorway-base-url> <slug> <expected-server-blob-hash> [expected-git-commit]
 # Exit codes:
-#   0 = MATCH (served serverBlobHash == expected) or FIELD-ABSENT (attestation
-#       not deployed on this host yet — forward-compatible skip)
-#   1 = MISMATCH (served serverBlobHash != expected) or UNREACHABLE (neither
-#       /health/startup nor /health answered 200 after retries)
+#   0 = MATCH (served serverBlobHash == expected, either immediately or after
+#       convergence retries) or FIELD-ABSENT (attestation not deployed on this
+#       host yet — forward-compatible skip)
+#   1 = STILL-DIVERGENT (served serverBlobHash != expected after the full
+#       convergence window) or UNREACHABLE (neither /health/startup nor
+#       /health answered 200 after retries)
+#
+# Env knobs (both overridable; defaults sized comfortably past one doorway
+# reconcile tick — see MISMATCH convergence-window note below):
+#   PROJHEAD_CONVERGE_INTERVAL  seconds between convergence re-probes (def 30)
+#   PROJHEAD_CONVERGE_WINDOW    total seconds to keep probing a MISMATCH
+#                                before failing for real (def 400)
 set -euo pipefail
+
+PROJHEAD_CONVERGE_INTERVAL="${PROJHEAD_CONVERGE_INTERVAL:-30}"
+PROJHEAD_CONVERGE_WINDOW="${PROJHEAD_CONVERGE_WINDOW:-400}"
 
 BASE_URL="$1"
 SLUG="$2"
@@ -154,8 +165,42 @@ fi
 if [ "${served_hash}" = "${EXPECTED_HASH}" ]; then
     echo "✓ projected head propagated: ${HOST} ${SLUG} ${served_hash}"
 else
-    echo "ERROR: projected head MISMATCH on ${HOST} ${SLUG}: declared=${EXPECTED_HASH} served=${served_hash}" >&2
-    exit 1
+    # MISMATCH here does not (yet) mean divergence: the doorway only
+    # materializes a just-authored head on its own reconcile tick (~300s
+    # cadence), and this probe runs immediately after the head is authored —
+    # i.e. right before the swap, every time a build changes the SSR bundle
+    # (elohim #1628/#1629 UNSTABLE on exactly this). The reachability ladder
+    # above is for TRANSIENT unreachability only; this is a SEPARATE
+    # convergence-window ladder for a reachable-but-stale host: keep probing
+    # on a slower cadence until a window comfortably past one reconcile tick
+    # closes, and only then report real divergence.
+    elapsed=0
+    converged=0
+    echo "  … MISMATCH on ${HOST} ${SLUG}: declared=${EXPECTED_HASH} served=${served_hash:-<absent>} — doorway may still be converging (reconcile tick ~300s); entering convergence window (up to ${PROJHEAD_CONVERGE_WINDOW}s, re-probing every ${PROJHEAD_CONVERGE_INTERVAL}s)" >&2
+    while [ "${elapsed}" -lt "${PROJHEAD_CONVERGE_WINDOW}" ]; do
+        sleep "${PROJHEAD_CONVERGE_INTERVAL}"
+        elapsed=$((elapsed + PROJHEAD_CONVERGE_INTERVAL))
+
+        code=$(fetch_health "/health/startup")
+        if [ "${code}" != "200" ]; then
+            code=$(fetch_health "/health")
+        fi
+        if [ "${code}" = "200" ] && [ "$(body_has_served_heads_key)" = "yes" ]; then
+            served_hash=$(extract_served_hash)
+            if [ -n "${served_hash}" ] && [ "${served_hash}" = "${EXPECTED_HASH}" ]; then
+                converged=1
+                break
+            fi
+        fi
+        echo "  … still divergent after ${elapsed}s/${PROJHEAD_CONVERGE_WINDOW}s: ${HOST} ${SLUG} served=${served_hash:-<absent>}" >&2
+    done
+
+    if [ "${converged}" = "1" ]; then
+        echo "✓ projected head converged after ${elapsed}s: ${HOST} ${SLUG} ${served_hash}"
+    else
+        echo "ERROR: projected head still divergent after full ${PROJHEAD_CONVERGE_WINDOW}s convergence window on ${HOST} ${SLUG}: declared=${EXPECTED_HASH} served=${served_hash:-<absent>}" >&2
+        exit 1
+    fi
 fi
 
 # Cheap, NON-GATING browser-bundle liveness signal (see header LIMITATION).
