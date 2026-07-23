@@ -204,6 +204,32 @@ describe('ElohimClient multi-host failover', () => {
     expect(fetchMock.mock.calls[1][0]).toBe(`${PRIMARY}/db/content/b`);
   });
 
+  it('(k) GET gets the default 8s per-attempt AbortSignal; bulk-write POST gets none', async () => {
+    const client = makeClient([FALLBACK]);
+
+    // GET: should carry an injected AbortSignal (failover-probing default).
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: 'x' }));
+    await client.get<TestContent>('content', 'x');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const getInit = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(getInit.signal).toBeInstanceOf(AbortSignal);
+
+    fetchMock.mockClear();
+
+    // Bulk-write POST (flushWriteBuffer -> flushToProjection): must NOT get
+    // an injected timeout — an 8s abort could kill an in-flight,
+    // non-idempotent write that would otherwise have succeeded.
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
+    await client.save('content', { id: 'w', title: 'queued' });
+    await client.flush();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(`${PRIMARY}/db/content/bulk`);
+    const postInit = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(postInit.signal).toBeUndefined();
+  });
+
   it('(j) fallback configured with a trailing slash — no double slash in the request URL, dedupe still works', async () => {
     const client = makeClient([`${FALLBACK}/`]);
 

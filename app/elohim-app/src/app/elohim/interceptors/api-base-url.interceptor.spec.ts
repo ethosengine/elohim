@@ -5,7 +5,7 @@ import {
   HttpErrorResponse,
   HttpResponse,
 } from '@angular/common/http';
-import { Observable, of, throwError } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { apiBaseUrlInterceptor, resetDoorwayFailoverState } from './api-base-url.interceptor';
@@ -335,6 +335,133 @@ describe('apiBaseUrlInterceptor', () => {
       const round3 = scriptedHandler(['success']);
       apiBaseUrlInterceptor(new HttpRequest('GET', '/db/content/3'), round3.handler).subscribe();
       expect(round3.calls()).toEqual([`${PRIMARY}/db/content/3`]);
+    });
+
+    it('(d) FIX 2: a healthy fallback does NOT get demoted before the reprobe TTL elapses', () => {
+      const round1 = scriptedHandler(['network', 'success']);
+      apiBaseUrlInterceptor(new HttpRequest('GET', '/db/content/1'), round1.handler).subscribe();
+      expect(round1.calls()).toEqual([`${PRIMARY}/db/content/1`, `${FALLBACK}/db/content/1`]);
+
+      // Well within the reprobe TTL — sticky fallback is tried alone, no
+      // speculative primary hop.
+      const round2 = scriptedHandler(['success']);
+      apiBaseUrlInterceptor(new HttpRequest('GET', '/db/content/2'), round2.handler).subscribe();
+      expect(round2.calls()).toEqual([`${FALLBACK}/db/content/2`]);
+    });
+
+    it('(e) FIX 2: primary-recovery demotion — a GET re-probes the primary once the TTL elapses, even though the fallback keeps answering', () => {
+      const nowSpy = vi.spyOn(Date, 'now');
+      let clock = 1_000_000;
+      nowSpy.mockImplementation(() => clock);
+
+      // Round 1: primary down, fallback answers — sticky pins to fallback at `clock`.
+      const round1 = scriptedHandler(['network', 'success']);
+      apiBaseUrlInterceptor(new HttpRequest('GET', '/db/content/1'), round1.handler).subscribe();
+      expect(round1.calls()).toEqual([`${PRIMARY}/db/content/1`, `${FALLBACK}/db/content/1`]);
+
+      // Advance past the reprobe TTL. Without FIX 2 this call would go
+      // straight to the fallback forever — the exact bug this closes: a
+      // one-time blip permanently strands the session on the fallback with
+      // no guaranteed content parity.
+      clock += 30_000;
+      const round2 = scriptedHandler(['success']);
+      apiBaseUrlInterceptor(new HttpRequest('GET', '/db/content/2'), round2.handler).subscribe();
+      expect(round2.calls()).toEqual([`${PRIMARY}/db/content/2`]);
+
+      // Round 3 proves the demotion stuck: sticky is back on the primary, no
+      // fallback hop needed.
+      const round3 = scriptedHandler(['success']);
+      apiBaseUrlInterceptor(new HttpRequest('GET', '/db/content/3'), round3.handler).subscribe();
+      expect(round3.calls()).toEqual([`${PRIMARY}/db/content/3`]);
+
+      nowSpy.mockRestore();
+    });
+
+    it('(f) FIX 2: reprobe never applies to a non-retriable write — a POST always trusts the current sticky preference', () => {
+      const nowSpy = vi.spyOn(Date, 'now');
+      let clock = 1_000_000;
+      nowSpy.mockImplementation(() => clock);
+
+      // Round 1: primary down, fallback answers a GET — sticky pins to fallback.
+      const round1 = scriptedHandler(['network', 'success']);
+      apiBaseUrlInterceptor(new HttpRequest('GET', '/db/content/1'), round1.handler).subscribe();
+      expect(round1.calls()).toEqual([`${PRIMARY}/db/content/1`, `${FALLBACK}/db/content/1`]);
+
+      // Well past the reprobe TTL, but this is a POST: it must not gamble a
+      // non-idempotent write on an unverified (possibly still-down) primary.
+      clock += 60_000;
+      const postHandler = scriptedHandler(['success']);
+      apiBaseUrlInterceptor(
+        new HttpRequest('POST', '/api/v1/mastery', {}),
+        postHandler.handler
+      ).subscribe();
+      expect(postHandler.calls()).toEqual([`${FALLBACK}/api/v1/mastery`]);
+
+      nowSpy.mockRestore();
+    });
+
+    it('(g) FIX 3: a black-holed (never-responding) primary still fails over via the per-attempt timeout', async () => {
+      vi.useFakeTimers();
+      try {
+        const calls: string[] = [];
+        let attempts = 0;
+        const handler: HttpHandlerFn = (r): Observable<HttpEvent<unknown>> => {
+          calls.push(r.url);
+          attempts++;
+          if (attempts === 1) {
+            // Black hole: never emits a next, error, or complete.
+            return NEVER;
+          }
+          return of(new HttpResponse({ status: 200, url: r.url }) as HttpEvent<unknown>);
+        };
+
+        let completed = false;
+        apiBaseUrlInterceptor(new HttpRequest('GET', '/db/content/1'), handler).subscribe(
+          () => (completed = true)
+        );
+
+        // Primary is black-holed — no status-0 ever arrives, so nothing
+        // happens yet without a per-attempt timeout.
+        expect(calls).toEqual([`${PRIMARY}/db/content/1`]);
+        expect(completed).toBe(false);
+
+        // Advance past the per-attempt timeout (8000ms, matched to
+        // ElohimClient's DEFAULT_ATTEMPT_TIMEOUT_MS) — the timed-out attempt
+        // is treated as a network failure and fails over to the fallback.
+        await vi.advanceTimersByTimeAsync(8100);
+
+        expect(calls).toEqual([`${PRIMARY}/db/content/1`, `${FALLBACK}/db/content/1`]);
+        expect(completed).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('(h) FIX 3: a non-retriable POST never gets a per-attempt timeout applied', async () => {
+      vi.useFakeTimers();
+      try {
+        const calls: string[] = [];
+        const handler: HttpHandlerFn = (r): Observable<HttpEvent<unknown>> => {
+          calls.push(r.url);
+          return NEVER; // Would time out if a timeout were (wrongly) applied.
+        };
+
+        let settled = false;
+        apiBaseUrlInterceptor(new HttpRequest('POST', '/api/v1/mastery', {}), handler).subscribe({
+          next: () => (settled = true),
+          error: () => (settled = true),
+        });
+
+        // Advance well past the per-attempt timeout window — a write must
+        // never be aborted by it; the request should still be hanging (not
+        // settled, not retried against another host).
+        await vi.advanceTimersByTimeAsync(60_000);
+
+        expect(calls).toEqual([`${PRIMARY}/api/v1/mastery`]);
+        expect(settled).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('(c) SSR guard: with no browser location, passes through untouched and never reads/writes sticky state', () => {

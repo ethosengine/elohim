@@ -6,9 +6,9 @@ import {
   HttpResponse,
 } from '@angular/common/http';
 
-import { catchError, tap } from 'rxjs/operators';
+import { catchError, tap, timeout } from 'rxjs/operators';
 
-import { Observable, throwError } from 'rxjs';
+import { Observable, TimeoutError, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 
@@ -19,6 +19,26 @@ const DOORWAY_PATH_PREFIXES = ['/api/', '/db/', '/blob/', '/apps/', '/health'];
 // after the request left the client can't distinguish "never arrived" from
 // "arrived, processed, response lost."
 const RETRIABLE_METHODS = new Set(['GET', 'HEAD']);
+
+// Per-attempt timeout so a black-holing (packet-dropping) host that never
+// produces a status-0 response still triggers failover — consistent with
+// ElohimClient's per-attempt default (elohim-client.ts DEFAULT_ATTEMPT_TIMEOUT_MS).
+// Applied ONLY to retriable (GET/HEAD) attempts: a non-retriable write is
+// tried exactly once and must be allowed to run to completion — injecting a
+// timeout here risks aborting an in-flight, non-idempotent write that would
+// otherwise have succeeded, with no safe retry available (same reasoning as
+// the ElohimClient SDK's non-retriable-write timeout exemption).
+const PER_ATTEMPT_TIMEOUT_MS = 8000;
+
+// How long a sticky preference for a fallback host is trusted before a
+// retriable (GET/HEAD) request is used to re-probe the primary. Without
+// this, a transient primary blip permanently strands the session on the
+// fallback even after the primary recovers, because a healthy fallback is
+// always tried first and a success never gives the primary another chance.
+// Only read traffic re-probes — see `buildCandidates`'s `allowReprobe` — a
+// write always trusts the current sticky preference rather than gambling a
+// non-idempotent request on an unverified host.
+const PRIMARY_REPROBE_INTERVAL_MS = 30000;
 
 function isAbsolute(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://');
@@ -88,9 +108,23 @@ function resolveBaseUrl(): string {
  */
 let preferredBase: string | null = null;
 
+/**
+ * Timestamp (`Date.now()`) of the last time `preferredBase` was set (to a
+ * fallback OR reconfirmed reachable). Drives the primary-recovery re-probe
+ * in `buildCandidates` — see `PRIMARY_REPROBE_INTERVAL_MS`.
+ */
+let preferredSetAt = 0;
+
 /** Test-only: reset sticky failover state between specs. */
 export function resetDoorwayFailoverState(): void {
   preferredBase = null;
+  preferredSetAt = 0;
+}
+
+/** Records a newly-confirmed (or newly-assumed) sticky preference with its timestamp. */
+function setPreferredBase(base: string | null): void {
+  preferredBase = base;
+  preferredSetAt = Date.now();
 }
 
 function normalizeHost(url: string): string {
@@ -114,19 +148,40 @@ function dedupe(items: string[]): string[] {
  * resolved primary, then the configured fallbacks — deduped after
  * normalization so the primary is never dropped just because it's also
  * sticky, and duplicate/repeated fallback entries collapse to one hop.
+ *
+ * `allowReprobe` (true only for retriable GET/HEAD requests) re-orders the
+ * ladder to try the PRIMARY first once the sticky fallback preference is
+ * older than `PRIMARY_REPROBE_INTERVAL_MS` — otherwise a healthy fallback is
+ * always tried first and a recovered primary never gets a chance to answer
+ * again. The fallback stays in the ladder as the very next candidate, so a
+ * still-down primary fails over exactly as before. Write-shaped calls never
+ * reorder: they always trust whichever host is currently sticky rather than
+ * gambling a non-idempotent request on an unverified host.
  */
-function buildCandidates(effectivePrimary: string): string[] {
+function buildCandidates(effectivePrimary: string, allowReprobe: boolean): string[] {
   const fallbacks = (environment.client?.doorwayFallbacks ?? []).map(normalizeHost);
-  const raw = [
-    ...(preferredBase ? [normalizeHost(preferredBase)] : []),
-    normalizeHost(effectivePrimary),
-    ...fallbacks,
-  ];
+  const primary = normalizeHost(effectivePrimary);
+  const sticky = preferredBase ? normalizeHost(preferredBase) : null;
+
+  const reprobeDue =
+    allowReprobe &&
+    sticky !== null &&
+    sticky !== primary &&
+    Date.now() - preferredSetAt >= PRIMARY_REPROBE_INTERVAL_MS;
+
+  const raw = reprobeDue
+    ? [primary, sticky, ...fallbacks]
+    : [...(sticky ? [sticky] : []), primary, ...fallbacks];
+
   return dedupe(raw);
 }
 
 function isNetworkFailure(err: unknown): boolean {
-  return err instanceof HttpErrorResponse && err.status === 0;
+  if (err instanceof HttpErrorResponse && err.status === 0) return true;
+  // A per-attempt timeout (FIX 3) means the host black-holed the request —
+  // no status ever arrived, so it must be treated the same as a network
+  // failure (status 0) for failover purposes.
+  return err instanceof TimeoutError;
 }
 
 function rewriteTo(req: HttpRequest<unknown>, base: string): HttpRequest<unknown> {
@@ -148,23 +203,31 @@ export const apiBaseUrlInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   const effectivePrimary = resolveBaseUrl() || origin;
-  const candidates = buildCandidates(effectivePrimary);
   const isRetriable = RETRIABLE_METHODS.has(req.method.toUpperCase());
+  const candidates = buildCandidates(effectivePrimary, isRetriable);
 
-  const attempt = (currentBase: string, remaining: string[]): Observable<HttpEvent<unknown>> =>
-    next(rewriteTo(req, currentBase)).pipe(
+  const attempt = (currentBase: string, remaining: string[]): Observable<HttpEvent<unknown>> => {
+    // Per-attempt timeout (FIX 3) — ONLY for retriable GET/HEAD requests, so
+    // a black-holing host still fails over even though it never produces a
+    // status-0 response. A non-retriable write is tried exactly once and
+    // must run to completion; injecting a timeout there could abort an
+    // in-flight, non-idempotent write that would otherwise have succeeded.
+    const response$ = next(rewriteTo(req, currentBase));
+    const withTimeout$ = isRetriable ? response$.pipe(timeout(PER_ATTEMPT_TIMEOUT_MS)) : response$;
+
+    return withTimeout$.pipe(
       tap(event => {
         // Only a genuine HttpResponse confirms the host is reachable —
         // HttpSentEvent fires at dispatch, before any network confirmation.
         if (event instanceof HttpResponse) {
-          preferredBase = currentBase;
+          setPreferredBase(currentBase);
         }
       }),
       catchError((err: unknown) => {
         if (!isNetworkFailure(err)) {
           // The host answered (even with an error status) — it's reachable,
           // never fail over on a non-zero status.
-          preferredBase = currentBase;
+          setPreferredBase(currentBase);
           return throwError(() => err);
         }
 
@@ -177,13 +240,14 @@ export const apiBaseUrlInterceptor: HttpInterceptorFn = (req, next) => {
           // Duplicate-write risk: don't re-issue. The failure already proves
           // currentBase is down, so steer subsequent requests to the
           // fallback without verifying it.
-          preferredBase = nextBase;
+          setPreferredBase(nextBase);
           return throwError(() => err);
         }
 
         return attempt(nextBase, rest);
       })
     );
+  };
 
   const [first, ...rest] = candidates;
   return attempt(first, rest);

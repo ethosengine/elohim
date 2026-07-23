@@ -171,6 +171,13 @@ export class ElohimClient {
    */
   private activeDoorwayUrl: string | null = null;
 
+  /**
+   * Default per-attempt abort timeout (ms) for idempotent GET/HEAD failover
+   * probing — NOT applied to non-retriable writes (see
+   * `withPerAttemptTimeout` / code-review finding on flushWriteBuffer).
+   */
+  private static readonly DEFAULT_ATTEMPT_TIMEOUT_MS = 8000;
+
   constructor(config: ElohimClientConfig) {
     this.mode = config.mode;
     this.holochain = config.holochain;
@@ -409,11 +416,19 @@ export class ElohimClient {
       // failure — duplicate-write risk. GET/HEAD fail over across hosts.
       const method = (options?.method ?? 'GET').toUpperCase();
       const allowFailover = method === 'GET' || method === 'HEAD';
+      // Only idempotent GET/HEAD failover-probing gets the default per-attempt
+      // timeout — a non-retriable write (POST/PUT/etc.) is tried exactly once
+      // and must be allowed to run to completion; injecting an abort here
+      // could cancel an in-flight non-idempotent write that would otherwise
+      // have succeeded, with no safe retry available.
       response = await this.fetchWithFailover(
         mode,
         baseUrl => `${baseUrl}${path}`,
         { ...options, headers },
-        { allowFailover }
+        {
+          allowFailover,
+          timeoutMs: allowFailover ? ElohimClient.DEFAULT_ATTEMPT_TIMEOUT_MS : undefined,
+        }
       );
     }
 
@@ -444,18 +459,24 @@ export class ElohimClient {
    * — retrying a write on a different host risks a duplicate — but still
    * advance the sticky preference on failure so the NEXT call skips the
    * unreachable host.
+   *
+   * `opts.timeoutMs` controls the per-attempt abort injected when the caller
+   * supplies no signal (see `withPerAttemptTimeout`). Pass `undefined` for
+   * non-retriable writes — a single-shot, non-idempotent request must be
+   * allowed to run to completion rather than risk an 8s abort killing an
+   * in-flight write that would otherwise have succeeded.
    */
   private async fetchWithFailover(
     mode: BrowserMode,
     buildUrl: (baseUrl: string) => string,
     init: RequestInit | undefined,
-    opts: { allowFailover: boolean }
+    opts: { allowFailover: boolean; timeoutMs?: number }
   ): Promise<Response> {
     const hosts = this.candidateDoorwayHosts(mode);
 
     for (let i = 0; i < hosts.length; i++) {
       const host = hosts[i];
-      const attemptInit = this.withPerAttemptTimeout(init);
+      const attemptInit = this.withPerAttemptTimeout(init, opts.timeoutMs);
 
       // .then/.catch attached synchronously on the fetch() call itself, not
       // via await + try/catch — zone.js checks for unhandled rejections at
@@ -522,12 +543,18 @@ export class ElohimClient {
     return url.replace(/\/+$/, '');
   }
 
-  /** Respect a caller-supplied AbortSignal; otherwise cap each attempt so a black-holing host can't stall failover. */
-  private withPerAttemptTimeout(init?: RequestInit): RequestInit {
-    if (init?.signal) {
-      return init;
+  /**
+   * Respect a caller-supplied AbortSignal; otherwise cap each attempt at
+   * `timeoutMs` so a black-holing host can't stall failover. When
+   * `timeoutMs` is `undefined` (non-retriable writes), NO abort is injected
+   * — the request runs to natural completion instead of risking cancellation
+   * of an in-flight, non-idempotent write.
+   */
+  private withPerAttemptTimeout(init?: RequestInit, timeoutMs?: number): RequestInit {
+    if (init?.signal || timeoutMs === undefined) {
+      return { ...init };
     }
-    return { ...init, signal: AbortSignal.timeout(8000) };
+    return { ...init, signal: AbortSignal.timeout(timeoutMs) };
   }
 
   private async fetchFromTauri<T>(
@@ -589,7 +616,7 @@ export class ElohimClient {
         mode,
         baseUrl => `${baseUrl}/db/content/${id}`,
         { headers },
-        { allowFailover: true }
+        { allowFailover: true, timeoutMs: ElohimClient.DEFAULT_ATTEMPT_TIMEOUT_MS }
       );
     }
 
@@ -635,7 +662,7 @@ export class ElohimClient {
         mode,
         baseUrl => `${baseUrl}/db/content?${params}`,
         { headers },
-        { allowFailover: true }
+        { allowFailover: true, timeoutMs: ElohimClient.DEFAULT_ATTEMPT_TIMEOUT_MS }
       );
     }
     if (!response.ok) {
@@ -683,6 +710,12 @@ export class ElohimClient {
         // Write-shaped: no auto-retry on network failure (duplicate-write
         // risk) — the error propagates, but the sticky preference still
         // advances so the NEXT flush skips the unreachable host.
+        //
+        // No `timeoutMs` (no default abort injected): this is a non-retriable
+        // bulk write — an 8s abort could kill an in-flight, non-idempotent
+        // write that would otherwise have succeeded, with no safe retry.
+        // Callers that need a bound on this request must supply their own
+        // `signal` via `options`/`init`.
         response = await this.fetchWithFailover(
           mode,
           baseUrl => `${baseUrl}/db/content/bulk`,
