@@ -38,3 +38,21 @@ fn rust_reach_matches_schema_enum_exactly() {
         "elohim_epr::Reach diverged from reach.schema.json — the schema is the source of record; fix the Rust side (or run the schema-change process, never hand-drift)"
     );
 }
+
+/// Compile-time exhaustiveness guard: if `Reach` gains a variant, this match
+/// stops compiling until the variant is added here — forcing `ALL` above (and
+/// the schema) to be revisited. Mirrors the exhaustive-match guard in
+/// elohim/epr/src/reach.rs tests.
+#[allow(dead_code)]
+const fn assert_reach_exhaustive(r: Reach) {
+    match r {
+        Reach::Private
+        | Reach::SelfScope
+        | Reach::Intimate
+        | Reach::Trusted
+        | Reach::Familiar
+        | Reach::Community
+        | Reach::Public
+        | Reach::Commons => (),
+    }
+}
