@@ -191,4 +191,28 @@ describe('DistributionBadgeComponent (elohim-library)', () => {
     // household_archetypes hint should produce a label mentioning household or archetype diversity
     expect(tooltip.textContent).toMatch(/household|archetype|replicas/i);
   });
+
+  // reachIcon: schema-8 coverage (private, self, intimate, trusted, familiar,
+  // community, public, commons) — see reach-vocabulary-frontend-strand backlog.
+
+  it.each([
+    'private',
+    'self',
+    'intimate',
+    'trusted',
+    'familiar',
+    'community',
+    'public',
+    'commons',
+  ] as const)('reachIcon("%s") returns a labeled icon, not the raw value', (reach) => {
+    const result = fixture.componentInstance.reachIcon(reach);
+    expect(result).not.toBe(reach);
+  });
+
+  it('reachIcon falls through to the raw string for an unrecognized value', () => {
+    const result = fixture.componentInstance.reachIcon(
+      'unrecognized' as DistributionSummary['reachClass'],
+    );
+    expect(result).toBe('unrecognized');
+  });
 });

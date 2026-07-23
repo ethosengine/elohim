@@ -37,6 +37,22 @@ const GAP_KIND_LABELS: Record<string, string> = {
   reach_class: 'Reach class',
 };
 
+/**
+ * Schema-8 reach vocabulary (elohim/sdk/schemas/v1/enums/reach.schema.json) →
+ * badge icon + label. Fallthrough in reachIcon() returns the raw string only
+ * for future-proofing against an as-yet-uncovered value.
+ */
+const REACH_ICONS: Record<string, string> = {
+  private: '🔒 private',
+  self: '🔒 self',
+  intimate: '🔒 peer-only',
+  trusted: '🤝 trusted',
+  familiar: '🤝 familiar',
+  community: '🏘️ community',
+  public: '🌐 public',
+  commons: '🌍 commons',
+};
+
 @Component({
   selector: 'elohim-distribution-badge',
   standalone: true,
@@ -143,10 +159,7 @@ export class DistributionBadgeComponent implements OnChanges {
   }
 
   reachIcon(reach: DistributionSummary['reachClass']): string {
-    if (reach === 'private') return '🔒 private';
-    if (reach === 'intimate') return '🔒 peer-only';
-    if (reach === 'public') return '🌐 public';
-    return reach;
+    return REACH_ICONS[reach] ?? reach;
   }
 
   dotIndices(count: number): number[] {
