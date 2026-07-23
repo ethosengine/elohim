@@ -29,14 +29,18 @@
  */
 
 // ============================================================================
-// REACH LEVELS - Graduated Visibility
+// LOCALITY LEVELS - Graduated Visibility
 // ============================================================================
 
 /**
- * ReachLevel - Geographic/jurisdictional scope of visibility.
+ * LocalityLevel — geographic/placement scope (dataplane: replication, eviction,
+ * caching). RENAMED from "ReachLevel" 2026-07-23: this vocabulary is NOT
+ * declared content reach (that is the schema-8 `Reach` enum, generated from
+ * elohim/sdk/schemas/v1/enums/reach.schema.json). See spec:
+ * reach-ontology-vocabulary-split-spec §1.
  *
  * These represent concentric geographic circles, each containing the previous.
- * Reach answers: "How far can this travel geographically?"
+ * Locality answers: "How far can this travel geographically?"
  *
  * Note: This is separate from AffinityScope (interest-based filtering)
  * and federation (whether content crosses instance boundaries).
@@ -47,7 +51,7 @@
  * - Economic layer: TokenReach (where value can flow geographically)
  * - Imago Dei: IdentityReach (geographic scope of identity disclosure)
  */
-export type ReachLevel =
+export type LocalityLevel =
   | 'private' // Only the agent themselves (and their Elohim)
   | 'invited' // Explicitly invited individuals (regardless of location)
   | 'local' // Household/immediate dwelling
@@ -58,9 +62,9 @@ export type ReachLevel =
   | 'commons'; // Globally public
 
 /**
- * Numeric values for reach levels for comparison operations.
+ * Numeric values for locality levels for comparison operations.
  */
-export const REACH_LEVEL_VALUES: Record<ReachLevel, number> = {
+export const LOCALITY_LEVEL_VALUES: Record<LocalityLevel, number> = {
   private: 0,
   invited: 1,
   local: 2,
@@ -71,6 +75,11 @@ export const REACH_LEVEL_VALUES: Record<ReachLevel, number> = {
   commons: 7,
 };
 
+/** @deprecated Renamed 2026-07-23 — use LocalityLevel. Burn-down tracked in reach-vocabulary-frontend-strand. */
+export type ReachLevel = LocalityLevel;
+/** @deprecated Renamed 2026-07-23 — use LOCALITY_LEVEL_VALUES. */
+export const REACH_LEVEL_VALUES = LOCALITY_LEVEL_VALUES;
+
 // ============================================================================
 // AFFINITY SCOPE - Interest-Based Community Filtering
 // ============================================================================
@@ -78,7 +87,7 @@ export const REACH_LEVEL_VALUES: Record<ReachLevel, number> = {
 /**
  * AffinityScope - Interest/community filter for content visibility.
  *
- * Unlike ReachLevel (geographic), AffinityScope filters by community membership
+ * Unlike LocalityLevel (geographic), AffinityScope filters by community membership
  * regardless of location. A 'denomination' scope might span continents.
  *
  * Affinity answers: "Who is this *for*, regardless of where they are?"
@@ -108,7 +117,7 @@ export type AffinityScope =
  */
 export interface ContentVisibility {
   /** Geographic scope - concentric circles */
-  reach: ReachLevel;
+  reach: LocalityLevel;
 
   /** Interest-based filter - who this is for */
   affinity: AffinityScope;
@@ -118,11 +127,14 @@ export interface ContentVisibility {
 }
 
 /**
- * Check if source reach encompasses target reach.
+ * Check if source locality encompasses target locality.
  */
-export function reachEncompasses(source: ReachLevel, target: ReachLevel): boolean {
-  return REACH_LEVEL_VALUES[source] >= REACH_LEVEL_VALUES[target];
+export function localityEncompasses(source: LocalityLevel, target: LocalityLevel): boolean {
+  return LOCALITY_LEVEL_VALUES[source] >= LOCALITY_LEVEL_VALUES[target];
 }
+
+/** @deprecated Renamed 2026-07-23 — use localityEncompasses. */
+export const reachEncompasses = localityEncompasses;
 
 // ============================================================================
 // INTIMACY LEVELS - Graduated Relationship Depth
@@ -322,7 +334,7 @@ export interface GeographicContext {
   displayName: string;
 
   /** Who can see this location information */
-  reach: ReachLevel;
+  reach: LocalityLevel;
 
   /** Optional coordinates (only if reach allows) */
   coordinates?: {
@@ -475,7 +487,7 @@ export interface Attestation {
   governanceLayer?: GovernanceLayer;
 
   /** Reach of this attestation (who can see it) */
-  reach: ReachLevel;
+  reach: LocalityLevel;
 
   /** Cryptographic proof (for verified credentials) */
   proof?: {
@@ -868,7 +880,7 @@ export interface Identifiable {
  * Reachable - Entities with reach settings.
  */
 export interface Reachable {
-  reach: ReachLevel;
+  reach: LocalityLevel;
 }
 
 /**

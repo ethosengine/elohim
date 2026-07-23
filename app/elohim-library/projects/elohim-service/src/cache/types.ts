@@ -9,14 +9,15 @@
  */
 
 // ============================================================================
-// Reach Levels (Elohim Protocol Constants)
+// Locality Levels (Elohim Protocol Constants)
 // ============================================================================
+// Mirrors LOCALITY_LEVEL_VALUES in @elohim/storage-client/protocol-core.model.ts — keep in sync (no dep edge; see reach-vocabulary-frontend-strand).
 
 /**
- * Content reach levels - concentric circles of visibility.
+ * Content locality levels - concentric circles of visibility.
  * Lower numbers = more private, higher = more public.
  */
-export const ReachLevel = {
+export const LocalityLevel = {
   /** Only visible to author */
   PRIVATE: 0,
   /** Visible to explicitly invited agents */
@@ -35,7 +36,12 @@ export const ReachLevel = {
   COMMONS: 7,
 } as const;
 
-export type ReachLevelType = (typeof ReachLevel)[keyof typeof ReachLevel];
+export type LocalityLevelType = (typeof LocalityLevel)[keyof typeof LocalityLevel];
+
+/** @deprecated Renamed 2026-07-23 — use LocalityLevel. Kept so `cache/index.ts`'s barrel re-export stays green without an out-of-scope edit. */
+export const ReachLevel = LocalityLevel;
+/** @deprecated Renamed 2026-07-23 — use LocalityLevelType. */
+export type ReachLevelType = LocalityLevelType;
 
 // ============================================================================
 // Mastery Levels (Bloom's Taxonomy for content freshness)
@@ -65,7 +71,7 @@ export interface CacheEntryMetadata {
   createdAt: number;
   lastAccessedAt: number;
   accessCount: number;
-  reachLevel: ReachLevelType;
+  reachLevel: LocalityLevelType;
   domain: string;
   epic: string;
   priority: number;

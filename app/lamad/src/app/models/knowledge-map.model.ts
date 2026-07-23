@@ -27,6 +27,8 @@
  * - Private maps on source chain, shared maps on DHT
  */
 
+import type { Reach } from '../../generated/schema-enums';
+
 /**
  * KnowledgeMapType - The four flavors of knowledge territory.
  *
@@ -497,8 +499,15 @@ export interface AssessmentInstrument {
   /** Original source (if adapting existing instrument) */
   derivedFrom?: InstrumentDerivation;
 
-  /** Content reach - same model as ContentNode */
-  reach: 'private' | 'invited' | 'local' | 'community' | 'federated' | 'commons';
+  /**
+   * Declared visibility for this instrument (schema-8 Reach).
+   * NOTE: ContentNode.reach is a different, geographic vocabulary
+   * (ContentReach = LocalityLevel — see content-node.model.ts) despite
+   * historically sharing this field's doc comment; this field types the
+   * declared-visibility Reach enum instead, since that is this field's
+   * actual purpose (who may see the instrument, not where it may travel).
+   */
+  reach: Reach;
 
   /** Recognition flows when instrument is used */
   recognitionModel: InstrumentRecognitionModel;

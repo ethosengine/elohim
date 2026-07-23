@@ -39,15 +39,15 @@
     "reachClass": {
       "enum": [
         "private",
+        "self",
         "intimate",
-        "household",
-        "neighborhood",
-        "collective",
+        "trusted",
+        "familiar",
         "community",
-        "district",
-        "public"
+        "public",
+        "commons"
       ],
-      "description": "Reach band the content is authored at — drives target replica count."
+      "description": "Reach band the content is authored at — drives target replica count. Schema-8 vocabulary (elohim/sdk/schemas/v1/enums/reach.schema.json); see reach-vocabulary-frontend-strand backlog for the multi-vocabulary reconciliation history."
     },
     "diversityHint": {
       "$ref": "diversity-hint.schema.json",

@@ -349,16 +349,6 @@ export interface HolochainContentRelationship {
 // Constants
 // =============================================================================
 
-/** Valid reach levels matching Rust validation */
-export const VALID_REACH_LEVELS = [
-  'private',
-  'invited',
-  'local',
-  'community',
-  'federated',
-  'commons',
-] as const;
-
 /** Valid relationship types matching Rust validation */
 export const VALID_RELATIONSHIP_TYPES = [
   'CONTAINS',
@@ -379,7 +369,6 @@ export const VALID_RELATIONSHIP_TYPES = [
 export const VALID_DIFFICULTY_LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
 
 // Type aliases from constants
-export type ValidReachLevel = (typeof VALID_REACH_LEVELS)[number];
 export type ValidRelationshipType = (typeof VALID_RELATIONSHIP_TYPES)[number];
 export type ValidDifficultyLevel = (typeof VALID_DIFFICULTY_LEVELS)[number];
 

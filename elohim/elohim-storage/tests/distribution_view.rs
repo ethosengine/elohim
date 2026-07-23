@@ -42,16 +42,29 @@ fn replica_health_thresholds() {
 #[test]
 fn replica_target_increases_with_reach() {
     let private = replica_target_for(&ReachClass::Private);
-    let household = replica_target_for(&ReachClass::Household);
+    let trusted = replica_target_for(&ReachClass::Trusted);
     let public = replica_target_for(&ReachClass::Public);
     assert!(
-        private < household,
-        "Private target ({private}) must be < Household target ({household})"
+        private < trusted,
+        "Private target ({private}) must be < Trusted target ({trusted})"
     );
     assert!(
-        household < public,
-        "Household target ({household}) must be < Public target ({public})"
+        trusted < public,
+        "Trusted target ({trusted}) must be < Public target ({public})"
     );
+}
+
+/// Reach-vocab slice 2: declared "trusted" (schema-8) must yield the pinned
+/// ladder value, not degrade to the Private floor.
+#[test]
+fn replica_target_trusted_is_six() {
+    assert_eq!(replica_target_for(&ReachClass::Trusted), 6);
+}
+
+/// Declared "commons" (schema-8 top rung) must yield the pinned ladder max.
+#[test]
+fn replica_target_commons_is_sixteen() {
+    assert_eq!(replica_target_for(&ReachClass::Commons), 16);
 }
 
 // ============================================================================
@@ -312,6 +325,74 @@ async fn summary_unknown_blob_defaults_to_private_zero_replicas() {
         "0/2 < 0.5 → Critical"
     );
     assert_eq!(summary.replica_target, 2);
+}
+
+/// Reach-vocab slice 2 (the fix this task ships): content declaring schema-8
+/// "trusted" must compose to replica_target 6, not degrade to the Private
+/// floor of 2 via `parse_reach_class`'s `unwrap_or(ReachClass::Private)`.
+#[tokio::test]
+async fn summary_declared_trusted_yields_replica_target_six() {
+    let pool = test_pool();
+    {
+        let mut conn = pool.get().unwrap();
+        let hash = "hash_declared_trusted";
+        seed_content_with_reach(&mut conn, hash, "trusted");
+        seed_inventory(&mut conn, "peer-trusted-1", hash);
+    }
+
+    let summary =
+        compose_distribution_summary(&pool, "hash_declared_trusted", DistributionContext::Visitor)
+            .await
+            .expect("compose should succeed");
+
+    assert_eq!(summary.reach_class, ReachClass::Trusted);
+    assert_eq!(
+        summary.replica_target, 6,
+        "declared 'trusted' must not degrade to the Private floor of 2"
+    );
+}
+
+/// Content declaring schema-8 "commons" (the new top rung) must compose to
+/// the pinned ladder max of 16 replicas.
+#[tokio::test]
+async fn summary_declared_commons_yields_replica_target_sixteen() {
+    let pool = test_pool();
+    {
+        let mut conn = pool.get().unwrap();
+        let hash = "hash_declared_commons";
+        seed_content_with_reach(&mut conn, hash, "commons");
+        seed_inventory(&mut conn, "peer-commons-1", hash);
+    }
+
+    let summary =
+        compose_distribution_summary(&pool, "hash_declared_commons", DistributionContext::Visitor)
+            .await
+            .expect("compose should succeed");
+
+    assert_eq!(summary.reach_class, ReachClass::Commons);
+    assert_eq!(summary.replica_target, 16);
+}
+
+/// Legacy stored declared-reach "household" (pre-slice-1 kebab-8 vocabulary)
+/// must alias-parse to Trusted, not fall through `parse_reach_class`'s `None`
+/// arm into the Private floor.
+#[tokio::test]
+async fn summary_legacy_stored_household_aliases_to_trusted() {
+    let pool = test_pool();
+    {
+        let mut conn = pool.get().unwrap();
+        let hash = "hash_legacy_household";
+        seed_content_with_reach(&mut conn, hash, "household");
+        seed_inventory(&mut conn, "peer-legacy-1", hash);
+    }
+
+    let summary =
+        compose_distribution_summary(&pool, "hash_legacy_household", DistributionContext::Visitor)
+            .await
+            .expect("compose should succeed");
+
+    assert_eq!(summary.reach_class, ReachClass::Trusted);
+    assert_eq!(summary.replica_target, 6);
 }
 
 #[tokio::test]

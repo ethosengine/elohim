@@ -52,6 +52,17 @@ describe('ContentNode Model', () => {
     });
   });
 
+  /**
+   * NOTE (reach-vocab-slice2, 2026-07-23): `ContentReach` here is elohim-service's OWN
+   * still-live retired-6 vocabulary (content-node.model.ts:46) — a site missed by the
+   * slice-1 retirement of `VALID_REACH_LEVELS` (holochain.model.ts, deleted) and distinct
+   * from lamad's `ContentReach` (renamed to alias `LocalityLevel` in slice 2 Task 1). It
+   * also duplicates `trust.service.ts`'s own local `ReachLevel` type, which has ~40 further
+   * literal 'invited'/'local'/'community'/'federated' usages across this package's specs
+   * (trust.service.spec.ts, conductor-normalizer.spec.ts, epr-ref.spec.ts). That blast
+   * radius is out of scope for slice 2 — flagged for a dedicated future migration task
+   * rather than swept in here. This fixture stays accurate to the still-unmigrated type.
+   */
   describe('ContentReach', () => {
     it('should include all valid reach levels', () => {
       const reaches: ContentReach[] = [

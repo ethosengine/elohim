@@ -26,12 +26,10 @@ import {
   ZomeCallResult,
   VALID_CONTENT_TYPES,
   VALID_CONTENT_FORMATS,
-  VALID_REACH_LEVELS,
   VALID_RELATIONSHIP_TYPES,
   VALID_DIFFICULTY_LEVELS,
   ValidContentType,
   ValidContentFormat,
-  ValidReachLevel,
   ValidRelationshipType,
   ValidDifficultyLevel
 } from './holochain.model';
@@ -82,21 +80,6 @@ describe('Holochain Model', () => {
       });
     });
 
-    describe('VALID_REACH_LEVELS', () => {
-      it('should contain all valid reach levels', () => {
-        expect(VALID_REACH_LEVELS).toContain('private');
-        expect(VALID_REACH_LEVELS).toContain('invited');
-        expect(VALID_REACH_LEVELS).toContain('local');
-        expect(VALID_REACH_LEVELS).toContain('community');
-        expect(VALID_REACH_LEVELS).toContain('federated');
-        expect(VALID_REACH_LEVELS).toContain('commons');
-      });
-
-      it('should have exactly 6 reach levels', () => {
-        expect(VALID_REACH_LEVELS).toHaveLength(6);
-      });
-    });
-
     describe('VALID_RELATIONSHIP_TYPES', () => {
       it('should contain all valid relationship types', () => {
         expect(VALID_RELATIONSHIP_TYPES).toContain('CONTAINS');
@@ -140,11 +123,6 @@ describe('Holochain Model', () => {
     it('should accept valid content format', () => {
       const format: ValidContentFormat = 'markdown';
       expect(format).toBe('markdown');
-    });
-
-    it('should accept valid reach level', () => {
-      const reach: ValidReachLevel = 'commons';
-      expect(reach).toBe('commons');
     });
 
     it('should accept valid relationship type', () => {

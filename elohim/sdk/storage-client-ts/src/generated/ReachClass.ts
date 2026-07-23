@@ -3,5 +3,13 @@
 /**
  * Reach class for a CID — mirrors the protocol Reach enum's content-distribution
  * classes. Drives target replica count and badge tier.
+ *
+ * Schema-8 vocabulary (`elohim/sdk/schemas/v1/enums/reach.schema.json`,
+ * mirrored by `elohim_epr::Reach`) — see the reach-vocabulary-frontend-strand
+ * backlog for the multi-vocabulary reconciliation history. `SelfScope`
+ * serializes as exactly `"self"` (verified by
+ * `distribution_view::tests::self_scope_serializes_as_self`), not
+ * `"self_scope"`, because `self` is a Rust reserved word and cannot be a
+ * variant name.
  */
-export type ReachClass = "private" | "intimate" | "household" | "neighborhood" | "collective" | "community" | "district" | "public";
+export type ReachClass = "private" | "self" | "intimate" | "trusted" | "familiar" | "community" | "public" | "commons";

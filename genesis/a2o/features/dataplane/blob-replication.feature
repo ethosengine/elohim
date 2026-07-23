@@ -38,3 +38,25 @@ Feature: Blob replication — EPR blobHash metadata propagation to federation pe
     #     blobHash is null — blob not yet attached
     # When it passes, EPR metadata has replicated and elohim.host can serve the landing app.
     Then EPR "elohim-host-landing" blobHash is non-null on peer "elohim.host"
+
+  # ── Harvested 2026-07-23 (shift/reach-vocab-slice2): replica targets track declared reach ──
+  # Constraint discovered: distribution's ReachClass parsed declared-reach strings
+  # with unwrap_or(Private) — after the vocabulary went schema-8, every declared
+  # "trusted"/"familiar"/"commons" row silently fell to the Private 2-replica
+  # floor. Vocabulary drift between a declared enum and its projection enum is
+  # a RESILIENCE bug, not a naming bug: under-replication is invisible until
+  # hosts churn. Fixed view-schema-first (schema JSON → Rust → contract test →
+  # codegen); parse fallback stays conservative (unknown → Private/2).
+  # Operational parameters (pinned replica ladder): private 2 · self 2 ·
+  # intimate 4 · trusted 6 · familiar 8 · community 12 · public 14 · commons 16.
+  # Informs: peer-diversity presets, storage capacity planning per corpus mix.
+  # Open follow-up: pre-migration legacy "public" rows parse canonically to
+  # public/14 until the one-time public→commons backfill runs (strand doc).
+
+  @wip @regression
+  Scenario: Declared reach maps to its replica target — no silent floor collapse
+    Given content is declared at "trusted" reach
+    When the distribution view computes its replica target
+    Then the replica target is 6
+    And a declared "commons" content's replica target is 16
+    And an unrecognized reach string falls back to the conservative 2-replica private floor
