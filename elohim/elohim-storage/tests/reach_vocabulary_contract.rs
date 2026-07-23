@@ -31,7 +31,13 @@ fn rust_reach_matches_schema_enum_exactly() {
         .collect();
     let rust_values: Vec<String> = ALL
         .iter()
-        .map(|r| serde_json::to_value(r).unwrap().as_str().unwrap().to_string())
+        .map(|r| {
+            serde_json::to_value(r)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string()
+        })
         .collect();
     assert_eq!(
         rust_values, schema_values,
