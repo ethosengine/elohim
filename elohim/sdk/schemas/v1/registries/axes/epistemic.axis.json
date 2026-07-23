@@ -1,0 +1,67 @@
+{
+  "$id": "epr:registry:axis:epistemic",
+  "axis": "epistemic",
+  "version": 1,
+  "kind": "derived",
+  "semantics": "Communal standing of a claim — how emergent truth moves through peer review toward settled canon. This axis is a standing verdict derived at the evidence-holding edge (a deterministic fold over witnessed REA review events), never a stored status column, and it is explained by a witness (the checks/observations folded, not an opaque score). Every contest point routes to `refer`, never to silence: an active dispute is a first-class outcome of the classification, not an error state or a stale value.",
+  "orthogonalTo": [
+    "witness-ladder (evidentiary custody of the record: local -> peer-validated -> notarized; README.md:208)",
+    "epr:registry:axis:reach (visibility/disclosure — not yet carded)"
+  ],
+  "vocabulary": { "$ref": "epr:schema:enum:epistemic-status" },
+  "ordered": false,
+  "values": [
+    {
+      "value": "emergent",
+      "semantics": "A claim newly announced, not yet reviewed. Served honestly as emergent — never hidden, never inflated to look reviewed before it has been."
+    },
+    {
+      "value": "reviewed",
+      "semantics": "Accumulated peer-review events (Affirm weight, weighed against Dismiss) have crossed the minimum review count. This is the mechanical maximum a threshold alone can reach — it cannot promote further without a governance act."
+    },
+    {
+      "value": "contested",
+      "semantics": "Negative-polarity review weight is active and unresolved. `cite_gate` returns `refer` for a contested claim — never a silent resolution to either side, and never a default back to `emergent`."
+    },
+    {
+      "value": "canon",
+      "semantics": "Conferred only by a referenced governance act (a Mishpat Precedent lineage entry) — never by threshold alone. `classify()` is structurally unable to return `canon` without a `CanonizationRef` input."
+    },
+    {
+      "value": "superseded",
+      "semantics": "Terminal status, reached via close-interval by a successor claim. The original record remains queryable forever — supersession closes an interval, it does not erase history."
+    }
+  ],
+  "sourceOfRecord": {
+    "kind": "derived-fold",
+    "crate": "elohim-epr-rea",
+    "module": "src/epistemic.rs",
+    "note": "status is computed, never stored; reconstruction = re-fold over witnessed events in canonical CID order (sort-before-accumulate, so two peers fold byte-identically)"
+  },
+  "reviewEvents": {
+    "wireType": "elohim_epr::witness::WitnessedInteraction",
+    "verbs": ["Cite", "Affirm", "Dismiss"],
+    "polarityLaw": "systems cannot ship positive-only feedback (epr:schema:enum:observation-polarity) — Dismiss must be representable and weighed"
+  },
+  "relatedVocabularies": [
+    {
+      "name": "Precedent.status",
+      "path": "elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs:27",
+      "values": "active|superseded|under-review (free-text)",
+      "disposition": "future-formalize-against-this-enum"
+    },
+    {
+      "name": "place-status",
+      "path": "elohim/sdk/schemas/v1/enums/place-status.schema.json",
+      "disposition": "domain-instance-stays"
+    },
+    {
+      "name": "validation-status",
+      "disposition": "unrelated (storage migration health)"
+    }
+  ],
+  "graduation": {
+    "dnaNotarization": "deferred — adding a DNA constant moves integrity code; execute only as a deliberate DNA-lineage event",
+    "persistence": "review events graduate B2: .eprfs/status/ local floor -> content-store attestation content_type at push"
+  }
+}
