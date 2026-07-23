@@ -75,6 +75,15 @@ pub enum HeadStatus {
     Refreshing,
     /// The last re-materialize attempt failed; the OLD renderer is still served.
     Failed,
+    /// The renderer loaded (bytes ARE on disk and serving) but the boot-time
+    /// `serverBlobHash` attestation could not be CONFIRMED — the declared-head
+    /// read failed, or the head MOVED across the materialize window so we cannot
+    /// prove which hash the on-disk bytes verified against. The slug is kept in
+    /// the head table (NOT dropped) precisely so `reconcile` retries it every
+    /// tick and converges to a confirmed head; the health surface shows it as
+    /// `unresolved` so a probe/operator can distinguish it from a slug that is
+    /// genuinely absent.
+    Unresolved,
 }
 
 impl HeadStatus {
@@ -84,6 +93,7 @@ impl HeadStatus {
             HeadStatus::Stale => "stale",
             HeadStatus::Refreshing => "refreshing",
             HeadStatus::Failed => "failed",
+            HeadStatus::Unresolved => "unresolved",
         }
     }
 }
@@ -371,6 +381,18 @@ impl RendererRegistry {
             // `serverBlobHash` field (not the browser `blobHash`). On resolve
             // failure (e.g. serverBlobHash absent mid-migration) SSR for this
             // app stays off → CSR fallback, never a crash.
+            //
+            // Single-resolve TOCTOU guard (Track-4): capture the declared head
+            // BEFORE materialize so `boot_head` can re-resolve AFTER and attest
+            // a `current` head ONLY when the declared head was UNCHANGED across
+            // the whole materialize window (materialize's own internal resolve
+            // then provably read that same stable hash, so the bytes on disk
+            // verified against the hash we attest). On drift/failure the slug is
+            // registered `unresolved` (never dropped) so reconcile converges.
+            let pre = {
+                use elohim_render::BundleSource;
+                src.resolve_server_blob_hash(slug)
+            };
             match elohim_render::materialize_server_bundle(&src, slug, &bundle_parent) {
                 Ok(materialized) => {
                     tracing::info!(
@@ -379,9 +401,7 @@ impl RendererRegistry {
                         path = %materialized.display(),
                         "SSR server bundle materialized from substrate"
                     );
-                    if let Some(head) = boot_head(&src, slug) {
-                        heads.insert(slug.clone(), head);
-                    }
+                    heads.insert(slug.clone(), boot_head(&src, slug, pre));
                 }
                 Err(e) => {
                     tracing::warn!(
@@ -430,6 +450,13 @@ impl RendererRegistry {
                 );
                 continue;
             }
+            // Single-resolve TOCTOU guard (see the default-app branch): capture
+            // the declared head before materialize so `boot_head` can bracket the
+            // materialize window and only attest a confirmed hash.
+            let pre = {
+                use elohim_render::BundleSource;
+                src.resolve_server_blob_hash(slug)
+            };
             let materialized = match elohim_render::materialize_server_bundle(&src, slug, &app_dir)
             {
                 Ok(p) => {
@@ -467,9 +494,7 @@ impl RendererRegistry {
                         slug.clone(),
                         Arc::new(r) as Arc<dyn elohim_render::Renderer>,
                     ));
-                    if let Some(head) = boot_head(&src, slug) {
-                        heads.insert(slug.clone(), head);
-                    }
+                    heads.insert(slug.clone(), boot_head(&src, slug, pre));
                 }
                 Err(e) => {
                     tracing::warn!(
@@ -914,28 +939,87 @@ impl RendererRegistry {
     }
 }
 
-/// Boot-time head record for a slug whose bundle just materialized. Resolves the
-/// declared `serverBlobHash` for the attestation; returns `None` if the resolve
-/// fails (the renderer still loads — we just can't attest the head yet).
-fn boot_head(src: &crate::ssr::DoorwayBundleSource, slug: &str) -> Option<BundleHead> {
+/// Boot-time head record for a slug whose bundle just materialized.
+///
+/// TOCTOU-guarded single-resolve attestation. `pre` is the declared
+/// `serverBlobHash` resolved BEFORE `materialize_server_bundle` ran; this
+/// re-resolves it AFTER and delegates the decision to [`decide_boot_head`]:
+/// a `current` head is attested ONLY when the declared head was unchanged
+/// across the whole materialize window (so the bytes on disk provably verified
+/// against the hash we attest). On drift or resolve failure the slug is returned
+/// as an `unresolved` head — NEVER dropped — so `reconcile` retries it each tick
+/// and the health surface can distinguish "unresolved" from "absent".
+fn boot_head(
+    src: &crate::ssr::DoorwayBundleSource,
+    slug: &str,
+    pre: elohim_render::Result<String>,
+) -> BundleHead {
     use elohim_render::BundleSource;
-    match src.resolve_server_blob_hash(slug) {
-        Ok(hash) => Some(BundleHead {
+    let post = src.resolve_server_blob_hash(slug);
+    let head = decide_boot_head(
+        slug,
+        pre.map_err(|e| e.to_string()),
+        post.map_err(|e| e.to_string()),
+    );
+    if head.status == HeadStatus::Unresolved {
+        tracing::warn!(
+            target: "doorway::ssr",
+            slug = %slug,
+            error = %head.last_error.as_deref().unwrap_or("unknown"),
+            "bundle head UNRESOLVED at boot — renderer serving, but attested head \
+             not confirmed; registered for reconcile retry"
+        );
+    }
+    head
+}
+
+/// Pure boot-head decision (no I/O) — the TOCTOU comparison of the pre- and
+/// post-materialize declared-head resolves. Extracted so the attest-only-on-
+/// stable and register-unresolved-on-drift arms are unit-testable without a
+/// storage backend or a V8 isolate.
+///
+/// - `pre == post` (both Ok, equal): the declared head held steady across the
+///   entire materialize window, so materialize's own internal resolve read the
+///   same hash and the on-disk bytes verified against it → attest `current`.
+/// - any resolve failed, or `pre != post` (head moved mid-materialize): we
+///   cannot prove which hash the served bytes match → `unresolved` head with an
+///   empty `server_blob_hash` (unknown until reconcile confirms), retained so
+///   reconcile converges.
+fn decide_boot_head(
+    slug: &str,
+    pre: std::result::Result<String, String>,
+    post: std::result::Result<String, String>,
+) -> BundleHead {
+    match (pre, post) {
+        (Ok(pre_hash), Ok(post_hash)) if pre_hash == post_hash => BundleHead {
             slug: slug.to_string(),
-            server_blob_hash: hash,
+            server_blob_hash: pre_hash,
             materialized_at: chrono::Utc::now(),
             status: HeadStatus::Current,
             declared_server_blob_hash: None,
             last_error: None,
-        }),
-        Err(e) => {
-            tracing::warn!(
-                target: "doorway::ssr",
-                slug = %slug,
-                "bundle head attestation skipped — serverBlobHash resolve failed: {}",
-                e
-            );
-            None
+        },
+        (pre_r, post_r) => {
+            let err = match (&pre_r, &post_r) {
+                (Err(e), _) => format!("declared-head resolve failed at boot: {e}"),
+                (_, Err(e)) => format!("declared-head re-resolve failed at boot: {e}"),
+                (Ok(a), Ok(b)) => {
+                    format!("declared head moved during boot materialize: {a} -> {b}")
+                }
+            };
+            BundleHead {
+                slug: slug.to_string(),
+                // Unknown: materialize does not return the hash it verified, and
+                // the bracketing resolves disagree — leave empty until reconcile
+                // materializes + confirms a head.
+                server_blob_hash: String::new(),
+                materialized_at: chrono::Utc::now(),
+                status: HeadStatus::Unresolved,
+                // Surface the post-resolve when we HAVE it, so an operator sees
+                // the head reconcile will converge toward.
+                declared_server_blob_hash: post_r.ok(),
+                last_error: Some(err),
+            }
         }
     }
 }
@@ -1253,6 +1337,124 @@ mod tests {
         assert_eq!(HeadStatus::Stale.as_str(), "stale");
         assert_eq!(HeadStatus::Refreshing.as_str(), "refreshing");
         assert_eq!(HeadStatus::Failed.as_str(), "failed");
+        assert_eq!(HeadStatus::Unresolved.as_str(), "unresolved");
+    }
+
+    // ── boot-head TOCTOU: attest a `current` head ONLY on a stable resolve ────
+    // window; NEVER attest a hash we didn't verify the served bytes against.
+
+    #[test]
+    fn boot_head_attests_current_only_when_resolve_window_is_stable() {
+        // Declared head unchanged across the materialize window (pre == post):
+        // materialize's own internal resolve provably read this same hash, so the
+        // on-disk bytes verified against it — safe to attest as the served head.
+        let head = decide_boot_head(
+            "app",
+            Ok("sha256-materialized".to_string()),
+            Ok("sha256-materialized".to_string()),
+        );
+        assert_eq!(head.status, HeadStatus::Current);
+        assert_eq!(
+            head.server_blob_hash, "sha256-materialized",
+            "attested head must be the hash whose bytes were materialized"
+        );
+        assert!(head.last_error.is_none());
+    }
+
+    #[test]
+    fn boot_head_drift_never_attests_the_unverified_hash() {
+        // The declared head MOVED between the pre- and post-materialize resolves.
+        // We cannot prove which hash the on-disk bytes verified against, so we
+        // must NOT attest a served head — the exact stale-certification this
+        // guard exists to prevent. The slug becomes `unresolved` (retained), and
+        // crucially its server_blob_hash is NOT set to the drifted post-value.
+        let head = decide_boot_head(
+            "app",
+            Ok("sha256-first".to_string()),
+            Ok("sha256-moved".to_string()),
+        );
+        assert_eq!(head.status, HeadStatus::Unresolved);
+        assert_eq!(
+            head.server_blob_hash, "",
+            "an unconfirmed head must NOT attest any served hash"
+        );
+        assert_ne!(
+            head.server_blob_hash, "sha256-moved",
+            "must never certify the hash whose bytes were never materialized"
+        );
+        // The observed post-value is surfaced only as the declared head to
+        // converge toward — never as the served head.
+        assert_eq!(
+            head.declared_server_blob_hash.as_deref(),
+            Some("sha256-moved")
+        );
+        assert!(head.last_error.is_some());
+    }
+
+    // ── failed boot resolve produces an UNRESOLVED head (not absent) so ───────
+    // reconcile retries it and the probe/operator can see it.
+
+    #[test]
+    fn boot_head_resolve_failure_is_unresolved_not_absent() {
+        // Pre-resolve failed (storage blip at boot). Old behavior dropped the
+        // slug entirely (returned None), excluding it from reconcile forever and
+        // making the CI probe read the absence as a PASS. New behavior: a
+        // retained `unresolved` head.
+        let head = decide_boot_head(
+            "app",
+            Err("storage GET failed".to_string()),
+            Err("storage GET failed".to_string()),
+        );
+        assert_eq!(head.status, HeadStatus::Unresolved);
+        assert_eq!(head.server_blob_hash, "");
+        assert!(head.last_error.is_some());
+    }
+
+    #[test]
+    fn unresolved_boot_slug_is_retained_and_reconcile_targets_it() {
+        // A slug whose boot resolve failed is REGISTERED (not dropped), so it is
+        // included in the head table that reconcile iterates …
+        let reg = RendererRegistry::with_entries(Some(stub("v1")), Some("app".into()), vec![]);
+        let unresolved = decide_boot_head("app", Err("boom".into()), Err("boom".into()));
+        reg.insert_head_for_test(unresolved);
+
+        let heads = reg.heads_snapshot();
+        assert_eq!(
+            heads.len(),
+            1,
+            "unresolved slug must be present, not absent"
+        );
+        assert_eq!(heads[0].status, HeadStatus::Unresolved);
+
+        // … and once storage recovers, reconcile's decision for that slug (empty
+        // materialized hash vs a freshly-resolved declared head) is Stale — i.e.
+        // it re-materializes + swaps, self-healing to a confirmed head on the
+        // 300s tick. This is the link that closes the "excluded forever" gap.
+        let decision = decide_reconcile(&heads[0].server_blob_hash, Ok("sha256-real".to_string()));
+        assert_eq!(
+            decision,
+            ReconcileDecision::Stale("sha256-real".to_string())
+        );
+    }
+
+    #[test]
+    fn unresolved_head_serializes_distinguishably_from_absent() {
+        // The health surface must let the probe/operator tell "unresolved" from
+        // "absent": the slug appears with status `unresolved` (not missing).
+        let reg = RendererRegistry::with_entries(Some(stub("v1")), Some("app".into()), vec![]);
+        reg.insert_head_for_test(decide_boot_head(
+            "app",
+            Err("boom".into()),
+            Err("boom".into()),
+        ));
+
+        let json = reg.heads_json();
+        let entry = &json.as_array().unwrap()[0];
+        assert_eq!(entry.get("slug").unwrap(), "app");
+        assert_eq!(entry.get("status").unwrap(), "unresolved");
+        // serverBlobHash present but empty — an honest "not yet confirmed",
+        // never a fabricated served head.
+        assert_eq!(entry.get("serverBlobHash").unwrap(), "");
     }
 
     #[test]
