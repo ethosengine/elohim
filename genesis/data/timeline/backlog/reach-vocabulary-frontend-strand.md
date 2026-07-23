@@ -10,7 +10,7 @@ author: "claude (elohim-pillar island recompose)"
 status: "backlog"
 priority: "medium"
 tags: [reach, vocabulary-drift, frontend, sdk, reconciliation, lamad, elohim-library, storage-client-ts, deprecation]
-fingerprints: [cad8d5f51f6f, 247dc16fb9d5]   # slice-2 @deprecated alias burn-down (LocalityLevel rename); owned by slice-3 active arc
+fingerprints: [cad8d5f51f6f, 247dc16fb9d5]   # RESOLVED 2026-07-23: aliases deleted by slice 3 (8a7ec681d); ledger lines removed — a re-fire on these fingerprints is a regression
 derived_from:
   - app/elohim-app/src/app/elohim/ARCHITECTURE.md   # retired to git 2026-06-11 (elohim-pillar island recompose) — carried the geographic 8 verbatim
   - elohim/elohim-storage/REACH.md                  # retired to git 2026-06-11 (storage island recompose) — design-doc ORIGIN of the geographic 8 (§Core Mapping carries the ladder verbatim)
