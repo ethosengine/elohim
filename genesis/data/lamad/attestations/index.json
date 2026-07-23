@@ -46,7 +46,7 @@
       "id": "att-manifesto-safety-reviewed",
       "contentId": "manifesto",
       "attestationType": "safety-reviewed",
-      "reachGranted": "federated",
+      "reachGranted": "public",
       "grantedBy": {
         "type": "elohim",
         "grantorId": "elohim-community-learning",
@@ -101,7 +101,7 @@
       "id": "att-governance-epic-peer-reviewed",
       "contentId": "governance-epic",
       "attestationType": "peer-reviewed",
-      "reachGranted": "federated",
+      "reachGranted": "public",
       "grantedBy": {
         "type": "community",
         "grantorId": "peer-review-panel-governance",
@@ -119,7 +119,7 @@
       "id": "att-governance-epic-safety",
       "contentId": "governance-epic",
       "attestationType": "safety-reviewed",
-      "reachGranted": "federated",
+      "reachGranted": "public",
       "grantedBy": {
         "type": "elohim",
         "grantorId": "elohim-community-learning",
@@ -357,7 +357,7 @@
       "id": "att-holochain-intro-peer-reviewed",
       "contentId": "tech-holochain-intro",
       "attestationType": "peer-reviewed",
-      "reachGranted": "federated",
+      "reachGranted": "public",
       "grantedBy": {
         "type": "community",
         "grantorId": "holochain-developers-guild",
@@ -375,7 +375,7 @@
       "id": "att-holochain-intro-safety",
       "contentId": "tech-holochain-intro",
       "attestationType": "safety-reviewed",
-      "reachGranted": "federated",
+      "reachGranted": "public",
       "grantedBy": {
         "type": "elohim",
         "grantorId": "elohim-community-learning",

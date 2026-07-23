@@ -114,15 +114,19 @@ export interface ContentNode {
   authorId?: string;
 
   /**
-   * Current reach level - determines who can discover/access this content.
-   * Computed from active attestations. See ContentReach type.
+   * Current geographic/placement scope - determines how far this content
+   * can travel (replication, discovery, caching). Computed from active
+   * attestations. See ContentReach type (aliases LocalityLevel — this is
+   * NOT the declared-visibility Reach enum; that lives in generated/schema-enums).
    * Defaults to 'commons' for legacy content (existing content is public).
    *
-   * - 'private': Only author
-   * - 'invited': Specific agents
-   * - 'local': Author's network
-   * - 'community': Community members
-   * - 'federated': Multiple communities
+   * - 'private': Only the author (and their Elohim)
+   * - 'invited': Explicitly invited individuals (regardless of location)
+   * - 'local': Author's household/immediate network
+   * - 'neighborhood': Block/building/immediate area
+   * - 'municipal': City/town
+   * - 'bioregional': Watershed/ecosystem boundary
+   * - 'regional': State/province level
    * - 'commons': Public/global
    */
   reach?: ContentReach;
@@ -147,7 +151,8 @@ export interface ContentNode {
   invitedAgentIds?: string[];
 
   /**
-   * Communities this content is shared with (when reach is 'community' or 'federated').
+   * Communities this content is shared with (when reach extends beyond
+   * 'local' — e.g. 'neighborhood', 'municipal', or broader).
    */
   communityIds?: string[];
 
