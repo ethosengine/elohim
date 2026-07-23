@@ -41,13 +41,13 @@
     "evidenceSources": []
   },
   "reachThresholds": {
-    "personal": "any",
+    "private": "any",
+    "self": "any",
     "intimate": "any",
-    "household": "any",
-    "neighborhood": "any",
-    "collective": "neutral",
+    "trusted": "any",
+    "familiar": "any",
     "community": "neutral",
-    "district": "neutral",
-    "public": "high"
+    "public": "high",
+    "commons": "high"
   }
 }

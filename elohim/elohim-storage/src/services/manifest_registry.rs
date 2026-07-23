@@ -132,6 +132,12 @@ impl ManifestRegistry {
     /// Returns the manifest-declared threshold string for the given reach
     /// (e.g. `"any"`, `"neutral"`, `"high"`). Returns `None` when the reach
     /// key is absent from the manifest map, or when no manifest is registered.
+    ///
+    /// The incoming key is normalized through `parse_reach_key` +
+    /// `as_manifest_key` before lookup, so legacy kebab-8 spellings (e.g.
+    /// `"household"`, `"district"`) resolve against a canonical schema-8-keyed
+    /// manifest payload. Keys that don't parse (unknown reach strings) are
+    /// looked up verbatim, which simply misses on a canonical-only payload.
     pub fn reach_threshold(&self, reach: &str) -> Option<String> {
         let guard = self
             .standing_policy_payload
@@ -139,7 +145,13 @@ impl ManifestRegistry {
             .expect("standing_policy_payload lock poisoned");
         let payload = guard.as_ref()?;
         let thresholds = payload.get("reachThresholds")?.as_object()?;
-        thresholds.get(reach)?.as_str().map(|s| s.to_string())
+        let canonical = crate::services::epr_kind::parse_reach_key(reach)
+            .map(|r| {
+                use crate::services::epr_kind::ReachStandingExt;
+                r.as_manifest_key()
+            })
+            .unwrap_or(reach);
+        thresholds.get(canonical)?.as_str().map(|s| s.to_string())
     }
 
     /// Returns the manifest-declared `unknownTreatment.default` policy.
@@ -554,9 +566,11 @@ mod tests {
         assert!(registry.debit_weights().is_none());
     }
 
-    #[test]
-    fn reach_threshold_returns_correct_value() {
-        let json = r#"{ "manifestKind": "standing-policy", "revision": 1,
+    /// Full canonical schema-8 `reachThresholds` map, mirroring the live
+    /// `bootstrap-standing-policy.json` (floor bands "any", community
+    /// "neutral", public+commons "high").
+    fn canonical_reach_thresholds_json() -> &'static str {
+        r#"{ "manifestKind": "standing-policy", "revision": 1,
             "floor": { "classes": [] },
             "newVoiceBaseline": { "score": "floor", "vulnerableClassLift": "low" },
             "debitWeights": {
@@ -566,12 +580,56 @@ mod tests {
                 "quarantine": {"advisory":0,"debit-soft":12,"debit-firm":30},
                 "vouch": {"advisory":0,"debit-soft":-3,"debit-firm":-8}
             },
-            "reachThresholds": { "public": "high", "household": "any" }
-        }"#;
-        let r = ManifestRegistry::from_payload_json(json).expect("parse");
+            "reachThresholds": {
+                "private": "any", "self": "any", "intimate": "any",
+                "trusted": "any", "familiar": "any",
+                "community": "neutral", "public": "high", "commons": "high"
+            }
+        }"#
+    }
+
+    #[test]
+    fn reach_threshold_resolves_every_canonical_schema8_key() {
+        let r =
+            ManifestRegistry::from_payload_json(canonical_reach_thresholds_json()).expect("parse");
+        for key in ["private", "self", "intimate", "trusted", "familiar"] {
+            assert_eq!(
+                r.reach_threshold(key),
+                Some("any".to_string()),
+                "floor-band key {key} must resolve to \"any\""
+            );
+        }
+        assert_eq!(r.reach_threshold("community"), Some("neutral".to_string()));
         assert_eq!(r.reach_threshold("public"), Some("high".to_string()));
-        assert_eq!(r.reach_threshold("household"), Some("any".to_string()));
+        assert_eq!(r.reach_threshold("commons"), Some("high".to_string()));
         assert_eq!(r.reach_threshold("not-in-map"), None);
+    }
+
+    #[test]
+    fn reach_threshold_normalizes_legacy_keys_against_canonical_payload() {
+        // A canonical-only payload (as bootstrap-standing-policy.json now is)
+        // must still resolve legacy kebab-8 lookups via parse_reach_key +
+        // as_manifest_key normalization inside reach_threshold — otherwise a
+        // caller still passing "household"/"district" would silently miss.
+        let r =
+            ManifestRegistry::from_payload_json(canonical_reach_thresholds_json()).expect("parse");
+        assert_eq!(
+            r.reach_threshold("household"),
+            Some("any".to_string()),
+            "legacy \"household\" normalizes to canonical \"trusted\""
+        );
+        assert_eq!(
+            r.reach_threshold("district"),
+            Some("high".to_string()),
+            "legacy \"district\" normalizes to canonical \"public\""
+        );
+    }
+
+    #[test]
+    fn reach_threshold_unknown_key_returns_none() {
+        let r =
+            ManifestRegistry::from_payload_json(canonical_reach_thresholds_json()).expect("parse");
+        assert_eq!(r.reach_threshold("not-a-reach-key"), None);
     }
 
     #[test]
