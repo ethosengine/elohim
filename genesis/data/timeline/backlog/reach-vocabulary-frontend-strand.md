@@ -9,7 +9,8 @@ written: "2026-06-11"
 author: "claude (elohim-pillar island recompose)"
 status: "backlog"
 priority: "medium"
-tags: [reach, vocabulary-drift, frontend, sdk, reconciliation, lamad, elohim-library, storage-client-ts]
+tags: [reach, vocabulary-drift, frontend, sdk, reconciliation, lamad, elohim-library, storage-client-ts, deprecation]
+fingerprints: [cad8d5f51f6f, 247dc16fb9d5]   # slice-2 @deprecated alias burn-down (LocalityLevel rename); owned by slice-3 active arc
 derived_from:
   - app/elohim-app/src/app/elohim/ARCHITECTURE.md   # retired to git 2026-06-11 (elohim-pillar island recompose) — carried the geographic 8 verbatim
   - elohim/elohim-storage/REACH.md                  # retired to git 2026-06-11 (storage island recompose) — design-doc ORIGIN of the geographic 8 (§Core Mapping carries the ladder verbatim)
@@ -244,3 +245,31 @@ drifted data to migrate. **No action needed, ever** — recorded here so a futur
 enum (`#[allow(dead_code)]` `can_serve`) — not reconciled, not scheduled. Verdict surface (spec §7
 item 3) and fixture harness (item 4) remain later slices, as does the a2o composition-law
 scenario suite (item 6).
+
+## Slice-3 alias burn-down — deprecation-triage canonicalization (2026-07-23)
+
+The deprecation-sentinel captured two NEW @deprecated-tag fingerprints once slice-2's aliases
+landed in `elohim/sdk/storage-client-ts/src/protocol-core.model.ts` (`afd8ee1c8`):
+
+- **`cad8d5f51f6f`** — `REACH_LEVEL_VALUES` alias (`:80`, "use LOCALITY_LEVEL_VALUES")
+- **`247dc16fb9d5`** — `reachEncompasses()` alias (`:136`, "use localityEncompasses")
+
+(The sibling `ReachLevel` type alias at `:78` is the same concern; if/when the sentinel surfaces
+its fingerprint it maps here too.)
+
+**Current decision — owned by the active slice-3 arc; deprecation-triage takes NO code action.**
+These aliases are the *deliberate* migration bridge slice-2 authored so the ~37 existing
+`ReachLevel`/`REACH_LEVEL_VALUES`/`reachEncompasses` consumers keep compiling. Their burn-down onto
+`LocalityLevel`/`LOCALITY_LEVEL_VALUES`/`localityEncompasses` is the **first workstream of slice 3**,
+actively in flight under `genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md`
+by the main session's slice-3 implementers **in this shared worktree**. A background deprecation-fix
+here would collide with those in-flight edits, so the correct disposition is
+canonicalize-and-suppress, not fix: the ledger entries are marked `triaged` pointing at this doc,
+so the sentinel stops re-firing. **The ledger lines are cleared (deleted) by whoever completes the
+slice-3 burn-down — deleting the `@deprecated` alias definitions is what makes the tag fingerprints
+read as gone; a reintroduced alias then correctly re-fires as NEW.** Do not re-scan or re-fork this
+concern; it is fully recorded here and in the slice-2 disposition above.
+
+Reminder carried from slice-2 for the burn-down implementer: SDK edits need `pnpm build` before
+app/lamad tsconfigs see them (both resolve `@elohim/storage-client` via compiled `dist/`, not
+source — the dist-freshness trap).
