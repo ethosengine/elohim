@@ -159,3 +159,15 @@ retired doc's claims; unconsumed storage scaffolding stays in
   `elohim/elohim-storage/src/` (only WAL-promotion hits in `db/mod.rs`).
   `content_store/src/attestation.rs:273` and `content_store/src/migration.rs:241` COPY/preserve
   the original reach; no audit-trail-preserving promotion mechanism exists.
+
+---
+
+## Slice-1 disposition (2026-07-23, shift/reach-vocab-slice1)
+
+Per `reach-ontology-vocabulary-split-spec` §1: vocabulary **#2 (Rust services kebab-8)** and
+**#5 (`VALID_REACH_LEVELS` 6)** are RETIRED — elohim-storage re-exports `elohim_epr::Reach`
+(schema-8) with `ReachStandingExt` floor semantics and a legacy-alias parser
+(`parse_reach_key`; data-aware migration, old manifests keep evaluating); both TS
+`VALID_REACH_LEVELS` definitions deleted (zero consumers). Drift test:
+`elohim-storage/tests/reach_vocabulary_contract.rs` pins Rust↔schema.
+Remaining strands: geographic-8 rename (locality) and Part-V custody rename — later slices.
