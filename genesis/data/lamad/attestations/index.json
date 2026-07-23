@@ -175,7 +175,7 @@
       "id": "att-value-scanner-author-verified",
       "contentId": "epic-value-scanner",
       "attestationType": "author-verified",
-      "reachGranted": "local",
+      "reachGranted": "trusted",
       "grantedBy": {
         "type": "elohim",
         "grantorId": "elohim-community-learning",
@@ -209,7 +209,7 @@
       "id": "att-draft-content-author-only",
       "contentId": "draft-new-feature",
       "attestationType": "author-verified",
-      "reachGranted": "local",
+      "reachGranted": "trusted",
       "grantedBy": {
         "type": "elohim",
         "grantorId": "elohim-community-learning",
@@ -243,7 +243,7 @@
       "id": "att-under-review-content",
       "contentId": "pending-review-guide",
       "attestationType": "author-verified",
-      "reachGranted": "local",
+      "reachGranted": "trusted",
       "grantedBy": {
         "type": "elohim",
         "grantorId": "elohim-community-learning",
@@ -284,7 +284,7 @@
       "id": "att-hardware-spec-author-verified",
       "contentId": "hardware-spec",
       "attestationType": "author-verified",
-      "reachGranted": "local",
+      "reachGranted": "trusted",
       "grantedBy": {
         "type": "elohim",
         "grantorId": "elohim-community-learning",
