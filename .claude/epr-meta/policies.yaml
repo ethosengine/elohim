@@ -12,7 +12,10 @@
 #     (which version applies is a DECLARED dependency, never recency; see the lens-version-DAG
 #     spec 2026-06-27). Editing a policy = adding a NEW version entry; existing bindings keep
 #     the old semantics until each binding re-declares. `status: superseded` + `superseded_by`
-#     record lineage; never delete a version that still has bindings.
+#     record lineage; never delete a version that still has bindings. A row not yet landed on
+#     `dev` may be amended in place by its authoring session (contentHash re-pinned); the
+#     never-mutate rule binds at first landing — ratification is peer acceptance at the branch
+#     rung (dev-merge), per the governance-escalation-ladder charter.
 #   • The policy owns semantics: class, scope (the default `when`), predicate/measure defaults,
 #     and the why. The binding owns placement and local variance: an optional `when` override
 #     and `params` (merged over the policy's `measure` defaults).
@@ -26,6 +29,7 @@ epr-meta-policies-version: 1
 policies:
   - id: source-file-loc-ceiling
     version: 1
+    contentHash: sha256:8982019cf14bd70060399817c82d0d6865853280a6fdc11fd7a4c155a5074be7
     title: Source-file LoC ceiling — architecture-review trigger
     binding: observation
     class: measure
@@ -50,6 +54,7 @@ policies:
 
   - id: memory-frontmatter-at-birth
     version: 1
+    contentHash: sha256:a622e4d20e5aa57ab9152e48a082ff437499ad5b498516408f0cc864cce003ee
     title: Memory topic files must be born with projectable frontmatter
     binding: constitutional
     class: deny
@@ -65,6 +70,7 @@ policies:
 
   - id: capability-governance
     version: 1
+    contentHash: sha256:37dc215287585ca66ca4a873e44db6714660bfdae21dc0f6e7e8cabf833ea5b4
     title: Capability package governance — re-import after editing its projection
     binding: observation
     class: measure
@@ -88,6 +94,7 @@ policies:
 
   - id: sovereignty-ontology-guard
     version: 1
+    contentHash: sha256:c6194b67110355fdde1b74603f9e64a571b394bca500783bfb8d2d5021ffceef
     title: Sovereignty ontology guard — affirm the frame, never assert the apex
     binding: binding-local
     class: ask
@@ -120,6 +127,7 @@ policies:
 
   - id: archetype-resource-alignment
     version: 1
+    contentHash: sha256:a62c78e26c81446263e2b6478d45e11d8f9d49685c2e93e82d7a1f98b529b795
     title: Device-archetype resource alignment — one class, one budget
     binding: binding-local
     class: ask
@@ -144,6 +152,7 @@ policies:
 
   - id: test-bench-aggregate-capacity
     version: 1
+    contentHash: sha256:a39ac2f8ec21391c60e43bf97cce33c324b526ab54c5d9ca6d5283fff48b4dec
     title: Alpha test-bench aggregate capacity — portfolio within observed envelope
     binding: binding-local
     class: ask
@@ -164,6 +173,7 @@ policies:
 
   - id: eprfs-meta-domain-neutrality
     version: 1
+    contentHash: sha256:97b0cd767d6b8a90acb4035c6f6596aab5b33cdff3b1b6b57a632e944b90ebf2
     title: EPRFS meta evaluator stays policy-domain neutral
     binding: binding-local
     class: ask
@@ -178,3 +188,42 @@ policies:
       replaced by content-addressed EPR/WASM resolution). A net-new concrete epr:validator-* ref in
       this publishable crate therefore requires explicit reach acknowledgement. The crate's Rust
       architecture test independently proves the zero-concrete-reference invariant.
+
+  - id: governance-escalation-ladder
+    version: 1
+    contentHash: sha256:97008339f53de85e02ff63222f3e521889f538a458e56d05f656cc48ecf75954
+    title: Governance escalation ladder — the agency charter
+    binding: binding-local
+    class: ask
+    scope: { write: ".epr-meta" }
+    validator: epr:validator-escalation-ladder
+    status: active
+    established_by: deliberated-2026-07-23-operator+claude
+    why: >
+      The agency charter: agents self-grant `measure`/`inject` (+ `dispatch` with a named agent
+      and prompt) freely — observation and advisory-with-directive cannot harm. `ask`/`deny`
+      authorship or promotion is different in kind (it narrows or blocks another agent's future
+      writes) and requires ratified authority from the DELIBERATING COMMUNITY — today the
+      operator+agents working this tree (the "us" of the pre-p2p era), tomorrow a qahal — never
+      agent self-declaration: narrow-never-widen applied to governance itself. Ratification is
+      not a solo stamp; it is PEER ACCEPTANCE AT THE BRANCH RUNG: the branch ladder is the repo's
+      reach axis (shift/* = self; dev = community; main = commons), a governance rule on a shift
+      branch is structurally pending, and the dev-merge acceptance IS the ratification event —
+      the CanonizationRef of repo governance (accepting a merge includes accepting the rules we
+      govern ourselves by). This validator fires when a `.epr-meta` write INTRODUCES
+      an ask|deny rule (a brand-new manifest: any ask|deny rule; an existing one: compared against
+      its prior on-disk content, so unrelated edits to an already-governed manifest never
+      retrigger) that is not backed by a `policy: <id>@<version>` binding whose registry row's
+      `established_by` carries deliberation provenance (`deliberated-*`, or the legacy
+      `operator-*` rows predating this convention). An INLINE ask|deny rule with no policy
+      binding at all is never backed: the charter requires the deliberated registry pin for
+      that class, not a rule authored directly in the manifest. `ask` tier: routes to review
+      (refer_reason `escalation-requires-ratification`) rather than hard-blocking, since the gate
+      cannot itself adjudicate ratification — only an operator can. Known v1 scope gap: `when`
+      patterns match by BASENAME only (`_matches_when` in _lib/epr_meta.py), so this binding's
+      `.epr-meta` scope covers the legacy flat manifest form but not the directory form
+      (`.epr-meta/manifest.md`, basename `manifest.md`) — tighten if/when that form sees adoption.
+      Bound at the repo root (not `.claude/epr-meta/.epr-meta`): `when` patterns are basename-only
+      and the cascade is a strict ancestor walk, so a manifest placed anywhere other than the repo
+      root can only ever govern writes BENEATH itself — it cannot reach out to unrelated
+      directories. A repo-wide charter needs the repo-root anchor.

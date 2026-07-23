@@ -15,9 +15,11 @@ except ImportError:  # pragma: no cover — non-POSIX
 
 # --- _lib bootstrap (clone of managed-surface-context.py:26-32) ---
 _here = Path(__file__).resolve()
+_REPO_ROOT = _here  # best-effort fallback if the loop below never matches
 for _ in range(8):
     if (_here / ".claude" / "scripts" / "_lib").is_dir():
         sys.path.insert(0, str(_here / ".claude" / "scripts"))
+        _REPO_ROOT = _here
         break
     _here = _here.parent
 
@@ -33,6 +35,18 @@ _ADVICE_WINDOW = 4 * 3600
 # one line per LIVE fingerprint; a fingerprint PRESENT suppresses re-dispatch; the entry is
 # deleted when the finding is drained (file back under ceiling), never parked.
 _ARCH_LEDGER_REL = ".claude/data/architecture-findings.jsonl"
+
+
+def _witness(root: Path, *, subject, decision: str, cls: str | None, rule_id: str | None = None,
+             policy_ref: str | None = None, refer: dict | None = None,
+             checks: list | None = None) -> None:
+    """Thin wrapper over the shared _lib.epr_meta.witness ledger-append (runtime='claude',
+    gate='pre-tool-use') — the SAME helper the git-gate CLI drives, so both runtimes write the
+    identical governance-findings.jsonl shape. Best-effort; never raises (witnessing must never
+    break the gate — epr_meta.witness already wraps its body in try/except)."""
+    epr_meta.witness(root, runtime="claude", gate="pre-tool-use", subject=subject,
+                      decision=decision, cls=cls, rule_id=rule_id, policy_ref=policy_ref,
+                      refer=refer, checks=checks)
 
 
 def _advice_debounced(root: Path, key: str) -> bool:
@@ -133,6 +147,24 @@ def _handle_measures(measures, merged, root: Path, fp_path: str) -> list[str]:
     return notes
 
 
+def _handle_dispatches(dispatches, merged, fp_path: str) -> list[str]:
+    """The dispatch side-channel: build the sentinel-idiom directive text per fired dispatch
+    verdict (deprecation-sentinel.py:487-509's dispatch-a-background-agent phrasing, verbatim
+    shape) from the rule's `parameters` (dispatch-agent / dispatch-prompt). Pure text assembly —
+    witnessing is the caller's job (main(), which has `root`)."""
+    notes: list[str] = []
+    for v in dispatches:
+        rule = merged["rules"].get(v.rule_id, {})
+        params = rule.get("parameters") if isinstance(rule.get("parameters"), dict) else {}
+        agent = params.get("dispatch-agent", "general-purpose")
+        prompt = params.get("dispatch-prompt", "review this change")
+        notes.append(
+            f"[epr-meta] dispatch rule `{v.rule_id}` fired — DISPATCH NOW (do not derail the "
+            f"current task): launch the `{agent}` agent via the Agent tool with "
+            f"run_in_background: true and the prompt: {prompt} (subject: {fp_path})")
+    return notes
+
+
 def _emit_deny(reason: str):
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse", "permissionDecision": "deny",
@@ -192,7 +224,10 @@ def main():
     try:
         data = json.loads(raw)
     except Exception:
-        sys.exit(0)  # malformed stdin -> fail open silently
+        _witness(_REPO_ROOT, subject=None, decision="permit", cls=None,
+                 refer={"layer": "operator", "reason": "gate-exception"},
+                 checks=["malformed stdin JSON — failing open"])
+        sys.exit(0)  # malformed stdin -> fail open, never silently (polarity law)
 
     tool = data.get("tool_name", "")
     if tool not in ("Write", "Edit"):
@@ -261,22 +296,6 @@ def main():
     if cov_nudge:  # a governed-but-unclaimed region: the nudge rides along with any rule advisories
         advisories.append(cov_nudge)
 
-    # Strict-but-recoverable governance: a MALFORMED .epr-meta in the cascade must NOT hard-deny the
-    # whole subtree (which would brick authoring — including the fix itself). Instead:
-    #   • editing the manifest itself is never blocked, so you can always fix the typo → advise;
-    #   • other writes in the subtree downgrade deny → ASK (overridable) until it's fixed.
-    # This encodes "proposed-but-not-yet-valid governance" as `ask`, not a binding `deny`.
-    target_is_manifest = epr_meta.is_manifest_path(target)
-    problems = [(m, errs) for m in chain if (errs := epr_meta.check_meta(m))]
-    if problems:
-        detail = "; ".join(f"{m}: {', '.join(e)}" for m, e in problems)
-        if target_is_manifest:
-            advisories.append(f"[.epr-meta] malformed governance manifest(s) — {detail}. "
-                              "(editing an .epr-meta is never blocked, so you can fix it.)")
-        else:
-            _emit_ask(f"governance manifest malformed — {detail}. Fix the manifest to restore full "
-                      "governance here; proceeding now requires confirmation.")
-
     metas = [(m, epr_meta.load_meta(m)) for m in chain]
     # Recursion-guard surface 6.2: a governed subtree whose cascade reached the repo/depth bound
     # without a `root: true` constitutional base is a misconfiguration. v1 ADVISES (fail-open
@@ -285,42 +304,83 @@ def main():
         advisories.append("[.epr-meta] no `root: true` constitutional base in this cascade — "
                           "add one (this subtree's governance has no anchor).")
 
-    merged = epr_meta.merge_rules(chain)
     root = epr_meta.find_repo_root(target)
-    policies, pol_errs = epr_meta.load_policies(root)
-    exp_errs = epr_meta.expand_policies(merged, policies)
-    advisories += [f"[.epr-meta] {e}" for e in (*pol_errs, *exp_errs)]
-
     write = {"path": fp, "content": content, "is_new": is_new,
              "is_new_subdir": is_new_subdir}
-    verdicts = epr_meta.evaluate(merged, write)
-
-    # Measure side-channel (observation tier — never blocks): hard-ceiling verdicts become
-    # fingerprinted architecture findings + a dispatch directive, sentinel-style.
-    measures = [v for v in verdicts if v.cls == "measure"]
-    if measures:
-        advisories += _handle_measures(measures, merged, root, fp)
 
     # Soft-ceiling injects re-fire on EVERY edit of an over-soft file — debounce per (rule, path)
-    # so the nudge informs once per working session instead of nagging each keystroke.
-    def _soft_debounced(v) -> bool:
+    # so the nudge informs once per working session instead of nagging each keystroke. Injected
+    # into resolve_write (which stays pure otherwise) as the `verdict_filter` extension point.
+    def _soft_filter(v, merged) -> bool:
         r = merged["rules"].get(v.rule_id, {})
         return (v.cls == "inject" and "measure" in r
                 and _advice_debounced(root, f"loc-soft:{v.rule_id}:{fp}"))
 
-    verdict = epr_meta.combine([v for v in verdicts if not _soft_debounced(v)])
-    if verdict is None:
-        if advisories:
-            _emit_advise(" ".join(advisories))
-        sys.exit(0)  # silent allow
-    src = merged["sources"][-1] if merged["sources"] else "?"
-    msg = f"{verdict.reason} [rule `{verdict.rule_id}` from {src}]"
-    if verdict.cls == "deny":
-        _emit_deny(msg)
-    elif verdict.cls == "ask":
-        _emit_ask(msg)
-    else:
-        _emit_advise(" ".join([msg, *advisories]))
+    # The governance correspondence spine: the SAME pure decision path the golden-vector parity
+    # runner drives (cascade -> malformed check -> merge+expand policies -> evaluate -> combine ->
+    # decision mapping). This resolver is thin BY CONSTRUCTION — it owns stdin/stdout, witnessing,
+    # the coverage nudge, the soft-debounce filter, and the two Claude-side side-channels
+    # (arch-ledger for measure, the sentinel-agent directive for dispatch); the decision itself
+    # lives in _lib.epr_meta.
+    result = epr_meta.resolve_write(target, write, root, verdict_filter=_soft_filter)
+    advisories += result["advisories"]
+    merged = result.get("merged")
+
+    # Measure side-channel (observation tier — never blocks): hard-ceiling verdicts become
+    # fingerprinted architecture findings + a dispatch directive, sentinel-style. Independent of
+    # the overall decision (fires even when a deny/ask elsewhere wins) — mirrors pre-slice
+    # behavior. Each fired measure is witnessed regardless of the overall winning class.
+    if result["measures"]:
+        advisories += _handle_measures(result["measures"], merged, root, fp)
+        for v in result["measures"]:
+            rule = merged["rules"].get(v.rule_id, {}) if merged else {}
+            _witness(root, subject=fp, decision="permit", cls="measure", rule_id=v.rule_id,
+                     policy_ref=rule.get("policy-ref"), checks=[v.reason])
+
+    # Dispatch side-channel (never blocks, class dispatch): the NEW capability this slice adds —
+    # pre-slice, a fired `class: dispatch` verdict was silently dropped (never messaged, never
+    # witnessed). Independent of the overall decision, same as measures — witnessed even when a
+    # deny/ask elsewhere wins; the directive text only reaches the model when dispatch itself is
+    # the winning (permitting) outcome, since a deny/ask response has no room for it.
+    if result["dispatches"]:
+        for v in result["dispatches"]:
+            rule = merged["rules"].get(v.rule_id, {}) if merged else {}
+            params = rule.get("parameters") if isinstance(rule.get("parameters"), dict) else {}
+            _witness(root, subject=fp, decision="permit", cls="dispatch", rule_id=v.rule_id,
+                     policy_ref=rule.get("policy-ref"),
+                     checks=[f"dispatch-agent={params.get('dispatch-agent', '?')}"])
+        if result["cls"] == "dispatch":
+            advisories += _handle_dispatches(result["dispatches"], merged, fp)
+
+    decision = result["decision"]
+    cls = result["cls"]
+    reason = result["reason"]
+
+    if decision == "refuse":  # deny — unchanged UX
+        _witness(root, subject=fp, decision="refuse", cls="deny", rule_id=result["rule_id"],
+                 policy_ref=(merged["rules"].get(result["rule_id"], {}).get("policy-ref")
+                             if merged and result["rule_id"] else None),
+                 checks=[reason])
+        _emit_deny(reason)
+
+    if decision == "refer":  # ask, OR an unresolvable-validator / malformed-manifest routing
+        _witness(root, subject=fp, decision="refer", cls=cls, rule_id=result["rule_id"],
+                 policy_ref=(merged["rules"].get(result["rule_id"], {}).get("policy-ref")
+                             if merged and result["rule_id"] else None),
+                 refer=result["refer"], checks=[reason])
+        _emit_ask(reason)
+
+    # decision == "permit": inject (advisory) / dispatch / measure / clean-allow-with-advisories.
+    if cls == "inject":
+        _witness(root, subject=fp, decision="permit", cls="inject", rule_id=result["rule_id"],
+                 policy_ref=(merged["rules"].get(result["rule_id"], {}).get("policy-ref")
+                             if merged and result["rule_id"] else None),
+                 checks=[reason])
+        _emit_advise(" ".join([reason, *advisories]))
+
+    if advisories:
+        _emit_advise(" ".join(advisories))
+    sys.exit(0)  # silent allow — no rule fired, nothing to witness (the polarity floor)
 
 
 if __name__ == "__main__":
@@ -329,5 +389,11 @@ if __name__ == "__main__":
     except SystemExit:
         raise
     except Exception as e:  # fail-open: internal error, NOT a deny
+        try:
+            _witness(_REPO_ROOT, subject=None, decision="permit", cls=None,
+                     refer={"layer": "operator", "reason": "gate-exception"},
+                     checks=[f"internal error: {e}"])
+        except Exception:  # noqa: BLE001 — witnessing must never break the gate
+            pass
         print(f"epr-meta-resolver internal error: {e}", file=sys.stderr)
         sys.exit(1)

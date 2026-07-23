@@ -1,0 +1,36 @@
+---
+epr-meta-version: 1
+id: epr-meta-tooling-governance
+covers: dir-only
+rules:
+  - id: policies-yaml-review
+    class: dispatch
+    when: { write: "policies.yaml" }
+    parameters:
+      dispatch-agent: code-reviewer
+      dispatch-prompt: >
+        Audit the policy-registry edit for version-pin discipline: policy edits must add NEW
+        version rows, never mutate an existing version in place (immutability is now
+        contentHash-enforced); verify contentHash pins updated via epr-meta-pin.py; report
+        violations
+    why: >
+      Meta-governance: the registry that governs governance gets agent review on every edit. The
+      first live `dispatch` rule (constraint 4/T1e) — proof that the class works end-to-end
+      (fires, witnesses, and directs a background agent) before other directories adopt it.
+      `dispatch-agent`/`dispatch-prompt` are read by the resolver hook's dispatch side-channel;
+      `class: dispatch` never blocks — it always resolves to `permit` plus the directive.
+---
+
+# `.claude/epr-meta/` — the policy registry's own governance
+
+Dir-only (not `covers: subtree`): this directory holds the registry (`policies.yaml`), the
+governor config (`governors.yaml`), and the compose recipes (`recipes.yaml`) — a flat leaf, not a
+subtree with descendants worth claiming.
+
+One live rule: every `policies.yaml` write dispatches a `code-reviewer` agent to audit version-pin
+discipline (immutability is contentHash-enforced — see `epr-meta-pin.py --verify`). This is
+deliberately `dispatch`, not `ask`: reviewing a registry edit is agent-self-grantable observation-
+with-a-named-reviewer, not an authority narrowing. The repo-wide `governance-escalation-ladder`
+policy (bound at the repo root — see `/.epr-meta/manifest.md`) is what actually gates a NEW
+ask/deny rule appearing in a `.epr-meta` manifest; this dispatch rule is a separate, lighter-touch
+concern (catch a bad pin/immutability violation early, every time).

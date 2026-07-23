@@ -1,6 +1,9 @@
 """The .epr-meta cascade + merge — the reuse of subject_routing's root-first/nearest-wins
 ancestor walk, retargeted to the `.epr-meta` manifest with nested-YAML parsing."""
 from __future__ import annotations
+import hashlib
+import json
+import time
 from pathlib import Path
 
 from _lib import frontmatter as fm
@@ -9,6 +12,11 @@ try:
     import yaml  # PyYAML — needed for the nested rule config
 except Exception:  # pragma: no cover
     yaml = None
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover — non-POSIX
+    fcntl = None
 
 MANIFEST_NAME = ".epr-meta"
 MANIFEST_FILE_NAME = "manifest.md"
@@ -153,14 +161,23 @@ from collections import namedtuple
 
 ENFORCEMENT_CLASSES = ("deny", "ask", "inject", "measure", "dispatch")
 _SEVERITY = {"deny": 3, "ask": 2, "inject": 1, "measure": 0, "dispatch": 0}
-Verdict = namedtuple("Verdict", ["cls", "reason", "rule_id"])
+# `refer_reason` is the ceiling-law vocabulary tag (constraint 3): rule-fired (default) |
+# unresolvable-validator | governance-manifest-malformed | policy-pin-mismatch |
+# escalation-requires-ratification. Defaulted so every existing 3-arg Verdict(...) call site
+# (this module + _lib/epr_meta_git.py) keeps working unchanged.
+Verdict = namedtuple("Verdict", ["cls", "reason", "rule_id", "refer_reason"], defaults=[None])
 
 # A rule of an enforcing class must carry at least one of these actionable predicate keys, else it
 # fires on nothing (a "deny everything here" that silently allows — the M2 footgun).
 _ACTIONABLE_KEYS = ("require-frontmatter", "allowed-types", "route-to", "no-new-subdirs",
                     "require-sibling", "dedupe-of", "validator")
+# `parameters` is dispatch-only config (dispatch-agent/dispatch-prompt) — NOT counted as a
+# competing actionable predicate (a dispatch rule may legitimately pair it with a real predicate
+# like require-frontmatter, exactly as a measure rule does; `parameters` alone is also a valid
+# fallback trigger — see _eval_rule's final branch). Recognized so it never trips the unknown-key
+# check, but excluded from _ACTIONABLE_KEYS so it never trips the >1-actionable-predicate check.
 _KNOWN_RULE_KEYS = {"id", "class", "why", "when", "max-files", "measure",
-                    "policy", "params"} | set(_ACTIONABLE_KEYS)
+                    "policy", "params", "parameters"} | set(_ACTIONABLE_KEYS)
 
 # Policy-binding rules (`policy: <id>@<version>`) carry ONLY placement + local variance; the
 # registry policy owns class/predicates/measure-defaults/why. The version pin is REQUIRED —
@@ -292,6 +309,11 @@ def _eval_rule(rule: dict, write: dict) -> Verdict | None:
     if not _matches_when(rule.get("when", {}), write):
         return None
 
+    if rule.get("pin-mismatch"):
+        # Synthesized by expand_policies when a bound policy's contentHash no longer matches its
+        # registry row — fires unconditionally once `when` matches (the binding itself is suspect).
+        return Verdict(cls, why, rid, rule.get("refer-reason"))
+
     if "require-frontmatter" in rule:
         present = _frontmatter_fields(write.get("content"))
         missing = [f for f in rule["require-frontmatter"] if f not in present]
@@ -321,10 +343,19 @@ def _eval_rule(rule: dict, write: dict) -> Verdict | None:
 
     if "validator" in rule:
         ref = rule["validator"]
+        if ref in RUNTIME_SCOPED_VALIDATORS:
+            # Declared runtime-scoped (e.g. rust-only eprfs-meta validators) — Unavailable-by-
+            # declaration, NOT unresolvable: skip clean, never downgrade the rule.
+            return None
         if ref not in REFERENCE_VALIDATORS:
-            return Verdict("inject", f"validator `{ref}` not registered (advisory). {why}", rid)
+            # An unresolvable reference must never soften to inject (the pre-slice soundness
+            # inversion) and must not hard-deny at authoring polarity — it ROUTES.
+            return Verdict("ask", f"validator `{ref}` not registered — unresolvable reference "
+                                  f"routes to review rather than guessing. {why}", rid,
+                           "unresolvable-validator")
         if REFERENCE_VALIDATORS[ref](write):
-            return Verdict(cls, f"validator `{ref}` flagged this write. {why}", rid)
+            return Verdict(cls, f"validator `{ref}` flagged this write. {why}", rid,
+                           VALIDATOR_REFER_REASONS.get(ref))
         return None
 
     if "measure" in rule:
@@ -348,6 +379,16 @@ def _eval_rule(rule: dict, write: dict) -> Verdict | None:
 
     if "max-files" in rule:
         return None
+
+    if cls == "dispatch" and "parameters" in rule:
+        # Fallback trigger: a dispatch rule with NO other actionable predicate fires
+        # unconditionally once `when` matches (exactly like `dedupe-of`) — the sentinel-style
+        # directive text is assembled by the caller (resolver.py) from rule.parameters
+        # (dispatch-agent / dispatch-prompt), never blocks. Only reached when none of the real
+        # actionable predicates above matched, so a dispatch rule that ALSO carries e.g.
+        # require-frontmatter is gated by that predicate first — `parameters` alone never competes
+        # with it for the single-predicate-discipline check (validate_meta excludes it).
+        return Verdict(cls, f"dispatch rule fired. {why}", rid)
     return None
 
 
@@ -600,11 +641,117 @@ def _test_bench_aggregate_capacity(write: dict) -> bool:
     return True
 
 
+# Declared runtime-scoped validator refs: NOT unresolvable — Unavailable-by-declaration, skips
+# clean without downgrading the rule (constraint 6). Value names the runtime that owns them.
+RUNTIME_SCOPED_VALIDATORS = {
+    "epr:validator-eprfs-meta-domain-neutrality": "rust-only",
+}
+
+# A validator that FLAGS a write can tag the fired Verdict with a specific refer_reason (the
+# ceiling-law vocabulary, constraint 3). Absent here -> decision_for() defaults to "rule-fired".
+VALIDATOR_REFER_REASONS = {
+    "epr:validator-escalation-ladder": "escalation-requires-ratification",
+}
+
+
+# ── Agency-charter validator (the ladder, constraint 4). Agents self-grant measure/inject (+
+# dispatch with a named agent); ask/deny authorship or promotion requires an operator-ratified
+# policy pin. Fires on a `.epr-meta`/manifest write that INTRODUCES an ask|deny rule (new file:
+# any ask|deny rule; existing file: compare against prior on-disk content, so unrelated edits to an
+# already-governed manifest never retrigger) not backed by a `policy:` binding whose registry row's
+# `established_by` starts with `operator-` (the pending-ratification convention counts as backed).
+def _frontmatter_or_whole(text: str) -> str:
+    """Mirror of the Rust `frontmatter_or_whole` (repository_validators.rs): real .epr-meta
+    files are `---`-fenced frontmatter + body — raw safe_load on them fails/abstains, which
+    would make any content-parsing validator silently never fire. Fenced → the block; bare
+    YAML → the whole text. Cross-runtime parity requires both sides to accept both shapes."""
+    if text.startswith("---\n"):
+        rest = text[4:]
+        end = rest.find("\n---")
+        if end != -1:
+            return rest[:end]
+    return text
+
+
+def _rule_ask_deny_classes(content: str | None, policies: dict) -> dict:
+    """Parse manifest YAML `content` -> {rule_id: effective_class} for rules whose EFFECTIVE class
+    (inline `class:`, or the bound registry policy's `class:`) is ask or deny. Best-effort: any
+    parse failure abstains ({})."""
+    if not content or yaml is None:
+        return {}
+    try:
+        data = yaml.safe_load(_frontmatter_or_whole(content))
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: dict = {}
+    for rule in data.get("rules", []) or []:
+        if not isinstance(rule, dict):
+            continue
+        rid = rule.get("id")
+        if not rid:
+            continue
+        ref = rule.get("policy")
+        cls = policies.get(ref, {}).get("class") if isinstance(ref, str) else rule.get("class")
+        if cls in ("ask", "deny"):
+            out[rid] = cls
+    return out
+
+
+def _rule_backed_by_ratified_policy(rid: str, content: str | None, policies: dict) -> bool:
+    """True iff rule `rid` in `content` binds a `policy:` ref whose registry row's
+    `established_by` starts with `operator-`. An INLINE ask|deny (no `policy:` binding) is NEVER
+    backed — the charter requires an operator-ratified pin for that class, not agent
+    self-declaration."""
+    if not content or yaml is None:
+        return False
+    try:
+        data = yaml.safe_load(_frontmatter_or_whole(content))
+    except Exception:
+        return False
+    if not isinstance(data, dict):
+        return False
+    for rule in data.get("rules", []) or []:
+        if not isinstance(rule, dict) or rule.get("id") != rid:
+            continue
+        ref = rule.get("policy")
+        if not isinstance(ref, str):
+            return False
+        pol = policies.get(ref)
+        return bool(
+            pol
+            and str(pol.get("established_by", "")).startswith(("operator-", "deliberated-"))
+        )
+    return False
+
+
+def _escalation_ladder(write: dict) -> bool:
+    path = Path(write["path"])
+    if not is_manifest_path(path):
+        return False
+    content = write.get("content")
+    root = find_repo_root(path)
+    policies, _errs = load_policies(root)
+    post = _rule_ask_deny_classes(content, policies)
+    if write.get("is_new"):
+        prior_ids: set = set()
+    else:
+        try:
+            prior = path.read_text(errors="replace")
+        except OSError:
+            prior = None
+        prior_ids = set(_rule_ask_deny_classes(prior, policies).keys())
+    introduced = {rid: c for rid, c in post.items() if rid not in prior_ids}
+    return any(not _rule_backed_by_ratified_policy(rid, content, policies) for rid in introduced)
+
+
 REFERENCE_VALIDATORS = {
     "epr:validator-p2p-design-gate": _p2p_design_gate,
     "epr:validator-sovereignty-ontology-guard": _sovereignty_ontology_guard,
     "epr:validator-archetype-resource-alignment": _archetype_resource_alignment,
     "epr:validator-test-bench-aggregate-capacity": _test_bench_aggregate_capacity,
+    "epr:validator-escalation-ladder": _escalation_ladder,
 }
 
 
@@ -614,6 +761,19 @@ REFERENCE_VALIDATORS = {
 # resolve time (after merge_rules, before evaluate) so `evaluate` stays pure and unchanged.
 # Graduated home: mishpat_integrity::Precedent entries (CID = entry_hash), bindings become cites. ──
 POLICY_REGISTRY_REL = ".claude/epr-meta/policies.yaml"
+
+# contentHash pins the row's SEMANTICS (canonical JSON, sorted+compact) minus lifecycle/volatile
+# fields — status and supersession lineage change without altering what the row governs, so they
+# stay out of the hash; contentHash itself is obviously excluded. Shared by load_policies
+# (verify) and epr-meta-pin.py (compute/write) — the SAME canonicalization, or the two would drift.
+_HASH_EXCLUDE_KEYS = {"contentHash", "status", "superseded_by"}
+
+
+def policy_content_hash(pol: dict) -> str:
+    """Canonical `sha256:<hex>` contentHash for one policy registry row."""
+    body = {k: v for k, v in pol.items() if k not in _HASH_EXCLUDE_KEYS}
+    canon = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return "sha256:" + hashlib.sha256(canon.encode("utf-8")).hexdigest()
 
 
 def load_policies(repo_root: Path) -> tuple[dict, list[str]]:
@@ -674,6 +834,15 @@ def load_policies(repo_root: Path) -> tuple[dict, list[str]]:
                             + (f" (non-integer: {bad})" if bad else "")
                             + " — it would measure nothing; NOT loaded")
                 continue
+        stored_hash = pol.get("contentHash")
+        if stored_hash:
+            computed = policy_content_hash(pol)
+            if computed != stored_hash:
+                errs.append(f"policy `{key}` contentHash mismatch — registry tampered (pinned "
+                            f"{stored_hash}, computed {computed}); bindings ROUTE to review "
+                            f"(policy-pin-mismatch), not enforced as authored")
+                out[key] = {"__pin_mismatch__": True}
+                continue
         out[key] = pol
     return out, errs
 
@@ -704,6 +873,21 @@ def expand_policies(merged: dict, policies: dict) -> list[str]:
             errs.append(f"rule `{rid}` binds unknown policy `{ref}` — rule NOT enforced "
                         f"(registry: {POLICY_REGISTRY_REL})")
             del merged["rules"][rid]
+            continue
+        if pol.get("__pin_mismatch__"):
+            # Tampered registry: the binding is suspect, not simply unknown — route to review
+            # rather than enforcing (or silently dropping) possibly-altered semantics.
+            errs.append(f"rule `{rid}` binds policy `{ref}` whose contentHash mismatches — "
+                        f"routing to review (policy-pin-mismatch)")
+            merged["rules"][rid] = {
+                "id": rid, "class": "ask", "pin-mismatch": True,
+                "why": f"policy `{ref}` contentHash mismatch — registry may be tampered; this "
+                       f"binding routes to review rather than enforcing possibly-altered "
+                       f"semantics. Re-pin with epr-meta-pin.py --write after confirming the "
+                       f"edit was legitimate.",
+                "when": rule.get("when") or {}, "policy-ref": ref,
+                "refer-reason": "policy-pin-mismatch",
+            }
             continue
         exp = {"id": rid, "class": pol.get("class", "inject"),
                "why": rule.get("why") or pol.get("why", ""),
@@ -743,6 +927,155 @@ def combine(verdicts: list[Verdict]) -> Verdict | None:
     if not blocking:
         return None
     return max(blocking, key=lambda v: _SEVERITY[v.cls])
+
+
+# ── The governance correspondence spine: decision_for() + resolve_write() — the shared, PURE
+# per-write decision path both the resolver hook and the git-gate CLI drive (the "same _witness
+# helper" / "the REAL path, not a reimplementation" the golden-vector parity runner exercises).
+# Decision vocabulary: epr:schema:enum:decision (permit|refuse|refer). ──
+FINDINGS_LEDGER_REL = ".claude/data/governance-findings.jsonl"
+
+
+def witness(root: Path, *, runtime: str, gate: str, subject, decision: str, cls: str | None,
+            rule_id: str | None = None, policy_ref: str | None = None, refer: dict | None = None,
+            checks: list | None = None) -> None:
+    """Append one JSON line to governance-findings.jsonl — the keel Verdict projected to JSONL.
+    Shared by the resolver hook AND the git-gate CLI so both runtimes write the SAME shape.
+    Flock-append idiom cloned from the resolver's _handle_measures (best-effort; NEVER raises —
+    witnessing must never break a gate). `decision` in permit|refuse|refer."""
+    try:
+        entry = {
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "runtime": runtime,
+            "gate": gate,
+            "subject": subject,
+            "decision": decision,
+            "class": cls,
+            "ruleId": rule_id,
+            "policyRef": policy_ref,
+            "refer": refer,
+            "witness": checks or [],
+        }
+        ledger = Path(root) / FINDINGS_LEDGER_REL
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        with open(ledger, "a", encoding="utf-8", errors="replace") as fh:
+            locked = fcntl is None
+            if not locked:
+                deadline = time.monotonic() + 0.5
+                while time.monotonic() < deadline:
+                    try:
+                        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        locked = True
+                        break
+                    except OSError:
+                        time.sleep(0.02)
+            if locked:
+                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:  # noqa: BLE001 — witnessing must never break the gate
+        pass
+
+
+def decision_for(verdict: Verdict | None) -> dict:
+    """PURE: map a combined Verdict (deny/ask/inject, or None) to the keel decision shape
+    {decision, cls, rule_id, refer}. deny -> refuse; ask -> refer (refer.reason = the verdict's
+    refer_reason, defaulting to 'rule-fired'); inject -> permit (advisory). measure/dispatch never
+    reach combine() (severity 0, always non-blocking) — callers handle them separately."""
+    if verdict is None:
+        return {"decision": "permit", "cls": None, "rule_id": None, "refer": None}
+    if verdict.cls == "deny":
+        return {"decision": "refuse", "cls": "deny", "rule_id": verdict.rule_id, "refer": None}
+    if verdict.cls == "ask":
+        reason = verdict.refer_reason or "rule-fired"
+        return {"decision": "refer", "cls": "ask", "rule_id": verdict.rule_id,
+                "refer": {"layer": "operator", "reason": reason}}
+    return {"decision": "permit", "cls": verdict.cls, "rule_id": verdict.rule_id, "refer": None}
+
+
+def resolve_write(target: Path, write: dict, root: Path, *, verdict_filter=None) -> dict:
+    """PURE GIVEN a pure (or absent) `verdict_filter` (read-only disk access for manifests/
+    policies, no side effects otherwise): the FULL per-write resolver decision — cascade ->
+    malformed check -> merge+expand policies -> evaluate -> combine -> decision mapping. Mirrors
+    epr-meta-resolver.py's main() minus stdin/stdout/witnessing/coverage-nudge/arch-ledger side
+    effects (those stay runtime-specific in the callers). Returns {decision, cls, rule_id, refer,
+    directive, advisories, measures, dispatches, witnessed, merged?} — `witnessed` is False ONLY
+    for the silent clean-allow paths (no manifest cascade at all, or a cascade that fired nothing
+    AND no malformed-manifest advisory): every other outcome (deny/ask/inject/measure/dispatch/
+    malformed-manifest/unresolvable-validator) is True, per the polarity law (fail-open, never
+    silent).
+
+    `verdict_filter(verdict, merged) -> bool`, when given, is called BEFORE combine() on every
+    fired verdict; True EXCLUDES it from the combine input (but never from `measures`/
+    `dispatches`, which always see every fired verdict of their class regardless). The extension
+    point for the resolver hook's per-session soft-ceiling inject debounce (a stateful, Claude-
+    side concern — this function stays pure by construction: the default `None` is EXACTLY the
+    golden-vector parity runner's path, since none of the 9 vectors exercise debounce).
+
+    A malformed manifest on a NON-manifest target hard-routes (returns immediately, mirroring the
+    original resolver's `_emit_ask` early-exit — "the gate cannot know what governance intended").
+    A malformed manifest on the MANIFEST's own edit is advisory-only and does NOT short-circuit —
+    editing an `.epr-meta` is never blocked, and independent concerns (root-anchor, other rules
+    that may still apply to the manifest file itself) still get evaluated, exactly as before."""
+    chain = collect_cascade(target)
+    if not chain:
+        return {"decision": "permit", "cls": None, "rule_id": None, "refer": None, "reason": None,
+                "directive": None, "advisories": [], "measures": [], "dispatches": [],
+                "witnessed": False}
+
+    target_is_manifest = is_manifest_path(target)
+    problems = [(m, errs) for m in chain if (errs := check_meta(m))]
+    advisories: list[str] = []
+    malformed_advisory = False
+    if problems:
+        detail = "; ".join(f"{m}: {', '.join(e)}" for m, e in problems)
+        if target_is_manifest:
+            advisories.append(f"[.epr-meta] malformed governance manifest(s) — {detail}. "
+                              "(editing an .epr-meta is never blocked, so you can fix it.)")
+            malformed_advisory = True
+        else:
+            return {"decision": "refer", "cls": "ask", "rule_id": None,
+                    "refer": {"layer": "operator", "reason": "governance-manifest-malformed"},
+                    "reason": f"governance manifest malformed — {detail}. Fix the manifest to "
+                              "restore full governance here; proceeding now requires "
+                              "confirmation.",
+                    "directive": None, "advisories": [], "measures": [], "dispatches": [],
+                    "witnessed": True}
+
+    merged = merge_rules(chain)
+    policies, pol_errs = load_policies(root)
+    exp_errs = expand_policies(merged, policies)
+    advisories += [f"[.epr-meta] {e}" for e in (*pol_errs, *exp_errs)]
+
+    verdicts = evaluate(merged, write)
+    measures = [v for v in verdicts if v.cls == "measure"]
+    dispatches = [v for v in verdicts if v.cls == "dispatch"]
+    combine_input = (verdicts if verdict_filter is None
+                      else [v for v in verdicts if not verdict_filter(v, merged)])
+    combined = combine(combine_input)
+
+    if combined is not None:
+        info = decision_for(combined)
+        src = merged["sources"][-1] if merged.get("sources") else "?"
+        info["reason"] = f"{combined.reason} [rule `{combined.rule_id}` from {src}]"
+        return {**info, "directive": None, "advisories": advisories, "measures": measures,
+                "dispatches": dispatches, "witnessed": True, "merged": merged}
+
+    if dispatches:
+        d = dispatches[0]
+        return {"decision": "permit", "cls": "dispatch", "rule_id": d.rule_id, "refer": None,
+                "reason": d.reason, "directive": "dispatch", "advisories": advisories,
+                "measures": measures, "dispatches": dispatches, "witnessed": True,
+                "merged": merged}
+
+    if measures:
+        m = measures[0]
+        return {"decision": "permit", "cls": "measure", "rule_id": m.rule_id, "refer": None,
+                "reason": m.reason, "directive": None, "advisories": advisories,
+                "measures": measures, "dispatches": dispatches, "witnessed": True,
+                "merged": merged}
+
+    return {"decision": "permit", "cls": None, "rule_id": None, "refer": None, "reason": None,
+            "directive": None, "advisories": advisories, "measures": measures,
+            "dispatches": dispatches, "witnessed": malformed_advisory, "merged": merged}
 
 
 # ── Subtree-coverage walk: the `.epr-meta` self-responsibility claim + the deterministic coverage
