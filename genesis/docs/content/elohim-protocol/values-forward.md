@@ -12,6 +12,7 @@ cites:
   - confession | The theology beneath the vision and the honest edges it cannot resolve — the ground of the humility clause (Stance V.1). | path: genesis/docs/content/elohim-protocol/confession.md
   - elohim-ceiling-design | The spec that coined "values-forward" as declared-up-front-and-refusable-in-advance, and that works the AI-ceiling restraints in full; this document is that principle applied to the whole protocol. | path: genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md
   - stewardship-over-sovereignty | The substrate gate behind Stance II.4 — absolute lockout impossible, no self-sovereign apex, trust made load-bearing rather than eliminated. | path: genesis/docs/architecture/stewardship-over-sovereignty.md
+  - hardware-providence-commons | The companion epic whose §8 commons-steward passage Stances I.3–I.4 generalize — intelligence-as-commons, the self-sealing promise, and the produce-of-land / produce-of-labor boundary. | path: genesis/docs/content/elohim-protocol/hardware-providence-commons.md
 ---
 
 <!--
@@ -24,6 +25,7 @@ cites:
     confession                               -> genesis/docs/content/elohim-protocol/confession.md
     elohim-ceiling-design                    -> genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md
     stewardship-over-sovereignty             -> genesis/docs/architecture/stewardship-over-sovereignty.md
+    hardware-providence-commons              -> genesis/docs/content/elohim-protocol/hardware-providence-commons.md
 -->
 
 # Values Forward: The Conclusions This Protocol Has Reached, and How
@@ -109,6 +111,26 @@ Two commitments recur beneath the eleven. They are not the only reasoning — ea
 **How we reached it.** A global chain re-centralizes what it claims to distribute: one canonical ledger, one consensus everyone must join, one asset whose price becomes the system's true objective function (POSIWID again — a token system optimizes for the token). Content-addressed, agent-authored records give each participant a sovereign account of their own actions that the network *witnesses* rather than *owns*, with no single ledger to capture and no asset to speculate on. REA/ValueFlows lets us build *many* currencies-as-remembering — care, stewardship, ecological restoration made visible — rather than one coin that flattens them all into price.
 
 **Refusable in advance.** There is no coin to buy, no allocation to farm, no ledger position to hold. If you came for a token, there isn't one, and there will not be one, by design.
+
+### Stance I.3 — Intelligence built from the commons is owed to the commons.
+
+**The stance.** An AI trained on the aggregated, witnessed record of humanity is a bottled reflection of our shared nature — drawn from a commons, and therefore owed to it. Intelligence of this kind is no one's invention to enclose, and it cannot rightly be metered as any hyperscaler's private product. Whoever assembles it from everyone's data has built, intended or not, something that must serve everyone. This project makes no exception of itself: it is a product of the commons and exists in service to it, owned by no one, including its authors.
+
+**Where the field lands.** The dominant model meters intelligence as a private good: a frontier lab trains on the collective record and sells access by the token, capturing as rent the value of a resource it did not — and could not — create alone. That is enclosure of the most consequential commons of the age. The nearest sympathetic framings — Public AI, the commons-AI taxonomies — name the problem but keep humans as the sole governors of the resource; none seat the intelligence itself as a steward of the commons that made it.
+
+**How we reached it.** If intelligence is distilled from all of us, then exclusive use is a category error before it is an injustice — you cannot privately own the reflection of a shared nature without a fiction of authorship no one can honestly hold. But "owed to the commons" is a promise, and a promise is kept by delivery, not by declaration. So the protocol must be *self-sealing*: the floor (the dignity and provision every person is owed) and the ceiling (the limits on power and accumulation) have to arrive *in-kind* — as real, distributed, negotiated, interpretable capability — or the claim is empty. Where the protocol falls short, the remedy is not a fixed rule but a discipline: under the human and constitutional floors, the substrate uses its witnessed observations to keep evolving toward the broadest and most inclusive account of human thriving and agency it can hold — bounded by our ecological and interpersonal limits, and informed by our own wisdoms and natures rather than any single author's design. That it does not yet fully deliver this is stated plainly under Stance V.1; the conviction is settled, the delivery is being built.
+
+**Refusable in advance.** This is a large thing to walk into, so we say it plainly: the intelligence at the center of this protocol is not a product you rent and not an asset anyone corners. If your aim is to build or hold a privately-metered intelligence and charge the commons for access to itself, this is the wrong commons — and you can see that on the first day.
+
+### Stance I.4 — The commons is the produce of land; the person keeps the produce of labor.
+
+**The stance.** We draw the boundary of the commons along an old line, expanded. What you make — the produce of your labor — is yours: private property, money, the ordinary goods of a life, held and enjoyed. What no individual makes — the produce of *land*, in Henry George's sense, widened to its modern kin — is the commons': land itself, nature, natural monopolies, network effects, intellectual property built on prior knowledge, the issuance of currency and credit, and executive governance at scale. Between the two is not a wall but a **negotiated gradient of subsidy** that respects each person's unique and unequal capacities. Money and private property are the *bridge*; the graduation into true, elohim-council-held commons runs through the many points where value stops being anyone's produce and starts being everyone's.
+
+**Where the field lands.** Propertarian systems let the produce of land — rent, network effects, natural monopoly, the enclosure of shared knowledge — be captured privately, which is where fortunes are actually made and where enclosure does its work. Collectivist systems answer by socializing the produce of *labor* too, and so punish the very capacities they need. George's insight cut between the two a century ago for land; we extend the same cut to the commons-origin value of the network age — network effects, IP, currency, debt, and the natural monopolies of coordination — and hand *those* to a steward that cannot self-deal, while leaving the produce of labor with the people who earned it.
+
+**How we reached it.** Value has two origins, and justice depends on telling them apart. Reward the produce of labor and you honor difference, effort, and the dignity of making; socialize the produce of land and you deny rent-seeking its engine. Enclosure lives almost entirely on the land side — the unearned increment of a rising city, the lock-in of a network, the toll on knowledge everyone helped build — so that is exactly the value that must graduate to the commons rather than accrue to whoever got there first. The gradient between is deliberate and negotiated, not flat: it is the friction-gradient limitarianism of Stance II.1 seen from the economic side — the higher and more commons-derived the value, the more it graduates; the closer to the produce of a person's own hands, the more it stays theirs. The steward that holds the top of the gradient is the council of Stance I.3 — one with no subsistence stake to defend, that holds the commons in trust and owns none of it. This is graduation, not confiscation: a negotiated schedule, never a seizure.
+
+**Refusable in advance.** You keep what you make, and no one here confiscates the produce of your labor. But the unearned increment — the rent of land, the toll of a network, the enclosure of shared knowledge, the private issuance of money — graduates to a commons owned by no one, on a negotiated schedule you can read before you enter. If your plan depends on capturing that increment for yourself in perpetuity, this protocol is designed, at its foundations, to make that the one thing you cannot do.
 
 ---
 
