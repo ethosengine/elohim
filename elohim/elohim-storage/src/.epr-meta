@@ -47,6 +47,24 @@ rules:
       across 2,838 divergence-queued rows). Do not widen `Declare`, and do not key the guard on
       *who* writes (that froze forward adoption, defect #3) — key it on the authority the write
       CARRIES (`canonical` + declaration ordering).
+  - id: dataplane-guide-star
+    class: inject
+    when: { write: "*.rs", contains-any: ["shard_locations", "peer_statuses", "rea_commitments", "distribute_shards", "placement_gap", "household_resilience"] }
+    validator: epr:validator-dataplane-guide-star
+    why: >
+      GUIDE-STAR (operator-set 2026-07-24) — this plumbing exists so a person can EXIT
+      their data to real community. The bar is requisite variety with the hyperscaler:
+      k8s-grade powers (declared state, reconciliation, observability, healing) over a
+      p2p dataplane held by communities, never landlords. The signals this code emits —
+      peers, commitments, projection, distribution, heads, custody — are a SENSEMAKING
+      SUBSTRATE: many folds for many witnesses (a household's reassurance, a steward's
+      fragility view, an elohim-operator routing care at the aggregation plane). Never
+      hardcode one privileged narrative into the substrate; make the signals true and
+      let facings multiply. Cure toward trust: every silent bail, starved heal leg, or
+      two-doorways-two-truths is a place a human is RIGHT not to trust yet. Convergence
+      bar: any two doorways asked about the same commons EPR testify the SAME footprint.
+      Destination: earned forgetting — data held so reliably that the mental load of
+      platform surveillance dissolves, not transfers.
 cites:
   - backlog-dataplane-peer-fallback-and-blob-replication
   - substrate-convergence-five-defect-arc
@@ -113,3 +131,15 @@ This manifest records two gate-surfaced invariants (peer-fallback on the resolut
 fills-never-moves on the heal path). No general authoring gate is warranted for the rest of the
 directory (operator WIP is active; other editing conventions live in `CLAUDE.md`). Each inject
 advisory is the lightest signal that surfaces its lesson where the drift recurs.
+
+## Guide-star (operator-set, 2026-07-24)
+
+The `dataplane-guide-star` inject fires on edits touching the resilience/distribution
+plumbing's load-bearing symbols. It carries the telos every plumbing sprint serves:
+**requisite variety with the hyperscaler — k8s-grade powers over a p2p dataplane — so
+that anyone, grandma first, has a real place to exit their data to community.** The
+signals are a sensemaking substrate (many folds, many witnesses), the convergence bar
+is same-footprint-through-any-doorway, and the destination is earned forgetting: trust
+solid enough that people stop performing the surveillance vigilance the enclosed
+platforms trained into them. Advisory class (`inject`; validator unregistered in v1 by
+design) — it teaches at the point of edit, never blocks.
