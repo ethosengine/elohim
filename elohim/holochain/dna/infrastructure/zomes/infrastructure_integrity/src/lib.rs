@@ -89,7 +89,12 @@ impl Default for DoorwayCapabilities {
 #[derive(Clone, PartialEq)]
 pub struct DoorwayRegistration {
     pub id: String,                       // "alpha-elohim-host"
-    pub url: String,                      // "https://alpha.elohim.host"
+    pub url: String,                      // compatibility alias for first gateway endpoint
+    pub identity_root: String,            // stable lineage root; id/hostname are aliases
+    pub signing_key: String,              // current Ed25519/Holochain agent head
+    pub endpoints: Vec<infrastructure_types::DoorwayEndpoint>,
+    pub record_serial: u64,               // signed monotonic replay boundary
+    pub record_signature: Vec<u8>,        // detached Ed25519 signature
     pub operator_agent: String,           // uhCAk... (who runs this doorway)
     pub operator_human: Option<String>,   // Reference to Human entry in imagodei DNA
     pub capabilities_json: String,        // DoorwayCapabilities as JSON
@@ -307,37 +312,7 @@ fn validate_doorway_registration(
     doorway: &DoorwayRegistration,
     action: &Create,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Self-registration only: operator_agent must be the author
-    let author_str = action.author.to_string();
-    if doorway.operator_agent != author_str {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Doorway operator_agent must match the author (self-registration only)".to_string(),
-        ));
-    }
-
-    // Validate URL format (basic check)
-    if !doorway.url.starts_with("http://") && !doorway.url.starts_with("https://") {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Doorway URL must start with http:// or https://".to_string(),
-        ));
-    }
-
-    // Validate ID is not empty
-    if doorway.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Doorway ID cannot be empty".to_string(),
-        ));
-    }
-
-    // Validate tier is valid
-    let valid_tiers = ["Emerging", "Established", "Trusted", "Anchor"];
-    if !valid_tiers.contains(&doorway.tier.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Invalid tier '{}'. Must be one of: {:?}", doorway.tier, valid_tiers),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
+    Ok(validate_doorway_record(doorway, &action.author))
 }
 
 /// Validate DoorwayRegistration update
@@ -345,30 +320,117 @@ fn validate_doorway_update(
     doorway: &DoorwayRegistration,
     action: &Update,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Self-registration only: operator_agent must be the author
-    let author_str = action.author.to_string();
-    if doorway.operator_agent != author_str {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Doorway operator_agent must match the author (self-registration only)".to_string(),
-        ));
+    Ok(validate_doorway_record(doorway, &action.author))
+}
+
+fn validate_doorway_record(
+    doorway: &DoorwayRegistration,
+    author: &AgentPubKey,
+) -> ValidateCallbackResult {
+    let author_str = author.to_string();
+    if doorway.operator_agent != author_str || doorway.signing_key != author_str {
+        return ValidateCallbackResult::Invalid(
+            "Doorway operator_agent and signing_key must match the action author".to_string(),
+        );
+    }
+    if doorway.id.trim().is_empty() || doorway.identity_root.trim().is_empty() {
+        return ValidateCallbackResult::Invalid(
+            "Doorway id and identity_root cannot be empty".to_string(),
+        );
+    }
+    if doorway.record_serial == 0 {
+        return ValidateCallbackResult::Invalid(
+            "Doorway record_serial must be greater than zero".to_string(),
+        );
+    }
+    if doorway.endpoints.is_empty() || doorway.endpoints.len() > 16 {
+        return ValidateCallbackResult::Invalid(
+            "Doorway endpoints must contain between 1 and 16 addresses".to_string(),
+        );
     }
 
-    // Validate URL format (basic check)
-    if !doorway.url.starts_with("http://") && !doorway.url.starts_with("https://") {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Doorway URL must start with http:// or https://".to_string(),
-        ));
-    }
-
-    // Validate tier is valid
     let valid_tiers = ["Emerging", "Established", "Trusted", "Anchor"];
     if !valid_tiers.contains(&doorway.tier.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(
+        return ValidateCallbackResult::Invalid(
             format!("Invalid tier '{}'. Must be one of: {:?}", doorway.tier, valid_tiers),
-        ));
+        );
     }
 
-    Ok(ValidateCallbackResult::Valid)
+    let mut first_gateway = None;
+    for endpoint in &doorway.endpoints {
+        if endpoint.ttl_secs < 30 || endpoint.ttl_secs > 86_400 {
+            return ValidateCallbackResult::Invalid(format!(
+                "Doorway endpoint TTL {} is outside 30..=86400 seconds",
+                endpoint.ttl_secs
+            ));
+        }
+        let valid_url = match endpoint.service.as_str() {
+            "gateway" | "bootstrap" => {
+                endpoint.url.starts_with("http://") || endpoint.url.starts_with("https://")
+            }
+            "signal" => endpoint.url.starts_with("ws://") || endpoint.url.starts_with("wss://"),
+            _ => {
+                return ValidateCallbackResult::Invalid(format!(
+                    "Unsupported doorway endpoint service '{}'",
+                    endpoint.service
+                ))
+            }
+        };
+        if !valid_url {
+            return ValidateCallbackResult::Invalid(format!(
+                "Invalid {} endpoint URL '{}'",
+                endpoint.service, endpoint.url
+            ));
+        }
+        if endpoint.service == "gateway" && first_gateway.is_none() {
+            first_gateway = Some(endpoint.url.as_str());
+        }
+    }
+
+    if first_gateway != Some(doorway.url.as_str()) {
+        return ValidateCallbackResult::Invalid(
+            "Doorway url must equal the first signed gateway endpoint".to_string(),
+        );
+    }
+
+    let signing_key: [u8; 32] = match author.get_raw_32().try_into() {
+        Ok(key) => key,
+        Err(_) => {
+            return ValidateCallbackResult::Invalid(
+                "Doorway author key is not a 32-byte Ed25519 key".to_string(),
+            )
+        }
+    };
+    let endpoint_refs = doorway
+        .endpoints
+        .iter()
+        .map(|endpoint| pkarr_bridge::EndpointRef {
+            service: &endpoint.service,
+            url: &endpoint.url,
+            priority: endpoint.priority,
+            ttl_secs: endpoint.ttl_secs,
+        })
+        .collect::<Vec<_>>();
+    let canonical = match pkarr_bridge::canonical_record_bytes(
+        &doorway.identity_root,
+        &signing_key,
+        doorway.record_serial,
+        &endpoint_refs,
+    ) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            return ValidateCallbackResult::Invalid(format!(
+                "Doorway endpoint record is not canonical: {error}"
+            ))
+        }
+    };
+
+    match pkarr_bridge::verify_record(&signing_key, &doorway.record_signature, &canonical) {
+        Ok(()) => ValidateCallbackResult::Valid,
+        Err(error) => ValidateCallbackResult::Invalid(format!(
+            "Doorway endpoint record signature invalid: {error}"
+        )),
+    }
 }
 
 // validate_doorway_heartbeat removed (observation-event-layer spec §10 Stage 6) — DoorwayHeartbeat entry type removed
@@ -485,4 +547,72 @@ fn validate_content_server(server: &ContentServer) -> ExternResult<ValidateCallb
     }
 
     Ok(ValidateCallbackResult::Valid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
+
+    fn signed_doorway() -> (DoorwayRegistration, AgentPubKey) {
+        let signing_key = SigningKey::from_bytes(&[19_u8; 32]);
+        let public_key = signing_key.verifying_key().to_bytes();
+        let author = AgentPubKey::from_raw_32(public_key.to_vec());
+        let endpoints = vec![infrastructure_types::DoorwayEndpoint {
+            service: "gateway".to_string(),
+            url: "https://doorway.example".to_string(),
+            priority: 0,
+            ttl_secs: 300,
+        }];
+        let refs = endpoints
+            .iter()
+            .map(|endpoint| pkarr_bridge::EndpointRef {
+                service: &endpoint.service,
+                url: &endpoint.url,
+                priority: endpoint.priority,
+                ttl_secs: endpoint.ttl_secs,
+            })
+            .collect::<Vec<_>>();
+        let canonical =
+            pkarr_bridge::canonical_record_bytes(&author.to_string(), &public_key, 7, &refs)
+                .unwrap();
+
+        (
+            DoorwayRegistration {
+                id: "alpha".to_string(),
+                url: "https://doorway.example".to_string(),
+                identity_root: author.to_string(),
+                signing_key: author.to_string(),
+                endpoints,
+                record_serial: 7,
+                record_signature: signing_key.sign(&canonical).to_bytes().to_vec(),
+                operator_agent: author.to_string(),
+                operator_human: None,
+                capabilities_json: "[]".to_string(),
+                reach: "commons".to_string(),
+                region: None,
+                bandwidth_mbps: None,
+                version: "0.1.0".to_string(),
+                tier: "Emerging".to_string(),
+                registered_at: "now".to_string(),
+                updated_at: "now".to_string(),
+            },
+            author,
+        )
+    }
+
+    #[test]
+    fn doorway_endpoint_signature_rejects_tampering() {
+        let (mut doorway, author) = signed_doorway();
+        assert!(matches!(
+            validate_doorway_record(&doorway, &author),
+            ValidateCallbackResult::Valid
+        ));
+
+        doorway.endpoints[0].url = "https://attacker.example".to_string();
+        assert!(matches!(
+            validate_doorway_record(&doorway, &author),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
 }

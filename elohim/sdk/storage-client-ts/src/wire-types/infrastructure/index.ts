@@ -2,6 +2,7 @@
 
 export type { ContentServer } from './ContentServer';
 export type { ContentServerOutput } from './ContentServerOutput';
+export type { DoorwayEndpoint } from './DoorwayEndpoint';
 export type { DoorwayOutput } from './DoorwayOutput';
 export type { DoorwayRegistration } from './DoorwayRegistration';
 export type { FindPublishersInput } from './FindPublishersInput';

@@ -1,0 +1,10 @@
+[package]
+name = "pkarr-bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Pkarr-shaped signed endpoint records for Elohim doorway discovery"
+
+[dependencies]
+ed25519-dalek.workspace = true

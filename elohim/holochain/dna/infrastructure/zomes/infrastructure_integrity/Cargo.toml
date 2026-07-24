@@ -11,3 +11,8 @@ name = "infrastructure_integrity"
 hdi.workspace = true
 holochain_serialized_bytes.workspace = true
 serde.workspace = true
+infrastructure-types = { path = "../../../../../sdk/domains/infrastructure/types" }
+pkarr-bridge = { path = "../../../../../../bridges/pkarr/pkarr-bridge" }
+
+[dev-dependencies]
+ed25519-dalek = { version = "2", default-features = false }

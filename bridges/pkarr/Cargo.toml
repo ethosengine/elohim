@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = ["pkarr-bridge"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Elohim Protocol"]
+
+[workspace.dependencies]
+ed25519-dalek = { version = "2", default-features = false, features = ["zeroize"] }

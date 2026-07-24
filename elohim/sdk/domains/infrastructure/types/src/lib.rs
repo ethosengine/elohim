@@ -18,6 +18,12 @@ use serde::{Deserialize, Serialize};
 pub struct RegisterDoorwayInput {
     pub id: String,
     pub url: String,
+    // Stable identity-chain root; the coordinator derives it for first registration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity_root: Option<String>,
+    // Pkarr-shaped candidate addresses signed as part of the registration.
+    #[serde(default)]
+    pub endpoints: Vec<DoorwayEndpoint>,
     pub capabilities_json: String,
     pub reach: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -27,12 +33,35 @@ pub struct RegisterDoorwayInput {
     pub version: String,
 }
 
+/// One address at which a doorway service can be reached.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct DoorwayEndpoint {
+    // Service projected at this address: gateway, bootstrap, or signal.
+    pub service: String,
+    pub url: String,
+    // Lower values are preferred. Ties retain signed record order.
+    pub priority: u16,
+    // Cache freshness only; doorway health is carried by observations.
+    pub ttl_secs: u32,
+}
+
 /// DoorwayRegistration entry fields (mirrors integrity zome).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct DoorwayRegistration {
     pub id: String,
+    // Compatibility alias for the first gateway endpoint.
     pub url: String,
+    // Stable identity-chain root. Hostnames and `id` are aliases only.
+    pub identity_root: String,
+    // Current Ed25519/Holochain agent key that signed this record.
+    pub signing_key: String,
+    pub endpoints: Vec<DoorwayEndpoint>,
+    // Monotonic signed serial used to reject replayed older endpoint sets.
+    pub record_serial: u64,
+    // Detached Ed25519 signature over the canonical endpoint record bytes.
+    pub record_signature: Vec<u8>,
     pub operator_agent: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_human: Option<String>,
@@ -229,6 +258,13 @@ mod tests {
         let input = RegisterDoorwayInput {
             id: "doorway-1".to_string(),
             url: "https://doorway.example.com".to_string(),
+            identity_root: None,
+            endpoints: vec![DoorwayEndpoint {
+                service: "gateway".to_string(),
+                url: "https://doorway.example.com".to_string(),
+                priority: 0,
+                ttl_secs: 300,
+            }],
             capabilities_json: r#"{"bootstrap":true}"#.to_string(),
             reach: "commons".to_string(),
             region: Some("us-east".to_string()),
@@ -238,6 +274,7 @@ mod tests {
         let decoded = roundtrip(&input);
         assert_eq!(decoded.id, "doorway-1");
         assert_eq!(decoded.region, Some("us-east".to_string()));
+        assert_eq!(decoded.endpoints, input.endpoints);
     }
 
     #[test]

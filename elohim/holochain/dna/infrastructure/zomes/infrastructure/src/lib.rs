@@ -27,9 +27,9 @@ pub use peer_status::*;
 // =============================================================================
 
 pub use infrastructure_types::{
-    ContentServerOutput, DoorwayOutput, FindPublishersInput, FindPublishersOutput,
-    HealthAttestationOutput, RecordHealthAttestationInput,
-    RecordSummaryInput, RegisterContentServerInput, RegisterDoorwayInput, StorageEndpointInput,
+    ContentServerOutput, DoorwayEndpoint, DoorwayOutput, FindPublishersInput, FindPublishersOutput,
+    HealthAttestationOutput, RecordHealthAttestationInput, RecordSummaryInput,
+    RegisterContentServerInput, RegisterDoorwayInput, StorageEndpointInput,
 };
 
 // =============================================================================
@@ -43,6 +43,11 @@ fn doorway_to_wire(
     infrastructure_types::DoorwayRegistration {
         id: entry.id.clone(),
         url: entry.url.clone(),
+        identity_root: entry.identity_root.clone(),
+        signing_key: entry.signing_key.clone(),
+        endpoints: entry.endpoints.clone(),
+        record_serial: entry.record_serial,
+        record_signature: entry.record_signature.clone(),
         operator_agent: entry.operator_agent.clone(),
         operator_human: entry.operator_human.clone(),
         capabilities_json: entry.capabilities_json.clone(),
@@ -55,7 +60,6 @@ fn doorway_to_wire(
         updated_at: entry.updated_at.clone(),
     }
 }
-
 
 /// Convert integrity ContentServer to wire type.
 fn content_server_to_wire(
@@ -223,6 +227,56 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
 // Doorway Registration Functions
 // =============================================================================
 
+fn normalize_doorway_endpoints(
+    primary_url: &str,
+    mut endpoints: Vec<DoorwayEndpoint>,
+) -> Vec<DoorwayEndpoint> {
+    if endpoints.is_empty() {
+        endpoints.push(DoorwayEndpoint {
+            service: "gateway".to_string(),
+            url: primary_url.to_string(),
+            priority: 0,
+            ttl_secs: 300,
+        });
+    }
+    endpoints
+}
+
+fn sign_doorway_endpoints(
+    signing_key: &AgentPubKey,
+    identity_root: &str,
+    record_serial: u64,
+    endpoints: &[DoorwayEndpoint],
+) -> ExternResult<Vec<u8>> {
+    let raw_key: [u8; 32] = signing_key.get_raw_32().try_into().map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Doorway signing key must contain 32 Ed25519 bytes".to_string()
+        ))
+    })?;
+    let endpoint_refs = endpoints
+        .iter()
+        .map(|endpoint| pkarr_bridge::EndpointRef {
+            service: &endpoint.service,
+            url: &endpoint.url,
+            priority: endpoint.priority,
+            ttl_secs: endpoint.ttl_secs,
+        })
+        .collect::<Vec<_>>();
+    let canonical = pkarr_bridge::canonical_record_bytes(
+        identity_root,
+        &raw_key,
+        record_serial,
+        &endpoint_refs,
+    )
+    .map_err(|error| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Could not encode doorway endpoint record: {error}"
+        )))
+    })?;
+    let signature = hdk::ed25519::sign_raw(signing_key.clone(), canonical)?;
+    Ok(signature.0.to_vec())
+}
+
 /// Register a new doorway (self-registration only).
 ///
 /// The operator_agent is set to the calling agent - doorways can only
@@ -232,34 +286,56 @@ pub fn register_doorway(input: RegisterDoorwayInput) -> ExternResult<DoorwayOutp
     let agent_info = agent_info()?;
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
+    let author = agent_info.agent_initial_pubkey.clone();
+    let author_string = author.to_string();
+    let existing = get_doorway_by_id(input.id.clone())?;
 
-    // Re-registration is ALLOWED (scoped bootstrap debt, 2026-06-11): a
-    // doorway whose conductor was reinstalled signs with a NEW agent key,
-    // and the old duplicate-rejection here + the operator guard on
-    // update_doorway made the lockout total — the live doorway could never
-    // reclaim its own id, so record_health_attestation failed forever
-    // ("Only the doorway operator can record attestations", every 5 min on
-    // alpha) and no attestation ever landed. Each registration creates a
-    // NEW entry + link: the full churn trail stays readable on the DHT
-    // (get_doorways_by_operator + the link history), and
-    // get_doorway_by_id resolves latest-wins. The id-squatting risk this
-    // accepts is bounded to the bootstrap phase; the consistent end-state
-    // is commitment-gated reclaim (operate-doorway REA / delegates-compute
-    // family) — tracked in
-    // genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md.
-    if let Some(prev) = get_doorway_by_id(input.id.clone())? {
-        if prev.doorway.operator_agent != agent_info.agent_initial_pubkey.to_string() {
-            warn!(
-                "register_doorway: id '{}' re-registered under a NEW operator agent (was {}, now {}) — operator churn recorded on the DHT trail",
-                input.id, prev.doorway.operator_agent, agent_info.agent_initial_pubkey
-            );
+    // A hostname/slug is now only an alias for a key-rooted identity. A new
+    // operator cannot win that alias by appending a later link. Key rotation
+    // must first be authorized by the identity-lineage coordinator; until the
+    // cross-DNA head gate is wired, fail closed instead of reviving the old
+    // id-squatting/latest-arrival behavior.
+    if let Some(prev) = &existing {
+        if prev.doorway.operator_agent != author_string {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Doorway '{}' is rooted at identity '{}'; a different key must present an authorized lineage head",
+                input.id, prev.doorway.identity_root
+            ))));
         }
     }
+
+    let identity_root = match (&existing, input.identity_root.as_deref()) {
+        (Some(prev), Some(requested)) if requested != prev.doorway.identity_root => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Doorway identity_root cannot change during re-registration".to_string()
+            )))
+        }
+        (Some(prev), _) => prev.doorway.identity_root.clone(),
+        (None, Some(requested)) if requested != author_string => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "A new doorway identity_root must equal its author key".to_string()
+            )))
+        }
+        (None, Some(requested)) => requested.to_string(),
+        (None, None) => author_string.clone(),
+    };
+    let endpoints = normalize_doorway_endpoints(&input.url, input.endpoints);
+    let record_serial = existing
+        .as_ref()
+        .map(|prev| prev.doorway.record_serial.saturating_add(1))
+        .unwrap_or_else(|| now.as_micros().max(1) as u64);
+    let record_signature =
+        sign_doorway_endpoints(&author, &identity_root, record_serial, &endpoints)?;
 
     let doorway = DoorwayRegistration {
         id: input.id.clone(),
         url: input.url,
-        operator_agent: agent_info.agent_initial_pubkey.to_string(),
+        identity_root,
+        signing_key: author_string.clone(),
+        endpoints,
+        record_serial,
+        record_signature,
+        operator_agent: author_string,
         operator_human: None,
         capabilities_json: input.capabilities_json,
         reach: input.reach,
@@ -350,9 +426,32 @@ pub fn update_doorway(input: RegisterDoorwayInput) -> ExternResult<DoorwayOutput
         )));
     }
 
+    if input
+        .identity_root
+        .as_deref()
+        .is_some_and(|root| root != existing.doorway.identity_root)
+    {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Doorway identity_root cannot change during update".to_string()
+        )));
+    }
+    let endpoints = normalize_doorway_endpoints(&input.url, input.endpoints);
+    let record_serial = existing.doorway.record_serial.saturating_add(1);
+    let record_signature = sign_doorway_endpoints(
+        &agent_info.agent_initial_pubkey,
+        &existing.doorway.identity_root,
+        record_serial,
+        &endpoints,
+    )?;
+
     let doorway = DoorwayRegistration {
         id: input.id.clone(),
         url: input.url,
+        identity_root: existing.doorway.identity_root,
+        signing_key: agent_info.agent_initial_pubkey.to_string(),
+        endpoints,
+        record_serial,
+        record_signature,
         operator_agent: existing.doorway.operator_agent,
         operator_human: existing.doorway.operator_human,
         capabilities_json: input.capabilities_json,
@@ -779,6 +878,11 @@ pub fn update_doorway_tier(doorway_id: String) -> ExternResult<DoorwayOutput> {
     let doorway = DoorwayRegistration {
         id: existing.doorway.id,
         url: existing.doorway.url,
+        identity_root: existing.doorway.identity_root,
+        signing_key: existing.doorway.signing_key,
+        endpoints: existing.doorway.endpoints,
+        record_serial: existing.doorway.record_serial,
+        record_signature: existing.doorway.record_signature,
         operator_agent: existing.doorway.operator_agent,
         operator_human: existing.doorway.operator_human,
         capabilities_json: existing.doorway.capabilities_json,

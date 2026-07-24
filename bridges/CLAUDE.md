@@ -32,6 +32,9 @@ by the kind of traffic it absorbs (web2 = doorway; protocol = storage).
 ## Current bridges
 
 - `valueflows/` — hREA / VF-GraphQL interop (Wave 3)
+- `did/` — W3C DID resolution and `did:key`/Holochain key translation
+- `pkarr/` — deterministic signed doorway endpoint records; the
+  infrastructure DHT is truth and pkarr publication is a later projection
 
 ## Adding a new bridge
 

@@ -39,6 +39,10 @@ const DNA: &str = "infrastructure";
 struct RegisterDoorwayInput {
     id: String,
     url: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    identity_root: Option<String>,
+    #[serde(default)]
+    endpoints: Vec<DoorwayEndpoint>,
     capabilities_json: String,
     reach: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -48,11 +52,24 @@ struct RegisterDoorwayInput {
     version: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct DoorwayEndpoint {
+    service: String,
+    url: String,
+    priority: u16,
+    ttl_secs: u32,
+}
+
 /// Mirrors `infrastructure_types::DoorwayRegistration`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DoorwayRegistration {
     id: String,
     url: String,
+    identity_root: String,
+    signing_key: String,
+    endpoints: Vec<DoorwayEndpoint>,
+    record_serial: u64,
+    record_signature: Vec<u8>,
     operator_agent: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     operator_human: Option<String>,
@@ -83,6 +100,8 @@ fn alpha_doorway_input() -> RegisterDoorwayInput {
     RegisterDoorwayInput {
         id: "alpha".to_string(),
         url: "https://alpha.example".to_string(),
+        identity_root: None,
+        endpoints: Vec::new(),
         capabilities_json: "{}".to_string(),
         reach: "regional".to_string(),
         region: Some("us-west".to_string()),
@@ -133,6 +152,19 @@ async fn doorway_self_registers() -> Result<()> {
     );
     assert_eq!(output.doorway.id, "alpha");
     assert_eq!(output.doorway.url, "https://alpha.example");
+    assert_eq!(output.doorway.identity_root, agent.to_string());
+    assert_eq!(output.doorway.signing_key, agent.to_string());
+    assert_eq!(
+        output.doorway.endpoints,
+        vec![DoorwayEndpoint {
+            service: "gateway".to_string(),
+            url: "https://alpha.example".to_string(),
+            priority: 0,
+            ttl_secs: 300,
+        }]
+    );
+    assert_eq!(output.doorway.record_signature.len(), 64);
+    assert!(output.doorway.record_serial > 0);
     assert_eq!(output.doorway.tier, "Emerging");
 
     // Retrieve by id — should round-trip successfully
@@ -208,6 +240,8 @@ async fn doorway_visible_across_agents_and_operator_only_can_update() -> Result<
     let hijack = RegisterDoorwayInput {
         id: "alpha".to_string(),
         url: "https://hijacked.example".to_string(),
+        identity_root: None,
+        endpoints: Vec::new(),
         capabilities_json: "{}".to_string(),
         reach: "regional".to_string(),
         region: Some("us-east".to_string()),
@@ -257,6 +291,8 @@ async fn get_all_doorways_lists_every_registered_doorway() -> Result<()> {
     let beta = RegisterDoorwayInput {
         id: "beta".to_string(),
         url: "https://beta.example".to_string(),
+        identity_root: None,
+        endpoints: Vec::new(),
         capabilities_json: "{}".to_string(),
         reach: "regional".to_string(),
         region: Some("us-east".to_string()),
