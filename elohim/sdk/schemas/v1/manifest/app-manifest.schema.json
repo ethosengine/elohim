@@ -192,6 +192,15 @@
       },
       "additionalProperties": false
     },
+    "gates": {
+      "type": "object",
+      "description": "Declared gate processes — THE CONSUMER'S VERDICT SURFACE. A gate is a decision procedure a domain contributes: it handles protocol events and its answer gates an action. This is the surface a downstream consumer would extend with their own vocabulary or ontology, which is exactly why each gate must state what its SILENCE means (see `closure`). Bringing a foreign ontology is not the risk; bringing it into an undeclared verdict path is. Keyed by gate id.",
+      "additionalProperties": { "$ref": "#/$defs/GateDeclaration" }
+    },
+    "attestations": {
+      "type": "object",
+      "description": "Declared attestation subtypes this domain mints. DECLARED BUT NOT CONSTRAINED here: bringing the key inside the schema (which sets additionalProperties: false) is this declaration's purpose; governing the interior is a separate concern, and over-constraining a shipped structure blind would manufacture drift rather than measure it."
+    },
     "routeClaims": {
       "type": "array",
       "description": "Bundle contentType route claims (RouteClaimTemplate, pillar-epr-decomposition spec §3.1), single-homed here per the 2026-07-02 epr-resolution-provider design I3. Generated consumers are the bundle claim tables (eprToRoute via BUNDLE_ROUTE_CONTEXT) and the seeder's project-epr grant claims (which become the doorway EprRouter's runtime claims index).",
@@ -223,6 +232,56 @@
   },
   "additionalProperties": false,
   "$defs": {
+    "GateDeclaration": {
+      "type": "object",
+      "description": "One gate process: a decision procedure a domain contributes to the protocol. A gate that handles events is a VERDICT PATH, and a verdict path must declare what silence means on it — otherwise a counterparty cannot tell whether an unmatched gate is an admission or a denial, which is precisely the ambiguity an adversarial party plays on.",
+      "required": ["processCid", "description", "handlesEvents", "governanceReach"],
+      "properties": {
+        "processCid": {
+          "type": "string",
+          "description": "The gate's own identity, e.g. `epr:gates:reach-gate-v1`. A gate carries its identity; this schema does not mint one."
+        },
+        "description": { "type": "string", "minLength": 1 },
+        "handlesEvents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Protocol events this gate answers on (e.g. AttestationWrite, CapabilityInvoke). A NON-EMPTY list makes this a verdict path and REQUIRES `closure`."
+        },
+        "governanceReach": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The reach at which this gate's authority is governed. NOT $ref'd to epr:schema:enum:reach on purpose: shipped gates use reach values (`community`) AND `protocol`, which is not a reach level. Coercing the field into the reach enum would manufacture drift rather than measure it — the divergence is recorded here so it can be reconciled deliberately, not silently. Reconciling it (is `protocol` a reach? a separate authority axis?) is its own decision."
+        },
+        "peerReviewedBy": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Gates that have peer-reviewed this one. An empty list is honest, not a failure — it says the review has not happened."
+        },
+        "supersedes": {
+          "type": ["string", "null"],
+          "description": "The gate this one replaces, if any."
+        },
+        "closure": {
+          "$ref": "../enums/closure.schema.json",
+          "description": "What SILENCE means on this gate. `closed`: an unmatched or unearned outcome is a REFUSAL — the default a verdict path should hold, because absence of a permit is a denial. `open`: absence is UNKNOWN and the gate defers rather than denies; legitimate only where the gate observes rather than authorizes. Declaring is mandatory for an event-handling gate; WHICH posture is the domain's call, and a consumer may declare `open` — they may not decline to say."
+        },
+        "closureRationale": {
+          "type": "string",
+          "description": "Why this gate holds its posture, in terms of what it gates."
+        }
+      },
+      "allOf": [
+        {
+          "description": "A gate that handles any event is a verdict path and must declare its closure posture.",
+          "if": {
+            "type": "object",
+            "required": ["handlesEvents"],
+            "properties": { "handlesEvents": { "type": "array", "minItems": 1 } }
+          },
+          "then": { "required": ["closure"] }
+        }
+      ]
+    },
     "Vocabulary": {
       "title": "Vocabulary",
       "description": "The app's content vocabulary — the types, formats, relationships, and signals it declares. The protocol validates structural coupling; the app owns the semantic meaning of each entry.",
