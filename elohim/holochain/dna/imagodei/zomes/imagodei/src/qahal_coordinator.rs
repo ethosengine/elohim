@@ -367,6 +367,91 @@ pub fn list_memberships_for_collective_cid(collective_cid: String) -> ExternResu
     list_memberships_for_collective(collective_hash)
 }
 
+/// Enumerate the household Collective CIDs the CALLING agent is a current
+/// (non-withdrawn) `Person` member of, read from the caller's OWN source chain.
+///
+/// ## Why this exists (DHT-truth discovery, index-free)
+///
+/// `identity_fill` (elohim-storage) needs the set of households a pod belongs to
+/// in order to project `humans.household_id`. Its existing source seeds that set
+/// from the LOCAL `collectives` SQL projection — which is EMPTY on a pod whose
+/// `CollectiveCommitted` signals landed on a different conductor (the seeder
+/// single-targets one doorway). The fill then inherits the very gap it exists to
+/// cure and no-ops.
+///
+/// The households a pod belongs to are nonetheless DHT truth: household-formation
+/// authors every member's `Membership` on THAT member's OWN conductor
+/// (formation-ceremony realism rung 3), so the caller's source chain carries its
+/// own memberships. `query()` returns them with NO anchor/link index — which is
+/// the only index-free enumeration available, because there is deliberately no
+/// global "all collectives" anchor (`CharterAnchor` is keyed per-cid, so it is a
+/// point-lookup base, never an enumerable one).
+///
+/// ## Household discriminator (byte-identical with the live projection)
+///
+/// A `create_collective` founder always authors a `Person` Steward membership,
+/// but the SAME entry type backs BOTH households and community collectives — the
+/// charter distinguishes them (`{"kind":"household"}` ⇒ family), exactly as the
+/// storage reconcile controller's `on_collective_projected` derives
+/// `governance_layer`. So `member_kind == Person` is necessary but NOT
+/// sufficient: each candidate Collective is fetched and its charter checked, so
+/// this returns ONLY households — matching what the live `on_membership_projected`
+/// path stamps `household_id` for (family only). Best-effort per record: an
+/// undecodable membership or an unresolved collective is skipped (next sweep).
+#[hdk_extern]
+pub fn get_my_household_collective_cids(_: ()) -> ExternResult<Vec<String>> {
+    let records = query(ChainQueryFilter::new().include_entries(true))?;
+    let mut cids: Vec<String> = Vec::new();
+    for record in &records {
+        let Some(m) = record.entry().to_app_option::<Membership>().ok().flatten() else {
+            continue;
+        };
+        if m.member_kind != MemberKind::Person || m.withdrawn_at_block_height.is_some() {
+            continue;
+        }
+        if cids.contains(&m.collective_cid) {
+            continue;
+        }
+        if collective_cid_is_household(&m.collective_cid)? {
+            cids.push(m.collective_cid);
+        }
+    }
+    Ok(cids)
+}
+
+/// True when `collective_cid` resolves to a Collective whose charter declares a
+/// household. DHT `get` (gossiped even when authored on another conductor); an
+/// unresolvable cid or a non-household charter yields `false` (skip this sweep).
+fn collective_cid_is_household(collective_cid: &str) -> ExternResult<bool> {
+    let Ok(action) = decode_collective_cid_to_action(collective_cid) else {
+        return Ok(false);
+    };
+    let Some(record) = get(action, GetOptions::default())? else {
+        return Ok(false);
+    };
+    let Some(collective) = record.entry().to_app_option::<Collective>().ok().flatten() else {
+        return Ok(false);
+    };
+    Ok(charter_declares_household(&collective.charter))
+}
+
+/// Household derivation from a Collective charter. Intentionally mirrors
+/// `elohim-storage` `reconcile::controller::on_collective_projected` (the
+/// `{"kind":"household"}` ⇒ family contract) so this coordinator and the SQL
+/// projection agree on household-ness. Tolerant: a non-JSON charter is not a
+/// household. KEEP IN SYNC with `on_collective_projected` if the charter schema
+/// evolves.
+fn charter_declares_household(charter: &str) -> bool {
+    #[derive(serde::Deserialize, Default)]
+    struct CharterHints {
+        #[serde(default)]
+        kind: Option<String>,
+    }
+    serde_json::from_str::<CharterHints>(charter)
+        .map(|h| h.kind.as_deref() == Some("household"))
+        .unwrap_or(false)
+}
+
 // =============================================================================
 // Private helpers
 // =============================================================================

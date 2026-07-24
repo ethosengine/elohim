@@ -80,9 +80,15 @@ use crate::db::{AppContext, DbPool};
 use crate::hc_client::HcClient;
 use crate::identity_namespace::{observe_agent_cid_write, resolve_agent_cid_write};
 use crate::services::holochain_humans_replayer::{
-    snapshot_household_ids, ConductorMembershipReader,
+    household_collective_cids, snapshot_household_ids_for_cids, ConductorMembershipReader,
+    MembershipReader, MembershipSnapshot,
 };
 use crate::StorageError;
+
+/// The imagodei zome + coordinator fn that enumerates the caller's OWN
+/// household memberships from its source chain (index-free DHT truth).
+const IMAGODEI_ZOME: &str = "imagodei";
+const SELF_HOUSEHOLD_CIDS_FN: &str = "get_my_household_collective_cids";
 
 /// Default fill cadence (seconds). Overridable via `IDENTITY_FILL_SECS`; `0`
 /// disables the loop entirely (the task is simply not spawned).
@@ -236,6 +242,70 @@ pub fn apply_membership_fill(
     Ok(stats)
 }
 
+/// Seam for the INDEX-FREE household discovery read: the set of household
+/// Collective cids the pod's OWN agent is a current member of, read from its
+/// source chain (the imagodei `get_my_household_collective_cids` coordinator fn).
+///
+/// This is the half that routes around the empty local `collectives` projection.
+/// Membership is DHT truth — every member authors its own `Membership` on its
+/// own conductor — but there is no global "all collectives" anchor to walk, so
+/// the caller's source chain is the only index-free enumeration. Tests supply a
+/// fake so [`discover_household_pairs`] is exercised without a conductor.
+#[async_trait]
+pub trait SelfHouseholdCidSource: Send + Sync {
+    /// Household Collective cids the calling agent is a current member of.
+    /// Errors surface so the caller can degrade (an empty result on error, never
+    /// a wrong write).
+    async fn self_household_cids(&self) -> Result<Vec<String>, StorageError>;
+}
+
+/// Compose the household membership snapshot from BOTH cid sources, then read
+/// members per cid.
+///
+/// The cid set is the UNION of:
+///   - the local `collectives` projection (family layer) — populated on a pod
+///     whose `CollectiveCommitted` signals landed here, EMPTY otherwise; and
+///   - the pod's own source chain (`self_cids`) — the index-free DHT-truth read
+///     that fills the gap when the projection is empty (the adam case).
+///
+/// fills-never-moves: this reads the local `collectives` table, it never writes
+/// it — a projection heal for that table stays the reconcile controller's job.
+/// A failure on EITHER cid source degrades to that side's empty set (never an
+/// error): the union still covers whatever the other side found. The per-cid
+/// membership read is [`snapshot_household_ids_for_cids`], reused verbatim.
+pub async fn discover_household_pairs(
+    pool: &DbPool,
+    ctx: &AppContext,
+    self_cids: &(dyn SelfHouseholdCidSource + '_),
+    reader: &(dyn MembershipReader + '_),
+) -> Result<MembershipSnapshot, StorageError> {
+    // Local projection cids (family layer). Empty is a valid, common outcome.
+    let local = household_collective_cids(pool, ctx).unwrap_or_else(|e| {
+        tracing::warn!(error = %e, "identity_fill: local collectives read failed; source-chain-only discovery");
+        Vec::new()
+    });
+
+    // Source-chain (self-authored) household cids — the index-free DHT read.
+    let self_side = self_cids.self_household_cids().await.unwrap_or_else(|e| {
+        tracing::warn!(error = %e, "identity_fill: self-household-cid read failed; projection-only discovery");
+        Vec::new()
+    });
+
+    // Union, de-duplicated, deterministic (local first, then novel self cids).
+    let mut union = local;
+    for cid in self_side {
+        if !union.contains(&cid) {
+            union.push(cid);
+        }
+    }
+
+    tracing::debug!(
+        cid_count = union.len(),
+        "identity_fill: discovered household collective cids (projection ∪ source-chain)"
+    );
+    snapshot_household_ids_for_cids(reader, &union).await
+}
+
 /// Run one fill sweep: fetch the current membership pairs from `source`, then
 /// apply the pure fill core. The conductor dependency is entirely inside
 /// `source`; a fetch error is surfaced so the loop logs + retries next tick.
@@ -318,11 +388,42 @@ pub async fn run_fill_loop<S: MembershipKeySource + ?Sized>(
 // Real source — the conductor-dependent half (reuses the boot snapshot read).
 // ===========================================================================
 
+/// Production [`SelfHouseholdCidSource`]: calls the imagodei
+/// `get_my_household_collective_cids` coordinator fn on the pod's own cell. That
+/// fn `query()`s the caller's source chain for its own household memberships — no
+/// anchor, no local projection — so it surfaces the households a pod belongs to
+/// even when the pod's `collectives` table is empty.
+pub struct ConductorSelfHouseholdCids {
+    hc: Arc<HcClient>,
+}
+
+#[async_trait]
+impl SelfHouseholdCidSource for ConductorSelfHouseholdCids {
+    async fn self_household_cids(&self) -> Result<Vec<String>, StorageError> {
+        // Unit-arg zome fn: encode `()` the same way the conductor expects.
+        let payload = rmp_serde::to_vec_named(&()).map_err(|e| {
+            StorageError::Internal(format!("identity_fill: encode self-household payload: {e}"))
+        })?;
+        let bytes = self
+            .hc
+            .call_zome(IMAGODEI_ZOME, SELF_HOUSEHOLD_CIDS_FN, payload)
+            .await?;
+        let cids: Vec<String> = rmp_serde::from_slice(&bytes).map_err(|e| {
+            StorageError::Serialization(format!(
+                "identity_fill: decode self-household cids Vec<String>: {e}"
+            ))
+        })?;
+        Ok(cids)
+    }
+}
+
 /// Production [`MembershipKeySource`]: reads the household-membership snapshot
-/// from the pod's own imagodei cell via the SAME two-step traversal the boot
-/// backfill uses (local `collectives` projection → conductor
-/// `list_memberships_for_collective_cid` per household). Only `pairs` is
-/// consumed — the incomplete/withdrawn abstention sets matter to the
+/// from the pod's own imagodei cell. The household cid set is the UNION of the
+/// local `collectives` projection AND the pod's own source chain (via
+/// [`ConductorSelfHouseholdCids`]) — the latter is what lights a pod whose
+/// projection is empty (the seeder single-targeted a different doorway). Members
+/// are then read per cid via `list_memberships_for_collective_cid`. Only `pairs`
+/// is consumed — the incomplete/withdrawn abstention sets matter to the
 /// key-supersede reconcile, not to a NULL-only fill (a missing member just leaves
 /// a member unfilled this tick, never a wrong write).
 pub struct ConductorMembershipKeySource {
@@ -349,7 +450,10 @@ impl MembershipKeySource for ConductorMembershipKeySource {
         let reader = ConductorMembershipReader {
             hc_client: self.hc.clone(),
         };
-        let snapshot = snapshot_household_ids(&self.pool, &self.ctx, &reader).await?;
+        let self_cids = ConductorSelfHouseholdCids {
+            hc: self.hc.clone(),
+        };
+        let snapshot = discover_household_pairs(&self.pool, &self.ctx, &self_cids, &reader).await?;
         Ok(snapshot.pairs)
     }
 }
@@ -600,5 +704,191 @@ mod tests {
         let p = pool();
         let err = run_once(&p, &FailingSource).await;
         assert!(matches!(err, Err(StorageError::Conductor(_))));
+    }
+
+    // ---- discovery composition: source-chain cids route around empty projection ----
+
+    use crate::services::holochain_humans_replayer::test_support::membership_record;
+    use holochain_types::prelude::Record;
+    use std::collections::HashMap;
+
+    /// Fake per-cid membership reader — returns hand-built Person `Record`s.
+    struct FakeReader {
+        by_cid: HashMap<String, Vec<Record>>,
+    }
+    #[async_trait]
+    impl MembershipReader for FakeReader {
+        async fn list_memberships(
+            &self,
+            collective_cid: &str,
+        ) -> Result<Vec<Record>, StorageError> {
+            Ok(self.by_cid.get(collective_cid).cloned().unwrap_or_default())
+        }
+    }
+
+    /// Fake source-chain enumerator — the imagodei `get_my_household_collective_cids`
+    /// stand-in.
+    struct FakeSelfCids {
+        cids: Vec<String>,
+    }
+    #[async_trait]
+    impl SelfHouseholdCidSource for FakeSelfCids {
+        async fn self_household_cids(&self) -> Result<Vec<String>, StorageError> {
+            Ok(self.cids.clone())
+        }
+    }
+
+    fn person(member: &str, cid: &str) -> Record {
+        membership_record(member, "Person", cid, None)
+    }
+
+    /// THE ADAM CASE: the local `collectives` projection is EMPTY, yet the pod's
+    /// OWN source chain names a household. Discovery reads its members and the
+    /// downstream fill has keyed rows to lay — the join lights.
+    #[tokio::test]
+    async fn discovery_fills_from_source_chain_when_projection_empty() {
+        let p = pool();
+        let ctx = AppContext::default_lamad();
+
+        // No collectives seeded — the local projection is empty (adam).
+        let self_cids = FakeSelfCids {
+            cids: vec!["collective:eden".to_string()],
+        };
+        let mut by_cid = HashMap::new();
+        by_cid.insert(
+            "collective:eden".to_string(),
+            vec![
+                person("agent:uhCAkADAM", "collective:eden"),
+                person("agent:uhCAkMATTHEW", "collective:eden"),
+            ],
+        );
+        let reader = FakeReader { by_cid };
+
+        let snap = discover_household_pairs(&p, &ctx, &self_cids, &reader)
+            .await
+            .expect("discover");
+        let mut pairs = snap.pairs;
+        pairs.sort();
+        assert_eq!(
+            pairs,
+            vec![
+                ("agent:uhCAkADAM".to_string(), "collective:eden".to_string()),
+                (
+                    "agent:uhCAkMATTHEW".to_string(),
+                    "collective:eden".to_string()
+                ),
+            ],
+            "source-chain-discovered household members are read even with an empty projection"
+        );
+
+        // End-to-end: the discovered pairs flow into the fill, lighting the join.
+        let mut conn = p.get().unwrap();
+        let stats = apply_membership_fill(&mut conn, &pairs).expect("fill");
+        assert_eq!(
+            stats.created, 2,
+            "both members' rows created from DHT truth"
+        );
+        assert!(get_human_by_agent_key(&mut conn, "uhCAkMATTHEW")
+            .unwrap()
+            .is_some());
+    }
+
+    /// UNION + DEDUP: a cid present in BOTH the local projection and the source
+    /// chain is read ONCE; a cid only in the source chain is added. Both
+    /// households' members surface.
+    #[tokio::test]
+    async fn discovery_unions_projection_and_source_chain_deduped() {
+        use crate::db::collectives::{create_collective, CreateCollectiveInput};
+        use crate::db::diesel_schema::collectives;
+        use crate::db::models::governance_layers;
+        use diesel::prelude::*;
+
+        let p = pool();
+        let ctx = AppContext::default_lamad();
+
+        // Seed ONE local family collective (stamped with its cid) — the projection
+        // side of the union.
+        {
+            let mut conn = p.get().unwrap();
+            let mut input = CreateCollectiveInput::stub("family-local");
+            input.governance_layer = governance_layers::FAMILY.to_string();
+            let c = create_collective(&mut conn, &ctx, &input).expect("seed collective");
+            diesel::update(collectives::table.filter(collectives::id.eq(&c.id)))
+                .set(collectives::collective_cid.eq(Some("collective:local")))
+                .execute(&mut conn)
+                .expect("stamp cid");
+        }
+
+        // Source chain reports the SAME local cid (dup) plus a NOVEL one.
+        let self_cids = FakeSelfCids {
+            cids: vec![
+                "collective:local".to_string(),
+                "collective:selfnew".to_string(),
+            ],
+        };
+
+        // Reader counts how many times each cid is asked for (dedup guard).
+        struct CountingReader {
+            by_cid: HashMap<String, Vec<Record>>,
+            calls: std::sync::Mutex<HashMap<String, usize>>,
+        }
+        #[async_trait]
+        impl MembershipReader for CountingReader {
+            async fn list_memberships(
+                &self,
+                collective_cid: &str,
+            ) -> Result<Vec<Record>, StorageError> {
+                *self
+                    .calls
+                    .lock()
+                    .unwrap()
+                    .entry(collective_cid.to_string())
+                    .or_insert(0) += 1;
+                Ok(self.by_cid.get(collective_cid).cloned().unwrap_or_default())
+            }
+        }
+        let mut by_cid = HashMap::new();
+        by_cid.insert(
+            "collective:local".to_string(),
+            vec![person("agent:uhCAkLOCALMEMBER", "collective:local")],
+        );
+        by_cid.insert(
+            "collective:selfnew".to_string(),
+            vec![person("agent:uhCAkSELFMEMBER", "collective:selfnew")],
+        );
+        let reader = CountingReader {
+            by_cid,
+            calls: std::sync::Mutex::new(HashMap::new()),
+        };
+
+        let snap = discover_household_pairs(&p, &ctx, &self_cids, &reader)
+            .await
+            .expect("discover");
+        let mut pairs = snap.pairs;
+        pairs.sort();
+        assert_eq!(
+            pairs,
+            vec![
+                (
+                    "agent:uhCAkLOCALMEMBER".to_string(),
+                    "collective:local".to_string()
+                ),
+                (
+                    "agent:uhCAkSELFMEMBER".to_string(),
+                    "collective:selfnew".to_string()
+                ),
+            ],
+            "both the projection household and the novel source-chain household surface"
+        );
+        let local_reads = *reader
+            .calls
+            .lock()
+            .unwrap()
+            .get("collective:local")
+            .unwrap();
+        assert_eq!(
+            local_reads, 1,
+            "the duplicated cid is read exactly once (union de-duplicated)"
+        );
     }
 }

@@ -211,8 +211,15 @@ fn extract_household_pairs(
 /// Source the set of household collective cids from the local `collectives`
 /// projection (governance_layer == family, collective_cid present). The
 /// projection is the read-optimised cache of the collectives DHT truth; it is
-/// the only per-conductor index of "which households exist on this node".
-fn household_collective_cids(pool: &DbPool, ctx: &AppContext) -> Result<Vec<String>, StorageError> {
+/// the per-conductor index of "which households exist on this node" — but it is
+/// EMPTY on a pod whose `CollectiveCommitted` signals landed on a different
+/// conductor (the seeder single-targets one doorway). `identity_fill` unions
+/// this with an index-free source-chain read to route around that gap, so this
+/// is `pub(crate)` for that composition.
+pub(crate) fn household_collective_cids(
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Vec<String>, StorageError> {
     let mut conn = pool
         .get()
         .map_err(|e| StorageError::Internal(e.to_string()))?;
@@ -287,15 +294,30 @@ pub async fn snapshot_household_ids(
         }
     };
 
+    snapshot_household_ids_for_cids(reader, &cids).await
+}
+
+/// Read the membership pairs for an EXPLICIT set of household collective cids —
+/// the conductor half of [`snapshot_household_ids`], factored out so callers that
+/// discover the cid set some other way (e.g. `identity_fill`, unioning the local
+/// projection with an index-free source-chain read) can reuse the per-collective
+/// read + incomplete/withdrawn accounting without re-deriving the cid set.
+///
+/// Same DHT-availability tolerance as [`snapshot_household_ids`]: a failed or
+/// malformed per-collective read degrades to a smaller mapping (marking that
+/// household incomplete), never an error. An empty `cids` yields the default
+/// (empty) snapshot.
+pub async fn snapshot_household_ids_for_cids(
+    reader: &dyn MembershipReader,
+    cids: &[String],
+) -> Result<MembershipSnapshot, StorageError> {
     if cids.is_empty() {
-        tracing::debug!(
-            "household replayer: no household collectives in projection; empty snapshot"
-        );
+        tracing::debug!("household replayer: no household collectives to read; empty snapshot");
         return Ok(MembershipSnapshot::default());
     }
 
     let mut snapshot = MembershipSnapshot::default();
-    for cid in &cids {
+    for cid in cids {
         match reader.list_memberships(cid).await {
             Ok(records) => {
                 let (pairs, incomplete, withdrawn_seen) = extract_household_pairs(cid, &records);
@@ -334,19 +356,20 @@ pub async fn snapshot_household_ids(
     Ok(snapshot)
 }
 
+/// Test-only fixtures shared with sibling services (`identity_fill`) that need
+/// to build fake conductor `Record`s without a live conductor.
 #[cfg(test)]
-mod tests {
-    use super::*;
+pub(crate) mod test_support {
     use holochain_types::prelude::{
-        Action, ActionHash, AgentPubKey, AppEntryBytes, AppEntryDef, Create, EntryHash, EntryType,
-        EntryVisibility, RecordEntry, SerializedBytes, Signature, SignedActionHashed, Timestamp,
-        UnsafeBytes,
+        Action, ActionHash, AgentPubKey, AppEntryBytes, AppEntryDef, Create, Entry, EntryHash,
+        EntryType, EntryVisibility, Record, SerializedBytes, Signature, SignedActionHashed,
+        Timestamp, UnsafeBytes,
     };
 
     /// Build a `Record` carrying a `MembershipWire`-shaped App entry, so the
     /// pure extractor can be exercised without a live conductor. The entry bytes
     /// are encoded with the SAME `rmp_serde::to_vec_named` the conductor uses.
-    fn membership_record(
+    pub(crate) fn membership_record(
         member_cid: &str,
         member_kind: &str,
         collective_cid: &str,
@@ -388,6 +411,13 @@ mod tests {
         let signed = SignedActionHashed::new_unchecked(action, Signature([0u8; 64]));
         Record::new(signed, Some(entry))
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test_support::membership_record;
+    use super::*;
+    use holochain_types::prelude::{AppEntryBytes, RecordEntry};
 
     #[test]
     fn extract_emits_person_pairs_with_caller_household_cid() {

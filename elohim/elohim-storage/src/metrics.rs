@@ -631,11 +631,19 @@ pub fn set_peer_status_fanout_missed(missed: u64) {
 }
 
 /// Record `n` identity-fill outcomes of `action` (one of the labels documented
-/// on [`IDENTITY_FILL_TOTAL`]). A zero `n` is a no-op (the label still exists).
+/// on [`IDENTITY_FILL_TOTAL`]).
+///
+/// The label series is ALWAYS materialised (via `with_label_values`), even when
+/// `n == 0` — `inc_by(0)` is a no-op on the value but registers the series. The
+/// fill loop calls this for all four labels every sweep, so after the first
+/// sweep all four series exist (at whatever value), and a completed no-op sweep
+/// (four series present at 0) is DISTINGUISHABLE in Prometheus from a
+/// never-ran loop (series absent). The earlier early-return-before-touch made a
+/// zero-`n` sweep indistinguishable from a loop that never ran — a diagnosis
+/// ambiguity that cost an hour on the adam `commitmentBacked 0` incident.
 pub fn inc_identity_fill(action: &str, n: u64) {
-    if n > 0 {
-        IDENTITY_FILL_TOTAL.with_label_values(&[action]).inc_by(n);
-    }
+    // Materialise the series unconditionally; increment only when non-zero.
+    IDENTITY_FILL_TOTAL.with_label_values(&[action]).inc_by(n);
 }
 
 /// Publish the last identity-fill sweep's rows-written (created + filled) count.
