@@ -382,6 +382,9 @@ Or via environment:
 ```bash
 DOORWAY_ID=alpha-elohim-host
 DOORWAY_URL=https://alpha.elohim.host
+# Ordered fallback gateway addresses for the same key identity:
+DOORWAY_URLS=https://alpha-backup.example,https://alpha-lan.example
+DOORWAY_ENDPOINT_TTL_SECS=300
 INSTALLED_APP_ID=elohim
 CONDUCTOR_URL=ws://localhost:4444
 ```
@@ -398,7 +401,17 @@ The final piece that closes the loop: **doorways themselves are entries in the D
 │                                                                          │
 │   {                                                                      │
 │     "id": "alpha-elohim-host",                                          │
-│     "url": "https://alpha.elohim.host",                                 │
+│     "url": "https://alpha.elohim.host", // compatibility primary alias │
+│     "identity_root": "uhCAk...",       // Stable key-lineage root       │
+│     "signing_key": "uhCAk...",         // Current Holochain/Ed25519 key │
+│     "endpoints": [                                                       │
+│       { "service": "gateway", "url": "https://alpha.elohim.host",      │
+│         "priority": 0, "ttl_secs": 300 },                               │
+│       { "service": "gateway", "url": "https://alpha-backup.example",   │
+│         "priority": 1, "ttl_secs": 300 }                                │
+│     ],                                                                   │
+│     "record_serial": 1721760000000000,                                  │
+│     "record_signature": [/* detached Ed25519 signature */],             │
 │     "operator_agent": "uhCAk...",      // Who runs this doorway         │
 │     "operator_human": "uhCEk...",      // Link to Human entry           │
 │     "capabilities": {                                                    │
@@ -410,8 +423,7 @@ The final piece that closes the loop: **doorways themselves are entries in the D
 │     "reach": "commons",                // What reach level it serves    │
 │     "region": "us-west",               // Geographic locality           │
 │     "bandwidth_mbps": 1000,                                             │
-│     "registered_at": "2024-01-01T00:00:00Z",                           │
-│     "signature": "..."                 // Operator's Ed25519 sig        │
+│     "registered_at": "2024-01-01T00:00:00Z"                            │
 │   }                                                                      │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘

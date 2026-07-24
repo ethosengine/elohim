@@ -66,6 +66,14 @@ export {
   // Sync configuration
   type DoorwayConfig,
   type NodeSyncConfig,
+  type ConfiguredDoorwayAddress,
+  type DoorwayAddressResolver,
+  type DoorwayEndpoint,
+  type DoorwayResolution,
+  type DoorwayResolutionSource,
+  ConfiguredDoorwayResolver,
+  gatewayCandidates,
+  normalizeDoorwayUrl,
 
   // Holochain (parallel connection, not a mode)
   type HolochainConnection,
@@ -84,6 +92,7 @@ export {
   // Angular integration
   ELOHIM_CLIENT,
   ELOHIM_CLIENT_CONFIG,
+  DOORWAY_ADDRESS_RESOLVER,
   provideElohimClient,
   provideAnonymousBrowserClient,
   detectClientMode,

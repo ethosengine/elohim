@@ -76,6 +76,18 @@
 
 // Main client
 export { ElohimClient, WriteBuffer, ReachEnforcer } from './elohim-client';
+export {
+  ConfiguredDoorwayResolver,
+  gatewayCandidates,
+  normalizeDoorwayUrl,
+} from './doorway-address-resolver';
+export type {
+  ConfiguredDoorwayAddress,
+  DoorwayAddressResolver,
+  DoorwayEndpoint,
+  DoorwayResolution,
+  DoorwayResolutionSource,
+} from './doorway-address-resolver';
 
 // Type exports (interfaces, type aliases) - must use 'export type' with isolatedModules
 export type {
@@ -113,6 +125,7 @@ export { WritePriority, WriteBufferDefaults, ReachLevel } from './types';
 export {
   ELOHIM_CLIENT,
   ELOHIM_CLIENT_CONFIG,
+  DOORWAY_ADDRESS_RESOLVER,
   provideElohimClient,
   provideAnonymousBrowserClient,
   detectClientMode,

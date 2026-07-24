@@ -24,6 +24,8 @@ export type ClientMode = BrowserMode | TauriMode;
  * - Holochain conductor WebSocket proxy
  */
 export interface DoorwayConfig {
+  /** Stable public-key/lineage identity. Defaults to url for legacy config. */
+  identity?: string;
   /** Primary doorway URL */
   url: string;
   /** Fallback doorway URLs (tried in order if primary fails) */
@@ -193,6 +195,8 @@ export interface WriteOp {
 export interface ElohimClientConfig {
   /** Client mode determines backend routing for content */
   mode: ClientMode;
+  /** Pluggable identity → ordered address resolver. Config-backed by default. */
+  doorwayResolver?: import('./doorway-address-resolver').DoorwayAddressResolver;
   /** Write buffer configuration (optional, uses defaults) */
   writeBuffer?: Partial<WriteBufferConfig>;
   /** Agent's reach level for access control */

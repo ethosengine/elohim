@@ -52,6 +52,8 @@ pub struct FederationConfig {
     pub doorway_id: String,
     /// Public URL of this doorway (e.g., "https://alpha.elohim.host")
     pub doorway_url: String,
+    /// Pkarr-shaped, signed candidate addresses advertised by this doorway.
+    pub endpoints: Vec<infrastructure_types::DoorwayEndpoint>,
     /// Geographic region for routing
     pub region: Option<String>,
     /// Heartbeat interval in seconds (default: 60)
@@ -68,11 +70,45 @@ impl FederationConfig {
     pub fn from_args(args: &Args) -> Option<Self> {
         let doorway_id = args.doorway_id.as_ref()?;
         let doorway_url = args.doorway_url.as_ref()?;
+        let ttl_secs = args.doorway_endpoint_ttl_secs;
+        let mut endpoints = vec![infrastructure_types::DoorwayEndpoint {
+            service: "gateway".to_string(),
+            url: doorway_url.clone(),
+            priority: 0,
+            ttl_secs,
+        }];
+        for (index, url) in args.doorway_urls.iter().enumerate() {
+            if url != doorway_url && !endpoints.iter().any(|endpoint| endpoint.url == *url) {
+                endpoints.push(infrastructure_types::DoorwayEndpoint {
+                    service: "gateway".to_string(),
+                    url: url.clone(),
+                    priority: u16::try_from(index + 1).unwrap_or(u16::MAX),
+                    ttl_secs,
+                });
+            }
+        }
+        if let Some(url) = &args.bootstrap_url {
+            endpoints.push(infrastructure_types::DoorwayEndpoint {
+                service: "bootstrap".to_string(),
+                url: url.clone(),
+                priority: 0,
+                ttl_secs,
+            });
+        }
+        if let Some(url) = &args.signal_url {
+            endpoints.push(infrastructure_types::DoorwayEndpoint {
+                service: "signal".to_string(),
+                url: url.clone(),
+                priority: 0,
+                ttl_secs,
+            });
+        }
 
         Some(Self {
             enabled: true,
             doorway_id: doorway_id.clone(),
             doorway_url: doorway_url.clone(),
+            endpoints,
             region: args.region.clone(),
             heartbeat_interval_secs: 60,
             infrastructure_role: "infrastructure".to_string(),
@@ -133,6 +169,8 @@ pub async fn register_doorway_in_dht(
     let input = RegisterDoorwayInput {
         id: config.doorway_id.clone(),
         url: config.doorway_url.clone(),
+        identity_root: None,
+        endpoints: config.endpoints.clone(),
         capabilities_json: caps_json,
         reach: "public".to_string(),
         region: config.region.clone(),
@@ -963,6 +1001,14 @@ mod tests {
             "alpha-elohim-host",
             "--doorway-url",
             "https://alpha.elohim.host",
+            "--doorway-urls",
+            "https://alpha-backup.example,https://alpha.elohim.host",
+            "--doorway-endpoint-ttl-secs",
+            "120",
+            "--bootstrap-url",
+            "https://bootstrap.elohim.host",
+            "--signal-url",
+            "wss://signal.elohim.host",
             "--region",
             "us-west",
         ]);
@@ -971,6 +1017,35 @@ mod tests {
         assert_eq!(config.doorway_url, "https://alpha.elohim.host");
         assert_eq!(config.region, Some("us-west".to_string()));
         assert_eq!(config.heartbeat_interval_secs, 60);
+        assert_eq!(
+            config.endpoints,
+            vec![
+                infrastructure_types::DoorwayEndpoint {
+                    service: "gateway".to_string(),
+                    url: "https://alpha.elohim.host".to_string(),
+                    priority: 0,
+                    ttl_secs: 120,
+                },
+                infrastructure_types::DoorwayEndpoint {
+                    service: "gateway".to_string(),
+                    url: "https://alpha-backup.example".to_string(),
+                    priority: 1,
+                    ttl_secs: 120,
+                },
+                infrastructure_types::DoorwayEndpoint {
+                    service: "bootstrap".to_string(),
+                    url: "https://bootstrap.elohim.host".to_string(),
+                    priority: 0,
+                    ttl_secs: 120,
+                },
+                infrastructure_types::DoorwayEndpoint {
+                    service: "signal".to_string(),
+                    url: "wss://signal.elohim.host".to_string(),
+                    priority: 0,
+                    ttl_secs: 120,
+                },
+            ]
+        );
     }
 
     #[test]
@@ -991,6 +1066,13 @@ mod tests {
         let input = RegisterDoorwayInput {
             id: "test-doorway".to_string(),
             url: "https://test.elohim.host".to_string(),
+            identity_root: None,
+            endpoints: vec![infrastructure_types::DoorwayEndpoint {
+                service: "gateway".to_string(),
+                url: "https://test.elohim.host".to_string(),
+                priority: 0,
+                ttl_secs: 300,
+            }],
             capabilities_json: r#"["gateway","bootstrap"]"#.to_string(),
             reach: "public".to_string(),
             region: Some("us-west".to_string()),

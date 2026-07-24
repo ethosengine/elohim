@@ -95,6 +95,7 @@ export const appConfig: ApplicationConfig = {
     // keeping API calls co-origin with the serving doorway (alpha or prod).
     ...provideElohimClient({
       mode: detectClientMode({
+        doorwayIdentity: environment.client?.doorwayIdentity ?? environment.client?.doorwayUrl,
         doorwayUrl: resolveDoorwayUrl(environment.client?.doorwayUrl),
         doorwayFallbacks: environment.client?.doorwayFallbacks,
         apiKey: environment.client?.apiKey,

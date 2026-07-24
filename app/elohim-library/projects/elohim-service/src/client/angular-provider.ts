@@ -5,10 +5,14 @@
  * Configure the client mode based on your environment.
  */
 
-// eslint-disable-next-line import/no-extraneous-dependencies
 import { InjectionToken, Provider, FactoryProvider } from '@angular/core';
 
-import { ElohimClient, ElohimClientConfig, ClientMode, ReachLevel } from './index';
+import { ConfiguredDoorwayResolver } from './doorway-address-resolver';
+
+import { ElohimClient, ReachLevel } from './index';
+
+import type { DoorwayAddressResolver } from './doorway-address-resolver';
+import type { ElohimClientConfig, ClientMode } from './index';
 
 /**
  * Injection token for ElohimClient
@@ -19,6 +23,11 @@ export const ELOHIM_CLIENT = new InjectionToken<ElohimClient>('ElohimClient');
  * Injection token for client configuration
  */
 export const ELOHIM_CLIENT_CONFIG = new InjectionToken<ElohimClientConfig>('ElohimClientConfig');
+
+/** Shared resolver seam used by SDK and Angular HTTP traffic. */
+export const DOORWAY_ADDRESS_RESOLVER = new InjectionToken<DoorwayAddressResolver>(
+  'DoorwayAddressResolver'
+);
 
 /**
  * Factory function for creating ElohimClient
@@ -54,8 +63,23 @@ export function elohimClientFactory(config: ElohimClientConfig): ElohimClient {
  * ```
  */
 export function provideElohimClient(config: ElohimClientConfig): Provider[] {
+  const doorway = config.mode.doorway;
+  const resolver =
+    config.doorwayResolver ??
+    (doorway
+      ? new ConfiguredDoorwayResolver([
+          {
+            identity: doorway.identity ?? doorway.url,
+            primaryUrl: doorway.url,
+            fallbackUrls: doorway.fallbacks,
+          },
+        ])
+      : new ConfiguredDoorwayResolver([]));
+  const resolvedConfig = { ...config, doorwayResolver: resolver };
+
   return [
-    { provide: ELOHIM_CLIENT_CONFIG, useValue: config },
+    { provide: DOORWAY_ADDRESS_RESOLVER, useValue: resolver },
+    { provide: ELOHIM_CLIENT_CONFIG, useValue: resolvedConfig },
     {
       provide: ELOHIM_CLIENT,
       useFactory: elohimClientFactory,
@@ -140,6 +164,8 @@ function _getCheStorageUrl(): string {
  * ```
  */
 export function detectClientMode(environment: {
+  /** Stable doorway identity key; defaults to doorwayUrl during migration. */
+  doorwayIdentity?: string;
   /** Primary doorway URL */
   doorwayUrl?: string;
   /** Fallback doorway URLs */
@@ -161,6 +187,7 @@ export function detectClientMode(environment: {
       invoke: tauri?.invoke ?? (async () => Promise.reject(new Error('Tauri not available'))),
       doorway: environment.doorwayUrl
         ? {
+            identity: environment.doorwayIdentity,
             url: environment.doorwayUrl,
             fallbacks: environment.doorwayFallbacks,
             apiKey: environment.apiKey,
@@ -182,6 +209,7 @@ export function detectClientMode(environment: {
     return {
       type: 'browser',
       doorway: {
+        identity: environment.doorwayIdentity,
         url: cheUrl,
         fallbacks: environment.doorwayFallbacks,
         apiKey: environment.apiKey,
@@ -195,6 +223,7 @@ export function detectClientMode(environment: {
   return {
     type: 'browser',
     doorway: {
+      identity: environment.doorwayIdentity,
       url: environment.doorwayUrl ?? 'http://localhost:8080',
       fallbacks: environment.doorwayFallbacks,
       apiKey: environment.apiKey,

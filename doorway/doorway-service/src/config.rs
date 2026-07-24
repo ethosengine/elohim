@@ -181,6 +181,15 @@ pub struct Args {
     #[arg(long, env = "DOORWAY_URL")]
     pub doorway_url: Option<String>,
 
+    /// Additional public gateway addresses for this same doorway identity.
+    /// Lower list positions receive higher priority in the signed registration.
+    #[arg(long, env = "DOORWAY_URLS", value_delimiter = ',')]
+    pub doorway_urls: Vec<String>,
+
+    /// Cache TTL carried by signed doorway endpoint records.
+    #[arg(long, env = "DOORWAY_ENDPOINT_TTL_SECS", default_value_t = 300)]
+    pub doorway_endpoint_ttl_secs: u32,
+
     /// URL of elohim-storage for blob storage
     /// (e.g., "http://localhost:8091")
     /// Doorway forwards blobs here for authoritative storage

@@ -4,11 +4,89 @@
 //! See `genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md`
 //! §5.1 (Scenario A — Hard browser navigation to a pillar URL).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
 
 use elohim_views::projection::EprProjectionView;
+use infrastructure_types::DoorwayRegistration;
+
+/// Build the ordered candidate set used by the EPR projection fetcher.
+///
+/// Doorway registrations are the notarized source of peer gateway addresses:
+/// `get_all_doorways` only returns records whose endpoint signatures passed the
+/// infrastructure DNA's integrity validation. This function is deliberately a
+/// Category-C operational projection of those records — it owns no endpoint
+/// truth and can be rebuilt on every refresh.
+///
+/// The first configured URL remains the primary so existing degraded-primary
+/// classification and WARN telemetry retain their meaning. Signed peer gateway
+/// endpoints follow it, ahead of the remaining configured static fallbacks.
+/// Within a doorway identity, lower signed priorities win and equal priorities
+/// retain signed record order. Doorway identities are ordered by id for
+/// deterministic cross-record behavior. This doorway's own public endpoint is
+/// excluded: querying it would loop back through the same gateway instead of
+/// reaching a peer projection.
+/// Peer gateway bases are valid fetch targets because elohim-storage declares
+/// `GET /db/rea_commitments` in its manifest and doorway's dynamic registry
+/// forwards that route to the peer's storage projection.
+/// The configured primary plus static fallbacks remain the bootstrap/fallback
+/// floor when DHT discovery is empty or unavailable.
+pub fn epr_fetch_candidate_urls(
+    registrations: &[DoorwayRegistration],
+    self_doorway_id: &str,
+    configured_urls: &[String],
+) -> Vec<String> {
+    let mut candidates = Vec::new();
+    let mut seen = HashSet::new();
+
+    if let Some(primary) = configured_urls.first() {
+        push_http_candidate(&mut candidates, &mut seen, primary);
+    }
+
+    let mut peers: Vec<&DoorwayRegistration> = registrations
+        .iter()
+        .filter(|registration| registration.id != self_doorway_id)
+        .collect();
+    peers.sort_by(|left, right| left.id.cmp(&right.id));
+
+    for registration in peers {
+        let mut endpoints: Vec<(usize, _)> = registration
+            .endpoints
+            .iter()
+            .enumerate()
+            .filter(|(_, endpoint)| endpoint.service == "gateway")
+            .collect();
+        endpoints.sort_by_key(|(signed_order, endpoint)| (endpoint.priority, *signed_order));
+
+        for (_, endpoint) in endpoints {
+            push_http_candidate(&mut candidates, &mut seen, &endpoint.url);
+        }
+    }
+
+    for configured_url in configured_urls.iter().skip(1) {
+        push_http_candidate(&mut candidates, &mut seen, configured_url);
+    }
+
+    candidates
+}
+
+fn push_http_candidate(candidates: &mut Vec<String>, seen: &mut HashSet<String>, raw_url: &str) {
+    let candidate = raw_url.trim().trim_end_matches('/');
+    if candidate.is_empty() {
+        return;
+    }
+    let Ok(parsed) = reqwest::Url::parse(candidate) else {
+        return;
+    };
+    if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
+        return;
+    }
+    let candidate = candidate.to_string();
+    if seen.insert(candidate.clone()) {
+        candidates.push(candidate);
+    }
+}
 
 /// Fetch active project-epr commitments from elohim-storage at doorway boot.
 ///
@@ -858,6 +936,207 @@ mod tests {
         let g0 = router.generation();
         router.replace_all(vec![make_projection("a", "/a")]);
         assert!(router.generation() > g0);
+    }
+
+    mod registration_candidates {
+        use super::super::{
+            epr_fetch_candidate_urls, fetch_projections_with_fallback, FallbackOutcome,
+        };
+        use super::make_projection;
+        use infrastructure_types::{DoorwayEndpoint, DoorwayRegistration};
+        use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+        fn endpoint(service: &str, url: &str, priority: u16) -> DoorwayEndpoint {
+            DoorwayEndpoint {
+                service: service.to_string(),
+                url: url.to_string(),
+                priority,
+                ttl_secs: 300,
+            }
+        }
+
+        fn registration(id: &str, endpoints: Vec<DoorwayEndpoint>) -> DoorwayRegistration {
+            let url = endpoints
+                .iter()
+                .find(|endpoint| endpoint.service == "gateway")
+                .map(|endpoint| endpoint.url.clone())
+                .unwrap_or_default();
+            DoorwayRegistration {
+                id: id.to_string(),
+                url,
+                identity_root: format!("{id}-identity-root"),
+                signing_key: format!("{id}-signing-key"),
+                endpoints,
+                record_serial: 1,
+                record_signature: vec![1; 64],
+                operator_agent: format!("{id}-operator"),
+                operator_human: None,
+                capabilities_json: r#"["gateway"]"#.to_string(),
+                reach: "public".to_string(),
+                region: None,
+                bandwidth_mbps: None,
+                version: "test".to_string(),
+                tier: "Emerging".to_string(),
+                registered_at: "test".to_string(),
+                updated_at: "test".to_string(),
+            }
+        }
+
+        #[test]
+        fn configured_primary_leads_signed_peers_then_static_fallbacks() {
+            let registrations = vec![
+                registration(
+                    "zeta",
+                    vec![endpoint("gateway", "https://zeta.example/", 0)],
+                ),
+                registration("self", vec![endpoint("gateway", "https://self.example", 0)]),
+                registration(
+                    "alpha",
+                    vec![
+                        endpoint("gateway", "https://alpha-backup.example", 20),
+                        endpoint("signal", "wss://alpha-signal.example", 0),
+                        endpoint("gateway", "https://alpha-primary.example", 0),
+                    ],
+                ),
+            ];
+            let configured = vec![
+                "http://storage-primary:8090/".to_string(),
+                "https://alpha-primary.example".to_string(),
+                "http://storage-peer:8090".to_string(),
+            ];
+
+            assert_eq!(
+                epr_fetch_candidate_urls(&registrations, "self", &configured),
+                vec![
+                    "http://storage-primary:8090",
+                    "https://alpha-primary.example",
+                    "https://alpha-backup.example",
+                    "https://zeta.example",
+                    "http://storage-peer:8090",
+                ]
+            );
+        }
+
+        #[test]
+        fn equal_priority_retains_signed_endpoint_order() {
+            let registrations = vec![registration(
+                "peer",
+                vec![
+                    endpoint("gateway", "https://first.example", 7),
+                    endpoint("gateway", "https://second.example", 7),
+                ],
+            )];
+
+            assert_eq!(
+                epr_fetch_candidate_urls(&registrations, "self", &[]),
+                vec!["https://first.example", "https://second.example"]
+            );
+        }
+
+        #[test]
+        fn configured_pool_is_preserved_when_registration_discovery_is_empty() {
+            let configured = vec![
+                " http://storage-primary:8090/ ".to_string(),
+                "http://storage-primary:8090".to_string(),
+                "http://storage-peer:8090".to_string(),
+            ];
+
+            assert_eq!(
+                epr_fetch_candidate_urls(&[], "self", &configured),
+                vec!["http://storage-primary:8090", "http://storage-peer:8090"]
+            );
+        }
+
+        #[test]
+        fn non_http_and_non_gateway_candidates_are_rejected_defensively() {
+            let registrations = vec![registration(
+                "peer",
+                vec![
+                    endpoint("signal", "wss://signal.example", 0),
+                    endpoint("gateway", "not-a-url", 0),
+                    endpoint("gateway", "ftp://files.example", 1),
+                    endpoint("gateway", "https://valid.example", 2),
+                ],
+            )];
+
+            assert_eq!(
+                epr_fetch_candidate_urls(
+                    &registrations,
+                    "self",
+                    &["wss://configured-signal.example".to_string()],
+                ),
+                vec!["https://valid.example"]
+            );
+        }
+
+        #[tokio::test]
+        async fn configured_primary_degrades_to_signed_peer_before_static_fallback() {
+            let primary = MockServer::start().await;
+            Mock::given(matchers::method("GET"))
+                .and(matchers::path("/db/rea_commitments"))
+                .respond_with(ResponseTemplate::new(500))
+                .expect(1)
+                .mount(&primary)
+                .await;
+
+            let peer = MockServer::start().await;
+            let body = vec![make_projection("landing", "/landing")];
+            Mock::given(matchers::method("GET"))
+                .and(matchers::path("/db/rea_commitments"))
+                .and(matchers::query_param("action", "project-epr"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&body))
+                .expect(1)
+                .mount(&peer)
+                .await;
+
+            let static_fallback = MockServer::start().await;
+            Mock::given(matchers::method("GET"))
+                .and(matchers::path("/db/rea_commitments"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&body))
+                .mount(&static_fallback)
+                .await;
+
+            let registrations = vec![registration(
+                "peer",
+                vec![endpoint("gateway", &peer.uri(), 0)],
+            )];
+            let candidates = epr_fetch_candidate_urls(
+                &registrations,
+                "self",
+                &[primary.uri(), static_fallback.uri()],
+            );
+
+            let outcome = fetch_projections_with_fallback(
+                &candidates,
+                "apex-elohim-host",
+                &reqwest::Client::new(),
+            )
+            .await;
+            match outcome {
+                FallbackOutcome::PeerServed {
+                    primary_url,
+                    primary_empty,
+                    serving_url,
+                    projections,
+                } => {
+                    assert_eq!(primary_url, primary.uri());
+                    assert!(!primary_empty);
+                    assert_eq!(serving_url, peer.uri());
+                    assert_eq!(projections.len(), 1);
+                }
+                other => {
+                    panic!("expected registered peer to serve degraded primary, got {other:?}")
+                }
+            }
+            assert!(
+                static_fallback
+                    .received_requests()
+                    .await
+                    .expect("static fallback requests")
+                    .is_empty(),
+                "later configured fallback must remain untouched when a registered peer serves"
+            );
+        }
     }
 
     // ── Fix A: storage-pool fallback for boot + refresh ──────────────────────

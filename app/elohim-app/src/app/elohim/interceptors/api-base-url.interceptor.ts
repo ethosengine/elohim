@@ -5,10 +5,19 @@ import {
   HttpRequest,
   HttpResponse,
 } from '@angular/common/http';
+import { inject } from '@angular/core';
 
 import { catchError, tap, timeout } from 'rxjs/operators';
 
-import { Observable, TimeoutError, throwError } from 'rxjs';
+import { from, Observable, switchMap, TimeoutError, throwError } from 'rxjs';
+
+import {
+  ConfiguredDoorwayResolver,
+  DOORWAY_ADDRESS_RESOLVER,
+  DoorwayAddressResolver,
+  DoorwayResolution,
+  gatewayCandidates,
+} from '@elohim/service';
 
 import { environment } from '../../../environments/environment';
 
@@ -158,9 +167,10 @@ function dedupe(items: string[]): string[] {
  * reorder: they always trust whichever host is currently sticky rather than
  * gambling a non-idempotent request on an unverified host.
  */
-function buildCandidates(effectivePrimary: string, allowReprobe: boolean): string[] {
-  const fallbacks = (environment.client?.doorwayFallbacks ?? []).map(normalizeHost);
-  const primary = normalizeHost(effectivePrimary);
+function buildCandidates(resolvedCandidates: string[], allowReprobe: boolean): string[] {
+  const [resolvedPrimary, ...resolvedFallbacks] = resolvedCandidates;
+  const primary = normalizeHost(resolvedPrimary);
+  const fallbacks = resolvedFallbacks.map(normalizeHost);
   const sticky = preferredBase ? normalizeHost(preferredBase) : null;
 
   const reprobeDue =
@@ -204,51 +214,90 @@ export const apiBaseUrlInterceptor: HttpInterceptorFn = (req, next) => {
 
   const effectivePrimary = resolveBaseUrl() || origin;
   const isRetriable = RETRIABLE_METHODS.has(req.method.toUpperCase());
-  const candidates = buildCandidates(effectivePrimary, isRetriable);
+  const identity =
+    environment.client?.doorwayIdentity ?? environment.client?.doorwayUrl ?? effectivePrimary;
+  let resolver: DoorwayAddressResolver | null = null;
+  if (!isTauri()) {
+    try {
+      // Direct unit calls run outside an Angular injection context; config is
+      // the intentional fallback adapter in that case.
+      resolver = inject(DOORWAY_ADDRESS_RESOLVER, { optional: true });
+    } catch {
+      resolver = null;
+    }
+  }
+  resolver ??= new ConfiguredDoorwayResolver([
+    {
+      identity,
+      primaryUrl: effectivePrimary,
+      fallbackUrls: environment.client?.doorwayFallbacks,
+    },
+  ]);
 
-  const attempt = (currentBase: string, remaining: string[]): Observable<HttpEvent<unknown>> => {
-    // Per-attempt timeout (FIX 3) — ONLY for retriable GET/HEAD requests, so
-    // a black-holing host still fails over even though it never produces a
-    // status-0 response. A non-retriable write is tried exactly once and
-    // must run to completion; injecting a timeout there could abort an
-    // in-flight, non-idempotent write that would otherwise have succeeded.
-    const response$ = next(rewriteTo(req, currentBase));
-    const withTimeout$ = isRetriable ? response$.pipe(timeout(PER_ATTEMPT_TIMEOUT_MS)) : response$;
+  const dispatch = (resolution: DoorwayResolution): Observable<HttpEvent<unknown>> => {
+    const resolvedCandidates = gatewayCandidates(resolution);
+    if (resolvedCandidates.length === 0) {
+      return throwError(
+        () => new Error(`Doorway identity "${identity}" resolved without gateway endpoints`)
+      );
+    }
+    const candidates = buildCandidates(resolvedCandidates, isRetriable);
 
-    return withTimeout$.pipe(
-      tap(event => {
-        // Only a genuine HttpResponse confirms the host is reachable —
-        // HttpSentEvent fires at dispatch, before any network confirmation.
-        if (event instanceof HttpResponse) {
-          setPreferredBase(currentBase);
-        }
-      }),
-      catchError((err: unknown) => {
-        if (!isNetworkFailure(err)) {
-          // The host answered (even with an error status) — it's reachable,
-          // never fail over on a non-zero status.
-          setPreferredBase(currentBase);
-          return throwError(() => err);
-        }
+    const attempt = (currentBase: string, remaining: string[]): Observable<HttpEvent<unknown>> => {
+      // Per-attempt timeout (FIX 3) — ONLY for retriable GET/HEAD requests, so
+      // a black-holing host still fails over even though it never produces a
+      // status-0 response. A non-retriable write is tried exactly once and
+      // must run to completion; injecting a timeout there could abort an
+      // in-flight, non-idempotent write that would otherwise have succeeded.
+      const response$ = next(rewriteTo(req, currentBase));
+      const withTimeout$ = isRetriable
+        ? response$.pipe(timeout(PER_ATTEMPT_TIMEOUT_MS))
+        : response$;
 
-        const [nextBase, ...rest] = remaining;
-        if (!nextBase) {
-          return throwError(() => err);
-        }
+      return withTimeout$.pipe(
+        tap(event => {
+          // Only a genuine HttpResponse confirms the host is reachable —
+          // HttpSentEvent fires at dispatch, before any network confirmation.
+          if (event instanceof HttpResponse) {
+            setPreferredBase(currentBase);
+          }
+        }),
+        catchError((err: unknown) => {
+          if (!isNetworkFailure(err)) {
+            // The host answered (even with an error status) — it's reachable,
+            // never fail over on a non-zero status.
+            setPreferredBase(currentBase);
+            return throwError(() => err);
+          }
 
-        if (!isRetriable) {
-          // Duplicate-write risk: don't re-issue. The failure already proves
-          // currentBase is down, so steer subsequent requests to the
-          // fallback without verifying it.
-          setPreferredBase(nextBase);
-          return throwError(() => err);
-        }
+          const [nextBase, ...rest] = remaining;
+          if (!nextBase) {
+            return throwError(() => err);
+          }
 
-        return attempt(nextBase, rest);
-      })
-    );
+          if (!isRetriable) {
+            // Duplicate-write risk: don't re-issue. The failure already proves
+            // currentBase is down, so steer subsequent requests to the
+            // fallback without verifying it.
+            setPreferredBase(nextBase);
+            return throwError(() => err);
+          }
+
+          return attempt(nextBase, rest);
+        })
+      );
+    };
+
+    const [first, ...rest] = candidates;
+    return attempt(first, rest);
   };
 
-  const [first, ...rest] = candidates;
-  return attempt(first, rest);
+  try {
+    const resolution = resolver.resolve(identity);
+    return resolution instanceof Promise
+      ? from(resolution).pipe(switchMap(dispatch))
+      : dispatch(resolution);
+  } catch (error) {
+    return throwError(() => error);
+  }
 };

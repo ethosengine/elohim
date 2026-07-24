@@ -723,15 +723,23 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             }
         };
 
-        // Fix A: consult the storage POOL, not just the singular primary.
-        // doorway-B's STORAGE_URL = adam (which returns 0 rows for
-        // doorwayId=apex-elohim-host); the pool (STORAGE_URLS) includes
-        // matthew, who holds the rows. Try primary first; fall through the pool
-        // on empty/unreachable so apex is routable while the primary heals.
-        // journal: .claude/deliver/journal-resilient-dual-doorway.md iter-0 RC #2.
-        let epr_pool_urls = epr_storage_pool(&state.args);
+        // Registration-driven pool: preserve the configured primary first,
+        // then try signed peer gateway endpoints discovered from the
+        // infrastructure DHT before the remaining configured fallbacks.
+        // The configured pool remains the bootstrap/fallback floor when
+        // discovery is empty or the conductor is not ready.
+        let configured_epr_urls = epr_storage_pool(&state.args);
+        let federation_config = services::FederationConfig::from_args(&state.args);
+        let epr_pool_urls = resolve_epr_storage_pool(
+            federation_config.as_ref(),
+            state.zome_caller.as_deref(),
+            &configured_epr_urls,
+        )
+        .await;
         if epr_pool_urls.is_empty() {
-            info!("STORAGE_URL/STORAGE_URLS not configured — EPR router starts empty");
+            info!(
+                "No signed doorway endpoints or STORAGE_URL/STORAGE_URLS configured — EPR router starts empty"
+            );
         } else {
             apply_epr_fallback_outcome(
                 doorway::projection::fetch_projections_with_fallback(
@@ -757,8 +765,12 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     // router self-populates once storage recovers — no kubectl restart needed.
     // On failure it logs at debug and preserves the last-good table (never
     // clears the router on transient storage unavailability).
-    let refresh_pool_urls = epr_storage_pool(&state.args);
-    if !refresh_pool_urls.is_empty() {
+    let refresh_configured_urls = epr_storage_pool(&state.args);
+    let refresh_federation_config = services::FederationConfig::from_args(&state.args);
+    let refresh_zome_caller = state.zome_caller.clone();
+    if !refresh_configured_urls.is_empty()
+        || (refresh_federation_config.is_some() && refresh_zome_caller.is_some())
+    {
         let refresh_secs = std::env::var("DOORWAY_EPR_REFRESH_SECS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
@@ -766,7 +778,8 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         let refresh_epr_router = Arc::clone(&state.epr_router);
         let refresh_node_id = state.args.node_id.to_string();
         let refresh_doorway_id = state.args.doorway_id.clone().unwrap_or(refresh_node_id);
-        let refresh_pool_size = refresh_pool_urls.len();
+        let configured_pool_size = refresh_configured_urls.len();
+        let registration_discovery = refresh_federation_config.is_some();
         tokio::spawn(async move {
             let http = reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(10))
@@ -777,8 +790,14 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             interval.tick().await;
             loop {
                 interval.tick().await;
-                // Fix A: same pool fallback as boot — primary first, peers on
-                // empty/unreachable, never silently clear a non-empty table.
+                // Re-resolve every tick so key-authenticated registration
+                // updates change the candidate set without a doorway restart.
+                let refresh_pool_urls = resolve_epr_storage_pool(
+                    refresh_federation_config.as_ref(),
+                    refresh_zome_caller.as_deref(),
+                    &refresh_configured_urls,
+                )
+                .await;
                 let outcome = doorway::projection::fetch_projections_with_fallback(
                     &refresh_pool_urls,
                     &refresh_doorway_id,
@@ -795,7 +814,8 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         });
         info!(
             interval_secs = refresh_secs,
-            pool_size = refresh_pool_size,
+            configured_pool_size,
+            registration_discovery,
             "EPR router periodic self-heal refresh task started"
         );
     }
@@ -1253,6 +1273,48 @@ fn epr_storage_pool(args: &Args) -> Vec<String> {
         }
     }
     pool
+}
+
+/// Resolve the operational EPR-fetch candidate list from notarized doorway
+/// registrations, retaining configured storage URLs as bootstrap/fallback.
+///
+/// The infrastructure zome validates each registration's detached endpoint
+/// signature before it can enter the DHT. We therefore consume
+/// `get_all_doorways` results directly instead of maintaining a second
+/// doorway-local signature or identity authority.
+async fn resolve_epr_storage_pool(
+    federation_config: Option<&services::FederationConfig>,
+    zome_caller: Option<&services::ZomeCaller>,
+    configured_urls: &[String],
+) -> Vec<String> {
+    let (Some(config), Some(zome_caller)) = (federation_config, zome_caller) else {
+        return configured_urls.to_vec();
+    };
+
+    match services::federation::get_all_doorways(zome_caller, config).await {
+        Ok(registrations) => {
+            let candidates = doorway::projection::epr_fetch_candidate_urls(
+                &registrations,
+                &config.doorway_id,
+                configured_urls,
+            );
+            debug!(
+                registration_count = registrations.len(),
+                candidate_count = candidates.len(),
+                configured_count = configured_urls.len(),
+                "Resolved EPR projection candidates from signed doorway registrations"
+            );
+            candidates
+        }
+        Err(error) => {
+            debug!(
+                error = %error,
+                configured_count = configured_urls.len(),
+                "Signed doorway registration resolution unavailable; using configured EPR candidates"
+            );
+            configured_urls.to_vec()
+        }
+    }
 }
 
 /// Apply a pool-fallback fetch outcome to the EPR router, logging at the level

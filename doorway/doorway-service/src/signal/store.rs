@@ -55,8 +55,10 @@ impl SignalStore {
     /// pod has no siblings, so cross-relay forwarding is inertly a no-op) UNLESS a
     /// `mongo` client is provided AND `BOOTSTRAP_MONGODB_DB` is set — then the
     /// shared [`MongoSignalBus`] on that same shared DB, so a domain's relays
-    /// forward handshake frames to each other. `relay_id` tags this relay's
-    /// publishes so it filters them back out on drain (loop-free).
+    /// forward handshake frames to each other. `relay_id` MUST identify one
+    /// running relay instance (not a logical doorway shared by replicas): it
+    /// tags this relay's publishes so only that instance filters them back out
+    /// on drain (loop-free).
     pub fn new(max_connections: usize, mongo: Option<&MongoClient>, relay_id: String) -> Self {
         let bus: Arc<dyn SignalBus> = match (mongo, std::env::var("BOOTSTRAP_MONGODB_DB").ok()) {
             (Some(m), Some(db)) if !db.is_empty() => {

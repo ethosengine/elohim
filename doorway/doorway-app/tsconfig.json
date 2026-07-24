@@ -6,7 +6,8 @@
     "baseUrl": ".",
     "paths": {
       "@elohim/identity": ["../../app/elohim-library/projects/elohim-identity/src/public-api.ts"],
-      "@elohim/identity/*": ["../../app/elohim-library/projects/elohim-identity/src/*"]
+      "@elohim/identity/*": ["../../app/elohim-library/projects/elohim-identity/src/*"],
+      "@elohim/service/*": ["../../app/elohim-library/projects/elohim-service/src/*"]
     },
     "outDir": "./dist/out-tsc",
     "strict": true,

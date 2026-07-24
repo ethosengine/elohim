@@ -15,6 +15,13 @@
  */
 
 import {
+  ConfiguredDoorwayResolver,
+  DoorwayAddressResolver,
+  DoorwayResolution,
+  gatewayCandidates,
+  normalizeDoorwayUrl,
+} from './doorway-address-resolver';
+import {
   ClientMode,
   BrowserMode,
   TauriMode,
@@ -30,6 +37,10 @@ import {
   ContentWriteable,
   WriteBufferDefaults,
 } from './types';
+
+function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+  return typeof (value as Promise<T>)?.then === 'function';
+}
 
 /**
  * Write buffer for backpressure protection
@@ -160,6 +171,7 @@ export class ReachEnforcer {
  */
 export class ElohimClient {
   private readonly mode: ClientMode;
+  private readonly doorwayResolver?: DoorwayAddressResolver;
   private readonly writeBuffer: WriteBuffer;
   private readonly reachEnforcer: ReachEnforcer;
   private readonly holochain?: HolochainConnection;
@@ -181,6 +193,18 @@ export class ElohimClient {
   constructor(config: ElohimClientConfig) {
     this.mode = config.mode;
     this.holochain = config.holochain;
+    const doorway = config.mode.doorway;
+    this.doorwayResolver =
+      config.doorwayResolver ??
+      (doorway
+        ? new ConfiguredDoorwayResolver([
+            {
+              identity: doorway.identity ?? doorway.url,
+              primaryUrl: doorway.url,
+              fallbackUrls: doorway.fallbacks,
+            },
+          ])
+        : undefined);
 
     // Select buffer config based on mode
     const bufferConfig = config.writeBuffer
@@ -466,14 +490,30 @@ export class ElohimClient {
    * allowed to run to completion rather than risk an 8s abort killing an
    * in-flight write that would otherwise have succeeded.
    */
-  private async fetchWithFailover(
+  // Intentionally non-async: configured resolution must reach fetch before
+  // the caller can synchronously abort an otherwise in-flight request.
+  // eslint-disable-next-line @typescript-eslint/promise-function-async
+  private fetchWithFailover(
     mode: BrowserMode,
     buildUrl: (baseUrl: string) => string,
     init: RequestInit | undefined,
     opts: { allowFailover: boolean; timeoutMs?: number }
   ): Promise<Response> {
     const hosts = this.candidateDoorwayHosts(mode);
+    return isPromiseLike(hosts)
+      ? hosts.then(async resolved =>
+          this.fetchAgainstCandidates(mode, resolved, buildUrl, init, opts)
+        )
+      : this.fetchAgainstCandidates(mode, hosts, buildUrl, init, opts);
+  }
 
+  private async fetchAgainstCandidates(
+    mode: BrowserMode,
+    hosts: string[],
+    buildUrl: (baseUrl: string) => string,
+    init: RequestInit | undefined,
+    opts: { allowFailover: boolean; timeoutMs?: number }
+  ): Promise<Response> {
     for (let i = 0; i < hosts.length; i++) {
       const host = hosts[i];
       const attemptInit = this.withPerAttemptTimeout(init, opts.timeoutMs);
@@ -525,12 +565,28 @@ export class ElohimClient {
   }
 
   /** Ordered, deduped candidate hosts: sticky-preferred, then primary, then configured fallbacks. */
-  private candidateDoorwayHosts(mode: BrowserMode): string[] {
-    const ordered = [
-      ...(this.activeDoorwayUrl ? [this.activeDoorwayUrl] : []),
-      mode.doorway.url,
-      ...(mode.doorway.fallbacks ?? []),
-    ].map(host => this.normalizeHost(host));
+  // Config resolves synchronously so caller abort signals attach to fetch
+  // immediately; future DHT/pkarr adapters may resolve asynchronously.
+  // eslint-disable-next-line sonarjs/function-return-type
+  private candidateDoorwayHosts(mode: BrowserMode): string[] | Promise<string[]> {
+    if (!this.doorwayResolver) {
+      throw new Error('No doorway address resolver is configured');
+    }
+    const identity = mode.doorway.identity ?? mode.doorway.url;
+    const resolution = this.doorwayResolver.resolve(identity);
+    return isPromiseLike(resolution)
+      ? resolution.then(resolved => this.orderDoorwayHosts(identity, resolved))
+      : this.orderDoorwayHosts(identity, resolution);
+  }
+
+  private orderDoorwayHosts(identity: string, resolution: DoorwayResolution): string[] {
+    const resolved = gatewayCandidates(resolution);
+    if (resolved.length === 0) {
+      throw new Error(`Doorway identity "${identity}" resolved without gateway endpoints`);
+    }
+    const ordered = [...(this.activeDoorwayUrl ? [this.activeDoorwayUrl] : []), ...resolved].map(
+      host => this.normalizeHost(host)
+    );
     return Array.from(new Set(ordered));
   }
 
@@ -540,7 +596,7 @@ export class ElohimClient {
    * compares/dedupes correctly against other candidate hosts.
    */
   private normalizeHost(url: string): string {
-    return url.replace(/\/+$/, '');
+    return normalizeDoorwayUrl(url);
   }
 
   /**

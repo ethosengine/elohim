@@ -55,6 +55,8 @@ export interface ProjectionApiConfig {
  * Maps to elohim-service/client types
  */
 export interface ClientEnvironmentConfig {
+  /** Stable public-key doorway identity; URL remains the migration fallback. */
+  doorwayIdentity?: string;
   /** Primary doorway URL */
   doorwayUrl: string;
   /** Fallback doorway URLs */

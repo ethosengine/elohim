@@ -127,6 +127,9 @@ importers:
       elohim-imagodei:
         specifier: workspace:*
         version: link:../elohim-elements/elohim-imagodei
+      elohim-qahal:
+        specifier: workspace:*
+        version: link:../elohim-elements/elohim-qahal
       highlight.js:
         specifier: ^11.11.1
         version: 11.11.1
@@ -903,6 +906,9 @@ importers:
       elohim-imagodei:
         specifier: workspace:*
         version: link:../elohim-elements/elohim-imagodei
+      elohim-qahal:
+        specifier: workspace:*
+        version: link:../elohim-elements/elohim-qahal
       highlight.js:
         specifier: '*'
         version: 11.11.1
@@ -967,6 +973,9 @@ importers:
       '@elohim/identity':
         specifier: workspace:*
         version: link:../../app/elohim-library/projects/elohim-identity
+      '@elohim/service':
+        specifier: workspace:*
+        version: link:../../app/elohim-library/projects/elohim-service
       rxjs:
         specifier: ~7.8.0
         version: 7.8.2

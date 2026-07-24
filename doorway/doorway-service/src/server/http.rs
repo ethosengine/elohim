@@ -372,6 +372,49 @@ fn init_ssr_http_client() -> Arc<reqwest::Client> {
     )
 }
 
+/// Return the instance-scoped identity used to suppress signal-bus echo.
+///
+/// `doorway_id` identifies the interchangeable logical doorway and is shared by
+/// its replicas. Using it here would make sibling replicas mistake each
+/// other's frames for their own. `node_id` is minted per gateway instance, so
+/// it is the correct origin identity for the operational signal bus.
+fn signal_relay_id(args: &Args) -> String {
+    args.node_id.to_string()
+}
+
+#[cfg(test)]
+mod signal_relay_identity_tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn sibling_replicas_of_one_doorway_have_distinct_signal_origins() {
+        let first = Args::try_parse_from([
+            "doorway",
+            "--node-id",
+            "00000000-0000-0000-0000-000000000001",
+            "--doorway-id",
+            "doorway:shared",
+        ])
+        .expect("first replica args must parse");
+        let second = Args::try_parse_from([
+            "doorway",
+            "--node-id",
+            "00000000-0000-0000-0000-000000000002",
+            "--doorway-id",
+            "doorway:shared",
+        ])
+        .expect("second replica args must parse");
+
+        assert_eq!(first.doorway_id, second.doorway_id);
+        assert_ne!(signal_relay_id(&first), signal_relay_id(&second));
+        assert_eq!(
+            signal_relay_id(&first),
+            "00000000-0000-0000-0000-000000000001"
+        );
+    }
+}
+
 impl AppState {
     /// Create AppState without external services (dev mode, direct proxy)
     pub fn new(args: Args) -> Self {
@@ -383,10 +426,7 @@ impl AppState {
         };
         let signal = if args.signal_enabled {
             let max_clients = args.signal_max_clients.unwrap_or(DEFAULT_MAX_CLIENTS);
-            let relay_id = args
-                .doorway_id
-                .clone()
-                .unwrap_or_else(|| args.node_id.to_string());
+            let relay_id = signal_relay_id(&args);
             Some(Arc::new(SignalStore::new(max_clients, None, relay_id)))
         } else {
             None
@@ -494,10 +534,7 @@ impl AppState {
         };
         let signal = if args.signal_enabled {
             let max_clients = args.signal_max_clients.unwrap_or(DEFAULT_MAX_CLIENTS);
-            let relay_id = args
-                .doorway_id
-                .clone()
-                .unwrap_or_else(|| args.node_id.to_string());
+            let relay_id = signal_relay_id(&args);
             Some(Arc::new(SignalStore::new(
                 max_clients,
                 mongo.as_ref(),
@@ -618,10 +655,7 @@ impl AppState {
         };
         let signal = if args.signal_enabled {
             let max_clients = args.signal_max_clients.unwrap_or(DEFAULT_MAX_CLIENTS);
-            let relay_id = args
-                .doorway_id
-                .clone()
-                .unwrap_or_else(|| args.node_id.to_string());
+            let relay_id = signal_relay_id(&args);
             Some(Arc::new(SignalStore::new(
                 max_clients,
                 mongo.as_ref(),
@@ -744,10 +778,7 @@ impl AppState {
         };
         let signal = if args.signal_enabled {
             let max_clients = args.signal_max_clients.unwrap_or(DEFAULT_MAX_CLIENTS);
-            let relay_id = args
-                .doorway_id
-                .clone()
-                .unwrap_or_else(|| args.node_id.to_string());
+            let relay_id = signal_relay_id(&args);
             Some(Arc::new(SignalStore::new(
                 max_clients,
                 Some(&mongo),

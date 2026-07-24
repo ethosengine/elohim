@@ -34,6 +34,11 @@ pub struct FederationDoorwaysResponse {
 pub struct DoorwaySummary {
     pub id: String,
     pub url: String,
+    pub identity_root: Option<String>,
+    pub signing_key: Option<String>,
+    pub endpoints: Vec<infrastructure_types::DoorwayEndpoint>,
+    pub record_serial: Option<u64>,
+    pub record_signature: Option<Vec<u8>>,
     pub region: Option<String>,
     pub tier: String,
     pub capabilities: Vec<String>,
@@ -80,6 +85,11 @@ pub async fn handle_federation_doorways(state: Arc<AppState>) -> Response<Full<B
                         DoorwaySummary {
                             id: d.id,
                             url: d.url,
+                            identity_root: Some(d.identity_root),
+                            signing_key: Some(d.signing_key),
+                            endpoints: d.endpoints,
+                            record_serial: Some(d.record_serial),
+                            record_signature: Some(d.record_signature),
                             region: d.region,
                             tier: d.tier,
                             capabilities,
@@ -107,7 +117,17 @@ pub async fn handle_federation_doorways(state: Arc<AppState>) -> Response<Full<B
         if seen_ids.insert(peer.id.clone()) {
             doorways.push(DoorwaySummary {
                 id: peer.id,
+                endpoints: vec![infrastructure_types::DoorwayEndpoint {
+                    service: "gateway".to_string(),
+                    url: peer.url.clone(),
+                    priority: 0,
+                    ttl_secs: 30,
+                }],
                 url: peer.url,
+                identity_root: None,
+                signing_key: None,
+                record_serial: None,
+                record_signature: None,
                 region: peer.region,
                 tier: "Federated".to_string(),
                 capabilities: peer.capabilities,
@@ -351,6 +371,13 @@ fn build_self_only_doorway(state: &AppState) -> Vec<DoorwaySummary> {
         vec![DoorwaySummary {
             id: doorway_id.clone(),
             url: state.args.doorway_url.clone().unwrap_or_default(),
+            identity_root: None,
+            signing_key: None,
+            endpoints: FederationConfig::from_args(&state.args)
+                .map(|config| config.endpoints)
+                .unwrap_or_default(),
+            record_serial: None,
+            record_signature: None,
             region: state.args.region.clone(),
             tier: "Emerging".to_string(),
             capabilities,

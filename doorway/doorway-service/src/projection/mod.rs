@@ -49,8 +49,8 @@ pub mod warm_stream;
 pub use document::{ProjectedDocument, ProjectionQuery};
 pub use engine::{spawn_engine_task, EngineConfig, ProjectionEngine, ProjectionSignal};
 pub use epr_router::{
-    fetch_projections_from_storage, fetch_projections_with_fallback, EprRouter, FallbackOutcome,
-    ReplaceOutcome,
+    epr_fetch_candidate_urls, fetch_projections_from_storage, fetch_projections_with_fallback,
+    EprRouter, FallbackOutcome, ReplaceOutcome,
 };
 pub use store::{ProjectionConfig, ProjectionStore};
 pub use subscriber::{
