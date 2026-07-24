@@ -1036,6 +1036,15 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             exit 1
                         fi
                         echo "elohim-imagodei build OK"
+
+                        echo "Building elohim-qahal (vite library + custom-elements-manifest)..."
+                        pnpm --filter elohim-qahal run build
+
+                        if [ ! -f app/elohim-elements/elohim-qahal/dist/register.js ]; then
+                            echo "ERROR: elohim-qahal/dist/register.js missing after build"
+                            exit 1
+                        fi
+                        echo "elohim-qahal build OK"
                     '''
                 }
             }
