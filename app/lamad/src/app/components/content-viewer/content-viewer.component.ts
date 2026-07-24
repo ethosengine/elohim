@@ -19,11 +19,12 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 // @coverage: 90.5% (2026-03-03)
 
-import { switchMap, takeUntil } from 'rxjs/operators';
+import { shareReplay, switchMap, takeUntil } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, Subject, Subscription, firstValueFrom, of } from 'rxjs';
 
 import 'elohim-core/register';
+import 'elohim-qahal/register';
 
 import { TrustBadge } from '../../models/trust-badge.model';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
@@ -219,7 +220,10 @@ export class ContentViewerComponent
   private readonly nodeId$ = new BehaviorSubject<string | null>(null);
 
   readonly resilienceSnapshot$: Observable<ResilienceSnapshotView | null> = this.nodeId$.pipe(
-    switchMap(id => (id ? this.libResilience.getSnapshot(id) : of(null)))
+    switchMap(id => (id ? this.libResilience.getSnapshot(id) : of(null))),
+    // Two template subscribers (title-line snapshot icon + felt-status card)
+    // must share one HTTP fetch; refCount tears down with the last one.
+    shareReplay({ bufferSize: 1, refCount: true })
   );
 
   // Doc-sync sibling signal (Automerge content-sync plane) — a CLIENT-COMPOSED

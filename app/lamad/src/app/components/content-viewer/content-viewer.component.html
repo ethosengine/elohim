@@ -133,6 +133,17 @@
           </span>
         </div>
 
+        <!-- Felt-status card ("names, not nines"): the household-addressed
+             projection of the same /household snapshot the title-line icon
+             reads — headline, who holds this, floor progress, next action.
+             Absent feltStatus (older storage) renders nothing. -->
+        <elohim-qahal-memory-safety
+          *ngIf="(resilienceSnapshot$ | async)?.feltStatus as felt"
+          [feltStatus]="felt"
+          [attr.content-label]="node.title"
+          data-testid="viewer-memory-safety"
+        ></elohim-qahal-memory-safety>
+
         <!-- Content actions -->
         <div class="content-actions">
           <app-content-download [node]="node"></app-content-download>

@@ -24,6 +24,7 @@
     "@types/d3": "*",
     "d3": "*",
     "elohim-core": "workspace:*",
+    "elohim-qahal": "workspace:*",
     "elohim-imagodei": "workspace:*",
     "highlight.js": "*",
     "marked": "*",
