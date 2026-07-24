@@ -19,11 +19,13 @@
     "crate": "elohim-storage",
     "module": "src/services/reach_earning.rs",
     "function": "evaluate",
-    "returns": "ReachVerdict (Allowed | Blocked | Pending)",
+    "returns": "ReachVerdict (Allowed | Blocked | Pending), narrowed onto elohim_epr::verdict::Verdict via ReachVerdict::into_verdict — Allowed->Permit, Blocked->Refuse, Pending->Refer (the ceiling law: Pending can never collapse to Refuse)",
     "gaps": [
-      "ReachVerdict predates the verdict spine and does not yet speak elohim_epr::verdict::Decision — `Pending` is the ceiling marker wearing a third name (alongside `.epr-meta` class: ask and constitution.md FlagForHuman). Conversion is owned by the ontology-keel slice, not this card.",
-      "the emitted verdict carries policy_ref: None at three sites, so a counterparty cannot check WHICH standing policy produced it — and the ManifestRegistry revision is a hand-asserted integer, not a content pin, so the same policy name may denote different bytes on two peers",
+      "the spine conversion has ZERO production callers: epr_compose returns ReachVerdict directly and never narrows onto Verdict, so no served path emits a spine verdict yet. The conversion and its citation are available and tested, not yet load-bearing.",
       "no timestamp on ReachVerdict or StandingEvidence: a verdict cannot be checked for freshness, so a revocation has no bounded window in which it must be reflected"
+    ],
+    "closedGaps": [
+      "2026-07-24 — policy_ref was None on every arm, so a counterparty could not check WHICH standing policy produced a verdict. ReachVerdict::into_verdict now cites ManifestRegistry::standing_policy_ref: the CID of the standing-policy manifest row, not its hand-asserted revision integer. The receiver fetches the exact bytes and checks our reasoning without sharing our code. An unpinned policy still emits None — silence is honest, a placeholder would be a citation resolving to nothing."
     ]
   },
   "ordered": true,

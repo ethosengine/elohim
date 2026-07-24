@@ -74,7 +74,12 @@
         "gaps": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Honestly declared distance between this classifier and the law it should satisfy. A named gap is a live obligation, not an excuse."
+          "description": "Honestly declared distance between this classifier and the law it should satisfy. A named gap is a live obligation, not an excuse — and it must be RETIRED when closed, because an overstated gap misleads exactly as much as a hidden one."
+        },
+        "closedGaps": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Gaps this classifier has closed, dated, with what changed. Kept rather than deleted so the card records its own trajectory — a reader can tell a gap that was never there from one that was met."
         }
       },
       "description": "The total function bridging the open fact layer to the closed verdict layer. REQUIRED when closure.verdicts is `closed`."
