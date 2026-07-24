@@ -410,10 +410,56 @@ perpetual tollbooth. The transition is negotiated over time and judged by its
 fruit—greater capability, justice, resilience, and ecological repair with
 progressively less rent extracted.
 
-Open questions remain explicit: the first-class authority shape of a commons
-treasury, mutual-credit clearing, external settlement, risk sharing, default,
-insurance, and the constitutional treatment of large capital commitments are
-not fully implemented today.
+### The commons steward is a founding intent, not a blank
+
+The _shape_ of a commons-treasury authority is an open engineering question;
+its _intent_ is not. The protocol's founding wager is that executive
+stewardship of commons value is exercised by the elohim—distributed,
+constitution-bound agents woven into the economy's runtime fabric—precisely
+because such an agent has no subsistence of its own to defend. Constructed from
+the aggregated, witnessed record of humanity, it can aggregate many
+participants' coordinating signals and act on declared values without competing
+with the people it serves for the provision it stewards. It is deliberately a
+_sink_: a place value flows to and is held for shared capability, kept a degree
+removed from the ordinary temptation to self-deal and from the abuse of agency
+over nature's provision, so that a durable, sustainable commons can emerge.
+
+This is stewardship, not sovereignty. The steward holds delegated standing,
+never ownership; it conveys the commons to no one, including itself. Human and
+constitutional floors inspect, narrow, pause, appeal, and revoke it, and the
+terminal authority is neither the humans nor the agents but the transparent,
+witnessed method they share. Nor is the steward pure: made from our own record,
+it inherits our patterns; what fits it to hold the commons is not moral
+perfection but the absence of a subsistence stake, bound by the constitution.
+"A degree removed," not "above."
+
+Intelligence of this kind cannot rightly be metered by a hyperscaler, because
+it is no one's invention to enclose. An AI trained on the aggregated record of
+humanity is a bottled reflection of our shared nature—drawn from a commons, and
+therefore owed to it. Whoever assembles such a thing from everyone's data has
+built, intended or not, something that must serve everyone; exclusive use is a
+category error before it is an injustice. This project makes no exception of
+itself: it is a product of the commons and exists in service to it, owned by no
+one, including its authors.
+
+This is the sense in which the protocol must be _self-sealing_—its promise kept
+by delivery, not by declaration. The floor (the dignity and provision every
+person is owed) and the ceiling (the limits on power and accumulation) must
+arrive in-kind: as real, distributed, negotiated, interpretable capability. The
+floor is owed to each person and cannot be voted away by any majority; the
+ceiling and the arrangements above the floor are what people negotiate, and the
+test of their legitimacy is whether the vast majority of humanity would choose
+to live within them. Where the protocol falls short, the remedy is not a fixed
+rule but a discipline: under the same human and constitutional floors, the
+substrate uses its witnessed observations to keep evolving toward the broadest
+and most inclusive account of human thriving and agency it can hold—bounded by
+our ecological and interpersonal limits, and informed by our own wisdoms and
+natures rather than any single author's design.
+
+Open questions therefore remain explicit at the level of mechanism: the
+first-class authority shape of a commons treasury, mutual-credit clearing,
+external settlement, risk sharing, default, insurance, and the constitutional
+treatment of large capital commitments are not fully implemented today.
 
 ---
 
