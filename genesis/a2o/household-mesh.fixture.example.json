@@ -1,0 +1,34 @@
+{
+  "commonsEprId": "manifesto",
+  "convergenceWindowMs": 60000,
+  "connectedPeersFloor": 2,
+  "doorways": {
+    "alpha": {
+      "url": "http://localhost:8888",
+      "primaryStorageUrl": "http://localhost:8090",
+      "poolStorageUrls": ["http://localhost:8091", "http://localhost:8092"],
+      "logPath": "/tmp/elohim-household/doorway-alpha.log"
+    },
+    "beta": {
+      "url": "http://localhost:8889"
+    },
+    "apex": {
+      "url": "http://localhost:8890",
+      "primaryStorageUrl": "http://localhost:8090"
+    }
+  },
+  "storagePeers": {
+    "matthew": {
+      "url": "http://localhost:8090",
+      "pidFile": "/tmp/elohim-household/matthew.pid"
+    },
+    "jessica": {
+      "url": "http://localhost:8091",
+      "pidFile": "/tmp/elohim-household/jessica.pid"
+    },
+    "james": {
+      "url": "http://localhost:8092",
+      "pidFile": "/tmp/elohim-household/james.pid"
+    }
+  }
+}

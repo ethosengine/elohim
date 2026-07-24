@@ -13,6 +13,14 @@ import { readFile } from 'node:fs/promises';
 
 import { Given, Then, When } from '@cucumber/cucumber';
 
+import {
+  loadHouseholdMeshFixture,
+  requireFixtureDoorwayLogPath,
+  requireFixturePeerPid,
+  requireFixturePoolStorageUrls,
+  requireFixturePrimaryStorageUrl,
+  requireFixtureStoragePeer,
+} from '../src/framework/fixtures/household-mesh.js';
 import { retry } from '../src/framework/utils/retry.js';
 import { E2EWorld } from '../src/framework/world.js';
 
@@ -313,32 +321,6 @@ interface PoolFailoverState {
 
 const poolFailoverStates = new WeakMap<E2EWorld, PoolFailoverState>();
 
-function requiredHttpUrl(name: string, fallbackName?: string): string {
-  const value = process.env[name] ?? (fallbackName ? process.env[fallbackName] : undefined);
-  const fallbackHint = fallbackName ? ` (or ${fallbackName})` : '';
-  assert.ok(
-    value && isHttpUrl(value),
-    `live federation fixture missing: set ${name}${fallbackHint}`
-  );
-  return withoutTrailingSlashes(value);
-}
-
-function requiredCsvUrls(name: string): string[] {
-  const configured = process.env[name]
-    ?.split(',')
-    .map(value => value.trim())
-    .filter(Boolean);
-  const conventional = ['MATTHEW', 'JESSICA', 'JAMES']
-    .map(peer => process.env[`E2E_STORAGE_${peer}`])
-    .filter((value): value is string => Boolean(value));
-  const values = configured?.length ? configured : conventional;
-  assert.ok(
-    values.length > 0 && values.every(isHttpUrl),
-    `live federation fixture missing: set ${name} to comma-separated storage URLs`
-  );
-  return [...new Set(values.map(withoutTrailingSlashes))];
-}
-
 function registeredDoorwayUrl(world: E2EWorld, id: string): string {
   const url = world.getDoorway(id).url;
   assert.ok(isHttpUrl(url), `set the registered ${id} doorway environment URL`);
@@ -382,8 +364,7 @@ function projectionHeads(rows: ProjectionRow[]): { urlPath: string; eprId: strin
 }
 
 async function captureLogStart(): Promise<{ path: string; offset: number }> {
-  const path = process.env['E2E_DOORWAY_LOG_PATH'];
-  assert.ok(path, 'live federation fixture missing: set E2E_DOORWAY_LOG_PATH');
+  const path = requireFixtureDoorwayLogPath(loadHouseholdMeshFixture(), 'alpha');
   let text: string;
   try {
     text = await readFile(path, 'utf8');
@@ -401,8 +382,9 @@ async function newLogText(path: string, offset: number): Promise<string> {
 async function initialPoolState(world: E2EWorld): Promise<PoolFailoverState> {
   const doorwayUrl = registeredDoorwayUrl(world, 'alpha');
   const initial = await coherence(doorwayUrl);
-  const primaryUrl = requiredHttpUrl('E2E_DOORWAY_PRIMARY_STORAGE_URL', 'E2E_STORAGE_URL');
-  const poolUrls = requiredCsvUrls('E2E_DOORWAY_POOL_STORAGE_URLS').filter(
+  const fixture = loadHouseholdMeshFixture();
+  const primaryUrl = requireFixturePrimaryStorageUrl(fixture, 'alpha');
+  const poolUrls = requireFixturePoolStorageUrls(fixture, 'alpha').filter(
     url => url !== primaryUrl
   );
   assert.ok(poolUrls.length > 0, 'storage pool must contain a non-primary peer URL');
@@ -545,7 +527,7 @@ Given(
   async function (this: E2EWorld) {
     const apexUrl = registeredDoorwayUrl(this, 'apex');
     const manifest = await coherence(apexUrl);
-    const primary = requiredHttpUrl('E2E_APEX_PRIMARY_STORAGE_URL');
+    const primary = requireFixturePrimaryStorageUrl(loadHouseholdMeshFixture(), 'apex');
     const rows = await projections(primary, manifest.doorwayId);
     assert.equal(rows.length, 0, `apex primary ${primary} returned ${rows.length} rows`);
   }
@@ -605,12 +587,13 @@ function householdState(world: E2EWorld): PeerLossState {
   const existing = peerLossStates.get(world);
   if (existing) return existing;
 
+  const fixture = loadHouseholdMeshFixture();
   const names: HouseholdPeerName[] = ['matthew', 'jessica', 'james'];
   const peers = names.map(name => ({
     name,
-    url: requiredHttpUrl(`E2E_STORAGE_${name.toUpperCase()}`),
+    url: requireFixtureStoragePeer(fixture, name).url,
   }));
-  const floor = Number(process.env['E2E_CONNECTED_PEERS_FLOOR'] ?? peers.length - 1);
+  const floor = fixture.connectedPeersFloor ?? peers.length - 1;
   assert.ok(Number.isInteger(floor) && floor >= 0, 'E2E_CONNECTED_PEERS_FLOOR must be an integer');
 
   const state: PeerLossState = { peers, paused: new Set(), floor };
@@ -632,13 +615,7 @@ function peerByName(state: PeerLossState, name: HouseholdPeerName): HouseholdPee
 }
 
 function peerPid(name: HouseholdPeerName): number {
-  const envName = `E2E_STORAGE_${name.toUpperCase()}_PID`;
-  const pid = Number(process.env[envName]);
-  assert.ok(
-    Number.isSafeInteger(pid) && pid > 1 && pid !== process.pid,
-    `live peer-loss fixture missing: set ${envName} to that local storage process PID`
-  );
-  return pid;
+  return requireFixturePeerPid(loadHouseholdMeshFixture(), name);
 }
 
 function pausePeerProcess(name: HouseholdPeerName): void {

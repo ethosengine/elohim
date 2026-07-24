@@ -14,6 +14,10 @@ import { Given } from '@cucumber/cucumber';
 
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
+import {
+  fixtureDoorwayUrl,
+  loadHouseholdMeshFixture,
+} from '../src/framework/fixtures/household-mesh.js';
 import { Human } from '../src/framework/human.js';
 import { doorwayToAppUrl } from '../src/framework/utils/url.js';
 import { E2EWorld } from '../src/framework/world.js';
@@ -93,7 +97,10 @@ Given(
 Given(
   'doorway {string} at {string}',
   function (this: E2EWorld, doorwayId: string, urlOrEnv: string) {
-    const url = process.env[urlOrEnv] ?? urlOrEnv;
+    const isEnvironmentReference = urlOrEnv.startsWith('E2E_');
+    const fixtureUrl = fixtureDoorwayUrl(loadHouseholdMeshFixture(), doorwayId);
+    const url =
+      process.env[urlOrEnv] ?? fixtureUrl ?? (isEnvironmentReference ? undefined : urlOrEnv);
     assert.ok(url, `Cannot resolve doorway URL from: ${urlOrEnv}`);
     this.addDoorway(doorwayId, url);
   }
