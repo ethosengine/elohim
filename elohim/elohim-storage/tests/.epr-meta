@@ -1,0 +1,23 @@
+---
+epr-meta-version: 1
+id: elohim-storage-tests-coverage
+covers: subtree
+purpose: >
+  Integration-test binaries for elohim-storage — the tier that exercises what
+  `cargo test --lib` cannot (multi-component seams: distribute/selection with
+  captured command channels, schema contracts, sweep harnesses). Considered
+  2026-07-24: no edit-time gate warranted. The real gates are structural — the
+  pre-push hook runs these binaries (it caught the custody-announce contract
+  change the lib suite missed, same day), and test-edit discipline is owned by
+  review + the never-edit-the-judge shift rule, which no declarative predicate
+  can express. Tests here assert BEHAVIORAL CONTRACTS: when a deliberate design
+  change breaks one, strengthen the assertion into a positive spec of the new
+  contract (see distribute_shards_diversity's custody-announce evolution) —
+  never loosen it to pass.
+---
+# elohim-storage/tests — integration-tier contracts
+
+Rules-free considered-coverage claim. Conventions: in-memory pools per test,
+`for_testing_capturing_commands` harnesses, `#[ignore]` for live-swarm needs
+(remember: `#[ignore]` is a CI no-op in DNA sweettests, but these are NOT
+sweettests — plain cargo test respects it here).

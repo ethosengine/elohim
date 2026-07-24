@@ -254,9 +254,26 @@ async fn self_selection_records_self_held_location_and_never_pushes() {
         "a self-held location must be distinguishable from a peer-verified one"
     );
 
+    // The self-held write now ANNOUNCES custody on the gossip plane (the
+    // convergence hot path) — exactly one GossipPublish on the custody topic,
+    // and still never a push/dial (the original no-self-dial contract).
+    match cmd_rx.try_recv() {
+        Ok(elohim_storage::p2p::P2PCommand::GossipPublish { topic, .. }) => {
+            assert_eq!(
+                topic,
+                elohim_storage::p2p::custody_announce::CUSTODY_ANNOUNCE_TOPIC,
+                "the only command a self-held shard emits is its custody announcement"
+            );
+        }
+        Ok(_) => panic!(
+            "a self-selected shard emitted a non-gossip P2P command — \
+             it must never push or dial"
+        ),
+        Err(e) => panic!("expected the custody GossipPublish announcement, got recv error: {e}"),
+    }
     assert!(
         cmd_rx.try_recv().is_err(),
-        "a self-selected shard must NOT produce any P2P command (no self-dial)"
+        "no further P2P commands after the custody announcement (no self-dial, no push)"
     );
 }
 
