@@ -151,6 +151,8 @@ async function readJson(path) {
 }
 
 async function writeText(path, value) {
+  const current = await readIfExists(path);
+  if (current === value) return;
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, value, 'utf8');
 }
@@ -471,6 +473,17 @@ function skillPackageFromClaude(path, parsed) {
       },
       codex: {
         path: `.codex/skills/${name}/SKILL.md`,
+        frontmatter: codexFrontmatter({
+          name,
+          description,
+          packageKind: 'SkillPackage',
+          sourcePath: relative(REPO_ROOT, path),
+          sourceRuntime: 'claude',
+          governance,
+        }),
+      },
+      codexProject: {
+        path: `.agents/skills/${name}/SKILL.md`,
         frontmatter: codexFrontmatter({
           name,
           description,
@@ -932,10 +945,12 @@ function projectionFixturePathsFor(pkg) {
     );
   }
   return pkg.kind === 'SkillPackage'
-    ? {
-        claude: resolve(PROJECTION_DIR, 'claude/skills', pkg.metadata.id, 'SKILL.md'),
-        codex: resolve(PROJECTION_DIR, 'codex/skills', pkg.metadata.id, 'SKILL.md'),
-      }
+    ? Object.fromEntries(
+        Object.keys(pkg.projections).map((runtime) => [
+          runtime,
+          resolve(PROJECTION_DIR, runtime, 'skills', pkg.metadata.id, 'SKILL.md'),
+        ]),
+      )
     : {
         claude: resolve(PROJECTION_DIR, 'claude/agents', `${pkg.metadata.id}.md`),
         codex: resolve(PROJECTION_DIR, 'codex/agents', `${pkg.metadata.id}.md`),
@@ -963,6 +978,14 @@ function runtimePathsFor(pkg) {
       out[runtime] = resolve(REPO_ROOT, pkg.projections[runtime].path);
     }
     return out;
+  }
+  if (pkg.kind === 'SkillPackage') {
+    return Object.fromEntries(
+      Object.entries(pkg.projections).map(([runtime, projection]) => [
+        runtime,
+        resolve(REPO_ROOT, projection.path),
+      ]),
+    );
   }
   // CommandPackage and the markdown skill/agent packages both carry claude+codex
   // projection paths; the generic two-runtime return covers them.
@@ -1277,6 +1300,13 @@ async function verifyPackage(pkg, validators, settings, packageCatalog) {
   await verifyProjectionFixture(pkg, 'codex');
   await verifyRuntimeProjectionIfPresent(pkg, 'claude');
   await verifyRuntimeProjectionIfPresent(pkg, 'codex');
+  if (pkg.kind === 'SkillPackage') {
+    for (const runtime of Object.keys(pkg.projections)) {
+      if (runtime === 'claude' || runtime === 'codex') continue;
+      await verifyProjectionFixture(pkg, runtime);
+      await verifyRuntimeProjectionIfPresent(pkg, runtime);
+    }
+  }
   await verifyGovernanceBackref(pkg);
 }
 
@@ -1284,21 +1314,27 @@ async function verifyGovernanceBackref(pkg) {
   const eprRef = pkg.metadata.governance?.eprRef;
   if (!eprRef) return;
   const paths = projectionFixturePathsFor(pkg);
-  const codexFixture = await readIfExists(paths.codex);
-  const ok = typeof codexFixture === 'string' && codexFixture.includes(eprRef);
-  assert(
-    ok,
-    `${pkg.metadata.id} governance backref matches package: codex projection fixture contains ${eprRef}`,
-  );
-  if (!ok) {
-    await lodgeGovernanceFinding({
-      fingerprint: governanceFingerprint(pkg.kind, pkg.metadata.id, 'governance-backref'),
-      kind: pkg.kind,
-      id: pkg.metadata.id,
-      detail:
-        `governance backref missing/stale: codex projection fixture ` +
-        `${relative(REPO_ROOT, paths.codex)} does not contain expected eprRef ${eprRef}`,
-    });
+  for (const runtime of Object.keys(pkg.projections).filter((name) => name !== 'claude')) {
+    const codexFixture = await readIfExists(paths[runtime]);
+    const ok = typeof codexFixture === 'string' && codexFixture.includes(eprRef);
+    assert(
+      ok,
+      `${pkg.metadata.id} governance backref matches package: ${runtime} projection fixture contains ${eprRef}`,
+    );
+    if (!ok) {
+      await lodgeGovernanceFinding({
+        fingerprint: governanceFingerprint(
+          pkg.kind,
+          pkg.metadata.id,
+          `governance-backref-${runtime}`,
+        ),
+        kind: pkg.kind,
+        id: pkg.metadata.id,
+        detail:
+          `governance backref missing/stale: ${runtime} projection fixture ` +
+          `${relative(REPO_ROOT, paths[runtime])} does not contain expected eprRef ${eprRef}`,
+      });
+    }
   }
 }
 
@@ -1556,6 +1592,17 @@ async function runSelfTest() {
             governance: governanceFor('skills', 'synthetic-flip'),
           }),
         },
+        codexProject: {
+          path: '.agents/skills/synthetic-flip/SKILL.md',
+          frontmatter: codexFrontmatter({
+            name: 'synthetic-flip',
+            description,
+            packageKind: 'SkillPackage',
+            sourcePath: '.epr-meta/elohim/packages/skills/synthetic-flip.json',
+            sourceRuntime: 'claude',
+            governance: governanceFor('skills', 'synthetic-flip'),
+          }),
+        },
       },
     };
     const flippedClaude = projectClaude(flippedPkg);
@@ -1578,6 +1625,15 @@ async function runSelfTest() {
     assert(
       !flippedClaude.includes(staleMarker),
       'selftest(b): flipped .claude IGNORES stale frontmatterRaw (generated, not passthrough)',
+    );
+    assert(
+      projectedTextFor(flippedPkg, 'codexProject') === projectCodex(flippedPkg),
+      'selftest(b): stock Codex project skill uses the Codex backend without forking identity',
+    );
+    assert(
+      runtimePathsFor(flippedPkg).codexProject ===
+        resolve(REPO_ROOT, '.agents/skills/synthetic-flip/SKILL.md'),
+      'selftest(b): stock Codex project skill targets .agents/skills/<id>/SKILL.md',
     );
 
     const normalBody = '# Normal\n\nnormal body\n';

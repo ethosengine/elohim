@@ -53,7 +53,8 @@
       "required": ["claude", "codex"],
       "properties": {
         "claude": { "$ref": "#/$defs/projection" },
-        "codex": { "$ref": "#/$defs/projection" }
+        "codex": { "$ref": "#/$defs/projection" },
+        "codexProject": { "$ref": "#/$defs/projection" }
       },
       "additionalProperties": false
     }
