@@ -94,6 +94,94 @@ async function main() {
   assert(vsValidate('healing'), 'validation-status accepts "healing"');
   assert(!vsValidate('broken'), 'validation-status rejects "broken"');
 
+  const closureValidate = ajv.getSchema('epr:schema:enum:closure');
+  assert(closureValidate('open'), 'closure accepts "open"');
+  assert(closureValidate('closed'), 'closure accepts "closed"');
+  assert(!closureValidate('partial'), 'closure rejects "partial" (two postures, not a gradient)');
+
+  // --- Axis Card Registry Tests ---
+  //
+  // Axis cards (registries/axes/*.axis.json) declare what an axis means, which vocabulary it
+  // classifies over, and — the load-bearing field — what SILENCE means on each of its two layers.
+  // Without the closure declaration a counterparty that does not share our code cannot tell whether
+  // our silence on an axis is an admission or a denial, which is the whole attack surface.
+  // Enum schemas are already in `ajv` above, so the card's `vocabulary.$ref` and the two
+  // `closure.*` $refs resolve by $id.
+
+  const axisCardSchema = await loadJson(join(SCHEMA_DIR, 'registries', 'axis-card.schema.json'));
+  ajv.addSchema(axisCardSchema);
+  const axisCardValidate = ajv.getSchema('epr:registry:axis-card');
+  assert(!!axisCardValidate, 'axis-card meta-schema compiles');
+
+  const axesDir = join(SCHEMA_DIR, 'registries', 'axes');
+  const axisFiles = (await readdir(axesDir)).filter((f) => f.endsWith('.axis.json'));
+  assert(axisFiles.length > 0, 'registries/axes contains at least one axis card');
+
+  for (const file of axisFiles) {
+    const card = await loadJson(join(axesDir, file));
+    const valid = axisCardValidate(card);
+    if (!valid) {
+      console.error(`  ${file}:`, JSON.stringify(axisCardValidate.errors, null, 2));
+    }
+    assert(valid, `axis card ${file} conforms to epr:registry:axis-card`);
+
+    // Identity coherence: filename stem, `axis`, and the `$id` suffix must agree. Three names for
+    // one axis is exactly how the reach vocabulary drifted five ways.
+    const stem = file.replace(/\.axis\.json$/, '');
+    assert(card.axis === stem, `axis card ${file}: \`axis\` matches filename stem`);
+    assert(
+      card.$id === `epr:registry:axis:${stem}`,
+      `axis card ${file}: $id matches filename stem`,
+    );
+
+    // The vocabulary is REFERENCED, never inlined — a card that copies its value list has forked
+    // the enum it was meant to point at.
+    const vocabId = card.vocabulary?.$ref;
+    assert(
+      !!ajv.getSchema(vocabId),
+      `axis card ${file}: vocabulary $ref "${vocabId}" resolves to a registered enum`,
+    );
+
+    // Totality law: a closed-verdict axis must name the classifier bridging its open fact layer to
+    // its closed verdict layer, and that classifier must be able to express the `refer` ceiling.
+    if (card.closure?.verdicts === 'closed') {
+      assert(
+        !!card.classifier,
+        `axis card ${file}: closed-verdict axis declares a classifier`,
+      );
+    }
+  }
+
+  // Assert the NEGATIVE — the conditional must actually bite. A closed-verdict card with no
+  // classifier has to fail, or the totality law is decorative.
+  const cardMissingClassifier = {
+    $id: 'epr:registry:axis:fixture',
+    axis: 'fixture',
+    version: 1,
+    kind: 'derived',
+    semantics: 'fixture',
+    vocabulary: { $ref: 'epr:schema:enum:closure' },
+    closure: { facts: 'open', verdicts: 'closed' },
+    sourceOfRecord: { kind: 'derived-fold' },
+  };
+  assert(
+    !axisCardValidate(cardMissingClassifier),
+    'axis-card REJECTS a closed-verdict card with no classifier (totality law bites)',
+  );
+  assert(
+    axisCardValidate({ ...cardMissingClassifier, closure: { facts: 'open', verdicts: 'open' } }),
+    'axis-card allows an open-verdict card without a classifier (the conditional is conditional)',
+  );
+  assert(
+    !axisCardValidate({ ...cardMissingClassifier, closure: { facts: 'open' } }),
+    'axis-card REJECTS a card declaring only half its closure posture',
+  );
+  const { closure: _dropped, ...cardNoClosure } = cardMissingClassifier;
+  assert(
+    !axisCardValidate(cardNoClosure),
+    'axis-card REJECTS a card with no closure declaration at all',
+  );
+
   // --- CreateContentInput Tests ---
 
   const inputSchemaRaw = await loadJson(
