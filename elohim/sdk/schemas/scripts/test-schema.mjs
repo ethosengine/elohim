@@ -443,29 +443,18 @@ async function main() {
     // sealed by the time this block runs.
     const fixtureAjv = new Ajv2020({ strict: false, allErrors: true });
 
-    const lifecycleSchemaPath = resolve(__dirname, '../v1/enums/session-lifecycle-state.schema.json');
-    const lifecycleSchema = await loadJson(lifecycleSchemaPath);
-    fixtureAjv.addSchema(lifecycleSchema, 'epr:enums/session-lifecycle-state.schema.json');
-
-    const instrumentSchema = await loadJson(
-      resolve(__dirname, '../v1/enums/instrument-archetype.schema.json')
-    );
-    fixtureAjv.addSchema(instrumentSchema, 'epr:enums/instrument-archetype.schema.json');
-
-    const polaritySchema = await loadJson(
-      resolve(__dirname, '../v1/enums/observation-polarity.schema.json')
-    );
-    fixtureAjv.addSchema(polaritySchema, 'epr:enums/observation-polarity.schema.json');
-
-    const substrateSignalSchema = await loadJson(
-      resolve(__dirname, '../v1/enums/substrate-signal.schema.json')
-    );
-    fixtureAjv.addSchema(substrateSignalSchema, 'epr:enums/substrate-signal.schema.json');
-
-    const eprKindSchema = await loadJson(
-      resolve(__dirname, '../v1/enums/epr-kind.schema.json')
-    );
-    fixtureAjv.addSchema(eprKindSchema, 'epr:enums/epr-kind.schema.json');
+    // Register EVERY enum under its resolved URI, matching the regression block below.
+    // This was previously a hand-picked list of five, which made any new enum $ref added
+    // to app-manifest.schema.json fail at COMPILE time with a MissingRefError — a trap
+    // that fires on the schema author, far from the list that caused it, and says nothing
+    // about which list to edit. Globbing removes the maintenance step entirely.
+    const fixtureEnumDir = resolve(__dirname, '../v1/enums');
+    for (const file of (await readdir(fixtureEnumDir)).filter((f) => f.endsWith('.schema.json'))) {
+      const resolvedUri = `epr:enums/${file}`;
+      if (!fixtureAjv.getSchema(resolvedUri)) {
+        fixtureAjv.addSchema(await loadJson(resolve(fixtureEnumDir, file)), resolvedUri);
+      }
+    }
 
     const pillarProjectionSchema = await loadJson(
       resolve(__dirname, '../v1/manifest/pillar-projection.schema.json')
@@ -723,15 +712,57 @@ async function main() {
       'StagedIntentDeclaration',       // catches $defs ref errors
       'GraduationPolicy',              // catches $defs ref errors
       'SessionLifecycleState',         // catches lifecycle enum ref errors
-      'session-lifecycle-state'        // catches the enum file path
+      'session-lifecycle-state',       // catches the enum file path
+      // Third-party gate closure (2026-07-24). `gates` is the CONSUMER'S verdict
+      // surface — where a downstream domain's own vocabulary reaches a decision.
+      // These tokens are here so a gate that handles events without declaring what
+      // its silence means fails loudly instead of joining the tolerated drift.
+      // NB: `GateDeclaration` (the $defs name) is the discriminator, NOT a bare `gates`
+      // token — `gates` also appears as a pre-existing undeclared key inside
+      // GovernanceLeg (vocabulary.contentTypes.*.coupling.governance.gates), which is one
+      // of the 35 counted drift items and unrelated to the top-level gate block.
+      'GateDeclaration',
+      'closure'
     ];
 
+    // Resolve the modular manifest split BEFORE validating — the EXACT rule from
+    // domains/lamad/scripts/codegen.mjs::resolveRefs: inline only `./manifest/` and
+    // `../` refs, and deliberately leave `./schemas/…` pointers alone (those are JSON
+    // Schema references for metadata payloads and must stay refs).
+    //
+    // Without this the validator sees `{"$ref": "./manifest/content-types/article.json"}`
+    // where the schema expects a content-type object and reports three phantom errors per
+    // content type (unexpected `$ref`, missing `description`, missing `coupling`). Measured
+    // 2026-07-24: raw load = 120 errors across 8 pillars, of which 85 were phantom; with
+    // this rule = 35 genuine. The error filter below was compensating for a loader that had
+    // never been wired in, not merely for drift.
+    const inlineManifestRefs = async (value, baseDir) => {
+      if (value === null || typeof value !== 'object') return value;
+      if (Array.isArray(value)) {
+        return Promise.all(value.map((v) => inlineManifestRefs(v, baseDir)));
+      }
+      if (
+        typeof value.$ref === 'string' &&
+        (value.$ref.startsWith('./manifest/') || value.$ref.startsWith('../'))
+      ) {
+        const refPath = resolve(baseDir, value.$ref);
+        return inlineManifestRefs(await loadJson(refPath), dirname(refPath));
+      }
+      const out = {};
+      for (const [k, v] of Object.entries(value)) {
+        out[k] = await inlineManifestRefs(v, baseDir);
+      }
+      return out;
+    };
+
     const pillars = ['avodah', 'elohim', 'imagodei', 'infrastructure', 'lamad', 'mishpat', 'qahal', 'shefa'];
+    let phantomRefErrors = 0;
     for (const pillar of pillars) {
-      const manifestPath = resolve(__dirname, `../../domains/${pillar}/manifest.json`);
+      const pillarDir = resolve(__dirname, `../../domains/${pillar}`);
+      const manifestPath = resolve(pillarDir, 'manifest.json');
       let manifest;
       try {
-        manifest = await loadJson(manifestPath);
+        manifest = await inlineManifestRefs(await loadJson(manifestPath), pillarDir);
       } catch (e) {
         assert(false, `Pillar manifest could not be loaded: ${pillar} (${e.message})`);
         continue;
@@ -739,6 +770,12 @@ async function main() {
 
       validate(manifest);
       const errors = validate.errors || [];
+
+      // The loader is wired iff no error blames a literal `$ref` key — that error can
+      // only occur when the modular split was left unresolved.
+      phantomRefErrors += errors.filter(
+        (e) => e.keyword === 'additionalProperties' && e.params?.additionalProperty === '$ref',
+      ).length;
 
       // Find any errors that reference our Task 1-3 substrate additions.
       const ourErrors = errors.filter(err => {
@@ -755,6 +792,51 @@ async function main() {
         `Tasks 1-3 substrate additions do not introduce errors for ${pillar} manifest (Task 6 non-regression)`
       );
     }
+
+    assert(
+      phantomRefErrors === 0,
+      'modular manifest $refs are resolved before validation (no phantom "$ref" errors)'
+    );
+
+    // The closure conditional must BITE on the consumer's verdict surface. A gate that
+    // handles an event and does not say what its silence means is the exact hole this
+    // declaration exists to close, so prove the schema rejects it rather than trusting
+    // that it would.
+    // Validate against the GateDeclaration $def directly rather than wrapping each case in
+    // a whole valid manifest — the unit under test is the gate, and a full-manifest fixture
+    // would fail on unrelated required vocabulary and obscure which rule actually fired.
+    // The $id deliberately mirrors the manifest's own shape
+    // (`epr:schema:manifest:app-manifest`) so the def's relative `../enums/…` ref resolves
+    // to the same `epr:enums/*` keys the enums are registered under.
+    const gateOnly = regressionAjv.compile({
+      $id: 'epr:schema:manifest:gate-declaration-only',
+      ...manifestSchema.$defs.GateDeclaration,
+    });
+    const baseGate = {
+      processCid: 'epr:gates:fixture',
+      description: 'fixture',
+      governanceReach: 'community',
+    };
+    assert(
+      !gateOnly({ ...baseGate, handlesEvents: ['CapabilityInvoke'] }),
+      'app-manifest REJECTS an event-handling gate with no closure declaration'
+    );
+    assert(
+      gateOnly({ ...baseGate, handlesEvents: ['CapabilityInvoke'], closure: 'closed' }),
+      'app-manifest accepts an event-handling gate that declares its closure'
+    );
+    assert(
+      gateOnly({ ...baseGate, handlesEvents: [] }),
+      'app-manifest allows a gate handling no events to omit closure (inert, not a verdict path)'
+    );
+    assert(
+      !gateOnly({ ...baseGate, handlesEvents: ['CapabilityInvoke'], closure: 'maybe' }),
+      'app-manifest REJECTS a gate closure outside the shared closure vocabulary'
+    );
+    assert(
+      !gateOnly({ processCid: 'epr:gates:x', handlesEvents: [], governanceReach: 'community' }),
+      'app-manifest REJECTS a gate with no description (a verdict surface must say what it does)'
+    );
   }
 
   console.log(`\n${passes} passed, ${failures} failed`);
