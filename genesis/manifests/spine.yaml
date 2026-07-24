@@ -114,7 +114,18 @@ nodes:
     active: true
     checks:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
+      - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; STANDING RED until the Matthew→Adam link-op/fetch seam is cured)"
     evidence: >
+      DELTA 2026-07-24 (convergence-day, dev@b83447bf7): the REA face of this
+      red is now runnable AND metric-visible — adam heal outcome missing:372
+      with rea local_total:0 (heal pacing cured starvation, exposing that B
+      cannot RETRIEVE A-authored REA entries at all); sweettest reproduces it
+      isolated (0 passed 1 failed, B cannot fetch A's commitment in 60s);
+      backlog genesis-pair-cross-conductor-fetch REOPENED with the full
+      Prometheus/Loki/diagnostics bundle. Asymmetry judgment: same Lamad cell
+      both streams — content's existing-row admission masks what REA's
+      remote-advertised IdToCommitment lookups expose; leading seam is
+      Matthew→Adam link-op/target integration or fetch. Prior delta below.
       DELTA 2026-07-12 (shift convergence-bank, dev@bcc023322): FIRST FULL
       3/3 GREEN — edge #1187 Dataplane Validation passed ALL notary-authority
       scenarios including scenario 2 (seam-smoke: "landing canonical head
