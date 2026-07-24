@@ -102,8 +102,19 @@ impl BlobCid {
 
     /// True iff this fingerprint is the content hash of `bytes` (tamper detection) — the property a
     /// String newtype could never provide.
+    ///
+    /// Recomputation dispatches on the codec THIS CID declares, because the codec tag is a claim
+    /// about what the bytes are: a `compute_raw` fingerprint (0x55, the codec of every document
+    /// body and file blob) and a `compute` fingerprint (0x71, canonical dag-cbor atoms) over the
+    /// same bytes are different CIDs, and each must verify only against its own construction.
+    /// An unrecognized codec fails closed — a fingerprint we cannot recompute is an unverified
+    /// claim, never a passing one.
     pub fn verifies(&self, bytes: &[u8]) -> bool {
-        Self::compute(bytes).0 == self.0
+        match self.0.codec() {
+            RAW_CODEC => Self::compute_raw(bytes).0 == self.0,
+            DAG_CBOR_CODEC => Self::compute(bytes).0 == self.0,
+            _ => false,
+        }
     }
 
     /// The underlying canonical CID.
@@ -218,6 +229,38 @@ mod tests {
         let cid = BlobCid::compute(b"hello");
         assert!(cid.verifies(b"hello"));
         assert!(!cid.verifies(b"hell0"));
+    }
+
+    // `verifies` must check against the codec THIS CID declares, not a hardcoded one. Every
+    // production caller content-addresses document bodies and file bytes with `compute_raw`
+    // (0x55) — `eprfs-cli/src/main.rs`, `epr-cli/src/flow/{mod,edges}.rs` — so a `verifies` that
+    // always recomputed dag-cbor (0x71) returned false for every real fingerprint against its own
+    // bytes. `verifies_detects_tampering` cannot catch that: it computes both sides with
+    // `compute`, so it passes either way.
+    #[test]
+    fn verifies_dispatches_on_declared_codec() {
+        let raw = BlobCid::compute_raw(b"hello world");
+        assert!(
+            raw.verifies(b"hello world"),
+            "raw CID must verify raw bytes"
+        );
+        assert!(!raw.verifies(b"hello w0rld"));
+
+        let cbor = BlobCid::compute(b"hello world");
+        assert!(cbor.verifies(b"hello world"), "dag-cbor CID must verify");
+        assert!(!cbor.verifies(b"hello w0rld"));
+
+        // Same bytes, different codec tag — neither may verify as the other.
+        assert_ne!(raw, cbor);
+    }
+
+    // An unrecognized codec must fail closed. Verification is the tamper-detection primitive; a
+    // codec we cannot recompute is an unverified claim, never a passing one.
+    #[test]
+    fn verifies_fails_closed_on_unknown_codec() {
+        // 0x70 = dag-pb, a valid multicodec this type never mints.
+        let dag_pb = BlobCid(Cid::new_v1(0x70, Code::Sha2_256.digest(b"hello world")));
+        assert!(!dag_pb.verifies(b"hello world"));
     }
 
     #[test]
