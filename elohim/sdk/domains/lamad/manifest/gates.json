@@ -7,7 +7,9 @@
     ],
     "governanceReach": "community",
     "peerReviewedBy": [],
-    "supersedes": null
+    "supersedes": null,
+    "closure": "closed",
+    "closureRationale": "This gate MINTS attestations, so its answer creates standing others will rely on. An unmatched moment must yield no story-point rather than a provisional one: absence of discernment is a refusal to mint, never 'unknown, so mint and revisit'. Minting on silence would manufacture the very evidence the attestation graph exists to earn."
   },
   "reach-gate-v1": {
     "processCid": "epr:gates:reach-gate-v1",
@@ -17,7 +19,9 @@
     ],
     "governanceReach": "community",
     "peerReviewedBy": [],
-    "supersedes": null
+    "supersedes": null,
+    "closure": "closed",
+    "closureRationale": "Gates disclosure on CapabilityInvoke, and disclosure is irreversible — bytes served cannot be unserved. Absence of aggregated reach is a refusal to widen, never 'serve it and find out'. Matches the posture on epr:registry:axis:reach, whose verdict layer this gate invokes; the two must not disagree about what silence means."
   },
   "content-safety-gate-v1": {
     "processCid": "epr:gates:content-safety-gate-v1",
@@ -29,6 +33,8 @@
     ],
     "governanceReach": "protocol",
     "peerReviewedBy": [],
-    "supersedes": null
+    "supersedes": null,
+    "closure": "closed",
+    "closureRationale": "Runs BEFORE the specialised domain gates, so its silence would propagate into every gate downstream. A safety gate that cannot evaluate must decline rather than defer: 'we could not tell' and 'it is fine' are the two readings an open posture cannot distinguish here, and only one of them is safe. Declining is recoverable; a wrongly-published payload is not."
   }
 }
