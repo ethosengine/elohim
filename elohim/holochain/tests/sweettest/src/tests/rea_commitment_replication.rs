@@ -17,21 +17,35 @@
 //! tests prove the on-the-wire shape decodes; this sweettest proves the
 //! DHT propagates that shape to peer B.
 //!
-//! Per memory `_sweettest_cross_agent_consistency`: requires
-//! `exchange_peer_info` THEN `await_consistency` after the write.
+//! The conductors start genuinely isolated, then exchange peer info after the
+//! write. Peer B polls `get_rea_commitment` within a bounded window so the test
+//! exercises the late-join DHT-fetch path directly.
 
 use anyhow::Result;
 use elohim_sweettest::common::{
-    conductors::{load_dna, two_agent_conductors},
+    conductors::{load_dna, two_agent_conductors_isolated},
     fixtures::network_seed,
 };
 use holo_hash::{ActionHash, EntryHash};
-use holochain::sweettest::{await_consistency, SweetConductor};
+use holochain::sweettest::SweetConductor;
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 const DNA: &str = "lamad";
 const ZOME: &str = "content_store";
+
+/// Per-invocation unique commitment id. nextest retries run in the same
+/// process, where kitsune2's mem-bootstrap store is process-global; a fixed id
+/// can therefore rejoin residue from an earlier attempt and self-poison the
+/// retry.
+fn unique_id(base: &str) -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system clock before UNIX_EPOCH")
+        .as_nanos();
+    format!("{base}-{nanos}")
+}
 
 // ---------------------------------------------------------------------------
 // Local mirrors — must match `shefa_types::CreateReaCommitmentInput` etc.
@@ -147,13 +161,13 @@ struct ReaCommitmentOutput {
 /// `get_rea_commitment` and must see the same commitment. If this test
 /// regresses, alpha's split-doorway divergence will return.
 ///
-/// `#[ignore]` — requires a packed lamad.dna artifact from Jenkins; the
-/// pipeline's pack-then-test stage runs this. Local invocation:
-/// `just pack && cargo test --test rea_commitment_replication -- --ignored`.
+/// The DNA pipeline packs `lamad.dna` before running the sweettest shard, so
+/// this test must remain unignored: the shard does not pass
+/// `--run-ignored all`. Local invocation after packing:
+/// `cargo test --test rea_commitment_replication -- --nocapture`.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Requires packed DNA from Jenkins pipeline"]
 async fn project_epr_commitment_replicates_to_peer_b() -> Result<()> {
-    let [(mut ca, a1), (mut cb, a2)] = two_agent_conductors().await?;
+    let [(mut ca, a1), (mut cb, a2)] = two_agent_conductors_isolated().await?;
     let dna = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
 
     let app_a = ca
@@ -166,7 +180,7 @@ async fn project_epr_commitment_replicates_to_peer_b() -> Result<()> {
     let cell_b = app_b.cells().first().expect("cell B").clone();
 
     // --- Alice writes the commitment. ---
-    let commitment_id = "test-project-epr-doorway:test|epr:lamad".to_string();
+    let commitment_id = unique_id("test-project-epr-doorway:test|epr:lamad");
     let input = CreateReaCommitmentInput {
         id: commitment_id.clone(),
         action: "project-epr".to_string(),
@@ -193,41 +207,45 @@ async fn project_epr_commitment_replicates_to_peer_b() -> Result<()> {
     assert_eq!(alice_output.commitment.id, commitment_id);
     assert_eq!(alice_output.commitment.action, "project-epr");
 
-    // --- Exchange peer info then await DHT consistency. ---
-    // The exchange_peer_info dance is required because two SweetConductor
-    // instances default to isolated kitsune nets; without exchanging, bob's
-    // DHT view never learns alice's agent exists. Pattern lifted from
-    // qahal_collab_t0_test.rs:563 — see memory `_sweettest_cross_agent_consistency`.
-    tokio::time::timeout(std::time::Duration::from_secs(30), async {
+    // --- Connect Bob only after Alice has authored the commitment. ---
+    // Bootstrap is disabled for both conductors, so this is a genuine
+    // late-join fetch rather than an accidentally pre-gossiped read through
+    // kitsune2's process-global mem-bootstrap store.
+    tokio::time::timeout(Duration::from_secs(30), async {
         while !SweetConductor::exchange_peer_info([&ca, &cb]).await {
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            tokio::time::sleep(Duration::from_millis(50)).await;
         }
     })
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
 
-    await_consistency(60, [&cell_a, &cell_b])
-        .await
-        .map_err(|e| anyhow::anyhow!("DHT consistency timeout after create_rea_commitment: {e}"))?;
+    // --- Bob resolves the commitment within a bounded window. ---
+    // Polling the coordinator read directly exercises the production
+    // `get_links` + `get(record)` DHT-fetch path. A transient None (link not
+    // visible yet) or zome error (link visible before its target record) is
+    // retried; failing the outer bound is the actionable notary-authority red.
+    let zome_b = cell_b.zome(ZOME);
+    let fetch_id = commitment_id.clone();
+    let bob_output = tokio::time::timeout(Duration::from_secs(60), async {
+        loop {
+            let read: holochain::conductor::api::error::ConductorApiResult<
+                Option<ReaCommitmentOutput>,
+            > = cb
+                .call_fallible(&zome_b, "get_rea_commitment", fetch_id.clone())
+                .await;
 
-    // --- Bob reads the commitment via the zome's get_rea_commitment. ---
-    // Substrate proof: if DHT gossip propagated the Commitment entry +
-    // its id_anchor link, Bob's get_rea_commitment returns Some(...) with
-    // the same id. This is the regression seatbelt — pre-Task-6.5/6.6 the
-    // entry would land in alice's chain but bob would see None.
-    let bob_view: Option<ReaCommitmentOutput> = cb
-        .call(
-            &cell_b.zome(ZOME),
-            "get_rea_commitment",
-            commitment_id.clone(),
-        )
-        .await;
+            if let Ok(Some(output)) = read {
+                break output;
+            }
 
-    let bob_output = bob_view.ok_or_else(|| {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+    })
+    .await
+    .map_err(|_| {
         anyhow::anyhow!(
-            "Bob's DHT view must contain Alice's commitment after exchange_peer_info + \
-             await_consistency. None here means DHT gossip did NOT propagate — the substrate \
-             replication gap the 2026-05-26 plan exists to close."
+            "Bob could not retrieve Alice's REA commitment {commitment_id} via \
+             get_rea_commitment within 60s after peer exchange"
         )
     })?;
     assert_eq!(

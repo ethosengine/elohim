@@ -3,11 +3,11 @@ id: "backlog-genesis-pair-cross-conductor-fetch-blocks-canonical-convergence"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "Genesis-pair cross-conductor DHT fetch is down — elohim.host-side conductors cannot retrieve matthew-authored actions, the SOLE remaining blocker for notary-authority scenario 2"
+title: "Genesis-pair cross-conductor DHT fetch regressed — adam cannot retrieve Matthew-advertised REA commitments (notary-authority recurrence)"
 slug: "genesis-pair-cross-conductor-fetch-blocks-canonical-convergence"
 written: "2026-07-11"
 author: "shift notary-scenario2-green"
-status: "resolved"
+status: "wip"
 priority: "high"
 area: "substrate/kitsune2-connectivity"
 domain: "operator"
@@ -19,10 +19,201 @@ cites:
   - genesis/data/timeline/backlog/view-federation-request-flakiness-mesh-wide.md
   - peer-discovery-fractal-federation | Peer Discovery as Fractal Federation | sha256:42ae0e67f9e9d4bc | path: genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md
   - genesis/a2o/features/dataplane/notary-authority.feature
-tags: [substrate, kitsune2, tx5, dht-fetch, genesis-pair, notary-authority, f-t19, signal-bus, canonical-head]
+tags: [substrate, kitsune2, tx5, dht-fetch, genesis-pair, notary-authority, f-t19, signal-bus, canonical-head, rea-commitments, recurrence]
 ---
 
-# Genesis-pair cross-conductor DHT fetch is down
+# Genesis-pair cross-conductor DHT fetch regression
+
+## REOPENED 2026-07-24 — REA inventory crosses the pair; Adam's conductor cannot fetch the 62-row set
+
+This is the same authority-boundary class this thread resolved for canonical
+content on 2026-07-11, not a fourth diagnosis. The 2026-07-23 projected-head
+red was correctly split to the Matthew saturation/breaker thread
+(`self-heal-doorway-alpha-storage-breaker-matthew-rekey.md`): the alpha-only
+probe was one build behind while Matthew's storage shed every request. Today's
+evidence is the opposite direction and re-owns the conductor-fetch concern
+here: both doorway diagnostics expose the same addressed agent set, Adam's
+storage receives Matthew's REA inventory, and then Adam's **own conductor**
+returns none for every one of the 62 gaps.
+
+### Prometheus evidence (live alpha, 2026-07-24)
+
+Queries ran through the read-only observability MCP, datasource `prometheus`.
+The point-in-time values in the handoff are confirmed, but they are counters,
+not distinct-entry counts:
+
+| UTC sample | Adam series | value | interpretation |
+|---|---|---:|---|
+| 16:50:57 | `elohim_projection_heal_outcomes_total{stream="rea",outcome="missing"}` | **372** | 372 failed fetch **attempts**, not 372 IDs |
+| 16:20:59–18:00:59 | `elohim_projection_reconcile_local_total{stream="rea"}` | **0 throughout** | no REA commitment ever projected on Adam during the observed series |
+| 16:46:02 and 16:51:02 | `elohim_projection_heal_outcomes_total{stream="content",outcome="healed"}` | **22** | 22 successful content-heal attempts; also not a distinct-ID count |
+| 16:21:04–18:01:04 | `elohim_projection_reconcile_local_total{stream="content"}` | **4,159 throughout** | content authority remained locally populated |
+
+The REA missing counter advances by exactly **62 every five minutes**:
+62, 124, 186, 248, 310, **372**, …, 1,240 at 18:00:57. The heal tracker is
+rebuilt from discovery on each sweep, so this is repeated failure over a stable
+62-ID gap set. It must not be reported as “372 missing entries.” The content
+healed counter continued to 83 by 18:01. That rules out an Adam-wide failure of
+the HcClient/conductor call path, but the two candidate sets are structurally
+non-comparable: content heal is existing-row-only and
+`resolve_content_head` can return a local-chain fallback, while the REA gaps are
+remote-advertised IDs resolved through `IdToCommitment`. Content success does
+not by itself prove the remote fetch path healthy.
+
+Reproduction queries:
+
+```promql
+elohim_projection_heal_outcomes_total{
+  pod="elohim-adam-alpha-0",stream="rea",outcome="missing"
+}
+elohim_projection_reconcile_local_total{
+  pod="elohim-adam-alpha-0",stream="rea"
+}
+elohim_projection_heal_outcomes_total{
+  pod="elohim-adam-alpha-0",stream="content",outcome="healed"
+}
+elohim_projection_reconcile_local_total{
+  pod="elohim-adam-alpha-0",stream="content"
+}
+```
+
+### Loki correlation — discovery succeeds; the conductor fetch is the failed leg
+
+At 16:46:15–28, Adam received five REA inventories:
+
+| responder peer | advertised rows |
+|---|---:|
+| `12D3KooWQAaK…F73N4` (Matthew; peer id already pinned in the June #1119 mesh evidence) | **62** |
+| `12D3KooWBS8a…23KQv` | 18 |
+| `12D3KooWFhAP…XQwwq` | 18 |
+| `12D3KooWCGiw…6bJv` | 6 |
+| `12D3KooWGPmV…qjK2W` | 0 |
+
+The corresponding 16:47:39 heal line says:
+
+```text
+peers_asked=5 ids_discovered=104 healed=0 conductor_missing=62
+divergent_anchor=0 local_total=0
+```
+
+Reproduction filters (use the snapshot window
+`2026-07-24T16:40:00Z`–`16:55:00Z`):
+
+```logql
+{namespace="elohim-alpha",pod="elohim-adam-alpha-0",container="elohim-node"}
+  |= "projection-reconcile: peer inventory received"
+{namespace="elohim-alpha",pod="elohim-adam-alpha-0",container="elohim-node"}
+  |= "projection-reconcile: heal complete"
+```
+
+The same result recurred at 16:54:01. At 18:01, with four responders,
+`ids_discovered=98` still reduced to the same `rea_gaps=62`. Therefore every
+distinct gap on Adam is present in Matthew's advertised 62-row set; the other
+inventories are subsets and do not enlarge the union.
+
+**Authorship limit:** “Matthew-advertised/held” is proven; “all 62 were
+Matthew-authored” is not yet. Over the preceding 24 hours, this query returned
+only Matthew's pod, with 66 author-local projection-signal events:
+
+```logql
+sum by (pod) (
+  count_over_time(
+    {namespace="elohim-alpha",container="elohim-node"}
+      |= "Projecting Commitment from DHT" [24h]
+  )
+)
+```
+
+But grouping those events by `fields_id` yields only 12 distinct IDs (six
+`custody-blob-*`, each observed six times; six `project-epr-*`, each observed
+five times). That is consistent with authoring being concentrated on Matthew,
+but it does not attribute the other 50 persisted inventory rows. The next
+diagnostic must compare the 62 inventory IDs/action authors directly; do not
+promote the stronger authorship claim from aggregate counts.
+
+### Both doorway conductor diagnostics (2026-07-24 17:56–17:57 UTC)
+
+Both public reads returned HTTP 200:
+
+```text
+https://doorway-alpha.elohim.host/db/p2p/conductor-diagnostics
+https://elohim.host/db/p2p/conductor-diagnostics
+```
+
+After removing the volatile `createdAt`/`expiresAt` fields, their
+`(agent, space, url, storageArc)` sets are identical:
+
+- 35 rows = 7 agents in each of 5 spaces;
+- relay split identical: 20 `signal.elohim.host` URLs and 15
+  `signal.doorway-alpha.elohim.host` URLs;
+- 32 full arcs `[0,4294967295]`, 3 `storageArc:null`, identically placed.
+
+This rules out the July-11 stale-addressing/churn shape and any
+peer-store/advertised-arc asymmetry for this observation.
+The richer diagnostic payload is partially blind on both sides:
+`transportStats` fails to decode because the client expects an `is_direct`
+field that the conductor payload lacks, and `?include=metrics` fails to decode
+`networkMetrics` because the expected `local_op_count` field is absent. Those
+are conductor/client version-skew observability gaps,
+not evidence that transport is healthy; the shared live agent map is the
+confirmed fact.
+
+### Historical anchor-divergence anchors (same lineage, not new diagnoses)
+
+- **2026-07-07:** DHT anchor sweeps were 0–6 divergent, while content projection
+  was node-localized: shem peers held ~4,158 rows with
+  `divergent_anchor=0`; Matthew plateaued at 1,941–2,116, Jessica at
+  2,105–2,161, and James at 2,212–3,268 for 20+ sweeps
+  (`content-projection-plateau-ethosengine-household.md`).
+- **2026-07-12:** this thread recorded Adam draining a roughly 2,838-row
+  post-restart content divergence queue before canonical convergence could be
+  measured.
+- **2026-07-18:** the Matthew breaker/lineage thread measured
+  `divergentAnchor` **2,091→2,177 and climbing** while storage reads shed 503.
+  Its 2026-07-23 recurrence is the breaker-split rule that prevents today's
+  REA-specific authority failure from being mislabeled as another generic
+  saturation red.
+
+### Bounded diagnosis and next legal move
+
+The failing boundary is now:
+
+```text
+Matthew-held REA projection inventory
+  → Adam storage discovers the 62 IDs
+  → Adam's own Lamad `content_store` cell queries each ID's
+    `IdToCommitment` links
+  → get_rea_commitment(id) returns none for all 62
+```
+
+REA and content both use the same Lamad `content_store` cell, so a
+different-DNA/cell explanation is refuted. The narrower leading hypothesis is
+that the remote-authored `IdToCommitment` link ops (or their targets) do not
+integrate/fetch from Matthew to Adam; content can still produce successful
+attempts because it skips remote-only rows and has a local-chain fallback.
+Advertised arcs and peer addressing are symmetric, while the transport metrics
+that would discriminate integration/fetch are version-skew blind. The legal
+first move is now a runnable red in
+`tests/sweettest/src/tests/rea_commitment_replication.rs`: author one
+build-unique REA commitment on isolated conductor A, exchange peer information,
+then resolve it through conductor B within 60 seconds. The existing target had
+been `#[ignore]`d even though the Jenkins nextest shard does not pass
+`--run-ignored all`; it is now live and uses a per-invocation `unique_id()` so
+the process-global mem-bootstrap store cannot self-poison retries.
+
+A focused local run on 2026-07-24 reproduced the failure:
+
+```text
+Error: Bob could not retrieve Alice's REA commitment
+test-project-epr-doorway:test|epr:lamad-1784916935702110971
+via get_rea_commitment within 60s after peer exchange
+
+test result: FAILED. 0 passed; 1 failed; finished in 229.23s
+```
+
+The total includes conductor setup; the retrieval assertion itself is bounded
+to 60 seconds. Conductor tuning or manifest changes remain proposals until this
+red plus action-author evidence pins the substrate mechanism.
 
 ## What works (proven live, 2026-07-11 overnight shift)
 
