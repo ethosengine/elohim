@@ -6,32 +6,26 @@ purpose: >
   The SDK is the single-source-of-record home: schemas/v1 (enums, views, registries, axis cards)
   generate every downstream projection (TS types, Rust constants, ordinal comparators). The
   recurring drift this directory breeds is hand-authored vocabulary — a value typed here instead
-  of generated from here is how five reach vocabularies diverged. Authored at inject/measure tier
-  by agent self-grant per the governance escalation ladder (2026-07-23 discipline-1 slice):
-  enforcement-class escalation to ask/deny is reserved to operator ratification.
-rules:
-  - id: generated-is-projection
-    class: inject
-    when: { write: "*generated*" }
-    why: >
-      Files under a generated path are projections — the source of record is the schema or card
-      that generates them (schemas/v1 + codegen scripts). Hand-edits here re-drift on the next
-      codegen run. Edit the source, re-run codegen (pnpm run schema:codegen:ts / cargo test
-      export_bindings), and commit source + projection together.
-  - id: new-vocabulary-declares-source
-    class: inject
-    when: { write: "schemas/v1/enums/*.schema.json", new: true }
-    why: >
-      A new closed vocabulary must state "Source of truth:" in its description (schema_contract
-      asserts this), decide its tier deliberately (_dna only via a deliberate DNA-lineage event),
-      and consider an axis card in registries/axes/ when the vocabulary is an orthogonal
-      coordinate (reach/locality/custody/epistemic pattern). Drift law: exactly ONE generative
-      source-of-record per vocabulary; every other appearance is generated or an explicit re-export.
+  of generated from here is how five reach vocabularies diverged. Until v1 has predicates that
+  can express these checks soundly, the conventions remain authoritative prose; any future
+  enforcement starts at inject/measure tier, with ask/deny reserved to operator ratification.
 ---
 
 # elohim/sdk — source-of-record governance
 
-This subtree is where vocabularies are BORN; the rules above keep them born-governed
-(advisory tier — they inform, never block). The reach reconciliation (slices 1-3) and the
+This subtree is where vocabularies are BORN. The reach reconciliation (slices 1-3) and the
 ontology keel (2026-07-23) are the case law: hand-typed vocabulary values outside a declared
 source-of-record are the recurring defect class here.
+
+Two conventions are authoritative but not gate-enforced in v1 because the closed predicate
+vocabulary cannot soundly express path-aware generated-file detection or a required phrase
+inside a JSON description:
+
+- Files under a generated path are projections. Edit the schema, card, Rust view, or codegen
+  source, rerun the relevant generator (`pnpm run schema:codegen:ts` / `cargo test
+  export_bindings`), and commit source plus projection together.
+- A new closed vocabulary states `Source of truth:` in its description, chooses its tier
+  deliberately (`_dna` only through a deliberate DNA-lineage event), and considers an axis
+  card in `registries/axes/` when it is an orthogonal coordinate. Exactly one generative
+  source of record exists per vocabulary; every other appearance is generated or an explicit
+  re-export.

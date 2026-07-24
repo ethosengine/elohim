@@ -8,6 +8,7 @@ written: 2026-06-13
 cites:
   - init-authoring-native-seeding-design | the per-corpus author-steward routing + story-derived collective graph this design's eligibility-and-visibility model must align with | sha256:c8efe09b9262401b | path: genesis/docs/superpowers/specs/2026-06-12-init-authoring-native-seeding-design.md
   - resilience-protocol-spec | Part V's three-class stewardship surface (encrypted / social / commons); the non-commons provide row lights the "social" class | sha256:2c832b517c7204cc | path: genesis/docs/content/elohim-protocol/resilience/README.md
+  - ontology-keel-slice1-verdict-spine-plan | the shared permit/refuse/refer decision spine Q-eligible must return instead of a bespoke boolean | sha256:059f604e7ebc7821 | path: genesis/docs/superpowers/plans/2026-07-23-ontology-keel-slice1-verdict-spine-plan.md
   # legacy path cites — no-id (slice2b spec predates frontmatter) / non-doc-root (data/ backlog); relationship documented in body prose (§"Companion to", §6)
   - genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md
   - genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md
@@ -88,6 +89,12 @@ Off-commons, two new questions appear that commons never had to answer:
   the commitment is public by nature. At household/intimate reach, the *existence and
   shape* of the commitment is itself reach-restricted data — leaking it leaks the social
   graph. The commitment's visibility must not exceed the reach of the content it provides.
+
+> **Verdict-spine retarget (2026-07-24):** this design predates the protocol verdict spine.
+> Q-eligible implementations must return the shared `Decision` shape (`permit` / `refuse` /
+> `refer` on the wire), not a bespoke boolean. A graph result that is incomplete, contested,
+> or requires a higher layer is `refer`, never silently collapsed into `false`; the eligibility
+> witness and policy reference travel with the decision.
 
 These two questions — not the projection mechanics — are the real content of this design.
 The projection generalizes trivially (§5); the consent model is the substrate decision (§4).
