@@ -206,19 +206,25 @@ pub async fn run_fanout_loop<F: PeerStatusFetcher + ?Sized>(
         tokio::select! {
             _ = ticker.tick() => {
                 match run_once(&pool, fetcher.as_ref(), &self_cid).await {
-                    Ok(stats) if stats.upserted > 0 => tracing::info!(
-                        fetched = stats.fetched,
-                        upserted = stats.upserted,
-                        skipped_stale = stats.skipped_stale,
-                        missed = stats.missed,
-                        "peer_status fan-in swept (cross-agent statuses projected)"
-                    ),
-                    Ok(stats) => tracing::debug!(
-                        fetched = stats.fetched,
-                        skipped_stale = stats.skipped_stale,
-                        missed = stats.missed,
-                        "peer_status fan-in swept (no newer snapshots)"
-                    ),
+                    Ok(stats) if stats.upserted > 0 => {
+                        crate::metrics::set_peer_status_fanout_missed(stats.missed as u64);
+                        tracing::info!(
+                            fetched = stats.fetched,
+                            upserted = stats.upserted,
+                            skipped_stale = stats.skipped_stale,
+                            missed = stats.missed,
+                            "peer_status fan-in swept (cross-agent statuses projected)"
+                        )
+                    }
+                    Ok(stats) => {
+                        crate::metrics::set_peer_status_fanout_missed(stats.missed as u64);
+                        tracing::debug!(
+                            fetched = stats.fetched,
+                            skipped_stale = stats.skipped_stale,
+                            missed = stats.missed,
+                            "peer_status fan-in swept (no newer snapshots)"
+                        )
+                    }
                     Err(e) => tracing::warn!(error = %e, "peer_status fan-in sweep failed (retry next tick)"),
                 }
             }

@@ -287,6 +287,80 @@ lazy_static! {
         "Shard-push targets skipped because the selected agent_cid had no libp2p transport binding.",
     )
     .unwrap();
+
+    // ── Projection-reconcile heal legibility (the saturated-conductor cure) ──
+
+    /// Projection-reconcile HEAL outcomes, by stream and outcome. The durable twin
+    /// of the per-row heal WARN/DEBUG lines (which 502-storm out of Loki): on a
+    /// saturated conductor (adam's ~1/min steady WS timeouts) the split between
+    /// `timeout_retried` (recovered by the bounded in-leg retry) and
+    /// `timeout_exhausted` (still wedged after retries) IS the diagnosis, and it was
+    /// previously invisible in Prometheus. labels: stream = "rea" | "content";
+    /// outcome = "healed" | "timeout_retried" | "timeout_exhausted" | "missing"
+    ///         | "failed".
+    ///
+    /// NOT a total-row-accounting metric: benign content resolutions
+    /// (SkippedDeclared / SkippedStale / NoRow) are deliberately uncounted so
+    /// the cure signal is not inflated — sum-of-outcomes < rows-attempted on
+    /// the content stream by design. Dashboard math must not assume equality.
+    pub static ref PROJECTION_HEAL_OUTCOMES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_projection_heal_outcomes_total",
+            "Projection-reconcile heal row outcomes by stream and outcome.",
+        ),
+        &["stream", "outcome"],
+    )
+    .unwrap();
+
+    /// Last-sweep DISCOVERED gaps per reconcile stream (pending after discovery,
+    /// before heal). label: stream = "rea" | "content". Watch this fall toward 0
+    /// as heal lands rows without tailing Loki.
+    pub static ref PROJECTION_RECONCILE_GAPS: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_gaps",
+            "Last-sweep discovered projection-reconcile gaps by stream.",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
+    /// Last-sweep LOCAL projection row count per reconcile stream (the convergence
+    /// target). label: stream = "rea" | "content". `rea` climbing off 0 is the
+    /// direct cure signal for the starved-heal incident (rea_local_total stuck at 0
+    /// for 3h on adam while matthew healed the same backlog).
+    pub static ref PROJECTION_RECONCILE_LOCAL_TOTAL: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_local_total",
+            "Last-sweep local projection row count by reconcile stream.",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
+    /// Part-B redistribution attempts SKIPPED because the candidate's blob bytes
+    /// were not local — measured-but-dark content this node holds a manifest for but
+    /// cannot source the bytes of, so it cannot be the distributor. Before this the
+    /// skip was a silent `return` (no log, no gap row, no metric) that hid
+    /// elohim-host-landing's non-distribution for a day. Pairs with the
+    /// `peers-unavailable` placement-gap row written on the same path: the
+    /// placement-gap `gap_kind` is a CLOSED enum at the wire schema
+    /// (`placement-gap-view.schema.json`), so the precise "bytes-not-local" cause
+    /// lives HERE, in this metric, not in the gap row's kind.
+    pub static ref SHARD_REDISTRIBUTE_BYTES_MISSING: IntCounter = IntCounter::new(
+        "elohim_shard_redistribute_bytes_missing_total",
+        "Redistribution attempts skipped because the candidate's blob bytes were not local.",
+    )
+    .unwrap();
+
+    /// Last peer_status fan-in sweep's `missed` count — per-agent reads that
+    /// failed or were skipped (`services::peer_status_fanout::FanoutStats.missed`).
+    /// Folded onto the durable surface so a chronically lossy fan-in is visible
+    /// without tailing Loki.
+    pub static ref PEER_STATUS_FANOUT_MISSED: IntGauge = IntGauge::new(
+        "elohim_peer_status_fanout_missed",
+        "Missed per-agent reads in the last peer_status fan-in sweep.",
+    )
+    .unwrap();
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -322,6 +396,11 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(SALVAGE_PROVIDER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_KEY_SUPERSEDE.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_PUSH_PEER_UNRESOLVED.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_HEAL_OUTCOMES.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_GAPS.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_LOCAL_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(SHARD_REDISTRIBUTE_BYTES_MISSING.clone()));
+        let _ = REGISTRY.register(Box::new(PEER_STATUS_FANOUT_MISSED.clone()));
     });
 }
 
@@ -464,6 +543,37 @@ pub fn inc_shard_push_peer_unresolved() {
     SHARD_PUSH_PEER_UNRESOLVED.inc();
 }
 
+/// Record one projection-reconcile heal row outcome. `stream` is "rea" | "content";
+/// `outcome` is one of the labels documented on [`PROJECTION_HEAL_OUTCOMES`].
+pub fn inc_projection_heal_outcome(stream: &str, outcome: &str) {
+    PROJECTION_HEAL_OUTCOMES
+        .with_label_values(&[stream, outcome])
+        .inc();
+}
+
+/// Publish a reconcile stream's last-sweep gauges: discovered `gaps` (pending after
+/// discovery) and `local_total` (local projection rows). `stream` is "rea" | "content".
+pub fn set_projection_reconcile_gauges(stream: &str, gaps: u64, local_total: u64) {
+    PROJECTION_RECONCILE_GAPS
+        .with_label_values(&[stream])
+        .set(gaps as i64);
+    PROJECTION_RECONCILE_LOCAL_TOTAL
+        .with_label_values(&[stream])
+        .set(local_total as i64);
+}
+
+/// Record one Part-B redistribution attempt skipped because the candidate's blob
+/// bytes were not local (the closed placement-gap enum cannot carry this cause, so
+/// the precise signal lives here — see [`SHARD_REDISTRIBUTE_BYTES_MISSING`]).
+pub fn inc_shard_redistribute_bytes_missing() {
+    SHARD_REDISTRIBUTE_BYTES_MISSING.inc();
+}
+
+/// Publish the last peer_status fan-in sweep's `missed` count.
+pub fn set_peer_status_fanout_missed(missed: u64) {
+    PEER_STATUS_FANOUT_MISSED.set(missed as i64);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -495,6 +605,24 @@ mod tests {
         }
         inc_view_federation_inbound_served();
         add_content_witness_authored(3);
+        // Projection-reconcile heal legibility: exercise every outcome label on
+        // both streams, the per-stream gauges, and the redistribution-bytes-missing
+        // + fan-in-missed surfaces.
+        for stream in ["rea", "content"] {
+            for outcome in [
+                "healed",
+                "timeout_retried",
+                "timeout_exhausted",
+                "missing",
+                "failed",
+            ] {
+                inc_projection_heal_outcome(stream, outcome);
+            }
+        }
+        set_projection_reconcile_gauges("rea", 62, 0);
+        set_projection_reconcile_gauges("content", 1956, 4158);
+        inc_shard_redistribute_bytes_missing();
+        set_peer_status_fanout_missed(2);
 
         let text = gather_text();
         assert!(
@@ -527,6 +655,30 @@ mod tests {
         assert!(
             text.contains("elohim_content_witness_authored_total"),
             "content witness-authored counter missing:\n{text}"
+        );
+        // Projection-reconcile heal legibility surfaces render with their labels.
+        assert!(
+            text.contains("elohim_projection_heal_outcomes_total"),
+            "projection heal outcomes counter missing:\n{text}"
+        );
+        assert!(text.contains("outcome=\"timeout_retried\""), "{text}");
+        assert!(text.contains("outcome=\"timeout_exhausted\""), "{text}");
+        assert!(text.contains("stream=\"rea\""), "{text}");
+        assert!(
+            text.contains("elohim_projection_reconcile_gaps"),
+            "reconcile gaps gauge missing:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_projection_reconcile_local_total"),
+            "reconcile local-total gauge missing:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_shard_redistribute_bytes_missing_total"),
+            "redistribute bytes-missing counter missing:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_peer_status_fanout_missed"),
+            "peer_status fan-in missed gauge missing:\n{text}"
         );
     }
 }

@@ -282,6 +282,65 @@ async fn record_one(
     Ok(true)
 }
 
+/// Record an honest, idempotent placement gap for a redistribution candidate whose
+/// blob bytes are NOT local — this node holds a manifest but cannot source the
+/// bytes, so it cannot be the distributor. One row per manifest shard, upserted by
+/// `(content_id, shard_hash, h_app_id, gap_kind)` exactly like `distribute_shards`'
+/// gap writer (so `first_seen_at` is preserved and `last_seen_at` bumps on re-run).
+///
+/// Returns the number of gap rows written (0 when the manifest is missing or has no
+/// shards — never an error path that would abort the sweep).
+///
+/// gap_kind — WHY `peers-unavailable`, not `bytes-not-local`: the placement-gap
+/// `gap_kind` is a CLOSED enum at the wire schema (`placement-gap-view.schema.json`:
+/// `under-committed | contracts-short | peers-unavailable`), generated into TS.
+/// Adding a `bytes-not-local` kind is schema churn crossing the wire, so we reuse
+/// the closest existing kind — `peers-unavailable` — which is also the exact
+/// fallback `distribute_shards` already uses for a push shortfall on a full
+/// selection ("no steward can hold these bytes"). The PRECISE cause lives on the
+/// `elohim_shard_redistribute_bytes_missing_total` metric instead, so no diagnostic
+/// fidelity is lost.
+#[cfg(feature = "p2p")]
+fn record_bytes_not_local_gap(
+    conn: &mut SqliteConnection,
+    content_id: &str,
+    h_app_id: &str,
+) -> Result<usize, StorageError> {
+    let Some(manifest) = crate::db::shard_manifests::get_manifest(conn, h_app_id, content_id)?
+    else {
+        return Ok(0);
+    };
+    let shard_hashes: Vec<String> =
+        serde_json::from_str(&manifest.shard_hashes_json).unwrap_or_default();
+    if shard_hashes.is_empty() {
+        return Ok(0);
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+    // Desired steward count mirrors `distribute_shards` (one steward per shard);
+    // achieved is 0 because distribution never began (bytes could not be sourced).
+    let requested = i32::try_from(shard_hashes.len()).unwrap_or(i32::MAX);
+    let mut written = 0usize;
+    for hash in &shard_hashes {
+        let id = uuid::Uuid::new_v4().to_string();
+        let gap = crate::db::models::NewPlacementGap {
+            id: &id,
+            content_id,
+            shard_hash: hash,
+            h_app_id,
+            requested_steward_count: requested,
+            achieved_steward_count: 0,
+            contract_coverage: 0.0,
+            gap_kind: "peers-unavailable",
+            first_seen_at: &now,
+            last_seen_at: &now,
+        };
+        crate::db::placement_gaps::upsert_gap(conn, &gap)?;
+        written += 1;
+    }
+    Ok(written)
+}
+
 /// Trigger shard distribution for one candidate (p2p feature only).
 ///
 /// Loads the blob (already verified present during `record_one`, but re-loads
@@ -297,7 +356,37 @@ async fn distribute_one(
 ) {
     let data = match blob_store.get(&candidate.blob_hash).await {
         Ok(d) => d,
-        Err(_) => return,
+        Err(_) => {
+            // HONESTY (the silent-bail this closes): a redistribution candidate
+            // whose bytes are NOT local cannot be distributed by this node — it
+            // holds a manifest but cannot source the bytes, so it cannot be the
+            // distributor. Pre-fix this was a bare `return`: no log, no gap row, no
+            // metric. That invisibility hid elohim-host-landing's non-distribution
+            // for a DAY (the card read `distributionState:"measured"` + `stewarding:0`
+            // + `placementGaps:[]` — measured yet dark, with nothing explaining why).
+            // Make it visible three ways: a WARN, a precise metric, and an idempotent
+            // placement gap the resilience card reads.
+            crate::metrics::inc_shard_redistribute_bytes_missing();
+            tracing::warn!(
+                content_id = %candidate.content_id,
+                blob_hash = %candidate.blob_hash,
+                h_app_id,
+                "shard_manifest_backfill: redistribution candidate bytes absent locally — \
+                 cannot distribute; recording bytes-not-local placement gap"
+            );
+            if let Ok(mut conn) = pool.get() {
+                if let Err(e) =
+                    record_bytes_not_local_gap(&mut conn, &candidate.content_id, h_app_id)
+                {
+                    tracing::warn!(
+                        content_id = %candidate.content_id,
+                        error = %e,
+                        "shard_manifest_backfill: bytes-not-local gap write failed (non-fatal)"
+                    );
+                }
+            }
+            return;
+        }
     };
     match handle
         .distribute_shards(&candidate.content_id, &data, pool, h_app_id)
@@ -606,6 +695,92 @@ mod tests {
             report.redistribute_attempts, 1,
             "Part B must still ATTEMPT redistribution (honest attempt count)"
         );
+    }
+
+    /// Slice 2 (honesty): the byte-sourcing gap writer emits one gap row per
+    /// manifest shard, all `peers-unavailable` with zero achieved stewards, and is
+    /// idempotent (upsert by content+shard+kind — a re-run leaves no duplicates).
+    #[cfg(feature = "p2p")]
+    #[test]
+    fn bytes_not_local_gap_is_written_per_shard_and_idempotent() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        insert_content(&mut conn, "dark", Some("sha256-dark"));
+        insert_manifest_with_shards(&mut conn, "dark", "sha256-dark", &["s-dark-1", "s-dark-2"]);
+
+        let n = record_bytes_not_local_gap(&mut conn, "dark", "lamad").expect("write gap");
+        assert_eq!(n, 2, "one gap row per manifest shard");
+
+        let query = crate::db::placement_gaps::GapQuery {
+            content_id: Some("dark".into()),
+            ..Default::default()
+        };
+        let gaps = crate::db::placement_gaps::list_gaps(&mut conn, "lamad", query.clone())
+            .expect("list gaps");
+        assert_eq!(gaps.len(), 2);
+        assert!(
+            gaps.iter().all(|g| g.gap_kind == "peers-unavailable"),
+            "closed wire enum → reuse peers-unavailable (precise cause on the metric)"
+        );
+        assert!(gaps.iter().all(|g| g.achieved_steward_count == 0));
+
+        // Idempotent: a second write upserts the SAME rows (no duplicates).
+        let n2 = record_bytes_not_local_gap(&mut conn, "dark", "lamad").expect("write gap 2");
+        assert_eq!(n2, 2);
+        let gaps2 =
+            crate::db::placement_gaps::list_gaps(&mut conn, "lamad", query).expect("list gaps 2");
+        assert_eq!(
+            gaps2.len(),
+            2,
+            "upsert by content+shard+kind — a re-run must not duplicate rows"
+        );
+    }
+
+    /// Slice 2 end-to-end: a Part-B redistribution candidate whose bytes are ABSENT
+    /// locally must leave an HONEST, visible placement gap — never the old silent
+    /// bail (no log, no gap, no metric) that hid non-distribution for a day.
+    #[cfg(feature = "p2p")]
+    #[tokio::test]
+    async fn dark_redistribution_records_gap_instead_of_silent_bail() {
+        let pool = test_pool();
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_content(&mut conn, "dark", Some("sha256-dark"));
+            insert_manifest_with_shards(&mut conn, "dark", "sha256-dark", &["s-dark-1"]);
+        }
+        // Blob bytes deliberately ABSENT from this store → distribute_one bails.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let blob_store = BlobStore::new(tmp.path()).await.expect("blob store");
+        let handle = crate::p2p::P2PHandle::for_testing();
+        let config = BackfillConfig {
+            batch_size: 25,
+            item_delay: Duration::from_millis(0),
+            batch_pause: Duration::from_millis(0),
+        };
+
+        let report = run_once(&pool, &blob_store, "lamad", &config, Some(handle))
+            .await
+            .expect("sweep");
+        assert_eq!(report.redistribute_candidates, 1);
+        assert_eq!(report.redistribute_attempts, 1);
+
+        let mut conn = pool.get().expect("conn");
+        let gaps = crate::db::placement_gaps::list_gaps(
+            &mut conn,
+            "lamad",
+            crate::db::placement_gaps::GapQuery {
+                content_id: Some("dark".into()),
+                ..Default::default()
+            },
+        )
+        .expect("list gaps");
+        assert_eq!(
+            gaps.len(),
+            1,
+            "dark redistribution must leave an honest, visible gap (not a silent bail)"
+        );
+        assert_eq!(gaps[0].gap_kind, "peers-unavailable");
+        assert_eq!(gaps[0].achieved_steward_count, 0);
     }
 
     /// Part B: the per-boot cap bounds the result.

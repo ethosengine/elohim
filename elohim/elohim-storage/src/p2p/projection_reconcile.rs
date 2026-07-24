@@ -105,6 +105,218 @@ const MAX_RETRIES: u32 = 3;
 /// Per-peer deadline for a single `ProjectionInventory` federation request.
 const PEER_TIMEOUT: Duration = Duration::from_secs(10);
 
+// ── Heal-leg pacing (the saturated-conductor cure) ──────────────────────────
+//
+// The incident: adam (shem node) sits on a saturated conductor with steady
+// ~1/min WS-timeout zome calls (1.5–1.8× matthew's rate). The heal leg is
+// single-flight and, pre-fix, UNBOUNDED — it walked every pending row calling
+// the conductor with no per-row retry and no per-leg wall-clock bound. On a
+// slow conductor one leg could grind for hours (1,956 content rows × a ~60s WS
+// timeout each), so the leg never recycled: the next discovery tick found the
+// leg still in flight (`SkipInFlight`) and the small REA backlog (62 rows) that
+// COULD have landed was starved behind the content queue. Result: rea_local_total
+// stuck at 0 for 3h while matthew (healthy conductor) healed the same backlog.
+//
+// The cure is three-part, all bounded and observable:
+//   1. Per-row transient retry — a WS timeout on ONE row gets a bounded in-leg
+//      retry (timeout-class errors only) so an intermittently-saturated conductor
+//      lands rows it would otherwise drop for the whole sweep.
+//   2. Per-leg wall-clock budget — each arm processes rows until its budget
+//      elapses, then YIELDS the single-flight guard so the leg recycles every
+//      sweep instead of one multi-hour grind. Un-attempted rows are re-discovered
+//      next sweep (the tracker is per-sweep), so nothing is lost.
+//   3. REA priority — REA heals FIRST with its own reserved budget, so its small
+//      backlog is never starved behind the large content queue.
+
+/// Bounded in-leg retry attempts for a transient (timeout-class) conductor error
+/// on a single row. 2 retries ⇒ up to 3 attempts. A row that exhausts these stays
+/// a `mark_failed` gap (re-discovered next sweep), exactly as before — the retry
+/// only adds chances to catch a saturated conductor's free window WITHIN a sweep.
+const MAX_ROW_RETRIES: u32 = 2;
+
+/// Per-attempt deadline for one heal conductor call. Deliberately TIGHTER than the
+/// conductor client's own ~60s WS timeout: a wedged call is abandoned fast and
+/// retried (or the next row attempted) rather than burning ~60s of the leg budget
+/// on a single hung row. `HcClient::call_zome` has no timeout of its own.
+const HEAL_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// In-leg retry backoff floor / span for a transient row (jittered in `[min, min+span)`).
+const HEAL_BACKOFF_MIN: Duration = Duration::from_secs(2);
+const HEAL_BACKOFF_SPAN: Duration = Duration::from_secs(3); // → 2–5s jittered
+
+/// Per-leg wall-clock budget for the REA arm (small backlog, prioritized — runs
+/// first with this reserved slice so it is never starved behind content).
+const REA_LEG_BUDGET: Duration = Duration::from_secs(45);
+
+/// Per-leg wall-clock budget for the content arm (the large backlog; recycles each
+/// sweep so a saturated conductor lands SOME rows per tick instead of one grind).
+const CONTENT_LEG_BUDGET: Duration = Duration::from_secs(120);
+
+/// Injectable pacing for the heal legs (retry + budget). Defaults come from the
+/// consts above; tests override with a fast profile (no real sleeps, generous
+/// budgets) so the retry/outcome logic is exercised without wall-clock waits.
+#[derive(Debug, Clone)]
+pub struct HealPacing {
+    pub max_row_retries: u32,
+    pub attempt_timeout: Duration,
+    pub backoff_min: Duration,
+    pub backoff_span: Duration,
+    pub rea_leg_budget: Duration,
+    pub content_leg_budget: Duration,
+}
+
+impl Default for HealPacing {
+    fn default() -> Self {
+        Self {
+            max_row_retries: MAX_ROW_RETRIES,
+            attempt_timeout: HEAL_ATTEMPT_TIMEOUT,
+            backoff_min: HEAL_BACKOFF_MIN,
+            backoff_span: HEAL_BACKOFF_SPAN,
+            rea_leg_budget: REA_LEG_BUDGET,
+            content_leg_budget: CONTENT_LEG_BUDGET,
+        }
+    }
+}
+
+impl HealPacing {
+    /// Test profile: no backoff, a generous per-attempt timeout, and budgets large
+    /// enough that a small test set never trips the yield (the retry/outcome logic
+    /// is what these tests exercise, not the wall-clock bound).
+    #[cfg(test)]
+    fn test_fast() -> Self {
+        Self {
+            max_row_retries: 2,
+            attempt_timeout: Duration::from_secs(30),
+            backoff_min: Duration::ZERO,
+            backoff_span: Duration::ZERO,
+            rea_leg_budget: Duration::from_secs(3600),
+            content_leg_budget: Duration::from_secs(3600),
+        }
+    }
+
+    /// Jittered backoff in `[backoff_min, backoff_min + backoff_span)`. Dependency-
+    /// free jitter from the wall clock's sub-second nanos (spreading concurrent
+    /// retries across the fleet is the only property needed — not cryptographic
+    /// randomness). A zero span (tests) yields exactly `backoff_min`.
+    fn backoff(&self) -> Duration {
+        let span_ms = self.backoff_span.as_millis() as u64;
+        if span_ms == 0 {
+            return self.backoff_min;
+        }
+        let jitter_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.subsec_nanos() as u64)
+            .unwrap_or(0)
+            % span_ms;
+        self.backoff_min + Duration::from_millis(jitter_ms)
+    }
+}
+
+/// True when a conductor error is a TRANSIENT class worth a bounded in-leg retry —
+/// a websocket timeout from a saturated conductor (adam's steady ~1/min WS
+/// timeouts), NOT a definitive miss (`Ok(None)`, retried next SWEEP) nor a
+/// decode/logic error (never retried, no free-window will fix it). The conductor
+/// client preserves the error text verbatim (`Zome call failed: Websocket error:
+/// Timeout`), so this is a substring match on that text plus the explicit
+/// [`StorageError::Timeout`] variant.
+fn is_transient_conductor_error(err: &crate::error::StorageError) -> bool {
+    use crate::error::StorageError;
+    match err {
+        StorageError::Timeout(_) => true,
+        StorageError::Conductor(m)
+        | StorageError::HolochainClient(m)
+        | StorageError::Connection(m) => {
+            let m = m.to_ascii_lowercase();
+            m.contains("timeout") || m.contains("timed out")
+        }
+        _ => false,
+    }
+}
+
+/// The classified result of healing ONE row, for the `/metrics` outcome counter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HealOutcomeKind {
+    /// Conductor answered and the projection write succeeded on the first attempt.
+    Healed,
+    /// Conductor answered and the write succeeded, but only after ≥1 transient
+    /// retry — the signal that the bounded retry is doing real work on a saturated
+    /// conductor (vs `timeout_exhausted`, where it could not recover the row).
+    TimeoutRetried,
+    /// Every attempt hit a transient (timeout-class) error — row stays a gap,
+    /// re-discovered next sweep.
+    TimeoutExhausted,
+    /// Conductor definitively could not see the row (`Ok(None)`) — retried next
+    /// sweep, never immediately.
+    Missing,
+    /// A non-transient error (decode/logic) or a projection-write failure — retried
+    /// next sweep, but no in-leg retry (no free window fixes it).
+    Failed,
+}
+
+impl HealOutcomeKind {
+    fn label(self) -> &'static str {
+        match self {
+            HealOutcomeKind::Healed => "healed",
+            HealOutcomeKind::TimeoutRetried => "timeout_retried",
+            HealOutcomeKind::TimeoutExhausted => "timeout_exhausted",
+            HealOutcomeKind::Missing => "missing",
+            HealOutcomeKind::Failed => "failed",
+        }
+    }
+}
+
+/// Outcome of the bounded-retry conductor call for one row: the final result plus
+/// whether any transient retry was taken (so a success-after-retry is countable).
+struct RetryResult<T> {
+    result: Result<T, crate::error::StorageError>,
+    retried: bool,
+}
+
+/// Call the conductor for one row with a per-attempt timeout and bounded transient
+/// retry. Non-transient errors and successes return immediately; a transient
+/// (timeout-class) error or a per-attempt timeout backs off (jittered) and retries
+/// up to `pacing.max_row_retries`. Generic over the call closure so it is unit-
+/// testable with a fake op (no conductor).
+async fn call_with_retry<T, F, Fut>(pacing: &HealPacing, mut op: F) -> RetryResult<T>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T, crate::error::StorageError>>,
+{
+    let mut retried = false;
+    let mut attempt: u32 = 0;
+    loop {
+        let outcome = match tokio::time::timeout(pacing.attempt_timeout, op()).await {
+            Ok(r) => r,
+            Err(_elapsed) => Err(crate::error::StorageError::Timeout(format!(
+                "heal conductor call exceeded per-attempt timeout {:?}",
+                pacing.attempt_timeout
+            ))),
+        };
+        match outcome {
+            Ok(v) => {
+                return RetryResult {
+                    result: Ok(v),
+                    retried,
+                }
+            }
+            Err(e) => {
+                // Only timeout-class errors are worth another attempt within the
+                // leg; anything else returns immediately (no free window fixes it).
+                if attempt < pacing.max_row_retries && is_transient_conductor_error(&e) {
+                    attempt += 1;
+                    retried = true;
+                    tokio::time::sleep(pacing.backoff()).await;
+                    continue;
+                }
+                return RetryResult {
+                    result: Err(e),
+                    retried,
+                };
+            }
+        }
+    }
+}
+
 /// Reconciliation progress for the REA-commitment projection stream, exposed
 /// via `/p2p/status` (the same surface `replication.rs` uses). Mirrors
 /// `ReplicationStatus` and adds reconcile-specific observability.
@@ -469,6 +681,10 @@ pub async fn run_heal(
     provide_state: &ProvideLoopState,
 ) {
     let SweepPlan { rea, content } = plan;
+    // Bounded heal pacing (per-row transient retry + per-leg wall-clock budget).
+    // REA runs FIRST with its own reserved budget so its small backlog is never
+    // starved behind the large content queue (the incident).
+    let pacing = HealPacing::default();
     let ReaDiscovery {
         mut tracker,
         discovered_by,
@@ -477,7 +693,14 @@ pub async fn run_heal(
         divergent_anchor: rea_divergent,
         local_total,
     } = rea;
-    let counts = heal_rea(&mut tracker, &discovered_by, hc, pool).await;
+    // Publish the last-sweep gauges BEFORE heal (discovered gaps + local rows), so
+    // convergence is watchable on `/metrics` without tailing Loki.
+    crate::metrics::set_projection_reconcile_gauges(
+        "rea",
+        tracker.counts().pending as u64,
+        local_total as u64,
+    );
+    let counts = heal_rea(&mut tracker, &discovered_by, hc, pool, &pacing).await;
 
     let ContentDiscovery {
         tracker: mut content_tracker,
@@ -487,8 +710,19 @@ pub async fn run_heal(
         ids_discovered: content_ids_discovered,
         local_anchored,
     } = content;
-    let (content_healed, content_missing) =
-        heal_content(&mut content_tracker, &content_discovered_by, hc, pool).await;
+    crate::metrics::set_projection_reconcile_gauges(
+        "content",
+        content_tracker.counts().pending as u64,
+        local_anchored as u64,
+    );
+    let (content_healed, content_missing) = heal_content(
+        &mut content_tracker,
+        &content_discovered_by,
+        hc,
+        pool,
+        &pacing,
+    )
+    .await;
 
     // GAP 1.5: green the un-witnessed seeded corpus. Composed onto (not forked
     // from) the content arm — same conductor gate + single-flight guard.
@@ -786,44 +1020,76 @@ async fn heal_rea(
     discovered_by: &std::collections::HashMap<String, String>,
     hc: &Arc<HcClient>,
     pool: &DbPool,
+    pacing: &HealPacing,
 ) -> crate::p2p::reconcile_rails::GapCounts {
     let app_ctx = crate::db::AppContext::default_lamad();
 
-    // (3+4) Heal each gap from the OWN conductor.
+    // (3+4) Heal each gap from the OWN conductor, bounded by the REA leg budget.
+    // REA runs FIRST (in `run_heal`) with its own reserved budget, so a small REA
+    // backlog is never starved behind the large content queue (the incident).
+    let leg_start = std::time::Instant::now();
     let gap_ids = tracker.pending_ids();
     for id in gap_ids {
-        match crate::services::conductor_writes::get_rea_commitment(hc, &id).await {
-            Ok(Some(output)) => {
-                let healed = heal_one(&output, pool, &app_ctx);
-                match healed {
-                    Ok(()) => {
-                        tracker.mark_completed(&id);
-                        let peer = discovered_by
-                            .get(&id)
-                            .cloned()
-                            .unwrap_or_else(|| "unknown".to_string());
-                        tracing::warn!(
-                            target: "elohim_storage::projection_reconcile",
-                            commitment_id = %id,
-                            discovered_via_peer = %peer,
-                            "projection-reconcile: HEALED rea_commitment from own conductor (peer discovery)"
-                        );
-                    }
-                    Err(e) => {
-                        tracing::warn!(commitment_id = %id, error = %e, "projection-reconcile: upsert failed; retry next sweep");
-                        tracker.mark_failed(&id);
+        let attempt = call_with_retry(pacing, || {
+            crate::services::conductor_writes::get_rea_commitment(hc, &id)
+        })
+        .await;
+        let kind = match attempt.result {
+            Ok(Some(output)) => match heal_one(&output, pool, &app_ctx) {
+                Ok(()) => {
+                    tracker.mark_completed(&id);
+                    let peer = discovered_by
+                        .get(&id)
+                        .cloned()
+                        .unwrap_or_else(|| "unknown".to_string());
+                    tracing::warn!(
+                        target: "elohim_storage::projection_reconcile",
+                        commitment_id = %id,
+                        discovered_via_peer = %peer,
+                        retried = attempt.retried,
+                        "projection-reconcile: HEALED rea_commitment from own conductor (peer discovery)"
+                    );
+                    if attempt.retried {
+                        HealOutcomeKind::TimeoutRetried
+                    } else {
+                        HealOutcomeKind::Healed
                     }
                 }
-            }
+                Err(e) => {
+                    tracing::warn!(commitment_id = %id, error = %e, "projection-reconcile: upsert failed; retry next sweep");
+                    tracker.mark_failed(&id);
+                    HealOutcomeKind::Failed
+                }
+            },
             Ok(None) => {
                 // Conductor can't see it — retry on NEXT sweep, never immediate.
                 tracing::debug!(commitment_id = %id, "projection-reconcile: own conductor returned None; retry next sweep");
                 tracker.mark_failed(&id);
+                HealOutcomeKind::Missing
             }
             Err(e) => {
-                tracing::warn!(commitment_id = %id, error = %e, "projection-reconcile: conductor get failed; retry next sweep");
+                let transient = is_transient_conductor_error(&e);
+                tracing::warn!(commitment_id = %id, error = %e, transient, "projection-reconcile: conductor get failed; retry next sweep");
                 tracker.mark_failed(&id);
+                if transient {
+                    HealOutcomeKind::TimeoutExhausted
+                } else {
+                    HealOutcomeKind::Failed
+                }
             }
+        };
+        crate::metrics::inc_projection_heal_outcome("rea", kind.label());
+
+        // Per-leg budget: yield the single-flight guard so the leg recycles next
+        // sweep. Un-attempted rows are re-discovered (the tracker is per-sweep), so
+        // nothing is lost — the next leg re-attempts them fresh.
+        if leg_start.elapsed() >= pacing.rea_leg_budget {
+            tracing::info!(
+                target: "elohim_storage::projection_reconcile",
+                budget_secs = pacing.rea_leg_budget.as_secs(),
+                "projection-reconcile: rea heal hit leg budget — yielding, remaining gaps resume next sweep"
+            );
+            break;
         }
     }
 
@@ -1169,14 +1435,23 @@ async fn heal_content(
     discovered_by: &std::collections::HashMap<String, String>,
     hc: &Arc<HcClient>,
     pool: &DbPool,
+    pacing: &HealPacing,
 ) -> (usize, usize) {
     let app_ctx = crate::db::AppContext::default_lamad();
 
-    // (5) Heal each gap from the OWN conductor (verified stamp).
+    // (5) Heal each gap from the OWN conductor (verified stamp), bounded by the
+    // content leg budget so a saturated conductor lands SOME rows per tick and the
+    // leg recycles instead of grinding for hours (the incident). Runs AFTER `heal_rea`
+    // so the small REA backlog is never starved behind this large content queue.
+    let leg_start = std::time::Instant::now();
     let mut healed = 0usize;
     let mut conductor_missing = 0usize;
     for id in tracker.pending_ids() {
-        match crate::services::conductor_writes::call_resolve_content_head(hc, &id).await {
+        let attempt = call_with_retry(pacing, || {
+            crate::services::conductor_writes::call_resolve_content_head(hc, &id)
+        })
+        .await;
+        match attempt.result {
             Ok(Some(head)) => match heal_content_one(&head, pool, &app_ctx) {
                 Ok(crate::db::content_diesel::StampOutcome::Stamped) => {
                     tracker.mark_completed(&id);
@@ -1189,7 +1464,16 @@ async fn heal_content(
                         target: "elohim_storage::projection_reconcile",
                         content_id = %id,
                         discovered_via_peer = %peer,
+                        retried = attempt.retried,
                         "projection-reconcile[content]: HEALED content anchor from own conductor (peer discovery)"
+                    );
+                    crate::metrics::inc_projection_heal_outcome(
+                        "content",
+                        if attempt.retried {
+                            HealOutcomeKind::TimeoutRetried.label()
+                        } else {
+                            HealOutcomeKind::Healed.label()
+                        },
                     );
                 }
                 Ok(crate::db::content_diesel::StampOutcome::SkippedDeclared) => {
@@ -1224,7 +1508,14 @@ async fn heal_content(
                 Err(e) => {
                     tracing::warn!(content_id = %id, error = %e, "projection-reconcile[content]: stamp failed; retry next sweep");
                     tracker.mark_failed(&id);
-                }
+                    crate::metrics::inc_projection_heal_outcome(
+                        "content",
+                        HealOutcomeKind::Failed.label(),
+                    );
+                } // SkippedDeclared / SkippedStale / NoRow are benign resolutions
+                  // (row already correct or absent): `mark_completed`, no stamp, and
+                  // deliberately NOT counted as `healed` so the cure signal (real
+                  // stamps) is not inflated by no-op resolutions.
             },
             Ok(None) => {
                 // Conductor can't see it yet (catch-up) — retry on the NEXT
@@ -1232,11 +1523,35 @@ async fn heal_content(
                 conductor_missing += 1;
                 tracing::debug!(content_id = %id, "projection-reconcile[content]: own conductor returned None; retry next sweep");
                 tracker.mark_failed(&id);
+                crate::metrics::inc_projection_heal_outcome(
+                    "content",
+                    HealOutcomeKind::Missing.label(),
+                );
             }
             Err(e) => {
-                tracing::warn!(content_id = %id, error = %e, "projection-reconcile[content]: conductor resolve failed; retry next sweep");
+                let transient = is_transient_conductor_error(&e);
+                tracing::warn!(content_id = %id, error = %e, transient, "projection-reconcile[content]: conductor resolve failed; retry next sweep");
                 tracker.mark_failed(&id);
+                crate::metrics::inc_projection_heal_outcome(
+                    "content",
+                    if transient {
+                        HealOutcomeKind::TimeoutExhausted.label()
+                    } else {
+                        HealOutcomeKind::Failed.label()
+                    },
+                );
             }
+        }
+
+        // Per-leg budget: yield so the leg recycles next sweep (see `heal_rea`).
+        if leg_start.elapsed() >= pacing.content_leg_budget {
+            tracing::info!(
+                target: "elohim_storage::projection_reconcile",
+                budget_secs = pacing.content_leg_budget.as_secs(),
+                healed,
+                "projection-reconcile[content]: heal hit leg budget — yielding, remaining gaps resume next sweep"
+            );
+            break;
         }
     }
 
@@ -1475,5 +1790,122 @@ mod tests {
             classify_content_gap("c", &present, &local_anchors, None),
             ContentGap::InSync
         );
+    }
+
+    // ── Heal-leg pacing: the saturated-conductor cure (retry + budget) ──
+
+    #[test]
+    fn transient_classifier_splits_timeout_from_logic() {
+        use crate::error::StorageError;
+        // The exact verbatim conductor text adam's Loki shows is transient.
+        assert!(is_transient_conductor_error(&StorageError::Conductor(
+            "Zome call failed: Websocket error: Timeout".into()
+        )));
+        assert!(is_transient_conductor_error(&StorageError::Timeout(
+            "per-attempt".into()
+        )));
+        assert!(is_transient_conductor_error(&StorageError::Connection(
+            "read timed out".into()
+        )));
+        // A logic/decode error is NOT transient — no free window fixes it, so no
+        // in-leg retry (it would just burn budget).
+        assert!(!is_transient_conductor_error(&StorageError::Conductor(
+            "Guest(\"not the author\")".into()
+        )));
+        assert!(!is_transient_conductor_error(&StorageError::Validation(
+            "bad enum".into()
+        )));
+    }
+
+    #[test]
+    fn heal_pacing_prioritizes_rea_and_bounds_attempts() {
+        let p = HealPacing::default();
+        assert!(
+            p.max_row_retries >= 1,
+            "a transient row must get at least one in-leg retry"
+        );
+        assert!(
+            p.attempt_timeout < Duration::from_secs(60),
+            "per-attempt timeout must be tighter than the conductor's ~60s WS timeout"
+        );
+        assert!(
+            p.rea_leg_budget <= p.content_leg_budget,
+            "rea's reserved budget must not exceed content's (rea is prioritized, small backlog)"
+        );
+        assert!(p.rea_leg_budget > Duration::ZERO && p.content_leg_budget > Duration::ZERO);
+        // Jittered backoff stays within [min, min+span).
+        let b = p.backoff();
+        assert!(b >= p.backoff_min && b < p.backoff_min + p.backoff_span);
+    }
+
+    #[test]
+    fn heal_outcome_labels_are_stable() {
+        // The `/metrics` label vocabulary is a wire contract — pin it.
+        assert_eq!(HealOutcomeKind::Healed.label(), "healed");
+        assert_eq!(HealOutcomeKind::TimeoutRetried.label(), "timeout_retried");
+        assert_eq!(
+            HealOutcomeKind::TimeoutExhausted.label(),
+            "timeout_exhausted"
+        );
+        assert_eq!(HealOutcomeKind::Missing.label(), "missing");
+        assert_eq!(HealOutcomeKind::Failed.label(), "failed");
+    }
+
+    #[tokio::test]
+    async fn call_with_retry_recovers_after_one_transient() {
+        use crate::error::StorageError;
+        let pacing = HealPacing::test_fast();
+        let calls = std::cell::Cell::new(0u32);
+        let r = call_with_retry(&pacing, || {
+            let n = calls.get();
+            calls.set(n + 1);
+            async move {
+                if n == 0 {
+                    // First attempt: a WS timeout (the adam signature).
+                    Err::<i32, StorageError>(StorageError::Conductor(
+                        "Websocket error: Timeout".into(),
+                    ))
+                } else {
+                    Ok(7)
+                }
+            }
+        })
+        .await;
+        assert_eq!(r.result.expect("recovered"), 7);
+        assert!(r.retried, "success came after a transient retry");
+        assert_eq!(calls.get(), 2, "one retry after the first transient");
+    }
+
+    #[tokio::test]
+    async fn call_with_retry_exhausts_on_persistent_transient() {
+        use crate::error::StorageError;
+        let pacing = HealPacing::test_fast(); // max_row_retries = 2 → 3 attempts
+        let calls = std::cell::Cell::new(0u32);
+        let r = call_with_retry(&pacing, || {
+            calls.set(calls.get() + 1);
+            async { Err::<i32, StorageError>(StorageError::Timeout("wedged".into())) }
+        })
+        .await;
+        assert!(
+            r.result.is_err(),
+            "a persistently-wedged row stays a failure"
+        );
+        assert!(r.retried);
+        assert_eq!(calls.get(), 3, "1 initial + max_row_retries(2) attempts");
+    }
+
+    #[tokio::test]
+    async fn call_with_retry_no_retry_on_non_transient() {
+        use crate::error::StorageError;
+        let pacing = HealPacing::test_fast();
+        let calls = std::cell::Cell::new(0u32);
+        let r = call_with_retry(&pacing, || {
+            calls.set(calls.get() + 1);
+            async { Err::<i32, StorageError>(StorageError::Validation("bad".into())) }
+        })
+        .await;
+        assert!(r.result.is_err());
+        assert!(!r.retried, "a non-transient error is never retried in-leg");
+        assert_eq!(calls.get(), 1, "exactly one attempt for a logic error");
     }
 }
