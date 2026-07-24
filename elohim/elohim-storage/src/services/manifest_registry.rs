@@ -47,6 +47,18 @@ pub struct ManifestRegistry {
     /// mutability so `load_from_db` can take `&self` (consistent with the
     /// existing `RwLock` cache pattern).
     standing_policy_payload: Mutex<Option<serde_json::Value>>,
+    /// Content address (CID) of the standing-policy manifest whose payload is
+    /// cached above. This is what makes a verdict auditable by a counterparty
+    /// who does not share our code: `policy_ref` on an emitted
+    /// [`elohim_epr::verdict::Verdict`] carries THIS value, so the receiver can
+    /// fetch the exact policy bytes that parameterized the check rather than
+    /// trusting a name. A revision integer could not do this — two peers can
+    /// hold different bytes under the same `revision: 1`.
+    ///
+    /// `None` when the policy was hand-built rather than loaded from a
+    /// content-addressed row (see [`ManifestRegistry::from_payload_json`]);
+    /// an unpinned policy must emit no ref rather than a name it cannot back.
+    standing_policy_cid: Mutex<Option<String>>,
 }
 
 impl ManifestRegistry {
@@ -54,6 +66,7 @@ impl ManifestRegistry {
         Self {
             cache: Arc::new(RwLock::new(HashMap::new())),
             standing_policy_payload: Mutex::new(None),
+            standing_policy_cid: Mutex::new(None),
         }
     }
 
@@ -88,7 +101,12 @@ impl ManifestRegistry {
             *cache = new_cache;
         }
 
-        // Load standing-policy payload if present.
+        // Load standing-policy payload if present, together with the CID that
+        // addresses it. The row's `cid` is the content address of the exact
+        // policy bytes; keeping the payload while discarding the cid would leave
+        // every verdict derived from it unciteable, which is what `policy_ref:
+        // None` meant. Payload and cid are set together so they can never
+        // describe different bytes.
         let policy_rows = fetch_manifests_by_kind(conn, "standing-policy").unwrap_or_default();
         if let Some(row) = policy_rows.first() {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(&row.payload_json) {
@@ -96,6 +114,10 @@ impl ManifestRegistry {
                     .standing_policy_payload
                     .lock()
                     .expect("standing_policy_payload lock poisoned") = Some(v);
+                *self
+                    .standing_policy_cid
+                    .lock()
+                    .expect("standing_policy_cid lock poisoned") = Some(row.cid.clone());
             }
         }
 
@@ -105,6 +127,22 @@ impl ManifestRegistry {
     // -------------------------------------------------------------------------
     // Standing-policy accessors (Phase 3.5 Light-Up-Graph)
     // -------------------------------------------------------------------------
+
+    /// The content address of the standing-policy manifest currently parameterizing
+    /// this registry, for citation as `Verdict::policy_ref`.
+    ///
+    /// A closed-verdict axis owes its counterparty the answer to "which policy
+    /// produced this?" (`epr:registry:axis:reach`). Returning the CID rather than
+    /// a name or a revision integer is the point: the receiver can fetch the exact
+    /// bytes and check our reasoning without sharing our code. `None` means the
+    /// active policy is not content-addressed — emit no ref rather than a claim
+    /// that cannot be resolved.
+    pub fn standing_policy_ref(&self) -> Option<String> {
+        self.standing_policy_cid
+            .lock()
+            .expect("standing_policy_cid lock poisoned")
+            .clone()
+    }
 
     /// Returns flat `(signal_kind, impact) → weight` map from the standing-policy
     /// manifest's `debitWeights` block.
