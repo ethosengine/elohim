@@ -36,6 +36,7 @@ pub mod binding_cross_signature;
 pub mod blob_fetch;
 pub mod blob_protocol;
 pub mod conductor_agent_info_gossip;
+pub mod custody_announce;
 pub mod dedup;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
@@ -1585,6 +1586,78 @@ impl P2PHandle {
         }
     }
 
+    /// Broadcast a single custody claim on the custody-announcement gossip plane
+    /// (`elohim/storage/custody`). Called on-change immediately after a
+    /// `shard_locations` row this node can verify is written — self-held recording
+    /// and push-ack placement in [`P2PHandle::distribute_shards`].
+    ///
+    /// Best-effort: routed through `P2PCommand::GossipPublish` (the libp2p
+    /// gossipsub plane — the same path content-reach broadcasts take via
+    /// `LibP2PGossipPublisher`). A closed/full channel is logged and never reverts
+    /// the local projection — the DB is this node's operational truth, and the
+    /// catch-up reconcile arm backfills peers that missed the gossip.
+    ///
+    /// KNOWN Dual-mode gap: this reaches only libp2p (the handle holds the command
+    /// channel, not the `DualGossipPublisher`), so an iroh-only peer converges via
+    /// the catch-up arm rather than this hot announce — same asymmetry class as the
+    /// inventory active-fetch path documented in `p2p::gossip_dispatch`.
+    ///
+    /// `holder_agent_cid` and `status` are exactly the values just written to
+    /// `shard_locations`; the receiver projects them as a weaker `peer-announced`
+    /// row that never overwrites a locally-witnessed one.
+    async fn announce_custody(
+        &self,
+        shard_hash: &str,
+        holder_agent_cid: &str,
+        h_app_id: &str,
+        status: &str,
+    ) {
+        use crate::p2p::custody_announce::{CustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
+
+        let ann = CustodyAnnouncement {
+            shard_hash: shard_hash.to_string(),
+            holder_agent_cid: holder_agent_cid.to_string(),
+            h_app_id: h_app_id.to_string(),
+            status: status.to_string(),
+            announced_at_ms: chrono::Utc::now().timestamp_millis(),
+            signature: vec![0x00], // Stage 1 structural non-empty
+        };
+        let bytes = match ann.to_bytes() {
+            Ok(b) => b,
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::custody",
+                    error = %e,
+                    "failed to serialize custody announcement"
+                );
+                return;
+            }
+        };
+        if let Err(e) = self
+            .command_tx
+            .send(P2PCommand::GossipPublish {
+                topic: CUSTODY_ANNOUNCE_TOPIC.to_string(),
+                payload: bytes,
+            })
+            .await
+        {
+            debug!(
+                target: "elohim_storage::custody",
+                error = %e,
+                "custody announcement publish failed (P2P command channel closed)"
+            );
+            return;
+        }
+        crate::metrics::inc_custody_announce("sent");
+        debug!(
+            target: "elohim_storage::custody",
+            shard_hash = %shard_hash,
+            holder = %holder_agent_cid,
+            status = %status,
+            "queued custody announcement for gossip"
+        );
+    }
+
     /// Distribute all shards of a blob to delivery peers.
     ///
     /// Uses the contract-aware diverse selector (`PeerSelection`) to rank peers
@@ -1762,6 +1835,15 @@ impl P2PHandle {
                             peer = %peer.peer_id,
                             "Shard recorded as self-held (bytes verified in local pantry; no push)"
                         );
+                        // Cross-pod convergence: announce this self-held custody
+                        // claim so peers (and other doorways) can project it.
+                        self.announce_custody(
+                            hash,
+                            &peer.peer_id,
+                            h_app_id,
+                            crate::services::self_stewardship::SELF_HELD_STATUS,
+                        )
+                        .await;
                         distributed += 1;
                     }
                     Ok(outcome) => {
@@ -1821,6 +1903,10 @@ impl P2PHandle {
                         };
                         let _ = crate::db::shard_locations::upsert_location(&mut conn, &location);
                     }
+                    // Cross-pod convergence: announce this push-acked placement so
+                    // peers project the holder into their own shard_locations.
+                    self.announce_custody(hash, &peer.peer_id, h_app_id, "announced")
+                        .await;
                     distributed += 1;
                 }
                 Err(e) => {

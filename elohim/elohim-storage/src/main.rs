@@ -3259,6 +3259,70 @@ async fn async_main(
     // is potentially moved into the import config.
     let saved_admin_url: Option<String> = args.admin_url.clone();
 
+    // ── Periodic identity fill (NULL agent_pub_key + create-missing members) ──
+    //
+    // The boot backfill above fills household_id NULLs and SUPERSEDES stale keys,
+    // but never fills a NULL `humans.agent_pub_key` and never CREATES a missing
+    // member row. So a pod that boots with a peer's row absent or key-NULL (adam
+    // renders `commitmentBacked 0` while matthew renders 4) stays dark until a
+    // fresh live membership signal arrives — which, for a peer's row, it may
+    // never. This periodic pass reads the pod's OWN imagodei cell for DHT-shared
+    // membership truth and fills-never-moves: create if absent, fill NULL keys,
+    // never overwrite a set key (supersede stays the boot reconcile's job).
+    // Gated on IDENTITY_FILL_SECS (default 300; `0` disables). The imagodei
+    // bridge is acquired INSIDE the task via connect_role_forever — a late
+    // connect is as good as a boot one (same rationale as the fan-in above).
+    if let (Some(pool), Some(admin_url)) = (db_pool.as_ref(), saved_admin_url.clone()) {
+        let fill_secs = std::env::var("IDENTITY_FILL_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(elohim_storage::services::identity_fill::DEFAULT_FILL_SECS);
+        if fill_secs == 0 {
+            info!("identity_fill disabled (IDENTITY_FILL_SECS=0)");
+        } else {
+            let fill_pool = pool.clone();
+            let fill_inputs = elohim_storage::hc_client_registry::HcRegistryInputs {
+                admin_url,
+                app_url: args.app_url.clone(),
+                app_id: args.app_id.clone(),
+            };
+            let connect_shutdown = shutdown_tx.subscribe();
+            let fill_shutdown = shutdown_tx.subscribe();
+            tokio::spawn(async move {
+                let hc = match elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
+                    &fill_inputs,
+                    "imagodei",
+                    connect_shutdown,
+                )
+                .await
+                {
+                    Some(hc) => hc,
+                    None => return, // only None on shutdown
+                };
+                let source = std::sync::Arc::new(
+                    elohim_storage::services::identity_fill::ConductorMembershipKeySource::new(
+                        fill_pool.clone(),
+                        hc,
+                    ),
+                );
+                elohim_storage::services::identity_fill::run_fill_loop(
+                    fill_pool,
+                    source,
+                    fill_secs,
+                    elohim_storage::services::identity_fill::DEFAULT_SETTLE_SECS,
+                    fill_shutdown,
+                )
+                .await;
+            });
+            info!(
+                fill_secs,
+                "identity_fill task started (membership-truth agent-key fill + create-missing)"
+            );
+        }
+    } else {
+        tracing::debug!("identity_fill skipped: db pool or admin_url unavailable");
+    }
+
     // Start import handler if enabled
     let import_handle = if !args.no_import {
         if let Some(admin_url) = args.admin_url {

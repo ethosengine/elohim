@@ -537,6 +537,15 @@ impl ElohimStorageBehaviour {
         gossipsub
             .subscribe(&salvage_topic)
             .expect("subscribe to elohim/storage/salvage");
+        // Custody-announcement topic: peers broadcast shard_locations writes
+        // (self-held / push-ack) so the holder footprint converges across pods;
+        // the receive arm projects arrivals as `peer-announced` rows under the
+        // never-overwrite-local rule (db/shard_locations::apply_peer_announced).
+        let custody_topic =
+            gossipsub::IdentTopic::new(super::custody_announce::CUSTODY_ANNOUNCE_TOPIC);
+        gossipsub
+            .subscribe(&custody_topic)
+            .expect("subscribe to elohim/storage/custody");
         // Task 4.4: subscribe to all observation namespaces so peers receive
         // CursorAnnouncements.  Role-based subscription override is a follow-on
         // (see spec §5.3 + open question 4).

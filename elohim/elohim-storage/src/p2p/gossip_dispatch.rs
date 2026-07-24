@@ -230,6 +230,8 @@ pub fn handle_gossip(ctx: &GossipDispatchCtx<'_>, topic: &str, data: &[u8], sour
         handle_inventory(ctx, data, source);
     } else if topic == crate::p2p::salvage_gossip::SALVAGE_CAPACITY_TOPIC {
         handle_salvage(ctx, data, source);
+    } else if topic == crate::p2p::custody_announce::CUSTODY_ANNOUNCE_TOPIC {
+        handle_custody_announce(ctx, data, source);
     } else if topic.starts_with("elohim/") {
         // Per-pillar reach-scoped EPR announce topics carry a msgpack-encoded
         // CID string (announce-only). Stage 1: decode CID + dedup only.
@@ -546,6 +548,117 @@ fn handle_salvage(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSourc
     }
 }
 
+/// Custody-announcement projection into `shard_locations` as a `peer-announced`
+/// row (Category C, cross-pod convergence). Decode → structural verify → dedup →
+/// resolve THIS node's self `agent_cid` → apply under the never-overwrite-local +
+/// monotone-newer rule. A peer telling us about ourselves is dropped
+/// (`DroppedSelf`); a claim weaker than an existing row is dropped
+/// (`dropped_weaker`).
+fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSource) {
+    use crate::p2p::custody_announce::CustodyAnnouncement;
+
+    let ann = match CustodyAnnouncement::from_bytes(data) {
+        Ok(a) => a,
+        Err(e) => {
+            debug!(
+                target: "elohim_storage::custody",
+                from = %source,
+                error = %e,
+                "CustodyAnnouncement decode failed — dropped"
+            );
+            return;
+        }
+    };
+    if let Err(reason) = ann.verify_structural() {
+        warn!(
+            target: "elohim_storage::custody",
+            from = %source,
+            reason = %reason,
+            "CustodyAnnouncement failed structural verify — dropped"
+        );
+        return;
+    }
+
+    // Dedup on the FULL identity incl. timestamp: an exact replay is dropped, but
+    // a fresher re-announce (newer `announced_at_ms`) is NOT deduped so the
+    // monotone refresh can still land.
+    let dedup_key = format!(
+        "Custody:{}:{}:{}",
+        ann.shard_hash, ann.holder_agent_cid, ann.announced_at_ms
+    );
+    if !ctx.dedup.insert(&dedup_key) {
+        debug!(
+            target: "elohim_storage::dedup",
+            from = %source,
+            shard_hash = %ann.shard_hash,
+            holder = %ann.holder_agent_cid,
+            "duplicate custody announcement — dropped"
+        );
+        return;
+    }
+
+    crate::metrics::inc_custody_announce("received");
+
+    let Some(pool) = ctx.db_pool else {
+        debug!(
+            target: "elohim_storage::custody",
+            "custody announcement: no db_pool configured, skipping projection"
+        );
+        return;
+    };
+    let mut conn = match pool.get() {
+        Ok(c) => c,
+        Err(e) => {
+            warn!(
+                target: "elohim_storage::custody",
+                error = %e,
+                "custody announcement: db pool exhausted"
+            );
+            return;
+        }
+    };
+
+    // Resolve THIS node's own agent_cid from the active session (best-effort);
+    // when known it powers the self-drop guard. `None` still projects safely —
+    // a self-claim about a shard we actually hold hits our stronger self-held /
+    // announced row and is dropped as `dropped_weaker` regardless.
+    let self_agent_cid = crate::reconcile::custody::resolve_self_agent_cid(&mut conn, None);
+
+    match crate::db::shard_locations::apply_peer_announced(
+        &mut conn,
+        &ann.shard_hash,
+        &ann.holder_agent_cid,
+        &ann.h_app_id,
+        ann.announced_at_ms,
+        self_agent_cid.as_deref(),
+    ) {
+        Ok(outcome) => {
+            use crate::db::shard_locations::PeerAnnounceOutcome as O;
+            let label = match outcome {
+                O::Inserted | O::Refreshed => "applied",
+                O::DroppedSelf => "dropped_self",
+                O::SkippedStronger | O::SkippedStale | O::NotAgentCid => "dropped_weaker",
+            };
+            crate::metrics::inc_custody_announce(label);
+            debug!(
+                target: "elohim_storage::custody",
+                from = %source,
+                shard_hash = %ann.shard_hash,
+                holder = %ann.holder_agent_cid,
+                status = %ann.status,
+                ?outcome,
+                "custody announcement projected"
+            );
+        }
+        Err(e) => warn!(
+            target: "elohim_storage::custody",
+            from = %source,
+            error = %e,
+            "apply_peer_announced failed"
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -577,6 +690,7 @@ mod tests {
             crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
             crate::p2p::inventory_gossip::INVENTORY_TOPIC,
             crate::p2p::salvage_gossip::SALVAGE_CAPACITY_TOPIC,
+            crate::p2p::custody_announce::CUSTODY_ANNOUNCE_TOPIC,
             "elohim/lamad/public",
             "some.unknown.topic",
         ] {
@@ -605,6 +719,49 @@ mod tests {
             !dedup.insert("bafyreiabc"),
             "cid should already be in the dedup cache after first announce"
         );
+    }
+
+    #[test]
+    fn custody_announce_projects_a_peer_announced_row_and_dedups_replay() {
+        use crate::p2p::custody_announce::{CustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = GossipDispatchCtx {
+            db_pool: Some(&pool),
+            dedup: &dedup,
+            agent_info_inbound_tx: None,
+            inventory_fetch: None,
+        };
+        let src = GossipSource::Iroh {
+            node: "peer-a".to_string(),
+        };
+        let ann = CustodyAnnouncement {
+            shard_hash: "sha256-xyz".to_string(),
+            holder_agent_cid: "uhCAkRemoteHolder".to_string(),
+            h_app_id: "lamad".to_string(),
+            status: "self-held".to_string(),
+            announced_at_ms: 1_700_000_000_000,
+            signature: vec![0x00],
+        };
+        let bytes = ann.to_bytes().expect("encode");
+
+        // First arrival projects a peer-announced row.
+        handle_gossip(&ctx, CUSTODY_ANNOUNCE_TOPIC, &bytes, &src);
+        let mut conn = pool.get().expect("conn");
+        let rows =
+            crate::db::shard_locations::get_locations_for_shard(&mut conn, "sha256-xyz").unwrap();
+        assert_eq!(rows.len(), 1, "one peer-announced row projected");
+        assert_eq!(rows[0].peer_id, "uhCAkRemoteHolder");
+        assert_eq!(
+            rows[0].status,
+            crate::db::shard_locations::PEER_ANNOUNCED_STATUS
+        );
+
+        // An exact replay is deduped — still exactly one row (no churn, no panic).
+        handle_gossip(&ctx, CUSTODY_ANNOUNCE_TOPIC, &bytes, &src);
+        let rows =
+            crate::db::shard_locations::get_locations_for_shard(&mut conn, "sha256-xyz").unwrap();
+        assert_eq!(rows.len(), 1, "replay deduped — no duplicate row");
     }
 
     #[test]

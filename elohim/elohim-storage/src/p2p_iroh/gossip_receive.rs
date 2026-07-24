@@ -46,6 +46,7 @@ const INBOUND_TOPICS: &[&str] = &[
     crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
     crate::p2p::conductor_agent_info_gossip::CONDUCTOR_AGENT_INFO_TOPIC,
     crate::p2p::salvage_gossip::SALVAGE_CAPACITY_TOPIC,
+    crate::p2p::custody_announce::CUSTODY_ANNOUNCE_TOPIC,
 ];
 
 /// Spawn one receive task per inbound topic. Each task subscribes to its topic

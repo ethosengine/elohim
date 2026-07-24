@@ -1613,6 +1613,116 @@ fn heal_content_one(
     )
 }
 
+// ---------------------------------------------------------------------------
+// Shard-location catch-up arm (Category C — custody convergence, cold path)
+// ---------------------------------------------------------------------------
+
+/// Catch-up reconcile for the `shard_locations` custody projection: fetch each
+/// connected peer's custody inventory over `/elohim/view-federation/1.0.0` and
+/// project every advertised claim as a `peer-announced` row via the SAME
+/// never-overwrite-local rule the gossip hot path uses.
+///
+/// ## Why this differs from the REA / content arms
+///
+/// Custody is Category C: there is NO DHT notary for who-holds-what. The
+/// announcing peer's own projection IS the heal source, so — unlike
+/// [`discover_rea`] / [`discover_content`], which advertise only `(id, anchor)`
+/// and heal row content from the OWN conductor — a custody inventory entry
+/// carries the FULL [`CustodyAnnouncement`] and is applied directly. No conductor
+/// is involved.
+///
+/// ## DORMANT until the responder serves the table
+///
+/// This is deliberately NOT wired into [`run_discovery`]/[`run_heal`] yet. The
+/// view-federation responder (`p2p::view_federation::build_inventory_payload`)
+/// returns an honest empty inventory for any table it does not know, and
+/// `shard_locations` is not yet a known table there. Wiring this into the sweep
+/// before the responder serves it would ship a guaranteed no-op that burns a
+/// federation round-trip per peer every tick. Activate it once the responder
+/// serves `table = "shard_locations"` with a `CustodyInventoryPayload` (see the
+/// slice report for the exact responder + `run_discovery` insertions). Kept
+/// `pub` so it compiles clean (no dead-code) as landed-but-dormant.
+pub async fn reconcile_shard_locations_from_peers(p2p: &P2PHandle, pool: &DbPool) {
+    use crate::p2p::custody_announce::{
+        CustodyInventoryPayload, PROJECTION_INVENTORY_TABLE_SHARD_LOCATIONS,
+    };
+
+    // Resolve THIS node's own agent_cid once for the self-drop guard.
+    let self_agent_cid = pool
+        .get()
+        .ok()
+        .and_then(|mut conn| crate::reconcile::custody::resolve_self_agent_cid(&mut conn, None));
+
+    let peers = p2p.list_peers().await;
+    let mut applied = 0usize;
+    let mut dropped_weaker = 0usize;
+    let mut dropped_self = 0usize;
+    let mut peers_asked = 0usize;
+
+    for peer in &peers {
+        let peer_id = match peer.peer_id.parse::<libp2p::PeerId>() {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+        let request = ViewFederationRequest {
+            view_kind: ViewKind::ProjectionInventory {
+                table: PROJECTION_INVENTORY_TABLE_SHARD_LOCATIONS.to_string(),
+            },
+            agent_cid: p2p.agent_pubkey().to_string(),
+            request_id: uuid::Uuid::new_v4().to_string(),
+            inventory_offset: None,
+        };
+        let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
+            Ok(r) => r,
+            Err(_) => continue, // peer offline/timeout — catch-up is best-effort
+        };
+        peers_asked += 1;
+
+        let payload: CustodyInventoryPayload =
+            match serde_json::from_value(resp.slice.payload.0.clone()) {
+                Ok(p) => p,
+                Err(e) => {
+                    tracing::warn!(
+                        target: "elohim_storage::custody",
+                        peer = %peer.peer_id,
+                        error = %e,
+                        "custody catch-up: peer inventory payload undecodable; skipping peer"
+                    );
+                    continue;
+                }
+            };
+
+        let Ok(mut conn) = pool.get() else { continue };
+        let stats = crate::db::shard_locations::apply_custody_inventory(
+            &mut conn,
+            &payload.entries,
+            self_agent_cid.as_deref(),
+        );
+        applied += stats.applied();
+        dropped_weaker += stats.dropped_weaker;
+        dropped_self += stats.dropped_self;
+    }
+
+    for _ in 0..applied {
+        crate::metrics::inc_custody_announce("applied");
+    }
+    for _ in 0..dropped_weaker {
+        crate::metrics::inc_custody_announce("dropped_weaker");
+    }
+    for _ in 0..dropped_self {
+        crate::metrics::inc_custody_announce("dropped_self");
+    }
+
+    tracing::info!(
+        target: "elohim_storage::custody",
+        peers_asked,
+        applied,
+        dropped_weaker,
+        dropped_self,
+        "custody catch-up: shard-location reconcile complete"
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

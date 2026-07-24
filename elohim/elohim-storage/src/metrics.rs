@@ -361,6 +361,52 @@ lazy_static! {
         "Missed per-agent reads in the last peer_status fan-in sweep.",
     )
     .unwrap();
+
+    /// Identity-fill outcomes by action — the periodic pass that fills NULL
+    /// `humans.agent_pub_key` and creates missing member rows from DHT membership
+    /// truth (`services::identity_fill`). labels: action = "created" | "filled"
+    /// | "skipped_present" | "skipped_non_agent_cid". `created` + `filled`
+    /// climbing off 0 on a dark pod (adam `commitmentBacked 0`) is the direct
+    /// cure signal that the resilience stewarding join now has keyed rows to join.
+    pub static ref IDENTITY_FILL_TOTAL: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_identity_fill_total",
+            "Periodic membership-truth identity fills, by action.",
+        ),
+        &["action"],
+    )
+    .unwrap();
+
+    /// Rows written (created + filled) in the LAST identity-fill sweep. Falls to
+    /// 0 once the pod's membership is fully projected (steady state); a nonzero
+    /// value means a member row was just laid this tick.
+    pub static ref IDENTITY_FILL_LAST_WRITES: IntGauge = IntGauge::new(
+        "elohim_identity_fill_last_writes",
+        "Rows created+filled in the last identity-fill sweep.",
+    )
+    .unwrap();
+
+    /// Custody-announcement flow (the cross-pod `shard_locations` convergence).
+    /// `shard_locations` is written only locally (self-held recording + push-ack),
+    /// so custody claims never left the node and each doorway read a different
+    /// network footprint. A [`CustodyAnnouncement`](crate::p2p::custody_announce)
+    /// gossips a claim on change; peers project it as a `peer-announced` row that
+    /// never overwrites a locally-witnessed one. labels: direction =
+    ///   "sent"          — a claim this node broadcast,
+    ///   "received"      — a claim decoded off the wire (before the apply verdict),
+    ///   "applied"       — landed a write (absence filled or refreshed),
+    ///   "dropped_weaker"— an existing local/peer row was stronger-or-fresher,
+    ///   "dropped_self"  — a peer claiming THIS node holds a shard (weaker than
+    ///                     our own records).
+    /// `received == applied + dropped_weaker + dropped_self` per receive path.
+    pub static ref CUSTODY_ANNOUNCE_TOTAL: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_custody_announce_total",
+            "Custody-announcement flow for cross-pod shard_locations convergence, by direction.",
+        ),
+        &["direction"],
+    )
+    .unwrap();
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -401,6 +447,9 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_LOCAL_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_REDISTRIBUTE_BYTES_MISSING.clone()));
         let _ = REGISTRY.register(Box::new(PEER_STATUS_FANOUT_MISSED.clone()));
+        let _ = REGISTRY.register(Box::new(IDENTITY_FILL_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(IDENTITY_FILL_LAST_WRITES.clone()));
+        let _ = REGISTRY.register(Box::new(CUSTODY_ANNOUNCE_TOTAL.clone()));
     });
 }
 
@@ -543,6 +592,13 @@ pub fn inc_shard_push_peer_unresolved() {
     SHARD_PUSH_PEER_UNRESOLVED.inc();
 }
 
+/// Record one custody-announcement flow event. `direction` is one of the labels
+/// documented on [`CUSTODY_ANNOUNCE_TOTAL`]: `sent` | `received` | `applied` |
+/// `dropped_weaker` | `dropped_self`.
+pub fn inc_custody_announce(direction: &str) {
+    CUSTODY_ANNOUNCE_TOTAL.with_label_values(&[direction]).inc();
+}
+
 /// Record one projection-reconcile heal row outcome. `stream` is "rea" | "content";
 /// `outcome` is one of the labels documented on [`PROJECTION_HEAL_OUTCOMES`].
 pub fn inc_projection_heal_outcome(stream: &str, outcome: &str) {
@@ -572,6 +628,19 @@ pub fn inc_shard_redistribute_bytes_missing() {
 /// Publish the last peer_status fan-in sweep's `missed` count.
 pub fn set_peer_status_fanout_missed(missed: u64) {
     PEER_STATUS_FANOUT_MISSED.set(missed as i64);
+}
+
+/// Record `n` identity-fill outcomes of `action` (one of the labels documented
+/// on [`IDENTITY_FILL_TOTAL`]). A zero `n` is a no-op (the label still exists).
+pub fn inc_identity_fill(action: &str, n: u64) {
+    if n > 0 {
+        IDENTITY_FILL_TOTAL.with_label_values(&[action]).inc_by(n);
+    }
+}
+
+/// Publish the last identity-fill sweep's rows-written (created + filled) count.
+pub fn set_identity_fill_last_writes(writes: u64) {
+    IDENTITY_FILL_LAST_WRITES.set(writes as i64);
 }
 
 #[cfg(test)]

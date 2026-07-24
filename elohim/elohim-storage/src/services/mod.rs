@@ -66,6 +66,7 @@ pub mod household_backfill;
 pub mod household_resilience;
 pub mod hub_capacity_service;
 pub mod hub_resolver; // Wave 2 T2 — agent→hub resolver (CID-canonical, slug-alias, seed-compatible)
+pub mod identity_fill; // Periodic NULL agent_pub_key fill + create-missing from DHT membership truth (fills-never-moves)
 pub mod imagodei_lookup; // Phase 4 T5 — display name resolver
 pub mod inference_engine;
 pub mod inference_router;
