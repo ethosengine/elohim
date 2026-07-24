@@ -1,8 +1,26 @@
+---
+title: "Elohim Protocol Hardware Ecosystem: Technical Specification"
+id: hardware-spec
+status: Vision envelope
+cites:
+  - hardware-providence-commons | the companion acceptance epic that turns this hardware vision into observable cybernetic, circularity, energy, and anti-enclosure proof obligations | sha256:0079c3507a8e64e0 | path: genesis/docs/content/elohim-protocol/hardware-providence-commons.md
+---
+
 # Elohim Protocol Hardware Ecosystem: Technical Specification
 
 ## Overview
 
 The Elohim Protocol requires a distributed computing architecture that enables families and communities to own their digital infrastructure while participating in a global network. This document consolidates all hardware requirements across the protocol's various applications.
+
+> **Companion proof epic:** [Hardware Providence — The Rack as Proof of the
+> Unenclosable Commons](./hardware-providence-commons.md) asks what the hardware
+> described here must observably do before the protocol may claim household-scale
+> cybernetic autonomy: care for the rack, close its material and energy loops, and
+> return value to a commons without recreating platform rent.
+
+_New to the vocabulary? The [glossary](epr:glossary) defines the load-bearing
+terms this document leans on — Holochain (conductor, source chain, DNA), REA
+(Resource–Event–Agent) accounting, reach, and standing._
 
 ## Progressive Participation: The Onboarding Journey
 
@@ -17,7 +35,7 @@ The Elohim Protocol meets users where they are, providing a gradual path from cu
 | **3. App User** | Tier 1 (Consumer Device) | Community-grounded autonomy (local keys) | Intermittent peer |
 | **4. Node Operator** | Tier 1 (lightweight) or Tier 3 (full) | Community-grounded autonomy (always-on) | Infrastructure provider |
 
-*Note: Stage 4 hardware requirements depend on the hApp. Lightweight apps (messaging, identity) can run on mobile. Heavy workloads (media storage, AI inference, community hub) need Tier 3.*
+*Note: Stage 4 hardware requirements depend on the hApp (Holochain application). Lightweight apps (messaging, identity) can run on mobile. Heavy workloads (media storage, AI inference, community hub) need Tier 3.*
 
 ### Stage 1: Visitor
 Users access public content through any web browser. No account, no commitment. "Commons" content is served by DNS-exposed nodes operated by Stage 4 participants. This is the entry point for discovery.
@@ -42,7 +60,7 @@ Users install the Elohim desktop app on their laptop or PC (Tier 1 hardware). Ke
 - Host public content reliably
 
 ### Stage 4: Node Operator
-Users deploy always-on infrastructure—ideally the Elohim Family Node (Tier 3). This enables full network participation: DHT hosting, bootstrap services, public content via DNS, and backup services for their trust network (family, church, neighborhood).
+Users deploy always-on infrastructure—ideally the Elohim Family Node (Tier 3). This enables full network participation: DHT hosting, bootstrap services, public content via DNS, and backup services for their trust network (family, church, neighborhood). (This human "Node Operator" is distinct from the software *elohim-operator* in the [companion proof epic](epr:hardware-providence-commons), which is an AI agent that tends the rack on the household's behalf.)
 
 **The Relational Backup Model**: Stage 4 operators don't just serve themselves. They provide redundancy for their relational network:
 - Backup data for family members (even those at Stage 2 or 3)
@@ -222,11 +240,12 @@ The node serves as family's personal cloud:
 - **Communication**: Family messaging, video calls, coordination
 - **Development Environment**: For technically inclined family members
 
-### Blockchain and Distributed Ledger
-- **Constitutional Layer**: Immutable Elohim protocol rules
-- **REA Accounting**: Resource-Event-Agent transaction recording
-- **Token Management**: Care, time, learning, steward token balances
-- **Identity Management**: Cryptographic family member identities
+### Distributed Substrate and Accounting
+The node runs on Holochain — an agent-centric peer-to-peer framework, **not** a blockchain: each participant keeps their own tamper-evident source chain, validated against a shared DHT, with no global chain or mining.
+- **Constitutional Layer**: the durable, community-governed protocol rules (graduated immutability, not a blockchain's flat immutability)
+- **REA Accounting**: Resource–Event–Agent recording of real contributions of care and labor as economic events
+- **Recognition and Reach**: care, time, and learning are recorded as REA recognition and earned reach/standing — relational, non-monetary, and not automatically convertible to money
+- **Identity Management**: content-addressed, cryptographic family-member identities
 
 ## Application Suite Overview
 
@@ -250,7 +269,7 @@ The Elohim Family Node hosts a complete suite of applications that replace cloud
 
 ### Learning and Development
 - **Learning Maps**: Structured educational pathways (like Khan Academy but generalized)
-- **Skill Verification**: Token-verified competencies for work access
+- **Skill Verification**: Attestation-verified competencies for work access
 - **Classical Education**: Traditional learning frameworks
 - **Relationship Maps**: Couple and family development paths
 - **Technical Skills**: Programming, trades, professional development
@@ -265,7 +284,7 @@ The Elohim Family Node hosts a complete suite of applications that replace cloud
 - **Calendar**: Family and community scheduling
 - **News Aggregation**: Elohim story feeds (family, community, municipal, state, global)
 - **Market and Exchange**: Shopping, sharing, mutual aid coordination
-- **Resource Management**: Token balances, savings, allocation
+- **Resource Management**: Recognition balances, savings, and resource allocation
 - **Geographic Mapping**: Local resources and community assets
 - **Elohim Agent Interface**: Direct interaction with family AI
 
