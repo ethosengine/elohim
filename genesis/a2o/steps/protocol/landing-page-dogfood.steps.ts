@@ -15,6 +15,7 @@ interface DogfoodWorld {
   doorwayResponse?: Response;
   commitments?: Record<string, unknown>[];
   scopedCommitment?: Record<string, unknown>;
+  doorways?: Map<string, { url: string }>;
 }
 
 // Background `Given doorway "alpha" at "E2E_DOORWAY_ALPHA"` (mode-aware.steps.ts) registers
@@ -68,7 +69,15 @@ Then('the blobHash is a sha256 hex string', function (this: DogfoodWorld) {
 });
 
 When('I GET {string} from the doorway', async function (this: DogfoodWorld, path: string) {
-  this.doorwayResponse = await fetch(`${DOORWAY_URL}${path}`);
+  // Most protocol scenarios use alpha. Federation failover scenarios can
+  // register a more specific doorway (currently "apex") in the same World;
+  // honor that registration instead of silently continuing to probe alpha.
+  // Unset env names are registered literally by the generic Background step,
+  // so accept only real HTTP(S) URLs before falling back to the legacy default.
+  const registeredUrl = this.doorways?.get('apex')?.url ?? this.doorways?.get('alpha')?.url;
+  const targetUrl =
+    registeredUrl && /^https?:\/\//.test(registeredUrl) ? registeredUrl : DOORWAY_URL;
+  this.doorwayResponse = await fetch(`${targetUrl}${path}`);
 });
 
 Then('the doorway response status is {int}', function (this: DogfoodWorld, expected: number) {

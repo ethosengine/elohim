@@ -1,4 +1,4 @@
-@e2e @federation @resilience @wip
+@e2e @federation @resilience
 Feature: Peer-loss failover — reads keep serving while a household peer is down
   As a household member reading content during a device outage
   I want reads to be served by the surviving household peers, and the
@@ -16,7 +16,6 @@ Feature: Peer-loss failover — reads keep serving while a household peer is dow
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
-  @wip
   Scenario: Reads still serve while one household peer is down
     Given the manifesto blob is replicated under custody across the household mesh
     And every household peer meets its connected-peers floor
@@ -24,20 +23,17 @@ Feature: Peer-loss failover — reads keep serving while a household peer is dow
     Then fetching the manifesto blob through the doorway still returns the content
     And the serving peer is a surviving household peer
 
-  @wip
   Scenario: A returning peer re-syncs without operator help
     Given Jessica's storage peer was down while the mesh kept serving
     When Jessica's storage peer comes back
     Then within the re-sync window Jessica's peer meets its connected-peers floor again
     And Jessica's peer inventory parity matches the mesh again
 
-  @wip
   Scenario: Household adjacency is bidirectional
     Given the household peers matthew, jessica, and james are up
     When each peer's live peer set is inspected
     Then every household peer lists every other household peer as connected
 
-  @wip
   Scenario: A single device still functions without the mesh
     Given Jessica's storage peer holds content it stewards locally
     When every other household peer is unreachable

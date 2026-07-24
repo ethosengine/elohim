@@ -1,4 +1,4 @@
-@e2e @federation @resilience @wip
+@e2e @federation @resilience
 Feature: Doorway multi-address failover — the browser keeps working when the primary doorway address goes dark
   As a household member using the elohim app from a browser
   I want my session to keep serving content through a configured fallback
@@ -24,7 +24,6 @@ Feature: Doorway multi-address failover — the browser keeps working when the p
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
     And doorway "alpha" is configured with a fallback doorway address "E2E_DOORWAY_ALPHA_FALLBACK"
 
-  @wip
   Scenario: Reads keep serving through the fallback address when the primary goes dark
     Given the person is viewing a lamad content page served by the primary doorway address
     When the primary doorway address stops answering
@@ -33,7 +32,6 @@ Feature: Doorway multi-address failover — the browser keeps working when the p
     And the person's session and content view are not lost
     And subsequent requests from the client stay sticky to the fallback address
 
-  @wip
   Scenario: A write during the outage fails honestly, then later traffic moves to the fallback
     Given the primary doorway address stops answering
     When the person submits a write while the client is still pointed at the primary address
@@ -41,7 +39,6 @@ Feature: Doorway multi-address failover — the browser keeps working when the p
     When the person's next read succeeds through the fallback doorway address
     Then subsequent writes are attempted against the fallback doorway address
 
-  @wip
   Scenario: With no fallback configured, an outage degrades exactly as today
     Given doorway "alpha" has no fallback doorway address configured
     When the primary doorway address stops answering
