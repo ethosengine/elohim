@@ -3,6 +3,7 @@ id: glossary
 cites:
   - elohim-protocol-manifesto | manifesto | sha256:5972ed90f0f8e0cc | path: genesis/docs/content/elohim-protocol/manifesto.md
   - constitution | constitution | sha256:1eb96af782012fc6 | path: genesis/docs/content/elohim-protocol/constitution.md
+  - values-forward | the stances that canonize the common inheritance, self-sealing, and the floor/ceiling | path: genesis/docs/content/elohim-protocol/values-forward.md
 ---
 # Glossary — Reading the Elohim Protocol
 
@@ -41,4 +42,7 @@ cites:
 - **the Constitution** (constitution-as-system-prompt) — the durable, human-readable values layer that any capable, reasonably-aligned AI can faithfully execute. It supplies *values*; the AI supplies *capability*. It is transparent, community-governed, and amendable.
 - **Qahal** — Hebrew for the assembled congregation or community: here, the participants gathered as a governing body.
 - **Mishpat** — Hebrew for justice understood as *restored capability*, not punishment: the boundary and the negotiated consequence, aimed at repair rather than exile.
+- **the common inheritance** — the value no individual made: nature and land, natural monopolies, network effects, knowledge built on prior knowledge, the issuance of money, coordination at scale, and the new value co-created with an AI drawn from all of us. What Henry George called *land*, widened to its modern kin. The produce of your *labor* is yours; the common inheritance is owed to everyone and returns, on a negotiated schedule, to raise the floor — and to inherit it is also to owe its stewardship onward.
+- **Jubilee / naḥalah** — from Leviticus 25: a *naḥalah* is a family's inalienable portion of land, which cannot be sold in perpetuity ("the land is mine; you are but sojourners with me"); the *Jubilee* is the fiftieth year that returns each portion and releases debts. The corpus's charter for the common inheritance — held in trust, owned by no one, returned to raise the floor for the neighbor.
+- **self-sealing** — the protocol's promise kept by *delivery*, not declaration: the floor (what every person is owed) and the ceiling (the limits on power and accumulation) must arrive in-kind — real, distributed, interpretable capability — or the promise is unmet. Where it falls short, the substrate uses its witnessed observations to keep evolving toward a broader, more inclusive account of human thriving, within ecological and interpersonal limits.
 - **kenosis** — Greek for "self-emptying" (from the hymn in Philippians 2:6–7): Christ not grasping at power but laying it down. The corpus uses it for the founder's designed surrender of control.
