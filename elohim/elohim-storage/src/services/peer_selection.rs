@@ -87,11 +87,33 @@ pub enum SelectionOutcome {
 
 pub struct PeerSelection {
     pool: DbPool,
+    /// Liveness staleness window (seconds). A PeerStatus row whose `timestamp` is
+    /// older than `now - staleness_secs` is treated as NOT accepting — a fanned-in
+    /// snapshot from a peer that has since gone dark must not count as live
+    /// forever. `0` disables the window (legacy behaviour): every row counts
+    /// regardless of age.
+    ///
+    /// Defaults to `0` in [`new`](Self::new) so existing callers and tests keep
+    /// legacy semantics; the production wiring (`p2p/mod.rs`) reads
+    /// `PEER_STATUS_STALENESS_SECS` (default 900) and injects it via
+    /// [`with_staleness_secs`](Self::with_staleness_secs). Self rows heartbeat
+    /// every 60s, so a 900s window never dims a live pod.
+    staleness_secs: i64,
 }
 
 impl PeerSelection {
     pub fn new(pool: DbPool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            staleness_secs: 0,
+        }
+    }
+
+    /// Set the liveness staleness window (seconds); `0` disables it. Injected by
+    /// the production wiring from `PEER_STATUS_STALENESS_SECS`.
+    pub fn with_staleness_secs(mut self, staleness_secs: i64) -> Self {
+        self.staleness_secs = staleness_secs;
+        self
     }
 
     /// Select up to `input.desired_count` peers for shard placement.
@@ -159,7 +181,20 @@ impl PeerSelection {
         // "Accepting" = status IN ('online','degraded') AND general_pool_member=1,
         // which is the definition used by heartbeat.rs and network_posture.rs.
         // peer_statuses has NO h_app_id column, so we don't filter on it here.
+        //
+        // Staleness (honesty guard): a fanned-in snapshot from a peer that has
+        // since gone dark must not count as live forever. When a window is
+        // configured, additionally require `timestamp >= now - window`. The row
+        // timestamp is microseconds (see diesel_schema); `i64::MIN` as the cutoff
+        // makes the filter a no-op when the window is disabled (legacy).
         // ----------------------------------------------------------------
+        let cutoff_micros: i64 = if self.staleness_secs > 0 {
+            chrono::Utc::now()
+                .timestamp_micros()
+                .saturating_sub(self.staleness_secs.saturating_mul(1_000_000))
+        } else {
+            i64::MIN
+        };
         let accepting: Vec<String> = peer_statuses::table
             .filter(
                 peer_statuses::status
@@ -168,6 +203,7 @@ impl PeerSelection {
             )
             .filter(peer_statuses::general_pool_member.eq(1))
             .filter(peer_statuses::peer_id.eq_any(&committed_agents))
+            .filter(peer_statuses::timestamp.ge(cutoff_micros))
             .select(peer_statuses::peer_id)
             .load::<String>(&mut conn)
             .map_err(|e| StorageError::Internal(e.to_string()))?;
@@ -369,5 +405,134 @@ impl PeerSelection {
                 requested,
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::run_migrations;
+    use diesel::r2d2::{ConnectionManager, Pool};
+    use diesel::SqliteConnection;
+
+    fn test_pool() -> DbPool {
+        let url = format!(
+            "file:peer_selection_staleness_test_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::<SqliteConnection>::new(&url))
+            .expect("pool");
+        run_migrations(&pool).expect("migrations");
+        pool
+    }
+
+    /// Seed one accepting peer: an imagodei human, a `content:commons` provide
+    /// commitment (lamad), and an online peer_status at the given timestamp.
+    fn seed_peer(pool: &DbPool, agent: &str, ts_micros: i64) {
+        let mut conn = pool.get().unwrap();
+        crate::db::humans::create_human(
+            &mut conn,
+            crate::db::humans::CreateHumanInput {
+                id: format!("human-{agent}"),
+                agent_pub_key: Some(agent.to_string()),
+                display_name: agent.to_string(),
+                bio: None,
+                affinities: "[]".to_string(),
+                profile_reach: "commons".to_string(),
+                location: None,
+                profile_photo_url: None,
+                h_app_id: crate::db::HUMANS_HAPP_ID.to_string(),
+                household_id: None,
+            },
+        )
+        .expect("seed human");
+
+        diesel::insert_into(rea_commitments::table)
+            .values((
+                rea_commitments::id.eq(format!("cmt-{agent}-commons")),
+                rea_commitments::h_app_id.eq("lamad"),
+                rea_commitments::action.eq("provide"),
+                rea_commitments::provider.eq(agent),
+                rea_commitments::receiver.eq(""),
+                rea_commitments::resource_classified_as.eq(Some("content:commons")),
+                rea_commitments::state.eq("active"),
+                rea_commitments::finished.eq(0),
+                rea_commitments::created_at.eq("2026-04-19T00:00:00Z"),
+            ))
+            .execute(&mut conn)
+            .expect("seed rea_commitment");
+
+        diesel::insert_into(peer_statuses::table)
+            .values((
+                peer_statuses::peer_id.eq(agent),
+                peer_statuses::status.eq("online"),
+                peer_statuses::general_pool_member.eq(1),
+                peer_statuses::accepting_stewardship_reserves.eq(1),
+                peer_statuses::timestamp.eq(ts_micros),
+                peer_statuses::dht_anchor_hash.eq("anchor-placeholder"),
+                peer_statuses::updated_at.eq(ts_micros),
+            ))
+            .execute(&mut conn)
+            .expect("seed peer_status");
+    }
+
+    fn commons_input() -> SelectionInput<'static> {
+        SelectionInput {
+            h_app_id: "lamad",
+            content_id: "content-x",
+            content_reach: "commons",
+            desired_count: 2,
+        }
+    }
+
+    fn picked_ids(outcome: &SelectionOutcome) -> Vec<String> {
+        let peers = match outcome {
+            SelectionOutcome::Ok(p) => p,
+            SelectionOutcome::Short { peers, .. } => peers,
+        };
+        let mut ids: Vec<String> = peers.iter().map(|p| p.peer_id.clone()).collect();
+        ids.sort();
+        ids
+    }
+
+    /// A 900s window counts a peer whose heartbeat landed 60s ago and EXCLUDES one
+    /// whose last snapshot is 901s old — the honesty guard against a fanned-in
+    /// "online" from a peer that has since gone dark. Self rows heartbeat every
+    /// 60s, so a 900s window never dims a live pod (the fresh row here stands in
+    /// for that live cadence).
+    #[test]
+    fn staleness_window_excludes_a_stale_peer_but_keeps_a_fresh_one() {
+        let pool = test_pool();
+        let now = chrono::Utc::now().timestamp_micros();
+        seed_peer(&pool, "uhCAkFRESH", now - 60 * 1_000_000); // 60s old — live
+        seed_peer(&pool, "uhCAkSTALE", now - 901 * 1_000_000); // 901s old — dark
+
+        let sel = PeerSelection::new(pool).with_staleness_secs(900);
+        let outcome = sel.select(&commons_input()).unwrap();
+        assert_eq!(
+            picked_ids(&outcome),
+            vec!["uhCAkFRESH".to_string()],
+            "only the fresh peer is accepting under a 900s window"
+        );
+    }
+
+    /// Window `0` (the `new()` default) keeps legacy behaviour: age is ignored, so
+    /// both peers — including the 901s-old one — are selected.
+    #[test]
+    fn staleness_window_zero_keeps_legacy_age_agnostic_behaviour() {
+        let pool = test_pool();
+        let now = chrono::Utc::now().timestamp_micros();
+        seed_peer(&pool, "uhCAkFRESH", now - 60 * 1_000_000);
+        seed_peer(&pool, "uhCAkSTALE", now - 901 * 1_000_000);
+
+        let sel = PeerSelection::new(pool); // window 0
+        let outcome = sel.select(&commons_input()).unwrap();
+        assert_eq!(
+            picked_ids(&outcome),
+            vec!["uhCAkFRESH".to_string(), "uhCAkSTALE".to_string()],
+            "both peers count when the window is disabled"
+        );
     }
 }

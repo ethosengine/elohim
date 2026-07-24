@@ -72,6 +72,13 @@ pub async fn spawn_p2p_with_peers(pool: DbPool, peers: &[(&str, &str, &str)]) ->
 
     let mut conn = pool.get().expect("test pool connection");
 
+    // Live peers carry a FRESH heartbeat timestamp. The production selection path
+    // (`distribute_shards`) applies a liveness staleness window
+    // (`PEER_STATUS_STALENESS_SECS`, default 900s), so an "accepting" fixture must
+    // look recently-heartbeated or it would be (correctly) treated as dark. `now`
+    // is stamped once so every seeded row shares one instant.
+    let now_micros = chrono::Utc::now().timestamp_micros();
+
     for (agent_key, household_id, lifecycle) in peers {
         // Insert human row
         let human_id = format!("human-{agent_key}");
@@ -103,9 +110,9 @@ pub async fn spawn_p2p_with_peers(pool: DbPool, peers: &[(&str, &str, &str)]) ->
                 peer_statuses::status.eq(status),
                 peer_statuses::general_pool_member.eq(pool_member),
                 peer_statuses::accepting_stewardship_reserves.eq(reserves),
-                peer_statuses::timestamp.eq(1_700_000_000_000_000i64),
+                peer_statuses::timestamp.eq(now_micros),
                 peer_statuses::dht_anchor_hash.eq("anchor-placeholder"),
-                peer_statuses::updated_at.eq(1_700_000_000_000_000i64),
+                peer_statuses::updated_at.eq(now_micros),
             ))
             .execute(&mut conn)
             .expect("insert peer_status");

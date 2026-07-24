@@ -1201,6 +1201,57 @@ async fn async_main(
                         );
                         }
 
+                        // ── Cross-agent PeerStatus fan-in ────────────────────────
+                        //
+                        // `peer_statuses` is otherwise STRUCTURALLY self-only: its
+                        // sole writer is the InfrastructureSignal projection above,
+                        // which fires only for THIS conductor's own
+                        // `record_peer_status`. That capped `peer_selection` at
+                        // nominating self, and the resilience card's
+                        // `stewardingCollectives` at 1. This periodic task fans in
+                        // OTHER agents' latest DHT PeerStatus snapshots (via the
+                        // infrastructure zome `get_latest_peer_status_for_agent`),
+                        // writing them monotone-by-timestamp so peer selection /
+                        // resilience see the whole pool. Self is excluded (its rows
+                        // arrive fresher via the signal projection). Consumers apply
+                        // the staleness honesty window; the fan-in just records.
+                        if let Some(fanout_pool) = db_pool.clone() {
+                            let fanout_secs = std::env::var("PEER_STATUS_FANOUT_SECS")
+                                .ok()
+                                .and_then(|v| v.parse::<u64>().ok())
+                                .unwrap_or(
+                                    elohim_storage::services::peer_status_fanout::DEFAULT_FANOUT_SECS,
+                                );
+                            if fanout_secs == 0 {
+                                info!("peer_status fan-in disabled (PEER_STATUS_FANOUT_SECS=0)");
+                            } else {
+                                let self_cid = hc.agent_key_uhcak();
+                                let fetcher = std::sync::Arc::new(
+                                    elohim_storage::services::peer_status_fanout::ConductorPeerStatusFetcher::new(
+                                        hc.clone(),
+                                    ),
+                                );
+                                let fanout_shutdown = shutdown_tx.subscribe();
+                                tokio::spawn(async move {
+                                    elohim_storage::services::peer_status_fanout::run_fanout_loop(
+                                        fanout_pool,
+                                        fetcher,
+                                        self_cid,
+                                        fanout_secs,
+                                        elohim_storage::services::peer_status_fanout::DEFAULT_SETTLE_SECS,
+                                        fanout_shutdown,
+                                    )
+                                    .await;
+                                });
+                                info!(
+                                    fanout_secs,
+                                    "peer_status fan-in task started (cross-agent PeerStatus projection)"
+                                );
+                            }
+                        } else {
+                            warn!("peer_status fan-in disabled: shared DB pool unavailable");
+                        }
+
                         // 2026-05-26-substrate-rea-replication-fix Task 6.5 — subscribe to
                         // ReaProjectionSignals (REA commitments, agreements, economic events)
                         // and project them into the local SQL via rea_projection::handle_rea_signal.

@@ -48,6 +48,44 @@ pub fn upsert(conn: &mut SqliteConnection, row: &PeerStatusRow) -> QueryResult<u
         .execute(conn)
 }
 
+/// Fan-in variant of [`upsert`]: write `row` ONLY when it is strictly newer than
+/// the existing row for the same `peer_id` (compared on `timestamp`, microseconds).
+///
+/// WHY THIS EXISTS (cross-agent fan-in, 2026-07): the plain [`upsert`] above is
+/// last-writer-wins and is driven EXCLUSIVELY by the post-commit signal
+/// projection (`signals::handle_signal`), which only ever writes THIS conductor's
+/// own `record_peer_status`. That makes `peer_statuses` structurally self-only.
+/// The cross-agent fan-in (`services::peer_status_fanout`) breaks that ceiling by
+/// reading OTHER agents' latest snapshots off the infrastructure DHT — but a DHT
+/// read can lag. If the fan-in used the plain `upsert`, a stale DHT read could
+/// clobber a fresher row (the signal-projected self row, or a more-recent
+/// fan-in). This guard makes the fan-in monotonic on `timestamp` so it can only
+/// ever move a peer's status FORWARD in time, never regress it. The signal
+/// projection path keeps using plain `upsert` (unchanged).
+///
+/// Returns `true` when a write landed, `false` when the stored row was already at
+/// least as fresh (a benign skip). Race-tolerant: the read-and-decide runs inside
+/// a single transaction on one pooled connection, so a concurrent writer cannot
+/// interleave between the freshness check and the write.
+pub fn upsert_if_newer(conn: &mut SqliteConnection, row: &PeerStatusRow) -> QueryResult<bool> {
+    conn.transaction(|conn| {
+        let existing_ts: Option<i64> = peer_statuses::table
+            .find(&row.peer_id)
+            .select(peer_statuses::timestamp)
+            .first::<i64>(conn)
+            .optional()?;
+        match existing_ts {
+            // Existing row is as-fresh-or-fresher — never regress it.
+            Some(ts) if ts >= row.timestamp => Ok(false),
+            // No row yet, or the incoming snapshot is strictly newer — write it.
+            _ => {
+                upsert(conn, row)?;
+                Ok(true)
+            }
+        }
+    })
+}
+
 /// Look up the current projected status for a single peer, if any.
 pub fn get_by_peer(conn: &mut SqliteConnection, peer: &str) -> QueryResult<Option<PeerStatusRow>> {
     peer_statuses::table
@@ -170,6 +208,102 @@ mod tests {
     fn get_by_peer_returns_none_for_unknown() {
         let mut conn = setup_test_db();
         assert!(get_by_peer(&mut conn, "missing").unwrap().is_none());
+    }
+
+    #[test]
+    fn upsert_if_newer_inserts_new_row() {
+        let mut conn = setup_test_db();
+        let row = PeerStatusRow {
+            peer_id: "uhCAkNEW".into(),
+            status: "online".into(),
+            general_pool_member: 1,
+            accepting_stewardship_reserves: 1,
+            archetype_class: None,
+            timestamp: 1_700_000_000_000_000,
+            dht_anchor_hash: String::new(),
+            updated_at: 1_700_000_000_000_000,
+        };
+        let wrote = upsert_if_newer(&mut conn, &row).unwrap();
+        assert!(wrote, "a peer with no prior row is written");
+        assert_eq!(
+            get_by_peer(&mut conn, "uhCAkNEW").unwrap().unwrap().status,
+            "online"
+        );
+    }
+
+    #[test]
+    fn upsert_if_newer_updates_on_strictly_newer() {
+        let mut conn = setup_test_db();
+        let base = PeerStatusRow {
+            peer_id: "uhCAkP".into(),
+            status: "online".into(),
+            general_pool_member: 1,
+            accepting_stewardship_reserves: 1,
+            archetype_class: None,
+            timestamp: 1_700_000_000_000_000,
+            dht_anchor_hash: String::new(),
+            updated_at: 1_700_000_000_000_000,
+        };
+        upsert(&mut conn, &base).unwrap();
+
+        let newer = PeerStatusRow {
+            status: "degraded".into(),
+            timestamp: 1_700_000_000_000_050,
+            ..base.clone()
+        };
+        let wrote = upsert_if_newer(&mut conn, &newer).unwrap();
+        assert!(wrote, "a strictly newer snapshot is written");
+        let row = get_by_peer(&mut conn, "uhCAkP").unwrap().unwrap();
+        assert_eq!(row.status, "degraded");
+        assert_eq!(row.timestamp, 1_700_000_000_000_050);
+    }
+
+    #[test]
+    fn upsert_if_newer_skips_older_or_equal() {
+        let mut conn = setup_test_db();
+        let base = PeerStatusRow {
+            peer_id: "uhCAkP".into(),
+            status: "online".into(),
+            general_pool_member: 1,
+            accepting_stewardship_reserves: 1,
+            archetype_class: None,
+            timestamp: 1_700_000_000_000_000,
+            dht_anchor_hash: String::new(),
+            updated_at: 1_700_000_000_000_000,
+        };
+        upsert(&mut conn, &base).unwrap();
+
+        // Strictly-older stale DHT read must NOT clobber the fresher stored row.
+        let older = PeerStatusRow {
+            status: "leaving".into(),
+            timestamp: 1_699_999_999_999_000,
+            ..base.clone()
+        };
+        assert!(
+            !upsert_if_newer(&mut conn, &older).unwrap(),
+            "an older snapshot is skipped"
+        );
+        assert_eq!(
+            get_by_peer(&mut conn, "uhCAkP").unwrap().unwrap().status,
+            "online",
+            "the fresher stored status is preserved"
+        );
+
+        // Equal timestamp is also a skip (monotone-strict: never regress, never
+        // churn on a re-read of the same snapshot).
+        let equal = PeerStatusRow {
+            status: "maintenance".into(),
+            timestamp: 1_700_000_000_000_000,
+            ..base.clone()
+        };
+        assert!(
+            !upsert_if_newer(&mut conn, &equal).unwrap(),
+            "an equal-timestamp snapshot is skipped"
+        );
+        assert_eq!(
+            get_by_peer(&mut conn, "uhCAkP").unwrap().unwrap().status,
+            "online"
+        );
     }
 
     #[test]

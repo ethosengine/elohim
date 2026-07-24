@@ -1614,8 +1614,17 @@ impl P2PHandle {
 
         let total_shards = shards.len();
 
-        // Run the contract-aware diverse selector.
-        let sel = crate::services::peer_selection::PeerSelection::new(pool.clone());
+        // Run the contract-aware diverse selector. The liveness staleness window
+        // (honesty guard: a fanned-in "online" from a peer that has since gone dark
+        // must not count as accepting forever) is read here at the wiring point,
+        // default 900s; `0` disables it. Self rows heartbeat every 60s, so a 900s
+        // window never dims a live pod.
+        let staleness_secs = std::env::var("PEER_STATUS_STALENESS_SECS")
+            .ok()
+            .and_then(|v| v.parse::<i64>().ok())
+            .unwrap_or(900);
+        let sel = crate::services::peer_selection::PeerSelection::new(pool.clone())
+            .with_staleness_secs(staleness_secs);
         let outcome = sel
             .select(&crate::services::peer_selection::SelectionInput {
                 h_app_id,

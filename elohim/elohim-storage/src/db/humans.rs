@@ -271,6 +271,27 @@ pub fn list_humans(
         .load::<Human>(conn)
 }
 
+/// List every `agent_pub_key` value under a scope — including NULLs and
+/// duplicates (raw column values, no filtering).
+///
+/// Thin loader for the cross-agent PeerStatus fan-in
+/// (`services::peer_status_fanout`): the fan-in's roster is the distinct
+/// non-NULL keys under [`crate::db::HUMANS_HAPP_ID`], minus this pod's own
+/// `agent_cid`. The NULL-skip / dedup / self-exclude logic lives in the pure,
+/// unit-tested roster builder in that service — so this stays a bare `SELECT`
+/// with no policy baked in.
+pub fn list_agent_pub_keys(
+    conn: &mut SqliteConnection,
+    h_app_id: &str,
+) -> Result<Vec<Option<String>>, StorageError> {
+    use crate::db::diesel_schema::humans::dsl;
+    dsl::humans
+        .filter(dsl::h_app_id.eq(h_app_id))
+        .select(dsl::agent_pub_key)
+        .load::<Option<String>>(conn)
+        .map_err(|e| StorageError::Internal(format!("Failed to list agent_pub_keys: {}", e)))
+}
+
 /// Update mutable profile fields for an existing human.
 ///
 /// Only fields present in `input` (i.e., `Some(...)`) are written.

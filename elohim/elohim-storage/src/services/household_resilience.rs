@@ -33,7 +33,9 @@ pub fn compute(
         .get()
         .map_err(|e| StorageError::Internal(format!("pool: {e}")))?;
     let (_measured, relation) = load_manifest_and_relation(&mut conn, &ctx.h_app_id, content_id)?;
-    compute_base(&mut conn, content_id, viewer_household_id, &relation)
+    // Legacy entry point — age-agnostic (window 0). The staleness honesty guard is
+    // applied at the production HTTP entry via `snapshot_with_staleness_secs`.
+    compute_base(&mut conn, content_id, viewer_household_id, &relation, 0)
 }
 
 /// Materialize the holder-relation for a content ONCE — the impure step that both
@@ -78,6 +80,7 @@ fn compute_base(
     content_id: &str,
     viewer_household_id: Option<&str>,
     relation: &[HolderRow],
+    staleness_secs: i64,
 ) -> Result<HouseholdResilienceView, StorageError> {
     // Fold distinct non-null households stewarding this content.
     let steward_households: HashSet<String> = resiliency::stewarding_hubs(relation);
@@ -88,7 +91,14 @@ fn compute_base(
     let households_reciprocated: i32 = 0;
 
     // Online peer count across the stewarding households (a separate projection).
-    let online_peer_count = count_online_peers_in_households(conn, &steward_households)?;
+    // The staleness window (0 = disabled) is injected by the caller; `now` is read
+    // once here (per request, not per row).
+    let online_peer_count = count_online_peers_in_households(
+        conn,
+        &steward_households,
+        staleness_secs,
+        chrono::Utc::now().timestamp_micros(),
+    )?;
 
     // Status classification (a2o spec): protected ← ≥3 households AND ≥2 online;
     // partial ← ≥2 households OR ≥1 online; at-risk otherwise.
@@ -125,11 +135,30 @@ fn compute_base(
 /// Enriched collective-general resilience snapshot. Builds on `compute()` and
 /// adds commitment-backed count, diversity score, regional distribution, and
 /// placement gaps. Handler for `/api/v1/resilience/{id}/household`.
+///
+/// Legacy (age-agnostic) entry point — delegates with a disabled staleness window
+/// so existing callers and tests keep their semantics. The production HTTP handler
+/// uses [`snapshot_with_staleness_secs`] to apply the liveness honesty guard.
 pub fn snapshot(
     pool: &DbPool,
     ctx: &AppContext,
     content_id: &str,
     viewer_household_id: Option<&str>,
+) -> Result<ResilienceSnapshotView, StorageError> {
+    snapshot_with_staleness_secs(pool, ctx, content_id, viewer_household_id, 0)
+}
+
+/// As [`snapshot`], but applies a liveness staleness window (seconds; `0` = the
+/// legacy age-agnostic behaviour) to the online-peer count. A fanned-in "online"
+/// from a peer whose last DHT snapshot is older than the window does not count
+/// toward the protection verdict. The production wiring (`api::resilience`) reads
+/// `PEER_STATUS_STALENESS_SECS` (default 900) and injects it here.
+pub fn snapshot_with_staleness_secs(
+    pool: &DbPool,
+    ctx: &AppContext,
+    content_id: &str,
+    viewer_household_id: Option<&str>,
+    staleness_secs: i64,
 ) -> Result<ResilienceSnapshotView, StorageError> {
     let mut conn = pool
         .get()
@@ -141,7 +170,13 @@ pub fn snapshot(
     // the stewarding count and the intra fold (they read on separate `pool.get()`s).
     let (measured, relation) = load_manifest_and_relation(&mut conn, &ctx.h_app_id, content_id)?;
 
-    let base = compute_base(&mut conn, content_id, viewer_household_id, &relation)?;
+    let base = compute_base(
+        &mut conn,
+        content_id,
+        viewer_household_id,
+        &relation,
+        staleness_secs,
+    )?;
 
     // Distribution-state honesty (2026-06-12 unmeasured≠zero): no manifest means
     // the content never entered the distribution plane — a non-measurement, not a
@@ -434,22 +469,145 @@ pub(crate) fn load_holder_relation(
     Ok(out)
 }
 
+/// Count online/degraded peers across the stewarding households, applying an
+/// optional liveness staleness window.
+///
+/// `staleness_secs > 0` excludes any PeerStatus row older than
+/// `now_micros - staleness_secs*1e6` (the `timestamp` column is microseconds) —
+/// the honesty guard so a fanned-in "online" from a peer that has since gone dark
+/// does not count toward the protection verdict forever. `staleness_secs == 0`
+/// disables the window (legacy: age-agnostic). `now_micros` is threaded in (not
+/// read from the clock here) so the predicate is deterministically unit-testable.
 fn count_online_peers_in_households(
     conn: &mut diesel::SqliteConnection,
     households: &HashSet<String>,
+    staleness_secs: i64,
+    now_micros: i64,
 ) -> Result<i32, StorageError> {
     if households.is_empty() {
         return Ok(0);
     }
+    // `i64::MIN` cutoff makes the age test a no-op when the window is disabled.
+    let cutoff_micros: i64 = if staleness_secs > 0 {
+        now_micros.saturating_sub(staleness_secs.saturating_mul(1_000_000))
+    } else {
+        i64::MIN
+    };
     let mut count = 0;
     for h in households.iter() {
         let rows = peer_statuses::list_by_household(conn, h)
             .map_err(|e| StorageError::Internal(format!("list_by_household: {e}")))?;
         for row in rows {
-            if matches!(row.status.as_str(), "online" | "degraded") {
+            if matches!(row.status.as_str(), "online" | "degraded")
+                && row.timestamp >= cutoff_micros
+            {
                 count += 1;
             }
         }
     }
     Ok(count)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::models::NewStewardedNode;
+    use crate::db::peer_statuses::PeerStatusRow;
+    use crate::db::run_migrations;
+    use diesel::r2d2::{ConnectionManager, Pool};
+    use diesel::SqliteConnection;
+
+    fn test_pool() -> DbPool {
+        let url = format!(
+            "file:household_staleness_test_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::<SqliteConnection>::new(&url))
+            .expect("pool");
+        run_migrations(&pool).expect("migrations");
+        pool
+    }
+
+    /// Seed a stewarded node (id == peer_id, joined by `list_by_household`) plus an
+    /// online peer_status at `ts_micros`, both in `household`.
+    fn seed_online_peer(
+        conn: &mut SqliteConnection,
+        peer_id: &str,
+        household: &str,
+        ts_micros: i64,
+    ) {
+        diesel::insert_into(crate::db::diesel_schema::stewarded_nodes::table)
+            .values(&NewStewardedNode {
+                id: peer_id.into(),
+                display_name: peer_id.into(),
+                claim_status: "claimed".into(),
+                cpu_cores: 1,
+                memory_gb: 1,
+                storage_tb: 0.1,
+                bandwidth_mbps: 10,
+                steward_tier: "household".into(),
+                custodian_opt_in: 0,
+                region: None,
+                context_epr_id: None,
+                dht_anchor_hash: None,
+                h_app_id: "lamad".into(),
+                device_archetype_id: None,
+                household_id: Some(household.to_string()),
+                hostname: None,
+                node_role: None,
+                capability_level: None,
+                can_steward: 1,
+                can_infer: 0,
+                can_doorway: 0,
+                signature: None,
+                signed_at: None,
+            })
+            .execute(conn)
+            .expect("seed stewarded node");
+
+        peer_statuses::upsert(
+            conn,
+            &PeerStatusRow {
+                peer_id: peer_id.into(),
+                status: "online".into(),
+                general_pool_member: 1,
+                accepting_stewardship_reserves: 1,
+                archetype_class: None,
+                timestamp: ts_micros,
+                dht_anchor_hash: String::new(),
+                updated_at: ts_micros,
+            },
+        )
+        .expect("seed peer_status");
+    }
+
+    /// A 900s window counts a peer heartbeated 60s ago and excludes one 901s stale
+    /// — the household-resilience half of the same honesty guard. Self rows
+    /// heartbeat every 60s, so a 900s window never dims a live pod.
+    #[test]
+    fn count_online_applies_staleness_window() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let now = chrono::Utc::now().timestamp_micros();
+        seed_online_peer(&mut conn, "uhCAkFRESH", "hh-a", now - 60 * 1_000_000);
+        seed_online_peer(&mut conn, "uhCAkSTALE", "hh-a", now - 901 * 1_000_000);
+
+        let households: HashSet<String> = HashSet::from(["hh-a".to_string()]);
+
+        // Window 900: only the fresh peer counts.
+        assert_eq!(
+            count_online_peers_in_households(&mut conn, &households, 900, now).unwrap(),
+            1,
+            "the 901s-stale peer is excluded under a 900s window"
+        );
+
+        // Window 0: legacy age-agnostic — both count.
+        assert_eq!(
+            count_online_peers_in_households(&mut conn, &households, 0, now).unwrap(),
+            2,
+            "both peers count when the window is disabled"
+        );
+    }
 }

@@ -73,11 +73,21 @@ async fn handle_get_household_resilience(
             .map(|(_, v)| v.into_owned())
     });
 
-    match crate::services::household_resilience::snapshot(
+    // Liveness honesty guard: a fanned-in "online" from a peer that has since gone
+    // dark must not count toward the protection verdict forever. Read the window
+    // here (the production wiring point), default 900s; `0` disables it. Self rows
+    // heartbeat every 60s, so a 900s window never dims a live pod.
+    let staleness_secs = std::env::var("PEER_STATUS_STALENESS_SECS")
+        .ok()
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(900);
+
+    match crate::services::household_resilience::snapshot_with_staleness_secs(
         pool,
         ctx,
         content_id,
         viewer_household.as_deref(),
+        staleness_secs,
     ) {
         Ok(view) => Ok(response::ok(&view)),
         Err(e) => Ok(response::internal_error(&format!(
