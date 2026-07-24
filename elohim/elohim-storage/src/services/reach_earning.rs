@@ -78,14 +78,26 @@ pub enum ReachVerdict {
 /// [`Decision::Refuse`] (which would silently swallow a question a human was owed).
 /// The [`StandingEvidence`] rides into the witness as `observed` values (positive
 /// evidence), so the verdict carries the standing it was computed from.
-impl From<ReachVerdict> for elohim_epr::verdict::Verdict {
-    fn from(v: ReachVerdict) -> Self {
+impl ReachVerdict {
+    /// Narrow onto the verdict spine, citing the policy that produced this answer.
+    ///
+    /// `policy_ref` should be [`ManifestRegistry::standing_policy_ref`] — the CID of
+    /// the standing-policy manifest that parameterized [`evaluate`]. Reach is a
+    /// closed-verdict axis (`epr:registry:axis:reach`), and a closed verdict owes its
+    /// counterparty the answer to *which policy decided this*: with the CID the
+    /// receiver fetches the exact bytes and checks our reasoning without sharing our
+    /// code. A name or a revision integer cannot do that — two peers can hold
+    /// different bytes under the same `revision: 1`.
+    ///
+    /// `None` is honest, not a default: it says this verdict came from a policy that
+    /// is not content-addressed, so no citation can be backed.
+    pub fn into_verdict(self, policy_ref: Option<String>) -> elohim_epr::verdict::Verdict {
         use elohim_epr::verdict::{
             CheckOutcome, CheckWitness, Decision, ReferQuestion, ReferReason, Verdict, Witness,
         };
 
         let axis = "reach".to_string();
-        match v {
+        match self {
             ReachVerdict::Allowed {
                 floor_class_match,
                 evidence,
@@ -112,7 +124,7 @@ impl From<ReachVerdict> for elohim_epr::verdict::Verdict {
                     subject: None,
                     decision: Decision::Permit,
                     witness: Witness { checks },
-                    policy_ref: None,
+                    policy_ref,
                 }
             }
             ReachVerdict::Blocked { reason, evidence } => {
@@ -135,7 +147,7 @@ impl From<ReachVerdict> for elohim_epr::verdict::Verdict {
                     subject: None,
                     decision: Decision::Refuse,
                     witness: Witness { checks },
-                    policy_ref: None,
+                    policy_ref,
                 }
             }
             ReachVerdict::Pending { reason, evidence } => {
@@ -163,10 +175,23 @@ impl From<ReachVerdict> for elohim_epr::verdict::Verdict {
                         note: Some(format!("{reason:?}")),
                     }),
                     witness: Witness { checks },
-                    policy_ref: None,
+                    policy_ref,
                 }
             }
         }
+    }
+}
+
+/// Convenience conversion that emits an **uncitable** verdict (`policy_ref: None`).
+///
+/// Kept so the spine conversion stays available where no registry is in hand (tests,
+/// pure-shape assertions). Production paths that hold a [`ManifestRegistry`] should
+/// call [`ReachVerdict::into_verdict`] with [`ManifestRegistry::standing_policy_ref`]
+/// instead — a verdict a counterparty cannot trace to its policy is unauditable, and
+/// this impl cannot supply the trace.
+impl From<ReachVerdict> for elohim_epr::verdict::Verdict {
+    fn from(v: ReachVerdict) -> Self {
+        v.into_verdict(None)
     }
 }
 
@@ -506,6 +531,121 @@ mod tests {
                 "Pending must NEVER collapse to Refuse"
             );
         }
+    }
+
+    // Reach is a closed-verdict axis (epr:registry:axis:reach). A closed verdict owes
+    // its counterparty the answer to "which policy decided this?" — and the answer has
+    // to be a content address, because two peers can hold different bytes under the
+    // same `revision: 1`. These pin the citation on EVERY decision arm, not just the
+    // happy one: a refusal is exactly the verdict a counterparty most wants to audit.
+    #[test]
+    fn every_decision_arm_cites_the_policy_that_produced_it() {
+        use elohim_epr::verdict::Decision;
+
+        let evidence = StandingEvidence {
+            standing: Standing::Unknown,
+        };
+        let pin = Some("bafyreipolicypin".to_string());
+
+        let cases = vec![
+            ReachVerdict::Allowed {
+                floor_class_match: Some(FloorClass::CidTargetedLookup),
+                evidence: evidence.clone(),
+            },
+            ReachVerdict::Blocked {
+                reason: BlockReason::StandingBelowThreshold,
+                evidence: evidence.clone(),
+            },
+            ReachVerdict::Pending {
+                reason: PendingReason::UnknownAuthorAtNonFloorReach,
+                evidence: evidence.clone(),
+            },
+        ];
+
+        for case in cases {
+            let v = case.into_verdict(pin.clone());
+            assert_eq!(
+                v.policy_ref, pin,
+                "every arm must cite its policy — including {:?}",
+                v.decision
+            );
+            // The citation must not quietly replace the evidence.
+            assert!(
+                !v.witness.checks.is_empty(),
+                "policy_ref supplements the witness, never substitutes for it"
+            );
+        }
+
+        // Refer carries the citation too: the layer receiving the escalation needs to
+        // know which policy could not decide it.
+        let referred = ReachVerdict::Pending {
+            reason: PendingReason::NewVoiceWithoutSponsor,
+            evidence,
+        }
+        .into_verdict(pin.clone());
+        assert!(matches!(referred.decision, Decision::Refer(_)));
+        assert_eq!(referred.policy_ref, pin);
+    }
+
+    // An unpinned policy must emit NO ref rather than a name it cannot back. Silence
+    // here is honest; a placeholder would be a citation that resolves to nothing.
+    #[test]
+    fn unpinned_policy_emits_no_citation() {
+        use elohim_epr::verdict::Verdict;
+
+        let v: Verdict = ReachVerdict::Allowed {
+            floor_class_match: None,
+            evidence: StandingEvidence {
+                standing: Standing::Unknown,
+            },
+        }
+        .into();
+        assert_eq!(
+            v.policy_ref, None,
+            "the registry-less From impl cannot supply a trace, and must not invent one"
+        );
+
+        // A hand-built policy is not content-addressed, so it has no ref to give.
+        let hand_built = registry_with_full_policy();
+        assert_eq!(
+            hand_built.standing_policy_ref(),
+            None,
+            "from_payload_json has no CID — an unpinned policy cites nothing"
+        );
+    }
+
+    #[test]
+    fn registry_loaded_from_db_carries_the_policy_cid() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        let payload = r#"{"manifestKind":"standing-policy","revision":1,
+            "reachThresholds":{"public":"high"}}"#;
+        crate::db::manifests::insert_manifest(
+            &mut conn,
+            &crate::db::manifests::ManifestRow {
+                cid: "bafyreistandingpolicy".to_string(),
+                manifest_kind: "standing-policy".to_string(),
+                pillar: None,
+                payload_json: payload.to_string(),
+                schema_ref: None,
+                signer_pubkey: vec![1, 2, 3],
+                created_at: "2026-07-24T00:00:00Z".to_string(),
+                verified_at: None,
+                revision: 1,
+            },
+        )
+        .expect("upsert standing-policy");
+
+        let registry = ManifestRegistry::new();
+        registry.load_from_db(&mut conn).expect("load");
+
+        assert_eq!(
+            registry.standing_policy_ref(),
+            Some("bafyreistandingpolicy".to_string()),
+            "the row's CID must survive into the registry — discarding it is what made \
+             every derived verdict uncitable"
+        );
     }
 
     #[test]
