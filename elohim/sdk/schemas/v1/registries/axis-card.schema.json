@@ -1,0 +1,152 @@
+{
+  "$id": "epr:registry:axis-card",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AxisCard",
+  "description": "The declaration format for a gradient axis (registries/axes/*.axis.json). An axis card DESCRIBES an axis — its semantics, the vocabulary it classifies over, where its source of record lives, and the posture it takes toward absence. It never DUPLICATES the vocabulary: `vocabulary` is a $ref to an enum's $id, and a card that inlines its value list has forked the vocabulary it was meant to point at. Source of truth: this schema; validated by the registries leg of scripts/test-schema.mjs.",
+  "type": "object",
+  "required": ["$id", "axis", "version", "kind", "semantics", "vocabulary", "closure", "sourceOfRecord"],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^epr:registry:axis:[a-z][a-z0-9-]*$",
+      "description": "House identifier form: epr:registry:axis:<axis>."
+    },
+    "axis": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "The axis name; must match the $id suffix and the filename stem."
+    },
+    "version": { "type": "integer", "minimum": 1 },
+    "kind": {
+      "type": "string",
+      "enum": ["declared", "derived", "two-layer"],
+      "description": "`declared`: the value is authored and stored. `derived`: the value is computed at the evidence-holding edge and never stored as a status column. `two-layer`: a declared floor narrowed by a derived verdict (the reach/vocabulary-split shape)."
+    },
+    "semantics": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What this axis means, in prose — including what it is NOT, since axis confusion is the recurring drift."
+    },
+    "vocabulary": {
+      "type": "object",
+      "required": ["$ref"],
+      "properties": {
+        "$ref": {
+          "type": "string",
+          "pattern": "^epr:schema:enum:[a-z][a-z0-9-]*$",
+          "description": "Pointer to the enum that supplies this axis's values. Never an inline list."
+        }
+      },
+      "description": "The vocabulary this axis classifies over, by reference."
+    },
+    "closure": {
+      "type": "object",
+      "required": ["facts", "verdicts"],
+      "additionalProperties": false,
+      "properties": {
+        "facts": {
+          "$ref": "epr:schema:enum:closure",
+          "description": "Posture of the FACT layer toward absence. Expected `open`: a peer's non-observation is not a negative fact. Declaring `closed` here is a strong claim — it asserts the fact layer is complete — and needs an explicit rationale."
+        },
+        "verdicts": {
+          "$ref": "epr:schema:enum:closure",
+          "description": "Posture of the VERDICT layer toward absence. Expected `closed`: absence of a permit is a refusal, never 'unknown, therefore possibly allowed'."
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Why each layer takes its posture, grounded in the shipped code that already behaves this way."
+        }
+      },
+      "description": "What silence means on each of this axis's two layers. Required — an axis whose closure posture is undeclared cannot be read by a counterparty that does not share our code."
+    },
+    "classifier": {
+      "type": "object",
+      "required": ["crate", "module", "function", "returns"],
+      "properties": {
+        "crate": { "type": "string", "minLength": 1 },
+        "module": { "type": "string", "minLength": 1 },
+        "function": { "type": "string", "minLength": 1 },
+        "returns": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The classifier's return type. For a closed-verdict axis this type must be able to express `refer` — the ceiling marker is never a fallthrough, a timeout, or an error."
+        },
+        "gaps": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Honestly declared distance between this classifier and the law it should satisfy. A named gap is a live obligation, not an excuse."
+        }
+      },
+      "description": "The total function bridging the open fact layer to the closed verdict layer. REQUIRED when closure.verdicts is `closed`."
+    },
+    "ordered": {
+      "type": "boolean",
+      "description": "Whether the vocabulary carries a meaningful order (mirrors the enum's _ordinal)."
+    },
+    "values": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["value", "semantics"],
+        "properties": {
+          "value": { "type": "string" },
+          "semantics": { "type": "string", "minLength": 1 }
+        }
+      },
+      "description": "Per-value semantics. The VALUE LIST is owned by the referenced enum; this annotates meaning, it does not define membership."
+    },
+    "orthogonalTo": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Axes this one must not be collapsed into. Axis confusion is the recurring drift; naming the neighbours is how a card resists it."
+    },
+    "sourceOfRecord": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["derived-fold", "declared-at-creation", "two-layer", "notarized"],
+          "description": "Where this axis's value actually lives. `derived-fold` means it is recomputed, never stored."
+        },
+        "crate": { "type": "string" },
+        "module": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "description": "Where the truth for this axis lives, and how it is reconstructed."
+    },
+    "reviewEvents": { "type": "object", "description": "Axis-specific evidence inputs, if any." },
+    "relatedVocabularies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "disposition"],
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "string" },
+          "values": { "type": "string" },
+          "disposition": { "type": "string", "minLength": 1 }
+        }
+      },
+      "description": "Near-miss vocabularies and their dispositions — the drift-check record, kept so the next author does not re-litigate a name collision."
+    },
+    "graduation": { "type": "object", "description": "Declared future moves (DNA notarization, persistence tier) — stated, not executed." }
+  },
+  "allOf": [
+    {
+      "description": "Totality law: a closed-verdict axis MUST declare the classifier that bridges its open fact layer to its closed verdict layer.",
+      "if": {
+        "type": "object",
+        "required": ["closure"],
+        "properties": {
+          "closure": {
+            "type": "object",
+            "required": ["verdicts"],
+            "properties": { "verdicts": { "const": "closed" } }
+          }
+        }
+      },
+      "then": { "required": ["classifier"] }
+    }
+  ]
+}

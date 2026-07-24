@@ -1,0 +1,9 @@
+{
+  "$id": "epr:schema:enum:closure",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Closure",
+  "description": "What SILENCE means on a layer — the posture a layer takes toward absence. `open`: the absence of an assertion is UNKNOWN, never a negative fact. A peer's non-observation is not evidence that a thing did not happen; treating it as such manufactures evidence out of partial views, which is the failure mode every distributed witness has. `closed`: the absence of a permit is a REFUSAL. Silence never reads as 'unknown, therefore possibly allowed' — that is the fail-open inversion, and it is the whole attack surface when the counterparty is adversarial. The two are opposite postures, NOT a gradient: there is no `_ordinal` and neither is 'more' than the other. Every gradient axis carries BOTH — an open fact layer and a closed verdict layer (see epr:registry:axis:* cards, `closure.facts` / `closure.verdicts`) — bridged by a classifier that MUST be total (epr:schema:enum:decision — permit | refuse | refer, with `refer` reachable from every path). An axis that leaves this undeclared cannot be safely read by a counterparty that does not share our code, because it cannot tell whether our silence is an admission or a denial. Source of truth: this schema; the per-axis declaration lives on the axis card (epr:registry:axis-card).",
+  "type": "string",
+  "enum": ["open", "closed"],
+  "_ordinal": false
+}
