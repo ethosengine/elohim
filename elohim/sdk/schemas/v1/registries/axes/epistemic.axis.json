@@ -6,9 +6,23 @@
   "semantics": "Communal standing of a claim — how emergent truth moves through peer review toward settled canon. This axis is a standing verdict derived at the evidence-holding edge (a deterministic fold over witnessed REA review events), never a stored status column, and it is explained by a witness (the checks/observations folded, not an opaque score). Every contest point routes to `refer`, never to silence: an active dispute is a first-class outcome of the classification, not an error state or a stale value.",
   "orthogonalTo": [
     "witness-ladder (evidentiary custody of the record: local -> peer-validated -> notarized; README.md:208)",
-    "epr:registry:axis:reach (visibility/disclosure — not yet carded)"
+    "epr:registry:axis:reach (visibility/disclosure — a different question about the same claim)"
   ],
   "vocabulary": { "$ref": "epr:schema:enum:epistemic-status" },
+  "closure": {
+    "facts": "open",
+    "verdicts": "closed",
+    "rationale": "FACTS are open because a claim nobody has reviewed is unreviewed, not rejected — silence from a peer is a partial view, never a Dismiss. The shipped code already behaves this way: `standing_ratio()` returns `Option<f64>` and yields `None` on zero evidence rather than 0.0, so 'no reviews' can never be read as 'reviewed badly', and classification of an unreviewed claim is `emergent` — served honestly as emergent, never inflated and never treated as refuted. VERDICTS are closed because `cite_gate` gates an action: a claim that has not earned standing does not cite, and the absence of accumulated affirmation is a refusal to promote, not a licence to proceed while we wait. The two postures meet at `classify()`, which is total, and the contested case routes to `refer` rather than resolving silently to either side."
+  },
+  "classifier": {
+    "crate": "elohim-epr-rea",
+    "module": "src/epistemic.rs",
+    "function": "classify + cite_gate",
+    "returns": "EpistemicStatus, gated to elohim_epr::verdict::Verdict (Decision::{Permit,Refuse,Refer})",
+    "gaps": [
+      "thresholds are hardcoded defaults with a TODO(policy-ref); the emitted Verdict carries no policy_ref, so a counterparty cannot check WHICH thresholds produced this standing"
+    ]
+  },
   "ordered": false,
   "values": [
     {

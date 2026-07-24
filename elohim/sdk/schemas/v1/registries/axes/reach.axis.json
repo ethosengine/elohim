@@ -1,0 +1,57 @@
+{
+  "$id": "epr:registry:axis:reach",
+  "axis": "reach",
+  "version": 1,
+  "kind": "two-layer",
+  "semantics": "Disclosure of a claim across the SOCIAL axis — who may see this, now. Two layers, per the vocabulary-split spec §2: a DECLARED FLOOR authored at creation (the eight-value reach vocabulary, notarized in the content_store_integrity zome) and a DERIVED VERDICT that may narrow it at serve time based on the author's earned standing. Composition is narrowing-only: the derived layer can refuse or withhold reach the floor declared, and can never widen past it. Reach is NOT epistemic standing (how well-reviewed a claim is), NOT the witness ladder (evidentiary custody of the record), and NOT retention (disclosure across the TEMPORAL axis — what may still be seen later). A well-reviewed claim may be private; an unreviewed claim may be public. Confusing reach with standing is the drift this card exists to resist.",
+  "orthogonalTo": [
+    "epr:registry:axis:epistemic (communal standing of the claim — how reviewed, not how visible)",
+    "witness-ladder (evidentiary custody of the record: local -> peer-validated -> notarized)",
+    "retention (the temporal half of the same disclosure gradient — not yet carded)"
+  ],
+  "vocabulary": { "$ref": "epr:schema:enum:reach" },
+  "closure": {
+    "facts": "open",
+    "verdicts": "closed",
+    "rationale": "FACTS are open because standing evidence is gathered from a partial view of the network: not having observed an author's contributions is not evidence that they have none, which is exactly why `Standing::Unknown` is a distinct value rather than a zero, and why the registry carries an explicit `UnknownTreatment` policy instead of silently reading absence as bad standing. VERDICTS are closed because reach gates disclosure, and disclosure is irreversible — bytes served cannot be unserved. The absence of earned standing is a refusal to widen, never an 'unknown, therefore serve it and find out'. This is the fail-open inversion the OWL2 graduation refused at the verdict layer: under an open-world reading, a missing standing assertion would read as 'possibly sufficient', and an adversary's optimal move becomes withholding evidence."
+  },
+  "classifier": {
+    "crate": "elohim-storage",
+    "module": "src/services/reach_earning.rs",
+    "function": "evaluate",
+    "returns": "ReachVerdict (Allowed | Blocked | Pending)",
+    "gaps": [
+      "ReachVerdict predates the verdict spine and does not yet speak elohim_epr::verdict::Decision — `Pending` is the ceiling marker wearing a third name (alongside `.epr-meta` class: ask and constitution.md FlagForHuman). Conversion is owned by the ontology-keel slice, not this card.",
+      "the emitted verdict carries policy_ref: None at three sites, so a counterparty cannot check WHICH standing policy produced it — and the ManifestRegistry revision is a hand-asserted integer, not a content pin, so the same policy name may denote different bytes on two peers",
+      "no timestamp on ReachVerdict or StandingEvidence: a verdict cannot be checked for freshness, so a revocation has no bounded window in which it must be reflected"
+    ]
+  },
+  "ordered": true,
+  "sourceOfRecord": {
+    "kind": "two-layer",
+    "crate": "elohim-storage",
+    "module": "src/services/reach_earning.rs",
+    "note": "declared floor is notarized (content_store_integrity REACH_LEVELS, authored at creation and carried on the content record); the derived verdict is recomputed at the evidence-holding edge from local standing evidence plus the ManifestRegistry standing-policy, never stored as a status column. Reconstruction = re-evaluate; the floor is the only persisted half."
+  },
+  "relatedVocabularies": [
+    {
+      "name": "geographic-8 / locality",
+      "disposition": "distinct axis (physical locality, not social disclosure) — rename tracked by the reach-vocab slices"
+    },
+    {
+      "name": "path-visibility",
+      "path": "elohim/sdk/schemas/v1/enums/path-visibility.schema.json",
+      "disposition": "domain instance — a learning path's own visibility setting, narrows onto reach, does not redefine it"
+    },
+    {
+      "name": "disclosureTier",
+      "path": "elohim/sdk/schemas/v1/agent/defender-manifest.schema.json:11",
+      "values": "intimate | trusted | public",
+      "disposition": "a three-value SUBSET of the reach vocabulary used for agent output tiering — narrows onto reach, must never diverge from it"
+    }
+  ],
+  "graduation": {
+    "dnaNotarization": "the declared floor is ALREADY DNA-notarized (REACH_LEVELS, content_store_integrity); the derived verdict stays operational and must never become a stored column",
+    "verdictSpine": "deferred — ReachVerdict -> Decision conversion is the ontology-keel slice's task, declared here as a gap so the distance is visible rather than assumed closed"
+  }
+}
