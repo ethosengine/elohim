@@ -1,0 +1,1888 @@
+# Elohim Protocol — vocabulary projection (SKOS).
+#
+# GENERATED from elohim/sdk/schemas/v1/. Do not hand-edit: run
+#   node elohim/sdk/schemas/scripts/codegen-ttl.mjs
+#
+# This file is a PROJECTION OUTWARD, never a source. Nothing in the protocol reads it,
+# and deleting it changes zero verdicts — that is the test that keeps it safe to publish.
+#
+# It is NAMING, NOT DECIDING. There are no owl: terms here by construction: no
+# equivalentClass, no property chains, no complement, nothing a reasoner could chain
+# into a verdict. What you get is the terms we use, what they mean, and — the part that
+# matters when we have never met — WHAT OUR SILENCE MEANS on each axis (epr:factClosure
+# / epr:verdictClosure below).
+#
+# Reading our silence: on a layer declared `open`, the absence of an assertion is
+# UNKNOWN and never a negative fact. On a layer declared `closed`, the absence of a
+# permit is a REFUSAL and never "unknown, therefore possibly allowed".
+
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dct:  <http://purl.org/dc/terms/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix epr:  <epr:vocab#> .
+
+# --- epr: annotation terms (documentation only; no formal semantics) ---
+<epr:vocab#factClosure> a rdfs:Datatype ;
+  rdfs:comment "Posture of an axis FACT layer toward absence: open = unknown, never a negative fact." .
+
+<epr:vocab#verdictClosure> a rdfs:Datatype ;
+  rdfs:comment "Posture of an axis VERDICT layer toward absence: closed = absence of a permit is a refusal." .
+
+# =============== vocabularies (41) ===============
+
+<epr:schema:enum:capacity-model> a skos:ConceptScheme ;
+  skos:prefLabel "CapacityModel" ;
+  dct:description "Whether resource has a finite stock, continuous flow, or both. stock=mineral deposit, flow=solar radiation, stock-and-flow=reservoir." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:capacity-model#stock>, <epr:schema:enum:capacity-model#flow>, <epr:schema:enum:capacity-model#stock-and-flow> .
+
+<epr:schema:enum:capacity-model#stock> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:capacity-model> ;
+  skos:prefLabel "stock" ;
+  skos:notation "stock" .
+
+<epr:schema:enum:capacity-model#flow> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:capacity-model> ;
+  skos:prefLabel "flow" ;
+  skos:notation "flow" .
+
+<epr:schema:enum:capacity-model#stock-and-flow> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:capacity-model> ;
+  skos:prefLabel "stock-and-flow" ;
+  skos:notation "stock-and-flow" .
+
+<epr:schema:enum:circularity> a skos:ConceptScheme ;
+  skos:prefLabel "Circularity" ;
+  dct:description "Lifecycle design intent — how value flows back after primary use. linear=single-use (generates circularity obligation), reusable=glass jar, cascading=EV battery to grid storage, circular=food to compost to soil to food." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:circularity#linear>, <epr:schema:enum:circularity#reusable>, <epr:schema:enum:circularity#cascading>, <epr:schema:enum:circularity#circular> .
+
+<epr:schema:enum:circularity#linear> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:circularity> ;
+  skos:prefLabel "linear" ;
+  skos:notation "linear" .
+
+<epr:schema:enum:circularity#reusable> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:circularity> ;
+  skos:prefLabel "reusable" ;
+  skos:notation "reusable" .
+
+<epr:schema:enum:circularity#cascading> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:circularity> ;
+  skos:prefLabel "cascading" ;
+  skos:notation "cascading" .
+
+<epr:schema:enum:circularity#circular> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:circularity> ;
+  skos:prefLabel "circular" ;
+  skos:notation "circular" .
+
+<epr:schema:enum:closure> a skos:ConceptScheme ;
+  skos:prefLabel "Closure" ;
+  dct:description "What SILENCE means on a layer — the posture a layer takes toward absence. `open`: the absence of an assertion is UNKNOWN, never a negative fact. A peer's non-observation is not evidence that a thing did not happen; treating it as such manufactures evidence out of partial views, which is the failure mode every distributed witness has. `closed`: the absence of a permit is a REFUSAL. Silence never reads as 'unknown, therefore possibly allowed' — that is the fail-open inversion, and it is the whole attack surface when the counterparty is adversarial. The two are opposite postures, NOT a gradient: there is no `_ordinal` and neither is 'more' than the other. Every gradient axis carries BOTH — an open fact layer and a closed verdict layer (see epr:registry:axis:* cards, `closure.facts` / `closure.verdicts`) — bridged by a classifier that MUST be total (epr:schema:enum:decision — permit | refuse | refer, with `refer` reachable from every path). An axis that leaves this undeclared cannot be safely read by a counterparty that does not share our code, because it cannot tell whether our silence is an admission or a denial. Source of truth: this schema; the per-axis declaration lives on the axis card (epr:registry:axis-card)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:closure#open>, <epr:schema:enum:closure#closed> .
+
+<epr:schema:enum:closure#open> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:closure> ;
+  skos:prefLabel "open" ;
+  skos:notation "open" .
+
+<epr:schema:enum:closure#closed> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:closure> ;
+  skos:prefLabel "closed" ;
+  skos:notation "closed" .
+
+<epr:schema:enum:completion-criteria> a skos:ConceptScheme ;
+  skos:prefLabel "CompletionCriteria" ;
+  dct:description "Criteria for completing a learning path step. Gates path progression." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:completion-criteria#all-required>, <epr:schema:enum:completion-criteria#pass-assessment>, <epr:schema:enum:completion-criteria#view-content> .
+
+<epr:schema:enum:completion-criteria#all-required> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:completion-criteria> ;
+  skos:prefLabel "all-required" ;
+  skos:notation "all-required" .
+
+<epr:schema:enum:completion-criteria#pass-assessment> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:completion-criteria> ;
+  skos:prefLabel "pass-assessment" ;
+  skos:notation "pass-assessment" .
+
+<epr:schema:enum:completion-criteria#view-content> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:completion-criteria> ;
+  skos:prefLabel "view-content" ;
+  skos:notation "view-content" .
+
+<epr:schema:enum:constitutional-layer> a skos:ConceptScheme ;
+  skos:prefLabel "ConstitutionalLayer" ;
+  dct:description "Governance authority hierarchy (1=most flexible, 7=most immutable). Defined in elohim/constitution/src/types.rs." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:constitutional-layer#individual>, <epr:schema:enum:constitutional-layer#family>, <epr:schema:enum:constitutional-layer#community>, <epr:schema:enum:constitutional-layer#provincial>, <epr:schema:enum:constitutional-layer#nation-state>, <epr:schema:enum:constitutional-layer#bioregional>, <epr:schema:enum:constitutional-layer#global> .
+
+<epr:schema:enum:constitutional-layer#individual> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:constitutional-layer> ;
+  skos:prefLabel "individual" ;
+  skos:notation "individual" .
+
+<epr:schema:enum:constitutional-layer#family> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:constitutional-layer> ;
+  skos:prefLabel "family" ;
+  skos:notation "family" .
+
+<epr:schema:enum:constitutional-layer#community> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:constitutional-layer> ;
+  skos:prefLabel "community" ;
+  skos:notation "community" .
+
+<epr:schema:enum:constitutional-layer#provincial> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:constitutional-layer> ;
+  skos:prefLabel "provincial" ;
+  skos:notation "provincial" .
+
+<epr:schema:enum:constitutional-layer#nation-state> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:constitutional-layer> ;
+  skos:prefLabel "nation-state" ;
+  skos:notation "nation-state" .
+
+<epr:schema:enum:constitutional-layer#bioregional> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:constitutional-layer> ;
+  skos:prefLabel "bioregional" ;
+  skos:notation "bioregional" .
+
+<epr:schema:enum:constitutional-layer#global> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:constitutional-layer> ;
+  skos:prefLabel "global" ;
+  skos:notation "global" .
+
+<epr:schema:enum:content-format> a skos:ConceptScheme ;
+  skos:prefLabel "ContentFormat" ;
+  dct:description "Content format for rendering. Core formats are DNA-notarized. Extended formats are storage-level rendering hints." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:content-format#markdown>, <epr:schema:enum:content-format#html>, <epr:schema:enum:content-format#video>, <epr:schema:enum:content-format#audio>, <epr:schema:enum:content-format#interactive>, <epr:schema:enum:content-format#external>, <epr:schema:enum:content-format#epr-composite>, <epr:schema:enum:content-format#plaintext>, <epr:schema:enum:content-format#text>, <epr:schema:enum:content-format#plain>, <epr:schema:enum:content-format#gherkin>, <epr:schema:enum:content-format#perseus>, <epr:schema:enum:content-format#perseus-json>, <epr:schema:enum:content-format#perseus-quiz-json>, <epr:schema:enum:content-format#video-embed>, <epr:schema:enum:content-format#audio-file>, <epr:schema:enum:content-format#html5-app>, <epr:schema:enum:content-format#spa-bundle>, <epr:schema:enum:content-format#human-json>, <epr:schema:enum:content-format#organization-json>, <epr:schema:enum:content-format#json>, <epr:schema:enum:content-format#sophia>, <epr:schema:enum:content-format#sophia-quiz-json>, <epr:schema:enum:content-format#element-registry-manifest> .
+
+<epr:schema:enum:content-format#markdown> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "markdown" ;
+  skos:notation "markdown" .
+
+<epr:schema:enum:content-format#html> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "html" ;
+  skos:notation "html" .
+
+<epr:schema:enum:content-format#video> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "video" ;
+  skos:notation "video" .
+
+<epr:schema:enum:content-format#audio> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "audio" ;
+  skos:notation "audio" .
+
+<epr:schema:enum:content-format#interactive> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "interactive" ;
+  skos:notation "interactive" .
+
+<epr:schema:enum:content-format#external> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "external" ;
+  skos:notation "external" .
+
+<epr:schema:enum:content-format#epr-composite> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "epr-composite" ;
+  skos:notation "epr-composite" .
+
+<epr:schema:enum:content-format#plaintext> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "plaintext" ;
+  skos:notation "plaintext" .
+
+<epr:schema:enum:content-format#text> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "text" ;
+  skos:notation "text" .
+
+<epr:schema:enum:content-format#plain> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "plain" ;
+  skos:notation "plain" .
+
+<epr:schema:enum:content-format#gherkin> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "gherkin" ;
+  skos:notation "gherkin" .
+
+<epr:schema:enum:content-format#perseus> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "perseus" ;
+  skos:notation "perseus" .
+
+<epr:schema:enum:content-format#perseus-json> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "perseus-json" ;
+  skos:notation "perseus-json" .
+
+<epr:schema:enum:content-format#perseus-quiz-json> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "perseus-quiz-json" ;
+  skos:notation "perseus-quiz-json" .
+
+<epr:schema:enum:content-format#video-embed> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "video-embed" ;
+  skos:notation "video-embed" .
+
+<epr:schema:enum:content-format#audio-file> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "audio-file" ;
+  skos:notation "audio-file" .
+
+<epr:schema:enum:content-format#html5-app> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "html5-app" ;
+  skos:notation "html5-app" .
+
+<epr:schema:enum:content-format#spa-bundle> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "spa-bundle" ;
+  skos:notation "spa-bundle" .
+
+<epr:schema:enum:content-format#human-json> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "human-json" ;
+  skos:notation "human-json" .
+
+<epr:schema:enum:content-format#organization-json> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "organization-json" ;
+  skos:notation "organization-json" .
+
+<epr:schema:enum:content-format#json> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "json" ;
+  skos:notation "json" .
+
+<epr:schema:enum:content-format#sophia> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "sophia" ;
+  skos:notation "sophia" .
+
+<epr:schema:enum:content-format#sophia-quiz-json> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "sophia-quiz-json" ;
+  skos:notation "sophia-quiz-json" .
+
+<epr:schema:enum:content-format#element-registry-manifest> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-format> ;
+  skos:prefLabel "element-registry-manifest" ;
+  skos:notation "element-registry-manifest" .
+
+<epr:schema:enum:content-type> a skos:ConceptScheme ;
+  skos:prefLabel "ContentType" ;
+  dct:description "Content type vocabulary. Core types are DNA-notarized (three-leg coupled: knowledge+value+governance). Storage-only types are cross-domain entity references. Extensible types are community vocabulary." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:content-type#epic>, <epr:schema:enum:content-type#concept>, <epr:schema:enum:content-type#lesson>, <epr:schema:enum:content-type#scenario>, <epr:schema:enum:content-type#assessment>, <epr:schema:enum:content-type#reflection>, <epr:schema:enum:content-type#discussion>, <epr:schema:enum:content-type#exercise>, <epr:schema:enum:content-type#article>, <epr:schema:enum:content-type#path>, <epr:schema:enum:content-type#human>, <epr:schema:enum:content-type#role>, <epr:schema:enum:content-type#collective>, <epr:schema:enum:content-type#example>, <epr:schema:enum:content-type#reference>, <epr:schema:enum:content-type#feature>, <epr:schema:enum:content-type#practice>, <epr:schema:enum:content-type#contributor>, <epr:schema:enum:content-type#video>, <epr:schema:enum:content-type#audio>, <epr:schema:enum:content-type#book>, <epr:schema:enum:content-type#book-chapter>, <epr:schema:enum:content-type#documentary>, <epr:schema:enum:content-type#bible-verse>, <epr:schema:enum:content-type#activity>, <epr:schema:enum:content-type#narrative>, <epr:schema:enum:content-type#course-module>, <epr:schema:enum:content-type#module>, <epr:schema:enum:content-type#quiz>, <epr:schema:enum:content-type#podcast>, <epr:schema:enum:content-type#simulation>, <epr:schema:enum:content-type#node-context>, <epr:schema:enum:content-type#stewardship-context>, <epr:schema:enum:content-type#work-story>, <epr:schema:enum:content-type#work-project>, <epr:schema:enum:content-type#issue-report>, <epr:schema:enum:content-type#application>, <epr:schema:enum:content-type#gate-process-declaration>, <epr:schema:enum:content-type#universal-band-declaration>, <epr:schema:enum:content-type#gate-rules-declaration>, <epr:schema:enum:content-type#aggregation-spec>, <epr:schema:enum:content-type#escalation-target-spec>, <epr:schema:enum:content-type#element-registry> .
+
+<epr:schema:enum:content-type#epic> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "epic" ;
+  skos:notation "epic" .
+
+<epr:schema:enum:content-type#concept> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "concept" ;
+  skos:notation "concept" .
+
+<epr:schema:enum:content-type#lesson> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "lesson" ;
+  skos:notation "lesson" .
+
+<epr:schema:enum:content-type#scenario> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "scenario" ;
+  skos:notation "scenario" .
+
+<epr:schema:enum:content-type#assessment> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "assessment" ;
+  skos:notation "assessment" .
+
+<epr:schema:enum:content-type#reflection> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "reflection" ;
+  skos:notation "reflection" .
+
+<epr:schema:enum:content-type#discussion> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "discussion" ;
+  skos:notation "discussion" .
+
+<epr:schema:enum:content-type#exercise> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "exercise" ;
+  skos:notation "exercise" .
+
+<epr:schema:enum:content-type#article> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "article" ;
+  skos:notation "article" .
+
+<epr:schema:enum:content-type#path> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "path" ;
+  skos:notation "path" .
+
+<epr:schema:enum:content-type#human> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "human" ;
+  skos:notation "human" .
+
+<epr:schema:enum:content-type#role> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "role" ;
+  skos:notation "role" .
+
+<epr:schema:enum:content-type#collective> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "collective" ;
+  skos:notation "collective" .
+
+<epr:schema:enum:content-type#example> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "example" ;
+  skos:notation "example" .
+
+<epr:schema:enum:content-type#reference> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "reference" ;
+  skos:notation "reference" .
+
+<epr:schema:enum:content-type#feature> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "feature" ;
+  skos:notation "feature" .
+
+<epr:schema:enum:content-type#practice> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "practice" ;
+  skos:notation "practice" .
+
+<epr:schema:enum:content-type#contributor> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "contributor" ;
+  skos:notation "contributor" .
+
+<epr:schema:enum:content-type#video> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "video" ;
+  skos:notation "video" .
+
+<epr:schema:enum:content-type#audio> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "audio" ;
+  skos:notation "audio" .
+
+<epr:schema:enum:content-type#book> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "book" ;
+  skos:notation "book" .
+
+<epr:schema:enum:content-type#book-chapter> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "book-chapter" ;
+  skos:notation "book-chapter" .
+
+<epr:schema:enum:content-type#documentary> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "documentary" ;
+  skos:notation "documentary" .
+
+<epr:schema:enum:content-type#bible-verse> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "bible-verse" ;
+  skos:notation "bible-verse" .
+
+<epr:schema:enum:content-type#activity> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "activity" ;
+  skos:notation "activity" .
+
+<epr:schema:enum:content-type#narrative> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "narrative" ;
+  skos:notation "narrative" .
+
+<epr:schema:enum:content-type#course-module> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "course-module" ;
+  skos:notation "course-module" .
+
+<epr:schema:enum:content-type#module> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "module" ;
+  skos:notation "module" .
+
+<epr:schema:enum:content-type#quiz> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "quiz" ;
+  skos:notation "quiz" .
+
+<epr:schema:enum:content-type#podcast> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "podcast" ;
+  skos:notation "podcast" .
+
+<epr:schema:enum:content-type#simulation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "simulation" ;
+  skos:notation "simulation" .
+
+<epr:schema:enum:content-type#node-context> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "node-context" ;
+  skos:notation "node-context" .
+
+<epr:schema:enum:content-type#stewardship-context> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "stewardship-context" ;
+  skos:notation "stewardship-context" .
+
+<epr:schema:enum:content-type#work-story> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "work-story" ;
+  skos:notation "work-story" .
+
+<epr:schema:enum:content-type#work-project> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "work-project" ;
+  skos:notation "work-project" .
+
+<epr:schema:enum:content-type#issue-report> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "issue-report" ;
+  skos:notation "issue-report" .
+
+<epr:schema:enum:content-type#application> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "application" ;
+  skos:notation "application" .
+
+<epr:schema:enum:content-type#gate-process-declaration> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "gate-process-declaration" ;
+  skos:notation "gate-process-declaration" .
+
+<epr:schema:enum:content-type#universal-band-declaration> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "universal-band-declaration" ;
+  skos:notation "universal-band-declaration" .
+
+<epr:schema:enum:content-type#gate-rules-declaration> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "gate-rules-declaration" ;
+  skos:notation "gate-rules-declaration" .
+
+<epr:schema:enum:content-type#aggregation-spec> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "aggregation-spec" ;
+  skos:notation "aggregation-spec" .
+
+<epr:schema:enum:content-type#escalation-target-spec> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "escalation-target-spec" ;
+  skos:notation "escalation-target-spec" .
+
+<epr:schema:enum:content-type#element-registry> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:content-type> ;
+  skos:prefLabel "element-registry" ;
+  skos:notation "element-registry" .
+
+<epr:schema:enum:coupling-leg> a skos:ConceptScheme ;
+  skos:prefLabel "CouplingLeg" ;
+  dct:description "The three legs of the ThreeLegCoupling defined by the graph substrate spec §4.1. Source of truth: elohim-epr protocol constants. Category A — enumeration values are part of the DNA-notarized protocol vocabulary. knowledge = knowledge graph binding (Claim EPR CID); value = economic event binding (EconomicEvent EPR CID); governance = governance attestation binding (Governance EPR CID). Serialized lowercase by serde." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:coupling-leg#knowledge>, <epr:schema:enum:coupling-leg#value>, <epr:schema:enum:coupling-leg#governance> .
+
+<epr:schema:enum:coupling-leg#knowledge> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:coupling-leg> ;
+  skos:prefLabel "knowledge" ;
+  skos:notation "knowledge" .
+
+<epr:schema:enum:coupling-leg#value> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:coupling-leg> ;
+  skos:prefLabel "value" ;
+  skos:notation "value" .
+
+<epr:schema:enum:coupling-leg#governance> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:coupling-leg> ;
+  skos:prefLabel "governance" ;
+  skos:notation "governance" .
+
+<epr:schema:enum:decision> a skos:ConceptScheme ;
+  skos:prefLabel "Decision" ;
+  dct:description "The three-valued verdict discriminator of the protocol's verdict spine. `permit` and `refuse` are the two mechanical outcomes a deterministic check can reach. `refer` is the ceiling marker: a first-class 'this is not decidable by rule; it routes to the named layer with a stated reason'. WHO resolves there (elohim counsel, human, quorum) is governed routing — deployment policy, never vocabulary — bounded by constitutional floors that guarantee value conflicts and irreversible acts reach humans — never a fallthrough, a timeout, or an error. Every gradient axis that classifies a claim (reach today, epistemic standing this slice, compute/trust variance and retention downstream) narrows onto this same spine. Source of truth: elohim/epr/src/verdict.rs (`Decision` enum — Rust is the wire authority, this schema is its projection). Spec: reach-ontology-vocabulary-split-spec §2a." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:decision#permit>, <epr:schema:enum:decision#refuse>, <epr:schema:enum:decision#refer> .
+
+<epr:schema:enum:decision#permit> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:decision> ;
+  skos:prefLabel "permit" ;
+  skos:notation "permit" .
+
+<epr:schema:enum:decision#refuse> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:decision> ;
+  skos:prefLabel "refuse" ;
+  skos:notation "refuse" .
+
+<epr:schema:enum:decision#refer> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:decision> ;
+  skos:prefLabel "refer" ;
+  skos:notation "refer" .
+
+<epr:schema:enum:depletability> a skos:ConceptScheme ;
+  skos:prefLabel "Depletability" ;
+  dct:description "Whether stock diminishes with use. depletable=fossil fuel, renewable=solar flow, regenerative=permaculture/living soil, non-depletable=knowledge." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:depletability#depletable>, <epr:schema:enum:depletability#renewable>, <epr:schema:enum:depletability#regenerative>, <epr:schema:enum:depletability#non-depletable> .
+
+<epr:schema:enum:depletability#depletable> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:depletability> ;
+  skos:prefLabel "depletable" ;
+  skos:notation "depletable" .
+
+<epr:schema:enum:depletability#renewable> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:depletability> ;
+  skos:prefLabel "renewable" ;
+  skos:notation "renewable" .
+
+<epr:schema:enum:depletability#regenerative> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:depletability> ;
+  skos:prefLabel "regenerative" ;
+  skos:notation "regenerative" .
+
+<epr:schema:enum:depletability#non-depletable> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:depletability> ;
+  skos:prefLabel "non-depletable" ;
+  skos:notation "non-depletable" .
+
+<epr:schema:enum:device-archetype> a skos:ConceptScheme ;
+  skos:prefLabel "DeviceArchetype" ;
+  dct:description "Hardware/deployment archetype of the device presenting an AgentPeerBinding. Source of truth: DHT (Notarized, Category A — imagodei integrity zome). DNA-notarized as part of the AgentPeerBinding entry type. Values: 'node' = dedicated elohim-node server/blade; 'desktop' = Tauri desktop app (workstation or laptop); 'mobile' = mobile client (phone or tablet); 'steward' = steward process managing collective infrastructure." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:device-archetype#node>, <epr:schema:enum:device-archetype#desktop>, <epr:schema:enum:device-archetype#mobile>, <epr:schema:enum:device-archetype#steward> .
+
+<epr:schema:enum:device-archetype#node> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:device-archetype> ;
+  skos:prefLabel "node" ;
+  skos:notation "node" .
+
+<epr:schema:enum:device-archetype#desktop> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:device-archetype> ;
+  skos:prefLabel "desktop" ;
+  skos:notation "desktop" .
+
+<epr:schema:enum:device-archetype#mobile> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:device-archetype> ;
+  skos:prefLabel "mobile" ;
+  skos:notation "mobile" .
+
+<epr:schema:enum:device-archetype#steward> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:device-archetype> ;
+  skos:prefLabel "steward" ;
+  skos:notation "steward" .
+
+<epr:schema:enum:elohim-skill> a skos:ConceptScheme ;
+  skos:prefLabel "ElohimSkill" ;
+  dct:description "Named gate capabilities an elohim can dispatch. Core skills map directly to registered gate interfaces the protocol orchestrates (content-safety-gate, discernment-gate-v1-mechanical, reach-gate-v1). Extensible skills map to the full ElohimCapability variant set and any community-registered capabilities." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:elohim-skill#content-safety-review>, <epr:schema:enum:elohim-skill#discernment-evaluation>, <epr:schema:enum:elohim-skill#reach-negotiation>, <epr:schema:enum:elohim-skill#attestation-recommendation>, <epr:schema:enum:elohim-skill#spiral-detection>, <epr:schema:enum:elohim-skill#care-connection>, <epr:schema:enum:elohim-skill#graduated-intervention>, <epr:schema:enum:elohim-skill#constitutional-verification>, <epr:schema:enum:elohim-skill#accuracy-verification>, <epr:schema:enum:elohim-skill#knowledge-map-synthesis>, <epr:schema:enum:elohim-skill#affinity-analysis>, <epr:schema:enum:elohim-skill#path-recommendation>, <epr:schema:enum:elohim-skill#cross-layer-validation>, <epr:schema:enum:elohim-skill#existential-boundary-enforcement>, <epr:schema:enum:elohim-skill#governance-ratification>, <epr:schema:enum:elohim-skill#path-analysis>, <epr:schema:enum:elohim-skill#learning-objective-validation>, <epr:schema:enum:elohim-skill#prerequisite-verification>, <epr:schema:enum:elohim-skill#mastery-assessment-design>, <epr:schema:enum:elohim-skill#family-value-alignment>, <epr:schema:enum:elohim-skill#personal-agent-support>, <epr:schema:enum:elohim-skill#feedback-profile-negotiation>, <epr:schema:enum:elohim-skill#feedback-profile-enforcement>, <epr:schema:enum:elohim-skill#feedback-profile-upgrade>, <epr:schema:enum:elohim-skill#feedback-profile-downgrade>, <epr:schema:enum:elohim-skill#place-attestation>, <epr:schema:enum:elohim-skill#place-naming-governance>, <epr:schema:enum:elohim-skill#geographic-reach-assignment>, <epr:schema:enum:elohim-skill#bioregional-enforcement> .
+
+<epr:schema:enum:elohim-skill#content-safety-review> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "content-safety-review" ;
+  skos:notation "content-safety-review" .
+
+<epr:schema:enum:elohim-skill#discernment-evaluation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "discernment-evaluation" ;
+  skos:notation "discernment-evaluation" .
+
+<epr:schema:enum:elohim-skill#reach-negotiation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "reach-negotiation" ;
+  skos:notation "reach-negotiation" .
+
+<epr:schema:enum:elohim-skill#attestation-recommendation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "attestation-recommendation" ;
+  skos:notation "attestation-recommendation" .
+
+<epr:schema:enum:elohim-skill#spiral-detection> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "spiral-detection" ;
+  skos:notation "spiral-detection" .
+
+<epr:schema:enum:elohim-skill#care-connection> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "care-connection" ;
+  skos:notation "care-connection" .
+
+<epr:schema:enum:elohim-skill#graduated-intervention> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "graduated-intervention" ;
+  skos:notation "graduated-intervention" .
+
+<epr:schema:enum:elohim-skill#constitutional-verification> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "constitutional-verification" ;
+  skos:notation "constitutional-verification" .
+
+<epr:schema:enum:elohim-skill#accuracy-verification> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "accuracy-verification" ;
+  skos:notation "accuracy-verification" .
+
+<epr:schema:enum:elohim-skill#knowledge-map-synthesis> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "knowledge-map-synthesis" ;
+  skos:notation "knowledge-map-synthesis" .
+
+<epr:schema:enum:elohim-skill#affinity-analysis> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "affinity-analysis" ;
+  skos:notation "affinity-analysis" .
+
+<epr:schema:enum:elohim-skill#path-recommendation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "path-recommendation" ;
+  skos:notation "path-recommendation" .
+
+<epr:schema:enum:elohim-skill#cross-layer-validation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "cross-layer-validation" ;
+  skos:notation "cross-layer-validation" .
+
+<epr:schema:enum:elohim-skill#existential-boundary-enforcement> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "existential-boundary-enforcement" ;
+  skos:notation "existential-boundary-enforcement" .
+
+<epr:schema:enum:elohim-skill#governance-ratification> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "governance-ratification" ;
+  skos:notation "governance-ratification" .
+
+<epr:schema:enum:elohim-skill#path-analysis> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "path-analysis" ;
+  skos:notation "path-analysis" .
+
+<epr:schema:enum:elohim-skill#learning-objective-validation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "learning-objective-validation" ;
+  skos:notation "learning-objective-validation" .
+
+<epr:schema:enum:elohim-skill#prerequisite-verification> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "prerequisite-verification" ;
+  skos:notation "prerequisite-verification" .
+
+<epr:schema:enum:elohim-skill#mastery-assessment-design> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "mastery-assessment-design" ;
+  skos:notation "mastery-assessment-design" .
+
+<epr:schema:enum:elohim-skill#family-value-alignment> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "family-value-alignment" ;
+  skos:notation "family-value-alignment" .
+
+<epr:schema:enum:elohim-skill#personal-agent-support> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "personal-agent-support" ;
+  skos:notation "personal-agent-support" .
+
+<epr:schema:enum:elohim-skill#feedback-profile-negotiation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "feedback-profile-negotiation" ;
+  skos:notation "feedback-profile-negotiation" .
+
+<epr:schema:enum:elohim-skill#feedback-profile-enforcement> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "feedback-profile-enforcement" ;
+  skos:notation "feedback-profile-enforcement" .
+
+<epr:schema:enum:elohim-skill#feedback-profile-upgrade> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "feedback-profile-upgrade" ;
+  skos:notation "feedback-profile-upgrade" .
+
+<epr:schema:enum:elohim-skill#feedback-profile-downgrade> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "feedback-profile-downgrade" ;
+  skos:notation "feedback-profile-downgrade" .
+
+<epr:schema:enum:elohim-skill#place-attestation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "place-attestation" ;
+  skos:notation "place-attestation" .
+
+<epr:schema:enum:elohim-skill#place-naming-governance> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "place-naming-governance" ;
+  skos:notation "place-naming-governance" .
+
+<epr:schema:enum:elohim-skill#geographic-reach-assignment> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "geographic-reach-assignment" ;
+  skos:notation "geographic-reach-assignment" .
+
+<epr:schema:enum:elohim-skill#bioregional-enforcement> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-skill> ;
+  skos:prefLabel "bioregional-enforcement" ;
+  skos:notation "bioregional-enforcement" .
+
+<epr:schema:enum:elohim-specialty> a skos:ConceptScheme ;
+  skos:prefLabel "ElohimSpecialty" ;
+  dct:description "Domains an elohim is primed for via constitution or fine-tuning. Core specialties are protocol-known and affect dispatch routing. Extensible specialties are community-declared and accepted by storage without DNA validation." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:elohim-specialty#child-safety>, <epr:schema:enum:elohim-specialty#family-dynamics>, <epr:schema:enum:elohim-specialty#content-safety>, <epr:schema:enum:elohim-specialty#discernment>, <epr:schema:enum:elohim-specialty#reach-evaluation>, <epr:schema:enum:elohim-specialty#medical>, <epr:schema:enum:elohim-specialty#legal>, <epr:schema:enum:elohim-specialty#crisis>, <epr:schema:enum:elohim-specialty#education>, <epr:schema:enum:elohim-specialty#code-review>, <epr:schema:enum:elohim-specialty#financial-advice>, <epr:schema:enum:elohim-specialty#creative-writing>, <epr:schema:enum:elohim-specialty#technical-documentation>, <epr:schema:enum:elohim-specialty#translation>, <epr:schema:enum:elohim-specialty#poetry>, <epr:schema:enum:elohim-specialty#philosophy>, <epr:schema:enum:elohim-specialty#governance>, <epr:schema:enum:elohim-specialty#conflict-resolution>, <epr:schema:enum:elohim-specialty#curriculum-design>, <epr:schema:enum:elohim-specialty#counseling>, <epr:schema:enum:elohim-specialty#theology>, <epr:schema:enum:elohim-specialty#science>, <epr:schema:enum:elohim-specialty#mathematics>, <epr:schema:enum:elohim-specialty#history>, <epr:schema:enum:elohim-specialty#language-learning>, <epr:schema:enum:elohim-specialty#mental-health>, <epr:schema:enum:elohim-specialty#disability-support>, <epr:schema:enum:elohim-specialty#elder-care>, <epr:schema:enum:elohim-specialty#research>, <epr:schema:enum:elohim-specialty#journalism> .
+
+<epr:schema:enum:elohim-specialty#child-safety> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "child-safety" ;
+  skos:notation "child-safety" .
+
+<epr:schema:enum:elohim-specialty#family-dynamics> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "family-dynamics" ;
+  skos:notation "family-dynamics" .
+
+<epr:schema:enum:elohim-specialty#content-safety> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "content-safety" ;
+  skos:notation "content-safety" .
+
+<epr:schema:enum:elohim-specialty#discernment> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "discernment" ;
+  skos:notation "discernment" .
+
+<epr:schema:enum:elohim-specialty#reach-evaluation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "reach-evaluation" ;
+  skos:notation "reach-evaluation" .
+
+<epr:schema:enum:elohim-specialty#medical> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "medical" ;
+  skos:notation "medical" .
+
+<epr:schema:enum:elohim-specialty#legal> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "legal" ;
+  skos:notation "legal" .
+
+<epr:schema:enum:elohim-specialty#crisis> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "crisis" ;
+  skos:notation "crisis" .
+
+<epr:schema:enum:elohim-specialty#education> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "education" ;
+  skos:notation "education" .
+
+<epr:schema:enum:elohim-specialty#code-review> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "code-review" ;
+  skos:notation "code-review" .
+
+<epr:schema:enum:elohim-specialty#financial-advice> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "financial-advice" ;
+  skos:notation "financial-advice" .
+
+<epr:schema:enum:elohim-specialty#creative-writing> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "creative-writing" ;
+  skos:notation "creative-writing" .
+
+<epr:schema:enum:elohim-specialty#technical-documentation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "technical-documentation" ;
+  skos:notation "technical-documentation" .
+
+<epr:schema:enum:elohim-specialty#translation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "translation" ;
+  skos:notation "translation" .
+
+<epr:schema:enum:elohim-specialty#poetry> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "poetry" ;
+  skos:notation "poetry" .
+
+<epr:schema:enum:elohim-specialty#philosophy> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "philosophy" ;
+  skos:notation "philosophy" .
+
+<epr:schema:enum:elohim-specialty#governance> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "governance" ;
+  skos:notation "governance" .
+
+<epr:schema:enum:elohim-specialty#conflict-resolution> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "conflict-resolution" ;
+  skos:notation "conflict-resolution" .
+
+<epr:schema:enum:elohim-specialty#curriculum-design> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "curriculum-design" ;
+  skos:notation "curriculum-design" .
+
+<epr:schema:enum:elohim-specialty#counseling> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "counseling" ;
+  skos:notation "counseling" .
+
+<epr:schema:enum:elohim-specialty#theology> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "theology" ;
+  skos:notation "theology" .
+
+<epr:schema:enum:elohim-specialty#science> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "science" ;
+  skos:notation "science" .
+
+<epr:schema:enum:elohim-specialty#mathematics> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "mathematics" ;
+  skos:notation "mathematics" .
+
+<epr:schema:enum:elohim-specialty#history> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "history" ;
+  skos:notation "history" .
+
+<epr:schema:enum:elohim-specialty#language-learning> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "language-learning" ;
+  skos:notation "language-learning" .
+
+<epr:schema:enum:elohim-specialty#mental-health> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "mental-health" ;
+  skos:notation "mental-health" .
+
+<epr:schema:enum:elohim-specialty#disability-support> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "disability-support" ;
+  skos:notation "disability-support" .
+
+<epr:schema:enum:elohim-specialty#elder-care> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "elder-care" ;
+  skos:notation "elder-care" .
+
+<epr:schema:enum:elohim-specialty#research> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "research" ;
+  skos:notation "research" .
+
+<epr:schema:enum:elohim-specialty#journalism> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-specialty> ;
+  skos:prefLabel "journalism" ;
+  skos:notation "journalism" .
+
+<epr:schema:enum:elohim-strength> a skos:ConceptScheme ;
+  skos:prefLabel "ElohimStrength" ;
+  dct:description "Observed strengths accrued from attestation history. Core strengths are protocol-named reputation dimensions the imagodei layer tracks. Extensible strengths are community-named emergent patterns. Phase 10 ships a minimal core vocabulary; Phase 11+ will codify additional values from real attestation-history analysis." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:elohim-strength#high-confidence-judgments>, <epr:schema:enum:elohim-strength#appeals-sustained>, <epr:schema:enum:elohim-strength#consensus-alignment>, <epr:schema:enum:elohim-strength#novel-pattern-detection>, <epr:schema:enum:elohim-strength#steady-baseline>, <epr:schema:enum:elohim-strength#consistent-constitutional-reasoning>, <epr:schema:enum:elohim-strength#low-false-positive-rate>, <epr:schema:enum:elohim-strength#fast-resolution>, <epr:schema:enum:elohim-strength#cross-context-consistency>, <epr:schema:enum:elohim-strength#escalation-accuracy> .
+
+<epr:schema:enum:elohim-strength#high-confidence-judgments> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-strength> ;
+  skos:prefLabel "high-confidence-judgments" ;
+  skos:notation "high-confidence-judgments" .
+
+<epr:schema:enum:elohim-strength#appeals-sustained> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-strength> ;
+  skos:prefLabel "appeals-sustained" ;
+  skos:notation "appeals-sustained" .
+
+<epr:schema:enum:elohim-strength#consensus-alignment> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-strength> ;
+  skos:prefLabel "consensus-alignment" ;
+  skos:notation "consensus-alignment" .
+
+<epr:schema:enum:elohim-strength#novel-pattern-detection> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-strength> ;
+  skos:prefLabel "novel-pattern-detection" ;
+  skos:notation "novel-pattern-detection" .
+
+<epr:schema:enum:elohim-strength#steady-baseline> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-strength> ;
+  skos:prefLabel "steady-baseline" ;
+  skos:notation "steady-baseline" .
+
+<epr:schema:enum:elohim-strength#consistent-constitutional-reasoning> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-strength> ;
+  skos:prefLabel "consistent-constitutional-reasoning" ;
+  skos:notation "consistent-constitutional-reasoning" .
+
+<epr:schema:enum:elohim-strength#low-false-positive-rate> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-strength> ;
+  skos:prefLabel "low-false-positive-rate" ;
+  skos:notation "low-false-positive-rate" .
+
+<epr:schema:enum:elohim-strength#fast-resolution> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-strength> ;
+  skos:prefLabel "fast-resolution" ;
+  skos:notation "fast-resolution" .
+
+<epr:schema:enum:elohim-strength#cross-context-consistency> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-strength> ;
+  skos:prefLabel "cross-context-consistency" ;
+  skos:notation "cross-context-consistency" .
+
+<epr:schema:enum:elohim-strength#escalation-accuracy> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-strength> ;
+  skos:prefLabel "escalation-accuracy" ;
+  skos:notation "escalation-accuracy" .
+
+<epr:schema:enum:elohim-tier> a skos:ConceptScheme ;
+  skos:prefLabel "ElohimTier" ;
+  dct:description "Source of truth: Cat-A CollabAgreement DHT entry's initial_tier field in imagodei DNA, plus the deferred friction-gradient evaluator's derived tier output (DNA-notarized at creation; derived thereafter). Category C — wire-shape vocabulary. Coordination scale tier for a Collab-Qahal. Per spec §3.1. M1 only reaches T0; T1+ requires deferred specs." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:elohim-tier#T0>, <epr:schema:enum:elohim-tier#T1>, <epr:schema:enum:elohim-tier#T2>, <epr:schema:enum:elohim-tier#T3> .
+
+<epr:schema:enum:elohim-tier#T0> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-tier> ;
+  skos:prefLabel "T0" ;
+  skos:notation "T0" .
+
+<epr:schema:enum:elohim-tier#T1> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-tier> ;
+  skos:prefLabel "T1" ;
+  skos:notation "T1" .
+
+<epr:schema:enum:elohim-tier#T2> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-tier> ;
+  skos:prefLabel "T2" ;
+  skos:notation "T2" .
+
+<epr:schema:enum:elohim-tier#T3> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:elohim-tier> ;
+  skos:prefLabel "T3" ;
+  skos:notation "T3" .
+
+<epr:schema:enum:engagement-type> a skos:ConceptScheme ;
+  skos:prefLabel "EngagementType" ;
+  dct:description "Types of learner engagement with content. Drive recognition flows and mastery progression." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:engagement-type#view>, <epr:schema:enum:engagement-type#quiz>, <epr:schema:enum:engagement-type#practice>, <epr:schema:enum:engagement-type#discuss>, <epr:schema:enum:engagement-type#create>, <epr:schema:enum:engagement-type#peer>, <epr:schema:enum:engagement-type#teach>, <epr:schema:enum:engagement-type#apply> .
+
+<epr:schema:enum:engagement-type#view> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:engagement-type> ;
+  skos:prefLabel "view" ;
+  skos:notation "view" .
+
+<epr:schema:enum:engagement-type#quiz> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:engagement-type> ;
+  skos:prefLabel "quiz" ;
+  skos:notation "quiz" .
+
+<epr:schema:enum:engagement-type#practice> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:engagement-type> ;
+  skos:prefLabel "practice" ;
+  skos:notation "practice" .
+
+<epr:schema:enum:engagement-type#discuss> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:engagement-type> ;
+  skos:prefLabel "discuss" ;
+  skos:notation "discuss" .
+
+<epr:schema:enum:engagement-type#create> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:engagement-type> ;
+  skos:prefLabel "create" ;
+  skos:notation "create" .
+
+<epr:schema:enum:engagement-type#peer> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:engagement-type> ;
+  skos:prefLabel "peer" ;
+  skos:notation "peer" .
+
+<epr:schema:enum:engagement-type#teach> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:engagement-type> ;
+  skos:prefLabel "teach" ;
+  skos:notation "teach" .
+
+<epr:schema:enum:engagement-type#apply> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:engagement-type> ;
+  skos:prefLabel "apply" ;
+  skos:notation "apply" .
+
+<epr:schema:enum:epistemic-status> a skos:ConceptScheme ;
+  skos:prefLabel "EpistemicStatus" ;
+  dct:description "Communal standing of a claim, as it moves from emergent truth through peer review toward settled canon. Derived-never-stored law: these values name the outcomes of a deterministic fold over witnessed review events (elohim/epr-rea/src/epistemic.rs), NEVER a stored status column — no table, no migration, reconstruction is a re-fold in canonical CID order. Partial order: `emergent` -> `reviewed` -> `canon` is the mechanical ladder; `contested` is sideways, not a rung — an active dispute that routes to a `refer` decision, never a silent resolution; `superseded` is terminal, reached via close-interval by a successor, and the original remains queryable forever. `canon` can only be conferred by a referenced governance act (Mishpat Precedent lineage) — a threshold alone is structurally insufficient to mint it; the maximum mechanical status is `reviewed`. Source of truth: derived — the fold in elohim/epr-rea, never persisted. Orthogonal to the witness ladder (local -> peer-validated -> notarized), which measures evidentiary custody of the record, not communal standing of the claim." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:epistemic-status#emergent>, <epr:schema:enum:epistemic-status#reviewed>, <epr:schema:enum:epistemic-status#contested>, <epr:schema:enum:epistemic-status#canon>, <epr:schema:enum:epistemic-status#superseded> .
+
+<epr:schema:enum:epistemic-status#emergent> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epistemic-status> ;
+  skos:prefLabel "emergent" ;
+  skos:notation "emergent" .
+
+<epr:schema:enum:epistemic-status#reviewed> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epistemic-status> ;
+  skos:prefLabel "reviewed" ;
+  skos:notation "reviewed" .
+
+<epr:schema:enum:epistemic-status#contested> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epistemic-status> ;
+  skos:prefLabel "contested" ;
+  skos:notation "contested" .
+
+<epr:schema:enum:epistemic-status#canon> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epistemic-status> ;
+  skos:prefLabel "canon" ;
+  skos:notation "canon" .
+
+<epr:schema:enum:epistemic-status#superseded> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epistemic-status> ;
+  skos:prefLabel "superseded" ;
+  skos:notation "superseded" .
+
+<epr:schema:enum:epr-kind> a skos:ConceptScheme ;
+  skos:prefLabel "EprKind" ;
+  dct:description "The nine EPR atom kinds defined by the graph substrate spec §4.2. Source of truth: elohim-epr protocol constants. Category A — enumeration values are part of the DNA-notarized protocol vocabulary. Each kind declares required coupling legs: Content requires all three (knowledge + value + governance); Agent/Manifest/Attestation/Delegation require governance; Claim/Observation require knowledge; EconomicEvent requires value; Commitment requires value + governance." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:epr-kind#Content>, <epr:schema:enum:epr-kind#Agent>, <epr:schema:enum:epr-kind#Manifest>, <epr:schema:enum:epr-kind#Claim>, <epr:schema:enum:epr-kind#Observation>, <epr:schema:enum:epr-kind#EconomicEvent>, <epr:schema:enum:epr-kind#Commitment>, <epr:schema:enum:epr-kind#Attestation>, <epr:schema:enum:epr-kind#Delegation> .
+
+<epr:schema:enum:epr-kind#Content> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epr-kind> ;
+  skos:prefLabel "Content" ;
+  skos:notation "Content" .
+
+<epr:schema:enum:epr-kind#Agent> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epr-kind> ;
+  skos:prefLabel "Agent" ;
+  skos:notation "Agent" .
+
+<epr:schema:enum:epr-kind#Manifest> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epr-kind> ;
+  skos:prefLabel "Manifest" ;
+  skos:notation "Manifest" .
+
+<epr:schema:enum:epr-kind#Claim> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epr-kind> ;
+  skos:prefLabel "Claim" ;
+  skos:notation "Claim" .
+
+<epr:schema:enum:epr-kind#Observation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epr-kind> ;
+  skos:prefLabel "Observation" ;
+  skos:notation "Observation" .
+
+<epr:schema:enum:epr-kind#EconomicEvent> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epr-kind> ;
+  skos:prefLabel "EconomicEvent" ;
+  skos:notation "EconomicEvent" .
+
+<epr:schema:enum:epr-kind#Commitment> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epr-kind> ;
+  skos:prefLabel "Commitment" ;
+  skos:notation "Commitment" .
+
+<epr:schema:enum:epr-kind#Attestation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epr-kind> ;
+  skos:prefLabel "Attestation" ;
+  skos:notation "Attestation" .
+
+<epr:schema:enum:epr-kind#Delegation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:epr-kind> ;
+  skos:prefLabel "Delegation" ;
+  skos:notation "Delegation" .
+
+<epr:schema:enum:excludability> a skos:ConceptScheme ;
+  skos:prefLabel "Excludability" ;
+  dct:description "Whether access can be restricted. excludable=fenced land, non-excludable=clean air, conditionally-excludable=commons with Ostrom rules." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:excludability#excludable>, <epr:schema:enum:excludability#non-excludable>, <epr:schema:enum:excludability#conditionally-excludable> .
+
+<epr:schema:enum:excludability#excludable> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:excludability> ;
+  skos:prefLabel "excludable" ;
+  skos:notation "excludable" .
+
+<epr:schema:enum:excludability#non-excludable> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:excludability> ;
+  skos:prefLabel "non-excludable" ;
+  skos:notation "non-excludable" .
+
+<epr:schema:enum:excludability#conditionally-excludable> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:excludability> ;
+  skos:prefLabel "conditionally-excludable" ;
+  skos:notation "conditionally-excludable" .
+
+<epr:schema:enum:fungibility> a skos:ConceptScheme ;
+  skos:prefLabel "Fungibility" ;
+  dct:description "Whether units are interchangeable. fungible=kWh, non-fungible=land parcel, class-fungible=Grade A eggs." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:fungibility#fungible>, <epr:schema:enum:fungibility#non-fungible>, <epr:schema:enum:fungibility#class-fungible> .
+
+<epr:schema:enum:fungibility#fungible> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:fungibility> ;
+  skos:prefLabel "fungible" ;
+  skos:notation "fungible" .
+
+<epr:schema:enum:fungibility#non-fungible> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:fungibility> ;
+  skos:prefLabel "non-fungible" ;
+  skos:notation "non-fungible" .
+
+<epr:schema:enum:fungibility#class-fungible> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:fungibility> ;
+  skos:prefLabel "class-fungible" ;
+  skos:notation "class-fungible" .
+
+<epr:schema:enum:inference-source> a skos:ConceptScheme ;
+  skos:prefLabel "InferenceSource" ;
+  dct:description "How a content relationship edge was derived. Canonical vocabulary for the inference_source field on relationship records. The DHT INFERENCE_SOURCES constant in content_store_integrity (lib.rs) is the Rust truth for the core 4 values; this schema agrees with it and adds 'system' (storage-layer derived, never notarized on-chain)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:inference-source#explicit>, <epr:schema:enum:inference-source#path>, <epr:schema:enum:inference-source#tag>, <epr:schema:enum:inference-source#semantic>, <epr:schema:enum:inference-source#system> .
+
+<epr:schema:enum:inference-source#explicit> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:inference-source> ;
+  skos:prefLabel "explicit" ;
+  skos:notation "explicit" .
+
+<epr:schema:enum:inference-source#path> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:inference-source> ;
+  skos:prefLabel "path" ;
+  skos:notation "path" .
+
+<epr:schema:enum:inference-source#tag> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:inference-source> ;
+  skos:prefLabel "tag" ;
+  skos:notation "tag" .
+
+<epr:schema:enum:inference-source#semantic> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:inference-source> ;
+  skos:prefLabel "semantic" ;
+  skos:notation "semantic" .
+
+<epr:schema:enum:inference-source#system> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:inference-source> ;
+  skos:prefLabel "system" ;
+  skos:notation "system" .
+
+<epr:schema:enum:instrument-archetype> a skos:ConceptScheme ;
+  skos:prefLabel "InstrumentArchetype" ;
+  dct:description "Protocol-level instrument archetypes for feedback observation. Each archetype is a named pattern for how observations are produced — apps reference these in their observation declarations." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:instrument-archetype#retention-check>, <epr:schema:enum:instrument-archetype#outcome-correlation>, <epr:schema:enum:instrument-archetype#distribution-health>, <epr:schema:enum:instrument-archetype#cost-accumulation>, <epr:schema:enum:instrument-archetype#outcome-divergence>, <epr:schema:enum:instrument-archetype#community-report> .
+
+<epr:schema:enum:instrument-archetype#retention-check> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:instrument-archetype> ;
+  skos:prefLabel "retention-check" ;
+  skos:notation "retention-check" .
+
+<epr:schema:enum:instrument-archetype#outcome-correlation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:instrument-archetype> ;
+  skos:prefLabel "outcome-correlation" ;
+  skos:notation "outcome-correlation" .
+
+<epr:schema:enum:instrument-archetype#distribution-health> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:instrument-archetype> ;
+  skos:prefLabel "distribution-health" ;
+  skos:notation "distribution-health" .
+
+<epr:schema:enum:instrument-archetype#cost-accumulation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:instrument-archetype> ;
+  skos:prefLabel "cost-accumulation" ;
+  skos:notation "cost-accumulation" .
+
+<epr:schema:enum:instrument-archetype#outcome-divergence> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:instrument-archetype> ;
+  skos:prefLabel "outcome-divergence" ;
+  skos:notation "outcome-divergence" .
+
+<epr:schema:enum:instrument-archetype#community-report> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:instrument-archetype> ;
+  skos:prefLabel "community-report" ;
+  skos:notation "community-report" .
+
+<epr:schema:enum:mastery-level> a skos:ConceptScheme ;
+  skos:prefLabel "MasteryLevel" ;
+  dct:description "Bloom's taxonomy-aligned mastery progression." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:mastery-level#not_started>, <epr:schema:enum:mastery-level#seen>, <epr:schema:enum:mastery-level#remember>, <epr:schema:enum:mastery-level#understand>, <epr:schema:enum:mastery-level#apply>, <epr:schema:enum:mastery-level#analyze>, <epr:schema:enum:mastery-level#evaluate>, <epr:schema:enum:mastery-level#create>, <epr:schema:enum:mastery-level#recognize>, <epr:schema:enum:mastery-level#recall>, <epr:schema:enum:mastery-level#synthesize> .
+
+<epr:schema:enum:mastery-level#not_started> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:mastery-level> ;
+  skos:prefLabel "not_started" ;
+  skos:notation "not_started" .
+
+<epr:schema:enum:mastery-level#seen> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:mastery-level> ;
+  skos:prefLabel "seen" ;
+  skos:notation "seen" .
+
+<epr:schema:enum:mastery-level#remember> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:mastery-level> ;
+  skos:prefLabel "remember" ;
+  skos:notation "remember" .
+
+<epr:schema:enum:mastery-level#understand> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:mastery-level> ;
+  skos:prefLabel "understand" ;
+  skos:notation "understand" .
+
+<epr:schema:enum:mastery-level#apply> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:mastery-level> ;
+  skos:prefLabel "apply" ;
+  skos:notation "apply" .
+
+<epr:schema:enum:mastery-level#analyze> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:mastery-level> ;
+  skos:prefLabel "analyze" ;
+  skos:notation "analyze" .
+
+<epr:schema:enum:mastery-level#evaluate> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:mastery-level> ;
+  skos:prefLabel "evaluate" ;
+  skos:notation "evaluate" .
+
+<epr:schema:enum:mastery-level#create> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:mastery-level> ;
+  skos:prefLabel "create" ;
+  skos:notation "create" .
+
+<epr:schema:enum:mastery-level#recognize> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:mastery-level> ;
+  skos:prefLabel "recognize" ;
+  skos:notation "recognize" .
+
+<epr:schema:enum:mastery-level#recall> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:mastery-level> ;
+  skos:prefLabel "recall" ;
+  skos:notation "recall" .
+
+<epr:schema:enum:mastery-level#synthesize> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:mastery-level> ;
+  skos:prefLabel "synthesize" ;
+  skos:notation "synthesize" .
+
+<epr:schema:enum:member-kind> a skos:ConceptScheme ;
+  skos:prefLabel "MemberKind" ;
+  dct:description "Source of truth: Cat-A Membership DHT entry's member_kind field in imagodei DNA (DNA-notarized). Category C — wire-shape projection of that enum field. Polymorphic membership subject type for Collective/Qahal members. Per spec §2.1." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:member-kind#Person>, <epr:schema:enum:member-kind#Collective>, <epr:schema:enum:member-kind#ElohimAgent> .
+
+<epr:schema:enum:member-kind#Person> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:member-kind> ;
+  skos:prefLabel "Person" ;
+  skos:notation "Person" .
+
+<epr:schema:enum:member-kind#Collective> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:member-kind> ;
+  skos:prefLabel "Collective" ;
+  skos:notation "Collective" .
+
+<epr:schema:enum:member-kind#ElohimAgent> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:member-kind> ;
+  skos:prefLabel "ElohimAgent" ;
+  skos:notation "ElohimAgent" .
+
+<epr:schema:enum:nat-status> a skos:ConceptScheme ;
+  skos:prefLabel "NatStatus" ;
+  dct:description "NAT traversal status as detected by libp2p autonat protocol" ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:nat-status#unknown>, <epr:schema:enum:nat-status#public>, <epr:schema:enum:nat-status#private> .
+
+<epr:schema:enum:nat-status#unknown> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:nat-status> ;
+  skos:prefLabel "unknown" ;
+  skos:notation "unknown" .
+
+<epr:schema:enum:nat-status#public> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:nat-status> ;
+  skos:prefLabel "public" ;
+  skos:notation "public" .
+
+<epr:schema:enum:nat-status#private> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:nat-status> ;
+  skos:prefLabel "private" ;
+  skos:notation "private" .
+
+<epr:schema:enum:observation-polarity> a skos:ConceptScheme ;
+  skos:prefLabel "ObservationPolarity" ;
+  dct:description "Polarity of a feedback observation. Positive observations extend claim validity horizons. Negative observations shorten them. The protocol requires at least one negative-polarity observation per manifest — systems cannot ship positive-only feedback." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:observation-polarity#positive>, <epr:schema:enum:observation-polarity#negative> .
+
+<epr:schema:enum:observation-polarity#positive> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:observation-polarity> ;
+  skos:prefLabel "positive" ;
+  skos:notation "positive" .
+
+<epr:schema:enum:observation-polarity#negative> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:observation-polarity> ;
+  skos:prefLabel "negative" ;
+  skos:notation "negative" .
+
+<epr:schema:enum:osm-element-type> a skos:ConceptScheme ;
+  skos:prefLabel "OsmElementType" ;
+  dct:description "OpenStreetMap element type for external spatial reference. node=point, way=line/polygon, relation=complex boundary/route." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:osm-element-type#node>, <epr:schema:enum:osm-element-type#way>, <epr:schema:enum:osm-element-type#relation> .
+
+<epr:schema:enum:osm-element-type#node> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:osm-element-type> ;
+  skos:prefLabel "node" ;
+  skos:notation "node" .
+
+<epr:schema:enum:osm-element-type#way> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:osm-element-type> ;
+  skos:prefLabel "way" ;
+  skos:notation "way" .
+
+<epr:schema:enum:osm-element-type#relation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:osm-element-type> ;
+  skos:prefLabel "relation" ;
+  skos:notation "relation" .
+
+<epr:schema:enum:path-visibility> a skos:ConceptScheme ;
+  skos:prefLabel "PathVisibility" ;
+  dct:description "Visibility levels for learning paths." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:path-visibility#private>, <epr:schema:enum:path-visibility#intimate>, <epr:schema:enum:path-visibility#unlisted>, <epr:schema:enum:path-visibility#community>, <epr:schema:enum:path-visibility#public>, <epr:schema:enum:path-visibility#draft> .
+
+<epr:schema:enum:path-visibility#private> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:path-visibility> ;
+  skos:prefLabel "private" ;
+  skos:notation "private" .
+
+<epr:schema:enum:path-visibility#intimate> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:path-visibility> ;
+  skos:prefLabel "intimate" ;
+  skos:notation "intimate" .
+
+<epr:schema:enum:path-visibility#unlisted> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:path-visibility> ;
+  skos:prefLabel "unlisted" ;
+  skos:notation "unlisted" .
+
+<epr:schema:enum:path-visibility#community> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:path-visibility> ;
+  skos:prefLabel "community" ;
+  skos:notation "community" .
+
+<epr:schema:enum:path-visibility#public> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:path-visibility> ;
+  skos:prefLabel "public" ;
+  skos:notation "public" .
+
+<epr:schema:enum:path-visibility#draft> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:path-visibility> ;
+  skos:prefLabel "draft" ;
+  skos:notation "draft" .
+
+<epr:schema:enum:place-status> a skos:ConceptScheme ;
+  skos:prefLabel "PlaceStatus" ;
+  dct:description "Lifecycle status of a governed Place. active=recognized boundary, proposed=pending governance approval, disputed=boundary under challenge, dissolved=no longer recognized." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:place-status#active>, <epr:schema:enum:place-status#proposed>, <epr:schema:enum:place-status#disputed>, <epr:schema:enum:place-status#dissolved> .
+
+<epr:schema:enum:place-status#active> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:place-status> ;
+  skos:prefLabel "active" ;
+  skos:notation "active" .
+
+<epr:schema:enum:place-status#proposed> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:place-status> ;
+  skos:prefLabel "proposed" ;
+  skos:notation "proposed" .
+
+<epr:schema:enum:place-status#disputed> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:place-status> ;
+  skos:prefLabel "disputed" ;
+  skos:notation "disputed" .
+
+<epr:schema:enum:place-status#dissolved> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:place-status> ;
+  skos:prefLabel "dissolved" ;
+  skos:notation "dissolved" .
+
+<epr:schema:enum:place-type> a skos:ConceptScheme ;
+  skos:prefLabel "PlaceType" ;
+  dct:description "Classification of governed spatial entities. administrative=city/state, bioregional=watershed/ecosystem, parcel=land plot, infrastructure=solar farm/water treatment, gathering=community center/market, watershed=waterbody/catchment, agricultural=farmland/greenhouse, custom=community-defined." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:place-type#administrative>, <epr:schema:enum:place-type#bioregional>, <epr:schema:enum:place-type#parcel>, <epr:schema:enum:place-type#infrastructure>, <epr:schema:enum:place-type#gathering>, <epr:schema:enum:place-type#watershed>, <epr:schema:enum:place-type#agricultural>, <epr:schema:enum:place-type#custom> .
+
+<epr:schema:enum:place-type#administrative> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:place-type> ;
+  skos:prefLabel "administrative" ;
+  skos:notation "administrative" .
+
+<epr:schema:enum:place-type#bioregional> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:place-type> ;
+  skos:prefLabel "bioregional" ;
+  skos:notation "bioregional" .
+
+<epr:schema:enum:place-type#parcel> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:place-type> ;
+  skos:prefLabel "parcel" ;
+  skos:notation "parcel" .
+
+<epr:schema:enum:place-type#infrastructure> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:place-type> ;
+  skos:prefLabel "infrastructure" ;
+  skos:notation "infrastructure" .
+
+<epr:schema:enum:place-type#gathering> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:place-type> ;
+  skos:prefLabel "gathering" ;
+  skos:notation "gathering" .
+
+<epr:schema:enum:place-type#watershed> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:place-type> ;
+  skos:prefLabel "watershed" ;
+  skos:notation "watershed" .
+
+<epr:schema:enum:place-type#agricultural> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:place-type> ;
+  skos:prefLabel "agricultural" ;
+  skos:notation "agricultural" .
+
+<epr:schema:enum:place-type#custom> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:place-type> ;
+  skos:prefLabel "custom" ;
+  skos:notation "custom" .
+
+<epr:schema:enum:reach> a skos:ConceptScheme ;
+  skos:prefLabel "Reach" ;
+  dct:description "Content reach/visibility level. Ordered from most restrictive to most open. Source of truth: DNA-notarized CORE_REACH_LEVELS constant in content_store_integrity zome. Category A — enumeration values are part of the protocol vocabulary enforced by gateways without parsing payload." ;
+  <epr:vocab#ordered> true ;
+  skos:hasTopConcept <epr:schema:enum:reach#private>, <epr:schema:enum:reach#self>, <epr:schema:enum:reach#intimate>, <epr:schema:enum:reach#trusted>, <epr:schema:enum:reach#familiar>, <epr:schema:enum:reach#community>, <epr:schema:enum:reach#public>, <epr:schema:enum:reach#commons> .
+
+<epr:schema:enum:reach#private> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach> ;
+  skos:prefLabel "private" ;
+  <epr:vocab#ordinalPosition> "0"^^xsd:integer ;
+  skos:notation "private" .
+
+<epr:schema:enum:reach#self> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach> ;
+  skos:prefLabel "self" ;
+  <epr:vocab#ordinalPosition> "1"^^xsd:integer ;
+  skos:notation "self" .
+
+<epr:schema:enum:reach#intimate> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach> ;
+  skos:prefLabel "intimate" ;
+  <epr:vocab#ordinalPosition> "2"^^xsd:integer ;
+  skos:notation "intimate" .
+
+<epr:schema:enum:reach#trusted> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach> ;
+  skos:prefLabel "trusted" ;
+  <epr:vocab#ordinalPosition> "3"^^xsd:integer ;
+  skos:notation "trusted" .
+
+<epr:schema:enum:reach#familiar> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach> ;
+  skos:prefLabel "familiar" ;
+  <epr:vocab#ordinalPosition> "4"^^xsd:integer ;
+  skos:notation "familiar" .
+
+<epr:schema:enum:reach#community> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach> ;
+  skos:prefLabel "community" ;
+  <epr:vocab#ordinalPosition> "5"^^xsd:integer ;
+  skos:notation "community" .
+
+<epr:schema:enum:reach#public> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach> ;
+  skos:prefLabel "public" ;
+  <epr:vocab#ordinalPosition> "6"^^xsd:integer ;
+  skos:notation "public" .
+
+<epr:schema:enum:reach#commons> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach> ;
+  skos:prefLabel "commons" ;
+  <epr:vocab#ordinalPosition> "7"^^xsd:integer ;
+  skos:notation "commons" .
+
+<epr:schema:enum:relationship-type> a skos:ConceptScheme ;
+  skos:prefLabel "RelationshipType" ;
+  dct:description "Content graph edge types." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:relationship-type#contains>, <epr:schema:enum:relationship-type#belongs_to>, <epr:schema:enum:relationship-type#describes>, <epr:schema:enum:relationship-type#implements>, <epr:schema:enum:relationship-type#validates>, <epr:schema:enum:relationship-type#relates_to>, <epr:schema:enum:relationship-type#references>, <epr:schema:enum:relationship-type#depends_on>, <epr:schema:enum:relationship-type#requires>, <epr:schema:enum:relationship-type#follows>, <epr:schema:enum:relationship-type#derived_from>, <epr:schema:enum:relationship-type#source_of> .
+
+<epr:schema:enum:relationship-type#contains> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relationship-type> ;
+  skos:prefLabel "contains" ;
+  skos:notation "contains" .
+
+<epr:schema:enum:relationship-type#belongs_to> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relationship-type> ;
+  skos:prefLabel "belongs_to" ;
+  skos:notation "belongs_to" .
+
+<epr:schema:enum:relationship-type#describes> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relationship-type> ;
+  skos:prefLabel "describes" ;
+  skos:notation "describes" .
+
+<epr:schema:enum:relationship-type#implements> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relationship-type> ;
+  skos:prefLabel "implements" ;
+  skos:notation "implements" .
+
+<epr:schema:enum:relationship-type#validates> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relationship-type> ;
+  skos:prefLabel "validates" ;
+  skos:notation "validates" .
+
+<epr:schema:enum:relationship-type#relates_to> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relationship-type> ;
+  skos:prefLabel "relates_to" ;
+  skos:notation "relates_to" .
+
+<epr:schema:enum:relationship-type#references> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relationship-type> ;
+  skos:prefLabel "references" ;
+  skos:notation "references" .
+
+<epr:schema:enum:relationship-type#depends_on> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relationship-type> ;
+  skos:prefLabel "depends_on" ;
+  skos:notation "depends_on" .
+
+<epr:schema:enum:relationship-type#requires> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relationship-type> ;
+  skos:prefLabel "requires" ;
+  skos:notation "requires" .
+
+<epr:schema:enum:relationship-type#follows> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relationship-type> ;
+  skos:prefLabel "follows" ;
+  skos:notation "follows" .
+
+<epr:schema:enum:relationship-type#derived_from> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relationship-type> ;
+  skos:prefLabel "derived_from" ;
+  skos:notation "derived_from" .
+
+<epr:schema:enum:relationship-type#source_of> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relationship-type> ;
+  skos:prefLabel "source_of" ;
+  skos:notation "source_of" .
+
+<epr:schema:enum:relay-mode> a skos:ConceptScheme ;
+  skos:prefLabel "RelayMode" ;
+  dct:description "Relay operating mode for libp2p circuit relay" ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:relay-mode#disabled>, <epr:schema:enum:relay-mode#client>, <epr:schema:enum:relay-mode#server>, <epr:schema:enum:relay-mode#both> .
+
+<epr:schema:enum:relay-mode#disabled> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relay-mode> ;
+  skos:prefLabel "disabled" ;
+  skos:notation "disabled" .
+
+<epr:schema:enum:relay-mode#client> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relay-mode> ;
+  skos:prefLabel "client" ;
+  skos:notation "client" .
+
+<epr:schema:enum:relay-mode#server> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relay-mode> ;
+  skos:prefLabel "server" ;
+  skos:notation "server" .
+
+<epr:schema:enum:relay-mode#both> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:relay-mode> ;
+  skos:prefLabel "both" ;
+  skos:notation "both" .
+
+<epr:schema:enum:renderer-kind> a skos:ConceptScheme ;
+  skos:prefLabel "RendererKind" ;
+  dct:description "Kind of server-side renderer a doorway carries. Reserved values are valid claim values; only `angular-ssr` is implemented in elohim-render today. Source of truth: doorway runtime (Category C operational). Not a DHT entry type." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:renderer-kind#angular-ssr>, <epr:schema:enum:renderer-kind#react-rsc>, <epr:schema:enum:renderer-kind#vue-ssr>, <epr:schema:enum:renderer-kind#svelte-ssr>, <epr:schema:enum:renderer-kind#lit-ssr>, <epr:schema:enum:renderer-kind#static-html> .
+
+<epr:schema:enum:renderer-kind#angular-ssr> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:renderer-kind> ;
+  skos:prefLabel "angular-ssr" ;
+  skos:notation "angular-ssr" .
+
+<epr:schema:enum:renderer-kind#react-rsc> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:renderer-kind> ;
+  skos:prefLabel "react-rsc" ;
+  skos:notation "react-rsc" .
+
+<epr:schema:enum:renderer-kind#vue-ssr> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:renderer-kind> ;
+  skos:prefLabel "vue-ssr" ;
+  skos:notation "vue-ssr" .
+
+<epr:schema:enum:renderer-kind#svelte-ssr> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:renderer-kind> ;
+  skos:prefLabel "svelte-ssr" ;
+  skos:notation "svelte-ssr" .
+
+<epr:schema:enum:renderer-kind#lit-ssr> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:renderer-kind> ;
+  skos:prefLabel "lit-ssr" ;
+  skos:notation "lit-ssr" .
+
+<epr:schema:enum:renderer-kind#static-html> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:renderer-kind> ;
+  skos:prefLabel "static-html" ;
+  skos:notation "static-html" .
+
+<epr:schema:enum:rivalry> a skos:ConceptScheme ;
+  skos:prefLabel "Rivalry" ;
+  dct:description "Whether consumption by one agent prevents consumption by another. rival=strawberry, non-rival=knowledge, partially-rival=bandwidth/shared compute." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:rivalry#rival>, <epr:schema:enum:rivalry#non-rival>, <epr:schema:enum:rivalry#partially-rival> .
+
+<epr:schema:enum:rivalry#rival> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rivalry> ;
+  skos:prefLabel "rival" ;
+  skos:notation "rival" .
+
+<epr:schema:enum:rivalry#non-rival> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rivalry> ;
+  skos:prefLabel "non-rival" ;
+  skos:notation "non-rival" .
+
+<epr:schema:enum:rivalry#partially-rival> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rivalry> ;
+  skos:prefLabel "partially-rival" ;
+  skos:notation "partially-rival" .
+
+<epr:schema:enum:session-lifecycle-state> a skos:ConceptScheme ;
+  skos:prefLabel "SessionLifecycleState" ;
+  dct:description "Pre-canonical participation lifecycle state managed by the session-bridge primitive. Operational vocabulary — not DHT-notarized; not held in any zome. Carried by the Capability Profile as a protocol-core Standing per the Capability Profile spec §5.1. See session-bridge spec (2026-05-28-session-bridge-design.md) §1 for the four-state lifecycle model." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:session-lifecycle-state#Anonymous>, <epr:schema:enum:session-lifecycle-state#OauthIdentified>, <epr:schema:enum:session-lifecycle-state#PeerNativeSampling>, <epr:schema:enum:session-lifecycle-state#PeerNativeMember> .
+
+<epr:schema:enum:session-lifecycle-state#Anonymous> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:session-lifecycle-state> ;
+  skos:prefLabel "Anonymous" ;
+  skos:notation "Anonymous" .
+
+<epr:schema:enum:session-lifecycle-state#OauthIdentified> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:session-lifecycle-state> ;
+  skos:prefLabel "OauthIdentified" ;
+  skos:notation "OauthIdentified" .
+
+<epr:schema:enum:session-lifecycle-state#PeerNativeSampling> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:session-lifecycle-state> ;
+  skos:prefLabel "PeerNativeSampling" ;
+  skos:notation "PeerNativeSampling" .
+
+<epr:schema:enum:session-lifecycle-state#PeerNativeMember> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:session-lifecycle-state> ;
+  skos:prefLabel "PeerNativeMember" ;
+  skos:notation "PeerNativeMember" .
+
+<epr:schema:enum:share-allocation-form> a skos:ConceptScheme ;
+  skos:prefLabel "ShareAllocationForm" ;
+  dct:description "Source of truth: Cat-A CollabAgreement DHT entry's share_allocation_json.form field in imagodei DNA (DNA-notarized). Category C — wire-shape vocabulary. Form of share-routing function. Per spec §6.1. M1 only supports declared." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:share-allocation-form#declared>, <epr:schema:enum:share-allocation-form#affinityDerived> .
+
+<epr:schema:enum:share-allocation-form#declared> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:share-allocation-form> ;
+  skos:prefLabel "declared" ;
+  skos:notation "declared" .
+
+<epr:schema:enum:share-allocation-form#affinityDerived> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:share-allocation-form> ;
+  skos:prefLabel "affinityDerived" ;
+  skos:notation "affinityDerived" .
+
+<epr:schema:enum:spatial-context-type> a skos:ConceptScheme ;
+  skos:prefLabel "SpatialContextType" ;
+  dct:description "Type of spatial context attached to an entity. point=single location, area=polygon boundary, route=path with waypoints." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:spatial-context-type#point>, <epr:schema:enum:spatial-context-type#area>, <epr:schema:enum:spatial-context-type#route> .
+
+<epr:schema:enum:spatial-context-type#point> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:spatial-context-type> ;
+  skos:prefLabel "point" ;
+  skos:notation "point" .
+
+<epr:schema:enum:spatial-context-type#area> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:spatial-context-type> ;
+  skos:prefLabel "area" ;
+  skos:notation "area" .
+
+<epr:schema:enum:spatial-context-type#route> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:spatial-context-type> ;
+  skos:prefLabel "route" ;
+  skos:notation "route" .
+
+<epr:schema:enum:step-type> a skos:ConceptScheme ;
+  skos:prefLabel "StepType" ;
+  dct:description "Types of steps within learning paths." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:step-type#content>, <epr:schema:enum:step-type#read>, <epr:schema:enum:step-type#path>, <epr:schema:enum:step-type#external>, <epr:schema:enum:step-type#practice>, <epr:schema:enum:step-type#assess>, <epr:schema:enum:step-type#video>, <epr:schema:enum:step-type#interactive>, <epr:schema:enum:step-type#checkpoint>, <epr:schema:enum:step-type#reflection> .
+
+<epr:schema:enum:step-type#content> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:step-type> ;
+  skos:prefLabel "content" ;
+  skos:notation "content" .
+
+<epr:schema:enum:step-type#read> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:step-type> ;
+  skos:prefLabel "read" ;
+  skos:notation "read" .
+
+<epr:schema:enum:step-type#path> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:step-type> ;
+  skos:prefLabel "path" ;
+  skos:notation "path" .
+
+<epr:schema:enum:step-type#external> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:step-type> ;
+  skos:prefLabel "external" ;
+  skos:notation "external" .
+
+<epr:schema:enum:step-type#practice> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:step-type> ;
+  skos:prefLabel "practice" ;
+  skos:notation "practice" .
+
+<epr:schema:enum:step-type#assess> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:step-type> ;
+  skos:prefLabel "assess" ;
+  skos:notation "assess" .
+
+<epr:schema:enum:step-type#video> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:step-type> ;
+  skos:prefLabel "video" ;
+  skos:notation "video" .
+
+<epr:schema:enum:step-type#interactive> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:step-type> ;
+  skos:prefLabel "interactive" ;
+  skos:notation "interactive" .
+
+<epr:schema:enum:step-type#checkpoint> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:step-type> ;
+  skos:prefLabel "checkpoint" ;
+  skos:notation "checkpoint" .
+
+<epr:schema:enum:step-type#reflection> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:step-type> ;
+  skos:prefLabel "reflection" ;
+  skos:notation "reflection" .
+
+<epr:schema:enum:substrate-signal> a skos:ConceptScheme ;
+  skos:prefLabel "SubstrateSignal" ;
+  dct:description "Protocol substrate signal categories. Every app signal maps to one of these primitives. These are the resource dimensions the protocol tracks and governs." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:substrate-signal#attention>, <epr:schema:enum:substrate-signal#compute>, <epr:schema:enum:substrate-signal#storage>, <epr:schema:enum:substrate-signal#bandwidth>, <epr:schema:enum:substrate-signal#energy>, <epr:schema:enum:substrate-signal#time>, <epr:schema:enum:substrate-signal#resource> .
+
+<epr:schema:enum:substrate-signal#attention> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:substrate-signal> ;
+  skos:prefLabel "attention" ;
+  skos:notation "attention" .
+
+<epr:schema:enum:substrate-signal#compute> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:substrate-signal> ;
+  skos:prefLabel "compute" ;
+  skos:notation "compute" .
+
+<epr:schema:enum:substrate-signal#storage> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:substrate-signal> ;
+  skos:prefLabel "storage" ;
+  skos:notation "storage" .
+
+<epr:schema:enum:substrate-signal#bandwidth> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:substrate-signal> ;
+  skos:prefLabel "bandwidth" ;
+  skos:notation "bandwidth" .
+
+<epr:schema:enum:substrate-signal#energy> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:substrate-signal> ;
+  skos:prefLabel "energy" ;
+  skos:notation "energy" .
+
+<epr:schema:enum:substrate-signal#time> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:substrate-signal> ;
+  skos:prefLabel "time" ;
+  skos:notation "time" .
+
+<epr:schema:enum:substrate-signal#resource> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:substrate-signal> ;
+  skos:prefLabel "resource" ;
+  skos:notation "resource" .
+
+<epr:schema:enum:validation-status> a skos:ConceptScheme ;
+  skos:prefLabel "ValidationStatus" ;
+  dct:description "Schema migration status for records. Defined in views.rs." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:validation-status#valid>, <epr:schema:enum:validation-status#migrated>, <epr:schema:enum:validation-status#degraded>, <epr:schema:enum:validation-status#healing> .
+
+<epr:schema:enum:validation-status#valid> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:validation-status> ;
+  skos:prefLabel "valid" ;
+  skos:notation "valid" .
+
+<epr:schema:enum:validation-status#migrated> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:validation-status> ;
+  skos:prefLabel "migrated" ;
+  skos:notation "migrated" .
+
+<epr:schema:enum:validation-status#degraded> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:validation-status> ;
+  skos:prefLabel "degraded" ;
+  skos:notation "degraded" .
+
+<epr:schema:enum:validation-status#healing> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:validation-status> ;
+  skos:prefLabel "healing" ;
+  skos:notation "healing" .
+
+# =============== axes (2) — what our silence means ===============
+
+<epr:registry:axis:epistemic> a <epr:vocab#Axis> ;
+  skos:prefLabel "epistemic" ;
+  dct:description "Communal standing of a claim — how emergent truth moves through peer review toward settled canon. This axis is a standing verdict derived at the evidence-holding edge (a deterministic fold over witnessed REA review events), never a stored status column, and it is explained by a witness (the checks/observations folded, not an opaque score). Every contest point routes to `refer`, never to silence: an active dispute is a first-class outcome of the classification, not an error state or a stale value." ;
+  <epr:vocab#vocabulary> <epr:schema:enum:epistemic-status> ;
+  <epr:vocab#kind> "derived" ;
+  <epr:vocab#factClosure> "open" ;
+  <epr:vocab#closureRationale> "FACTS are open because a claim nobody has reviewed is unreviewed, not rejected — silence from a peer is a partial view, never a Dismiss. The shipped code already behaves this way: `standing_ratio()` returns `Option<f64>` and yields `None` on zero evidence rather than 0.0, so 'no reviews' can never be read as 'reviewed badly', and classification of an unreviewed claim is `emergent` — served honestly as emergent, never inflated and never treated as refuted. VERDICTS are closed because `cite_gate` gates an action: a claim that has not earned standing does not cite, and the absence of accumulated affirmation is a refusal to promote, not a licence to proceed while we wait. The two postures meet at `classify()`, which is total, and the contested case routes to `refer` rather than resolving silently to either side." ;
+  <epr:vocab#orthogonalTo> "witness-ladder (evidentiary custody of the record: local -> peer-validated -> notarized; README.md:208)" ;
+  <epr:vocab#orthogonalTo> "epr:registry:axis:reach (visibility/disclosure — a different question about the same claim)" ;
+  <epr:vocab#verdictClosure> "closed" .
+
+<epr:registry:axis:reach> a <epr:vocab#Axis> ;
+  skos:prefLabel "reach" ;
+  dct:description "Disclosure of a claim across the SOCIAL axis — who may see this, now. Two layers, per the vocabulary-split spec §2: a DECLARED FLOOR authored at creation (the eight-value reach vocabulary, notarized in the content_store_integrity zome) and a DERIVED VERDICT that may narrow it at serve time based on the author's earned standing. Composition is narrowing-only: the derived layer can refuse or withhold reach the floor declared, and can never widen past it. Reach is NOT epistemic standing (how well-reviewed a claim is), NOT the witness ladder (evidentiary custody of the record), and NOT retention (disclosure across the TEMPORAL axis — what may still be seen later). A well-reviewed claim may be private; an unreviewed claim may be public. Confusing reach with standing is the drift this card exists to resist." ;
+  <epr:vocab#vocabulary> <epr:schema:enum:reach> ;
+  <epr:vocab#kind> "two-layer" ;
+  <epr:vocab#factClosure> "open" ;
+  <epr:vocab#closureRationale> "FACTS are open because standing evidence is gathered from a partial view of the network: not having observed an author's contributions is not evidence that they have none, which is exactly why `Standing::Unknown` is a distinct value rather than a zero, and why the registry carries an explicit `UnknownTreatment` policy instead of silently reading absence as bad standing. VERDICTS are closed because reach gates disclosure, and disclosure is irreversible — bytes served cannot be unserved. The absence of earned standing is a refusal to widen, never an 'unknown, therefore serve it and find out'. This is the fail-open inversion the OWL2 graduation refused at the verdict layer: under an open-world reading, a missing standing assertion would read as 'possibly sufficient', and an adversary's optimal move becomes withholding evidence." ;
+  <epr:vocab#orthogonalTo> "epr:registry:axis:epistemic (communal standing of the claim — how reviewed, not how visible)" ;
+  <epr:vocab#orthogonalTo> "witness-ladder (evidentiary custody of the record: local -> peer-validated -> notarized)" ;
+  <epr:vocab#orthogonalTo> "retention (the temporal half of the same disclosure gradient — not yet carded)" ;
+  <epr:vocab#verdictClosure> "closed" .
+
+# 41 vocabularies · 315 concepts · 2 axes
