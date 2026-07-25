@@ -20,6 +20,7 @@ in the sprint report.
 | `blob-durability` | Deterministic floor — blob heal-on-read (race-fetch), chaos/churn survival, grandma-vertical felt safety, household-diversity placement, salvage placement, governed distribution. Sourced from `features/resilience/` (not this directory). |
 | `keyspace-coverage` | Cluster-wide RS coverage, placement-gap counts, and weave-lens capacity eyes. Sourced from `features/resilience/operational-weave.feature`. |
 | `reconcile-inventory` | Commitment inventory reconciliation — commitment-backed card counting, custody-pair naming, peer-discovered commitment convergence, substrate delivery reconciliation. Sourced from `features/resilience/`. |
+| `operator-runtime-surface` | Operator verbs as commitment-gated protocol acts — a `delegates-compute` holder drives a reconcile and the peer attests the commitment cid; a non-holder and a revoked holder are refused; a peer serves its own telemetry. Kills the kubectl-only class and the adam-invisibility class. **RED-FIRST and currently `@wip`** — the gate primitive already exists (`elohim-storage/src/services/operation_authorization.rs`); the gap is that `/admin/*` verbs never consult it and doorways run `DEV_MODE=true`. Un-`@wip` is an operator decision (it adds a red concern to the rollup). |
 
 Add new concerns here as they are introduced. Concern names must be lowercase kebab-case (e.g.
 `@concern:my-new-concern`), and must appear in the table above before the feature file is merged.
