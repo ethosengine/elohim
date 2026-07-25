@@ -194,7 +194,7 @@
     },
     "gates": {
       "type": "object",
-      "description": "Declared gate processes — THE CONSUMER'S VERDICT SURFACE. A gate is a decision procedure a domain contributes: it handles protocol events and its answer gates an action. This is the surface a downstream consumer would extend with their own vocabulary or ontology, which is exactly why each gate must state what its SILENCE means (see `closure`). Bringing a foreign ontology is not the risk; bringing it into an undeclared verdict path is. Keyed by gate id.",
+      "description": "Declared gate processes — THE CONSUMER'S VERDICT SURFACE. A gate is a decision procedure a domain contributes: it handles protocol events and its answer gates an action. This is the surface a downstream consumer would extend with their own vocabulary or ontology, which is exactly why each gate must state what its SILENCE means (see `closure`). Bringing a foreign ontology is not the risk; bringing it into an undeclared verdict path is. Keyed by gate id. OBLIGATION FOR WHOEVER BUILDS GATE CONSUMPTION (no runtime reads this block as of 2026-07-24): the enforcement point is CONSUMPTION, never publication. Do not gate whose manifest may exist — that makes this protocol the registrar of who is allowed an app, which is the capture vector the whole design refuses. Instead, decline to ACT on a verdict from a gate whose closure is undeclared: the check is local, needs no central authority, and is symmetric — a counterparty may apply the identical rule to us, which is why the vocabulary is published as a Turtle/SKOS projection (generated-ttl/) rather than kept internal.",
       "additionalProperties": { "$ref": "#/$defs/GateDeclaration" }
     },
     "attestations": {
