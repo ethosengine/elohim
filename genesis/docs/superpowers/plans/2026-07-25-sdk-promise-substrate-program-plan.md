@@ -42,7 +42,11 @@ cites:
 - **Doorway builds:** `RUSTFLAGS=""`, `CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/integ/doorway__doorway-service/dev`, run from `/projects/elohim/doorway/doorway-service`.
 - **Sweettest builds:** `CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/integ/elohim__holochain__tests__sweettest/dev`. DNA/WASM workspaces (`elohim/holochain/dna/*`) use **plain cargo** — never redirect `target/`, `hc dna pack` canonicalizes `./target`.
 - **No nextest in this container** — use plain `cargo test`. Long cargo runs go `run_in_background`.
-- **Wire evolution is two-phase.** `SyncRequest`/`SyncResponse` encode via `rmp_serde::to_vec` (compact, positional arrays). Adding a field to an existing variant is **decode-fatal** for peers that predate it; adding a new variant is decode-*rejecting* (the request fails, nothing mis-parses). Therefore: **ship the handler in one release, ship the sender in the next.** Never do both in one deploy.
+- **Wire evolution is two-phase — but not for the reason this plan first gave.** MEASURED 2026-07-25 (`p2p::sync_protocol` tests, not assumption): `rmp_serde::to_vec` encodes an externally-tagged enum as `{VariantName: [fields…]}` — a fixmap keyed by the variant **NAME**, never an ordinal (`GetHeads` → `[0x81, 0xA8, "GetHeads", 0x92, …]`). So:
+  - **Variant ORDER is NOT a hazard.** An earlier draft of this plan claimed inserting a variant anywhere but the end would renumber its successors. That is false — there are no ordinals. Append or insert freely.
+  - **A variant's FIELDS are a positional fixarray**, so adding a field to an existing variant *is* wire-breaking. That is the real reason `ListDocumentsSince` is a new variant rather than an extra field on `ListDocuments`.
+  - An older peer decoding an unknown variant **errors** rather than landing on a neighbour — verified by test, and the premise the rollout rests on. Therefore: **ship the handler in one release, ship the sender in the next.** Never both in one deploy.
+  - **This gate applies ONLY to new variants.** `AnnounceChange` (Task 9) is an *existing* variant every peer already decodes, so its sender ships without waiting for anything.
 - **The spine's fake-green guard is binding** (`spine.yaml`, node `sync-scale-honesty`): `sync_round::round_opener` and `sync_round::announcements_for_local_change` must stay the **only** constructors of the round opener and the announce requests. Returning announce requests without a caller that sends them turns the test green while nothing propagates.
 - **The WIP fence is binding** (spine covenant rule 3): max 2 nodes `active: true`. `notary-authority` and `sync-scale-honesty` hold both slots today. Phase 3 does not activate its nodes — it writes their reds, which is legal for an `unwired` node and does not consume a slot.
 - **Status flips require evidence** (spine covenant rule 4): a build number, a live probe, or a test run. Never edit `spine.yaml` status from intention.
@@ -61,6 +65,39 @@ cites:
 | 4 | Attribution — bindings are self-asserted | `identity-cross-signed` | unwired | **Phase 3** — Task 11 (write the red) |
 | 5 | Confidentiality — no private-replica encryption; reach unenforced | `reach-enforced-everywhere` | unwired | **Phase 3** — Task 12 (write the red) |
 | 6 | Actuation — operator plane is kubectl-only | `operator-runtime-surface` | unwired | **Phase 3** — Task 13 (write the red) |
+
+## Execution status (2026-07-25, updated in flight)
+
+| Task | State | Commit |
+|---|---|---|
+| 1 · `converged != caughtUp` in the gap machine | **done** | `1e5e51bc7` (on `dev`) |
+| 2 · publish `converged`/`exhausted` on `/p2p/status` | **done** | `ae5cbc319` |
+| 3 · reconcile honesty metrics | **done** | `e3ba801b3` |
+| 4 · `/health` staleness stamp | **done** (parallel lane) | `02dedf204` |
+| 5 · move the a2o gate off `caughtUp` | **blocked — operator decision** | — |
+| 6 · deploy + read the instrument | pending runway | — |
+| 7 · `ListDocumentsSince` handler (inert) | **done** | `0dda5cb6e` |
+| 8 · stateful round opener | **gated on Task 7 being fleet-wide** | — |
+| 9 · announce-on-change send site | **done — flips check 2** | `b3a7f45b5` |
+| 10 · convergence RCA | pending (fleet-free; sweettest reproduces) | — |
+| 11–13 · reds for the three unwired nodes | not started | — |
+
+`cargo test --test sync_scale_honesty -- --ignored` is now **1 passed / 1 failed** (was 0/2). The
+remaining red is check 1, which is Task 8 by design.
+
+**Three premises in this plan were wrong and are corrected in place** — noted here because a plan
+that quietly absorbs its own errors teaches nothing:
+1. *Variant ordering was never a wire hazard* (see Global Constraints). Measured, not assumed.
+2. *Task 9 was never gated on the Task 7 deploy.* `AnnounceChange` is an existing variant; only
+   genuinely-new variants need the two-phase rollout. Treating them as one blocked chain would have
+   idled the half that could ship.
+3. *The reconcile plane was already partly metered.* `elohim_projection_heal_outcomes_total`,
+   `…_reconcile_gaps{stream}` and `…_reconcile_local_total{stream}` already existed and are exactly
+   what the dataplane shift was reading (`rea local_total:0`, `missing:372`). Task 3 was rescoped to
+   add only what those cannot express, and adds no healed-total counter because heals are already
+   derivable from the outcomes series.
+
+---
 
 **Prioritization note (staleness guard).** `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md` was last regenerated **2026-06-02** and ranks none of this work; `genesis/manifests/spine.yaml` was updated **2026-07-04** and carries live evidence through 2026-07-25. For dataplane work the spine is the live prioritization surface and this plan follows it. The roadmap needs a regeneration pass — that is a cartographer job, filed as complementary work below, not folded into this plan.
 
