@@ -510,11 +510,14 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
                                 peer_count: status["connectedPeers"].as_u64().unwrap_or(0) as usize,
                                 peer_id: status["peerId"].as_str().map(|s| s.to_string()),
                                 caught_up: recon["caughtUp"].as_bool(),
+                                converged: recon["converged"].as_bool(),
                                 divergent_anchor: recon["divergentAnchor"]
                                     .as_u64()
                                     .map(|n| n as usize),
+                                ..Default::default()
                             };
-                            *p2p_health.write().await = Some(health);
+                            *p2p_health.write().await =
+                                Some(doorway::routes::health::P2PHealthSnapshot::new(health));
                         }
                     }
                     _ => {

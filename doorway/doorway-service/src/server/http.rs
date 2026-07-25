@@ -176,7 +176,7 @@ pub struct AppState {
     /// Mutable list of federation peer URLs (seeded from env, mutable via admin API)
     pub peer_url_list: crate::services::federation::PeerUrlList,
     /// Cached P2P health from elohim-storage sidecar (polled every 30s)
-    pub p2p_health: Arc<tokio::sync::RwLock<Option<crate::routes::health::P2PHealth>>>,
+    pub p2p_health: Arc<tokio::sync::RwLock<Option<crate::routes::health::P2PHealthSnapshot>>>,
     /// CORS configuration (origin allowlist, dev-mode flag)
     pub cors_config: crate::cors::CorsConfig,
     /// Dynamic route registry — steward peer routes + external agent routes
@@ -1752,11 +1752,14 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
                                 peer_count: body["connectedPeers"].as_u64().unwrap_or(0) as usize,
                                 peer_id: body["peerId"].as_str().map(String::from),
                                 caught_up: recon["caughtUp"].as_bool(),
+                                converged: recon["converged"].as_bool(),
                                 divergent_anchor: recon["divergentAnchor"]
                                     .as_u64()
                                     .map(|n| n as usize),
+                                ..Default::default()
                             };
-                            *p2p_health.write().await = Some(health);
+                            *p2p_health.write().await =
+                                Some(crate::routes::health::P2PHealthSnapshot::new(health));
                         }
                     }
                     _ => {

@@ -17,6 +17,7 @@ use http_body_util::Full;
 use hyper::{Response, StatusCode};
 use serde::Serialize;
 use std::sync::Arc;
+use std::time::Instant;
 
 use crate::server::AppState;
 
@@ -60,9 +61,10 @@ pub struct HealthResponse {
     pub conductor: ConductorHealth,
     /// Projection role (writer or reader)
     pub projection: ProjectionRole,
-    /// P2P network status (from elohim-storage sidecar)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub p2p: Option<P2PHealth>,
+    /// P2P network status (from elohim-storage sidecar). This block is always
+    /// present so callers can distinguish unavailable cache data (`stale: true`)
+    /// from a missing field.
+    pub p2p: P2PHealth,
     /// Backing-aware DHT-participation identity (Tier C — peer-discovery spec).
     #[serde(rename = "dhtBacking")]
     pub dht_backing: DhtBacking,
@@ -88,9 +90,77 @@ pub struct P2PHealth {
     /// None when storage's reconcile task is not spawned (block is null).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub caught_up: Option<bool>,
+    /// True only when the reconcile sweep has neither pending nor exhausted
+    /// gaps. None until the storage sidecar ships this additive field.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub converged: Option<bool>,
     /// Count of anchors that diverged during reconcile (from projectionReconcile).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub divergent_anchor: Option<usize>,
+    /// Milliseconds since doorway last observed the storage `/p2p/status`.
+    /// Absent when there is no cached snapshot or the lock is unavailable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observed_age_ms: Option<u64>,
+    /// Whether this P2P status is too old to treat as current. Always present:
+    /// an unavailable snapshot is stale rather than silently omitted.
+    pub stale: bool,
+}
+
+impl Default for P2PHealth {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            peer_count: 0,
+            peer_id: None,
+            caught_up: None,
+            converged: None,
+            divergent_anchor: None,
+            observed_age_ms: None,
+            stale: true,
+        }
+    }
+}
+
+/// One cached storage P2P status plus the instant at which doorway observed it.
+/// The timestamp stays doorway-local; `/health` derives the age at read time.
+#[derive(Clone)]
+pub struct P2PHealthSnapshot {
+    health: P2PHealth,
+    observed_at: Instant,
+}
+
+impl P2PHealthSnapshot {
+    pub fn new(health: P2PHealth) -> Self {
+        Self {
+            health,
+            observed_at: Instant::now(),
+        }
+    }
+
+    pub fn health(&self) -> &P2PHealth {
+        &self.health
+    }
+
+    fn with_observed_age(&self) -> P2PHealth {
+        let observed_age_ms =
+            u64::try_from(self.observed_at.elapsed().as_millis()).unwrap_or(u64::MAX);
+        P2PHealth {
+            observed_age_ms: Some(observed_age_ms),
+            stale: is_stale(Some(observed_age_ms)),
+            ..self.health.clone()
+        }
+    }
+}
+
+/// Two sync rounds at the 60s default cadence. A snapshot older than this
+/// describes a fleet state that has had two full opportunities to change.
+pub const P2P_HEALTH_STALE_AFTER_MS: u64 = 120_000;
+
+pub fn is_stale(observed_age_ms: Option<u64>) -> bool {
+    match observed_age_ms {
+        Some(age) => age > P2P_HEALTH_STALE_AFTER_MS,
+        None => true,
+    }
 }
 
 /// Backing-aware DHT-participation identity (Tier C — peer-discovery
@@ -250,11 +320,13 @@ fn build_health_response(state: &AppState) -> HealthResponse {
     let uptime = (chrono::Utc::now() - state.started_at).num_seconds().max(0) as u64;
 
     // Read cached P2P health (non-blocking — uses try_read to avoid stalling health checks)
-    let p2p = state
-        .p2p_health
-        .try_read()
-        .ok()
-        .and_then(|guard| guard.clone());
+    let p2p = match state.p2p_health.try_read() {
+        Ok(guard) => guard
+            .as_ref()
+            .map(P2PHealthSnapshot::with_observed_age)
+            .unwrap_or_default(),
+        Err(_) => P2PHealth::default(),
+    };
 
     // Backing-aware DHT-participation identity (Tier C). `bootstrap_backend` is
     // read from the LIVE store (authoritative shared-vs-per-pod signal); the
@@ -447,6 +519,7 @@ mod tests {
             peer_id: Some("p".to_string()),
             caught_up: Some(true),
             divergent_anchor: Some(0),
+            ..Default::default()
         };
         let json = serde_json::to_value(&h).unwrap();
         assert_eq!(json["caughtUp"], serde_json::json!(true));
@@ -461,6 +534,7 @@ mod tests {
             peer_id: None,
             caught_up: None,
             divergent_anchor: None,
+            ..Default::default()
         };
         let json = serde_json::to_value(&h).unwrap();
         assert!(
@@ -468,6 +542,44 @@ mod tests {
             "caughtUp must be omitted when None"
         );
         assert!(json.get("divergentAnchor").is_none());
+    }
+
+    #[test]
+    fn a_cached_p2p_snapshot_older_than_two_rounds_is_marked_stale() {
+        // The cache stays (health must not block); its age makes a stale
+        // snapshot distinguishable from a current storage status response.
+        assert!(!is_stale(Some(59_000)), "inside one round: fresh");
+        assert!(!is_stale(Some(119_999)), "inside two rounds: fresh");
+        assert!(is_stale(Some(120_001)), "past two rounds: stale");
+        assert!(is_stale(None), "no snapshot is stale, never fresh");
+    }
+
+    #[test]
+    fn p2p_health_carries_age_staleness_and_convergence() {
+        let h = P2PHealth {
+            enabled: true,
+            peer_count: 2,
+            peer_id: Some("p".to_string()),
+            caught_up: Some(true),
+            converged: Some(false),
+            divergent_anchor: Some(1_860),
+            observed_age_ms: Some(4_000),
+            stale: false,
+        };
+        let json = serde_json::to_value(&h).unwrap();
+        assert_eq!(json["caughtUp"], serde_json::json!(true));
+        assert_eq!(json["converged"], serde_json::json!(false));
+        assert_eq!(json["observedAgeMs"], serde_json::json!(4_000));
+        assert_eq!(json["stale"], serde_json::json!(false));
+    }
+
+    #[test]
+    fn health_emits_a_stale_p2p_block_when_no_snapshot_is_cached() {
+        let state = test_state();
+        let response = build_health_response(&state);
+        let json = serde_json::to_value(&response).unwrap();
+        assert_eq!(json["p2p"]["stale"], serde_json::json!(true));
+        assert!(json["p2p"].get("observedAgeMs").is_none());
     }
 }
 

@@ -235,7 +235,10 @@ pub async fn handle_self_healing(state: Arc<crate::server::AppState>) -> Respons
     // try_read so a held write-lock never stalls the read model.
     let (p2p_caught_up, p2p_divergent_anchor) = match state.p2p_health.try_read() {
         Ok(guard) => match guard.as_ref() {
-            Some(h) => (h.caught_up, h.divergent_anchor),
+            Some(snapshot) => {
+                let health = snapshot.health();
+                (health.caught_up, health.divergent_anchor)
+            }
             None => (None, None),
         },
         Err(_) => (None, None),

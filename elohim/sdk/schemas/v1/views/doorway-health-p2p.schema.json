@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:doorway-health-p2p",
+  "title": "DoorwayHealthP2P",
+  "description": "The cached elohim-storage P2P status embedded in doorway GET /health. Source of truth: doorway's timestamped observation of the storage /p2p/status operational surface (Category C); reconstructed on every health read, never persisted. stale=true means this cache block is unavailable or older than two 60-second sync rounds.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["enabled", "peerCount", "stale"],
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "description": "Whether doorway last observed P2P as enabled in its storage sidecar."
+    },
+    "peerCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Connected P2P peer count in doorway's last storage observation."
+    },
+    "peerId": {
+      "type": "string",
+      "description": "Storage node peer ID, when the cached status supplied one."
+    },
+    "caughtUp": {
+      "type": "boolean",
+      "description": "True when the last reconcile sweep ended; exhausted gaps may still remain."
+    },
+    "converged": {
+      "type": "boolean",
+      "description": "True only when no reconcile gap is pending or exhausted. Absent until the storage sidecar supports it."
+    },
+    "divergentAnchor": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Anchor divergence count from the last storage observation."
+    },
+    "observedAgeMs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Milliseconds since doorway observed this storage status; omitted when no snapshot can be read."
+    },
+    "stale": {
+      "type": "boolean",
+      "description": "True when no snapshot is available or it is more than two sync rounds old."
+    }
+  }
+}

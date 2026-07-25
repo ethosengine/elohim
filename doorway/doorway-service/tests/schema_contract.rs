@@ -16,6 +16,7 @@ use doorway::routes::auth_routes::{
     AccountResponse, AuthResponse, AuthorityRef, ExchangeSessionResponse, HumanProfileResponse,
     MeResponse, SessionTokenResponse,
 };
+use doorway::routes::health::P2PHealth;
 use doorway::routes::self_healing::{
     AdmissionView, ConductorView, PeerView, ProjectorView, RenderView, SelfHealingView,
     UpstreamView, WarmupView,
@@ -255,6 +256,23 @@ fn auth_response_rejects_additional_properties() {
 fn human_profile_response_matches_schema() {
     let json = serde_json::to_value(sample_profile()).unwrap();
     validate_against_schema("views/human-profile-response.schema.json", &json);
+}
+
+#[test]
+fn doorway_health_p2p_matches_schema() {
+    let health = P2PHealth {
+        enabled: true,
+        peer_count: 2,
+        peer_id: Some("12D3KooWexample".to_string()),
+        caught_up: Some(true),
+        converged: Some(false),
+        divergent_anchor: Some(1_860),
+        observed_age_ms: Some(4_000),
+        stale: false,
+    };
+
+    let json = serde_json::to_value(&health).unwrap();
+    validate_against_schema("views/doorway-health-p2p.schema.json", &json);
 }
 
 #[test]
