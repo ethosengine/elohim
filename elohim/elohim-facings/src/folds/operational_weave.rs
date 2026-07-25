@@ -24,8 +24,101 @@ pub struct CustodianRow {
     pub stewarded: Option<u64>,
 }
 
+/// The durable service posture a pantry has evidence to provide. `drawn` is
+/// intentionally absent: it is a caller's transient working-set state, never a
+/// custody commitment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CustodyClass {
+    /// An authoritative commitment lookup found no active stewardship promise.
+    /// This is distinct from `Option::None`, which remains unknown.
+    None,
+    Shelved,
+    Stocked,
+    StockedWarm,
+}
+
+/// Why this observer believes a named holder has a shard. The loader classifies
+/// evidence at ingestion; a received peer assertion never becomes stronger by
+/// being folded here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CustodyEvidence {
+    DirectPossession,
+    VerifiedDraw,
+    AcceptedPush,
+    PeerAsserted,
+    NotObserved,
+    ObservedLost,
+}
+
+/// DB-free materialization of one observer's current fact about a shard holder.
+///
+/// `observed_custody_class` is populated only after the storage-side loader has
+/// established both the relevant commitment and its evidence obligation.
+/// `Some(CustodyClass::None)` means a complete commitment lookup measured no
+/// active promise; `None` is an honest unknown, never an inferred zero. The
+/// loader owns choosing the latest row for each `(observer, shard, holder)` tuple.
+#[derive(Debug, Clone)]
+pub struct CustodyObservationRow {
+    pub observer_agent_cid: String,
+    pub shard_cid: String,
+    pub holder_agent_cid: String,
+    pub observed_custody_class: Option<CustodyClass>,
+    pub evidence: CustodyEvidence,
+    pub observed_at: String,
+    pub is_fresh: bool,
+}
+
+/// Counts current holder observations by custody class. `unknown` includes
+/// missing or expired observations; fresh negative evidence remains visible as
+/// `observed_lost`. **No unknown is ever silently promoted to a custody class** —
+/// a stale or absent observation falls to `unknown`, never to `none`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct CustodyClassCounts {
+    pub none: usize,
+    pub shelved: usize,
+    pub stocked: usize,
+    pub stocked_warm: usize,
+    pub unknown: usize,
+    pub observed_lost: usize,
+}
+
+/// Fold materialized, latest-per-holder observations into custody-class counts.
+/// This does not derive a class from capacity, a draw, a peer announcement, or
+/// a missing observation.
+pub fn observed_custody_class_counts(rows: &[CustodyObservationRow]) -> CustodyClassCounts {
+    let mut counts = CustodyClassCounts::default();
+    for row in rows {
+        if row.is_fresh && row.evidence == CustodyEvidence::ObservedLost {
+            counts.observed_lost += 1;
+            continue;
+        }
+        match (row.is_fresh, row.observed_custody_class) {
+            (true, Some(CustodyClass::None)) => counts.none += 1,
+            (true, Some(CustodyClass::Shelved)) => counts.shelved += 1,
+            (true, Some(CustodyClass::Stocked)) => counts.stocked += 1,
+            (true, Some(CustodyClass::StockedWarm)) => counts.stocked_warm += 1,
+            _ => counts.unknown += 1,
+        }
+    }
+    counts
+}
+
+/// Count fresh observations by evidence class. The buckets preserve what the
+/// observer actually knows; callers must not sum them into an unlabeled holder
+/// count.
+pub fn fresh_evidence_counts(rows: &[CustodyObservationRow]) -> BTreeMap<CustodyEvidence, usize> {
+    crate::fold::bucket_by(rows, |row| row.is_fresh.then_some(row.evidence))
+        .into_iter()
+        .map(|(evidence, rows)| (evidence, rows.len()))
+        .collect()
+}
+
 pub fn node_capacity(c: &CustodianRow) -> ComputeTriptych {
-    ComputeTriptych { free: c.free, used: c.used, stewarded: c.stewarded }
+    ComputeTriptych {
+        free: c.free,
+        used: c.used,
+        stewarded: c.stewarded,
+    }
 }
 
 /// Per-field Option-sum rollup across nodes. A field is `Some` iff at least one node
@@ -140,7 +233,12 @@ mod tests {
     }
 
     fn cust(free: Option<u64>, used: Option<u64>, stewarded: Option<u64>) -> super::CustodianRow {
-        super::CustodianRow { agent_cid: "a".into(), free, used, stewarded }
+        super::CustodianRow {
+            agent_cid: "a".into(),
+            free,
+            used,
+            stewarded,
+        }
     }
 
     #[test]
@@ -148,7 +246,7 @@ mod tests {
         let rows = vec![cust(Some(10), Some(5), None), cust(Some(20), None, Some(3))];
         let t = super::aggregate_capacity(&rows);
         assert_eq!(t.free, Some(30));
-        assert_eq!(t.used, Some(5));       // second row's used is None → skipped
+        assert_eq!(t.used, Some(5)); // second row's used is None → skipped
         assert_eq!(t.stewarded, Some(3));
     }
 
@@ -173,6 +271,89 @@ mod tests {
         let d = super::region_occupancy(&holders);
         assert_eq!(d.global, 1, "hub-a known region, no viewer → global");
         assert_eq!(d.unknown, 1, "hub-b no region → unknown");
-        assert_eq!(d.local + d.regional, 0, "no viewer → no local/regional split");
+        assert_eq!(
+            d.local + d.regional,
+            0,
+            "no viewer → no local/regional split"
+        );
+    }
+
+    fn observation(
+        class: Option<CustodyClass>,
+        evidence: CustodyEvidence,
+        is_fresh: bool,
+    ) -> CustodyObservationRow {
+        CustodyObservationRow {
+            observer_agent_cid: "observer".into(),
+            shard_cid: "bafkrei-shard".into(),
+            holder_agent_cid: "holder".into(),
+            observed_custody_class: class,
+            evidence,
+            observed_at: "2026-07-25T00:00:00Z".into(),
+            is_fresh,
+        }
+    }
+
+    #[test]
+    fn observed_custody_counts_preserve_unknown_without_inference() {
+        let rows = vec![
+            observation(
+                Some(CustodyClass::Shelved),
+                CustodyEvidence::DirectPossession,
+                true,
+            ),
+            observation(
+                Some(CustodyClass::Stocked),
+                CustodyEvidence::VerifiedDraw,
+                true,
+            ),
+            observation(
+                Some(CustodyClass::StockedWarm),
+                CustodyEvidence::AcceptedPush,
+                true,
+            ),
+            observation(Some(CustodyClass::None), CustodyEvidence::NotObserved, true),
+            observation(None, CustodyEvidence::PeerAsserted, true),
+            observation(
+                Some(CustodyClass::Stocked),
+                CustodyEvidence::VerifiedDraw,
+                false,
+            ),
+            observation(None, CustodyEvidence::ObservedLost, true),
+        ];
+
+        assert_eq!(
+            observed_custody_class_counts(&rows),
+            CustodyClassCounts {
+                none: 1,
+                shelved: 1,
+                stocked: 1,
+                stocked_warm: 1,
+                unknown: 2,
+                observed_lost: 1,
+            },
+        );
+    }
+
+    #[test]
+    fn fresh_evidence_counts_excludes_expired_observations() {
+        let rows = vec![
+            observation(
+                Some(CustodyClass::Stocked),
+                CustodyEvidence::VerifiedDraw,
+                true,
+            ),
+            observation(
+                Some(CustodyClass::Stocked),
+                CustodyEvidence::VerifiedDraw,
+                false,
+            ),
+            observation(None, CustodyEvidence::PeerAsserted, true),
+        ];
+
+        let counts = fresh_evidence_counts(&rows);
+        assert_eq!(counts.get(&CustodyEvidence::VerifiedDraw), Some(&1));
+        assert_eq!(counts.get(&CustodyEvidence::PeerAsserted), Some(&1));
+        assert_eq!(counts.len(), 2);
     }
 }

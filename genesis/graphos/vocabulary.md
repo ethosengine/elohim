@@ -1,8 +1,8 @@
 # Elohim Protocol — Design Vocabulary
 
-**Version:** 0.1
+**Version:** 0.2
 **Status:** Active reference
-**Last updated:** 2026-04-30
+**Last updated:** 2026-07-25
 
 ---
 
@@ -19,7 +19,7 @@ This register governs **design-level language and new concepts**. Wire-level ter
 | Layer | Language | Examples |
 |---|---|---|
 | **Wire / interface** (HTTP routes, content addresses, internal Rust types named for HTTP wire shape) | Existing terms — `blob`, `/blob/{hash}`, `sha256-{hex}`, `BlobStore` | Do not rename; externally legible |
-| **Design discussion, narrative, signals/events, configmap keys, admin endpoints, tracing spans, new Rust/TS identifiers we invent** | New vocabulary — `quilt`, `pantry`, `stock`, `draw`, `shard`, `RS(N,K)` | Use these consistently |
+| **Design discussion, narrative, signals/events, configmap keys, admin endpoints, tracing spans, new Rust/TS identifiers we invent** | New vocabulary — `quilt`, `pantry`, `stock`, `draw`, `shard`, `RS(N,K)`, custody class | Use these consistently |
 
 If you are about to invent a new identifier (signal name, event name, type name, span name, admin endpoint), reach for the new vocabulary. If you are touching an existing wire-level identifier, leave it alone.
 
@@ -55,6 +55,34 @@ If you are about to invent a new identifier (signal name, event name, type name,
 **Replaces.** Conceptually replaces "bucket", "store-as-destination", "S3 bucket" framing. Does **not** replace the Rust type `BlobStore` — that names the on-disk structure, which is one component of how a peer tends a pantry.
 
 **Already in narrative.** Existing a2o scenarios use `pantry` in domestic contexts (`genesis/docs/content/elohim-protocol/value_scanner/parent/scenarios/household.feature`, `value_scanner/student/scenarios/household.feature`, `value_scanner/vulnerable_temporary/scenarios/neighborhood.feature`). The protocol-level meaning is consonant with the domestic one — a pantry is what a household tends.
+
+---
+
+### `custody class`
+
+**Meaning.** The service posture a pantry has committed to provide for a quilt or shard. It is a
+promise plus evidence of fulfillment, not a synonym for physical medium, access recency,
+redundancy, reach, or a caller's cache state.
+
+**Order.** `none < shelved < stocked < stocked-warm`.
+
+- `none` — no stewardship commitment.
+- `shelved` — committed durable, slower custody.
+- `stocked` — committed persistent pantry custody.
+- `stocked-warm` — committed persistent custody with a warm draw path.
+
+**Evidence rule.** A holder's class is observed only when the relevant commitment and fresh
+evidence justify it. Capacity bytes, a peer announcement, or a successful draw alone do not
+prove a custody class.
+
+**Distinct from.** `drawn` is a transient working-set state: `absent | drawn`. A draw may create
+a caller copy while the source remains shelved, stocked, or stocked-warm. Never use `drawn` as a
+custody floor or count it as stewardship.
+
+**Migration rule.** Existing `defaultTierFloor` is legacy vocabulary whose values are interpreted
+only by the current manifest contract. New design and runtime surfaces should say
+`defaultCustodyFloor`; a wire rename requires an explicit compatibility migration, not a second
+independent temperature enum.
 
 ---
 
