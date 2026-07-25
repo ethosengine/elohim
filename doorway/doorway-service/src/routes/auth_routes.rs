@@ -806,7 +806,37 @@ async fn handle_register(
         // operator's conductor. No provisioning step — the doorway IS the
         // conductor for this identity.
         "doorway" => {
-            let generated_human_id = uuid::Uuid::new_v4().to_string();
+            // Prefer a caller-supplied canonical human_id — the same override the
+            // node/device branch below already honors — over minting a fresh UUID.
+            // Minting an unconditional UUID here is the root cause of a household-
+            // formation founder-capture bug: seed-household-formation.ts binds
+            // conductor sessions to household members by exact humanId
+            // (HOUSEHOLD_MEMBERS' canonical `human-<name>` ids); a doorway-phase
+            // registrant whose Human entry got a random UUID id can never bind,
+            // and if that registrant is the ceremony's founder, formation FATALs
+            // with "no conductor found for the founder". There is no general
+            // email→humanId resolution available at this call site (the household
+            // roster is dev/genesis fixture data, not runtime state doorway-service
+            // holds) — so a canonical id is only resolvable when the caller passes
+            // one explicitly. Healing an already-registered account's UUID Human is
+            // out of scope here (chain-captured; needs migration/lineage, not a
+            // silent overwrite) — this only prevents NEW doorway-phase registrations
+            // from recreating the bug when the caller knows its canonical id.
+            let generated_human_id = if !body.human_id.is_empty() {
+                body.human_id.clone()
+            } else {
+                warn!(
+                    identifier = %body.identifier,
+                    "Doorway: registering agencyPhase=doorway with no caller-supplied \
+                     human_id — minting a random UUID for this Human. If this registrant \
+                     is meant to be a household-formation founder (e.g. matthew), the \
+                     resulting conductor identity will never match HOUSEHOLD_MEMBERS' \
+                     canonical humanId and seed-household-formation.ts will FATAL with \
+                     'no conductor found for the founder' — pass human_id explicitly on \
+                     /auth/register for any household/genesis registration."
+                );
+                uuid::Uuid::new_v4().to_string()
+            };
 
             let zome_result = call_create_human(
                 &state,
@@ -992,7 +1022,26 @@ async fn handle_register(
 
             // Step 2: create_human on the provisioned conductor (or fall back to
             // singleton ZomeCaller / dev mode if no conductor available)
-            let generated_human_id = uuid::Uuid::new_v4().to_string();
+            //
+            // Same caller-supplied-human_id preference as the "doorway" branch above
+            // (see its comment for the household-formation founder-capture rationale) —
+            // a hosted-phase household registration is exposed to the identical class
+            // of bug if it ever mints an unbindable UUID Human.
+            let generated_human_id = if !body.human_id.is_empty() {
+                body.human_id.clone()
+            } else {
+                warn!(
+                    identifier = %body.identifier,
+                    "Hosted: registering with no caller-supplied human_id — minting a \
+                     random UUID for this Human. If this registrant is meant to be a \
+                     household-formation founder, the resulting conductor identity will \
+                     never match HOUSEHOLD_MEMBERS' canonical humanId and \
+                     seed-household-formation.ts will FATAL with 'no conductor found for \
+                     the founder' — pass human_id explicitly on /auth/register for any \
+                     household/genesis registration."
+                );
+                uuid::Uuid::new_v4().to_string()
+            };
 
             let zome_result = if let Some(ref p) = provisioner_result {
                 call_create_human_on_conductor(
