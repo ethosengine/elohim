@@ -407,6 +407,56 @@ lazy_static! {
         &["direction"],
     )
     .unwrap();
+
+    // ── Sync plane cost + outcomes (spine node `sync-scale-honesty`) ──
+
+    /// Sync rounds initiated by this node's poll tick. The denominator for every
+    /// other sync counter — "requests per round" and "docs enumerated per round"
+    /// are only readable against it.
+    pub static ref SYNC_ROUNDS: IntCounter = IntCounter::new(
+        "elohim_sync_rounds_total",
+        "Sync rounds initiated by the poll tick.",
+    )
+    .unwrap();
+
+    /// Outbound sync requests by protocol verb. label: kind = "list_documents"
+    /// (round opener + page follow-ups) | "sync_changes" (per diverged doc) |
+    /// "announce_change" (push on local change — NO send site exists yet, so this
+    /// series staying at zero IS the standing red, visible rather than asserted).
+    pub static ref SYNC_REQUESTS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_sync_requests_total",
+            "Outbound sync requests by protocol verb.",
+        ),
+        &["kind"],
+    )
+    .unwrap();
+
+    /// Document entries received in `DocumentList` answers — the MAGNITUDE of the
+    /// round's enumeration. This is the counter that makes a corpus-proportional
+    /// round visible: on a converged mesh it should trend to zero, and today it
+    /// tracks corpus size x peers forever. Rate over `elohim_sync_rounds_total`
+    /// is the scaling read.
+    pub static ref SYNC_DOCS_ENUMERATED: IntCounter = IntCounter::new(
+        "elohim_sync_docs_enumerated_total",
+        "Document entries received in DocumentList answers (round enumeration cost).",
+    )
+    .unwrap();
+
+    /// Outbound sync request outcomes. Deliberately labelled by RESULT ONLY, never
+    /// by peer: a peer-id label is an unbounded-cardinality bomb on a real mesh.
+    /// Peer identity stays in the log line at the same site. label: result = "ok" |
+    /// "timeout" | "connection_closed" | "dial_failure" | "unsupported_protocols" |
+    /// "io" — the same closed vocabulary as `elohim_view_federation_outbound_total`,
+    /// so the two planes read the same way.
+    pub static ref SYNC_REQUEST_OUTCOMES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_sync_request_outcomes_total",
+            "Outbound sync request outcomes by result (ok vs failure variant).",
+        ),
+        &["result"],
+    )
+    .unwrap();
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -450,6 +500,10 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_LAST_WRITES.clone()));
         let _ = REGISTRY.register(Box::new(CUSTODY_ANNOUNCE_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_ROUNDS.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_REQUESTS.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_DOCS_ENUMERATED.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_REQUEST_OUTCOMES.clone()));
     });
 }
 
@@ -555,6 +609,31 @@ pub fn inc_view_federation_outbound(result: &str) {
 /// Record one inbound view-federation request answered with a signed slice.
 pub fn inc_view_federation_inbound_served() {
     VIEW_FEDERATION_INBOUND_SERVED.inc();
+}
+
+/// Record one sync round initiated by the poll tick.
+pub fn inc_sync_round() {
+    SYNC_ROUNDS.inc();
+}
+
+/// Record one outbound sync request by protocol verb ("list_documents" |
+/// "sync_changes" | "announce_change").
+pub fn inc_sync_request(kind: &str) {
+    SYNC_REQUESTS.with_label_values(&[kind]).inc();
+}
+
+/// Record document entries received in one `DocumentList` answer — the round's
+/// enumeration cost.
+pub fn add_sync_docs_enumerated(n: u64) {
+    SYNC_DOCS_ENUMERATED.inc_by(n);
+}
+
+/// Record one outbound sync request outcome ("ok" | "timeout" |
+/// "connection_closed" | "dial_failure" | "unsupported_protocols" | "io").
+/// Result-only by design — see [`SYNC_REQUEST_OUTCOMES`] on why there is no peer
+/// label.
+pub fn inc_sync_request_outcome(result: &str) {
+    SYNC_REQUEST_OUTCOMES.with_label_values(&[result]).inc();
 }
 
 /// Record `n` content heads freshly authored by the witness-bootstrap sweep.
@@ -700,6 +779,25 @@ mod tests {
         set_projection_reconcile_gauges("content", 1956, 4158);
         inc_shard_redistribute_bytes_missing();
         set_peer_status_fanout_missed(2);
+        // Sync plane (spine node sync-scale-honesty): the round's cost and its
+        // per-request outcomes had NO metric at all — the plane was not just
+        // poll-only, it was unmeasured, so a corpus-proportional round and a
+        // peer whose sync requests always time out looked identical to healthy.
+        inc_sync_round();
+        for kind in ["list_documents", "sync_changes", "announce_change"] {
+            inc_sync_request(kind);
+        }
+        add_sync_docs_enumerated(1956);
+        for result in [
+            "ok",
+            "timeout",
+            "connection_closed",
+            "dial_failure",
+            "unsupported_protocols",
+            "io",
+        ] {
+            inc_sync_request_outcome(result);
+        }
 
         let text = gather_text();
         assert!(
@@ -733,6 +831,26 @@ mod tests {
             text.contains("elohim_content_witness_authored_total"),
             "content witness-authored counter missing:\n{text}"
         );
+        // Sync plane cost + per-request outcome attribution.
+        assert!(
+            text.contains("elohim_sync_rounds_total"),
+            "sync rounds counter missing:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_sync_requests_total"),
+            "sync requests counter missing:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_sync_docs_enumerated_total"),
+            "sync docs-enumerated counter missing — this is the one that makes a \
+             corpus-proportional round visible:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_sync_request_outcomes_total"),
+            "sync request-outcome counter missing:\n{text}"
+        );
+        assert!(text.contains("kind=\"list_documents\""), "{text}");
+        assert!(text.contains("kind=\"announce_change\""), "{text}");
         // Projection-reconcile heal legibility surfaces render with their labels.
         assert!(
             text.contains("elohim_projection_heal_outcomes_total"),

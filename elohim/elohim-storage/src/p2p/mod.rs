@@ -64,6 +64,7 @@ pub mod salvage_gossip;
 pub mod shamir_transport;
 pub mod shard_protocol;
 pub mod sync_protocol;
+pub mod sync_round;
 pub mod topics;
 pub mod trust_cache;
 pub mod trust_protocol;
@@ -140,7 +141,9 @@ type DocListCursorMap =
 /// Page size for `ListDocuments` sync-round enumeration — shared by the round
 /// opener (`initiate_sync_round`, page 0) and the `DocumentList` follow-up
 /// (next pages), so the cursor arithmetic and the request size can't drift.
-const SYNC_LIST_PAGE_LIMIT: u32 = 1000;
+/// Defined in `sync_round` so the round planner and the wire agree by
+/// construction (see that module's standing-red note).
+const SYNC_LIST_PAGE_LIMIT: u32 = sync_round::SYNC_LIST_PAGE_LIMIT;
 
 /// Client-side page cursors for in-flight `ListContent` replication chains:
 /// request ID → (peer, offset that page was requested at). The `ListContent`
@@ -500,6 +503,13 @@ pub struct P2PConfig {
     /// P3 salvage: cadence (seconds) for the capacity-ad broadcast and the
     /// salvage recheck sweep. Threaded from `Config::salvage_recheck_seconds`.
     pub salvage_recheck_seconds: u64,
+    /// Sync round cadence in seconds, threaded from `Config::sync_interval_secs`.
+    /// `None` (and `Some(0)`) fall back to `sync_round::DEFAULT_ROUND_INTERVAL`.
+    ///
+    /// Before this field the round tick was a hardcoded `Duration::from_secs(60)`
+    /// in `run()` while `Config::sync_interval_secs` existed, was documented, and
+    /// was read by nothing — the one cadence knob for the plane was inert.
+    pub sync_interval_secs: Option<u64>,
 }
 
 impl Default for P2PConfig {
@@ -531,6 +541,7 @@ impl Default for P2PConfig {
             salvage_capacity_enabled: false,
             salvage_target_replicas: 2,
             salvage_recheck_seconds: 300,
+            sync_interval_secs: None,
         }
     }
 }
@@ -2680,7 +2691,10 @@ impl P2PNode {
         self.hydrate_replication_state().await;
 
         let mut status_interval = tokio::time::interval(Duration::from_secs(30));
-        let mut sync_interval = tokio::time::interval(Duration::from_secs(60));
+        // Cadence comes from Config::sync_interval_secs (threaded via P2PConfig);
+        // `round_interval` guards the zero that would panic tokio's ticker.
+        let mut sync_interval =
+            tokio::time::interval(sync_round::round_interval(self.config.sync_interval_secs));
         let mut verify_interval = tokio::time::interval(Duration::from_secs(300));
         verify_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut replication_interval = tokio::time::interval(Duration::from_secs(60));
@@ -5212,6 +5226,7 @@ impl P2PNode {
                     request_id,
                     response,
                 } => {
+                    crate::metrics::inc_sync_request_outcome("ok");
                     self.handle_sync_response(peer, request_id, response).await;
                 }
             },
@@ -5223,6 +5238,14 @@ impl P2PNode {
                 },
             ) => {
                 warn!(peer = %peer, request_id = ?request_id, error = ?error, "Outbound sync request failed");
+                // Task #9's surface: persistent per-peer sync-request failures used
+                // to exist ONLY as this warn line, so a peer whose sync requests
+                // always time out was indistinguishable from a healthy one in
+                // Prometheus. The label set is result-only (bounded) — peer
+                // identity stays in the log line above, where cardinality is free.
+                crate::metrics::inc_sync_request_outcome(sync_round::outbound_failure_label(
+                    &error,
+                ));
                 // Drop any page cursor for the failed request so the map stays
                 // bounded by genuinely in-flight requests.
                 self.doc_list_cursors.lock().await.remove(&request_id);
@@ -6495,6 +6518,10 @@ impl P2PNode {
                     peer = %peer, h_app_id = %h_app_id, doc_count = documents.len(),
                     total = total, has_more = has_more, "Received document list from peer"
                 );
+                // The round's enumeration cost, made visible: on a converged mesh
+                // this should trend to zero, and today it tracks corpus size x
+                // peers forever (spine node `sync-scale-honesty`).
+                crate::metrics::add_sync_docs_enumerated(documents.len() as u64);
 
                 // Follow the page cursor BEFORE processing this page: without
                 // this, every doc past the first page sat outside every sync
@@ -6523,6 +6550,7 @@ impl P2PNode {
                                 .lock()
                                 .await
                                 .insert(next_id, next_offset);
+                            crate::metrics::inc_sync_request("list_documents");
                             debug!(
                                 peer = %peer, offset = next_offset, request_id = ?next_id,
                                 "Requested next document-list page"
@@ -6562,6 +6590,7 @@ impl P2PNode {
                                     .behaviour_mut()
                                     .sync_protocol
                                     .send_request(&peer, sync_request);
+                                crate::metrics::inc_sync_request("sync_changes");
                                 debug!(
                                     peer = %peer, doc_id = %remote_doc.doc_id,
                                     request_id = ?req_id, "Requested changes for diverged document"
@@ -6581,6 +6610,7 @@ impl P2PNode {
                                 .behaviour_mut()
                                 .sync_protocol
                                 .send_request(&peer, sync_request);
+                            crate::metrics::inc_sync_request("sync_changes");
                             debug!(
                                 peer = %peer, doc_id = %remote_doc.doc_id,
                                 request_id = ?req_id, "Requested full sync for new document"
@@ -6643,6 +6673,7 @@ impl P2PNode {
                             .behaviour_mut()
                             .sync_protocol
                             .send_request(&peer, sync_request);
+                        crate::metrics::inc_sync_request("sync_changes");
                         debug!(peer = %peer, doc_id = %doc_id, "Heads differ, requesting changes");
                     }
                     _ => {
@@ -7213,19 +7244,43 @@ impl P2PNode {
         }
 
         info!(peer_count = peers.len(), "Initiating sync round");
+        crate::metrics::inc_sync_round();
+
+        // Single source of truth for the sync-partition namespace: the producer
+        // (`sync::projector::project_content_doc`) writes docs under this same
+        // const. Referencing it here (not a bare literal) makes producer/consumer
+        // drift compile-impossible — a silent content-sync killer otherwise (see
+        // PROJECTION_NAMESPACE docs).
+        let namespace = crate::sync::projector::PROJECTION_NAMESPACE;
+
+        // What we already hold, read LOCALLY (no network). The opener SHOULD be a
+        // function of this so a converged peer can answer with the difference
+        // instead of its whole corpus; today `round_opener` ignores it and the
+        // round stays a full enumeration — the `sync-scale-honesty` standing red
+        // (tests/sync_scale_honesty.rs). This state is threaded now so the cure is
+        // a change in one planner body, not a re-plumb of every round.
+        let local_state = match self
+            .sync_manager
+            .list_documents(namespace, None, 0, SYNC_LIST_PAGE_LIMIT)
+            .await
+        {
+            Ok((docs, _total)) => sync_round::LocalCorpusState {
+                docs: docs
+                    .into_iter()
+                    .map(|d| sync_round::DocHead {
+                        doc_id: d.doc_id,
+                        heads: d.heads,
+                    })
+                    .collect(),
+            },
+            Err(e) => {
+                debug!(error = %e, "Sync round: local corpus read failed, opening blind");
+                sync_round::LocalCorpusState::default()
+            }
+        };
 
         for peer_id in peers {
-            let request = SyncRequest::ListDocuments {
-                // Single source of truth for the sync-partition namespace: the
-                // producer (`sync::projector::project_content_doc`) writes docs
-                // under this same const. Referencing it here (not a bare literal)
-                // makes producer/consumer drift compile-impossible — a silent
-                // content-sync killer otherwise (see PROJECTION_NAMESPACE docs).
-                h_app_id: crate::sync::projector::PROJECTION_NAMESPACE.to_string(),
-                prefix: None,
-                offset: 0,
-                limit: SYNC_LIST_PAGE_LIMIT,
-            };
+            let request = sync_round::round_opener(namespace, &local_state);
 
             let mut swarm = self.swarm.write().await;
             let request_id = swarm
@@ -7236,6 +7291,7 @@ impl P2PNode {
             // Track the page cursor so a has_more response can request the
             // next page (silent-tail guard — see DocListCursorMap).
             self.doc_list_cursors.lock().await.insert(request_id, 0);
+            crate::metrics::inc_sync_request("list_documents");
             debug!(peer = %peer_id, request_id = ?request_id, "Sent ListDocuments sync request");
         }
     }

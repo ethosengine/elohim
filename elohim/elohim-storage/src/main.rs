@@ -2092,6 +2092,9 @@ async fn async_main(
             salvage_capacity_enabled: config.salvage_capacity_enabled,
             salvage_target_replicas: config.salvage_target_replicas,
             salvage_recheck_seconds: config.salvage_recheck_seconds,
+            // Sync round cadence — Config::sync_interval_secs existed and was read
+            // by nothing until now (the tick in P2PNode::run was hardcoded 60s).
+            sync_interval_secs: Some(config.sync_interval_secs),
             ..Default::default()
         };
 
