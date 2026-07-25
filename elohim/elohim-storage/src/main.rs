@@ -1252,6 +1252,54 @@ async fn async_main(
                             warn!("peer_status fan-in disabled: shared DB pool unavailable");
                         }
 
+                        // ── Periodic local capacity reporter ─────────────────────
+                        //
+                        // `elohim_custodian_{free,used,stewarded}_bytes` (the
+                        // `/metrics` gauges) were only ever set from
+                        // `GET /api/v1/weave`, whose input table
+                        // (`custodian_metrics`) has been permanently empty (its
+                        // only writer was a browser service that was never
+                        // started). This periodic task measures this node's real
+                        // storage numbers and (a) sets the gauges directly from
+                        // local truth every tick, and (b) upserts a
+                        // `custodian_metrics` row under this node's resolved
+                        // `agent_cid` so the cluster-aggregate fold has real data.
+                        if let Some(capacity_pool) = db_pool.clone() {
+                            let report_secs = std::env::var("CAPACITY_REPORT_SECS")
+                                .ok()
+                                .and_then(|v| v.parse::<u64>().ok())
+                                .unwrap_or(
+                                    elohim_storage::services::capacity_reporter::DEFAULT_REPORT_SECS,
+                                );
+                            if report_secs == 0 {
+                                info!("capacity_reporter disabled (CAPACITY_REPORT_SECS=0)");
+                            } else {
+                                let capacity_hc = hc.clone();
+                                let capacity_blob_path = blob_store.root_dir().to_path_buf();
+                                let capacity_h_app_id =
+                                    elohim_storage::db::AppContext::default_lamad().h_app_id;
+                                let capacity_shutdown = shutdown_tx.subscribe();
+                                tokio::spawn(async move {
+                                    elohim_storage::services::capacity_reporter::run_report_loop(
+                                        capacity_pool,
+                                        capacity_hc,
+                                        capacity_blob_path,
+                                        capacity_h_app_id,
+                                        report_secs,
+                                        elohim_storage::services::capacity_reporter::DEFAULT_SETTLE_SECS,
+                                        capacity_shutdown,
+                                    )
+                                    .await;
+                                });
+                                info!(
+                                    report_secs,
+                                    "capacity_reporter task started (local capacity measurement + custodian_metrics upsert)"
+                                );
+                            }
+                        } else {
+                            warn!("capacity_reporter disabled: shared DB pool unavailable");
+                        }
+
                         // 2026-05-26-substrate-rea-replication-fix Task 6.5 — subscribe to
                         // ReaProjectionSignals (REA commitments, agreements, economic events)
                         // and project them into the local SQL via rea_projection::handle_rea_signal.

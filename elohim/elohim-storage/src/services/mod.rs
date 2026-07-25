@@ -29,6 +29,7 @@ pub mod behavioral_trust;
 pub mod boot_registration;
 pub mod bootstrap_manifests;
 pub mod bounds_validator;
+pub mod capacity_reporter; // Periodic local capacity reporter — measures + upserts custodian_metrics, sets the cluster-capacity gauges
 pub mod cluster_view;
 pub mod commitment_fetcher;
 pub mod concentration_service;

@@ -444,6 +444,18 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Household collective cids discovered by the LAST identity-fill sweep's
+    /// `discover_household_pairs` union (local `collectives` projection ∪ the
+    /// pod's own source-chain read). A sustained `0` here — previously invisible
+    /// at DEBUG — is the direct explanation for a fill sweep that silently does
+    /// nothing: no memberships were found on the DHT or in the local projection,
+    /// so there was nothing to fill.
+    pub static ref IDENTITY_FILL_DISCOVERED_CIDS: IntGauge = IntGauge::new(
+        "elohim_identity_fill_discovered_cids",
+        "Household collective cids discovered by the last identity-fill sweep.",
+    )
+    .unwrap();
+
     /// Custody-announcement flow (the cross-pod `shard_locations` convergence).
     /// `shard_locations` is written only locally (self-held recording + push-ack),
     /// so custody claims never left the node and each doorway read a different
@@ -580,6 +592,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(PEER_STATUS_FANOUT_MISSED.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_LAST_WRITES.clone()));
+        let _ = REGISTRY.register(Box::new(IDENTITY_FILL_DISCOVERED_CIDS.clone()));
         let _ = REGISTRY.register(Box::new(CUSTODY_ANNOUNCE_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_ROUNDS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUESTS.clone()));
@@ -852,6 +865,12 @@ pub fn inc_identity_fill(action: &str, n: u64) {
 /// Publish the last identity-fill sweep's rows-written (created + filled) count.
 pub fn set_identity_fill_last_writes(writes: u64) {
     IDENTITY_FILL_LAST_WRITES.set(writes as i64);
+}
+
+/// Publish the household collective cid count discovered by the last
+/// identity-fill sweep's `discover_household_pairs` union.
+pub fn set_identity_fill_discovered_cids(count: u64) {
+    IDENTITY_FILL_DISCOVERED_CIDS.set(count as i64);
 }
 
 #[cfg(test)]

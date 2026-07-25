@@ -299,10 +299,24 @@ pub async fn discover_household_pairs(
         }
     }
 
-    tracing::debug!(
-        cid_count = union.len(),
-        "identity_fill: discovered household collective cids (projection ∪ source-chain)"
-    );
+    crate::metrics::set_identity_fill_discovered_cids(union.len() as u64);
+    if union.is_empty() {
+        // Previously DEBUG-only (see also `holochain_humans_replayer.rs`'s
+        // `snapshot_household_ids_for_cids` empty-cids early return), this case
+        // has been the invisible steady state for a month: discovery finds
+        // nothing, the fill sweep is a correct no-op, and nobody sees it. Rare
+        // enough per-sweep (once per `IDENTITY_FILL_SECS`, default 300s) that a
+        // WARN here is not a storm.
+        tracing::warn!(
+            "identity_fill: discovery found zero household cids (no memberships on DHT or \
+             projection) — nothing to fill"
+        );
+    } else {
+        tracing::debug!(
+            cid_count = union.len(),
+            "identity_fill: discovered household collective cids (projection ∪ source-chain)"
+        );
+    }
     snapshot_household_ids_for_cids(reader, &union).await
 }
 
@@ -469,6 +483,18 @@ mod tests {
 
     fn pool() -> DbPool {
         crate::test_util::test_pool()
+    }
+
+    /// Serializes tests that call `discover_household_pairs` and then assert on
+    /// the process-global `IDENTITY_FILL_DISCOVERED_CIDS` gauge it sets — without
+    /// this, parallel test threads racing the same gauge would make the
+    /// assertions flaky. Poisoning (a prior panic while holding the lock) is
+    /// tolerated so one failing test never cascades into spurious failures.
+    static DISCOVERED_CIDS_GAUGE_TEST_LOCK: Mutex<()> = Mutex::new(());
+    fn lock_discovered_cids_gauge() -> std::sync::MutexGuard<'static, ()> {
+        DISCOVERED_CIDS_GAUGE_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
     }
 
     /// Seed a slug-keyed human (imagodei scope — the production shape). `None`
@@ -747,6 +773,7 @@ mod tests {
     /// downstream fill has keyed rows to lay — the join lights.
     #[tokio::test]
     async fn discovery_fills_from_source_chain_when_projection_empty() {
+        let _guard = lock_discovered_cids_gauge();
         let p = pool();
         let ctx = AppContext::default_lamad();
 
@@ -798,6 +825,7 @@ mod tests {
     /// households' members surface.
     #[tokio::test]
     async fn discovery_unions_projection_and_source_chain_deduped() {
+        let _guard = lock_discovered_cids_gauge();
         use crate::db::collectives::{create_collective, CreateCollectiveInput};
         use crate::db::diesel_schema::collectives;
         use crate::db::models::governance_layers;
@@ -889,6 +917,67 @@ mod tests {
         assert_eq!(
             local_reads, 1,
             "the duplicated cid is read exactly once (union de-duplicated)"
+        );
+    }
+
+    // ---- discovery darkness observability: the empty-union gauge ----
+
+    /// The invisible-steady-state case: neither the local projection nor the
+    /// pod's own source chain names a household. Previously this exited at
+    /// DEBUG with no other signal; now the discovered-cid gauge reads 0 (the
+    /// warn log itself is not asserted here — `tracing` output is not a return
+    /// value — but the gauge is the durable, scrapeable twin of that warn).
+    #[tokio::test]
+    async fn discovery_sets_zero_gauge_when_union_is_empty() {
+        let _guard = lock_discovered_cids_gauge();
+        crate::metrics::register_all(); // idempotent (Once-guarded)
+        let p = pool();
+        let ctx = AppContext::default_lamad();
+
+        let self_cids = FakeSelfCids { cids: vec![] };
+        let reader = FakeReader {
+            by_cid: HashMap::new(),
+        };
+
+        let snap = discover_household_pairs(&p, &ctx, &self_cids, &reader)
+            .await
+            .expect("discover");
+        assert!(snap.pairs.is_empty(), "no household cids discovered");
+        assert_eq!(
+            crate::metrics::IDENTITY_FILL_DISCOVERED_CIDS.get(),
+            0,
+            "the discovered-cids gauge reflects the empty union"
+        );
+    }
+
+    /// The healthy case: the gauge tracks the discovered UNION size (not the
+    /// member/pair count), so an operator can distinguish "found households but
+    /// zero members" from "found nothing at all."
+    #[tokio::test]
+    async fn discovery_sets_gauge_to_union_size_when_cids_found() {
+        let _guard = lock_discovered_cids_gauge();
+        crate::metrics::register_all(); // idempotent (Once-guarded)
+        let p = pool();
+        let ctx = AppContext::default_lamad();
+
+        let self_cids = FakeSelfCids {
+            cids: vec!["collective:eden".to_string(), "collective:eve".to_string()],
+        };
+        let mut by_cid = HashMap::new();
+        by_cid.insert(
+            "collective:eden".to_string(),
+            vec![person("agent:uhCAkADAM", "collective:eden")],
+        );
+        by_cid.insert("collective:eve".to_string(), vec![]);
+        let reader = FakeReader { by_cid };
+
+        discover_household_pairs(&p, &ctx, &self_cids, &reader)
+            .await
+            .expect("discover");
+        assert_eq!(
+            crate::metrics::IDENTITY_FILL_DISCOVERED_CIDS.get(),
+            2,
+            "the gauge counts the discovered cid union, independent of member counts"
         );
     }
 }

@@ -256,7 +256,11 @@ fn aggregate_pledges_by_tier(
 /// so a blob satisfying multiple commitments counts once (spec §7.1). Inventory
 /// rows are PK'd on `(peer_id, blob_hash)`, so they are already distinct per peer.
 /// Held blobs with no shard manifest (e.g. raw EPR blobs) contribute 0.
-fn compute_unique_shard_bytes(
+///
+/// `pub(crate)` — reused by `services::capacity_reporter` (the periodic local
+/// capacity reporter) so both callers fold over the SAME held-bytes definition
+/// instead of re-deriving it.
+pub(crate) fn compute_unique_shard_bytes(
     conn: &mut SqliteConnection,
     peer_cid: &str,
 ) -> Result<u64, StorageError> {
