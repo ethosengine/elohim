@@ -1,0 +1,35 @@
+---
+epr-meta-version: 1
+id: a2o-dataplane-resiliency-saga
+covers: subtree
+purpose: >
+  Ten ordered a2o chapter features narrating the resiliency-saga epic — a device
+  awakens, an eprfs upload is hosted at a doorway, a co-steward agreement is
+  notarized, blobs converge on one head, custody is witnessed, capacity is
+  reported, projector caches carry the head, and the resilience card on
+  elohim.host and alpha tells the truth. Each chapter runs in the edge
+  pipeline's advisory Dataplane Validation stage and rolls up per-concern in
+  sprint-report-dataplane.json. Governed as a whole; the parent a2o CLAUDE.md
+  and features/dataplane/README.md carry the authoring conventions (tags,
+  concern taxonomy, step-definition paths, RED-FIRST discipline) — no
+  additional edit-time gate is needed for this subtree.
+cites:
+  - genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md
+  - genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md
+  - genesis/docs/superpowers/plans/2026-06-21-resiliency-card-p2p-weave-sprint-plan.md
+---
+# resiliency-saga/ — the ten-chapter epic
+
+Ten ordered `.feature` files, one per chapter of the narrative described in this
+directory's `README.md`. Each chapter file carries exactly one `@concern:saga-NN-<name>`
+tag (registered in `../README.md`'s concern taxonomy table) and reuses existing
+step definitions from `steps/dataplane.steps.ts` and `steps/resilience.steps.ts`
+wherever a fitting primitive already exists; new glue lives in
+`steps/dataplane/resiliency-saga.steps.ts`.
+
+**Considered, no enforcing rule beyond the parent's.** This manifest exists to satisfy
+the parent `genesis/a2o/.epr-meta` no-orphan-subtree rule (`new-feature-subdir-needs-meta`)
+and to claim coverage (`covers: subtree`) so the coverage walk terminates here. The real
+authoring discipline — tag requirements, RED-FIRST assertions, step-definition placement —
+is prose convention in the parent `CLAUDE.md`/`README.md`, not a mechanizable predicate; no
+new drift has been observed in this tree that a rule would catch better than review.

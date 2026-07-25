@@ -401,6 +401,42 @@ export function parsePrometheusMetrics(text: string): ParsedMetrics {
   return metrics;
 }
 
+/**
+ * Parse a SINGLE labelled Prometheus series matching `series{...labelKey="labelValue"...}`,
+ * summing across any other label dimensions present on matching lines (mirrors
+ * `scripts/look-doorway-membrane.ts`'s `readCounter` — ported here as a sibling of
+ * `parsePrometheusMetrics` so a caller can pin one label combination instead of the
+ * arbitrary first-seen value `parsePrometheusMetrics`' bare-name collapse returns for
+ * a `*Vec` metric with multiple label sets).
+ *
+ * Returns `null` when the series name never appears in the scrape (metric not
+ * emitted at all) OR appears but no line carries the requested label pair (that
+ * exact label value has never been observed) — both are "absent", not "zero";
+ * callers must treat `null` as pending/skip, never as a measured 0.
+ */
+export function parseLabeledPrometheusMetric(
+  text: string,
+  series: string,
+  labelKey: string,
+  labelValue: string
+): number | null {
+  let total: number | null = null;
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim();
+    if (line.startsWith('#') || !line.startsWith(series)) continue;
+    // The line is either `series value` (unlabelled) or `series{...} value`; a
+    // longer metric name sharing this prefix (e.g. `series_total` vs `series`)
+    // must not falsely match — the char right after the prefix must be a space
+    // or the label-set opener.
+    const after = line.slice(series.length);
+    if (after.length > 0 && !after.startsWith(' ') && !after.startsWith('{')) continue;
+    if (!after.includes(`${labelKey}="${labelValue}"`)) continue;
+    const value = Number(line.trim().split(/\s+/).pop());
+    if (!Number.isNaN(value)) total = (total ?? 0) + value;
+  }
+  return total;
+}
+
 // ---------------------------------------------------------------------------
 // Path-segment encoding helpers
 // ---------------------------------------------------------------------------

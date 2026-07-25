@@ -21,9 +21,41 @@ in the sprint report.
 | `keyspace-coverage` | Cluster-wide RS coverage, placement-gap counts, and weave-lens capacity eyes. Sourced from `features/resilience/operational-weave.feature`. |
 | `reconcile-inventory` | Commitment inventory reconciliation — commitment-backed card counting, custody-pair naming, peer-discovered commitment convergence, substrate delivery reconciliation. Sourced from `features/resilience/`. |
 | `operator-runtime-surface` | Operator verbs as commitment-gated protocol acts — a `delegates-compute` holder drives a reconcile and the peer attests the commitment cid; a non-holder and a revoked holder are refused; a peer serves its own telemetry. Kills the kubectl-only class and the adam-invisibility class. **RED-FIRST and currently `@wip`** — the gate primitive already exists (`elohim-storage/src/services/operation_authorization.rs`); the gap is that `/admin/*` verbs never consult it and doorways run `DEV_MODE=true`. Un-`@wip` is an operator decision (it adds a red concern to the rollup). |
+| `saga-01-device-awakens` | Resiliency-saga chapter 1 — conductor connectivity + peer health, the floor every later chapter assumes. |
+| `saga-02-household-forms` | Resiliency-saga chapter 2 — identity-fill discovers a household's collective cid and writes its member rows. **RED-FIRST** — born red until the identity-fill ceremony cure deploys. |
+| `saga-03-eprfs-upload` | Resiliency-saga chapter 3 — the uploaded EPR's served head matches its declared head, with an attached blob, on the author peer. |
+| `saga-04-doorway-serves` | Resiliency-saga chapter 4 — the root path serves the rendered landing SPA shell, not a 404. |
+| `saga-05-co-steward-agreement` | Resiliency-saga chapter 5 — a Mishpat-notarized co-steward Commitment (`replicates-commons`/`replicates-dwelling`) is active in `rea_commitments`. **RED-FIRST** — born red; the loop's work queue. |
+| `saga-06-heads-converge` | Resiliency-saga chapter 6 — local reconcile catch-up + zero divergence, extended to a cross-doorway same-served-head proof. |
+| `saga-07-custody-witnessed` | Resiliency-saga chapter 7 — a labeled custody-class gauge showing an observed, classified shard holder. **RED/PENDING** — the fold exists (`elohim-facings`) but the gauge is not deployed yet. |
+| `saga-08-capacity-reported` | Resiliency-saga chapter 8 — cluster-aggregate free/stewarded custodian capacity gauges are live and readable. |
+| `saga-09-projectors-carry` | Resiliency-saga chapter 9 — the household-resilience projection's `commitmentBackedReplication.totalPledgedBytes` reflects real pledged bytes. **RED-FIRST** — born red; `household_resilience.rs` hard-codes this field to its zero default (T15 TODO). |
+| `saga-10-card-tells-truth` | Resiliency-saga chapter 10 — two doorways report the SAME non-zero stewarding count for the same content ("two doorways, one truth"). **RED-FIRST** — depends on chapters 5 and 9 landing first. |
 
 Add new concerns here as they are introduced. Concern names must be lowercase kebab-case (e.g.
 `@concern:my-new-concern`), and must appear in the table above before the feature file is merged.
+
+### The resiliency-saga (sourced from `features/dataplane/resiliency-saga/`)
+
+Ten ordered chapter features narrating one continuous epic — a device awakens through
+to the resilience card telling the truth on every doorway that serves it. Unlike the
+deterministic-floor concerns above, these scenarios live IN this directory (a governed
+subdirectory, `features/dataplane/resiliency-saga/`, with its own `.epr-meta`), not in
+`features/resilience/`. See `resiliency-saga/README.md` for the full narrative and the
+chapter/concern/proof-signal table.
+
+| file | concern |
+|---|---|
+| `resiliency-saga/01-device-awakens.feature` | `saga-01-device-awakens` |
+| `resiliency-saga/02-household-forms.feature` | `saga-02-household-forms` |
+| `resiliency-saga/03-eprfs-upload.feature` | `saga-03-eprfs-upload` |
+| `resiliency-saga/04-doorway-serves.feature` | `saga-04-doorway-serves` |
+| `resiliency-saga/05-co-steward-agreement.feature` | `saga-05-co-steward-agreement` |
+| `resiliency-saga/06-heads-converge.feature` | `saga-06-heads-converge` |
+| `resiliency-saga/07-custody-witnessed.feature` | `saga-07-custody-witnessed` |
+| `resiliency-saga/08-capacity-reported.feature` | `saga-08-capacity-reported` |
+| `resiliency-saga/09-projectors-carry.feature` | `saga-09-projectors-carry` |
+| `resiliency-saga/10-card-tells-truth.feature` | `saga-10-card-tells-truth` |
 
 ### Deterministic-floor concerns (sourced from `features/resilience/`)
 
