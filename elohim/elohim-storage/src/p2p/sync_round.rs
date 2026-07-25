@@ -158,17 +158,34 @@ pub fn round_opener(h_app_id: &str, _local: &LocalCorpusState) -> SyncRequest {
 
 /// The push notifications a locally-authored change owes each connected peer.
 ///
-/// Today: empty — there is no announce send site anywhere in the tree, so a local
-/// change waits for each peer's next poll (up to the full round interval) before it
-/// can propagate. `AnnounceChange` is already carried by the protocol and handled
-/// by both the libp2p and iroh backends; only the producing half is missing.
+/// One `AnnounceChange` per connected peer, **metadata only** (`change_data:
+/// None`). The receiving peer pulls the bytes through the existing
+/// `SyncChanges`/`GetChanges` path, so a large change is never fanned out N
+/// times across the mesh — the announce is a doorbell, not a delivery.
+///
+/// This is the sole constructor of the announce requests, deliberately: the
+/// planner staying the only constructor is what keeps `tests/sync_scale_honesty`
+/// measuring the wire instead of a test-local mirror.
 pub fn announcements_for_local_change(
-    _h_app_id: &str,
-    _doc_id: &str,
-    _change_hash: &str,
-    _peers: &[PeerId],
+    h_app_id: &str,
+    doc_id: &str,
+    change_hash: &str,
+    peers: &[PeerId],
 ) -> Vec<(PeerId, SyncRequest)> {
-    Vec::new()
+    peers
+        .iter()
+        .map(|p| {
+            (
+                *p,
+                SyncRequest::AnnounceChange {
+                    h_app_id: h_app_id.to_string(),
+                    doc_id: doc_id.to_string(),
+                    change_hash: change_hash.to_string(),
+                    change_data: None,
+                },
+            )
+        })
+        .collect()
 }
 
 #[cfg(test)]

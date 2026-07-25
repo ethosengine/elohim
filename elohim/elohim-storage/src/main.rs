@@ -2853,12 +2853,39 @@ async fn async_main(
             // producer wiring is a separate, p2p-iroh-gated follow-up).
             #[cfg(feature = "p2p")]
             if let Some(ref node) = p2p_node {
+                // Announce-on-change bridge (spine node `sync-scale-honesty`).
+                // The projector reports locally-authored changes as plain
+                // `LocalChange` values; this task translates them into the p2p
+                // command, so `sync/` never depends on p2p types. Bounded and
+                // lossy BY DESIGN: the projector uses `try_send`, and the 60s
+                // round stays the reconciliation backstop, so a saturated queue
+                // costs propagation latency and never correctness.
+                let (announce_tx, mut announce_rx) =
+                    tokio::sync::mpsc::channel::<elohim_storage::sync::projector::LocalChange>(256);
+                let announce_cmd_tx = node.handle().command_sender();
+                tokio::spawn(async move {
+                    while let Some(change) = announce_rx.recv().await {
+                        if announce_cmd_tx
+                            .try_send(elohim_storage::p2p::P2PCommand::AnnounceLocalChange {
+                                doc_id: change.doc_id,
+                                change_hash: change.change_hash,
+                            })
+                            .is_err()
+                        {
+                            tracing::debug!(
+                                "announce bridge: p2p command queue full, the sync round will carry the change"
+                            );
+                        }
+                    }
+                });
+
                 elohim_storage::sync::projector::spawn_content_projection_listener(
                     services.events.clone(),
                     node.sync_manager().clone(),
                     pool.clone(),
+                    Some(announce_tx),
                 );
-                info!("Content-projection producer spawned — Automerge content-sync plane lit");
+                info!("Content-projection producer spawned — Automerge content-sync plane lit, announce-on-change wired");
 
                 // Corpus back-fill (default ON, idempotent — reconciliation-
                 // controller leg, eager reconcile). The go-forward producer above
@@ -2927,6 +2954,11 @@ async fn async_main(
                     services.events.clone(),
                     iroh_sync.clone(),
                     pool.clone(),
+                    // No announce on the iroh plane yet: it has no periodic
+                    // round driver either (see the note above), so wiring a
+                    // doorbell with no backstop behind it would be the worse
+                    // half of the pair. Follows the iroh round driver.
+                    None,
                 );
                 info!(
                     "Content-projection producer spawned on iroh transport — \

@@ -623,10 +623,28 @@ async fn project_content_bulk(
 /// no-op skip. Projection writes only the sled DocStore (the value plane); it never
 /// stamps notary/anchor provenance — `dht_anchor_hash` is written exclusively by the
 /// conductor-verified path (`upsert_with_anchor`).
+/// A locally-authored change worth telling connected peers about.
+///
+/// Deliberately a plain data struct owned by `sync`, not a `p2p` type: the
+/// projector must not depend on the p2p feature, and the announce path must not
+/// depend on the projector. `main.rs` bridges this to
+/// `P2PCommand::AnnounceLocalChange` under `#[cfg(feature = "p2p")]`.
+#[derive(Debug, Clone)]
+pub struct LocalChange {
+    pub doc_id: String,
+    pub change_hash: String,
+}
+
+/// Where the projector reports locally-authored changes. `None` disables
+/// announcing (no p2p, or tests) and leaves the 60s round as the only
+/// propagation path — exactly today's behaviour.
+pub type AnnounceTx = tokio::sync::mpsc::Sender<LocalChange>;
+
 pub fn spawn_content_projection_listener(
     events: Arc<EventBus>,
     sync: Arc<SyncManager>,
     pool: DbPool,
+    announce: Option<AnnounceTx>,
 ) -> tokio::task::JoinHandle<()> {
     let mut rx = events.subscribe();
     // Serialises overlapping bulk-projection tasks — see the doc comment.
@@ -638,10 +656,46 @@ pub fn spawn_content_projection_listener(
                 | Ok(StorageEvent::ContentUpdated { id }) => {
                     match load_content_row(&pool, &id).await {
                         Ok(Some(content)) => {
-                            if let Err(e) = project_content_doc(&sync, &content).await {
-                                tracing::error!(%id, error = %e, "projector: doc projection failed");
-                            } else {
-                                tracing::debug!(%id, "projector: content projected to sync DocStore");
+                            match project_content_doc(&sync, &content).await {
+                                Err(e) => {
+                                    tracing::error!(%id, error = %e, "projector: doc projection failed");
+                                }
+                                // Ok(false) = idempotent no-op (nothing changed
+                                // locally), so there is nothing to announce.
+                                Ok(false) => {
+                                    tracing::debug!(%id, "projector: content already current, no announce");
+                                }
+                                Ok(true) => {
+                                    tracing::debug!(%id, "projector: content projected to sync DocStore");
+                                    if let Some(tx) = announce.as_ref() {
+                                        let doc_id = content_doc_id(&content.id);
+                                        match sync.get_heads(PROJECTION_NAMESPACE, &doc_id).await {
+                                            Ok(heads) if !heads.is_empty() => {
+                                                // try_send, never send: the announce
+                                                // path must never apply backpressure
+                                                // to projection. A full queue drops
+                                                // the doorbell and the 60s round
+                                                // still carries the change — degraded
+                                                // latency, never lost data.
+                                                if tx
+                                                    .try_send(LocalChange {
+                                                        doc_id,
+                                                        change_hash: heads[0].clone(),
+                                                    })
+                                                    .is_err()
+                                                {
+                                                    tracing::debug!(%id, "projector: announce queue full, falling back to the sync round");
+                                                }
+                                            }
+                                            Ok(_) => {
+                                                tracing::warn!(%id, "projector: projected doc has no heads, cannot announce");
+                                            }
+                                            Err(e) => {
+                                                tracing::warn!(%id, error = %e, "projector: head read failed, cannot announce");
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                         Ok(None) => tracing::warn!(%id, "projector: content row vanished"),
@@ -1972,6 +2026,9 @@ mod tests {
             Arc::clone(&events),
             Arc::clone(&sync),
             pool.clone(),
+            // This test covers bulk projection, which never announces (bulk
+            // uses reconcile semantics, not local authorship).
+            None,
         );
 
         events.emit(StorageEvent::ContentBulkCreated {

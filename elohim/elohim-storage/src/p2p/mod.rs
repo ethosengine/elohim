@@ -955,6 +955,14 @@ pub enum P2PCommand {
     ListPeers {
         reply: oneshot::Sender<Vec<PeerInfoView>>,
     },
+    /// Tell every connected peer that this node just authored a change, so they
+    /// learn about it by being told rather than by waiting up to a full round
+    /// interval for their next poll (spine node `sync-scale-honesty`).
+    ///
+    /// Fire-and-forget: there is no reply channel because the 60s round remains
+    /// the reconciliation backstop — a dropped or failed announce costs latency,
+    /// never correctness.
+    AnnounceLocalChange { doc_id: String, change_hash: String },
     /// Publish a RecoveryInvitation to the `recovery.invitation` gossipsub topic.
     /// Sent by the projection layer after a successful `RecoveryRequestCreated`
     /// upsert. The swarm event loop calls `gossipsub.publish(topic, bytes)`.
@@ -1242,6 +1250,7 @@ impl P2PHandle {
                         let _ = reply.send(vec![]);
                     }
                     P2PCommand::PublishEprHead { .. } => {} // fire-and-forget
+                    P2PCommand::AnnounceLocalChange { .. } => {} // fire-and-forget
                     P2PCommand::PublishRecoveryInvitation(_) => {} // fire-and-forget
                     P2PCommand::PublishIdentityBinding(_) => {} // fire-and-forget
                     P2PCommand::PublishRecoveryRevocation(_) => {} // fire-and-forget
@@ -3537,6 +3546,34 @@ impl P2PNode {
                     .lock()
                     .await
                     .insert(request_id, reply);
+            }
+            P2PCommand::AnnounceLocalChange {
+                doc_id,
+                change_hash,
+            } => {
+                // The send site the standing red names. `announcements_for_local_change`
+                // stays the ONLY constructor of these requests — making it return
+                // requests without a caller that sends them would turn the test
+                // green while nothing propagates.
+                let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
+                let namespace = crate::sync::projector::PROJECTION_NAMESPACE;
+                let announcements = sync_round::announcements_for_local_change(
+                    namespace,
+                    &doc_id,
+                    &change_hash,
+                    &peers,
+                );
+                if announcements.is_empty() {
+                    debug!(doc_id = %doc_id, "Announce: no connected peers, the round remains the propagation path");
+                }
+                for (peer_id, request) in announcements {
+                    swarm
+                        .behaviour_mut()
+                        .sync_protocol
+                        .send_request(&peer_id, request);
+                    crate::metrics::inc_sync_request("announce_change");
+                }
+                debug!(doc_id = %doc_id, change_hash = %change_hash, peers = peers.len(), "Announced local change to connected peers");
             }
             P2PCommand::ListPeers { reply } => {
                 let peers: Vec<PeerInfoView> = swarm
