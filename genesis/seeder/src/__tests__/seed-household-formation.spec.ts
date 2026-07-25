@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   buildHouseholdCharter, buildCeremonyCustodyInput, HOUSEHOLD_MEMBERS,
-  resolveExistingCollectiveCid,
+  resolveExistingCollectiveCid, electFounder,
 } from '../seed-household-formation.js';
 import {
   clearPeerIdCache, deterministicPeerId, resolvePeerId, storageUrlForHuman,
@@ -130,6 +130,32 @@ describe('HOUSEHOLD_MEMBERS', () => {
       'human-matthew-manager', 'human-jessica-spouse', 'human-james-son',
     ]);
     expect(HOUSEHOLD_MEMBERS[2].minor).toBe(true);
+  });
+});
+
+describe('electFounder', () => {
+  it('elects HOUSEHOLD_MEMBERS[0] when the nominal founder bound a session', () => {
+    const bound = new Set(['human-matthew-manager', 'human-jessica-spouse', 'human-james-son']);
+    expect(electFounder(HOUSEHOLD_MEMBERS, bound)?.humanId).toBe('human-matthew-manager');
+  });
+
+  it('falls through to the next member in declared order when the nominal founder is unbindable', () => {
+    // e.g. matthew's conductor embodies a UUID-minted Human (doorway registration) that
+    // never matches human-matthew-manager — the ceremony must still elect a founder.
+    const bound = new Set(['human-jessica-spouse', 'human-james-son']);
+    expect(electFounder(HOUSEHOLD_MEMBERS, bound)?.humanId).toBe('human-jessica-spouse');
+  });
+
+  it('preserves declared order even when a later member binds "first" (Map insertion order)', () => {
+    const bound = new Map([
+      ['human-james-son', {}],
+      ['human-jessica-spouse', {}],
+    ]);
+    expect(electFounder(HOUSEHOLD_MEMBERS, bound)?.humanId).toBe('human-jessica-spouse');
+  });
+
+  it('returns undefined when no member bound a session (caller keeps this FATAL)', () => {
+    expect(electFounder(HOUSEHOLD_MEMBERS, new Set())).toBeUndefined();
   });
 });
 

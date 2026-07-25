@@ -126,10 +126,22 @@ def peerStorageUrlsCsv() {
 }
 
 /**
- * Build comma-separated CONDUCTOR_URLS for non-suspended humans whose
- * agencyPhase is node, doorway, or device. Each URL points at the conductor's
- * app WebSocket port; the seeder derives admin port (= app port - 1) per the
- * existing socat convention in K8s.
+ * Build comma-separated CONDUCTOR_URLS for every non-suspended human declared
+ * in genesis/orchestrator/data/deployments.json — the authoritative record of
+ * who actually has a deployed conductor pod on alpha (every entry there runs
+ * the consolidated elohim-node pattern: conductor + storage + doorway in one
+ * container). Each URL points at the conductor's app WebSocket port; the
+ * seeder derives admin port (= app port - 1) per the existing socat
+ * convention in K8s.
+ *
+ * Historical note: this used to read genesis/orchestrator/environments/
+ * topology.json (a file that has never existed) filtered by an `agencyPhase`
+ * field deployments.json doesn't carry — the fallback-to-3-humans path silently
+ * became the only path, which is why household members outside the
+ * matthew/adam/jessica fallback (e.g. james) never got a conductor session to
+ * bind (genesis household-formation FATAL: no conductor found for the founder).
+ * deployments.json's `suspended` flag remains the single is-this-human-
+ * exercise-able source of truth (feedback_deterministic_flag_agent_canon_stasis_pattern).
  *
  * NETPOL DEPENDENCY: reaching these conductor admin/app WS sockets from a
  * jenkins agent requires the elohim-alpha NetworkPolicy default-deny-cross-env
@@ -150,28 +162,29 @@ def peerStorageUrlsCsv() {
  * genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md
  */
 def getConductorAppUrls() {
-    def topoPath = "genesis/orchestrator/environments/topology.json"
+    def path = "genesis/orchestrator/data/deployments.json"
     def humans = []
-    if (fileExists(topoPath)) {
+    if (fileExists(path)) {
         try {
-            def topo = new groovy.json.JsonSlurper().parseText(readFile(topoPath))
-            humans = topo.humans ?: []
-        } catch (e) {
-            echo "WARN: topology.json parse failed for conductor URLs: ${e.message}"
+            // readJSON (not JsonSlurper) — JsonSlurper's LazyMap is CPS-non-serializable
+            // across Jenkins pipeline step boundaries (see remoteOnlyHumanRecords() above);
+            // readJSON is the proven-safe pattern for reading deployments.json here.
+            def data = readJSON(file: path)
+            humans = (data.humans ?: []).findAll { !it.suspended && it.name }
+        } catch (Exception e) {
+            echo "WARN: getConductorAppUrls() deployments.json parse failed: ${e.message}"
         }
     }
     if (humans.isEmpty()) {
-        // Fallback: alpha-concentration default (mirrors getHumanStorageUrls).
+        // Fallback: alpha-concentration default (mirrors getHumanStorageUrls) —
+        // only reached if deployments.json is missing/unparseable/empty.
         humans = [
-            [name: 'matthew', service: 'elohim-matthew-alpha', namespace: 'elohim-alpha', agencyPhase: 'doorway'],
-            [name: 'adam',    service: 'elohim-adam-alpha',    namespace: 'elohim-alpha', agencyPhase: 'doorway'],
-            [name: 'jessica', service: 'elohim-jessica-alpha', namespace: 'elohim-alpha', agencyPhase: 'device'],
+            [name: 'matthew'],
+            [name: 'adam'],
+            [name: 'jessica'],
         ]
     }
-    def urls = humans
-        .findAll { ['node', 'doorway', 'device'].contains(it.agencyPhase) }
-        .findAll { !it.suspended }
-        .collect { "ws://${it.service}.${it.namespace}.svc.cluster.local:4445" }
+    def urls = humans.collect { "ws://elohim-${it.name}-alpha.elohim-alpha.svc.cluster.local:4445" }
     return urls.join(',')
 }
 

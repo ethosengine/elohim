@@ -87,6 +87,24 @@ export function buildHouseholdCharter(): string {
   return JSON.stringify({ kind: 'household', rubric: 'recognition-of-given', slugAlias: 'family-dowell' });
 }
 
+/**
+ * Elect the founder: the first HOUSEHOLD_MEMBERS entry (in declared, deterministic
+ * order) whose humanId has a bound conductor session. HOUSEHOLD_MEMBERS[0] is the
+ * preferred/nominal founder, but a bound session isn't guaranteed for the nominal
+ * first member — e.g. a doorway-registered human whose conductor embodies a
+ * UUID-minted Human (auth_routes.rs `generated_human_id`) rather than the canonical
+ * household id can never match (findMemberSessions binds by exact humanId). Pure
+ * over anything with a `.has(id)` (a `Set<string>` or the sessions `Map` itself) so
+ * it's unit-testable without standing up conductors. Returns `undefined` when NO
+ * member bound a session — the caller keeps that case FATAL.
+ */
+export function electFounder(
+  members: readonly HouseholdMember[],
+  boundHumanIds: { has(id: string): boolean },
+): HouseholdMember | undefined {
+  return members.find(m => boundHumanIds.has(m.humanId));
+}
+
 export interface CeremonyCustodyParams {
   providerHumanId: string;
   providerArchetype: Archetype;
@@ -588,8 +606,8 @@ async function main(): Promise<void> {
   activeSessions = sessions as typeof activeSessions;
   console.log('');
 
-  const founder = HOUSEHOLD_MEMBERS[0];
-  const founderSession = sessions.get(founder.humanId);
+  // See electFounder() docstring for why the founder can't just be HOUSEHOLD_MEMBERS[0].
+  const electedFounder = electFounder(HOUSEHOLD_MEMBERS, sessions);
 
   const closeAll = async () => {
     for (const s of sessions.values()) {
@@ -601,10 +619,26 @@ async function main(): Promise<void> {
     }
   };
 
-  if (!founderSession) {
-    console.error(`FATAL: no conductor found for the founder (${founder.humanId}).`);
+  if (!electedFounder) {
+    console.error(
+      `FATAL: no conductor bound for any household member — cannot elect a founder. ` +
+        `Checked: ${HOUSEHOLD_MEMBERS.map(m => m.humanId).join(', ')}.`,
+    );
     await closeAll();
     process.exit(1);
+  }
+
+  const founder = electedFounder;
+  const founderSession = sessions.get(founder.humanId)!;
+
+  if (founder.humanId !== HOUSEHOLD_MEMBERS[0].humanId) {
+    console.warn(
+      `[!] founder ${HOUSEHOLD_MEMBERS[0].humanId} unbindable (no conductor session matched — ` +
+        `likely a UUID-minted Human from doorway registration rather than the canonical id) — ` +
+        `electing ${founder.humanId} as founder instead.`,
+    );
+  } else {
+    console.log(`[=] founder elected: ${founder.humanId} (nominal default, session bound)`);
   }
 
   const affirmed = new Set<string>([founder.humanId]); // founder is steward-affirmed by create_collective
@@ -649,7 +683,9 @@ async function main(): Promise<void> {
   }
 
   // -- 2. Invite + affirm each non-founder member -------------------------
-  for (const member of HOUSEHOLD_MEMBERS.slice(1)) {
+  // Filter by humanId (not slice(1)) — the elected founder isn't guaranteed to
+  // be HOUSEHOLD_MEMBERS[0] (see founder-election above).
+  for (const member of HOUSEHOLD_MEMBERS.filter(m => m.humanId !== founder.humanId)) {
     const memberSession = sessions.get(member.humanId);
     if (!memberSession) {
       console.error(`  [X] ${member.humanId}: no conductor bound — cannot affirm`);
