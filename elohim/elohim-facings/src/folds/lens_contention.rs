@@ -83,18 +83,23 @@ mod tests {
 
     #[test]
     fn split_is_maximally_contended_unanimous_is_not() {
-        let split = vec![
-            v("e", "l", "agree", "a"),
-            v("e", "l", "disagree", "b"),
-        ];
-        assert_eq!(contention_index(&split, "e"), 1.0, "1/1 split = max contention");
+        let split = vec![v("e", "l", "agree", "a"), v("e", "l", "disagree", "b")];
+        assert_eq!(
+            contention_index(&split, "e"),
+            1.0,
+            "1/1 split = max contention"
+        );
 
         let unanimous = vec![
             v("e", "l", "agree", "a"),
             v("e", "l", "agree", "b"),
             v("e", "l", "agree", "c"),
         ];
-        assert_eq!(contention_index(&unanimous, "e"), 0.0, "3/0 = no contention");
+        assert_eq!(
+            contention_index(&unanimous, "e"),
+            0.0,
+            "3/0 = no contention"
+        );
     }
 
     #[test]

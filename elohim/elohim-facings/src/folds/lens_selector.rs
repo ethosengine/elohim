@@ -32,7 +32,11 @@ pub struct LensRow {
 /// warm (spec §3.1).
 pub fn select_lenses(rows: &[LensRow]) -> Vec<&LensRow> {
     let mut selected: Vec<&LensRow> = rows.iter().filter(|r| r.valid).collect();
-    selected.sort_by(|a, b| b.affinity.cmp(&a.affinity).then(a.lens_cid.cmp(&b.lens_cid)));
+    selected.sort_by(|a, b| {
+        b.affinity
+            .cmp(&a.affinity)
+            .then(a.lens_cid.cmp(&b.lens_cid))
+    });
     selected
 }
 
@@ -90,16 +94,36 @@ mod tests {
             lens("georgist", 8, 0.1, true),
         ];
         let sel = select_lenses(&rows);
-        assert_eq!(sel.len(), 2, "both valid lenses kept — plurality preserved, poisoned skipped");
+        assert_eq!(
+            sel.len(),
+            2,
+            "both valid lenses kept — plurality preserved, poisoned skipped"
+        );
         assert_eq!(sel[0].lens_cid, "georgist", "higher affinity ranks first");
         assert_eq!(sel[1].lens_cid, "beerian");
     }
 
     #[test]
     fn regime_breached_only_on_joint_decay_and_rise() {
-        assert_eq!(classify_regime(3, 5, 0.8, 0.4), RegimeStatus::Breached, "affinity down AND contention up");
-        assert_eq!(classify_regime(3, 5, 0.4, 0.4), RegimeStatus::Drifting, "affinity down alone");
-        assert_eq!(classify_regime(5, 5, 0.8, 0.4), RegimeStatus::Drifting, "contention up alone");
-        assert_eq!(classify_regime(6, 5, 0.2, 0.4), RegimeStatus::Stable, "both healthy");
+        assert_eq!(
+            classify_regime(3, 5, 0.8, 0.4),
+            RegimeStatus::Breached,
+            "affinity down AND contention up"
+        );
+        assert_eq!(
+            classify_regime(3, 5, 0.4, 0.4),
+            RegimeStatus::Drifting,
+            "affinity down alone"
+        );
+        assert_eq!(
+            classify_regime(5, 5, 0.8, 0.4),
+            RegimeStatus::Drifting,
+            "contention up alone"
+        );
+        assert_eq!(
+            classify_regime(6, 5, 0.2, 0.4),
+            RegimeStatus::Stable,
+            "both healthy"
+        );
     }
 }

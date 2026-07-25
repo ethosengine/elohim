@@ -125,7 +125,12 @@ pub fn steward_allocation_summary(allocs: &[AllocationRow]) -> (i32, f64) {
 mod tests {
     use super::*;
 
-    fn ev(action: &str, receiver: &str, value: Option<f64>, content: Option<&str>) -> RecognitionEventRow {
+    fn ev(
+        action: &str,
+        receiver: &str,
+        value: Option<f64>,
+        content: Option<&str>,
+    ) -> RecognitionEventRow {
         RecognitionEventRow {
             action: action.to_string(),
             receiver: receiver.to_string(),
@@ -200,8 +205,8 @@ mod tests {
         let allocs = vec![
             alloc("c1", 1.0, "active", 10.0),
             alloc("c2", 0.5, "active", 4.0),
-            alloc("c3", 1.0, "disputed", 99.0),    // excluded
-            alloc("c4", 1.0, "superseded", 99.0),  // excluded
+            alloc("c3", 1.0, "disputed", 99.0),   // excluded
+            alloc("c4", 1.0, "superseded", 99.0), // excluded
         ];
         let (count, total) = steward_allocation_summary(&allocs);
         assert_eq!(count, 2);

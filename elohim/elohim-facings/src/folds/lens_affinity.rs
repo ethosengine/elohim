@@ -82,7 +82,11 @@ mod tests {
             sel("beerian", "carol", "epr:land"),
         ];
         let aff = affinity_in_scope(&rows, "epr:land");
-        assert_eq!(aff.get("georgist").copied(), Some(2), "distinct selectors, not raw count");
+        assert_eq!(
+            aff.get("georgist").copied(),
+            Some(2),
+            "distinct selectors, not raw count"
+        );
         assert_eq!(aff.get("beerian").copied(), Some(1));
     }
 
@@ -96,6 +100,10 @@ mod tests {
             sel("antitrust", "c", "epr:platform"),
         ];
         assert_eq!(affinity_for(&rows, "land-tax", "epr:developing"), 2);
-        assert_eq!(affinity_for(&rows, "land-tax", "epr:platform"), 0, "warm, not active, in this context");
+        assert_eq!(
+            affinity_for(&rows, "land-tax", "epr:platform"),
+            0,
+            "warm, not active, in this context"
+        );
     }
 }
