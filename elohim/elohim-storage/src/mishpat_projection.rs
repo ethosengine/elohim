@@ -776,6 +776,165 @@ pub fn provide_projection_for(row: &NewMishpatCommitment) -> Option<ProvideProje
     })
 }
 
+// ============================================================================
+// mishpat → REA replication-commitment mirror (the wrong-table-split cure)
+// ============================================================================
+
+/// A **per-commitment** `rea_commitments` mirror of a notarized `replicates-*`
+/// commitment.
+///
+/// ## Why this exists (the wrong-table split)
+///
+/// The live producer (`services::conductor_commitment_author`) authors
+/// commitments through the **mishpat** zome; its post-commit
+/// `MishpatSignal::CommitmentCommitted` projects into `mishpat_commitments`.
+/// But EVERY resilience/distribution reader queries `rea_commitments`, which
+/// only the lamad/content_store `ReaCommitmentCommitted` path ever populated.
+/// Result: the resilience card's commitment fields read zero forever.
+///
+/// [`ProvideProjection`] already bridges one narrow slice of this — but it
+/// collapses to ONE `(provider, reach)`-keyed `provide` row, deliberately
+/// losing per-commitment identity, tier, counterparty and pledged bytes. This
+/// descriptor is the faithful, per-commitment mirror the replication lens needs
+/// (`elohim_facings::folds::replication_commitment`).
+///
+/// ## Storage-only — the DHT path is untouched
+///
+/// No new entry type, no second write, no re-notarization. The commitment is
+/// already notarized and already lands in `mishpat_commitments`; this is a
+/// second **projection** of that same notarized event into the table the readers
+/// actually read.
+///
+/// ## `id` is the entry_hash, never the action_hash
+///
+/// `cid` carries the commitment `entry_hash` (memory
+/// `project_mishpat_commitment_cid_is_entry_hash`): the `entry_hash` is what
+/// `economic_events.bounded_by` and every bounds gate key on; the `action_hash`
+/// lives ONLY in `dht_anchor_hash`. Returning the action hash as the CID
+/// silently breaks every bounds gate.
+///
+/// Pure — no DB, no conductor. The caller in `signals.rs` performs the write via
+/// [`crate::db::rea_commitments::mirror_replication_commitment`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplicationMirror {
+    /// The commitment `entry_hash` → `rea_commitments.id`.
+    pub cid: String,
+    /// The action discriminator, carried through verbatim
+    /// (`replicates-dwelling` | `replicates-commons` | `replicates-content`).
+    pub action: String,
+    /// `rea_commitments.provider`. An `agent_cid` for a content provide; a *hub
+    /// id* for a dwelling commitment (`provider_dwelling_hub_id`) — the write
+    /// site OBSERVES that namespace divergence rather than rejecting it
+    /// (`identity_namespace`, enforcement-by-observation).
+    pub provider: String,
+    /// `rea_commitments.receiver`. The EPR `head_ref` for a commons **content**
+    /// commitment (the per-content link), the recipient hub id for a dwelling
+    /// commitment, empty for a capacity pledge (no counterparty).
+    pub receiver: String,
+    /// The action-specific policy envelope, snake_case as the DHT wrote it (the
+    /// row's `bounds_json`, plus the identity/validity fields the envelope needs
+    /// to stand alone). The replication fold parses `provider_role` /
+    /// `capacity_bytes` / `commons_bytes` out of this.
+    pub metadata_json: String,
+    /// `["content:<reach>"]` for a commons **content** commitment (the same
+    /// uniform JSON-list contract the `provide` projection writes, non-commons
+    /// spec §11.2 Option A), `None` where the commitment declares no content
+    /// classification.
+    pub resource_classified_as: Option<String>,
+    /// The commitment's `action_hash` — notarized provenance, never the id.
+    pub dht_anchor_hash: Option<String>,
+}
+
+/// Replication actions that mirror into `rea_commitments`.
+///
+/// `replicates-content` is the reach-general content action; `replicates-commons`
+/// is the migration-window alias the conductor author still emits;
+/// `replicates-dwelling` is the household/collective capacity commitment.
+/// `delegates-compute`, `custody-blob`, `project-epr`, `author-lens`,
+/// `binds-identity`, `acknowledges-reach-change` are NOT replication and are
+/// never mirrored.
+const MIRRORED_REPLICATION_ACTIONS: [&str; 3] = [
+    "replicates-dwelling",
+    "replicates-commons",
+    "replicates-content",
+];
+
+/// Decide whether a just-parsed commitment row should ALSO be mirrored into
+/// `rea_commitments` as a per-commitment replication row, and with what shape.
+///
+/// Returns `None` for any non-replication action. A malformed/absent
+/// `bounds_json` does NOT drop the mirror — the commitment is real and its
+/// identity fields are known; the envelope degrades to `{}` and the fold's
+/// classification simply skips it (measured absence beats a lost row).
+///
+/// Pure — no DB, no conductor.
+pub fn replication_mirror_for(row: &NewMishpatCommitment) -> Option<ReplicationMirror> {
+    if !MIRRORED_REPLICATION_ACTIONS.contains(&row.action.as_str()) {
+        return None;
+    }
+
+    // Start from the notarized policy envelope; degrade a non-object to `{}`.
+    let mut envelope = match serde_json::from_str::<serde_json::Value>(&row.bounds_json) {
+        Ok(serde_json::Value::Object(map)) => map,
+        _ => serde_json::Map::new(),
+    };
+
+    // Identity + validity fields the envelope needs to stand alone once it is
+    // divorced from the `mishpat_commitments` row. snake_case throughout — this
+    // is the DHT payload's own vocabulary, and the fold reads either casing.
+    envelope.insert("action".into(), serde_json::json!(row.action));
+    envelope.insert("provider".into(), serde_json::json!(row.provider));
+    envelope.insert("recipient".into(), serde_json::json!(row.recipient));
+    envelope.insert("valid_from".into(), serde_json::json!(row.valid_from));
+    envelope.insert("valid_until".into(), serde_json::json!(row.valid_until));
+
+    let mut resource_classified_as = None;
+
+    if row.action == "replicates-dwelling" {
+        // Restore the hub-id field names the dwelling payload uses, so a reader
+        // holding only `metadata_json` sees the same shape the DHT payload had.
+        envelope.insert(
+            "provider_dwelling_hub_id".into(),
+            serde_json::json!(row.provider),
+        );
+        envelope.insert(
+            "recipient_dwelling_hub_id".into(),
+            serde_json::json!(row.recipient),
+        );
+    } else {
+        // `replicates-commons` / `replicates-content`. The parser distinguishes
+        // the two payload variants by counterparty: the `content` variant sets
+        // `recipient = head_ref`; the `capacity` pledge leaves it empty.
+        let variant = if row.recipient.is_empty() {
+            "capacity"
+        } else {
+            "content"
+        };
+        envelope.insert("variant".into(), serde_json::json!(variant));
+        if variant == "content" {
+            envelope.insert("head_ref".into(), serde_json::json!(row.recipient));
+            // Classification mirrors the `provide` projection's contract so the
+            // existing scope-membership readers (`commitment_backed_collectives`,
+            // `peer_selection`) see this row at the content's own reach. The
+            // reach is READ THROUGH from the bounds (never re-vocabularized).
+            if let Some(reach) = envelope.get("reach").and_then(|v| v.as_str()) {
+                resource_classified_as =
+                    serde_json::to_string(&vec![format!("content:{reach}")]).ok();
+            }
+        }
+    }
+
+    Some(ReplicationMirror {
+        cid: row.cid.clone(),
+        action: row.action.clone(),
+        provider: row.provider.clone(),
+        receiver: row.recipient.clone(),
+        metadata_json: serde_json::Value::Object(envelope).to_string(),
+        resource_classified_as,
+        dht_anchor_hash: row.dht_anchor_hash.clone(),
+    })
+}
+
 /// The mishpat→REA bridge for a `delegates-compute` commitment (Wave 4.3).
 ///
 /// Sibling to [`ProvideProjection`]: where that descriptor bridges a content

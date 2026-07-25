@@ -64,6 +64,7 @@ name = "elohim-facings"
 version = "0.1.0"
 dependencies = [
  "elohim-views",
+ "serde_json",
 ]
 
 [[package]]

@@ -17,5 +17,13 @@ categories = ["data-structures"]
 # The wire-shape view types the folds return/assemble (FeltStatusView,
 # RegionalDistributionView, StewardingCollectiveEntry, PlacementGapView, …).
 # This + std is the ENTIRE dependency surface — deliberately NO diesel, no
-# elohim-storage, no serde/chrono (add per-lens only when a moved type needs it).
+# elohim-storage (add per-lens only when a fold's own type needs it).
 elohim-views = { path = "../elohim-views" }
+# Per-lens addition (folds/replication_commitment.rs): a replication commitment's
+# TIER is decided by its action-specific policy envelope (`provider_role`,
+# `capacity_bytes`, `commons_bytes`), which is stored as an opaque JSON string.
+# The classification vocabulary belongs in ONE place — the fold — so the fold
+# owns the parse. `serde_json` is NOT a DB dependency: the crate's no-DB boundary
+# (no diesel, direct or transitive) is unchanged and still guarded by
+# `boundary_tests::no_transitive_diesel_in_dep_tree`.
+serde_json = "1"

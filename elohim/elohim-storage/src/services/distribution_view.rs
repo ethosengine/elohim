@@ -408,6 +408,47 @@ pub async fn compose_distribution_details(
 
     let fault_domain_diversity = compute_fault_domain_diversity(&replica_peers);
 
+    // replication_commitments: the active `replicates-*` commitments that NAME
+    // this content. `ReplicationCommitmentRef` is documented (elohim-views) as
+    // "one active replicates-* commitment whose recipient + scope cover this
+    // CID", so this list is scoped, never the node's whole ledger — a per-content
+    // view listing every commitment on the node would actively mislead.
+    //
+    // The scoping is an ADDRESS-EQUIVALENCE set, because this view is keyed by a
+    // blob address while a commons **content** commitment names an EPR `head_ref`
+    // (`mishpat_projection::parse_replicates_commons` → `recipient: head_ref`) —
+    // two namespaces for the same artifact. We pass the two addresses we can
+    // PROVE equivalent: the blob hash itself, and every `content.id` stored under
+    // that blob hash. A commitment naming either covers this content; an address
+    // we cannot prove equivalent is simply absent, so an empty list is a measured
+    // absence, never a fabricated global list.
+    //
+    // Dwelling / commons-capacity pledges name a hub or no counterparty at all —
+    // they cover a `scope_filter`, not a named CID, and are never claimed here
+    // (evaluating a scope filter per-CID is a separate lens).
+    let replication_commitments = {
+        let mut addresses: std::collections::HashSet<String> =
+            [blob_hash.to_string()].into_iter().collect();
+        {
+            use crate::db::diesel_schema::content::dsl as c;
+            let content_ids: Vec<String> = c::content
+                .filter(c::blob_hash.eq(blob_hash))
+                .select(c::id)
+                .load::<String>(&mut conn)
+                .unwrap_or_default();
+            addresses.extend(content_ids);
+        }
+        // `distribution_view` carries no AppContext of its own (same reason as
+        // `hub_summary` below) — the lamad default is the scope every other read
+        // on this path uses.
+        let h_app_id = AppContext::default_lamad().h_app_id;
+        let relation =
+            crate::db::rea_commitments::load_replication_commitment_relation(&mut conn, &h_app_id);
+        elohim_facings::folds::replication_commitment::commitment_refs_covering_any(
+            &relation, &addresses,
+        )
+    };
+
     Ok(DistributionDetails {
         summary,
         replica_peers,
@@ -415,8 +456,7 @@ pub async fn compose_distribution_details(
         placement_gaps,
         recent_projection_events,
         commitment_references,
-        // Sprint-3 stub: querying rea_commitments by content-recipient + scope lands in the collective-tier follow-up
-        replication_commitments: Vec::new(),
+        replication_commitments,
         fault_domain_diversity,
     })
 }

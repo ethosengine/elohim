@@ -569,6 +569,212 @@ pub fn record_provide_from_content_commitment(
     Ok(inserted > 0)
 }
 
+// ============================================================================
+// mishpat → REA replication-commitment mirror (the wrong-table-split cure)
+// ============================================================================
+
+/// The replication actions the mirror + the loader agree on, plus the `provide`
+/// aggregate the same relation carries. Kept next to the query so the two
+/// halves of "what is a replication commitment" cannot drift apart.
+///
+/// (`provide` is loaded because the relation is the honest commitment relation;
+/// the pure fold decides that it is not a *tier* — see
+/// `elohim_facings::folds::replication_commitment`.)
+const REPLICATION_RELATION_ACTIONS: [&str; 4] = [
+    "provide",
+    "replicates-content",
+    "replicates-commons",
+    "replicates-dwelling",
+];
+
+/// Mirror ONE notarized `replicates-*` Commitment into `rea_commitments` as a
+/// per-commitment row.
+///
+/// ## Why (the wrong-table split)
+///
+/// The live producer authors through the **mishpat** zome, whose post-commit
+/// signal projects into `mishpat_commitments`. Every resilience/distribution
+/// reader queries `rea_commitments`. Nothing joined the two per-commitment, so
+/// the resilience card's commitment fields were structurally zero. This is the
+/// storage-only bridge; the DHT path is untouched (no new entry, no re-notarize).
+///
+/// ## Shape contract
+/// - `id` = the commitment **`entry_hash`** ([`crate::mishpat_projection::ReplicationMirror::cid`]);
+///   `dht_anchor_hash` = the `action_hash`. Never the other way round — every
+///   bounds gate keys on the entry_hash.
+/// - `state = "active"`: a notarized, non-revoked replication commitment IS live
+///   coverage. (`mishpat_commitments.state` starts `proposed` and graduates on a
+///   *fulfilment* event — that column tracks fulfilment, not liveness. The same
+///   reading is already baked into [`record_provide_from_content_commitment`],
+///   which writes `active` straight off the notarized commitment.) Revocation is
+///   the thing that ends coverage, and it is projected by
+///   [`cancel_mirrored_replication`].
+/// - `finished = 0`, `metadata_json` = the action's policy envelope,
+///   `resource_classified_as` = `["content:<reach>"]` for a content commitment.
+/// - Byte pledges are NOT copied into `resource_quantity_value` (an `f32` column
+///   — a 50 GB pledge would round). They stay in `metadata_json`, exactly where
+///   `peer_capacity_service::aggregate_pledges_by_tier` already reads them.
+///
+/// Idempotent: `insert_or_ignore` on the entry_hash id, so a re-fired signal (or
+/// a restart replay) is a no-op. Returns `Ok(true)` when a new row landed.
+pub fn mirror_replication_commitment(
+    conn: &mut SqliteConnection,
+    h_app_id: &str,
+    mirror: &crate::mishpat_projection::ReplicationMirror,
+) -> Result<bool, StorageError> {
+    // Identity-namespace enforcement-by-observation (rung 1-2): `provider` is a
+    // column the joins treat as `agent_cid`. A `replicates-dwelling` commitment
+    // legitimately carries a *hub id* there today, so this OBSERVES (WARN +
+    // counter) and never rejects — the drift is made visible, not fatal.
+    crate::identity_namespace::observe_agent_cid_write(
+        "rea_commitments.provider",
+        Some(mirror.provider.as_str()),
+    );
+
+    let new = NewReaCommitment {
+        id: &mirror.cid,
+        h_app_id,
+        action: &mirror.action,
+        provider: &mirror.provider,
+        receiver: &mirror.receiver,
+        resource_conforms_to: None,
+        resource_classified_as: mirror.resource_classified_as.as_deref(),
+        resource_quantity_value: None,
+        resource_quantity_unit: None,
+        effort_quantity_value: None,
+        effort_quantity_unit: None,
+        has_beginning: None,
+        has_end: None,
+        due: None,
+        clause_of: None,
+        in_scope_of: None,
+        medium_of_exchange_id: None,
+        state: "active",
+        finished: 0,
+        note: None,
+        metadata_json: Some(&mirror.metadata_json),
+        dht_anchor_hash: mirror.dht_anchor_hash.as_deref(),
+    };
+
+    let inserted = diesel::insert_or_ignore_into(rea_commitments::table)
+        .values(&new)
+        .execute(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!("replication commitment mirror insert failed: {e}"))
+        })?;
+
+    Ok(inserted > 0)
+}
+
+/// Cancel the mirrored replication row for a revoked commitment.
+///
+/// The revoke half of [`mirror_replication_commitment`]: a `revokes-commitment`
+/// sets `revoked_at` on the `mishpat_commitments` row, and this projects the same
+/// fact onto the mirror so a **cancelled promise never reads as live coverage**.
+/// Keyed by the commitment `entry_hash` (the mirror's `id`); no-ops (0 rows) when
+/// the CID was never mirrored.
+pub fn cancel_mirrored_replication(
+    conn: &mut SqliteConnection,
+    commitment_cid: &str,
+) -> Result<usize, StorageError> {
+    diesel::update(
+        rea_commitments::table
+            .filter(rea_commitments::id.eq(commitment_cid))
+            .filter(rea_commitments::action.eq_any(REPLICATION_RELATION_ACTIONS)),
+    )
+    .set(rea_commitments::state.eq("cancelled"))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("replication mirror cancel failed: {e}")))
+}
+
+/// Materialize the **replication commitment relation** — the impure loader for
+/// `elohim_facings::folds::replication_commitment`.
+///
+/// Selects the active commitment relation ONCE (`h_app_id`-scoped, the four
+/// [`REPLICATION_RELATION_ACTIONS`], `state = 'active'`) and left-joins each
+/// provider to its household via `humans.agent_pub_key`, so the fold can scope a
+/// rollup to a content's authoring households without a second query.
+///
+/// The join is deliberately a LEFT join: a dwelling commitment's provider is a
+/// *hub id*, not an `agent_cid`, so it has no `humans` row. Such a commitment is
+/// still part of the relation (it is real coverage) — it simply cannot be
+/// attributed to a household, and the fold excludes it from household-scoped
+/// rollups rather than guessing.
+///
+/// Classification/scope filtering is deliberately NOT done in SQL:
+/// `resource_classified_as` is a JSON list by contract (non-commons spec §11.2
+/// Option A) and a scalar `.eq()` silently misses an array-wrapped row (U1
+/// 2026-06-19, the dark resilience card). Callers that need a scope filter run it
+/// in Rust over [`classifications_of`], mirroring
+/// `services::household_resilience`'s pattern.
+///
+/// A query failure degrades to an EMPTY relation with a WARN — the folds then
+/// report honest zeros rather than propagating an error that would dark the whole
+/// card. (Same posture as `services::operational_weave_facing::load_custodian_relation`.)
+pub fn load_replication_commitment_relation(
+    conn: &mut SqliteConnection,
+    h_app_id: &str,
+) -> Vec<elohim_facings::folds::replication_commitment::ReplicationCommitmentRow> {
+    use crate::db::diesel_schema::humans;
+    use elohim_facings::folds::replication_commitment::ReplicationCommitmentRow;
+
+    type LoadedRow = (
+        String,
+        String,
+        String,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+    );
+
+    let rows: Vec<LoadedRow> = match rea_commitments::table
+        .left_join(
+            humans::table.on(humans::agent_pub_key
+                .nullable()
+                .eq(rea_commitments::provider.nullable())),
+        )
+        .filter(rea_commitments::h_app_id.eq(h_app_id))
+        .filter(rea_commitments::action.eq_any(REPLICATION_RELATION_ACTIONS))
+        .filter(rea_commitments::state.eq("active"))
+        .select((
+            rea_commitments::id,
+            rea_commitments::action,
+            rea_commitments::provider,
+            rea_commitments::receiver,
+            rea_commitments::state,
+            rea_commitments::metadata_json,
+            humans::household_id.nullable(),
+        ))
+        .load::<LoadedRow>(conn)
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "load_replication_commitment_relation: query failed — folding an empty relation"
+            );
+            return Vec::new();
+        }
+    };
+
+    rows.into_iter()
+        .map(
+            |(commitment_cid, action, provider, recipient, state, metadata_json, household_id)| {
+                ReplicationCommitmentRow {
+                    commitment_cid,
+                    action,
+                    provider,
+                    recipient,
+                    state,
+                    metadata_json,
+                    household_id,
+                }
+            },
+        )
+        .collect()
+}
+
 /// Create an REA commitment - scoped by app
 pub fn create_commitment(
     conn: &mut SqliteConnection,

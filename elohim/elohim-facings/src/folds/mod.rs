@@ -11,4 +11,5 @@ pub mod lens_contention;
 pub mod lens_selector;
 pub mod operational_weave;
 pub mod rea;
+pub mod replication_commitment;
 pub mod resiliency;

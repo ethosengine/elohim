@@ -270,6 +270,16 @@ pub async fn handle_api_request(
         let measured_at = chrono::Utc::now().to_rfc3339();
         let view =
             crate::services::operational_weave_facing::build_weave_view(&mut conn, measured_at);
+        // WIRE: the custody-class gauges ride the same sweep. They are a
+        // Prometheus-only projection (the WeaveView wire shape is unchanged), so
+        // a failure here must never fail the view — but it is never swallowed
+        // silently either.
+        //
+        // The observer is THIS node's agent_cid, resolved from the active local
+        // session. When no agent_cid is resolvable we emit NOTHING rather than
+        // publishing an observer-less (or transport-id-keyed) count — an
+        // unattributed custody observation is not an observation.
+        emit_custody_class_gauges(&mut conn, &app_ctx.h_app_id);
         Ok(response::ok(&view))
     } else if sub_path.starts_with("comments") {
         let resource_path = sub_path.strip_prefix("comments").unwrap_or("");
@@ -752,6 +762,77 @@ fn build_gate_view(result: &GateResult, ctx: &TrustContext) -> GateEvaluationVie
             settlement_boundary: Some(boundary.clone()),
             appeal_path: appeal_path.clone(),
         },
+    }
+}
+
+/// Publish the six `elohim_custody_class_count{class=…}` gauges from the custody
+/// facing's fold, on the back of the `/api/v1/weave` sweep.
+///
+/// Three honesty properties, all deliberate:
+/// 1. **Observer-attributed or not emitted.** The observer is this node's
+///    `agent_cid` (the active local session's `agent_pub_key`). If none resolves,
+///    or it is not an `agent_cid` (never a libp2p/iroh transport id — the
+///    namespaces must not be crossed), we publish NOTHING: an unattributed
+///    custody observation is not an observation, and stale gauges are more honest
+///    than mis-attributed ones.
+/// 2. **Never fails the view.** The gauges are a side projection; the WeaveView
+///    response shape is untouched by an error here.
+/// 3. **Never silent.** Every bail-out logs — a starved emit leg that says
+///    nothing is exactly the shape that leaves an operator rightly distrustful.
+fn emit_custody_class_gauges(conn: &mut diesel::SqliteConnection, h_app_id: &str) {
+    let observer = match crate::db::local_sessions::get_active_session(conn) {
+        Ok(Some(session)) => session.agent_pub_key,
+        Ok(None) => {
+            tracing::debug!(
+                target: "custody_facing",
+                "weave sweep: no active local session — custody-class gauges not published \
+                 (an unattributed observation is not an observation)"
+            );
+            return;
+        }
+        Err(e) => {
+            tracing::warn!(
+                target: "custody_facing",
+                error = %e,
+                "weave sweep: local session lookup failed — custody-class gauges not published"
+            );
+            return;
+        }
+    };
+    if !crate::identity_namespace::is_agent_cid(&observer) {
+        tracing::warn!(
+            target: "custody_facing",
+            observer = %observer,
+            "weave sweep: active session identity is not an agent_cid — custody-class gauges \
+             not published (never key an observation on a transport id)"
+        );
+        return;
+    }
+
+    let now_micros = chrono::Utc::now().timestamp_micros();
+    match crate::services::custody_facing::compute_and_emit_custody_counts(
+        conn,
+        h_app_id,
+        &observer,
+        now_micros,
+        crate::services::custody_facing::DEFAULT_CUSTODY_STALENESS_SECS,
+    ) {
+        Ok(counts) => tracing::debug!(
+            target: "custody_facing",
+            none = counts.none,
+            shelved = counts.shelved,
+            stocked = counts.stocked,
+            stocked_warm = counts.stocked_warm,
+            unknown = counts.unknown,
+            observed_lost = counts.observed_lost,
+            "weave sweep: custody-class gauges published"
+        ),
+        Err(e) => tracing::warn!(
+            target: "custody_facing",
+            error = %e,
+            "weave sweep: custody-class fold failed — gauges left at their previous values \
+             rather than zeroed (a failed look is not a measured zero)"
+        ),
     }
 }
 

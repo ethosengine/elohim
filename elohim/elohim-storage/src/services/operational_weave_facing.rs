@@ -48,8 +48,19 @@ pub fn load_custodian_relation(conn: &mut SqliteConnection) -> Vec<CustodianRow>
     let custodian_ids: Vec<&str> = metrics.iter().map(|m| m.custodian_id.as_str()).collect();
 
     // Join key: custodian_metrics.custodian_id == rea_commitments.provider == agent_cid (the canonical agent identity).
+    //
+    // `state = 'active'` is load-bearing, not cosmetic: without it a CANCELLED
+    // (or `proposed`, or `terminated`) custody promise summed into the stewarded
+    // byte total, so a withdrawn commitment kept reading as live stewardship on
+    // the weave gauges. `.eq("active")` is the dominant convention across this
+    // crate's `rea_commitments` readers (peer_selection, serve_routing,
+    // household_resilience, membership_identity_reconcile) — the `.ne("cancelled")
+    // .ne("terminated")` form used by replication_prioritizer/peer_capacity_service
+    // is the minority spelling and admits `proposed` rows, which are promises not
+    // yet live.
     let stewarded_rows: Vec<(String, Option<f64>)> = match rc::rea_commitments
         .filter(rc::action.eq("custody-blob"))
+        .filter(rc::state.eq("active"))
         .filter(rc::provider.eq_any(&custodian_ids))
         .group_by(rc::provider)
         .select((

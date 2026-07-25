@@ -39,6 +39,7 @@ pub mod connectivity; // Phase 4 T6 — libp2p connected-peers snapshot helper
 pub mod constitutional_ratio_registry;
 pub mod content_service;
 pub mod contributor_reflexive_facing; // Wave 2 — "how the network sees a contributor" facing (folds in elohim-facings)
+pub mod custody_facing; // custody-observation loader for the typed custody folds (elohim-facings) + the class gauges
 pub mod demand_autopin; // self-healing opportunity map row 15 — auto-pin on a local content read-miss
 pub mod device_capacity; // Phase 4 T7 — available bytes helper
 pub mod did_identity_store; // did:elohim assembly store — implements the did-bridge ElohimIdentityStore contract (spec §3.4)

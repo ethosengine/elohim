@@ -79,7 +79,45 @@ pub fn build_summary(engine: &GraphEngine, cid: &str) -> Result<DistributionSumm
 ///
 /// Wraps `build_summary` and provides empty replica/projector lists as composition
 /// placeholders (these require peer blob-inventory reads in a follow-on sprint).
+///
+/// `replication_commitments` is likewise empty on this arm — NOT as a stub, but
+/// because the commitment relation lives in SQLite (`rea_commitments`) and this
+/// entry point takes only a `GraphEngine`. Its one caller
+/// (`api::blob::handle_distribution_details`, the `graph-native` branch) holds a
+/// `DbPool` but does not thread a connection here. Use
+/// [`build_details_with_commitments`] from a call site that has a connection —
+/// that arm computes the same scoped list the relational sibling
+/// (`services::distribution_view::compose_distribution_details`) returns. An
+/// empty list here is an honest "not measured on this arm", never a claim that no
+/// commitment covers the CID.
 pub fn build_details(engine: &GraphEngine, cid: &str) -> Result<DistributionDetails, GraphError> {
+    build_details_inner(engine, cid, Vec::new())
+}
+
+/// As [`build_details`], but hydrates `replication_commitments` from the SQLite
+/// commitment relation.
+///
+/// The commitments that NAME this CID (`recipient == cid` — the commons
+/// **content** variant's `head_ref` link). Scope-general dwelling / capacity
+/// pledges name a hub or no counterparty and are never claimed to cover a
+/// specific CID; see `elohim_facings::folds::replication_commitment`.
+pub fn build_details_with_commitments(
+    engine: &GraphEngine,
+    cid: &str,
+    conn: &mut diesel::SqliteConnection,
+    h_app_id: &str,
+) -> Result<DistributionDetails, GraphError> {
+    let relation = crate::db::rea_commitments::load_replication_commitment_relation(conn, h_app_id);
+    let refs =
+        elohim_facings::folds::replication_commitment::commitment_refs_covering(&relation, cid);
+    build_details_inner(engine, cid, refs)
+}
+
+fn build_details_inner(
+    engine: &GraphEngine,
+    cid: &str,
+    replication_commitments: Vec<elohim_views::infrastructure::ReplicationCommitmentRef>,
+) -> Result<DistributionDetails, GraphError> {
     let summary = build_summary(engine, cid)?;
 
     Ok(DistributionDetails {
@@ -90,7 +128,7 @@ pub fn build_details(engine: &GraphEngine, cid: &str) -> Result<DistributionDeta
         placement_gaps: vec![],
         recent_projection_events: vec![],
         commitment_references: None,
-        replication_commitments: Vec::new(), // T15: computed
+        replication_commitments,
         fault_domain_diversity: FaultDomainDiversity::default(), // T15: computed
     })
 }

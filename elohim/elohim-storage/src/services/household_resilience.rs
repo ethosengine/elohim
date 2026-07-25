@@ -9,15 +9,14 @@
 use std::collections::HashSet;
 
 use diesel::prelude::*;
-use elohim_facings::folds::resiliency;
+use elohim_facings::folds::{replication_commitment, resiliency};
 use elohim_facings::relation::HolderRow;
 
 use crate::db::{peer_statuses, placement_gaps, AppContext, DbPool};
 use crate::error::StorageError;
 use crate::views::{
-    CommitmentBackedReplication, HouseholdResilienceDetails, HouseholdResilienceView,
-    OnlinePeersView, PlacementGapView, ResilienceSnapshotDetailsView, ResilienceSnapshotView,
-    StewardingCollectiveEntry,
+    HouseholdResilienceDetails, HouseholdResilienceView, OnlinePeersView, PlacementGapView,
+    ResilienceSnapshotDetailsView, ResilienceSnapshotView, StewardingCollectiveEntry,
 };
 
 /// Compute per-content household resilience. The viewer's household id is
@@ -35,7 +34,14 @@ pub fn compute(
     let (_measured, relation) = load_manifest_and_relation(&mut conn, &ctx.h_app_id, content_id)?;
     // Legacy entry point — age-agnostic (window 0). The staleness honesty guard is
     // applied at the production HTTP entry via `snapshot_with_staleness_secs`.
-    compute_base(&mut conn, content_id, viewer_household_id, &relation, 0)
+    compute_base(
+        &mut conn,
+        &ctx.h_app_id,
+        content_id,
+        viewer_household_id,
+        &relation,
+        0,
+    )
 }
 
 /// Materialize the holder-relation for a content ONCE — the impure step that both
@@ -77,6 +83,7 @@ fn load_manifest_and_relation(
 /// at-risk view, so the no-manifest case needs no special-casing here.
 fn compute_base(
     conn: &mut diesel::SqliteConnection,
+    h_app_id: &str,
     content_id: &str,
     viewer_household_id: Option<&str>,
     relation: &[HolderRow],
@@ -115,6 +122,29 @@ fn compute_base(
         (online_peer_count as f32 / households_stewarding as f32).clamp(0.0, 1.0)
     };
 
+    // commitment_backed_replication: the per-tier counts + pledged bytes of the
+    // notarized `replicates-*` commitments made by the households stewarding this
+    // content. `CommitmentBackedReplication` is documented (elohim-views) as the
+    // counts "for a CID's authoring household", so the scoping axis is the
+    // steward households — NOT the whole node's ledger, and not a per-CID join.
+    //
+    // The relation is the `rea_commitments` replication relation, which is
+    // populated per-commitment by the mishpat→REA mirror
+    // (`db::rea_commitments::mirror_replication_commitment`). Before that bridge
+    // existed this field was a hard-coded `::default()`, because the live
+    // producer wrote only to `mishpat_commitments` (the wrong-table split) —
+    // every reader here queries `rea_commitments`.
+    //
+    // Loader degrades to an empty relation on query failure, so a DB hiccup folds
+    // to honest zeros rather than darking the whole card.
+    let commitment_relation =
+        crate::db::rea_commitments::load_replication_commitment_relation(conn, h_app_id);
+    let commitment_backed_replication =
+        replication_commitment::commitment_backed_replication_for_households(
+            &commitment_relation,
+            &steward_households,
+        );
+
     let mut steward_households_sorted: Vec<String> = steward_households.into_iter().collect();
     steward_households_sorted.sort();
 
@@ -128,7 +158,7 @@ fn compute_base(
             online_peer_count,
             health_score,
         },
-        commitment_backed_replication: CommitmentBackedReplication::default(), // T15: computed
+        commitment_backed_replication,
     })
 }
 
@@ -172,6 +202,7 @@ pub fn snapshot_with_staleness_secs(
 
     let base = compute_base(
         &mut conn,
+        &ctx.h_app_id,
         content_id,
         viewer_household_id,
         &relation,

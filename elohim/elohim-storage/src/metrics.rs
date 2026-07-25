@@ -112,6 +112,31 @@ lazy_static! {
     )
     .expect("valid gauge");
 
+    /// Current holder observations bucketed by custody class — the gauge
+    /// projection of `CustodyClassCounts` (the typed custody fold in
+    /// `elohim-facings`), set by `services::custody_facing`.
+    ///
+    /// label `class` ∈ `none` | `shelved` | `stocked` | `stocked_warm` |
+    /// `unknown` | `observed_lost`. The vocabulary is deliberately six-valued and
+    /// NOT summable into a single "holders" number:
+    /// - `none` = a COMPLETE commitment lookup measured no active promise
+    ///   (measured absence), whereas
+    /// - `unknown` = missing/expired observation or an incomplete lookup
+    ///   (honest unknown — never a fabricated zero), and
+    /// - `observed_lost` = FRESH negative evidence, a distinct fact from both.
+    ///
+    /// All six series are materialised on every publish, so a bucket sitting at
+    /// 0 is distinguishable from an emitter that never ran (series absent).
+    pub static ref ELOHIM_CUSTODY_CLASS_COUNT: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_custody_class_count",
+            "Current holder observations by custody class (none=measured absence, \
+             unknown=honest unknown, observed_lost=fresh negative evidence).",
+        ),
+        &["class"],
+    )
+    .expect("valid gauge");
+
     /// Boot-time cgroup CPU quota in millicores (0 = unbounded/unknown).
     pub static ref NODE_CPU_QUOTA_MILLICORES: IntGauge = IntGauge::new(
         "elohim_node_cpu_quota_millicores",
@@ -574,6 +599,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_FREE_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_USED_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_STEWARDED_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODY_CLASS_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_OUTBOUND.clone()));
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_INBOUND_SERVED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_AUTHORED.clone()));
@@ -871,6 +897,31 @@ pub fn set_identity_fill_last_writes(writes: u64) {
 /// identity-fill sweep's `discover_household_pairs` union.
 pub fn set_identity_fill_discovered_cids(count: u64) {
     IDENTITY_FILL_DISCOVERED_CIDS.set(count as i64);
+}
+
+/// Publish the six custody-class buckets from one fold of the custody-observation
+/// relation (`services::custody_facing`).
+///
+/// ALL six series are set on every call — including the zeros — so "this bucket
+/// is empty" stays distinguishable from "the emitter never ran" (the same
+/// diagnosis-ambiguity lesson as [`inc_identity_fill`]). The buckets are not
+/// summable into an unlabeled holder count: `none` is a measured absence,
+/// `unknown` an honest unknown, `observed_lost` fresh negative evidence.
+pub fn set_custody_class_counts(
+    counts: &elohim_facings::folds::operational_weave::CustodyClassCounts,
+) {
+    for (class, value) in [
+        ("none", counts.none),
+        ("shelved", counts.shelved),
+        ("stocked", counts.stocked),
+        ("stocked_warm", counts.stocked_warm),
+        ("unknown", counts.unknown),
+        ("observed_lost", counts.observed_lost),
+    ] {
+        ELOHIM_CUSTODY_CLASS_COUNT
+            .with_label_values(&[class])
+            .set(value as i64);
+    }
 }
 
 #[cfg(test)]

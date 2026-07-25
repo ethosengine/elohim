@@ -900,6 +900,46 @@ pub fn handle_mishpat_signal(
                             }
                         }
                     }
+                    // The wrong-table-split cure: mirror the notarized
+                    // `replicates-*` commitment into `rea_commitments` PER
+                    // COMMITMENT. The `provide` side-projection above collapses
+                    // to one `(provider, reach)` row and loses commitment
+                    // identity, tier, counterparty and pledged bytes — the four
+                    // things the resilience card's commitment fields and the
+                    // distribution views' `replication_commitments` list are made
+                    // of. Storage-only: the DHT path (and the authoritative
+                    // `mishpat_commitments` write below) are untouched.
+                    if let Some(mirror) =
+                        crate::mishpat_projection::replication_mirror_for(&new_row)
+                    {
+                        match crate::db::rea_commitments::mirror_replication_commitment(
+                            conn, app_id, &mirror,
+                        ) {
+                            Ok(inserted) => {
+                                if inserted {
+                                    tracing::info!(
+                                        cid = %mirror.cid,
+                                        action = %mirror.action,
+                                        provider = %mirror.provider,
+                                        "handle_mishpat_signal: replicates-* → per-commitment rea_commitments mirror"
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                // Non-fatal for the same reason as the provide
+                                // side-projection: the authoritative
+                                // mishpat_commitments write below must still land.
+                                // The mirror is idempotent, so the next
+                                // commitment signal re-attempts cleanly.
+                                tracing::warn!(
+                                    error = %e,
+                                    cid = %mirror.cid,
+                                    "handle_mishpat_signal: replication mirror failed (non-fatal; idempotent retry on next commitment)"
+                                );
+                            }
+                        }
+                    }
+
                     crate::db::mishpat_commitments::upsert_with_anchor(conn, new_row)
                         .map_err(|e| StorageError::Database(e.to_string()))?;
                     tracing::info!(
@@ -965,13 +1005,28 @@ pub fn handle_mishpat_signal(
                     let affected_identity_heads =
                         crate::db::identity_heads::set_revoked_at(conn, &target_cid, &signed_at)
                             .map_err(|e| StorageError::Database(e.to_string()))?;
+                    // A revoke must also land on the `rea_commitments` mirror, or
+                    // a cancelled promise keeps reading as live coverage on the
+                    // resilience card (the mirror is keyed by the same entry_hash
+                    // CID). No-ops when the CID was never mirrored.
+                    let affected_replication_mirrors =
+                        crate::db::rea_commitments::cancel_mirrored_replication(conn, &target_cid)
+                            .unwrap_or_else(|e| {
+                                tracing::warn!(
+                                    error = %e,
+                                    target_cid = %target_cid,
+                                    "handle_mishpat_signal: replication mirror cancel failed (non-fatal)"
+                                );
+                                0
+                            });
                     tracing::info!(
                         target_cid = %target_cid,
                         action_hash = %action_hash,
                         affected_commitments,
                         affected_lenses,
                         affected_identity_heads,
-                        "handle_mishpat_signal: revokes-commitment projected → set_revoked_at (commitments + lenses + identity_heads)"
+                        affected_replication_mirrors,
+                        "handle_mishpat_signal: revokes-commitment projected → set_revoked_at (commitments + lenses + identity_heads) + mirror cancel"
                     );
                 }
                 Err(e) => {
@@ -3943,5 +3998,335 @@ mod revocation_sweep_tests {
                 .expect("sweep on empty table must not error");
 
         assert_eq!(count, 0);
+    }
+}
+
+// =============================================================================
+// mishpat → REA replication-commitment mirror (the wrong-table-split cure)
+// =============================================================================
+
+#[cfg(test)]
+mod mishpat_replication_mirror_tests {
+    use super::*;
+    use diesel::prelude::*;
+
+    const APP_ID: &str = "lamad";
+
+    /// A `CommitmentCommitted` signal carrying a mishpat-shaped payload.
+    /// `entry_hash` becomes the projection cid (and the mirror's `rea_commitments.id`);
+    /// `action_hash` becomes `dht_anchor_hash`. Never the other way round.
+    fn commitment_signal(
+        action: &str,
+        payload_json: &str,
+        entry_hash: &str,
+        action_hash: &str,
+    ) -> MishpatSignal {
+        MishpatSignal::CommitmentCommitted {
+            action_hash: HoloHashB64::from(action_hash),
+            entry_hash: HoloHashB64::from(entry_hash),
+            author: HoloHashB64::from("uhCAkauthor"),
+            commitment: crate::mishpat_projection::CommitmentPayload {
+                action: action.to_string(),
+                payload_json: payload_json.to_string(),
+                signed_at: "2026-07-01T00:00:00Z".to_string(),
+            },
+        }
+    }
+
+    /// The DHT `replicates-dwelling` payload shape (snake_case, per the mishpat
+    /// integrity zome's required-field list).
+    fn dwelling_payload(role: &str, capacity: u64) -> String {
+        serde_json::json!({
+            "action": "replicates-dwelling",
+            "provider_dwelling_hub_id": "hub:provider",
+            "recipient_dwelling_hub_id": "hub:recipient",
+            "provider_role": role,
+            "capacity_bytes": capacity,
+            "scope_filter": {},
+            "valid_from": "2026-01-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z",
+            "grace_period_days": 14,
+            "rotation_ttl_days": 90,
+            "ratio_attestation": {
+                "commons_pct": 20, "dwelling_pct": 40,
+                "collective_pct": 25, "free_pct": 15,
+                "effective_ratio_cid": "bafkrei-x"
+            }
+        })
+        .to_string()
+    }
+
+    /// The DHT `replicates-commons` **content** payload the conductor author emits
+    /// (`services::conductor_commitment_author::build_content_payload`).
+    fn commons_content_payload(head_ref: &str, reach: &str) -> String {
+        serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "content",
+            "head_ref": head_ref,
+            "reach": reach,
+            "bounds": { "rate_per_minute": 30, "reach_ceiling": "commons" },
+            "provider": "uhCAkprovider",
+            "valid_from": "2026-01-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+        })
+        .to_string()
+    }
+
+    fn load_mirror(
+        conn: &mut diesel::SqliteConnection,
+        id: &str,
+    ) -> Option<crate::db::models::ReaCommitment> {
+        use crate::db::diesel_schema::rea_commitments::dsl as rc;
+        rc::rea_commitments
+            .filter(rc::id.eq(id))
+            .first::<crate::db::models::ReaCommitment>(conn)
+            .optional()
+            .expect("mirror lookup")
+    }
+
+    #[test]
+    fn dwelling_commitment_signal_lands_a_rea_commitments_mirror_row() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        handle_mishpat_signal(
+            &mut conn,
+            APP_ID,
+            commitment_signal(
+                "replicates-dwelling",
+                &dwelling_payload("steward_mutual", 1_024),
+                "uhCEkentry-dwelling",
+                "uhCkkaction-dwelling",
+            ),
+        )
+        .expect("signal projects");
+
+        let row = load_mirror(&mut conn, "uhCEkentry-dwelling")
+            .expect("the wrong-table split is cured: the mirror row exists in rea_commitments");
+        assert_eq!(row.action, "replicates-dwelling");
+        assert_eq!(row.provider, "hub:provider");
+        assert_eq!(row.receiver, "hub:recipient");
+        assert_eq!(row.state, "active");
+        assert_eq!(
+            row.dht_anchor_hash.as_deref(),
+            Some("uhCkkaction-dwelling"),
+            "action_hash lives ONLY in dht_anchor_hash; the id is the entry_hash"
+        );
+        let meta: serde_json::Value =
+            serde_json::from_str(row.metadata_json.as_deref().expect("metadata_json"))
+                .expect("metadata_json is valid JSON");
+        assert_eq!(meta["provider_role"], "steward_mutual");
+        assert_eq!(meta["capacity_bytes"], 1_024);
+    }
+
+    #[test]
+    fn mirrored_dwelling_commitment_folds_into_commitment_backed_replication() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        for (i, role) in ["steward_mutual", "collective_steward"].iter().enumerate() {
+            handle_mishpat_signal(
+                &mut conn,
+                APP_ID,
+                commitment_signal(
+                    "replicates-dwelling",
+                    &dwelling_payload(role, 500),
+                    &format!("uhCEkentry-{i}"),
+                    &format!("uhCkkaction-{i}"),
+                ),
+            )
+            .expect("signal projects");
+        }
+
+        let relation =
+            crate::db::rea_commitments::load_replication_commitment_relation(&mut conn, APP_ID);
+        let folded =
+            elohim_facings::folds::replication_commitment::commitment_backed_replication(&relation);
+        assert_eq!(folded.dwelling_commitments, 1, "steward_mutual → Dwelling");
+        assert_eq!(
+            folded.collective_commitments, 1,
+            "collective_steward → Collective"
+        );
+        assert_eq!(folded.total_pledged_bytes, 1_000, "500 + 500");
+    }
+
+    #[test]
+    fn commons_content_commitment_mirrors_with_head_ref_and_content_reach_classification() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        handle_mishpat_signal(
+            &mut conn,
+            APP_ID,
+            commitment_signal(
+                "replicates-commons",
+                &commons_content_payload("epr:head-abc", "household"),
+                "uhCEkentry-commons",
+                "uhCkkaction-commons",
+            ),
+        )
+        .expect("signal projects");
+
+        let row = load_mirror(&mut conn, "uhCEkentry-commons").expect("mirror row exists");
+        assert_eq!(
+            row.receiver, "epr:head-abc",
+            "the content variant's head_ref IS the per-content link"
+        );
+        assert_eq!(
+            crate::db::rea_commitments::classifications_of(row.resource_classified_as.as_deref()),
+            vec!["content:household".to_string()],
+            "reach is READ THROUGH, never re-vocabularized to commons"
+        );
+
+        // …and it scopes to the CID it names, not to another.
+        let relation =
+            crate::db::rea_commitments::load_replication_commitment_relation(&mut conn, APP_ID);
+        let covering = elohim_facings::folds::replication_commitment::commitment_refs_covering(
+            &relation,
+            "epr:head-abc",
+        );
+        assert_eq!(covering.len(), 1);
+        assert_eq!(covering[0].commitment_cid, "uhCEkentry-commons");
+        assert!(
+            elohim_facings::folds::replication_commitment::commitment_refs_covering(
+                &relation,
+                "epr:some-other-head"
+            )
+            .is_empty(),
+            "a commitment never covers a CID it does not name"
+        );
+    }
+
+    #[test]
+    fn re_fired_signal_is_idempotent_no_duplicate_mirror() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let signal = || {
+            commitment_signal(
+                "replicates-dwelling",
+                &dwelling_payload("steward_mutual", 42),
+                "uhCEkentry-dupe",
+                "uhCkkaction-dupe",
+            )
+        };
+        handle_mishpat_signal(&mut conn, APP_ID, signal()).expect("first fire");
+        handle_mishpat_signal(&mut conn, APP_ID, signal()).expect("re-fire");
+        handle_mishpat_signal(&mut conn, APP_ID, signal()).expect("re-fire again");
+
+        use crate::db::diesel_schema::rea_commitments::dsl as rc;
+        let count: i64 = rc::rea_commitments
+            .filter(rc::id.eq("uhCEkentry-dupe"))
+            .count()
+            .get_result(&mut conn)
+            .expect("count");
+        assert_eq!(
+            count, 1,
+            "insert_or_ignore on the entry_hash id — a replayed signal is a no-op"
+        );
+
+        let relation =
+            crate::db::rea_commitments::load_replication_commitment_relation(&mut conn, APP_ID);
+        let folded =
+            elohim_facings::folds::replication_commitment::commitment_backed_replication(&relation);
+        assert_eq!(
+            folded.dwelling_commitments, 1,
+            "three signal fires must not inflate the count to three"
+        );
+        assert_eq!(folded.total_pledged_bytes, 42);
+    }
+
+    #[test]
+    fn non_replication_actions_are_never_mirrored() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let payload = serde_json::json!({
+            "scope": "republish-epr",
+            "provider": "uhCAkprovider",
+            "recipient": "uhCAkrecipient",
+            "bounds": {},
+            "valid_from": "2026-01-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+        })
+        .to_string();
+        handle_mishpat_signal(
+            &mut conn,
+            APP_ID,
+            commitment_signal(
+                "delegates-compute",
+                &payload,
+                "uhCEkentry-compute",
+                "uhCkkaction-compute",
+            ),
+        )
+        .expect("signal projects");
+
+        assert!(
+            load_mirror(&mut conn, "uhCEkentry-compute").is_none(),
+            "delegates-compute is not replication — it must not mint a replication mirror"
+        );
+        assert!(
+            crate::db::mishpat_commitments::get_by_cid(&mut conn, "uhCEkentry-compute")
+                .expect("lookup")
+                .is_some(),
+            "…but the authoritative mishpat_commitments projection still lands"
+        );
+    }
+
+    #[test]
+    fn revoked_commitment_cancels_the_mirror_so_it_stops_reading_as_live() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        handle_mishpat_signal(
+            &mut conn,
+            APP_ID,
+            commitment_signal(
+                "replicates-dwelling",
+                &dwelling_payload("steward_mutual", 900),
+                "uhCEkentry-revoked",
+                "uhCkkaction-revoked",
+            ),
+        )
+        .expect("signal projects");
+
+        let before =
+            crate::db::rea_commitments::load_replication_commitment_relation(&mut conn, APP_ID);
+        assert_eq!(
+            elohim_facings::folds::replication_commitment::commitment_backed_replication(&before)
+                .dwelling_commitments,
+            1
+        );
+
+        let revoke_payload = serde_json::json!({
+            "target_cid": "uhCEkentry-revoked",
+            "signed_at": "2026-07-02T00:00:00Z"
+        })
+        .to_string();
+        handle_mishpat_signal(
+            &mut conn,
+            APP_ID,
+            commitment_signal(
+                "revokes-commitment",
+                &revoke_payload,
+                "uhCEkentry-revoke-evt",
+                "uhCkkaction-revoke-evt",
+            ),
+        )
+        .expect("revoke projects");
+
+        let after =
+            crate::db::rea_commitments::load_replication_commitment_relation(&mut conn, APP_ID);
+        assert!(
+            after.is_empty(),
+            "a cancelled promise must never read as live coverage"
+        );
+        assert_eq!(
+            load_mirror(&mut conn, "uhCEkentry-revoked")
+                .expect("row still present")
+                .state,
+            "cancelled"
+        );
     }
 }
