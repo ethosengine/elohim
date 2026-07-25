@@ -58,14 +58,17 @@ pub fn discover_root(start: &Path) -> Result<PathBuf> {
 /// All governance semantics remain in Rust; this module can later swap to
 /// brit/gix without changing the library or CLI contracts.
 pub fn working_tree_changes(root: &Path) -> Result<Vec<ChangedPath>> {
-    let output = std::process::Command::new("git")
-        .args(["status", "--porcelain=v1", "-z", "--untracked-files=all"])
-        .current_dir(root)
-        .output()
-        .map_err(|source| Error::Spawn {
-            program: "git".into(),
-            source,
-        })?;
+    let output = crate::process::build_command(
+        "git",
+        &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        root,
+        &[],
+    )
+    .output()
+    .map_err(|source| Error::Spawn {
+        program: "git".into(),
+        source,
+    })?;
     if !output.status.success() {
         return Err(Error::Command {
             program: "git status".into(),
@@ -101,14 +104,17 @@ pub fn working_tree_changes(root: &Path) -> Result<Vec<ChangedPath>> {
 /// set a developer normally intends to push or merge.
 pub fn changes_against(root: &Path, target: &str) -> Result<Vec<ChangedPath>> {
     let range = format!("{target}...HEAD");
-    let output = std::process::Command::new("git")
-        .args(["diff", "--name-status", "-z", "--find-renames", &range])
-        .current_dir(root)
-        .output()
-        .map_err(|source| Error::Spawn {
-            program: "git".into(),
-            source,
-        })?;
+    let output = crate::process::build_command(
+        "git",
+        &["diff", "--name-status", "-z", "--find-renames", &range],
+        root,
+        &[],
+    )
+    .output()
+    .map_err(|source| Error::Spawn {
+        program: "git".into(),
+        source,
+    })?;
     if !output.status.success() {
         return Err(Error::Command {
             program: format!("git diff {range}"),
@@ -138,9 +144,7 @@ pub fn default_target(root: &Path) -> String {
 
 pub fn content_at(root: &Path, revision: &str, path: &str) -> Option<String> {
     let object = format!("{revision}:{path}");
-    let output = std::process::Command::new("git")
-        .args(["show", &object])
-        .current_dir(root)
+    let output = crate::process::build_command("git", &["show", &object], root, &[])
         .output()
         .ok()?;
     output

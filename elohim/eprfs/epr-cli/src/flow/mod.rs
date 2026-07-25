@@ -15,7 +15,7 @@ pub mod walk;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 
 use cid::Cid;
 use elohim_epr_rea::{atom_cid, AgentRef, PinnedRef};
@@ -496,9 +496,7 @@ pub fn producing_commit(root: &Path, rel_path: &str) -> Option<(String, String)>
 /// history (a fresh, uncommitted tree). Reuses the same `git log` provenance source as
 /// [`producing_commit`].
 pub fn head_commit_epoch(root: &Path) -> Option<i64> {
-    let out = Command::new("git")
-        .args(["log", "-1", "--format=%ct"])
-        .current_dir(root)
+    let out = crate::process::build_command("git", &["log", "-1", "--format=%ct"], root, &[])
         .output()
         .ok()?;
     if !out.status.success() {
@@ -511,7 +509,7 @@ fn git_log_pairs(root: &Path, extra: &[&str], rel_path: &str) -> Vec<(String, St
     let mut args: Vec<&str> = vec!["log"];
     args.extend_from_slice(extra);
     args.extend_from_slice(&["--format=%ae%x1f%aI", "--", rel_path]);
-    let Ok(out) = Command::new("git").args(&args).current_dir(root).output() else {
+    let Ok(out) = crate::process::build_command("git", &args, root, &[]).output() else {
         return Vec::new();
     };
     if !out.status.success() {

@@ -3,15 +3,15 @@
 //! feature file), git-inits with one commit, then exercises project → walk → status.
 
 use std::path::Path;
-use std::process::Command;
 
 use elohim_epr_cli::flow::{project, walk};
 use tempfile::TempDir;
 
 fn git(root: &Path, args: &[&str]) {
-    let status = Command::new("git")
-        .args(args)
-        .current_dir(root)
+    // build_command, not a bare Command: git exports GIT_DIR into hook
+    // environments and this suite runs under the pre-push hook, where a bare
+    // spawn is redirected at the ambient repo instead of this TempDir.
+    let status = elohim_epr_cli::process::build_command("git", args, root, &[])
         .env("GIT_AUTHOR_NAME", "Fixture Author")
         .env("GIT_AUTHOR_EMAIL", "author@example.test")
         .env("GIT_COMMITTER_NAME", "Fixture Author")
