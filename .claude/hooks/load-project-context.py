@@ -112,6 +112,22 @@ def get_spine_status(project_dir: str) -> str:
         return ""
 
 
+def get_saga_status(project_dir: str) -> str:
+    """Resiliency-saga headline (deterministic; from saga-status.py, no args = one-liner).
+    Sibling of get_spine_status: same subprocess/timeout/silent-failure posture — a failed
+    or slow saga-status.py emits nothing rather than blocking session start."""
+    import subprocess
+    saga = os.path.join(project_dir, '.claude', 'scripts', 'saga-status.py')
+    if not os.path.exists(saga):
+        return ""
+    try:
+        r = subprocess.run([sys.executable, saga],
+                           capture_output=True, text=True, timeout=10)
+        return r.stdout.strip()
+    except Exception:
+        return ""
+
+
 def seed_memory_injection_flag(session_id: str) -> None:
     """Pre-seed pre-tool-memory.py's flag for the MAIN session tree.
 
@@ -153,6 +169,15 @@ def main():
         spine = get_spine_status(project_dir)
         if spine:
             context_parts.append(spine)
+            context_parts.append("")
+
+        # Resiliency-saga headline — the ten dataplane chapters' green/frontier state
+        # (genesis/a2o/features/dataplane/resiliency-saga/), joined from flows.jsonl +
+        # the (often-absent-locally) dataplane sprint-report. See saga-sync.sh to pull
+        # the report down and refresh the flow state.
+        saga = get_saga_status(project_dir)
+        if saga:
+            context_parts.append(saga)
             context_parts.append("")
 
         # Schema + sync-relationship data lives in .claude/file-relationships.json and is
