@@ -407,6 +407,10 @@ impl ProjectionReconcileState {
         // locally under an anchor no peer advertises are divergence this sweep
         // did not resolve, so they defeat convergence on their own.
         s.converged = counts.converged && divergent_anchor == 0;
+        // Same call site as the wire field on purpose: metric and /p2p/status
+        // are written together, so they cannot drift apart the way /health and
+        // /p2p/status did (1860 vs 148 in the same minute, 2026-07-25).
+        crate::metrics::record_reconcile_sweep(&counts, divergent_anchor);
     }
 }
 
@@ -716,6 +720,8 @@ pub async fn run_heal(
         "rea",
         tracker.counts().pending as u64,
         local_total as u64,
+        tracker.counts().exhausted as u64,
+        rea_divergent as u64,
     );
     let counts = heal_rea(&mut tracker, &discovered_by, hc, pool, &pacing).await;
 
@@ -731,6 +737,8 @@ pub async fn run_heal(
         "content",
         content_tracker.counts().pending as u64,
         local_anchored as u64,
+        content_tracker.counts().exhausted as u64,
+        content_divergent as u64,
     );
     let (content_healed, content_missing) = heal_content(
         &mut content_tracker,

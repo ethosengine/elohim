@@ -337,6 +337,64 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Last-sweep gaps ABANDONED at `max_retries` per reconcile stream. label:
+    /// stream = "rea" | "content".
+    ///
+    /// This is the counterpart `gaps` cannot show. `GapTracker::mark_failed`
+    /// removes an id from `pending` without re-queueing it, and
+    /// `enqueue_missing` refuses to re-queue anything past `max_retries` — so an
+    /// abandoned gap leaves BOTH `pending` and the `gaps` gauge, and the sweep
+    /// reports `caughtUp: true` having healed nothing. A `gaps` gauge falling to
+    /// zero is therefore ambiguous: it means "healed" or "gave up", and only
+    /// this series tells them apart.
+    pub static ref PROJECTION_RECONCILE_EXHAUSTED: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_exhausted",
+            "Last-sweep gaps abandoned at max_retries by reconcile stream.",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
+    /// Last-sweep ANCHOR-DIVERGENT rows per reconcile stream — present locally
+    /// but under a different anchor than a peer advertised. label: stream =
+    /// "rea" | "content". Per-arm on purpose: the status surface folds both arms
+    /// into one `divergentAnchor` number, which cannot answer "which stream is
+    /// diverging?" — the first question asked when a peer will not converge.
+    pub static ref PROJECTION_RECONCILE_DIVERGENT: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_divergent",
+            "Last-sweep anchor-divergent rows by reconcile stream.",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
+    /// Reconcile sweeps completed. The DENOMINATOR for every other reconcile
+    /// series — "gaps per sweep" and "heals per sweep" are only readable against
+    /// it, exactly as `elohim_sync_rounds_total` serves the sync plane. Without
+    /// it, `healedTotal: 0` cannot be distinguished from "no sweep has run yet".
+    pub static ref PROJECTION_RECONCILE_SWEEPS: IntCounter = IntCounter::new(
+        "elohim_projection_reconcile_sweeps_total",
+        "Reconcile sweeps completed.",
+    )
+    .unwrap();
+
+    /// 1 when this peer holds what its peers advertised, 0 otherwise:
+    /// `pending == 0 && exhausted == 0 && divergentAnchor == 0`.
+    ///
+    /// The field an SLO may ride. Deliberately NOT the same thing as the
+    /// `caughtUp` published on `/p2p/status`, which goes true when a sweep ENDS
+    /// — including a sweep that healed nothing because every gap spent its retry
+    /// budget (the live 22-sweep / `healedTotal: 0` shape). Cumulative heals are
+    /// already derivable from `elohim_projection_heal_outcomes_total`, so no
+    /// healed-total counter is added here.
+    pub static ref PROJECTION_RECONCILE_CONVERGED: IntGauge = IntGauge::new(
+        "elohim_projection_reconcile_converged",
+        "1 when the peer holds what its peers advertised (pending+exhausted+divergent all zero).",
+    )
+    .unwrap();
+
     /// Part-B redistribution attempts SKIPPED because the candidate's blob bytes
     /// were not local — measured-but-dark content this node holds a manifest for but
     /// cannot source the bytes of, so it cannot be the distributor. Before this the
@@ -514,6 +572,10 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(PROJECTION_HEAL_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_GAPS.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_LOCAL_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_EXHAUSTED.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_DIVERGENT.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_SWEEPS.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_CONVERGED.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_REDISTRIBUTE_BYTES_MISSING.clone()));
         let _ = REGISTRY.register(Box::new(PEER_STATUS_FANOUT_MISSED.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_TOTAL.clone()));
@@ -714,13 +776,49 @@ pub fn inc_projection_heal_outcome(stream: &str, outcome: &str) {
 
 /// Publish a reconcile stream's last-sweep gauges: discovered `gaps` (pending after
 /// discovery) and `local_total` (local projection rows). `stream` is "rea" | "content".
-pub fn set_projection_reconcile_gauges(stream: &str, gaps: u64, local_total: u64) {
+pub fn set_projection_reconcile_gauges(
+    stream: &str,
+    gaps: u64,
+    local_total: u64,
+    exhausted: u64,
+    divergent: u64,
+) {
     PROJECTION_RECONCILE_GAPS
         .with_label_values(&[stream])
         .set(gaps as i64);
     PROJECTION_RECONCILE_LOCAL_TOTAL
         .with_label_values(&[stream])
         .set(local_total as i64);
+    PROJECTION_RECONCILE_EXHAUSTED
+        .with_label_values(&[stream])
+        .set(exhausted as i64);
+    PROJECTION_RECONCILE_DIVERGENT
+        .with_label_values(&[stream])
+        .set(divergent as i64);
+}
+
+/// 1 when the peer holds what its peers advertised, 0 otherwise. Pure so the
+/// three-condition rule is testable without a registry — and so it cannot drift
+/// from `GapCounts::converged`, which computes the same rule minus divergence.
+pub fn converged_gauge_value(
+    counts: &crate::p2p::reconcile_rails::GapCounts,
+    divergent: usize,
+) -> i64 {
+    i64::from(counts.converged && divergent == 0)
+}
+
+/// Publish one completed reconcile sweep: advance the sweep denominator and
+/// republish whether this peer actually converged.
+///
+/// Called from `ProjectionReconcileState::publish_sweep`, so the metric and the
+/// `/p2p/status` field are written from the same place and cannot disagree —
+/// the failure mode that let `/health` and `/p2p/status` drift 12x apart.
+pub fn record_reconcile_sweep(
+    counts: &crate::p2p::reconcile_rails::GapCounts,
+    divergent_anchor: usize,
+) {
+    PROJECTION_RECONCILE_SWEEPS.inc();
+    PROJECTION_RECONCILE_CONVERGED.set(converged_gauge_value(counts, divergent_anchor));
 }
 
 /// Record one Part-B redistribution attempt skipped because the candidate's blob
@@ -759,6 +857,38 @@ pub fn set_identity_fill_last_writes(writes: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::p2p::reconcile_rails::GapCounts;
+
+    #[test]
+    fn converged_gauge_needs_all_three_conditions_not_just_an_empty_queue() {
+        // pending==0 AND exhausted==0 AND divergentAnchor==0. Any one of the
+        // three defeats it — that is the whole point of the field.
+        let healed = GapCounts {
+            pending: 0,
+            completed: 5,
+            failed: 0,
+            caught_up: true,
+            exhausted: 0,
+            converged: true,
+        };
+        assert_eq!(converged_gauge_value(&healed, 0), 1);
+
+        // The live beta shape: 22 sweeps, healedTotal 0 — every gap abandoned
+        // at max_retries. `caught_up` is true here; convergence must not be.
+        let abandoned = GapCounts {
+            pending: 0,
+            completed: 0,
+            failed: 61,
+            caught_up: true,
+            exhausted: 61,
+            converged: false,
+        };
+        assert_eq!(converged_gauge_value(&abandoned, 0), 0);
+
+        // Clean gap ledger, but rows sit locally under an anchor no peer
+        // advertises. The sweep resolved nothing about them.
+        assert_eq!(converged_gauge_value(&healed, 1860), 0);
+    }
 
     #[test]
     fn register_all_idempotent_and_gathers_all_metrics() {
@@ -801,8 +931,22 @@ mod tests {
                 inc_projection_heal_outcome(stream, outcome);
             }
         }
-        set_projection_reconcile_gauges("rea", 62, 0);
-        set_projection_reconcile_gauges("content", 1956, 4158);
+        // The live 2026-07-25 shape, per arm: rea holds ZERO local rows while
+        // 62 gaps sit discovered, and content carries 1860 rows under an anchor
+        // no peer advertises. `caughtUp` reported true over both.
+        set_projection_reconcile_gauges("rea", 62, 0, 61, 0);
+        set_projection_reconcile_gauges("content", 1956, 4158, 0, 1860);
+        record_reconcile_sweep(
+            &GapCounts {
+                pending: 0,
+                completed: 0,
+                failed: 61,
+                caught_up: true,
+                exhausted: 61,
+                converged: false,
+            },
+            1860,
+        );
         inc_shard_redistribute_bytes_missing();
         set_peer_status_fanout_missed(2);
         // Sync plane (spine node sync-scale-honesty): the round's cost and its
@@ -871,6 +1015,26 @@ mod tests {
         assert!(
             text.contains("elohim_content_witness_authored_total"),
             "content witness-authored counter missing:\n{text}"
+        );
+        // Reconcile honesty. `gaps`/`local_total`/`heal_outcomes` already
+        // existed; what was missing is the distinction between "this sweep
+        // ended" and "this peer holds what its peers hold" — and the sweep
+        // denominator that makes the other reconcile series a rate.
+        assert!(
+            text.contains("elohim_projection_reconcile_exhausted"),
+            "exhausted gauge missing — abandoned gaps stay invisible:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_projection_reconcile_divergent"),
+            "per-stream divergent gauge missing:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_projection_reconcile_sweeps_total"),
+            "sweep denominator missing:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_projection_reconcile_converged"),
+            "converged gauge missing — the field an SLO rides:\n{text}"
         );
         // Sync plane cost + per-request outcome attribution.
         assert!(
