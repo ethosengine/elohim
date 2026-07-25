@@ -4629,6 +4629,9 @@ impl P2PNode {
                                                 self.replication_state
                                                     .mark_failed(&content_id)
                                                     .await;
+                                                crate::metrics::inc_acquisition_outcome(
+                                                    "no_db_pool",
+                                                );
                                                 self.acquisition.mark_failed(&content_id).await;
                                                 return;
                                             }
@@ -4639,6 +4642,9 @@ impl P2PNode {
                                                 self.replication_state
                                                     .mark_failed(&content_id)
                                                     .await;
+                                                crate::metrics::inc_acquisition_outcome(
+                                                    "no_db_conn",
+                                                );
                                                 self.acquisition.mark_failed(&content_id).await;
                                                 return;
                                             }
@@ -4755,6 +4761,9 @@ impl P2PNode {
                                                     self.replication_state
                                                         .mark_failed(&content_id)
                                                         .await;
+                                                    crate::metrics::inc_acquisition_outcome(
+                                                        "blob_unavailable",
+                                                    );
                                                     self.acquisition.mark_failed(&content_id).await;
                                                 }
                                             }
@@ -4763,6 +4772,9 @@ impl P2PNode {
                                                 self.replication_state
                                                     .mark_failed(&content_id)
                                                     .await;
+                                                crate::metrics::inc_acquisition_outcome(
+                                                    "store_failed",
+                                                );
                                                 self.acquisition.mark_failed(&content_id).await;
                                             }
                                         }
@@ -4776,6 +4788,7 @@ impl P2PNode {
                                             .await
                                             .remove(&request_id)
                                         {
+                                            crate::metrics::inc_acquisition_outcome("fetch_error");
                                             self.acquisition.mark_failed(&acq_id).await;
                                         }
                                         if let Some(content_id) = self

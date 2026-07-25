@@ -445,7 +445,7 @@ lazy_static! {
 
     /// Acquisition (`pull` leg) outcomes — the leg that fetches content this peer
     /// is missing. label: outcome = "fetched" | "transport_failure" | "no_db_pool" |
-    /// "no_db_conn".
+    /// "no_db_conn" | "blob_unavailable" | "store_failed" | "fetch_error".
     ///
     /// Measured on alpha 2026-07-25: `pull` reported total=29 fetched=0 failed=29
     /// (beta: 5/0/5) while the ONLY code signal was a `debug!` the deployed level
@@ -828,7 +828,15 @@ mod tests {
         // beta 5/5 failed, fetched=0 on both — a 100% dead leg whose ONLY signal
         // was a debug! that the deployed log level drops (1.13M log lines in 6h,
         // zero mentions). A silent total failure is indistinguishable from health.
-        for outcome in ["fetched", "transport_failure", "no_db_pool", "no_db_conn"] {
+        for outcome in [
+            "fetched",
+            "transport_failure",
+            "no_db_pool",
+            "no_db_conn",
+            "blob_unavailable",
+            "store_failed",
+            "fetch_error",
+        ] {
             inc_acquisition_outcome(outcome);
         }
 
