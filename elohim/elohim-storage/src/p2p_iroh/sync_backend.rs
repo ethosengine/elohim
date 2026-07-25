@@ -219,6 +219,84 @@ impl SyncBackend for SyncManagerBackend {
                     }
                 }
             }
+            SyncRequest::ListDocumentsSince {
+                h_app_id,
+                prefix,
+                corpus_digest,
+                limit,
+            } => {
+                // Mirrors the libp2p arm exactly (see `p2p/mod.rs`): equal
+                // digests ⇒ InSync and NO enumeration; different ⇒ the same full
+                // list the ListDocuments arm above would have produced. Both
+                // transports must agree or a dual-stack fleet would converge on
+                // one plane and re-enumerate forever on the other.
+                match self
+                    .sync_manager
+                    .list_documents(
+                        &h_app_id,
+                        prefix.as_deref(),
+                        0,
+                        crate::p2p::sync_round::SYNC_LIST_PAGE_LIMIT,
+                    )
+                    .await
+                {
+                    Ok((docs, total)) => {
+                        let local = crate::p2p::sync_round::LocalCorpusState {
+                            docs: docs
+                                .iter()
+                                .map(|d| crate::p2p::sync_round::DocHead {
+                                    doc_id: d.doc_id.clone(),
+                                    heads: d.heads.clone(),
+                                })
+                                .collect(),
+                        };
+                        let ours = crate::p2p::sync_round::corpus_digest(&local);
+                        if ours == corpus_digest {
+                            debug!(
+                                h_app_id = %h_app_id,
+                                digest = %ours,
+                                docs = local.len(),
+                                "iroh ListDocumentsSince: digests match — InSync"
+                            );
+                            SyncResponse::InSync {
+                                h_app_id,
+                                corpus_digest: ours,
+                            }
+                        } else {
+                            debug!(
+                                h_app_id = %h_app_id,
+                                ours = %ours,
+                                theirs = %corpus_digest,
+                                "iroh ListDocumentsSince: digests differ — full enumeration"
+                            );
+                            let documents: Vec<DocumentInfo> = docs
+                                .into_iter()
+                                .take(limit as usize)
+                                .map(|d| DocumentInfo {
+                                    doc_id: d.doc_id,
+                                    doc_type: d.doc_type,
+                                    change_count: d.change_count,
+                                    last_modified: d.last_modified,
+                                    heads: d.heads,
+                                })
+                                .collect();
+                            let has_more = (documents.len() as u64) < total;
+                            SyncResponse::DocumentList {
+                                h_app_id,
+                                documents,
+                                total,
+                                has_more,
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warn!(h_app_id = %h_app_id, error = %e, "iroh ListDocumentsSince failed");
+                        SyncResponse::Error {
+                            message: format!("Failed to list documents: {}", e),
+                        }
+                    }
+                }
+            }
         }
     }
 }

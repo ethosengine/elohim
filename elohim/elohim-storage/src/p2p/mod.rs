@@ -6513,6 +6513,80 @@ impl P2PNode {
                     }
                 }
             }
+            SyncRequest::ListDocumentsSince {
+                h_app_id,
+                prefix,
+                corpus_digest,
+                limit,
+            } => {
+                // Digest-first opener. Equal digests ⇒ answer with one hash and
+                // enumerate NOTHING; different ⇒ fall through to exactly the
+                // ListDocuments behaviour above, so a divergent pair is no worse
+                // off than before. Same page window the opener itself uses
+                // (offset 0, SYNC_LIST_PAGE_LIMIT) or the two sides would digest
+                // different slices and never agree.
+                match self
+                    .sync_manager
+                    .list_documents(&h_app_id, prefix.as_deref(), 0, SYNC_LIST_PAGE_LIMIT)
+                    .await
+                {
+                    Ok((docs, total)) => {
+                        let local = sync_round::LocalCorpusState {
+                            docs: docs
+                                .iter()
+                                .map(|d| sync_round::DocHead {
+                                    doc_id: d.doc_id.clone(),
+                                    heads: d.heads.clone(),
+                                })
+                                .collect(),
+                        };
+                        let ours = sync_round::corpus_digest(&local);
+                        if ours == corpus_digest {
+                            debug!(
+                                h_app_id = %h_app_id,
+                                digest = %ours,
+                                docs = local.len(),
+                                "ListDocumentsSince: digests match — answering InSync, enumerating nothing"
+                            );
+                            SyncResponse::InSync {
+                                h_app_id,
+                                corpus_digest: ours,
+                            }
+                        } else {
+                            debug!(
+                                h_app_id = %h_app_id,
+                                ours = %ours,
+                                theirs = %corpus_digest,
+                                "ListDocumentsSince: digests differ — falling back to full enumeration"
+                            );
+                            let documents: Vec<DocumentInfo> = docs
+                                .into_iter()
+                                .take(limit as usize)
+                                .map(|d| DocumentInfo {
+                                    doc_id: d.doc_id,
+                                    doc_type: d.doc_type,
+                                    change_count: d.change_count,
+                                    last_modified: d.last_modified,
+                                    heads: d.heads,
+                                })
+                                .collect();
+                            let has_more = (documents.len() as u64) < total;
+                            SyncResponse::DocumentList {
+                                h_app_id,
+                                documents,
+                                total,
+                                has_more,
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warn!(h_app_id = %h_app_id, error = %e, "Failed to list documents for digest compare");
+                        SyncResponse::Error {
+                            message: format!("Failed to list documents: {}", e),
+                        }
+                    }
+                }
+            }
         }
     }
 

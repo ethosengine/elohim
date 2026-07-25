@@ -94,6 +94,34 @@ pub enum SyncRequest {
         offset: u32,
         limit: u32,
     },
+
+    /// Open a round with a FINGERPRINT of what the requester already holds,
+    /// instead of unconditionally asking for the whole document list.
+    ///
+    /// The responder compares it against its own corpus digest for the same
+    /// namespace. Equal ⇒ [`SyncResponse::InSync`], one hash each way, O(1).
+    /// Different ⇒ the responder falls through to exactly the `ListDocuments`
+    /// path, so correctness in the divergent case is unchanged — only the
+    /// CONVERGED steady state gets cheap, which is where a healthy mesh spends
+    /// nearly all of its time.
+    ///
+    /// Spine node `sync-scale-honesty`: the pre-existing opener ignored local
+    /// state entirely, so a converged peer re-enumerated its whole corpus every
+    /// tick forever — cost O(peers × corpus) instead of O(changes).
+    ///
+    /// **Rollout:** a peer that predates this variant cannot decode the NAME and
+    /// fails the request (see the wire tests in this module). The handler must
+    /// therefore be fleet-wide one release before any sender constructs it.
+    ListDocumentsSince {
+        /// Application namespace
+        h_app_id: String,
+        /// Optional filter by document type/prefix
+        prefix: Option<String>,
+        /// Fingerprint of the requester's whole corpus for this namespace.
+        corpus_digest: String,
+        /// Page size to use if the digests differ and a full list is needed.
+        limit: u32,
+    },
 }
 
 /// Sync response types
@@ -160,6 +188,18 @@ pub enum SyncResponse {
         doc_id: String,
     },
 
+    /// The responder's corpus digest matches the requester's — nothing to
+    /// enumerate. The whole point of [`SyncRequest::ListDocumentsSince`]: a
+    /// converged pair exchanges two hashes instead of two full document lists,
+    /// every tick, forever.
+    InSync {
+        /// Application namespace
+        h_app_id: String,
+        /// Echoed back so the requester can confirm which corpus state was
+        /// agreed on, rather than trusting a bare "yes".
+        corpus_digest: String,
+    },
+
     /// Error response
     Error { message: String },
 }
@@ -216,6 +256,7 @@ impl SyncResponse {
                 documents.len()
             ),
             Self::NotFound { doc_id, .. } => format!("NotFound(doc={doc_id})"),
+            Self::InSync { corpus_digest, .. } => format!("InSync(digest={corpus_digest})"),
             Self::Error { message } => format!("Error({message})"),
         }
     }
@@ -378,6 +419,116 @@ pub fn next_doc_list_offset(offset: u32, page_len: usize, has_more: bool) -> Opt
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn variants_are_name_keyed_so_variant_order_is_not_a_compat_hazard() {
+        // Measured, not assumed: `rmp_serde::to_vec` (compact) encodes an
+        // externally-tagged enum as a 1-entry map {VariantName: [fields…]} —
+        // the variant NAME rides the wire, never an ordinal.
+        //
+        // Consequence for protocol evolution: adding a variant ANYWHERE in the
+        // enum is order-safe (there are no successor ordinals to renumber). The
+        // real hazard is different — an older peer that has never heard the name
+        // cannot decode it and fails the request. That is why a new variant's
+        // HANDLER must be fleet-wide one release BEFORE any sender exists.
+        let bytes = rmp_serde::to_vec(&SyncRequest::GetHeads {
+            h_app_id: "e".into(),
+            doc_id: "d".into(),
+        })
+        .unwrap();
+        assert_eq!(
+            bytes[0], 0x81,
+            "1-entry fixmap, not a [ordinal, payload] pair"
+        );
+        assert_eq!(bytes[1], 0xA8, "fixstr of length 8");
+        assert_eq!(&bytes[2..10], b"GetHeads", "the NAME is the discriminant");
+    }
+
+    #[test]
+    fn variant_fields_are_positional_so_adding_a_field_is_wire_breaking() {
+        // The flip side, and the reason ListDocumentsSince is a new VARIANT
+        // rather than an extra field on ListDocuments: a variant's fields encode
+        // as a positional fixarray, so a 5th field changes the arity an older
+        // peer expects. Adding a variant degrades to "this one request fails";
+        // adding a field degrades to "mis-parsed or rejected payload".
+        let bytes = rmp_serde::to_vec(&SyncRequest::ListDocuments {
+            h_app_id: "e".into(),
+            prefix: None,
+            offset: 0,
+            limit: 1,
+        })
+        .unwrap();
+        // 0x81 map + 0xAD fixstr(13) + "ListDocuments" = 15 bytes of preamble.
+        assert_eq!(&bytes[2..15], b"ListDocuments");
+        assert_eq!(bytes[15], 0x94, "exactly 4 positional fields");
+    }
+
+    #[test]
+    fn list_documents_since_round_trips_over_msgpack() {
+        let req = SyncRequest::ListDocumentsSince {
+            h_app_id: "elohim".into(),
+            prefix: None,
+            corpus_digest: "sha256:deadbeef".into(),
+            limit: 1000,
+        };
+        let bytes = rmp_serde::to_vec(&req).unwrap();
+        let decoded: SyncRequest = rmp_serde::from_slice(&bytes).unwrap();
+        match decoded {
+            SyncRequest::ListDocumentsSince {
+                h_app_id,
+                corpus_digest,
+                limit,
+                ..
+            } => {
+                assert_eq!(h_app_id, "elohim");
+                assert_eq!(corpus_digest, "sha256:deadbeef");
+                assert_eq!(limit, 1000);
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn in_sync_response_round_trips_over_msgpack() {
+        let resp = SyncResponse::InSync {
+            h_app_id: "elohim".into(),
+            corpus_digest: "sha256:deadbeef".into(),
+        };
+        let bytes = rmp_serde::to_vec(&resp).unwrap();
+        let decoded: SyncResponse = rmp_serde::from_slice(&bytes).unwrap();
+        assert!(matches!(decoded, SyncResponse::InSync { .. }));
+    }
+
+    #[test]
+    fn an_older_peer_rejects_an_unknown_variant_rather_than_mis_parsing_it() {
+        // The degradation mode the two-phase rollout depends on. Decoding a
+        // ListDocumentsSince into an enum that lacks it must ERROR, not silently
+        // land on a neighbouring variant — a mis-parse would be far worse than a
+        // failed request.
+        #[derive(serde::Deserialize)]
+        enum OldSyncRequest {
+            #[allow(dead_code)]
+            GetHeads { h_app_id: String, doc_id: String },
+            #[allow(dead_code)]
+            ListDocuments {
+                h_app_id: String,
+                prefix: Option<String>,
+                offset: u32,
+                limit: u32,
+            },
+        }
+        let bytes = rmp_serde::to_vec(&SyncRequest::ListDocumentsSince {
+            h_app_id: "elohim".into(),
+            prefix: None,
+            corpus_digest: "sha256:deadbeef".into(),
+            limit: 1000,
+        })
+        .unwrap();
+        assert!(
+            rmp_serde::from_slice::<OldSyncRequest>(&bytes).is_err(),
+            "a peer predating the variant must refuse it, never mis-parse it"
+        );
+    }
 
     #[test]
     fn test_sync_request_serialization() {

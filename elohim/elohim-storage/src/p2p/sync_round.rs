@@ -111,6 +111,35 @@ impl LocalCorpusState {
     }
 }
 
+/// A stable fingerprint of the whole local corpus for one namespace: the sorted
+/// set of `(doc_id, sorted heads)`, hashed.
+///
+/// Both sides sort before hashing, so two peers holding the same documents at
+/// the same heads produce the same digest regardless of the order their stores
+/// happen to enumerate in — the property the whole `InSync` shortcut rests on.
+/// An unsorted digest would differ spuriously between peers and the shortcut
+/// would simply never fire, silently degrading to today's full enumeration.
+pub fn corpus_digest(local: &LocalCorpusState) -> String {
+    use sha2::{Digest, Sha256};
+    let mut entries: Vec<String> = local
+        .docs
+        .iter()
+        .map(|d| {
+            let mut heads = d.heads.clone();
+            heads.sort();
+            format!("{}={}", d.doc_id, heads.join(","))
+        })
+        .collect();
+    entries.sort();
+    let mut h = Sha256::new();
+    for e in &entries {
+        h.update(e.as_bytes());
+        // Length-delimit so ("ab","c") and ("a","bc") cannot collide.
+        h.update(b"\n");
+    }
+    format!("sha256:{:x}", h.finalize())
+}
+
 /// The request that opens a sync round with one peer.
 ///
 /// Today: an unconditional `ListDocuments` from offset 0 — identical whether we
