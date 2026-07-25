@@ -7,6 +7,7 @@
 //! git, and records are deduped by CID against the existing sidecar before append.
 
 pub mod edges;
+pub mod fulfill;
 pub mod governor;
 pub mod project;
 pub mod registry;
@@ -141,6 +142,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "seal" => run_seal(&args[1..]),
         "reseal" => run_reseal(&args[1..]),
         "hold" => run_hold(&args[1..]),
+        "fulfill" => run_fulfill(&args[1..]),
         other => Err(FlowError::InvalidArguments(format!(
             "unknown flow subcommand `{other}`\n{}",
             usage()
@@ -224,6 +226,41 @@ fn run_hold(args: &[String]) -> FlowResult<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+fn run_fulfill(args: &[String]) -> FlowResult<ExitCode> {
+    let (file, tail) = positional_file(args)?;
+    let (opts, rest) = parse_global(tail)?;
+    let mut fulfill_opts = fulfill::FulfillOptions::default();
+    let mut i = 0;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--dry-run" => {
+                fulfill_opts.dry_run = true;
+                i += 1;
+            }
+            "--surface-prefix" => {
+                let value = rest.get(i + 1).ok_or_else(|| {
+                    FlowError::InvalidArguments("--surface-prefix needs a value".into())
+                })?;
+                fulfill_opts.surface_prefix = value.clone();
+                i += 2;
+            }
+            other => {
+                return Err(FlowError::InvalidArguments(format!(
+                    "unknown fulfill argument `{other}`"
+                )))
+            }
+        }
+    }
+    let report_path = resolve_under(&opts.root, file);
+    let summary = fulfill::fulfill(&opts.root, &report_path, &fulfill_opts)?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&summary)?);
+    } else {
+        summary.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
 /// Pull `--root` and `--json` out of `args`, returning the remainder untouched.
 fn parse_global(args: &[String]) -> FlowResult<(GlobalOpts, Vec<String>)> {
     let mut root = PathBuf::from(".");
@@ -276,7 +313,8 @@ fn usage() -> String {
      [--desc <text>] [--json] [--root DIR] \
      (omit --governor to auto-derive from .claude/epr-meta/governors.yaml)\n  \
      | reseal <file> [--on <upstream>] [--all-stale] [--json] [--root DIR]\n  \
-     | hold <file> --on <upstream> --reason <text> [--valid-from <iso8601>] [--json] [--root DIR]\n>"
+     | hold <file> --on <upstream> --reason <text> [--valid-from <iso8601>] [--json] [--root DIR]\n  \
+     | fulfill <report.json> [--dry-run] [--surface-prefix genesis/a2o] [--json] [--root DIR]\n>"
         .to_string()
 }
 

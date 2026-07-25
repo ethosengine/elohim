@@ -65,3 +65,28 @@ recipes:
       - { from: plan, to: intent, meaningful: true, validators: [decompose] }
       - { from: spec, to: scenario, meaningful: true, validators: [a2o-parse] }
       - { from: scenario, to: validation, meaningful: true, validators: [a2o-run] }
+  - id: resiliency-saga
+    version: 1
+    description: >
+      The resiliency saga: ten ordered dataplane chapters (01-…10-) narrating data
+      surviving node loss, walked as a value chain. Chapter ORDER is carried by the
+      filename prefixes (stage_files sorts lexicographically); the chapter→probe
+      join is each chapter's @concern: tag, rolled up by sprint-report-dataplane
+      byConcern. Edges below are declarative documentation minted into the
+      ProcessSpec atom; nothing enforces them in v1 (honest-about-inert).
+    stages:
+      - name: epic
+        artifactKind: "doc:saga-narrative"
+        paths:
+          - "genesis/a2o/features/dataplane/resiliency-saga/README.md"
+      - name: scenario
+        artifactKind: "a2o:feature"
+        paths:
+          - "genesis/a2o/features/dataplane/resiliency-saga/*.feature"
+      - name: validation
+        artifactKind: "a2o:verdict"
+        paths:
+          - "genesis/a2o/reports/sprint-report-dataplane.json"
+    edges:
+      - { from: epic, to: scenario, meaningful: false, validators: [] }
+      - { from: scenario, to: validation, meaningful: true, validators: [a2o-run] }
