@@ -1743,6 +1743,10 @@ mod tests {
                     completed: 2,
                     failed: 1,
                     caught_up: true,
+                    // The failed gap spent its budget: the sweep ended
+                    // (caught_up) without healing it, so it did NOT converge.
+                    exhausted: 1,
+                    converged: false,
                 },
                 3,
                 1,
@@ -1765,6 +1769,8 @@ mod tests {
                     completed: 1,
                     failed: 0,
                     caught_up: true,
+                    exhausted: 0,
+                    converged: true,
                 },
                 2,
                 0,

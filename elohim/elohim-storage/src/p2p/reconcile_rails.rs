@@ -25,7 +25,20 @@ pub struct GapCounts {
     pub pending: usize,
     pub completed: usize,
     pub failed: usize,
+    /// This SWEEP is over: every discovered gap was healed OR exhausted its
+    /// retry budget. Load-bearing for the existing `/health`, `/p2p/status`
+    /// and a2o surfaces; deliberately NOT renamed. It does not mean the peer
+    /// converged — see [`GapCounts::converged`].
     pub caught_up: bool,
+    /// Gaps abandoned at `max_retries` — counted, never silently dropped.
+    /// `enqueue_missing` refuses to re-queue these, so they are permanently
+    /// absent from `pending`; that absence is why `pending.is_empty()`
+    /// overstates convergence.
+    pub exhausted: usize,
+    /// This PEER holds what its peers advertised: nothing pending AND nothing
+    /// abandoned. Strictly stronger than `caught_up`; this is the field an SLO
+    /// may be offered over.
+    pub converged: bool,
 }
 
 impl GapTracker {
@@ -36,12 +49,25 @@ impl GapTracker {
         }
     }
 
+    /// Ids whose retry budget is spent. `enqueue_missing` refuses to re-queue
+    /// these, so they leave `pending` permanently — the exact reason
+    /// `pending.is_empty()` (i.e. `caught_up`) overstates convergence.
+    pub fn exhausted_count(&self) -> usize {
+        self.failed
+            .values()
+            .filter(|&&n| n >= self.max_retries)
+            .count()
+    }
+
     pub fn counts(&self) -> GapCounts {
+        let exhausted = self.exhausted_count();
         GapCounts {
             pending: self.pending.len(),
             completed: self.completed.len(),
             failed: self.failed.len(),
             caught_up: self.caught_up,
+            exhausted,
+            converged: self.pending.is_empty() && exhausted == 0,
         }
     }
 
@@ -197,6 +223,67 @@ mod tests {
         let gaps = t.reconcile_desired(vec!["x".into()]);
         assert!(gaps.is_empty());
         assert_eq!(t.counts().failed, 1);
+    }
+
+    #[test]
+    fn retry_exhausted_gaps_are_caught_up_but_not_converged() {
+        // The live lie: a sweep whose gaps all failed past max_retries drains
+        // `pending` (mark_failed removes without re-queue) and reports
+        // caught_up=true while nothing was healed. That is "this sweep is
+        // over", not "this peer holds what its peers hold" — the shape behind
+        // caughtUp:true over 1860 divergent anchors.
+        let mut t = GapTracker::new(2);
+        t.discover(vec!["a".into(), "b".into(), "c".into()]);
+        for _ in 0..2 {
+            for id in ["a", "b", "c"] {
+                t.mark_failed(id);
+            }
+            // Retry-on-NEXT-cycle: re-discovery is what re-enqueues (R-E).
+            t.discover(vec!["a".into(), "b".into(), "c".into()]);
+        }
+        t.update_caught_up();
+
+        let c = t.counts();
+        assert_eq!(c.completed, 0, "nothing was healed");
+        assert!(
+            c.caught_up,
+            "existing semantics preserved: the sweep is over"
+        );
+        assert_eq!(c.exhausted, 3, "all three exhausted their retry budget");
+        assert!(
+            !c.converged,
+            "converged must be FALSE when gaps were abandoned, not healed"
+        );
+    }
+
+    #[test]
+    fn a_fully_healed_sweep_is_both_caught_up_and_converged() {
+        let mut t = GapTracker::new(2);
+        t.discover(vec!["a".into(), "b".into()]);
+        t.mark_completed("a");
+        t.mark_completed("b");
+        t.update_caught_up();
+
+        let c = t.counts();
+        assert!(c.caught_up);
+        assert!(c.converged, "healed gaps converge");
+        assert_eq!(c.exhausted, 0);
+    }
+
+    #[test]
+    fn a_gap_still_retrying_is_neither_caught_up_nor_converged() {
+        // Guards the other direction: a failure that has budget left is still
+        // in flight, so `exhausted` must not count it.
+        let mut t = GapTracker::new(3);
+        t.discover(vec!["a".into()]);
+        t.mark_failed("a");
+        t.discover(vec!["a".into()]); // re-queued: 1 < 3
+        t.update_caught_up();
+
+        let c = t.counts();
+        assert!(!c.caught_up);
+        assert!(!c.converged);
+        assert_eq!(c.exhausted, 0, "retryable != exhausted");
     }
 
     #[test]
