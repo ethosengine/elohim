@@ -1,6 +1,16 @@
 #!/bin/bash
-# saga-sync.sh — pull the latest dataplane sprint-report down from CI, project +
+# jenkins-sync.sh — the Jenkins→fabric bridge script: pull the latest dataplane sprint-report down from CI, project +
 # fulfill the resiliency-saga flow, then print the saga-status one-liner.
+#
+# WHY THIS LIVES IN genesis/scripts/ (bridge-seam provenance, 2026-07-25): the ONLY step
+# that knows Jenkins exists is the artifact fetch — an external-protocol translation
+# (bridge-shaped, per the seam map's what-do-you-ADD rule); everything downstream
+# (`epr flow project|fulfill`) is substrate-native. It sits here with the rest of the
+# manual/web2 pipeline orchestration because the whole class is deleted together at the
+# rakia graduation: a rakia compute-commitment runner witnesses the verdict at execution
+# (signed, on-chain, peer-validated) and there is nothing left to fetch or translate.
+# A fetched report is an imported claim and never becomes stronger by being folded —
+# the rakia-native verdict is admissible witness evidence instead.
 #
 # The resiliency-saga (genesis/a2o/features/dataplane/resiliency-saga/NN-*.feature) rolls up
 # per-concern into genesis/a2o/reports/sprint-report-dataplane.json (gitignored, CI-produced —
@@ -41,7 +51,7 @@ JENKINS_BUILD="${JENKINS_BUILD:-lastSuccessfulBuild}"
 ARTIFACT_PATH="genesis/a2o/reports/sprint-report-dataplane.json"
 ARTIFACT_URL="${JENKINS_BASE}/job/${JENKINS_JOB}/job/${JENKINS_BRANCH}/${JENKINS_BUILD}/artifact/${ARTIFACT_PATH}"
 
-echo "=== saga-sync ==="
+echo "=== jenkins-sync ==="
 mkdir -p "${REPORTS_DIR}"
 
 # --- (a) fetch the latest sprint-report-dataplane.json --------------------------------

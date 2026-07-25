@@ -2,7 +2,7 @@
 title: "Resiliency Saga — executable eprfs valueflow driving the epic to live completion"
 id: resiliency-saga-valueflow
 tier: plan
-status: Executed (CLAIMED — verify via CI dataplane runs + saga-sync)
+status: Executed (CLAIMED — verify via CI dataplane runs + jenkins-sync)
 created: 2026-07-25
 maintainers: Matthew Dowell + Claude Fable 5
 sprint: verify-track
@@ -29,7 +29,7 @@ This plan (a) finished the custody production chain, and (b) converted the epic'
 
 matthew boots a device → household forms → matthew uploads elohim-host-landing into his eprfs → hosts a doorway → adam co-stewards (rea-agreement, Mishpat-notarized) → their blobs sync to one head → custody witnessed honestly → each node reports capacity → in-kind doorway-operator agreements, projector caches carry the head → the resilience card tells the truth on elohim.host and alpha.elohim.host. (Anycast deferred.)
 
-Canonical home: `genesis/a2o/features/dataplane/resiliency-saga/` (README carries the narrative + chapter/proof table; concerns `saga-01…saga-10` in the dataplane taxonomy). Recipe: `resiliency-saga` in `.claude/epr-meta/recipes.yaml`. Frontier reader: `.claude/scripts/saga-status.py` (session-start line) + `.claude/scripts/saga-sync.sh` (fetch report → project → fulfill; agent-side, since `.eprfs/` is per-checkout derived state).
+Canonical home: `genesis/a2o/features/dataplane/resiliency-saga/` (README carries the narrative + chapter/proof table; concerns `saga-01…saga-10` in the dataplane taxonomy). Recipe: `resiliency-saga` in `.claude/epr-meta/recipes.yaml`. Frontier reader: `.claude/scripts/saga-status.py` (session-start line) + `genesis/scripts/jenkins-sync.sh` (fetch report → project → fulfill; agent-side, since `.eprfs/` is per-checkout derived state — renamed/relocated 2026-07-25: the Jenkins-facing fetch is the bridge-shaped sliver, housed with the manual pipeline orchestration that all deletes together at rakia graduation).
 
 ## Tasks (executed 2026-07-25)
 
@@ -38,7 +38,7 @@ Canonical home: `genesis/a2o/features/dataplane/resiliency-saga/` (README carrie
 - [x] T3 — `custody_facing` observation loader feeding the ae7c695b8 typed folds: evidence from `shard_locations.status`, commitment standing from active custody-blob rows, shard→blob via manifests; binding honesty rules (failure→unknown-preserving-evidence; StockedWarm only by recorded pledge; PeerAsserted never reaches Stocked); `elohim_custody_class_count{class}` gauges (6eaaf4046)
 - [x] T4 — ten chapter features + label-aware Prometheus + runLook glue; born-red chapters 2/5/7/9/10 are the loop's work queue (89eb92c64)
 - [x] T5 — `resiliency-saga` recipe + `epr flow fulfill` (Produce on all-green, Dismiss on regression, generatedAt-idempotent, discharged-set skip) (a581fee74)
-- [x] T6 — `saga-status.py` frontier reader (green/emit-due/regressed/red/pending-env/unprojected; <0.1s), session-start SAGA line, `saga-sync.sh` actuator, 8 backlog items for deliberate v1 exclusions (35abe6f38)
+- [x] T6 — `saga-status.py` frontier reader (green/emit-due/regressed/red/pending-env/unprojected; <0.1s), session-start SAGA line, `jenkins-sync.sh` actuator (born `.claude/scripts/saga-sync.sh`, relocated same day), 8 backlog items for deliberate v1 exclusions (35abe6f38)
 
 ## Verification ladder (the loop from here)
 
@@ -48,7 +48,7 @@ Canonical home: `genesis/a2o/features/dataplane/resiliency-saga/` (README carrie
 4. `rea_commitments` gains mirrored replicates-* rows → ch05; `commitmentBackedReplication.totalPledgedBytes ≥ 1` → ch09.
 5. Custody class gauges non-vacuous → ch07.
 6. Both doorways report the same non-zero stewarding count → ch10 — the epic's finish line.
-After each CI dataplane run: `saga-sync.sh` (or the delivery-stasis loop on `emit-due`) converts green verdicts into fulfillment events; `saga-status.py` shows the frontier.
+After each CI dataplane run: `genesis/scripts/jenkins-sync.sh` (or the delivery-stasis loop on `emit-due`) converts green verdicts into fulfillment events; `saga-status.py` shows the frontier.
 
 ## Deliberately out of scope (backlogged)
 

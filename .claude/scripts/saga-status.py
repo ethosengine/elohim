@@ -13,7 +13,7 @@ any missing input, no network):
      green/red sprint-report into Produce (fulfilling)/Dismiss (regression) FlowEvents.
   3. REPORT (optional) — genesis/a2o/reports/sprint-report-dataplane.json, the latest dataplane
      validation run's summary.byConcern rollup (gitignored; may be absent locally — CI-only
-     until `saga-sync.sh` pulls it down).
+     until `genesis/scripts/jenkins-sync.sh` pulls it down).
 
 Usage:
   saga-status.py            one line for the SessionStart context block
@@ -400,7 +400,7 @@ def full(rows, report, flows_present) -> str:
     if report:
         lines.append(f"report: runId={report.get('runId', '?')} generatedAt={report.get('generatedAt', '?')}")
     else:
-        lines.append(f"report: (absent — {REPORT_PATH} not found locally; run saga-sync.sh)")
+        lines.append(f"report: (absent — {REPORT_PATH} not found locally; run genesis/scripts/jenkins-sync.sh)")
     lines.append(f"flows:  {'present' if flows_present else '(absent — ' + str(FLOWS_PATH) + ' not found)'}")
     lines.append("")
 
