@@ -909,7 +909,6 @@ pub fn aggregate_for_content(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diesel::prelude::*;
     use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
     const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
