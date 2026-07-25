@@ -27,7 +27,7 @@ use elohim_sweettest::common::{
     fixtures::network_seed,
 };
 use holo_hash::{ActionHash, EntryHash};
-use holochain::sweettest::SweetConductor;
+use holochain::sweettest::{await_consistency, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -218,6 +218,22 @@ async fn project_epr_commitment_replicates_to_peer_b() -> Result<()> {
     })
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
+
+    // --- Wait for op convergence before asserting the READ. ---
+    // Restored 2026-07-25 (operator-approved). Commit 837b772c9 switched this
+    // test to isolated conductors, un-`#[ignore]`d it, AND dropped this barrier
+    // in one move — collapsing the green sibling idiom (60s consistency + poll,
+    // see tests/lamad.rs:542/576/680/951) into a bare 60s poll. Without it the
+    // test cannot distinguish "peer B cannot RESOLVE the commitment" from "the
+    // ops have not finished integrating yet", and in a debug-profile conductor
+    // with a 3.5MB DNA (75 entry types x 225 link types validated op-by-op)
+    // late-join convergence lands near the minute mark — two CONTENT sweettests
+    // that are green in CI also red in this container on the shorter budget.
+    // The barrier is what makes a failure of the poll below MEAN something: it
+    // is the difference between a substrate red and a stopwatch.
+    await_consistency(60, [&cell_a, &cell_b])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout after create_rea_commitment: {e}"))?;
 
     // --- Bob resolves the commitment within a bounded window. ---
     // Polling the coordinator read directly exercises the production
