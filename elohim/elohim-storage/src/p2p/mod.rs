@@ -4682,6 +4682,9 @@ impl P2PNode {
                                                     self.acquisition
                                                         .mark_completed(&content_id)
                                                         .await;
+                                                    crate::metrics::inc_acquisition_outcome(
+                                                        "fetched",
+                                                    );
 
                                                     // Republish EPR Head so other peers can discover from us
                                                     if let Some(head_bytes) =
@@ -4870,7 +4873,13 @@ impl P2PNode {
                     .await
                     .remove(&request_id)
                 {
-                    debug!(content_id = %content_id, error = ?error, "Acquisition fetch failed at transport level");
+                    // WARN, not debug: this leg was measured failing 100% on both
+                    // genesis peers (alpha 29/29, beta 5/5, fetched=0) while emitting
+                    // NOTHING at the deployed level — 1.13M log lines over 6h contained
+                    // zero occurrences of this message. A leg that fails every attempt
+                    // must not be indistinguishable from an idle healthy one.
+                    warn!(content_id = %content_id, error = ?error, "Acquisition fetch failed at transport level");
+                    crate::metrics::inc_acquisition_outcome("transport_failure");
                     self.acquisition.mark_failed(&content_id).await;
                 }
             }

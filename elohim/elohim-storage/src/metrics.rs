@@ -443,6 +443,25 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Acquisition (`pull` leg) outcomes — the leg that fetches content this peer
+    /// is missing. label: outcome = "fetched" | "transport_failure" | "no_db_pool" |
+    /// "no_db_conn".
+    ///
+    /// Measured on alpha 2026-07-25: `pull` reported total=29 fetched=0 failed=29
+    /// (beta: 5/0/5) while the ONLY code signal was a `debug!` the deployed level
+    /// drops — 1.13M log lines over 6h contained zero occurrences. A leg that fails
+    /// every single attempt looked exactly like a healthy idle leg. `fetched` is
+    /// counted alongside the failures on purpose: a ratio is readable, a failure
+    /// count alone is not.
+    pub static ref ACQUISITION_OUTCOMES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_outcomes_total",
+            "Acquisition (pull-leg) fetch outcomes by result.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// Outbound sync request outcomes. Deliberately labelled by RESULT ONLY, never
     /// by peer: a peer-id label is an unbounded-cardinality bomb on a real mesh.
     /// Peer identity stays in the log line at the same site. label: result = "ok" |
@@ -504,6 +523,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(SYNC_REQUESTS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_DOCS_ENUMERATED.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUEST_OUTCOMES.clone()));
+        let _ = REGISTRY.register(Box::new(ACQUISITION_OUTCOMES.clone()));
     });
 }
 
@@ -634,6 +654,12 @@ pub fn add_sync_docs_enumerated(n: u64) {
 /// label.
 pub fn inc_sync_request_outcome(result: &str) {
     SYNC_REQUEST_OUTCOMES.with_label_values(&[result]).inc();
+}
+
+/// Record one acquisition (pull-leg) outcome ("fetched" | "transport_failure" |
+/// "no_db_pool" | "no_db_conn").
+pub fn inc_acquisition_outcome(outcome: &str) {
+    ACQUISITION_OUTCOMES.with_label_values(&[outcome]).inc();
 }
 
 /// Record `n` content heads freshly authored by the witness-bootstrap sweep.
@@ -798,6 +824,13 @@ mod tests {
         ] {
             inc_sync_request_outcome(result);
         }
+        // Acquisition (the `pull` leg). Measured 2026-07-25: alpha 29/29 failed,
+        // beta 5/5 failed, fetched=0 on both — a 100% dead leg whose ONLY signal
+        // was a debug! that the deployed log level drops (1.13M log lines in 6h,
+        // zero mentions). A silent total failure is indistinguishable from health.
+        for outcome in ["fetched", "transport_failure", "no_db_pool", "no_db_conn"] {
+            inc_acquisition_outcome(outcome);
+        }
 
         let text = gather_text();
         assert!(
@@ -851,6 +884,12 @@ mod tests {
         );
         assert!(text.contains("kind=\"list_documents\""), "{text}");
         assert!(text.contains("kind=\"announce_change\""), "{text}");
+        assert!(
+            text.contains("elohim_acquisition_outcomes_total"),
+            "acquisition outcome counter missing — the pull leg's 100% failure was \
+             invisible without it:\n{text}"
+        );
+        assert!(text.contains("outcome=\"transport_failure\""), "{text}");
         // Projection-reconcile heal legibility surfaces render with their labels.
         assert!(
             text.contains("elohim_projection_heal_outcomes_total"),
