@@ -1,5 +1,6 @@
 export * from './enums/capacity-model';
 export * from './enums/circularity';
+export * from './enums/closure';
 export * from './enums/completion-criteria';
 export * from './enums/constitutional-layer';
 export * from './enums/content-format';
@@ -90,6 +91,7 @@ export * from './views/distribution-details';
 export * from './views/distribution-summary';
 export * from './views/diversity-hint';
 export * from './views/doorway-dashboard-view';
+export * from './views/doorway-health-p2p';
 export * from './views/doorway-operator-binding-view';
 export * from './views/drain-status-view';
 export * from './views/economic-event-view';

@@ -90,11 +90,22 @@ export interface P2PStatusView {
     pending: number;
     completed: number;
     failed: number;
+    /**
+     * This SWEEP ended: every discovered gap was healed OR exhausted its retry budget. NOT a convergence signal — use `converged`.
+     */
     caughtUp: boolean;
     peersAsked: number;
     divergentAnchor: number;
     healedTotal: number;
     sweeps: number;
+    /**
+     * Gaps abandoned at max_retries this sweep — healed nothing, retried no more.
+     */
+    exhausted: number;
+    /**
+     * This peer holds what its peers advertised: pending==0 AND exhausted==0 AND divergentAnchor==0. Strictly stronger than caughtUp; an SLO may be offered over this field, not that one.
+     */
+    converged: boolean;
   } | null;
   /**
    * Provide-loop + re-anchor-backfill observability. null when the holder is not wired (e.g. a P2PNode built without the builder).

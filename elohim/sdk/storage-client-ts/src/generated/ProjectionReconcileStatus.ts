@@ -25,7 +25,10 @@ completed: number,
  */
 failed: number, 
 /**
- * True when every discovered gap was healed or exhausted retries.
+ * True when this SWEEP ended: every discovered gap was healed **or**
+ * exhausted retries. Deliberately NOT renamed — `/health`, `/p2p/status`
+ * and a live a2o gate consume it. It is not a convergence signal; see
+ * [`ProjectionReconcileStatus::converged`].
  */
 caughtUp: boolean, 
 /**
@@ -44,4 +47,16 @@ healedTotal: number,
 /**
  * Sweeps completed this process lifetime.
  */
-sweeps: number, };
+sweeps: number, 
+/**
+ * Gaps abandoned at MAX_RETRIES this sweep — healed nothing, retried no
+ * more. `enqueue_missing` refuses to re-queue them, so they leave
+ * `pending` permanently; that is why `caught_up` alone overstates.
+ */
+exhausted: number, 
+/**
+ * True when this peer holds what its peers advertised: nothing pending,
+ * nothing abandoned, nothing divergent. `caught_up` says only that the
+ * sweep ended — an SLO may be offered over THIS field, not that one.
+ */
+converged: boolean, };

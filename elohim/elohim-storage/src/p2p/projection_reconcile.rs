@@ -339,7 +339,10 @@ pub struct ProjectionReconcileStatus {
     /// next sweep until MAX_RETRIES.
     #[ts(type = "number")]
     pub failed: usize,
-    /// True when every discovered gap was healed or exhausted retries.
+    /// True when this SWEEP ended: every discovered gap was healed **or**
+    /// exhausted retries. Deliberately NOT renamed — `/health`, `/p2p/status`
+    /// and a live a2o gate consume it. It is not a convergence signal; see
+    /// [`ProjectionReconcileStatus::converged`].
     pub caught_up: bool,
     /// Peers asked for an inventory in the last completed sweep.
     #[ts(type = "number")]
@@ -354,6 +357,15 @@ pub struct ProjectionReconcileStatus {
     /// Sweeps completed this process lifetime.
     #[ts(type = "number")]
     pub sweeps: usize,
+    /// Gaps abandoned at MAX_RETRIES this sweep — healed nothing, retried no
+    /// more. `enqueue_missing` refuses to re-queue them, so they leave
+    /// `pending` permanently; that is why `caught_up` alone overstates.
+    #[ts(type = "number")]
+    pub exhausted: usize,
+    /// True when this peer holds what its peers advertised: nothing pending,
+    /// nothing abandoned, nothing divergent. `caught_up` says only that the
+    /// sweep ended — an SLO may be offered over THIS field, not that one.
+    pub converged: bool,
 }
 
 /// Thread-safe holder for the latest sweep's status snapshot. The `GapTracker`
@@ -390,6 +402,11 @@ impl ProjectionReconcileState {
         s.divergent_anchor = divergent_anchor;
         s.healed_total = s.healed_total.saturating_add(counts.completed);
         s.sweeps = s.sweeps.saturating_add(1);
+        s.exhausted = counts.exhausted;
+        // The gap ledger converging is necessary but not sufficient: rows held
+        // locally under an anchor no peer advertises are divergence this sweep
+        // did not resolve, so they defeat convergence on their own.
+        s.converged = counts.converged && divergent_anchor == 0;
     }
 }
 
@@ -1781,6 +1798,84 @@ mod tests {
         assert_eq!(s2.sweeps, 2);
         assert_eq!(s2.completed, 1);
         assert_eq!(s2.divergent_anchor, 0);
+    }
+
+    #[tokio::test]
+    async fn a_sweep_with_divergent_anchors_is_not_converged() {
+        // The live beta shape: every gap healed and the retry budget untouched,
+        // but rows sit locally under an anchor no peer advertises. `caught_up`
+        // says the sweep ended; it does NOT say this peer holds what its peers
+        // hold. divergent_anchor alone must defeat convergence.
+        let state = ProjectionReconcileState::new();
+        state
+            .publish_sweep(
+                GapCounts {
+                    pending: 0,
+                    completed: 4,
+                    failed: 0,
+                    caught_up: true,
+                    exhausted: 0,
+                    converged: true, // the GAP LEDGER converged...
+                },
+                3,
+                1860, // ...but 1860 rows diverge, so the PEER did not.
+            )
+            .await;
+
+        let s = state.status().await;
+        assert!(s.caught_up, "the sweep did finish");
+        assert_eq!(s.divergent_anchor, 1860);
+        assert_eq!(s.exhausted, 0);
+        assert!(
+            !s.converged,
+            "divergent anchors mean this peer does NOT hold what its peers hold"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_sweep_that_abandoned_every_gap_is_caught_up_but_not_converged() {
+        // The live beta shape from the other end: healedTotal stays 0 across
+        // sweeps while gaps exhaust their retry budget. caught_up flips true;
+        // converged must not.
+        let state = ProjectionReconcileState::new();
+        state
+            .publish_sweep(
+                GapCounts {
+                    pending: 0,
+                    completed: 0,
+                    failed: 61,
+                    caught_up: true,
+                    exhausted: 61,
+                    converged: false,
+                },
+                3,
+                0,
+            )
+            .await;
+
+        let s = state.status().await;
+        assert!(s.caught_up);
+        assert_eq!(s.exhausted, 61);
+        assert_eq!(
+            s.healed_total, 0,
+            "22 sweeps, healedTotal 0 — the live shape"
+        );
+        assert!(!s.converged);
+    }
+
+    #[test]
+    fn status_serializes_converged_and_exhausted_as_camel_case() {
+        // Wire contract: p2p-status-view.schema.json sets
+        // additionalProperties:false on projectionReconcile, so these names
+        // must match the schema exactly or the contract test rejects them.
+        let s = ProjectionReconcileStatus {
+            exhausted: 61,
+            converged: false,
+            ..Default::default()
+        };
+        let v = serde_json::to_value(&s).unwrap();
+        assert_eq!(v["exhausted"], serde_json::json!(61));
+        assert_eq!(v["converged"], serde_json::json!(false));
     }
 
     #[test]

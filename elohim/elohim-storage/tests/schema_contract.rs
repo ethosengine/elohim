@@ -299,6 +299,10 @@ fn p2p_status_view_matches_schema() {
             divergent_anchor: 1,
             healed_total: 9,
             sweeps: 3,
+            // 1 pending + 1 divergent anchor ⇒ this peer has NOT converged,
+            // even though nothing exhausted its retry budget.
+            exhausted: 0,
+            converged: false,
         }),
         sync_paused: false,
         dedup_unique_len: 42,

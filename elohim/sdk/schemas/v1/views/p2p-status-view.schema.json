@@ -129,17 +129,30 @@
             "peersAsked",
             "divergentAnchor",
             "healedTotal",
-            "sweeps"
+            "sweeps",
+            "exhausted",
+            "converged"
           ],
           "properties": {
             "pending": { "type": "integer" },
             "completed": { "type": "integer" },
             "failed": { "type": "integer" },
-            "caughtUp": { "type": "boolean" },
+            "caughtUp": {
+              "type": "boolean",
+              "description": "This SWEEP ended: every discovered gap was healed OR exhausted its retry budget. NOT a convergence signal — use `converged`."
+            },
             "peersAsked": { "type": "integer" },
             "divergentAnchor": { "type": "integer" },
             "healedTotal": { "type": "integer" },
-            "sweeps": { "type": "integer" }
+            "sweeps": { "type": "integer" },
+            "exhausted": {
+              "type": "integer",
+              "description": "Gaps abandoned at max_retries this sweep — healed nothing, retried no more."
+            },
+            "converged": {
+              "type": "boolean",
+              "description": "This peer holds what its peers advertised: pending==0 AND exhausted==0 AND divergentAnchor==0. Strictly stronger than caughtUp; an SLO may be offered over this field, not that one."
+            }
           },
           "additionalProperties": false
         },
