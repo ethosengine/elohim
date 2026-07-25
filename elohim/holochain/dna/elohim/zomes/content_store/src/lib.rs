@@ -12809,6 +12809,79 @@ pub fn get_rea_commitment(id: String) -> ExternResult<Option<ReaCommitmentOutput
     }
 }
 
+/// The EPR scopes THIS agent has committed to steward, read from its OWN
+/// source chain.
+///
+/// ## Why a chain query and not `get_links`
+///
+/// `get_links` / `get` default to `GetStrategy::Network`, whose own doc says:
+/// *"If the current agent is an authority for this hash, this call will not go
+/// to the network."* Every node here runs FULL ARC (`target_arc_factor`
+/// defaults to 1), so every node is an authority for every hash — meaning every
+/// `get_links` on this fleet is, in practice, a LOCAL read. A miss is therefore
+/// not evidence the data is absent; it means gossip has not delivered the op
+/// yet. That is why a steward could not discover its own obligations through
+/// the anchor index while the peer that authored them was reachable the whole
+/// time.
+///
+/// `query()` reads the caller's own source chain, which is always present and
+/// needs no gossip. So the AUTHORIZATION leg — "what did I promise to hold?" —
+/// is immune to the gap that breaks cross-peer discovery. This deliberately
+/// mirrors `imagodei::qahal_coordinator::get_my_household_collective_cids`,
+/// which took the same turn for the same reason.
+///
+/// ## The division of labour this serves
+///
+/// The DHT notarizes the MANIFEST — the commitment is the witnessed promise
+/// that this agent stewards this EPR. It does not move bytes; it is not on the
+/// hot path. The libp2p/iroh/sqlite dataplane answers the resulting request
+/// performantly. So this returns scopes, not content: it tells the dataplane
+/// WHAT this node has undertaken to hold, and the dataplane decides how to go
+/// get it.
+///
+/// Only LIVE custody undertakings count — a finished or cancelled commitment is
+/// a promise discharged or withdrawn, and re-fetching for it would be work no
+/// one asked for. Best-effort per record: an undecodable entry is skipped
+/// rather than failing the sweep, matching the household-cid precedent.
+#[hdk_extern]
+pub fn get_my_custody_epr_scopes(_: ()) -> ExternResult<Vec<String>> {
+    let records = query(ChainQueryFilter::new().include_entries(true))?;
+    let mut scopes: Vec<String> = Vec::new();
+    for record in &records {
+        let Some(c) = record.entry().to_app_option::<Commitment>().ok().flatten() else {
+            continue;
+        };
+        if c.finished || c.state == "cancelled" {
+            continue;
+        }
+        if !action_is_custody(&c.action) {
+            continue;
+        }
+        for scope in decode_in_scope_of(&c.in_scope_of_json) {
+            if !scopes.contains(&scope) {
+                scopes.push(scope);
+            }
+        }
+    }
+    Ok(scopes)
+}
+
+/// Custody-bearing REA actions — the ones that mean "I undertake to HOLD this",
+/// as opposed to the many commitment actions that describe other economic
+/// intents. Kept narrow on purpose: widening it silently enlarges what every
+/// steward starts fetching.
+fn action_is_custody(action: &str) -> bool {
+    matches!(action, "custody-blob" | "project-epr" | "provide")
+}
+
+/// `in_scope_of_json` is a JSON array of scope strings, written by
+/// `create_rea_commitment`. Tolerant by design: a malformed or absent value
+/// yields no scopes rather than an error, so one bad row cannot stop a steward
+/// from discovering the rest of its obligations.
+fn decode_in_scope_of(json: &str) -> Vec<String> {
+    serde_json::from_str::<Vec<String>>(json).unwrap_or_default()
+}
+
 /// Update an REA Commitment's state field (e.g., transition to "cancelled").
 ///
 /// Substrate-correct PATCH path for /api/v1/commitments/{id} per
