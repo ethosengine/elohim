@@ -177,6 +177,33 @@ else
     elapsed=0
     converged=0
     echo "  … MISMATCH on ${HOST} ${SLUG}: declared=${EXPECTED_HASH} served=${served_hash:-<absent>} — doorway may still be converging (reconcile tick ~300s); entering convergence window (up to ${PROJHEAD_CONVERGE_WINDOW}s, re-probing every ${PROJHEAD_CONVERGE_INTERVAL}s)" >&2
+
+    # ACTUATE the reconcile instead of only waiting for it.
+    #
+    # `POST /admin/ssr-bundle/refresh` is documented as "the actuation twin of
+    # the background reconcile tick": it re-resolves each slug's declared
+    # serverBlobHash, re-materializes on mismatch, and hot-swaps the registry
+    # entry IN PLACE — converging without a doorway restart. It is idempotent
+    # (an already-current slug reports `current` and does no work), degrades
+    # safely (`failed`/`unreachable` keep the old bundle), and is the same
+    # no-auth Cat-C operator-seat class as /admin/steward-peers/refresh.
+    #
+    # Waiting passively for the host's own tick is what made this probe fail
+    # for NINE consecutive builds (elohim #1632→#1640, both elohim.host slugs):
+    # a doorway whose tick is not converging never converges just because we
+    # watched it for 400s, and the failure text then told a human to "trigger a
+    # restart" — a kubectl action CI cannot take. Asking the host to reconcile
+    # is the action the message was really describing, and the pipeline can do
+    # it itself. Non-gating: a refresh that fails or 404s (older doorway
+    # without the route) leaves the convergence ladder below exactly as it was.
+    refresh_code=$(curl -sS -o /tmp/ssr-refresh.$$ -w '%{http_code}' --max-time 30 \
+        -X POST "${BASE_URL}/admin/ssr-bundle/refresh" 2>/dev/null || echo 000)
+    if [ "${refresh_code}" = "200" ]; then
+        echo "  ↻ asked ${HOST} to reconcile its SSR bundles: $(head -c 400 /tmp/ssr-refresh.$$ 2>/dev/null)" >&2
+    else
+        echo "  ↻ ssr-bundle refresh on ${HOST} returned ${refresh_code} (non-gating — falling back to the passive convergence window)" >&2
+    fi
+    rm -f /tmp/ssr-refresh.$$
     while [ "${elapsed}" -lt "${PROJHEAD_CONVERGE_WINDOW}" ]; do
         sleep "${PROJHEAD_CONVERGE_INTERVAL}"
         elapsed=$((elapsed + PROJHEAD_CONVERGE_INTERVAL))
