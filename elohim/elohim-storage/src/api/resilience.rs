@@ -102,19 +102,34 @@ async fn handle_get_resilience(
     ctx: &AppContext,
     graph_engine: Option<&std::sync::Arc<crate::graph::engine::GraphEngine>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    // graph-native branch: derive resilience snapshot from STEWARDS + MEMBER_OF edges.
-    // Returns ResilienceSnapshotView (graph shape). Full composition with relational
-    // data (diversity, placement gaps) lands in the follow-on sprint.
-    #[cfg(feature = "graph-native")]
-    if let Some(engine) = graph_engine {
-        return match crate::graph_views::shefa::resilience_snapshot::build(engine, content_id) {
-            Ok(view) => Ok(response::ok(&view)),
-            Err(e) => Ok(response::internal_error(&format!(
-                "graph resilience_snapshot build failed: {e}"
-            ))),
-        };
-    }
-    let _ = graph_engine; // suppress unused warning on non-graph builds
+    // RETIRED 2026-07-25: this route used to short-circuit into
+    // `graph_views::shefa::resilience_snapshot::build` whenever the (default-on)
+    // `graph-native` feature supplied an engine. That branch could never answer:
+    //   (1) it counts `epr_edge` rows with rel_type 'STEWARDS'/'MEMBER_OF', and
+    //       nothing in this repo ever writes such an edge — `GraphProjector::
+    //       upsert_edge` is only reached from `head.relationships[].rel_type` and
+    //       a hard-coded "SUPERSEDES". Stewards are projected onto a *different*
+    //       relation (`epr_shefa.stewards`), which an `epr_edge` query cannot see;
+    //   (2) it queried by content SLUG against a relation keyed by CID.
+    // Two independent guarantees of zero, so the card reported
+    // `stewardingCollectives: 0, distributionState: "unmeasured"` on every node —
+    // including nodes whose relational tables held the answer. Worse, the graph
+    // shape (`ResilienceSnapshotView`) is not the shape this route's only frontend
+    // consumer reads: epr-relationship-card's `isRenderableResilience` guard
+    // requires `stewardship.stewardCount` / `distribution.distinctPeers` /
+    // `health.canSurviveFailures` — the `ResilienceView` the relational path below
+    // returns — so the badge was silently unrenderable rather than merely zero.
+    //
+    // `distributionState: "unmeasured"` was the tell: the graph builder derives it
+    // from `stewarding_count > 0`, so an empty query is indistinguishable from a
+    // measurement that never ran. The relational path derives the same field from
+    // manifest existence, which is the honest semantics.
+    //
+    // Re-landing a graph-backed card needs three things this branch never had: a
+    // slug→CID resolve, a steward query against `epr_shefa.stewards`, and a
+    // projector that emits MEMBER_OF edges at all. Until then the relational
+    // computation below is the only one that can answer, so it is the one we serve.
+    let _ = graph_engine; // retained in the signature for the graph-backed re-land
 
     let mut conn = get_conn(pool)?;
 

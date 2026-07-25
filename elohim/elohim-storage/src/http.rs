@@ -5477,6 +5477,22 @@ impl HttpServer {
             Some(patch),
         )?;
 
+        // Pattern Z.B.1 bridge — the SAME refresh the direct-PATCH arm applies
+        // after ContentService::update. `stamp_declared_head` mirrors blob_cid
+        // into blob_hash on the row, but the `/apps/{slug}/{file}` fast-path
+        // answers from the in-memory `slug_index`, which is only ever built by
+        // `load_slug_index()` (at boot, and after a direct PATCH). Without this
+        // refresh a peer that ADOPTS a declared head reports the new head on
+        // GET /db/content/{id}/head while still serving the OLD bundle bytes
+        // until its next restart — converged on the wire, divergent in what the
+        // human actually sees. Adopting the declaration is exactly the moment
+        // that split must not open, so refresh here too.
+        drop(conn);
+        self.load_slug_index().await;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
         // 200 with the fresh HEAD answer, re-read from the stamped row — same
         // response shape as the single-author declare handler (ContentHeadView).
         match db::content_diesel::get_content_with_tags(
