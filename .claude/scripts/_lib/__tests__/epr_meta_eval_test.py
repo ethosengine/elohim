@@ -106,3 +106,30 @@ with tempfile.TemporaryDirectory() as _td:
           epr_meta.load_meta(big) == {} and epr_meta.load_meta(deep) == {})
 
 print(f"\n  {_passed} assertions passed ✅")
+
+# ── Unresolvable validator must not ESCALATE a rule above its declared class ──
+# An unregistered validator routes to review so an unanalyzable BLOCKING rule can
+# never silently soften (the S5 soundness law, epr_seal.py). But the same branch
+# was also hardening rules whose declared class is ADVISORY: every `class: inject`
+# rule naming an unregistered validator emitted `ask`, which blocks the agent and
+# waits on a human. That is the inversion in the other direction — the rule's own
+# text says "it never blocks" while it blocked. Advisory rules must stay advisory
+# (warn the agent); only blocking rules route to review.
+_UNREG = "epr:validator-does-not-exist"
+
+_inject_rule = {"id": "advisory-with-phantom-validator", "class": "inject",
+                "validator": _UNREG, "when": {"write": "*.rs"}, "why": "advisory text"}
+v = epr_meta.combine(epr_meta.evaluate(_merged([_inject_rule]),
+                                       {"path": "src/x.rs", "content": "fn main() {}"}))
+check("inject rule w/ unregistered validator does NOT escalate to ask/deny",
+      v is None or v.cls == "inject")
+
+for _blocking in ("ask", "deny"):
+    _r = {"id": f"blocking-{_blocking}", "class": _blocking, "validator": _UNREG,
+          "when": {"write": "*.rs"}, "why": "gate"}
+    _v = epr_meta.combine(epr_meta.evaluate(_merged([_r]),
+                                            {"path": "src/x.rs", "content": "fn main() {}"}))
+    check(f"{_blocking} rule w/ unregistered validator STILL routes to review (S5 law)",
+          _v is not None and _v.cls in ("ask", "deny"))
+
+print(f"\n{_passed} checks passed")

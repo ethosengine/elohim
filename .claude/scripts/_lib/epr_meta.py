@@ -348,11 +348,26 @@ def _eval_rule(rule: dict, write: dict) -> Verdict | None:
             # declaration, NOT unresolvable: skip clean, never downgrade the rule.
             return None
         if ref not in REFERENCE_VALIDATORS:
-            # An unresolvable reference must never soften to inject (the pre-slice soundness
-            # inversion) and must not hard-deny at authoring polarity — it ROUTES.
-            return Verdict("ask", f"validator `{ref}` not registered — unresolvable reference "
-                                  f"routes to review rather than guessing. {why}", rid,
-                           "unresolvable-validator")
+            # An unresolvable reference must never SOFTEN a rule that was declared to gate
+            # (the pre-slice soundness inversion): a `class: ask|deny` rule whose validator
+            # cannot be resolved ROUTES to review rather than guessing.
+            #
+            # It must not HARDEN an advisory one either. A `class: inject` rule is declared
+            # non-blocking by its author — escalating it to `ask` stops the agent and waits
+            # on a human for a rule whose own text says it never blocks (the `p2p/**` rules:
+            # peer-fallback-invariant, heal-fills-never-moves, dataplane-guide-star,
+            # interface-first-reuse-*, all `class: inject`, every one of them gating every
+            # edit to elohim-storage). That is the same soundness inversion pointing the
+            # other way, and it costs agency instead of safety. The advisory text still
+            # reaches the agent — it warns without blocking, which is the rule's whole intent.
+            #
+            # Clamp to the DECLARED class: route only what was already meant to gate.
+            if _SEVERITY.get(cls, 0) >= _SEVERITY["ask"]:
+                return Verdict("ask", f"validator `{ref}` not registered — unresolvable "
+                                      f"reference routes to review rather than guessing. {why}",
+                               rid, "unresolvable-validator")
+            return Verdict(cls, f"validator `{ref}` not registered — advisory only, not "
+                                f"evaluated. {why}", rid, "unresolvable-validator")
         if REFERENCE_VALIDATORS[ref](write):
             return Verdict(cls, f"validator `{ref}` flagged this write. {why}", rid,
                            VALIDATOR_REFER_REASONS.get(ref))
