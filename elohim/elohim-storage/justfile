@@ -117,5 +117,21 @@ fmt-check:
 clean:
     cargo clean
 
-# Quality gate: fmt-check + clippy + test
-gate: fmt-check clippy test
+# Guard against the diesel migration timestamp-prefix collision:
+# embed_migrations! keys on the YYYY-MM-DD-HHMMSS prefix and SILENTLY keeps
+# only ONE of any two dirs sharing it. That hid a never-created
+# challenge_outcomes table for ~3 months (cured 2026-07-26). Any duplicate
+# prefix here means one of the colliding migrations will never run.
+migration-hygiene:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dupes="$(ls -d migrations/*/ 2>/dev/null | sed 's#.*/\([0-9-]*\)_.*#\1#' | sort | uniq -d)"
+    if [ -n "$dupes" ]; then
+        echo "✗ duplicate diesel migration timestamp prefix(es) — embed_migrations! will silently drop one:" >&2
+        echo "$dupes" >&2
+        exit 1
+    fi
+    echo "✓ no duplicate migration timestamp prefixes"
+
+# Quality gate: migration-hygiene + fmt-check + clippy + test
+gate: migration-hygiene fmt-check clippy test
