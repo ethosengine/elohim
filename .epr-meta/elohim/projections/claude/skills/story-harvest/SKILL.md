@@ -23,6 +23,26 @@ This skill applies the same loop to software: **bug -> design -> proven capabili
 - **After debugging**: When systematic-debugging resolves a root cause and the fix is verified.
 - **Manual**: `/story-harvest` at any time.
 
+## The Maintainer Role — Atom Perspective
+
+Every agent touching a value chain carries a second, standing role: **maintainer of the story-graph itself**. The chains you work inside (saga chapters, valueflow commitments, a2o scenarios) are chains of content-addressed atoms; a seam you discover mid-flight is not a log line for your report — it is a **missing node between two named atoms** of an existing chain.
+
+This role fires MID-FLIGHT, not only at branch-finish:
+
+- **Pipeline discovery**: your diagnosis reveals that a single asserted truth is actually a pipeline of truths (the 2026-07-26 precedent: ch05 "agreement exists" proved to be an eight-station chain — consent pin → desired-set → notarize → read-back → bounds → announce → graduate → mirror). The refinement move is **station decomposition**: keep the chapter's finish-line assertion untouched (it IS the spec), add station scenarios *before* it, each asserting one observable intermediate truth. Earned progress becomes visible without weakening the spec, and the frontier line gains resolution.
+- **Interstitial discovery**: an unnamed precondition sits between two chapters (precedent: "each doorway's conductor witnesses the content it serves" — the seam between upload and heads-converge that could only be found by log archaeology until it was minted as a node).
+
+**Report shape when you lack a2o write access** (most cure agents): state the seam in node terms, ready to mint —
+
+```
+chain: <recipe/chapter id>
+between: <upstream node> -> <downstream node>
+missing node: <one-line assertion, with the probe that measures it>
+current state: <green|red> by <live evidence>
+```
+
+The orchestrator (or a story-refinement leg) mints it; `epr flow project` re-mints commitments from the recipe automatically, so a minted node becomes a measured node on the next run. A seam reported in this shape costs the next sprint one measurement; a seam left in prose costs it an excavation.
+
 ## The Discovery Loop
 
 ```
