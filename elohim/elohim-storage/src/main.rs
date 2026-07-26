@@ -1578,18 +1578,41 @@ async fn async_main(
                                                 }
                                             };
                                             use elohim_storage::services::provide_reconcile::ProvideEligibility;
-                                            let head_refs: Vec<String> = pins.iter().map(|p| p.head_ref.clone()).collect();
+                                            // Pins carry `epr:`-prefixed head_refs while the content
+                                            // table keys bare ids — query by the bare id but keep every
+                                            // derived set keyed by the pin's OWN head_ref form, because
+                                            // derive_desired matches sets against `p.head_ref` verbatim.
+                                            // (Raw head_refs here made `present` empty for every pin,
+                                            // so the author tick never fired for anything.)
+                                            let id_for = |h: &str| h.strip_prefix("epr:").unwrap_or(h).to_string();
+                                            let bare_ids: Vec<String> =
+                                                pins.iter().map(|p| id_for(&p.head_ref)).collect();
                                             // Caught-up proxy: reach-agnostic local presence.
-                                            let present = elohim_storage::db::content_diesel::content_ids_present(
-                                                &mut conn, &app_ctx, &head_refs,
+                                            let present_ids = elohim_storage::db::content_diesel::content_ids_present(
+                                                &mut conn, &app_ctx, &bare_ids,
                                             )
                                             .unwrap_or_default();
+                                            let present: std::collections::HashSet<String> = pins
+                                                .iter()
+                                                .filter(|p| present_ids.contains(&id_for(&p.head_ref)))
+                                                .map(|p| p.head_ref.clone())
+                                                .collect();
                                             // Eligibility gate: per-content (head_ref, reach)
                                             // for present content, classified reach-aware.
-                                            let candidates: Vec<(String, String)> = elohim_storage::db::content_diesel::content_reaches_for_ids(
-                                                &mut conn, &app_ctx, &head_refs,
+                                            let candidates_by_id: Vec<(String, String)> = elohim_storage::db::content_diesel::content_reaches_for_ids(
+                                                &mut conn, &app_ctx, &bare_ids,
                                             )
                                             .unwrap_or_default();
+                                            let reach_by_id: std::collections::HashMap<String, String> =
+                                                candidates_by_id.iter().cloned().collect();
+                                            let candidates: Vec<(String, String)> = pins
+                                                .iter()
+                                                .filter_map(|p| {
+                                                    reach_by_id
+                                                        .get(&id_for(&p.head_ref))
+                                                        .map(|r| (p.head_ref.clone(), r.clone()))
+                                                })
+                                                .collect();
                                             let eligible = eligibility.eligible_head_refs(&candidates);
                                             // Stage B: content reach per head_ref → threaded onto
                                             // the desired provide so the author declares the
