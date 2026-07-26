@@ -59,6 +59,7 @@ pub mod events;
 pub mod exchange_service;
 pub mod federator;
 pub mod floor_protections;
+pub mod gate_challenge_namespace_backfill; // level-triggered heal: re-file dark gate-challenge/outcome projections into the canonical namespace
 pub mod genesis_self_heal; // OPERATOR-AUTHORIZED genesis bootstrap — self-heal own NULL agent_pub_key from own cell key (gated, NULL-only)
 pub mod gossip_flood;
 pub mod governance_health;

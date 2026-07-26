@@ -62,6 +62,55 @@ pub fn upsert(conn: &mut SqliteConnection, row: &ChallengeOutcomeRow) -> QueryRe
 }
 
 // ---------------------------------------------------------------------------
+// Projection-namespace repair (h_app_id class)
+// ---------------------------------------------------------------------------
+
+/// `(app_id, outcome_id)` of rows filed under a namespace OTHER than
+/// `canonical_app_id`, oldest-decided first, capped at `limit`.
+///
+/// The candidate set for [`crate::services::gate_challenge_namespace_backfill`].
+/// Read namespace-blind by construction — that is the whole point: every other
+/// reader in this module scopes to one namespace and therefore cannot see these
+/// rows at all.
+pub fn foreign_namespace_rows(
+    conn: &mut SqliteConnection,
+    canonical_app_id: &str,
+    limit: i64,
+) -> QueryResult<Vec<(String, String)>> {
+    challenge_outcomes::table
+        .filter(challenge_outcomes::app_id.ne(canonical_app_id))
+        .select((challenge_outcomes::app_id, challenge_outcomes::outcome_id))
+        .order(challenge_outcomes::decided_at.asc())
+        .limit(limit)
+        .load::<(String, String)>(conn)
+}
+
+/// Re-file one mis-filed row into `canonical_app_id`, keyed by the FULL
+/// composite PRIMARY KEY `(app_id, outcome_id)`.
+///
+/// Deliberately narrow: both key halves are supplied by the caller from a row it
+/// just observed, never a blanket `WHERE app_id = 'x'` sweep — a row this node
+/// did not project must never be moved between namespaces as collateral.
+///
+/// The caller MUST establish that no row already occupies
+/// `(canonical_app_id, outcome_id)`; `app_id` is half the key here, so the
+/// update would otherwise collide with a legitimately-filed twin.
+pub fn refile_namespace(
+    conn: &mut SqliteConnection,
+    from_app_id: &str,
+    outcome_id: &str,
+    canonical_app_id: &str,
+) -> QueryResult<usize> {
+    diesel::update(
+        challenge_outcomes::table
+            .filter(challenge_outcomes::app_id.eq(from_app_id))
+            .filter(challenge_outcomes::outcome_id.eq(outcome_id)),
+    )
+    .set(challenge_outcomes::app_id.eq(canonical_app_id))
+    .execute(conn)
+}
+
+// ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
 

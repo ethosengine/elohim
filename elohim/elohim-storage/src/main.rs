@@ -1555,10 +1555,50 @@ async fn async_main(
                                                 "mishpat_mirror_backfill failed (non-fatal; retries next boot)"
                                             ),
                                         }
+
+                                        // Same defect class, two more tables.
+                                        // The SAME mis-supplied app_id was
+                                        // stamped onto `gate_decision_challenges`
+                                        // and `challenge_outcomes`, whose readers
+                                        // (`/db/gate-decision-challenges`,
+                                        // `/db/challenge-outcomes`) scope
+                                        // `ctx.h_app_id` = "lamad". Those two
+                                        // tables key on `(app_id, <id>)`, so a
+                                        // mis-filed row is invisible but NOT
+                                        // insert-blocking, and there is no local
+                                        // desired-state ledger to insert from —
+                                        // hence a re-file-only sweep (see the
+                                        // module doc). Runs on the same boot
+                                        // tick, same pool, same canonical value.
+                                        match elohim_storage::services::gate_challenge_namespace_backfill::run_once(
+                                            &mut conn, &canonical,
+                                        ) {
+                                            Ok(report) if report.healed_anything() => info!(
+                                                challenges_examined = report.challenges_examined,
+                                                challenges_refiled = report.challenges_refiled,
+                                                challenges_shadowed = report.challenges_shadowed,
+                                                outcomes_examined = report.outcomes_examined,
+                                                outcomes_refiled = report.outcomes_refiled,
+                                                outcomes_shadowed = report.outcomes_shadowed,
+                                                "gate_challenge_namespace_backfill: gate-challenge projections re-filed into the canonical projection namespace"
+                                            ),
+                                            Ok(report) if report.saw_anything() => info!(
+                                                challenges_shadowed = report.challenges_shadowed,
+                                                outcomes_shadowed = report.outcomes_shadowed,
+                                                "gate_challenge_namespace_backfill: mis-filed rows observed but all shadowed by canonical twins (left in place)"
+                                            ),
+                                            Ok(_) => info!(
+                                                "gate_challenge_namespace_backfill: gate-challenge projections already coherent (no-op)"
+                                            ),
+                                            Err(e) => warn!(
+                                                error = %e,
+                                                "gate_challenge_namespace_backfill failed (non-fatal; retries next boot)"
+                                            ),
+                                        }
                                     }
                                     Err(e) => warn!(
                                         error = %e,
-                                        "mishpat_mirror_backfill skipped: db pool unavailable"
+                                        "namespace heal sweeps skipped: db pool unavailable"
                                     ),
                                 }
                             });
