@@ -322,12 +322,27 @@ lazy_static! {
     /// `timeout_exhausted` (still wedged after retries) IS the diagnosis, and it was
     /// previously invisible in Prometheus. labels: stream = "rea" | "content";
     /// outcome = "healed" | "timeout_retried" | "timeout_exhausted" | "missing"
-    ///         | "failed".
+    ///         | "failed" | "refreshed" | "refused_declared" | "refused_stale"
+    ///         | "no_row".
     ///
-    /// NOT a total-row-accounting metric: benign content resolutions
-    /// (SkippedDeclared / SkippedStale / NoRow) are deliberately uncounted so
-    /// the cure signal is not inflated — sum-of-outcomes < rows-attempted on
-    /// the content stream by design. Dashboard math must not assume equality.
+    /// The last four are CONTENT-only and were previously uncounted "so the cure
+    /// signal is not inflated". That reasoning inverted: giving each its own label
+    /// keeps `healed` clean (label-filtered) while making the two questions an
+    /// operator actually asks answerable from Prometheus alone —
+    ///
+    /// - **Is the heal starved, erroring, or refusing?** `refused_declared` /
+    ///   `refused_stale` are correct refusals (heal fills-never-moves); a backlog
+    ///   made of these is HONEST and permanent until a canonical channel fires.
+    ///   `timeout_*` / `failed` / `missing` are the not-refusing classes.
+    /// - **Is the heal converging or SPINNING?** `healed` means the declared HEAD
+    ///   actually moved; `refreshed` means the own conductor answered the head the
+    ///   row already held, so nothing converged. A high `refreshed` rate against a
+    ///   non-zero `divergent_anchor` means the peers hold different roots and heal
+    ///   can never close it (live 2026-07-26: 1578 heal events in 12h on matthew,
+    ///   `elohim-host-landing`'s head never moved).
+    ///
+    /// Still NOT total-row-accounting: `Refreshed` rows also re-enqueue next sweep,
+    /// so dashboard math must not assume outcomes partition attempts exactly.
     pub static ref PROJECTION_HEAL_OUTCOMES: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_projection_heal_outcomes_total",

@@ -194,6 +194,13 @@ Then(
  */
 Then(
   'within {int} seconds doorway {string} has at least one active {string} commitment',
+  // Cucumber's default step timeout (30s) is shorter than this step's own
+  // 60s poll deadline (timeoutMs below) — without an explicit per-step
+  // timeout, cucumber kills the step at 30s before the poll's own governor
+  // ever fires (edge #1233: "function timed out, ensure the promise
+  // resolves within 30000 milliseconds"). 75s gives the 60s poll a margin
+  // over cucumber's own timer rather than racing it exactly.
+  { timeout: 75_000 },
   async function (this: E2EWorld, seconds: number, peerName: string, action: string) {
     const doorway = this.getDoorway(peerName);
     await retry(

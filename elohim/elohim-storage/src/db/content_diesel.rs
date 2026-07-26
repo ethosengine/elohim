@@ -963,7 +963,11 @@ pub fn stamp_declared_head(
         patch,
         StampMode::Declare,
     )
-    .map(|o| o == StampOutcome::Stamped)
+    // `true` means "there was a row and we wrote it" — BOTH a converging stamp and
+    // a same-head refresh qualify (this bool predates the Stamped/Refreshed split
+    // and its callers only ask "was there a row to stamp?"). Callers that need to
+    // know whether the HEAD actually MOVED must use `stamp_declared_head_mode`.
+    .map(|o| matches!(o, StampOutcome::Stamped | StampOutcome::Refreshed))
 }
 
 /// How a declared-head stamp may interact with an already-declared row.
@@ -1000,8 +1004,25 @@ pub enum StampMode {
 /// Outcome of [`stamp_declared_head_mode`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StampOutcome {
-    /// Row updated.
+    /// Row updated AND the declared HEAD actually MOVED — an undeclared row was
+    /// filled, or a declared row was advanced to a different action. This is the
+    /// only outcome that represents CONVERGENCE.
     Stamped,
+    /// Row updated but the declared HEAD did NOT move: the row already carried
+    /// this exact action. The write still did real work (value-field patch
+    /// refresh, and — load-bearing — recording `declared_head_at` on a row whose
+    /// ordering was NULL), but nothing converged.
+    ///
+    /// Distinguished from [`StampOutcome::Stamped`] because conflating them made
+    /// the heal plane illegible: a peer whose own conductor answers with the head
+    /// the row ALREADY holds re-stamps it every sweep and reported each one as
+    /// `HEALED` (live 2026-07-26: matthew logged 1578 `HEALED content anchor`
+    /// lines in 12h while `elohim-host-landing`'s head never moved —
+    /// `updated_at` advanced 05:33:54 → 05:49:00 on an unchanged
+    /// `uhCkkh_Gb…`). Cross-peer divergence cannot be healed from the OWN
+    /// conductor when the two peers hold genuinely different roots; counting the
+    /// no-op as a cure hid that permanently.
+    Refreshed,
     /// GapFill mode: row already carries a DIFFERENT declared head — left
     /// untouched (canonical channels own moving it).
     SkippedDeclared,
@@ -1045,6 +1066,14 @@ pub fn stamp_declared_head_mode(
     let moving_declared_row = matches!(
         declared.as_deref(),
         Some(current) if !current.is_empty() && current != head_action_hash
+    );
+
+    // The row already carries EXACTLY this head — the write below is a refresh
+    // (patch fields + ordering backfill), not a convergence. Captured BEFORE the
+    // update so the outcome can tell the caller which of the two happened.
+    let same_declared_head = matches!(
+        declared.as_deref(),
+        Some(current) if current == head_action_hash
     );
 
     match mode {
@@ -1111,7 +1140,11 @@ pub fn stamp_declared_head_mode(
         apply_content_patch_fields(conn, ctx, id, &patch)?;
     }
 
-    Ok(StampOutcome::Stamped)
+    if same_declared_head {
+        Ok(StampOutcome::Refreshed)
+    } else {
+        Ok(StampOutcome::Stamped)
+    }
 }
 
 // ============================================================================
@@ -3022,7 +3055,8 @@ mod tests {
             "GapFill must not resurrect a superseded head over the adopted canonical"
         );
 
-        // Same-head GapFill re-stamp is an idempotent refresh, not a skip.
+        // Same-head GapFill re-stamp is an idempotent REFRESH — it writes, but the
+        // HEAD does not move, so it is `Refreshed`, never `Stamped` (convergence).
         let same = stamp_declared_head_mode(
             &mut conn,
             &ctx,
@@ -3033,7 +3067,7 @@ mod tests {
             StampMode::GapFill,
         )
         .unwrap();
-        assert_eq!(same, StampOutcome::Stamped);
+        assert_eq!(same, StampOutcome::Refreshed);
 
         // Declare mode (canonical channels) still moves the declared head.
         let moved = stamp_declared_head_mode(
@@ -3116,7 +3150,8 @@ mod tests {
         .unwrap();
         assert_eq!(unknown, StampOutcome::SkippedStale);
 
-        // Same-head refresh is idempotent, never a skip.
+        // Same-head refresh is idempotent, never a skip — and never `Stamped`:
+        // the HEAD did not move, so it reports `Refreshed` (no convergence).
         let same = stamp_declared_head_mode(
             &mut conn,
             &ctx,
@@ -3127,7 +3162,7 @@ mod tests {
             StampMode::HealCanonical,
         )
         .unwrap();
-        assert_eq!(same, StampOutcome::Stamped);
+        assert_eq!(same, StampOutcome::Refreshed);
 
         // A provably NEWER canonical answer moves the row forward — this is
         // exactly how a peer converges when the canonical link gossips in.
@@ -3170,6 +3205,79 @@ mod tests {
             stuck,
             StampOutcome::SkippedStale,
             "heal never gambles on unknown stored ordering"
+        );
+    }
+
+    /// The SPIN signature (live 2026-07-26): when two peers hold genuinely
+    /// different roots for the same id, each peer's own conductor keeps answering
+    /// with ITS OWN head — the head the row already holds. The stamp still writes
+    /// (patch refresh + ordering backfill) and `updated_at` advances, but the HEAD
+    /// never moves and the cross-peer divergence is untouched.
+    ///
+    /// This MUST report `Refreshed`, never `Stamped`. Conflating them is what let
+    /// matthew log 1578 `HEALED content anchor` lines in 12h while
+    /// `elohim-host-landing` sat on an unchanged `uhCkkh_Gb…` and elohim.host sat
+    /// on a different root — a spinning heal plane that read as a working one.
+    #[test]
+    fn same_head_restamp_is_refreshed_not_stamped_so_spin_is_legible() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let id = "epr:two-roots";
+        create_content(&mut conn, &ctx, mk_bundle(id)).unwrap();
+
+        // This peer adopts its own root (the fill — real convergence from empty).
+        let filled = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            id,
+            "uhCkk-own-root",
+            Some(1_000),
+            None,
+            StampMode::HealCanonical,
+        )
+        .unwrap();
+        assert_eq!(
+            filled,
+            StampOutcome::Stamped,
+            "filling an empty row converges"
+        );
+
+        // Every subsequent sweep: the peer advertises a DIFFERENT root, so this row
+        // is re-enqueued as divergent — but the own conductor answers `uhCkk-own-root`
+        // again. The write happens; the head does not move.
+        for sweep in 0..3 {
+            let spun = stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                id,
+                "uhCkk-own-root",
+                Some(1_000),
+                None,
+                StampMode::HealCanonical,
+            )
+            .unwrap();
+            assert_eq!(
+                spun,
+                StampOutcome::Refreshed,
+                "sweep {sweep}: a same-head re-stamp is a no-op refresh, NOT a heal"
+            );
+        }
+
+        // The head is exactly where it started — nothing converged.
+        let row = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-own-root"),
+            "the peer's divergent root was never adopted — only a canonical channel can do that"
+        );
+
+        // The legacy bool wrapper still reports `true` (there WAS a row and we
+        // wrote it) — the Stamped/Refreshed split must not change that contract.
+        assert!(
+            stamp_declared_head(&mut conn, &ctx, id, "uhCkk-own-root", Some(1_000), None).unwrap(),
+            "same-head refresh still counts as 'a row was written' for the bool callers"
         );
     }
 

@@ -12610,6 +12610,41 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/pins — the acquisition-pin consent surface. The handlers have
+        // been live on the node-local listener since the demand-autopin work
+        // (dispatch arms at the top of handle_request), but were never declared
+        // here, so no doorway could discover them: the resilience card's own
+        // call-to-action ("invite a household to help hold these") had no
+        // reachable lever from outside the cluster. POST is the explicit
+        // stewardship-acceptance act (a pin with provide intent feeds the
+        // provide loop's desired set); it carries auth_required like the sibling
+        // POST /api/v1/commitments.
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/pins")
+                .handler("list_pins")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/pins")
+                .handler("create_pin")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/pins/{epr_id}/pull")
+                .handler("epr_pull_status")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
+            Route::delete("/api/v1/pins/{id}")
+                .handler("remove_pin")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
         // /db/ — Structured local database (content, paths, relationships, etc.)
         // =====================================================================
         .route(

@@ -251,6 +251,30 @@ enum HealOutcomeKind {
     /// A non-transient error (decode/logic) or a projection-write failure — retried
     /// next sweep, but no in-leg retry (no free window fixes it).
     Failed,
+    /// Content arm, `StampMode::GapFill`: the conductor gave a FALLBACK (non-
+    /// canonical) answer and the row already carries a DIFFERENT declared head, so
+    /// heal left it to the canonical channels ([`StampOutcome::SkippedDeclared`]).
+    /// Not an error and not progress — the heal is REFUSING CORRECTLY.
+    RefusedDeclared,
+    /// Content arm, `StampMode::HealCanonical`: the conductor's CANONICAL answer is
+    /// not provably newer than the adopted head, so the heal kept the adopted head
+    /// ([`StampOutcome::SkippedStale`]). Also a correct refusal.
+    RefusedStale,
+    /// The local row vanished between the presence check and the stamp
+    /// ([`StampOutcome::NoRow`]) — resolved, not a conductor miss.
+    NoRow,
+    /// The stamp wrote, but the declared HEAD did not move: the row already held
+    /// the action the own conductor answered with
+    /// ([`StampOutcome::Refreshed`]). Real work (patch refresh + ordering
+    /// backfill) but NOT convergence — the peer-advertised anchor this row was
+    /// enqueued for is still divergent, and will be re-enqueued next sweep.
+    ///
+    /// A sustained high `refreshed` rate against a non-zero `divergent_anchor` is
+    /// the SPIN signature: the two peers hold genuinely different roots, the own
+    /// conductor keeps answering with its own, and no amount of healing can
+    /// converge them — only a canonical channel can. That diagnosis was
+    /// previously indistinguishable from real healing.
+    Refreshed,
 }
 
 impl HealOutcomeKind {
@@ -261,6 +285,10 @@ impl HealOutcomeKind {
             HealOutcomeKind::TimeoutExhausted => "timeout_exhausted",
             HealOutcomeKind::Missing => "missing",
             HealOutcomeKind::Failed => "failed",
+            HealOutcomeKind::RefusedDeclared => "refused_declared",
+            HealOutcomeKind::RefusedStale => "refused_stale",
+            HealOutcomeKind::NoRow => "no_row",
+            HealOutcomeKind::Refreshed => "refreshed",
         }
     }
 }
@@ -1501,6 +1529,26 @@ async fn heal_content(
                         },
                     );
                 }
+                Ok(crate::db::content_diesel::StampOutcome::Refreshed) => {
+                    // The own conductor answered with the head this row ALREADY
+                    // holds: the write refreshed value fields and backfilled the
+                    // declaration ordering, but the HEAD did not move — so the
+                    // peer-advertised divergence that enqueued this row is
+                    // UNCHANGED and will re-enqueue next sweep. Deliberately NOT
+                    // counted in `healed` and NOT logged as HEALED: conflating
+                    // this no-op with convergence is what made a spinning heal
+                    // plane read as a working one (see `StampOutcome::Refreshed`).
+                    tracker.mark_completed(&id);
+                    tracing::info!(
+                        target: "elohim_storage::projection_reconcile",
+                        content_id = %id,
+                        "projection-reconcile[content]: head unchanged — refreshed row, divergence NOT resolved (own conductor answered the head this row already holds)"
+                    );
+                    crate::metrics::inc_projection_heal_outcome(
+                        "content",
+                        HealOutcomeKind::Refreshed.label(),
+                    );
+                }
                 Ok(crate::db::content_diesel::StampOutcome::SkippedDeclared) => {
                     // Row already carries a DIFFERENT declared head — the heal
                     // must not move it (a fresh-boot conductor resolve can fall
@@ -1509,6 +1557,10 @@ async fn heal_content(
                     // 2026-07-11 20:42:40 regression). Canonical channels own it.
                     tracker.mark_completed(&id);
                     tracing::info!(content_id = %id, "projection-reconcile[content]: row already declared — heal left it to the canonical channels");
+                    crate::metrics::inc_projection_heal_outcome(
+                        "content",
+                        HealOutcomeKind::RefusedDeclared.label(),
+                    );
                 }
                 Ok(crate::db::content_diesel::StampOutcome::SkippedStale) => {
                     // The conductor's CANONICAL answer is not provably newer
@@ -1523,12 +1575,20 @@ async fn heal_content(
                     // next sweep's answer becomes provably newer and stamps.
                     tracker.mark_completed(&id);
                     tracing::info!(content_id = %id, "projection-reconcile[content]: conductor canonical answer not provably newer — heal kept the adopted head");
+                    crate::metrics::inc_projection_heal_outcome(
+                        "content",
+                        HealOutcomeKind::RefusedStale.label(),
+                    );
                 }
                 Ok(crate::db::content_diesel::StampOutcome::NoRow) => {
                     // Row vanished between presence check and stamp (rare race).
                     // Nothing to stamp — resolved, not a conductor miss.
                     tracker.mark_completed(&id);
                     tracing::debug!(content_id = %id, "projection-reconcile[content]: stamp found no local row; nothing to do");
+                    crate::metrics::inc_projection_heal_outcome(
+                        "content",
+                        HealOutcomeKind::NoRow.label(),
+                    );
                 }
                 Err(e) => {
                     tracing::warn!(content_id = %id, error = %e, "projection-reconcile[content]: stamp failed; retry next sweep");
