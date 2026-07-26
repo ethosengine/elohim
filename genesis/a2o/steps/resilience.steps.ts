@@ -1548,7 +1548,7 @@ Given(
   async function (this: E2EWorld, contentId: string, reach: string) {
     const payload = {
       id: contentId,
-      contentType: 'album',
+      contentType: 'narrative',
       contentFormat: 'external',
       reach,
       title: contentId,
@@ -1650,7 +1650,7 @@ When(
   async function (this: E2EWorld, reach: string, contentId: string) {
     const payload = {
       id: contentId,
-      contentType: 'album',
+      contentType: 'narrative',
       contentFormat: 'external',
       reach,
       title: contentId,

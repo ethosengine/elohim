@@ -34,10 +34,24 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::db::DbPool;
-use crate::generated_enums::CORE_REACH_LEVELS;
+use crate::generated_enums::{ALL_CONTENT_TYPES, CORE_REACH_LEVELS};
 use crate::services::provide_loop_status::ProvideLoopState;
 use crate::services::ContentService;
 use crate::StorageError;
+
+/// True when `content_type` is re-authorable through the conductor's
+/// `create_content` — i.e. it would pass `Content::validate()`
+/// (`elohim/holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs`),
+/// which checks the FULL extensible vocabulary (`ALL_CONTENT_TYPES`, not the
+/// DNA-notarized-core-only subset — content_type has an extensible tier,
+/// unlike reach) plus the `attestation:`/`governance-action:` discriminator
+/// prefixes that are enumerated separately (`generated_attestation_kinds`),
+/// never in the content-type list itself.
+pub(crate) fn is_canonical_content_type(content_type: &str) -> bool {
+    content_type.starts_with("attestation:")
+        || content_type.starts_with("governance-action:")
+        || ALL_CONTENT_TYPES.contains(&content_type)
+}
 
 /// Tuning for a single re-anchor sweep.
 #[derive(Debug, Clone)]
@@ -118,6 +132,11 @@ pub(crate) enum RowOutcome {
     /// Stored reach outside the DNA vocabulary — never re-authorable; skipped
     /// permanently (a seed-data fix, not a retry).
     SkippedNonCanonicalReach,
+    /// Stored content_type outside the vocabulary `Content::validate()`
+    /// accepts (`ALL_CONTENT_TYPES` + the `attestation:`/`governance-action:`
+    /// prefixes) — never re-authorable; skipped permanently (a seed-data fix,
+    /// not a retry). Symmetric with `SkippedNonCanonicalReach`.
+    SkippedNonCanonicalContentType,
     /// Genuine, retryable failure — healed on a future boot's sweep.
     Failed,
 }
@@ -129,6 +148,7 @@ impl ReanchorReport {
             RowOutcome::Reanchored => self.reanchored += 1,
             RowOutcome::AlreadyAnchored => self.already_anchored += 1,
             RowOutcome::SkippedNonCanonicalReach => self.skipped += 1,
+            RowOutcome::SkippedNonCanonicalContentType => self.skipped += 1,
             RowOutcome::Failed => self.failed += 1,
         }
     }
@@ -172,7 +192,7 @@ pub async fn run_once(
 ) -> Result<ReanchorReport, StorageError> {
     let app_ctx = crate::db::AppContext::default_lamad();
 
-    let candidates: Vec<(String, String)> = {
+    let candidates: Vec<(String, String, String)> = {
         let mut conn = pool
             .get()
             .map_err(|e| StorageError::Internal(format!("reanchor: db conn: {e}")))?;
@@ -199,7 +219,7 @@ pub async fn run_once(
         "reanchor_backfill: re-authoring NULL-anchor content via conductor (cold-seed recovery)"
     );
 
-    for (id, reach) in &candidates {
+    for (id, reach, content_type) in &candidates {
         // Guard: a stored reach outside the DNA-notarized vocabulary can
         // never be re-authored (the content_store zome rejects it), so it
         // would fail every sweep forever and saturate the conductor. Skip
@@ -211,6 +231,22 @@ pub async fn run_once(
                 content_id = %id,
                 reach = %reach,
                 "reanchor_backfill: skipping row with non-canonical reach (not re-authorable)"
+            );
+            continue;
+        }
+        // Symmetric guard: a stored content_type outside the vocabulary
+        // Content::validate() accepts (ALL_CONTENT_TYPES plus the
+        // attestation:/governance-action: discriminator prefixes) can never
+        // be re-authored either — create_content_unchecked's
+        // prepare_content_for_storage rejects it every sweep. Skip it
+        // loudly; the fix is a seed-data correction (e.g. the a2o
+        // resilience seed steps' now-fixed 'album' → 'narrative' typo).
+        if !is_canonical_content_type(content_type) {
+            report.record(RowOutcome::SkippedNonCanonicalContentType);
+            tracing::warn!(
+                content_id = %id,
+                content_type = %content_type,
+                "reanchor_backfill: skipping row with non-canonical content_type (not re-authorable)"
             );
             continue;
         }
@@ -313,6 +349,33 @@ mod tests {
     }
 
     #[test]
+    fn content_type_guard_excludes_album_includes_narrative() {
+        // Locks the guard contract to the vocabulary Content::validate()
+        // actually accepts: 'album' is NOT a valid content_type (the a2o
+        // resilience seed steps' bug that poisoned reanchor candidates with
+        // an unre-authorable row), and the fix target 'narrative' IS —
+        // it's in the extensible ALL_CONTENT_TYPES tier, not DNA-notarized
+        // core, which is why this guard must check ALL_CONTENT_TYPES and
+        // not the narrower CORE_CONTENT_TYPES.
+        assert!(!is_canonical_content_type("album"));
+        assert!(is_canonical_content_type("narrative"));
+    }
+
+    #[test]
+    fn content_type_guard_admits_attestation_and_governance_action_prefixes() {
+        // attestation:*/governance-action:* content_type values are enumerated
+        // in generated_attestation_kinds, never in the content-type list
+        // itself — the guard must not treat every such row as non-canonical.
+        assert!(is_canonical_content_type("attestation:humanness"));
+        assert!(is_canonical_content_type(
+            "governance-action:recovery-request"
+        ));
+        // A near-miss prefix (no trailing colon) must NOT be admitted by the
+        // prefix check alone — it still has to be a real vocabulary member.
+        assert!(!is_canonical_content_type("attestation"));
+    }
+
+    #[test]
     fn default_config_is_bounded_and_paced() {
         let cfg = ReanchorConfig::default();
         assert!(cfg.max_per_sweep > 0, "must bound conductor load per sweep");
@@ -406,14 +469,17 @@ mod tests {
         assert_eq!(decide_outcome(&genuine, None), RowOutcome::Failed);
 
         // Accounting: AlreadyAnchored increments its own counter and leaves
-        // `failed` at zero — the load-bearing property of the fix.
+        // `failed` at zero — the load-bearing property of the fix. Both skip
+        // classes (reach and content_type) fold into the same `skipped`
+        // counter — symmetric non-re-authorable-vocabulary dispositions.
         let mut report = ReanchorReport::default();
         report.record(RowOutcome::AlreadyAnchored);
         report.record(RowOutcome::Reanchored);
         report.record(RowOutcome::SkippedNonCanonicalReach);
+        report.record(RowOutcome::SkippedNonCanonicalContentType);
         assert_eq!(report.already_anchored, 1);
         assert_eq!(report.reanchored, 1);
-        assert_eq!(report.skipped, 1);
+        assert_eq!(report.skipped, 2);
         assert_eq!(
             report.failed, 0,
             "an already-anchored row must NEVER be counted as failed"

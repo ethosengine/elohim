@@ -952,9 +952,10 @@ struct ContentHealOutcome {
 /// ## Bounds
 ///
 /// Reuses [`WITNESS_MAX_PER_TICK`] / [`WITNESS_ITEM_DELAY`] /
-/// [`WITNESS_SWEEP_BUDGET`], and the same `CORE_REACH_LEVELS` guard the
-/// re-anchor path uses (a non-canonical reach is not re-authorable and would
-/// fail every sweep forever). Self-terminating: once authored, the conductor
+/// [`WITNESS_SWEEP_BUDGET`], and the same `CORE_REACH_LEVELS` /
+/// `is_canonical_content_type` guards the re-anchor path uses (a
+/// non-canonical reach or content_type is not re-authorable and would fail
+/// every sweep forever). Self-terminating: once authored, the conductor
 /// resolves the id and it is never a candidate again.
 async fn witness_ghost_anchors(hc: &Arc<HcClient>, pool: &DbPool, candidates: &[String]) {
     if candidates.is_empty() {
@@ -963,7 +964,7 @@ async fn witness_ghost_anchors(hc: &Arc<HcClient>, pool: &DbPool, candidates: &[
     let app_ctx = crate::db::AppContext::default_lamad();
 
     // Narrow the conductor-missing set to rows that actually CLAIM an anchor.
-    let ghosts: Vec<(String, String)> = {
+    let ghosts: Vec<(String, String, String)> = {
         let mut conn = match pool.get() {
             Ok(c) => c,
             Err(e) => {
@@ -996,7 +997,7 @@ async fn witness_ghost_anchors(hc: &Arc<HcClient>, pool: &DbPool, candidates: &[
         let mut authored = 0usize;
         let mut skipped = 0usize;
         let mut failed = 0usize;
-        for (id, reach) in ghosts.iter().take(WITNESS_MAX_PER_TICK as usize) {
+        for (id, reach, content_type) in ghosts.iter().take(WITNESS_MAX_PER_TICK as usize) {
             // Same guard as the re-anchor path: a reach outside the DNA-notarized
             // vocabulary can never be re-authored, so it would burn a conductor
             // round-trip every sweep forever.
@@ -1006,6 +1007,20 @@ async fn witness_ghost_anchors(hc: &Arc<HcClient>, pool: &DbPool, candidates: &[
                     content_id = %id,
                     reach = %reach,
                     "projection-reconcile[ghost-witness]: skipping row with non-canonical reach (not re-authorable)"
+                );
+                continue;
+            }
+            // Symmetric guard: a content_type outside the vocabulary
+            // Content::validate() accepts (see
+            // `services::reanchor_backfill::is_canonical_content_type`) can
+            // never be re-authored either — skip it loudly rather than
+            // burning a conductor round-trip every sweep forever.
+            if !crate::services::reanchor_backfill::is_canonical_content_type(content_type) {
+                skipped += 1;
+                tracing::warn!(
+                    content_id = %id,
+                    content_type = %content_type,
+                    "projection-reconcile[ghost-witness]: skipping row with non-canonical content_type (not re-authorable)"
                 );
                 continue;
             }
@@ -2176,6 +2191,18 @@ mod tests {
             !classify(Some(false)),
             "a FALLBACK answer still proves a local chain exists — not a ghost"
         );
+    }
+
+    #[test]
+    fn ghost_witness_content_type_guard_is_the_reanchor_guard() {
+        // The ghost-witness sweep's content_type skip guard is composed, not
+        // forked: it calls the SAME `is_canonical_content_type` the re-anchor
+        // path uses (symmetric with `ghost_witness_reuses_the_witness_bounds`
+        // for the pacing bounds). Locks the vocabulary at this seam too — the
+        // a2o resilience seed steps' 'album' typo must never be treated as
+        // re-authorable here either, while its 'narrative' fix must be.
+        assert!(!crate::services::reanchor_backfill::is_canonical_content_type("album"));
+        assert!(crate::services::reanchor_backfill::is_canonical_content_type("narrative"));
     }
 
     #[test]

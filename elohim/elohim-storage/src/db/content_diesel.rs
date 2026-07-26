@@ -1232,8 +1232,9 @@ pub fn content_reaches_for_ids(
         .load(conn)
 }
 
-/// `(id, reach)` for the subset of `ids` that are locally present AND carry a
-/// NON-NULL `dht_anchor_hash` — the GHOST-ANCHOR candidate query.
+/// `(id, reach, content_type)` for the subset of `ids` that are locally
+/// present AND carry a NON-NULL `dht_anchor_hash` — the GHOST-ANCHOR
+/// candidate query.
 ///
 /// A row in this set claims notarized provenance in SQL. When this node's OWN
 /// conductor cannot resolve the same id (`resolve_content_head` → `Ok(None)`),
@@ -1246,6 +1247,11 @@ pub fn content_reaches_for_ids(
 /// against it is refused by the zome (`no content found for id`, because
 /// `gather_content_chain`'s `IdToContent` link does not exist locally either).
 ///
+/// `content_type` rides along (widened alongside `reach`) so the caller can
+/// apply the same non-canonical-vocabulary skip guard content_type gets in
+/// [`list_unanchored_content_ids`] — a row whose `content_type` the conductor's
+/// `validate()` would reject is not re-authorable either.
+///
 /// Deliberately a FOCUSED query, not a filter bolted onto
 /// [`content_reaches_for_ids`]: the anchored predicate is the whole point of
 /// this candidate class, and conflating the two would let a NULL-anchor row
@@ -1257,7 +1263,7 @@ pub fn anchored_content_reaches_for_ids(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     ids: &[String],
-) -> QueryResult<Vec<(String, String)>> {
+) -> QueryResult<Vec<(String, String, String)>> {
     if ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -1265,7 +1271,7 @@ pub fn anchored_content_reaches_for_ids(
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq_any(ids))
         .filter(content::dht_anchor_hash.is_not_null())
-        .select((content::id, content::reach))
+        .select((content::id, content::reach, content::content_type))
         .load(conn)
 }
 
@@ -1457,24 +1463,27 @@ pub fn list_unpublished_content_ids(
 /// `created_at` ascending so the oldest un-anchored rows heal first and the
 /// ordering is stable across sweeps (restart-safe, idempotent: an id that
 /// gained an anchor on a prior sweep is no longer a candidate).
-/// Returns `(id, reach)` for each NULL-anchor row so the re-anchor sweep can
-/// skip rows whose stored reach is non-canonical (the conductor would reject
-/// them on every sweep). Only the reanchor_backfill service calls this.
+/// Returns `(id, reach, content_type)` for each NULL-anchor row so the
+/// re-anchor sweep can skip rows whose stored reach OR content_type is
+/// non-canonical (the conductor's `Content::validate()` would reject either
+/// on every sweep — see `generated_enums::ALL_CONTENT_TYPES` and the
+/// `attestation:`/`governance-action:` prefix exception). Only the
+/// reanchor_backfill service calls this.
 pub fn list_unanchored_content_ids(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     limit: i64,
-) -> Result<Vec<(String, String)>, StorageError> {
+) -> Result<Vec<(String, String, String)>, StorageError> {
     if limit <= 0 {
         return Ok(Vec::new());
     }
     content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::dht_anchor_hash.is_null())
-        .select((content::id, content::reach))
+        .select((content::id, content::reach, content::content_type))
         .order((content::created_at.asc(), content::id.asc()))
         .limit(limit)
-        .load::<(String, String)>(conn)
+        .load::<(String, String, String)>(conn)
         .map_err(|e| StorageError::Internal(format!("list_unanchored_content_ids failed: {}", e)))
 }
 
@@ -1841,13 +1850,20 @@ mod tests {
             "absent-1".to_string(),
         ];
         let rows = anchored_content_reaches_for_ids(&mut conn, &ctx, &ids).unwrap();
-        let map: std::collections::HashMap<String, String> = rows.into_iter().collect();
+        let map: std::collections::HashMap<String, (String, String)> = rows
+            .into_iter()
+            .map(|(id, reach, content_type)| (id, (reach, content_type)))
+            .collect();
         assert_eq!(
             map.len(),
             1,
             "only the present+anchored row is a ghost candidate"
         );
-        assert_eq!(map.get("ghost-1").map(String::as_str), Some("commons"));
+        assert_eq!(
+            map.get("ghost-1")
+                .map(|(reach, ct)| (reach.as_str(), ct.as_str())),
+            Some(("commons", "concept"))
+        );
         assert!(
             !map.contains_key("unanchored-1"),
             "a NULL-anchor row is the existing witness sweep's candidate, not a ghost"
