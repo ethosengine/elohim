@@ -757,8 +757,14 @@ pub fn inc_sync_request_outcome(result: &str) {
     SYNC_REQUEST_OUTCOMES.with_label_values(&[result]).inc();
 }
 
-/// Record one acquisition (pull-leg) outcome ("fetched" | "transport_failure" |
-/// "no_db_pool" | "no_db_conn").
+/// Record one acquisition (pull-leg) outcome ("fetched" | "fetch_error" |
+/// "transport_failure" | "blob_unavailable" | "store_failed" | "no_db_pool" |
+/// "no_db_conn" | "unexpected_response").
+///
+/// `unexpected_response` is the peer answering with a variant the fetch path does
+/// not model — in practice `ShardResponse::Error(_)` from the responder's own DB
+/// layer. Before it existed that case fell through a bare `debug!` and leaked the
+/// in-flight slot outright (see the catch-all arm in `p2p::mod`).
 pub fn inc_acquisition_outcome(outcome: &str) {
     ACQUISITION_OUTCOMES.with_label_values(&[outcome]).inc();
 }
@@ -1050,6 +1056,7 @@ mod tests {
             "blob_unavailable",
             "store_failed",
             "fetch_error",
+            "unexpected_response",
         ] {
             inc_acquisition_outcome(outcome);
         }

@@ -26,7 +26,10 @@
  *      "When I request/fetch" steps.
  *   4. A cross-doorway truth-compare step + a runLook rendered-card verdict
  *      (chapter 10) — "two doorways, one truth" needs a same-value-AND-non-zero
- *      assertion across two peers in one step; no existing step does both.
+ *      assertion across two peers in one step; no existing step does both. The
+ *      compared field is `stewardingCollectives` (ResilienceSnapshotView) — the
+ *      count of stewarding collectives of any kind; there is no
+ *      `householdsStewarding` on this route's wire shape.
  */
 
 import { strict as assert } from 'node:assert';
@@ -220,7 +223,18 @@ Then(
           `No active "${action}" commitments on ${peerName} yet — the co-steward agreement has not been notarized and projected.`
         );
       },
-      { timeoutMs: seconds * 1000, initialDelayMs: 1000, backoffFactor: 1.2, maxDelayMs: 5000 }
+      {
+        timeoutMs: seconds * 1000,
+        initialDelayMs: 1000,
+        backoffFactor: 1.2,
+        maxDelayMs: 5000,
+        // retry()'s own default (maxAttempts: 10) would exhaust in ~21s at this
+        // backoff schedule — well short of the "within {seconds} seconds" budget
+        // this step promises. Set generously high so timeoutMs (the deadline
+        // check at the top of retry()'s loop) is the only real governor, matching
+        // the stated intent.
+        maxAttempts: 1000,
+      }
     );
   }
 );
@@ -275,20 +289,22 @@ Then('the raw response body contains {string}', function (this: E2EWorld, needle
 // ---------------------------------------------------------------------------
 
 /**
- * "Two doorways, one truth": read householdsStewarding
- * (GET /api/v1/resilience/{contentId}/household, HouseholdResilienceView) from
- * TWO peers and assert both (a) agree, and (b) are non-zero. Agreement alone
- * would false-pass a card that reads 0 identically everywhere; non-zero alone
- * would false-pass two doorways that silently diverge. Both together are the
+ * "Two doorways, one truth": read stewardingCollectives
+ * (GET /api/v1/resilience/{contentId}/household, ResilienceSnapshotView — the
+ * type the production handler `handle_get_household_resilience` actually
+ * serializes via `household_resilience::snapshot_with_staleness_secs`) from TWO
+ * peers and assert both (a) agree, and (b) are non-zero. Agreement alone would
+ * false-pass a card that reads 0 identically everywhere; non-zero alone would
+ * false-pass two doorways that silently diverge. Both together are the
  * felt-safety invariant.
  *
  * Example:
- *   Then peers "alpha-A" and "elohim.host" report the same non-zero householdsStewarding for "elohim-host-landing"
+ *   Then peers "alpha-A" and "elohim.host" report the same non-zero stewardingCollectives for "elohim-host-landing"
  */
 Then(
-  'peers {string} and {string} report the same non-zero householdsStewarding for {string}',
+  'peers {string} and {string} report the same non-zero stewardingCollectives for {string}',
   async function (this: E2EWorld, peerA: string, peerB: string, contentId: string) {
-    const readHouseholdsStewarding = async (peerName: string): Promise<number> => {
+    const readStewardingCollectives = async (peerName: string): Promise<number> => {
       const doorway = this.getDoorway(peerName);
       const { status, text } = await getRaw(
         `${doorway.url}/api/v1/resilience/${encodeURIComponent(contentId)}/household`
@@ -306,24 +322,24 @@ Then(
           `GET /api/v1/resilience/${contentId}/household on ${peerName}: response is not valid JSON`
         );
       }
-      const value = body['householdsStewarding'];
+      const value = body['stewardingCollectives'];
       assert.ok(
         typeof value === 'number',
-        `householdsStewarding on ${peerName} is not a number: ${JSON.stringify(value)}`
+        `stewardingCollectives on ${peerName} is not a number: ${JSON.stringify(value)}`
       );
       return value;
     };
 
-    const a = await readHouseholdsStewarding(peerA);
-    const b = await readHouseholdsStewarding(peerB);
+    const a = await readStewardingCollectives(peerA);
+    const b = await readStewardingCollectives(peerB);
     assert.ok(
       a > 0,
-      `householdsStewarding on ${peerA} is ${a} — expected > 0 (the resilience card must not read zero)`
+      `stewardingCollectives on ${peerA} is ${a} — expected > 0 (the resilience card must not read zero)`
     );
     assert.strictEqual(
       a,
       b,
-      `householdsStewarding diverges: ${peerA}=${a} vs ${peerB}=${b} — the two doorways don't tell the same truth`
+      `stewardingCollectives diverges: ${peerA}=${a} vs ${peerB}=${b} — the two doorways don't tell the same truth`
     );
   }
 );

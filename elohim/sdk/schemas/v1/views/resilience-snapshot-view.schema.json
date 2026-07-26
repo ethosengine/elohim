@@ -71,6 +71,18 @@
       }
     },
     "coverageShortfall": { "type": "integer", "minimum": 0, "description": "How many additional distinct-collective slots short of the diversity floor (CoverageRollup deficit measure). Derived in the graph-backed branch via CoverageRollup.deficit.measure(). Present with value 0 when the graph branch measures the floor exactly met; absent (not-selected) only on the relational household_resilience::snapshot path." },
+    "commitmentBackedReplication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dwellingCommitments", "collectiveCommitments", "commonsCommitments", "totalPledgedBytes"],
+      "description": "Per-tier counts + pledged bytes of the notarized `replicates-*` REA commitments held by the collectives stewarding this content. Same shape and same fold as HouseholdResilienceView.commitmentBackedReplication (elohim_facings::folds::replication_commitment) — this is that fold surfaced on the served snapshot. Scoping axis is the steward collectives, NOT the whole node ledger. Absent (missing, never a present null) means the producing path did not select this lens: the graph-backed branch cannot reach the relational rea_commitments relation, so it omits the key rather than emitting a fake measured zero. The relational household_resilience::snapshot path ALWAYS sets it.",
+      "properties": {
+        "dwellingCommitments":   { "type": "integer", "minimum": 0, "description": "Active `replicates-dwelling` commitments across the stewarding collectives." },
+        "collectiveCommitments": { "type": "integer", "minimum": 0, "description": "Active collective-scoped replication commitments across the stewarding collectives." },
+        "commonsCommitments":    { "type": "integer", "minimum": 0, "description": "Active `replicates-commons` / `replicates-content` commitments across the stewarding collectives." },
+        "totalPledgedBytes":     { "type": "integer", "minimum": 0, "description": "Sum of pledged bytes across those commitments. Read from each commitment's metadata_json policy envelope (never resource_quantity_value — that column is f32 and would round a multi-GB pledge)." }
+      }
+    },
     "feltStatus": {
       "type": "object",
       "additionalProperties": false,

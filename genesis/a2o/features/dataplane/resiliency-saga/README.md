@@ -34,12 +34,12 @@ felt-safety signal.
 | 2 | The household forms | `@concern:saga-02-household-forms` | `elohim_identity_fill_discovered_cids >= 1` + labeled `elohim_identity_fill_total{action="created"} >= 1` | RED — born red until the identity-fill ceremony cure deploys |
 | 3 | matthew uploads elohim-host-landing into his eprfs | `@concern:saga-03-eprfs-upload` | served head matches declared head + blobHash non-null on alpha-A | GREEN — matthew is the deploy-time author peer |
 | 4 | The doorway serves | `@concern:saga-04-doorway-serves` | `GET /` → 200 with the rendered SPA shell | GREEN |
-| 5 | adam co-stewards via a rea-agreement | `@concern:saga-05-co-steward-agreement` | `GET /api/v1/commitments?action=replicates-commons&state=active` reports ≥1 row within 60s | **RED — born red**, the loop's work queue |
+| 5 | adam co-stewards via a rea-agreement | `@concern:saga-05-co-steward-agreement` | `GET /api/v1/commitments?action=replicates-commons&state=active` reports ≥1 row within 60s | **RED — born red**: the notarize→mirror path (`rea_commitments::mirror_replication_commitment`) is wired — the row is absent because no `replicates-commons` commitment has actually been authored/notarized for adam on alpha yet, not because the projection is missing |
 | 6 | Blobs sync to one head | `@concern:saga-06-heads-converge` | `/health` `divergentAnchor<=0` + `caughtUp=true` locally; served head matches on both federation doorways | GREEN locally; cross-node scenario needs `@requires:alpha-cluster-6peer` |
-| 7 | Custody is witnessed | `@concern:saga-07-custody-witnessed` | labeled `elohim_custody_class_count{class="stocked"} >= 1` | **RED/PENDING — born red**, gauge not yet deployed (Track 3 landing now) |
+| 7 | Custody is witnessed | `@concern:saga-07-custody-witnessed` | labeled `elohim_custody_class_count{class="stocked"} >= 1` | **RED/PENDING — born red**: the gauge is registered and wired to the `/api/v1/weave` sweep (`emit_custody_class_gauges`, gated on an active local session) — red means the sweep hasn't populated the series on alpha yet, not that the gauge is unbuilt |
 | 8 | Capacity is reported | `@concern:saga-08-capacity-reported` | `elohim_custodian_free_bytes > 0` (also `stewarded_bytes >= 0`) | Live infrastructure; free-bytes expected non-zero, stewarded-bytes gated on chapter 2 |
-| 9 | Projector caches carry the head | `@concern:saga-09-projectors-carry` | `GET /api/v1/resilience/elohim-host-landing/household` `commitmentBackedReplication.totalPledgedBytes >= 1` | **RED — born red**, `household_resilience.rs:131` hard-codes the field to its zero default (`// T15: computed`) |
-| 10 | The card tells the truth | `@concern:saga-10-card-tells-truth` | same non-zero `householdsStewarding` on both alpha-A and elohim.host; `@wip`/`@browser-only` rendered-card companion | **RED — born red** on the numeric compare; the rendered scenario stays `@wip` |
+| 9 | Projector caches carry the head | `@concern:saga-09-projectors-carry` | `GET /api/v1/resilience/elohim-host-landing/household` `commitmentBackedReplication.commonsCommitments >= 1` | **RED — born red**: the field now rides the served `ResilienceSnapshotView` (the prior wiring gap is closed) — re-aimed off `totalPledgedBytes`, which is unreachable by design from a content-tier commitment (`replication_commitment.rs:182-194` pledges 0 bytes for `replicates-content`/`replicates-commons` content commitments; they're counted, not summed) and has no capacity-tier pledge producer in the codebase at all (backlog residue below); `commonsCommitments` flips 0→1 the same moment chapter 5's cure lands |
+| 10 | The card tells the truth | `@concern:saga-10-card-tells-truth` | same non-zero `stewardingCollectives` on both alpha-A and elohim.host; `@wip`/`@browser-only` rendered-card companion | **RED — born red** on the numeric compare, and additionally blocked on chapters 5/9 landing; the rendered scenario stays `@wip` |
 
 ## RED-FIRST is correct
 
@@ -60,3 +60,26 @@ supports dotted paths). New glue lives only where no existing primitive fit: a
 label-aware Prometheus step (chapters 2, 7), a commitment-count poll (chapter 5), a
 raw-body HTML check (chapter 4), and a cross-doorway truth compare + `runLook` card
 verdict (chapter 10) — all in `steps/dataplane/resiliency-saga.steps.ts`.
+
+## Documented residue
+
+Chapter 9's proof signal is deliberately scoped to `commonsCommitments`, not
+`totalPledgedBytes`. Both fields ride the same served `commitmentBackedReplication`
+object, but only a **capacity-tier** pledge (a `replicates-dwelling` commitment, or
+the `capacity` variant of a `replicates-commons` commitment) contributes bytes
+(`elohim-facings/src/folds/replication_commitment.rs:36-42, 182-194`); a
+**content-tier** commitment — the kind chapter 5 proves — names an EPR and pledges 0
+bytes by design. No capacity-tier pledge producer (a coordinator function or HTTP
+lever that authors a `replicates-dwelling` / commons-`capacity` commitment) exists
+anywhere in the codebase today. Building one is a backlog item this saga has
+surfaced but does not itself resolve; when it lands, chapter 9's assertion can be
+widened back to (or paired with) `totalPledgedBytes >= 1`.
+
+Demand-autopins have no retirement path (surfaced by the chapter-5 cure work): a
+pin whose acquisition exhausted its retry budget stays `active` forever — it
+occupies one of `MAX_ACTIVE_PIN_ROWS`, is re-scanned by both 60s reconcile loops
+every tick, and holds `pull.caughtUp` false in perpetuity (alpha's `e2e-*`
+phantom pins show exactly this). Retirement semantics (TTL, an auditable
+`abandoned` state, or source-side exclusion of ephemeral ids) is an operator
+policy decision about what "I wanted this" means once provably unfetchable —
+deliberately not decided by the cure sprint.

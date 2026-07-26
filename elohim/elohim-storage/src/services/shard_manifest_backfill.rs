@@ -32,14 +32,39 @@ use crate::blob_store::BlobStore;
 use crate::db::DbPool;
 use crate::StorageError;
 
-/// A content row eligible for manifest backfill: has a blob, lacks a manifest.
+/// A content row eligible for manifest backfill: has a blob, lacks a manifest —
+/// or holds a manifest that has DIVERGED from the content's current blob.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BackfillCandidate {
     pub content_id: String,
+    /// `content.blob_hash` — the bytes the content points at RIGHT NOW.
     pub blob_hash: String,
     pub blob_cid: Option<String>,
     pub content_format: String,
     pub reach: String,
+    /// `shard_manifests.blob_hash` — the bytes the STORED manifest was stamped
+    /// from. `None` when no manifest exists (Part A). `Some(h)` with
+    /// `h != blob_hash` is the divergence this sweep re-stamps.
+    pub manifest_blob_hash: Option<String>,
+}
+
+impl BackfillCandidate {
+    /// The stored manifest was stamped from bytes the content no longer points at.
+    ///
+    /// This is the `stewardingCollectives: 0` root cause. `distribute_shards`
+    /// (`p2p/mod.rs`) recomputes a FRESH manifest from the bytes handed to it and
+    /// writes `shard_locations` under those NEW shard hashes — but it never
+    /// reconciles the stored `shard_manifests` row. Every per-content reader
+    /// (`db::shard_locations::get_locations_for_content`,
+    /// `household_resilience::load_holder_relation`) keys off the STORED manifest,
+    /// so after a blob rotation the join is guaranteed-empty even though
+    /// distribution SUCCEEDED and holder rows exist. The card reads
+    /// `distributionState: "measured"` with zero stewards — measured yet dark.
+    pub fn is_manifest_divergent(&self) -> bool {
+        self.manifest_blob_hash
+            .as_deref()
+            .is_some_and(|stamped| stamped != self.blob_hash)
+    }
 }
 
 /// Tuning for a single backfill sweep.
@@ -80,6 +105,18 @@ pub struct BackfillReport {
     /// Part B: re-distribution ATTEMPTS made (not necessarily placements — a
     /// still-unresolvable peer set leaves shards unplaced; honest attempt count).
     pub redistribute_attempts: usize,
+    /// Part B: candidates selected because their stored manifest had DIVERGED
+    /// from `content.blob_hash` (blob rotation). Subset of `redistribute_candidates`.
+    pub divergent_manifests: usize,
+    /// Part B: divergent manifests actually RE-STAMPED from the current local bytes.
+    pub manifests_restamped: usize,
+    /// Part B: divergent manifests that could NOT be re-stamped because the bytes
+    /// for `content.blob_hash` are absent locally — the `bytes-not-local` gap arm
+    /// stays authoritative for these (never a re-stamp from bytes we don't hold).
+    pub restamp_bytes_missing: usize,
+    /// Part B: orphaned `shard_locations` rows pruned after re-stamping (keyed
+    /// under a superseded manifest's shard hashes, named by no manifest any more).
+    pub orphan_locations_pruned: usize,
 }
 
 /// Part B cap: the most re-distribution attempts a single boot sweep will make.
@@ -141,6 +178,8 @@ pub fn select_candidates(
                 blob_cid,
                 content_format,
                 reach,
+                // Part A selects on the ABSENCE of a manifest, by construction.
+                manifest_blob_hash: None,
             })
         })
         .collect();
@@ -148,21 +187,32 @@ pub fn select_candidates(
     Ok(candidates)
 }
 
-/// Part B — select content that HAS a manifest but whose shards have ZERO
-/// `shard_locations` rows: measured (manifest present) yet never-distributed (no
-/// holder rows). This is the exact dark shape the push-side identity fix (slice 2)
-/// unblocks — on the next boot after the fix these re-attempt distribution instead
-/// of needing a manual per-content re-seed. It is measurement-driven REMEDIATION,
-/// NOT a stewardship claim: distribution still has to succeed + be acked to write
-/// `shard_locations`.
+/// Part B — select content that HAS a manifest but is not truthfully readable
+/// through it. Two admission arms, in priority order:
 ///
-/// Output is capped at `cap` (see [`REDISTRIBUTE_CAP_PER_BOOT`]). The per-content
-/// `shard_locations` existence check is one small query per manifest content — an
-/// alpha-scale corpus, and the cap bounds the *result*; the scan stops once `cap`
-/// candidates are found.
+/// 1. **DIVERGENT** (`shard_manifests.blob_hash != content.blob_hash`) — the blob
+///    rotated (an SSR bundle rebuild) and the stored manifest still names the OLD
+///    bytes' shard hashes. Every per-content reader joins through that manifest, so
+///    the holder join is guaranteed-empty *no matter how well distribution went*.
+///    These are admitted REGARDLESS of location count: a divergent manifest with
+///    plenty of holder rows under the new hash is exactly the
+///    `stewardingCollectives: 0` case, and re-stamping alone lights it.
+/// 2. **DARK** — manifest agrees with the content blob, but its shards have ZERO
+///    `shard_locations` rows: measured yet never-distributed. Measurement-driven
+///    REMEDIATION, not a stewardship claim — distribution still has to succeed and
+///    be acked to write `shard_locations`.
 ///
-/// A blob present-but-absent-locally is NOT excluded here (the byte load happens
-/// at distribution time in `distribute_one`, which skips-and-returns on absence).
+/// Output is capped at `cap` (see [`REDISTRIBUTE_CAP_PER_BOOT`]) with **divergent
+/// first**, so a rotated blob cannot lose the per-boot slot lottery to healthy-but-
+/// dark rows in a corpus of thousands. Within a bucket, order is the query's.
+///
+/// The per-content `shard_locations` existence check runs only for the DARK arm and
+/// only while that bucket has room, so the expensive per-row query is bounded by
+/// `cap` even though the scan itself sees every manifest row (divergence is a free
+/// in-memory comparison on already-loaded columns).
+///
+/// A blob present-but-absent-locally is NOT excluded here — the byte load happens in
+/// `run_once`/`distribute_one`, which record an honest `bytes-not-local` gap instead.
 pub fn select_redistribution_candidates(
     conn: &mut SqliteConnection,
     h_app_id: &str,
@@ -174,11 +224,13 @@ pub fn select_redistribution_candidates(
         return Ok(Vec::new());
     }
 
-    // (content_id, blob_hash, blob_cid, content_format, reach, shard_hashes_json)
+    // (content_id, blob_hash, blob_cid, content_format, reach, shard_hashes_json,
+    //  manifest_blob_hash)
     type Row = (
         String,
         Option<String>,
         Option<String>,
+        String,
         String,
         String,
         String,
@@ -199,19 +251,58 @@ pub fn select_redistribution_candidates(
             content::content_format,
             content::reach,
             shard_manifests::shard_hashes_json,
+            shard_manifests::blob_hash,
         ))
         .load::<Row>(conn)
         .map_err(StorageError::from)?;
 
-    let mut out: Vec<BackfillCandidate> = Vec::new();
-    for (content_id, blob_hash, blob_cid, content_format, reach, shard_hashes_json) in rows {
-        if out.len() >= cap {
+    let mut divergent: Vec<BackfillCandidate> = Vec::new();
+    let mut dark: Vec<BackfillCandidate> = Vec::new();
+
+    for (
+        content_id,
+        blob_hash,
+        blob_cid,
+        content_format,
+        reach,
+        shard_hashes_json,
+        manifest_blob_hash,
+    ) in rows
+    {
+        // Both buckets full — nothing further can enter the capped result.
+        if divergent.len() >= cap && dark.len() >= cap {
             break;
         }
         let Some(blob_hash) = blob_hash else { continue };
         if blob_hash.trim().is_empty() {
             continue;
         }
+
+        let candidate = BackfillCandidate {
+            content_id,
+            blob_hash,
+            blob_cid,
+            content_format,
+            reach,
+            manifest_blob_hash: Some(manifest_blob_hash),
+        };
+
+        // Arm 1 — divergent manifest. Admitted on the divergence alone; the
+        // location count is irrelevant because the STORED shard hashes are the
+        // wrong join key either way.
+        if candidate.is_manifest_divergent() {
+            if divergent.len() < cap {
+                divergent.push(candidate);
+            }
+            continue;
+        }
+
+        // Arm 2 — dark (manifest agrees, zero holders). Skip the per-row count
+        // query once this bucket is full: it can no longer affect the result.
+        if dark.len() >= cap {
+            continue;
+        }
+
         // The manifest's shard hashes are the join key into shard_locations.
         let shard_hashes: Vec<String> =
             serde_json::from_str(&shard_hashes_json).unwrap_or_default();
@@ -230,16 +321,14 @@ pub fn select_redistribution_candidates(
             .map_err(StorageError::from)?;
 
         if location_count == 0 {
-            out.push(BackfillCandidate {
-                content_id,
-                blob_hash,
-                blob_cid,
-                content_format,
-                reach,
-            });
+            dark.push(candidate);
         }
     }
 
+    // Divergent first: a rotated blob must not lose the per-boot cap to healthy rows.
+    let mut out = divergent;
+    out.extend(dark);
+    out.truncate(cap);
     Ok(out)
 }
 
@@ -495,13 +584,91 @@ pub async fn run_once(
         };
         report.redistribute_candidates = redistribute.len();
 
+        report.divergent_manifests = redistribute
+            .iter()
+            .filter(|c| c.is_manifest_divergent())
+            .count();
+
         if !redistribute.is_empty() {
             tracing::info!(
                 redistribute_candidates = report.redistribute_candidates,
+                divergent_manifests = report.divergent_manifests,
                 h_app_id,
                 "shard_manifest_backfill: re-attempting distribution for measured-but-dark content"
             );
+
+            // Shard hashes freed by a re-stamp this sweep — pruned at the end once
+            // we can prove no manifest names them any more.
+            let mut orphan_candidates: std::collections::HashSet<String> =
+                std::collections::HashSet::new();
+
             for (idx, candidate) in redistribute.iter().enumerate() {
+                // ── Re-stamp arm (blob rotation) ─────────────────────────────
+                // A divergent manifest is the wrong join key for EVERY per-content
+                // reader; distributing again without re-stamping just writes more
+                // holder rows under a hash the readers never look up. Re-stamp
+                // FIRST (level-triggered reconciliation: heal the divergence that
+                // already exists, retroactively), then distribute.
+                if candidate.is_manifest_divergent() {
+                    // Capture the superseded shard hashes BEFORE the overwrite.
+                    let superseded: Vec<String> = {
+                        match pool.get() {
+                            Ok(mut conn) => crate::db::shard_manifests::get_manifest(
+                                &mut conn,
+                                h_app_id,
+                                &candidate.content_id,
+                            )
+                            .ok()
+                            .flatten()
+                            .and_then(|m| {
+                                serde_json::from_str::<Vec<String>>(&m.shard_hashes_json).ok()
+                            })
+                            .unwrap_or_default(),
+                            Err(_) => Vec::new(),
+                        }
+                    };
+
+                    // HONESTY: re-stamp ONLY from bytes we actually hold. When the
+                    // bytes for `content.blob_hash` are absent locally the stored
+                    // manifest is stale but we cannot truthfully replace it — the
+                    // `bytes-not-local` gap arm inside `distribute_one` stays
+                    // authoritative, and the divergence remains visible.
+                    match record_one(pool, blob_store, candidate, h_app_id).await {
+                        Ok(true) => {
+                            report.manifests_restamped += 1;
+                            orphan_candidates.extend(superseded);
+                            tracing::info!(
+                                content_id = %candidate.content_id,
+                                content_blob_hash = %candidate.blob_hash,
+                                stale_manifest_blob_hash = ?candidate.manifest_blob_hash,
+                                h_app_id,
+                                "shard_manifest_backfill: manifest re-stamped after blob rotation \
+                                 (stale shard hashes were the guaranteed-empty holder join)"
+                            );
+                        }
+                        Ok(false) => {
+                            report.restamp_bytes_missing += 1;
+                            tracing::warn!(
+                                content_id = %candidate.content_id,
+                                content_blob_hash = %candidate.blob_hash,
+                                stale_manifest_blob_hash = ?candidate.manifest_blob_hash,
+                                h_app_id,
+                                "shard_manifest_backfill: manifest DIVERGED from content.blob_hash \
+                                 but the current bytes are absent locally — not re-stamping \
+                                 (bytes-not-local gap stays authoritative)"
+                            );
+                        }
+                        Err(e) => {
+                            report.failed += 1;
+                            tracing::warn!(
+                                content_id = %candidate.content_id,
+                                error = %e,
+                                "shard_manifest_backfill: manifest re-stamp failed (non-fatal)"
+                            );
+                        }
+                    }
+                }
+
                 distribute_one(handle, pool, blob_store, candidate, h_app_id).await;
                 report.redistribute_attempts += 1;
 
@@ -509,6 +676,39 @@ pub async fn run_once(
                     tokio::time::sleep(config.batch_pause).await;
                 } else {
                     tokio::time::sleep(config.item_delay).await;
+                }
+            }
+
+            // Prune holder rows keyed under superseded shard hashes that no
+            // manifest names any more (see `db::shard_locations::prune_orphaned_locations`
+            // for the content-addressing safety argument). One pass, one query.
+            if !orphan_candidates.is_empty() {
+                match pool.get() {
+                    Ok(mut conn) => match crate::db::shard_locations::prune_orphaned_locations(
+                        &mut conn,
+                        h_app_id,
+                        &orphan_candidates,
+                    ) {
+                        Ok(n) => {
+                            report.orphan_locations_pruned = n;
+                            if n > 0 {
+                                tracing::info!(
+                                    pruned = n,
+                                    h_app_id,
+                                    "shard_manifest_backfill: pruned orphaned shard_locations rows \
+                                     left by superseded manifests"
+                                );
+                            }
+                        }
+                        Err(e) => tracing::warn!(
+                            error = %e,
+                            "shard_manifest_backfill: orphan location prune failed (non-fatal)"
+                        ),
+                    },
+                    Err(e) => tracing::warn!(
+                        error = %e,
+                        "shard_manifest_backfill: orphan prune skipped (no db conn)"
+                    ),
                 }
             }
         }
@@ -520,6 +720,10 @@ pub async fn run_once(
         failed = report.failed,
         redistribute_candidates = report.redistribute_candidates,
         redistribute_attempts = report.redistribute_attempts,
+        divergent_manifests = report.divergent_manifests,
+        manifests_restamped = report.manifests_restamped,
+        restamp_bytes_missing = report.restamp_bytes_missing,
+        orphan_locations_pruned = report.orphan_locations_pruned,
         "shard_manifest_backfill: sweep complete"
     );
 
@@ -781,6 +985,295 @@ mod tests {
         );
         assert_eq!(gaps[0].gap_kind, "peers-unavailable");
         assert_eq!(gaps[0].achieved_steward_count, 0);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Cure 1 — shard-manifest re-stamp on blob rotation.
+    //
+    // Root cause: `distribute_shards` recomputes a FRESH manifest from the bytes it
+    // is handed and writes `shard_locations` under those NEW shard hashes, but never
+    // reconciles the STORED `shard_manifests` row. Every per-content reader joins
+    // through the stored manifest, so after a blob rotation the holder join is
+    // guaranteed-empty even though distribution succeeded — `distributionState:
+    // "measured"` with `stewardingCollectives: 0` (live: elohim-host-landing, stored
+    // manifest stamped from a 9,972,404-byte SSR bundle while content.blob_hash
+    // points at the 10,002,432-byte current one).
+    // ────────────────────────────────────────────────────────────────────────
+
+    /// DETECTOR (i): manifest present + DIVERGENT blob_hash → selected for the
+    /// re-stamp path, *regardless of how many holder rows exist*.
+    ///
+    /// This is the leg the pre-fix selector could never reach: its only admission
+    /// rule was "zero shard_locations", and a rotated blob whose distribution
+    /// SUCCEEDED has holder rows — under the NEW hash. Both the old rule and the
+    /// readers looked at the stale hashes, so the content was simultaneously
+    /// "already placed" (excluded from remediation) and "unreadable" (empty join).
+    #[test]
+    fn divergent_manifest_is_selected_even_with_holder_rows_present() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        // Content now points at the NEW bytes; the manifest still names the OLD.
+        insert_content(&mut conn, "rotated", Some("sha256-new"));
+        insert_manifest_with_shards(&mut conn, "rotated", "sha256-old", &["sha256-old"]);
+        // Distribution DID succeed — but the holder row is keyed under the new hash,
+        // which the stored manifest does not name.
+        seed_location(&mut conn, "sha256-new", "uhCAkHolder");
+
+        let cands = select_redistribution_candidates(&mut conn, "lamad", 50).expect("select");
+        let ids: Vec<&str> = cands.iter().map(|c| c.content_id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["rotated"],
+            "a divergent manifest must be admitted despite holder rows existing"
+        );
+        assert!(cands[0].is_manifest_divergent());
+        assert_eq!(cands[0].blob_hash, "sha256-new");
+        assert_eq!(
+            cands[0].manifest_blob_hash.as_deref(),
+            Some("sha256-old"),
+            "the candidate must carry the stale stamp so the sweep can log the divergence"
+        );
+    }
+
+    /// DETECTOR (ii): manifest present + MATCHING blob_hash + holders → untouched.
+    /// The healthy steady state must never enter the re-stamp path.
+    #[test]
+    fn matching_manifest_with_holders_is_not_selected() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        insert_content(&mut conn, "healthy", Some("sha256-same"));
+        insert_manifest_with_shards(&mut conn, "healthy", "sha256-same", &["s-1"]);
+        seed_location(&mut conn, "s-1", "uhCAkHolder");
+
+        let cands = select_redistribution_candidates(&mut conn, "lamad", 50).expect("select");
+        assert!(
+            cands.is_empty(),
+            "an agreeing manifest with holders is healthy, got {cands:?}"
+        );
+    }
+
+    /// PRIORITY: a divergent manifest must not lose the per-boot cap lottery to
+    /// healthy-but-dark rows. Alpha carries ~11.5k content rows against
+    /// `REDISTRIBUTE_CAP_PER_BOOT = 50`, so an unordered scan can starve the one
+    /// row that actually needs re-stamping for boot after boot.
+    #[test]
+    fn divergent_candidates_are_prioritised_within_the_cap() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        // Two dark rows FIRST in insertion order, then the divergent one.
+        for i in 0..2 {
+            let id = format!("dark-{i}");
+            let bh = format!("sha256-dark-{i}");
+            insert_content(&mut conn, &id, Some(&bh));
+            insert_manifest_with_shards(&mut conn, &id, &bh, &[&format!("s-dark-{i}")]);
+        }
+        insert_content(&mut conn, "rotated", Some("sha256-new"));
+        insert_manifest_with_shards(&mut conn, "rotated", "sha256-old", &["sha256-old"]);
+
+        let cands = select_redistribution_candidates(&mut conn, "lamad", 1).expect("select");
+        let ids: Vec<&str> = cands.iter().map(|c| c.content_id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["rotated"],
+            "the single capped slot must go to the divergent manifest, not a dark row"
+        );
+    }
+
+    /// END-TO-END re-stamp: the stored manifest is rewritten from the CURRENT local
+    /// bytes, so the shard hashes the readers join through finally match the hashes
+    /// distribution writes holder rows under.
+    #[cfg(feature = "p2p")]
+    #[tokio::test]
+    async fn run_once_restamps_a_divergent_manifest_from_local_bytes() {
+        let pool = test_pool();
+        let blob_store = BlobStore::new_memory();
+
+        // The CURRENT bytes — present locally (this node genuinely holds them).
+        let current = blob_store
+            .store(b"<html>the rebuilt SSR bundle</html>")
+            .await
+            .expect("store current blob");
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_content(&mut conn, "rotated", Some(&current.hash));
+            // Manifest stamped from a PREVIOUS bundle's bytes.
+            insert_manifest_with_shards(
+                &mut conn,
+                "rotated",
+                "sha256-previous-bundle",
+                &["sha256-previous-bundle"],
+            );
+        }
+
+        let config = BackfillConfig {
+            batch_size: 25,
+            item_delay: Duration::from_millis(0),
+            batch_pause: Duration::from_millis(0),
+        };
+        let handle = crate::p2p::P2PHandle::for_testing();
+        let report = run_once(&pool, &blob_store, "lamad", &config, Some(handle))
+            .await
+            .expect("sweep");
+
+        assert_eq!(report.divergent_manifests, 1);
+        assert_eq!(
+            report.manifests_restamped, 1,
+            "the divergence must be healed"
+        );
+        assert_eq!(report.restamp_bytes_missing, 0);
+
+        let mut conn = pool.get().expect("conn");
+        let manifest = crate::db::shard_manifests::get_manifest(&mut conn, "lamad", "rotated")
+            .expect("get manifest")
+            .expect("manifest present");
+        assert_eq!(
+            manifest.blob_hash, current.hash,
+            "the manifest must now be stamped from the content's CURRENT blob"
+        );
+        let shard_hashes: Vec<String> =
+            serde_json::from_str(&manifest.shard_hashes_json).expect("decode shard hashes");
+        // Small payload → encoding "none" → the single shard IS the blob.
+        assert_eq!(
+            shard_hashes,
+            vec![current.hash.clone()],
+            "the join key readers use must be the current bytes' hash"
+        );
+        assert!(
+            !shard_hashes.contains(&"sha256-previous-bundle".to_string()),
+            "the superseded shard hash must be gone from the manifest"
+        );
+    }
+
+    /// HONESTY: a divergent manifest whose CURRENT bytes are absent locally must NOT
+    /// be re-stamped — this node cannot truthfully restate a manifest from bytes it
+    /// does not hold. The `bytes-not-local` gap arm stays authoritative and the
+    /// stale manifest stays visibly stale.
+    #[cfg(feature = "p2p")]
+    #[tokio::test]
+    async fn divergent_manifest_without_local_bytes_is_not_restamped() {
+        let pool = test_pool();
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_content(&mut conn, "rotated", Some("sha256-new-not-held"));
+            insert_manifest_with_shards(&mut conn, "rotated", "sha256-old", &["sha256-old"]);
+        }
+        // Blob store deliberately EMPTY — the current bytes are not local.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let blob_store = BlobStore::new(tmp.path()).await.expect("blob store");
+
+        let config = BackfillConfig {
+            batch_size: 25,
+            item_delay: Duration::from_millis(0),
+            batch_pause: Duration::from_millis(0),
+        };
+        let handle = crate::p2p::P2PHandle::for_testing();
+        let report = run_once(&pool, &blob_store, "lamad", &config, Some(handle))
+            .await
+            .expect("sweep");
+
+        assert_eq!(report.divergent_manifests, 1);
+        assert_eq!(
+            report.manifests_restamped, 0,
+            "never re-stamp from bytes this node does not hold"
+        );
+        assert_eq!(report.restamp_bytes_missing, 1);
+        assert_eq!(
+            report.orphan_locations_pruned, 0,
+            "no re-stamp means nothing was superseded, so nothing may be pruned"
+        );
+
+        let mut conn = pool.get().expect("conn");
+        let manifest = crate::db::shard_manifests::get_manifest(&mut conn, "lamad", "rotated")
+            .expect("get manifest")
+            .expect("manifest present");
+        assert_eq!(
+            manifest.blob_hash, "sha256-old",
+            "the stale manifest must be left exactly as it was"
+        );
+
+        // The gap arm remains authoritative and visible.
+        let gaps = crate::db::placement_gaps::list_gaps(
+            &mut conn,
+            "lamad",
+            crate::db::placement_gaps::GapQuery {
+                content_id: Some("rotated".into()),
+                ..Default::default()
+            },
+        )
+        .expect("list gaps");
+        assert_eq!(
+            gaps.len(),
+            1,
+            "bytes-not-local must still leave an honest gap"
+        );
+        assert_eq!(gaps[0].gap_kind, "peers-unavailable");
+    }
+
+    /// ORPHAN PRUNE: holder rows keyed under a superseded manifest's shard hashes
+    /// are removed once no manifest names them — but a hash still named by ANOTHER
+    /// manifest survives (shard hashes are content-addressed; byte-identical content
+    /// legitimately shares them, and with `encoding = "none"` the shard hash IS the
+    /// blob hash).
+    #[cfg(feature = "p2p")]
+    #[tokio::test]
+    async fn restamp_prunes_orphans_but_spares_shared_shard_hashes() {
+        let pool = test_pool();
+        let blob_store = BlobStore::new_memory();
+        let current = blob_store
+            .store(b"<html>rebuilt</html>")
+            .await
+            .expect("store");
+
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_content(&mut conn, "rotated", Some(&current.hash));
+            insert_manifest_with_shards(
+                &mut conn,
+                "rotated",
+                "sha256-old",
+                &["s-orphan", "s-kept"],
+            );
+            // A holder row under each of the OLD manifest's shard hashes.
+            seed_location(&mut conn, "s-orphan", "uhCAkHolder");
+            seed_location(&mut conn, "s-kept", "uhCAkHolder");
+            // A DIFFERENT content whose manifest also names `s-kept` — that shard
+            // hash is still live and its holder row must survive the prune.
+            insert_content(&mut conn, "sibling", Some("sha256-sibling"));
+            insert_manifest_with_shards(&mut conn, "sibling", "sha256-sibling", &["s-kept"]);
+        }
+
+        let config = BackfillConfig {
+            batch_size: 25,
+            item_delay: Duration::from_millis(0),
+            batch_pause: Duration::from_millis(0),
+        };
+        let handle = crate::p2p::P2PHandle::for_testing();
+        let report = run_once(&pool, &blob_store, "lamad", &config, Some(handle))
+            .await
+            .expect("sweep");
+        assert_eq!(report.manifests_restamped, 1);
+        assert_eq!(
+            report.orphan_locations_pruned, 1,
+            "only the truly-unreferenced shard hash may be pruned"
+        );
+
+        let mut conn = pool.get().expect("conn");
+        assert!(
+            crate::db::shard_locations::get_locations_for_shard(&mut conn, "s-orphan")
+                .expect("query")
+                .is_empty(),
+            "the orphaned holder row must be gone"
+        );
+        assert_eq!(
+            crate::db::shard_locations::get_locations_for_shard(&mut conn, "s-kept")
+                .expect("query")
+                .len(),
+            1,
+            "a shard hash another manifest still names must NOT be pruned"
+        );
     }
 
     /// Part B: the per-boot cap bounds the result.

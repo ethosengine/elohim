@@ -67,6 +67,27 @@ export interface ResilienceSnapshotView {
    */
   coverageShortfall?: number;
   /**
+   * Per-tier counts + pledged bytes of the notarized `replicates-*` REA commitments held by the collectives stewarding this content. Same shape and same fold as HouseholdResilienceView.commitmentBackedReplication (elohim_facings::folds::replication_commitment) — this is that fold surfaced on the served snapshot. Scoping axis is the steward collectives, NOT the whole node ledger. Absent (missing, never a present null) means the producing path did not select this lens: the graph-backed branch cannot reach the relational rea_commitments relation, so it omits the key rather than emitting a fake measured zero. The relational household_resilience::snapshot path ALWAYS sets it.
+   */
+  commitmentBackedReplication?: {
+    /**
+     * Active `replicates-dwelling` commitments across the stewarding collectives.
+     */
+    dwellingCommitments: number;
+    /**
+     * Active collective-scoped replication commitments across the stewarding collectives.
+     */
+    collectiveCommitments: number;
+    /**
+     * Active `replicates-commons` / `replicates-content` commitments across the stewarding collectives.
+     */
+    commonsCommitments: number;
+    /**
+     * Sum of pledged bytes across those commitments. Read from each commitment's metadata_json policy envelope (never resource_quantity_value — that column is f32 and would round a multi-GB pledge).
+     */
+    totalPledgedBytes: number;
+  };
+  /**
    * Household-addressed felt projection of the resilience claim — names, not nines. Computed in household_resilience.rs::snapshot(). Honest by construction: floor-relative (reassurance is measured against the content's resilience floor, not a flat threshold) and unmeasured-aware (distributionState 'unmeasured' → reassurance 'not-yet-seen', never a fake verdict). The inverse of the operator debug Lens; consumed by <elohim-memory-safety>.
    */
   feltStatus?: {

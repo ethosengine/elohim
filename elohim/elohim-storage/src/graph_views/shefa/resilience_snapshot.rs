@@ -133,5 +133,13 @@ pub fn build(engine: &GraphEngine, cid: &str) -> Result<ResilienceSnapshotView, 
         // Descent: how many additional distinct-collective slots short of the floor.
         // Derived from steward_rollup.deficit — the genuine cure surfaced to callers.
         coverage_shortfall: Some(shortfall),
+        // Honesty boundary (same rule as `placement_gaps` / `felt_status` above):
+        // the per-tier replication-commitment fold reads the RELATIONAL
+        // `rea_commitments` relation, which is unreachable from the Cozo graph
+        // context. Emitting `CommitmentBackedReplication::default()` here would
+        // be a fake measured zero — an all-zeros pledge is indistinguishable
+        // from "no commitments exist". `None` says not-selected, and the key is
+        // omitted from the wire entirely.
+        commitment_backed_replication: None,
     })
 }

@@ -400,6 +400,12 @@ pub fn snapshot_with_staleness_secs(
         // The graph branch computes coverage_shortfall via CoverageRollup;
         // the relational path does not select that lens — missing ≡ not-selected.
         coverage_shortfall: None,
+        // The commitment-backed replication fold `compute_base` ALREADY ran over
+        // the `rea_commitments` replication relation (loaded once per request);
+        // surface it on the served snapshot instead of computing-then-dropping it.
+        // No second query: this is the same value `HouseholdResilienceView`
+        // carries, moved onto the wire shape the HTTP route actually serves.
+        commitment_backed_replication: Some(base.commitment_backed_replication),
     })
 }
 

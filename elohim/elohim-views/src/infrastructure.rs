@@ -1480,6 +1480,26 @@ pub struct ResilienceSnapshotView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub coverage_shortfall: Option<u32>,
+    /// Per-tier counts + pledged bytes of the notarized `replicates-*` REA
+    /// commitments held by the collectives stewarding this content — the SAME
+    /// `elohim_facings::folds::replication_commitment` fold
+    /// [`HouseholdResilienceView::commitment_backed_replication`] carries,
+    /// surfaced on the served snapshot (the `/api/v1/resilience/{id}/household`
+    /// wire shape) instead of being computed-then-dropped.
+    ///
+    /// The scoping axis is the STEWARD COLLECTIVES, not the whole node ledger.
+    ///
+    /// `None` ≡ the producing path did not select this lens — missing, never a
+    /// present null (same contract as `coverage_shortfall` / `details`). The
+    /// graph-backed branch (`graph_views::shefa::resilience_snapshot`) cannot
+    /// reach the relational `rea_commitments` relation from the Cozo context, so
+    /// it omits the key rather than emitting a fake measured zero. The relational
+    /// path (`household_resilience::snapshot_with_staleness_secs`) ALWAYS sets it.
+    /// Wire: `commitmentBackedReplication` in
+    /// `resilience-snapshot-view.schema.json`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub commitment_backed_replication: Option<CommitmentBackedReplication>,
 }
 
 /// A collective (of any kind) currently stewarding a content item.

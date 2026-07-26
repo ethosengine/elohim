@@ -6,10 +6,18 @@
 # human actually sees reflects it, consistently, everywhere it's rendered.
 #
 # Proof signal (HTTP, runs in Dataplane Validation): GET
-# /api/v1/resilience/elohim-host-landing/household householdsStewarding is the SAME
-# non-zero value on both alpha-A and elohim.host. New glue
+# /api/v1/resilience/elohim-host-landing/household stewardingCollectives is the
+# SAME non-zero value on both alpha-A and elohim.host. New glue
 # (steps/dataplane/resiliency-saga.steps.ts): no existing step compares a field
 # across two peers with a non-zero floor in one assertion.
+#
+# Vocabulary note: the served ResilienceSnapshotView field is
+# `stewardingCollectives` (a count of stewarding collectives of any kind — a
+# deliberate rename from the earlier "households" framing). There is no
+# `householdsStewarding` field on this route's wire shape — that name belongs to
+# the unrelated, test-only HouseholdResilienceView (household_resilience.rs's
+# `compute()`, exercised only by elohim-storage's own test suite, never wired to
+# this HTTP handler).
 #
 # Proof signal (rendered, @wip/@browser-only — excluded from Dataplane Validation
 # by the CI script's "not @browser-only" tag filter): a runLook capture of the
@@ -33,7 +41,7 @@ Feature: Chapter 10 — the resilience card tells the truth
     And peer "elohim.host" at "elohim.host"
 
   Scenario: Both doorways report the same non-zero stewarding count for elohim-host-landing
-    Then peers "alpha-A" and "elohim.host" report the same non-zero householdsStewarding for "elohim-host-landing"
+    Then peers "alpha-A" and "elohim.host" report the same non-zero stewardingCollectives for "elohim-host-landing"
 
   @wip @browser-only
   Scenario: The rendered resilience card shows the truth on elohim.host

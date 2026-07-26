@@ -296,6 +296,79 @@ pub fn get_locations_for_content(
         .map_err(StorageError::from)
 }
 
+/// Delete shard-location rows for hashes that NO shard manifest names any more.
+///
+/// # Why this exists (blob-rotation orphans)
+///
+/// `shard_locations` is keyed by `shard_hash`; every per-content reader
+/// ([`get_locations_for_content`], `household_resilience::load_holder_relation`)
+/// reaches it THROUGH the stored `shard_manifests.shard_hashes_json`. When a
+/// content's blob rotates (an SSR bundle rebuild changes `content.blob_hash`) and
+/// the manifest is re-stamped from the new bytes, the previous manifest's shard
+/// hashes stop being named by anything — the rows keyed under them become
+/// unreachable through every manifest-keyed read.
+///
+/// They are not, however, harmless: `operational_weave_facing::load_all_holder_relation`
+/// scans `shard_locations` with NO manifest key, so an orphan keeps inflating the
+/// region-occupancy fold with a holder of bytes nobody references. And because a
+/// bundle rotates on every deploy, orphans accumulate without bound.
+///
+/// # Safety (why this cannot delete a live join)
+///
+/// `candidates` are hashes we believe we just orphaned, but a shard hash is
+/// CONTENT-ADDRESSED: byte-identical content elsewhere legitimately names the same
+/// hash (with `encoding = "none"` the shard hash IS the blob hash, so two content
+/// rows over one blob share it outright). We therefore delete a candidate only when
+/// it appears in NO manifest at all — and the reference scan is deliberately
+/// **cross-app** (no `h_app_id` filter on `shard_manifests`), so a manifest in
+/// another app scope still protects the hash. The DELETE itself stays scoped to
+/// `h_app_id`. Conservative in both directions: a hash referenced anywhere is never
+/// pruned.
+///
+/// Returns the number of rows deleted.
+pub fn prune_orphaned_locations(
+    conn: &mut SqliteConnection,
+    h_app_id: &str,
+    candidates: &std::collections::HashSet<String>,
+) -> Result<usize, StorageError> {
+    use super::diesel_schema::shard_manifests;
+
+    if candidates.is_empty() {
+        return Ok(0);
+    }
+
+    // Every shard hash named by ANY manifest, across ALL app scopes.
+    let all_json: Vec<String> = shard_manifests::table
+        .select(shard_manifests::shard_hashes_json)
+        .load(conn)
+        .map_err(StorageError::from)?;
+    let mut referenced: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for json in &all_json {
+        if let Ok(hashes) = serde_json::from_str::<Vec<String>>(json) {
+            referenced.extend(hashes);
+        }
+    }
+
+    let doomed: Vec<String> = candidates
+        .iter()
+        .filter(|h| !referenced.contains(*h))
+        .cloned()
+        .collect();
+    if doomed.is_empty() {
+        return Ok(0);
+    }
+
+    let deleted = diesel::delete(
+        shard_locations::table
+            .filter(shard_locations::h_app_id.eq(h_app_id))
+            .filter(shard_locations::shard_hash.eq_any(&doomed)),
+    )
+    .execute(conn)
+    .map_err(StorageError::from)?;
+
+    Ok(deleted)
+}
+
 pub fn mark_lost(
     conn: &mut SqliteConnection,
     shard_hash: &str,
@@ -551,6 +624,128 @@ mod rekey_tests {
         assert_eq!(
             get_locations_for_peer(&mut conn, "uhCAkOLD").unwrap().len(),
             1
+        );
+    }
+}
+
+#[cfg(test)]
+mod prune_orphaned_tests {
+    use super::*;
+    use crate::db::models::{NewShardLocation, NewShardManifest};
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    fn setup() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory DB");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    fn seed_loc(conn: &mut SqliteConnection, shard: &str, app: &str) {
+        upsert_location(
+            conn,
+            &NewShardLocation {
+                shard_hash: shard,
+                peer_id: "uhCAkHolder",
+                h_app_id: app,
+                status: "announced",
+            },
+        )
+        .expect("seed location");
+    }
+
+    fn seed_manifest(conn: &mut SqliteConnection, content_id: &str, app: &str, shards: &[&str]) {
+        let json = serde_json::to_string(shards).expect("encode");
+        crate::db::shard_manifests::upsert_manifest(
+            conn,
+            &NewShardManifest {
+                content_id,
+                h_app_id: app,
+                blob_hash: "sha256-x",
+                blob_cid: None,
+                encoding: "rs",
+                data_shard_count: shards.len() as i32,
+                parity_shard_count: 0,
+                shard_hashes_json: &json,
+                total_size_bytes: 0,
+                shard_size_bytes: 0,
+                mime_type: "html5-app",
+                reach: "commons",
+            },
+        )
+        .expect("seed manifest");
+    }
+
+    /// Only hashes that NO manifest names are deleted, and the delete is scoped to
+    /// the caller's app.
+    #[test]
+    fn prunes_only_unreferenced_hashes_in_scope() {
+        let mut conn = setup();
+        seed_loc(&mut conn, "s-orphan", "lamad");
+        seed_loc(&mut conn, "s-live", "lamad");
+        seed_manifest(&mut conn, "live-content", "lamad", &["s-live"]);
+
+        let candidates: std::collections::HashSet<String> =
+            ["s-orphan".to_string(), "s-live".to_string()]
+                .into_iter()
+                .collect();
+        let n = prune_orphaned_locations(&mut conn, "lamad", &candidates).expect("prune");
+
+        assert_eq!(n, 1, "only the unreferenced hash may be deleted");
+        assert!(get_locations_for_shard(&mut conn, "s-orphan")
+            .expect("query")
+            .is_empty());
+        assert_eq!(
+            get_locations_for_shard(&mut conn, "s-live")
+                .expect("query")
+                .len(),
+            1,
+            "a hash a manifest still names must survive"
+        );
+    }
+
+    /// SAFETY: the reference scan is deliberately CROSS-APP. A shard hash is
+    /// content-addressed, so a manifest in another app scope legitimately names the
+    /// same bytes — pruning the lamad-scoped holder row would break that manifest's
+    /// join. A hash referenced anywhere is never pruned.
+    #[test]
+    fn a_hash_referenced_by_another_app_is_never_pruned() {
+        let mut conn = setup();
+        seed_loc(&mut conn, "s-shared", "lamad");
+        seed_manifest(&mut conn, "qahal-content", "qahal", &["s-shared"]);
+
+        let candidates: std::collections::HashSet<String> =
+            ["s-shared".to_string()].into_iter().collect();
+        let n = prune_orphaned_locations(&mut conn, "lamad", &candidates).expect("prune");
+
+        assert_eq!(n, 0, "a cross-app manifest reference must protect the hash");
+        assert_eq!(
+            get_locations_for_shard(&mut conn, "s-shared")
+                .expect("query")
+                .len(),
+            1
+        );
+    }
+
+    /// A hash NOT in the candidate set is never touched, even when unreferenced —
+    /// the prune only ever collects what a re-stamp in the same sweep superseded.
+    #[test]
+    fn unreferenced_hashes_outside_the_candidate_set_are_untouched() {
+        let mut conn = setup();
+        seed_loc(&mut conn, "s-unrelated", "lamad");
+
+        let empty: std::collections::HashSet<String> = std::collections::HashSet::new();
+        assert_eq!(
+            prune_orphaned_locations(&mut conn, "lamad", &empty).expect("prune"),
+            0
+        );
+        assert_eq!(
+            get_locations_for_shard(&mut conn, "s-unrelated")
+                .expect("query")
+                .len(),
+            1,
+            "the prune is candidate-scoped, never a global sweep"
         );
     }
 }

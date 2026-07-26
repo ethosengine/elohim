@@ -12556,9 +12556,18 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         // /api/v1/commitments — REA commitments
         // =====================================================================
         .route(
+            // TTL 30s (not 300): this route is the observation surface for the
+            // runtime commitment producers (the provide loop authors on a 60s
+            // tick, and the mishpat→REA mirror lands on a post-commit signal).
+            // A 5-minute projection cache made a freshly-notarized commitment
+            // invisible for up to 5 ticks, so any acceptance check that polls
+            // for a new commitment inside a ~60s window read a stale empty list
+            // and reported "producer dead" when the producer had in fact
+            // authored. Matched to the /api/v1/resilience TTL so the commitment
+            // ledger and the card computed FROM it cannot disagree by cache age.
             Route::get("/api/v1/commitments")
                 .handler("list_commitments")
-                .cache_ttl(300)
+                .cache_ttl(30)
                 .build(),
         )
         .route(

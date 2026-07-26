@@ -241,6 +241,24 @@ type PendingVerificationMap = Arc<
 type PendingReplicationFetchMap =
     Arc<tokio::sync::Mutex<std::collections::HashMap<request_response::OutboundRequestId, String>>>;
 
+/// Round-robin peer index for an acquisition dispatch, offset by a per-drain
+/// `rotation` so successive RETRIES of the same item walk different peers.
+///
+/// `position` is the item's index within the drained batch; because the acquisition
+/// queue is rebuilt each 60s reconcile from `list_active_pins` in stable DB order,
+/// that position is stable across retries. Without the rotation term an item is
+/// therefore asked of exactly one peer for its whole retry budget — provider
+/// resolution that never resolves past the first candidate.
+///
+/// Returns `0` for an empty peer set (callers peer-gate before dispatch; the guard
+/// keeps this total so it can be unit-tested without a swarm).
+fn rotated_peer_index(rotation: usize, position: usize, peer_count: usize) -> usize {
+    if peer_count == 0 {
+        return 0;
+    }
+    rotation.wrapping_add(position) % peer_count
+}
+
 /// Map of pending blob-pull requests (issued after a replication GetContent returns a
 /// non-empty blob_hash): outbound request ID → (content_id, blob_hash).
 ///
@@ -629,6 +647,10 @@ pub struct P2PNode {
     pending_acquisition_fetches: PendingReplicationFetchMap,
     /// acquisition gap queue (priority-ordered at enqueue time)
     acquisition_queue: ReplicationGapQueue,
+    /// Round-robin rotation offset for acquisition dispatch, bumped once per
+    /// drain. Without it, `peers[position % peers.len()]` pins every RETRY of a
+    /// given item to the SAME peer — see [`rotated_peer_index`].
+    acquisition_rotation: Arc<std::sync::atomic::AtomicUsize>,
     /// Extraction cache for delivery capability advertisement
     extraction_cache: Option<Arc<ExtractionCache>>,
     /// Content graph engine (graph-native feature). Threaded into the
@@ -2250,6 +2272,7 @@ impl P2PNode {
                 std::collections::HashMap::new(),
             )),
             acquisition_queue: Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new())),
+            acquisition_rotation: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             extraction_cache: None,
             #[cfg(feature = "graph-native")]
             graph_engine: None,
@@ -4876,8 +4899,53 @@ impl P2PNode {
                                             debug!("Content not found on peer (no pending replication request)");
                                         }
                                     }
-                                    _ => {
-                                        debug!(request_id = ?request_id, response = ?response, "Received shard response");
+                                    // Every OTHER response variant — notably
+                                    // `ShardResponse::Error(_)`, which the responder
+                                    // returns for "No database pool" / "DB connection
+                                    // failed" / "Content fetch failed" — used to fall
+                                    // through here as a bare debug log. That LEAKED the
+                                    // in-flight slot: the request id was never removed
+                                    // from `pending_{acquisition,replication}_fetches`,
+                                    // so `DispatchBudget::available(in_flight)` shrank
+                                    // permanently. After MAX_ACQUISITION_INFLIGHT (25)
+                                    // such responses the acquisition stream wedges at
+                                    // `available == 0` and never dispatches again — with
+                                    // no log, no metric, and a tracker that reports
+                                    // neither pending nor failed. Release the slot and
+                                    // record the failure honestly so the retry budget
+                                    // (and the exhaustion counters) can see it.
+                                    other => {
+                                        let acq_id = self
+                                            .pending_acquisition_fetches
+                                            .lock()
+                                            .await
+                                            .remove(&request_id);
+                                        let repl_id = self
+                                            .pending_replication_fetches
+                                            .lock()
+                                            .await
+                                            .remove(&request_id);
+                                        if let Some(ref id) = acq_id {
+                                            crate::metrics::inc_acquisition_outcome(
+                                                "unexpected_response",
+                                            );
+                                            self.acquisition.mark_failed(id).await;
+                                        }
+                                        if let Some(ref id) = repl_id {
+                                            self.replication_state.mark_failed(id).await;
+                                            self.replication_state.update_caught_up().await;
+                                        }
+                                        if acq_id.is_some() || repl_id.is_some() {
+                                            warn!(
+                                                request_id = ?request_id,
+                                                content_id = ?acq_id.or(repl_id),
+                                                response = %other.summary(),
+                                                "Fetch got an unexpected shard response; \
+                                                 in-flight slot released and item marked failed"
+                                            );
+                                        } else {
+                                            debug!(request_id = ?request_id, response = ?other, "Received shard response");
+                                        }
                                     }
                                 }
                             }
@@ -7747,6 +7815,18 @@ impl P2PNode {
     /// Acquisition dispatch (spec §4.2): shared-rails budget, round-robin
     /// GetContent across connected peers — same wire request the replication
     /// stream uses; streams differ in WHAT they want, not HOW they fetch.
+    ///
+    /// # Retry rotation (why `acquisition_rotation` exists)
+    ///
+    /// A failed item is NOT re-queued immediately: `GapTracker::mark_failed` drops
+    /// it from `pending` and the next 60s `run_acquisition_reconcile` re-enqueues it
+    /// (retry-on-NEXT-cycle, R-E). That reconcile rebuilds the queue from
+    /// `list_active_pins` in stable DB order, so an item lands at the SAME batch
+    /// position every cycle. With a bare `peers[position % peers.len()]` the item is
+    /// therefore asked of exactly ONE peer on all `MAX_RETRIES` attempts — on a
+    /// 6-peer fabric, five of six possible providers are never asked, and the item
+    /// exhausts its retry budget having probed 1/6 of the fabric. The rotation
+    /// offset advances once per drain so successive retries walk distinct peers.
     async fn drain_acquisition_queue(&self) {
         let budget = reconcile_rails::DispatchBudget::new(acquisition::MAX_ACQUISITION_INFLIGHT);
         let peers: Vec<PeerId> = {
@@ -7769,6 +7849,11 @@ impl P2PNode {
             let len = queue.len();
             queue.drain(..available.min(len)).collect()
         };
+        // Advance once per drain so a retry at a stable batch position walks to a
+        // different peer than the attempt before it.
+        let rotation = self
+            .acquisition_rotation
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let mut skipped = 0usize;
         let mut sent = 0usize;
         for (i, id) in to_dispatch.iter().enumerate() {
@@ -7776,7 +7861,7 @@ impl P2PNode {
                 skipped += 1;
                 continue;
             }
-            let peer = peers[i % peers.len()];
+            let peer = peers[rotated_peer_index(rotation, i, peers.len())];
             let request = ShardRequest::GetContent { id: id.clone() };
             let mut swarm = self.swarm.write().await;
             let request_id = swarm
@@ -8057,6 +8142,67 @@ mod bootstrap_peering_tests {
             &connected,
         );
         assert_eq!(needing.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod acquisition_rotation_tests {
+    use super::rotated_peer_index;
+
+    /// THE DEFECT: with a bare `position % peer_count`, an item at a stable batch
+    /// position is asked of the SAME peer on every retry. The acquisition queue is
+    /// rebuilt each 60s reconcile from `list_active_pins` in stable DB order, so the
+    /// position IS stable — meaning on a 6-peer fabric an item burns its whole
+    /// retry budget probing one sixth of the fabric. Live alpha read
+    /// `pull:{total:36,fetched:0,failed:36}`.
+    ///
+    /// With the rotation term, successive drains walk successive peers, so a
+    /// 3-retry budget probes 3 DISTINCT peers.
+    #[test]
+    fn successive_retries_of_a_stable_position_walk_distinct_peers() {
+        let peers = 6usize;
+        let position = 0usize; // the pathological case: always first in the batch
+
+        // Pre-fix behaviour, for contrast: position % peers is constant.
+        assert_eq!(position % peers, 0);
+
+        // Post-fix: drain N (rotation = N) sends that position to a new peer.
+        let visited: Vec<usize> = (0..3)
+            .map(|rotation| rotated_peer_index(rotation, position, peers))
+            .collect();
+        assert_eq!(visited, vec![0, 1, 2]);
+        let distinct: std::collections::HashSet<usize> = visited.iter().copied().collect();
+        assert_eq!(
+            distinct.len(),
+            3,
+            "a 3-retry budget must probe 3 distinct peers, not one peer 3 times"
+        );
+    }
+
+    /// Within ONE drain the spread across the batch is preserved — the rotation
+    /// shifts the whole batch, it does not collapse it onto a single peer.
+    #[test]
+    fn one_drain_still_spreads_the_batch_across_peers() {
+        let peers = 3usize;
+        let assigned: Vec<usize> = (0..6)
+            .map(|position| rotated_peer_index(7, position, peers))
+            .collect();
+        assert_eq!(assigned, vec![1, 2, 0, 1, 2, 0]);
+    }
+
+    /// Total function: an empty peer set yields 0 rather than panicking on `% 0`.
+    /// (Callers peer-gate before dispatch; this keeps the helper unit-testable.)
+    #[test]
+    fn empty_peer_set_is_total() {
+        assert_eq!(rotated_peer_index(9, 4, 0), 0);
+    }
+
+    /// The rotation counter is a monotonically-increasing `AtomicUsize`; it must
+    /// stay correct across the `usize` wrap rather than panicking in debug builds.
+    #[test]
+    fn rotation_wraps_without_overflow() {
+        assert_eq!(rotated_peer_index(usize::MAX, 1, 4), 0);
+        assert_eq!(rotated_peer_index(usize::MAX, 2, 4), 1);
     }
 }
 

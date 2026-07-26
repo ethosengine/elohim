@@ -1051,6 +1051,7 @@ version = "0.1.0"
 dependencies = [
  "cid",
  "elohim-epr",
+ "multihash-codetable",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",

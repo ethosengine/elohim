@@ -1221,6 +1221,7 @@ fn placement_gap_view_matches_schema() {
 
 #[test]
 fn resilience_snapshot_view_matches_schema() {
+    use elohim_storage::views::CommitmentBackedReplication;
     use elohim_storage::{
         FeltFloorView, FeltStatusView, OnlinePeersView, PlacementGapView, RegionalDistributionView,
         ResilienceSnapshotDetailsView, ResilienceSnapshotView, StewardingCollectiveEntry,
@@ -1295,9 +1296,24 @@ fn resilience_snapshot_view_matches_schema() {
             suggested_action: None,
         }),
         coverage_shortfall: None,
+        // Relational path always sets this — the served
+        // `/api/v1/resilience/{id}/household` shape.
+        commitment_backed_replication: Some(CommitmentBackedReplication {
+            dwelling_commitments: 1,
+            collective_commitments: 2,
+            commons_commitments: 3,
+            total_pledged_bytes: 53_687_091_200,
+        }),
     };
 
     let json = serde_json::to_value(&view).unwrap();
+    assert_eq!(
+        json["commitmentBackedReplication"]["totalPledgedBytes"],
+        serde_json::Value::Number(53_687_091_200_u64.into()),
+        "totalPledgedBytes must survive the wire as an exact u64 (a 50 GiB pledge \
+         rounds through f32 — the reason pledged bytes never ride \
+         resource_quantity_value)"
+    );
     validate_against_schema("views/resilience-snapshot-view.schema.json", &json);
 }
 
@@ -1324,6 +1340,7 @@ fn resilience_snapshot_view_minimal_matches_schema() {
         details: None,
         felt_status: None,
         coverage_shortfall: None,
+        commitment_backed_replication: None,
     };
 
     let json = serde_json::to_value(&view).unwrap();
@@ -1346,6 +1363,15 @@ fn resilience_snapshot_view_minimal_matches_schema() {
     assert!(
         !json.as_object().unwrap().contains_key("coverageShortfall"),
         "coverageShortfall must be absent when None (missing ≡ not-selected)"
+    );
+    assert!(
+        !json
+            .as_object()
+            .unwrap()
+            .contains_key("commitmentBackedReplication"),
+        "commitmentBackedReplication must be absent when None — the graph branch \
+         cannot reach the relational rea_commitments relation, and an all-zeros \
+         block would read as a measured zero rather than not-selected"
     );
     validate_against_schema("views/resilience-snapshot-view.schema.json", &json);
 }
@@ -1373,6 +1399,8 @@ fn resilience_snapshot_view_with_coverage_shortfall_validates() {
         details: None,
         felt_status: None,
         coverage_shortfall: Some(1), // 1 slot short of floor=3
+        // Graph branch: relational commitment relation unreachable → not-selected.
+        commitment_backed_replication: None,
     };
 
     let json = serde_json::to_value(&view).unwrap();
