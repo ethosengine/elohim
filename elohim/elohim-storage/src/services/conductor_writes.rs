@@ -462,7 +462,7 @@ pub async fn call_create_commitment(
             "conductor_writes: encode CreateMishpatCommitmentInput: {e}"
         ))
     })?;
-    hc.call_zome(MISHPAT_ZOME, "create_commitment", payload)
+    hc.call_zome_mishpat(MISHPAT_ZOME, "create_commitment", payload)
         .await
 }
 
@@ -502,7 +502,7 @@ pub async fn call_create_commitment_state_link(
             "conductor_writes: encode CreateCommitmentStateLinkInput: {e}"
         ))
     })?;
-    hc.call_zome(MISHPAT_ZOME, "create_commitment_state_link", payload)
+    hc.call_zome_mishpat(MISHPAT_ZOME, "create_commitment_state_link", payload)
         .await
 }
 
@@ -518,7 +518,7 @@ pub async fn get_commitment(
         StorageError::Internal(format!("conductor_writes: encode get_commitment cid: {e}"))
     })?;
     let bytes = hc
-        .call_zome(MISHPAT_ZOME, "get_commitment", payload)
+        .call_zome_mishpat(MISHPAT_ZOME, "get_commitment", payload)
         .await?;
     let out: Option<GetCommitmentOutput> = rmp_serde::from_slice(&bytes).map_err(|e| {
         StorageError::Serialization(format!("conductor_writes: decode GetCommitmentOutput: {e}"))

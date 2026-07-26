@@ -85,6 +85,16 @@ pub struct HcClient {
     app_ws: AppWebsocket,
     /// The cell ID for zome calls
     cell_id: CellId,
+    /// The mishpat role's cell, when the installed happ provisions one.
+    /// Every zome call routed through `call_zome` targets `cell_id` (the
+    /// configured role, "lamad" in production) — so mishpat coordinator calls
+    /// (`create_commitment`, `get_commitment`, state links) MUST target this
+    /// cell instead: on a live conductor they otherwise die with
+    /// `ZomeNotFound: mishpat`, because the lamad DNA has no mishpat zome.
+    /// `None` when the happ has no mishpat role (minimal local-dev bundles) —
+    /// `call_zome_mishpat` then returns a legible NotFound instead of the
+    /// misleading ZomeNotFound.
+    mishpat_cell_id: Option<CellId>,
     /// Signing credentials
     signer: Arc<ClientAgentSigner>,
 }
@@ -186,6 +196,25 @@ impl HcClient {
             "Found cell"
         );
 
+        // Resolve the mishpat role's cell when the happ provisions one, so
+        // governance zome calls target the DNA that actually carries the
+        // mishpat zome (targeting the lamad cell dies with ZomeNotFound).
+        let mishpat_cell_id = app_info
+            .cell_info
+            .get("mishpat")
+            .and_then(|cells| cells.first())
+            .and_then(|cell| match cell {
+                holochain_client::CellInfo::Provisioned(p) => Some(p.cell_id.clone()),
+                _ => None,
+            });
+        match &mishpat_cell_id {
+            Some(mc) => info!(
+                dna_hash = %hex::encode(&mc.dna_hash().get_raw_39()[..8]),
+                "Found mishpat cell"
+            ),
+            None => info!("No mishpat role in installed happ — mishpat zome calls unavailable"),
+        }
+
         // Create signing credentials
         let signer = ClientAgentSigner::default();
 
@@ -202,6 +231,24 @@ impl HcClient {
 
         // Add credentials to signer
         signer.add_credentials(cell_id.clone(), credentials);
+
+        // Authorize the mishpat cell too — the signer is per-cell, so without
+        // this a role-targeted mishpat call fails at signing, not at dispatch.
+        if let Some(mc) = &mishpat_cell_id {
+            let mishpat_credentials = admin_ws
+                .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
+                    cell_id: mc.clone(),
+                    functions: None,
+                })
+                .await
+                .map_err(|e| {
+                    StorageError::Connection(format!(
+                        "authorize_signing_credentials (mishpat) failed: {}",
+                        e
+                    ))
+                })?;
+            signer.add_credentials(mc.clone(), mishpat_credentials);
+        }
         info!("Signing credentials authorized");
 
         // Get app auth token
@@ -227,8 +274,45 @@ impl HcClient {
             admin_ws,
             app_ws,
             cell_id,
+            mishpat_cell_id,
             signer: signer_arc,
         })
+    }
+
+    /// Make a signed zome call against the MISHPAT cell (governance DNA).
+    /// The default `call_zome` targets the configured role's cell (lamad in
+    /// production), whose DNA has no mishpat zome — routing governance calls
+    /// there fails ZomeNotFound on every live conductor.
+    pub async fn call_zome_mishpat(
+        &self,
+        zome_name: &str,
+        fn_name: &str,
+        payload: Vec<u8>,
+    ) -> Result<Vec<u8>, StorageError> {
+        let cell_id = self.mishpat_cell_id.clone().ok_or_else(|| {
+            StorageError::NotFound(
+                "mishpat cell not provisioned in installed happ — governance zome calls \
+                 unavailable on this node"
+                    .to_string(),
+            )
+        })?;
+        debug!(
+            zome = %zome_name,
+            fn_name = %fn_name,
+            payload_len = payload.len(),
+            "Making signed zome call (mishpat cell)"
+        );
+        let result = self
+            .app_ws
+            .call_zome(
+                ZomeCallTarget::CellId(cell_id),
+                zome_name.into(),
+                fn_name.into(),
+                ExternIO::from(payload),
+            )
+            .await
+            .map_err(|e| StorageError::Conductor(format!("Zome call failed: {}", e)))?;
+        Ok(result.into_vec())
     }
 
     /// Make a signed zome call
