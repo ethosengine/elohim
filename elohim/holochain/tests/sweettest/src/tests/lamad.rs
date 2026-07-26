@@ -12,6 +12,9 @@
 //! DNA artifact: `dna/elohim/workdir/lamad.dna`.
 
 use anyhow::Result;
+// `Record` is used by the declare-carries-Record test to decode a served
+// record and construct the entry-swap forgery the coordinator must refuse.
+use hdk::prelude::Record;
 use holo_hash::{ActionHash, ActionHashB64, AgentPubKey};
 use holochain::sweettest::{await_consistency, SweetConductor};
 use serde::{Deserialize, Serialize};
@@ -113,6 +116,37 @@ struct DeclareContentHeadInput {
 struct DeclareCanonicalHeadInput {
     pub id: String,
     pub head_action_hash: String,
+}
+
+/// Mirrors `content_store::DeclareCanonicalHeadInput` WITH the sprint-3
+/// declare-carries-Record field.
+///
+/// Kept as a SEPARATE mirror on purpose: every existing test keeps sending the
+/// two-field shape above, so those calls double as the backward-compatibility
+/// proof — an old-shaped MessagePack map (no `carried_record` key) must still
+/// decode on the new coordinator via `#[serde(default)]`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DeclareCanonicalHeadWithRecordInput {
+    pub id: String,
+    pub head_action_hash: String,
+    pub carried_record: Option<Vec<u8>>,
+}
+
+/// Mirrors `content_store::GetRecordForActionInput` — the SOURCE half of
+/// declare-carries-Record.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct GetRecordForActionInput {
+    pub action_hash: String,
+}
+
+/// Mirrors `content_store::CarriedRecordOutput`. `action_hash` is `String`
+/// because the zome field is `ActionHashB64`, which serializes as a canonical
+/// base64 STRING (a raw-bytes `ActionHash` would fail to deserialize it).
+/// `record` is the opaque `holochain_serialized_bytes` encoding of a `Record`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CarriedRecordOutput {
+    pub action_hash: String,
+    pub record: Vec<u8>,
 }
 
 /// Mirrors the fields of `content_store::ContentHeadOutput` these tests assert.
@@ -992,6 +1026,307 @@ async fn earned_beats_newer_staging_at_resolve() -> Result<()> {
     assert_eq!(
         head_c1.head_action_hash, head_c2.head_action_hash,
         "CONVERGENCE: both peers resolve the earned head despite newer staging"
+    );
+
+    Ok(())
+}
+
+/// DECLARE-CARRIES-RECORD (sprint-3 centerpiece): a conductor can declare a
+/// canonical head it CANNOT retrieve, by carrying the target's signed `Record`
+/// and verifying it in wasm.
+///
+/// Why this exists: on a full-arc fleet (`target_arc_factor = 1`) every peer is
+/// an authority for every hash, so the `get` cascade short-circuits WITHOUT a
+/// network fetch. A gossip gap therefore reads as permanent ABSENCE, and the
+/// coordinator's "target action is not retrievable" refusal is unclearable by
+/// any retry ladder. Carrying the record replaces "wait for gossip" with
+/// "prove it locally".
+///
+/// Two conductors, deliberately NEVER peer-exchanged, so c2 genuinely does not
+/// hold c1's record. Proves:
+///   a. `get_record_for_action` serves on the holder (c1) and honestly answers
+///      `None` on the non-holder (c2).
+///   b. WITHOUT a carried record, c2's declare is refused "not retrievable" —
+///      the unchanged pre-sprint-3 behaviour (backward compatibility, sent on
+///      the OLD two-field wire shape).
+///   c. NEGATIVE — a carried record for a DIFFERENT action is refused
+///      (action-hash equality gate).
+///   d. NEGATIVE — a genuinely-signed action paired with a SWAPPED entry is
+///      refused (entry↔action binding gate). This is the dangerous forgery:
+///      checks 1 and 2 pass, only the entry-hash binding catches it.
+///   e. NEGATIVE — byte-tampered record bytes are refused.
+///   f. WITH the genuine carried record, the declare SUCCEEDS and the canonical
+///      head points at c1's ORIGINAL action hash, authored by a1 — the
+///      anchor-equality property (no local re-author, no new action hash).
+#[tokio::test(flavor = "multi_thread")]
+async fn declare_carries_record_for_unretrievable_target() -> Result<()> {
+    // ISOLATED and NEVER exchanged: the whole point is that c2 cannot reach
+    // c1's record. `two_agent_conductors_isolated` keeps the process-global
+    // mem-bootstrap store from joining them behind our back.
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors_isolated().await?;
+    let seed = network_seed(DNA);
+    let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
+    let app1 = c1
+        .setup_app_for_agent("lamad-app", a1.clone(), &[dna_file.clone()])
+        .await?;
+    let app2 = c2
+        .setup_app_for_agent("lamad-app", a2.clone(), &[dna_file])
+        .await?;
+    let cell1 = app1.cells().first().unwrap().clone();
+    let cell2 = app2.cells().first().unwrap().clone();
+    let zome1 = cell1.zome("content_store");
+    let zome2 = cell2.zome("content_store");
+
+    let carried_x = unique_id("carried-x");
+    let decoy_z = unique_id("carried-decoy-z");
+
+    // c1 authors the TARGET root. c2 authors its own independent root for the
+    // same id, so c2 passes the id-exists gate locally (that gate is not what
+    // this test is about) while still not holding c1's action.
+    let root_a: ContentOutput = c1
+        .call(&zome1, "create_content", test_content(&carried_x))
+        .await;
+    let root_a_action = root_a.action_hash.clone();
+    let root_b: ContentOutput = c2
+        .call(&zome2, "create_content", test_content(&carried_x))
+        .await;
+    assert_ne!(
+        root_a_action, root_b.action_hash,
+        "the two independent roots must be distinct actions"
+    );
+    // A second, unrelated record on c1 — the decoy for the negative cases.
+    let decoy: ContentOutput = c1
+        .call(&zome1, "create_content", test_content(&decoy_z))
+        .await;
+
+    let target_b64 = ActionHashB64::from(root_a_action.clone()).to_string();
+
+    // --- (a) the holder serves; the non-holder honestly answers None.
+    let served: Option<CarriedRecordOutput> = c1
+        .call(
+            &zome1,
+            "get_record_for_action",
+            GetRecordForActionInput {
+                action_hash: target_b64.clone(),
+            },
+        )
+        .await;
+    let served = served.expect("the authoring peer must serve its own record");
+    assert_eq!(
+        served.action_hash, target_b64,
+        "served record is for the requested action"
+    );
+    assert!(!served.record.is_empty(), "served record must carry bytes");
+
+    let c2_view: Option<CarriedRecordOutput> = c2
+        .call(
+            &zome2,
+            "get_record_for_action",
+            GetRecordForActionInput {
+                action_hash: target_b64.clone(),
+            },
+        )
+        .await;
+    assert!(
+        c2_view.is_none(),
+        "c2 must NOT hold c1's action (no peer exchange) — otherwise this test \
+         proves nothing"
+    );
+
+    // --- (b) no carried record → the unchanged "not retrievable" refusal.
+    // Sent on the OLD two-field mirror: this doubles as the backward-compat
+    // proof that a payload with no `carried_record` key still decodes.
+    let bare: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: carried_x.clone(),
+                head_action_hash: target_b64.clone(),
+            },
+        )
+        .await;
+    assert!(
+        bare.is_err(),
+        "without a carried record the declare must still be refused"
+    );
+    let bare_err = format!("{:?}", bare.unwrap_err());
+    assert!(
+        bare_err.contains("not retrievable"),
+        "the classic refusal must be preserved verbatim; got: {bare_err}"
+    );
+
+    // --- (c) NEGATIVE: carry the DECOY record while declaring the target hash.
+    let decoy_served: Option<CarriedRecordOutput> = c1
+        .call(
+            &zome1,
+            "get_record_for_action",
+            GetRecordForActionInput {
+                action_hash: ActionHashB64::from(decoy.action_hash.clone()).to_string(),
+            },
+        )
+        .await;
+    let decoy_served = decoy_served.expect("c1 must serve the decoy record");
+    let mismatched: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadWithRecordInput {
+                id: carried_x.clone(),
+                head_action_hash: target_b64.clone(),
+                carried_record: Some(decoy_served.record.clone()),
+            },
+        )
+        .await;
+    assert!(
+        mismatched.is_err(),
+        "a carried record for a DIFFERENT action must be refused"
+    );
+    let mismatched_err = format!("{:?}", mismatched.unwrap_err());
+    assert!(
+        mismatched_err.contains("does not match"),
+        "the action-hash gate must name the mismatch; got: {mismatched_err}"
+    );
+
+    // --- (d) NEGATIVE: genuine signed action + SWAPPED entry. Checks 1 (hash)
+    // and 2 (signature) pass — only the entry↔action binding catches this, so
+    // it is the sharpest guard in the set.
+    let genuine: Record = holochain_serialized_bytes::decode(&served.record)
+        .map_err(|e| anyhow::anyhow!("decode served record: {e}"))?;
+    let decoy_record: Record = holochain_serialized_bytes::decode(&decoy_served.record)
+        .map_err(|e| anyhow::anyhow!("decode decoy record: {e}"))?;
+    let swapped = Record::new(
+        genuine.signed_action().clone(),
+        decoy_record.entry().as_option().cloned(),
+    );
+    let swapped_bytes: Vec<u8> = holochain_serialized_bytes::encode(&swapped)
+        .map_err(|e| anyhow::anyhow!("encode swapped record: {e}"))?;
+    let swapped_declare: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadWithRecordInput {
+                id: carried_x.clone(),
+                head_action_hash: target_b64.clone(),
+                carried_record: Some(swapped_bytes),
+            },
+        )
+        .await;
+    assert!(
+        swapped_declare.is_err(),
+        "a genuine action paired with a SWAPPED entry must be refused"
+    );
+
+    // --- (e) NEGATIVE: byte-tampered record. Either the decode fails or a hash
+    // check does; both are refusals, and neither may write a canonical link.
+    let mut tampered = served.record.clone();
+    let last = tampered.len() - 1;
+    tampered[last] ^= 0xFF;
+    let tampered_declare: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadWithRecordInput {
+                id: carried_x.clone(),
+                head_action_hash: target_b64.clone(),
+                carried_record: Some(tampered),
+            },
+        )
+        .await;
+    assert!(
+        tampered_declare.is_err(),
+        "byte-tampered carried record must be refused"
+    );
+
+    // --- (f) POSITIVE: the genuine carried record lands the declaration.
+    let declared: ContentHeadOutput = c2
+        .call(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadWithRecordInput {
+                id: carried_x.clone(),
+                head_action_hash: target_b64.clone(),
+                carried_record: Some(served.record.clone()),
+            },
+        )
+        .await;
+    assert_eq!(
+        declared.head_action_hash, root_a_action,
+        "ANCHOR EQUALITY: the canonical head is c1's ORIGINAL action hash — the \
+         carried record is verified in place, never re-authored locally"
+    );
+    assert_eq!(
+        declared.author, a1,
+        "the declared head keeps its foreign author (a1), not the declarer (a2)"
+    );
+    assert_eq!(declared.content_id, carried_x);
+    assert_ne!(
+        a1, a2,
+        "the two agents must be distinct for (f) to mean anything"
+    );
+
+    // --- (g) The link is REAL, not just a 200. `resolve_content_head` cannot
+    // show it yet: `gather_canonical_head_record` resolves the winning
+    // declaration's target with a local `get` and returns None when the target
+    // is unretrievable, so c2 still degrades to its own root election. That is
+    // the pre-existing, correct degrade — and on the live fleet it does not
+    // matter, because the HTTP declare arm stamps the projection from the
+    // declare OUTPUT (built here from the carried record), not from a re-resolve.
+    let pre_gossip: Option<ContentHeadOutput> = c2
+        .call(&zome2, "resolve_content_head", carried_x.clone())
+        .await;
+    assert_eq!(
+        pre_gossip
+            .expect("c2 still resolves SOME head")
+            .head_action_hash,
+        root_b.action_hash,
+        "before gossip, resolve degrades to c2's own root — the documented \
+         behaviour of gather_canonical_head_record on an unretrievable target"
+    );
+
+    // Now let the peers meet. The canonical link c2 wrote from carried evidence
+    // must be a genuine DHT link pointing at c1's action — so once the target
+    // gossips in, BOTH peers resolve it. This is the assertion that separates
+    // "the declare returned 200" from "the canonical head actually landed".
+    tokio::time::timeout(Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&c1, &c2]).await {
+            sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
+    await_consistency(60, [&cell1, &cell2])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout after carried declare: {e}"))?;
+
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let resolved: ContentHeadOutput = loop {
+        let h: Option<ContentHeadOutput> = c2
+            .call(&zome2, "resolve_content_head", carried_x.clone())
+            .await;
+        if let Some(h) = h {
+            if h.head_action_hash == root_a_action {
+                break h;
+            }
+        }
+        if Instant::now() >= deadline {
+            panic!("the carried canonical head did not resolve on c2 within 30s");
+        }
+        sleep(Duration::from_millis(100)).await;
+    };
+    assert_eq!(
+        resolved.author, a1,
+        "the resolved carried head keeps a1's authorship"
+    );
+
+    let head_c1: Option<ContentHeadOutput> = c1
+        .call(&zome1, "resolve_content_head", carried_x.clone())
+        .await;
+    assert_eq!(
+        head_c1.expect("c1 must resolve the head").head_action_hash,
+        root_a_action,
+        "CONVERGENCE: the link c2 wrote from carried evidence is honored by the \
+         authoring peer too"
     );
 
     Ok(())

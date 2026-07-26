@@ -2620,10 +2620,50 @@ pub struct DeclareContentHeadInput {
 /// string-wire-safety reason as `DeclareContentHeadInput` (accepts base64 and
 /// raw-byte forms under rmp_serde; converted to `ActionHash` internally). It is
 /// REQUIRED — a cross-root declaration always names its explicit target.
+///
+/// `carried_record` is the DECLARE-CARRIES-RECORD extension (sprint-3): the
+/// optional, `holochain_serialized_bytes`-encoded [`Record`] of the declared
+/// target, supplied by the caller when the declaring conductor may not hold
+/// the target locally. It exists because on a FULL-ARC fleet
+/// (`target_arc_factor = 1`) every peer is an authority for every hash, so the
+/// `get` cascade short-circuits WITHOUT a network fetch — a gossip gap reads
+/// as absence, and no retry ladder can ever clear it. The carried record turns
+/// that dead end into a locally-verifiable proof (see
+/// [`validate_carried_record`]).
+///
+/// Additive + backward compatible: `#[serde(default)]` means an old caller
+/// that omits the key decodes to `None` and gets EXACTLY the prior behaviour.
+/// A carried record is only consulted when the local `get` misses — a locally
+/// retrievable target always wins.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DeclareCanonicalHeadInput {
     pub id: String,
     pub head_action_hash: holo_hash::ActionHashB64,
+    /// `holochain_serialized_bytes`-encoded [`Record`] of the target action.
+    /// `None` (or absent) → local-`get`-only, the pre-sprint-3 behaviour.
+    #[serde(default)]
+    pub carried_record: Option<Vec<u8>>,
+}
+
+/// Input for [`get_record_for_action`] — the SOURCE side of
+/// declare-carries-Record. `action_hash` is typed [`holo_hash::ActionHashB64`]
+/// for the same string-wire-safety reason as [`DeclareCanonicalHeadInput`].
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetRecordForActionInput {
+    pub action_hash: holo_hash::ActionHashB64,
+}
+
+/// Output of [`get_record_for_action`]: the serialized [`Record`] a caller can
+/// carry to a peer that cannot retrieve the action itself.
+///
+/// `record` is `holochain_serialized_bytes::encode(&Record)` — the SAME
+/// MessagePack encoding [`validate_carried_record`] decodes on the receiving
+/// side, so the bytes are an opaque token to every layer in between (HTTP
+/// base64s them; nothing else needs to understand a `Record`).
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CarriedRecordOutput {
+    pub action_hash: holo_hash::ActionHashB64,
+    pub record: Vec<u8>,
 }
 
 /// Walk an action's Update lineage down to the root Create and return its
@@ -3206,15 +3246,107 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
     Ok(out)
 }
 
+/// Verify a CARRIED [`Record`] well enough to treat it as the declared target
+/// WITHOUT ever having held it locally — the substrate half of
+/// declare-carries-Record.
+///
+/// Nothing about the carrier is trusted: every claim in the payload is
+/// re-derived in wasm from the bytes themselves, so a hostile (or merely
+/// buggy) carrier cannot bind an arbitrary Content as a canonical head.
+/// Four checks, each closing a distinct forgery:
+///
+///   1. **Action-hash equality** — `hash_action(carried.action)` MUST equal the
+///      declared `target`. Closes "carry record X, declare hash Y": the link we
+///      write points at `target`, so the bytes must be the pre-image of exactly
+///      that hash. The record's own *claimed* hash is checked too, so the
+///      carried envelope is self-consistent as well.
+///   2. **Author signature** — the action's signature MUST verify against the
+///      action's own author key. Closes hand-rolled actions: only the author's
+///      private key can produce it, and the conductor signs the HSB-encoded
+///      `Action` exactly as [`verify_signature`] re-encodes it here.
+///   3. **Entry↔action binding** — `hash_entry(carried.entry)` MUST equal the
+///      action's `entry_hash`. Closes the swap attack: without it a carrier
+///      could pair a genuinely-signed action with DIFFERENT Content bytes, and
+///      the eager projection stamp would take the substituted content.
+///   4. Content decode + `content.id == id` — deliberately NOT here; it is the
+///      shared TARGET-ID GATE in [`declare_canonical_head_inner`], which runs
+///      identically for locally-retrieved and carried records.
+///
+/// Together 1–3 make the carried record equivalent-in-force to one this
+/// conductor fetched itself: same author, same bytes, same hash. It is
+/// evidence, not authority — WHO may declare is still the caller's gate.
+fn validate_carried_record(target: &ActionHash, bytes: &[u8]) -> ExternResult<Record> {
+    let record: Record = holochain_serialized_bytes::decode(bytes).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_canonical_head: carried record for {target:?} could not be deserialized: {e}"
+        )))
+    })?;
+
+    // (1) The carried bytes must hash to the declared target — both the
+    // recomputed hash and the envelope's own claimed hash.
+    let computed = hash_action(record.action().clone())?;
+    if &computed != target {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_canonical_head: carried record hashes to {computed:?}, which does not match \
+             the declared head action {target:?}"
+        ))));
+    }
+    if record.action_address() != target {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_canonical_head: carried record claims action {:?}, which does not match the \
+             declared head action {target:?}",
+            record.action_address()
+        ))));
+    }
+
+    // (2) The author's signature must verify over the action.
+    let author = record.action().author().clone();
+    let signature = record.signature().clone();
+    if !verify_signature(author.clone(), signature, record.action())? {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_canonical_head: carried record for {target:?} carries an invalid author \
+             signature (author {author:?})"
+        ))));
+    }
+
+    // (3) The carried entry must be the one this action committed.
+    let entry = record.entry().as_option().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_canonical_head: carried record for {target:?} carries no entry"
+        )))
+    })?;
+    let action_entry_hash = record.action().entry_hash().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_canonical_head: carried record for {target:?} has an action with no entry hash"
+        )))
+    })?;
+    let computed_entry_hash = hash_entry(entry.clone())?;
+    if &computed_entry_hash != action_entry_hash {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_canonical_head: carried record for {target:?} carries an entry hashing to \
+             {computed_entry_hash:?}, which does not match the action's entry hash \
+             {action_entry_hash:?}"
+        ))));
+    }
+
+    Ok(record)
+}
+
 /// Shared body for both canonical-head declaration tiers: validate the id +
 /// cross-root target, write the canonical-head link with the given provenance
 /// `tag`, emit the reused `ContentHeadDeclared` signal, and build the output.
 /// Callers own the AUTHORITY decision (which tier / who may declare) and the
 /// earned-head guard BEFORE calling this.
+///
+/// `carried_record` (declare-carries-Record, sprint-3) is consulted ONLY when
+/// the local `get` misses. See [`DeclareCanonicalHeadInput::carried_record`]
+/// for why the local `get` cannot be made to succeed on a full-arc fleet, and
+/// [`validate_carried_record`] for what the carried bytes must prove.
 fn declare_canonical_head_inner(
     id: &str,
     head_action_hash: holo_hash::ActionHashB64,
     tag: &[u8],
+    carried_record: Option<Vec<u8>>,
 ) -> ExternResult<ContentHeadOutput> {
     // The id must exist as content (guards typos / declaring a phantom id).
     if gather_content_chain(id)?.is_none() {
@@ -3225,12 +3357,27 @@ fn declare_canonical_head_inner(
 
     // Resolve + validate the cross-root target: must be a retrievable Content
     // record. `ActionHash::from(ActionHashB64)` is the inner-hash unwrap.
+    //
+    // DECLARE-CARRIES-RECORD: the local `get` stays FIRST — a target this
+    // conductor already holds is always preferred, so the carried path can
+    // never displace locally-held truth. Only on a local MISS do we fall back
+    // to the carried record, and then only after it proves itself in wasm. On a
+    // full-arc fleet this miss is terminal without a carried record (the
+    // cascade short-circuits at authority, so there is no network fetch to
+    // wait for) — hence the unchanged "not retrievable" error when the caller
+    // carried nothing, which is the honest diagnostic the CI ladder reads.
     let target = ActionHash::from(head_action_hash);
-    let target_record = get(target.clone(), GetOptions::default())?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "declare_canonical_head: target action {target:?} is not retrievable"
-        )))
-    })?;
+    let target_record = match get(target.clone(), GetOptions::default())? {
+        Some(record) => record,
+        None => match carried_record {
+            Some(bytes) => validate_carried_record(&target, &bytes)?,
+            None => {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "declare_canonical_head: target action {target:?} is not retrievable"
+                ))))
+            }
+        },
+    };
     // Confirm it carries a Content entry (build_content_head_output would also
     // catch this, but we validate up front for a clearer error).
     let content: Content = target_record
@@ -3322,7 +3469,12 @@ pub fn declare_canonical_content_head(
         }
     }
 
-    declare_canonical_head_inner(&input.id, input.head_action_hash, CANONICAL_TAG_STAGING)
+    declare_canonical_head_inner(
+        &input.id,
+        input.head_action_hash,
+        CANONICAL_TAG_STAGING,
+        input.carried_record,
+    )
 }
 
 /// Declare the CROSS-ROOT canonical head of a content id — the EARNED tier.
@@ -3352,7 +3504,52 @@ pub fn declare_earned_canonical_head(
             input.id
         ))));
     }
-    declare_canonical_head_inner(&input.id, input.head_action_hash, CANONICAL_TAG_EARNED)
+    declare_canonical_head_inner(
+        &input.id,
+        input.head_action_hash,
+        CANONICAL_TAG_EARNED,
+        input.carried_record,
+    )
+}
+
+/// Serve the full [`Record`] for an action from THIS conductor's local DHT view
+/// — the SOURCE half of declare-carries-Record.
+///
+/// The authoring peer holds the record; a peer that cannot fetch it (full-arc
+/// gossip gap) cannot ask the network for it. So the caller asks the peer that
+/// HAS it, and carries the bytes to the peer that does not — see
+/// [`DeclareCanonicalHeadInput::carried_record`] and
+/// [`validate_carried_record`].
+///
+/// Coordinator-only and read-only: no entry types, no links, no commits — so
+/// this ships on the `update_coordinators` hot-swap path with no DNA-hash move.
+/// `Ok(None)` when this conductor cannot retrieve the action (honest absence;
+/// the caller simply declares without a carried record).
+///
+/// NOT a confidentiality boundary: it returns exactly what any DHT authority
+/// for the hash already holds, and every field is self-authenticating (the
+/// author's signature travels with it). Edge auth still applies at the HTTP
+/// surface.
+#[hdk_extern]
+pub fn get_record_for_action(
+    input: GetRecordForActionInput,
+) -> ExternResult<Option<CarriedRecordOutput>> {
+    let action_hash = ActionHash::from(input.action_hash);
+    let record = match get(action_hash.clone(), GetOptions::default())? {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+    // Same encoding `validate_carried_record` decodes — HSB (MessagePack with
+    // struct-map), the canonical serialization on every Holochain boundary.
+    let bytes = holochain_serialized_bytes::encode(&record).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "get_record_for_action: could not serialize record for {action_hash:?}: {e}"
+        )))
+    })?;
+    Ok(Some(CarriedRecordOutput {
+        action_hash: holo_hash::ActionHashB64::from(action_hash),
+        record: bytes,
+    }))
 }
 
 /// Bulk create content entries (for import operations)

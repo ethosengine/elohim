@@ -42,6 +42,50 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
         echo "  ⚠ DECLARE_ONLY: could not resolve headActionHash from ${SRC}/db/content/${SLUG}/head — skipping propagation to ${DOORWAY_EPR_URL}" >&2
         exit 0
     fi
+    # DECLARE-CARRIES-RECORD (sprint-3). Ask the AUTHORING doorway for the head
+    # action's full serialized Record and carry it in the declare body. Without
+    # it, the receiving conductor's only way to see the target is its local
+    # `get` — and on a full-arc fleet (target_arc_factor=1) that cascade
+    # short-circuits at authority WITHOUT a network fetch, so a gossip gap reads
+    # as permanent absence and NO retry ladder can ever clear it. With it, the
+    # receiver re-derives the action hash, author signature, and entry↔action
+    # binding in wasm and honors the declaration on evidence rather than gossip.
+    #
+    # Strictly best-effort and strictly additive: any failure here (old peer
+    # without the route, 404, malformed JSON) leaves record_b64 empty and the
+    # declare falls back to the exact pre-sprint-3 body. The record is only
+    # accepted when the source's own headActionHash matches the hash we are
+    # about to declare — a mismatch means the head moved between the two reads,
+    # and carrying a record for a different action would be refused anyway.
+    #
+    # bash + coreutils ONLY here (scripts/ci/.epr-meta deploy-script invariant):
+    # both fields are base64/base64url, so they contain no `"` and need no JSON
+    # escaping — sed extraction and printf construction are exact.
+    record_b64=""
+    record_head=""
+    head_record_json=$(curl -fSs -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
+        "${SRC}/db/content/${SLUG}/head-record" 2>/dev/null) || head_record_json=""
+    if [ -n "${head_record_json}" ]; then
+        record_head=$(printf '%s' "${head_record_json}" \
+            | sed -n 's/.*"headActionHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+        if [ "${record_head}" = "${head_hash}" ]; then
+            record_b64=$(printf '%s' "${head_record_json}" \
+                | sed -n 's/.*"record"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+        fi
+    fi
+    # Build the declare body in a file: a multi-KB base64 payload must not ride
+    # in argv (length limits) and must not be re-quoted by the shell. The body
+    # is byte-identical to the pre-sprint-3 one when there is no carried record.
+    declare_body_file="$(mktemp)"
+    trap 'rm -f "${declare_body_file}"' EXIT
+    if [ -n "${record_b64}" ]; then
+        printf '{"headActionHash":"%s","record":"%s"}' "${head_hash}" "${record_b64}" \
+            > "${declare_body_file}"
+        echo "  · DECLARE_ONLY: carrying head record from ${SRC} (${#record_b64} b64 chars) — target verifiable without gossip"
+    else
+        printf '{"headActionHash":"%s"}' "${head_hash}" > "${declare_body_file}"
+        echo "  · DECLARE_ONLY: no carried record available from ${SRC} — declaring hash-only (pre-sprint-3 behaviour; 'not retrievable' stays possible)" >&2
+    fi
     # Retry ladder for DHT publish lag AND peer backpressure. Two retryable
     # classes, everything else is structural (retrying just burns build time):
     #   - "not retrievable" refusal — a head authored SECONDS ago is
@@ -65,7 +109,7 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
         declare_raw=$(curl -sS -o - -w '\n%{http_code}' -X POST \
             -H 'Content-Type: application/json' \
             -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
-            -d "{\"headActionHash\":\"${head_hash}\"}" \
+            --data-binary "@${declare_body_file}" \
             "${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head" 2>&1) || {
             echo "  ⚠ DECLARE_ONLY: curl error POSTing canonical-head to ${DOORWAY_EPR_URL}: ${declare_raw} — peer keeps its own head until gossip/heal converges" >&2
             exit 0

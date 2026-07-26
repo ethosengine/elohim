@@ -262,10 +262,42 @@ pub struct DeclareContentHeadInput {
 /// `head_action_hash` is REQUIRED — a cross-root declaration always names its
 /// explicit target action (any retrievable Content action for the id, including
 /// one authored under a different root by a different agent).
+///
+/// `carried_record` is the DECLARE-CARRIES-RECORD extension (sprint-3): the
+/// `holochain_serialized_bytes`-encoded `Record` of the target, served by the
+/// AUTHORING peer via [`call_get_record_for_action`]. On a full-arc fleet
+/// (`target_arc_factor = 1`) every conductor is an authority for every hash, so
+/// the coordinator's `get` cascade short-circuits WITHOUT a network fetch — a
+/// gossip gap reads as absence and no retry ladder can clear it. Carrying the
+/// record lets the declaring conductor verify the target in wasm instead of
+/// waiting for gossip that will never arrive.
+///
+/// Additive: `None` (the pre-sprint-3 shape) is serialized as a msgpack nil the
+/// coordinator's `#[serde(default)] Option<Vec<u8>>` decodes to `None`, so an
+/// old coordinator and a new one both accept this payload.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DeclareCanonicalHeadInput {
     pub id: String,
     pub head_action_hash: String,
+    #[serde(default)]
+    pub carried_record: Option<Vec<u8>>,
+}
+
+/// Caller-input wire shape for the `content_store::get_record_for_action`
+/// coordinator — the SOURCE half of declare-carries-Record.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GetRecordForActionInput {
+    pub action_hash: String,
+}
+
+/// Typed decode of the `content_store::get_record_for_action` coordinator
+/// return (`CarriedRecordOutput`). `record` is the opaque HSB/MessagePack
+/// encoding of the `Record` — storage never interprets it, it only relays it
+/// (base64 on the HTTP hop, raw bytes on the zome hop).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CarriedRecordWire {
+    pub action_hash: String,
+    pub record: Vec<u8>,
 }
 
 /// Resolve the notary-declared HEAD for a content `id` from THIS conductor's DHT view
@@ -341,14 +373,24 @@ pub async fn call_declare_content_head(
 /// unmapped via `?`) so callers can match on the coordinator's guard substrings — e.g.
 /// "earned head is protected" (staging cannot override an earned canonical) or
 /// unauthorized-declarer.
+///
+/// `carried_record` (declare-carries-Record) is the optional HSB-encoded
+/// `Record` of the target. Pass `None` for the classic behaviour; pass
+/// `Some(bytes)` — obtained from the authoring peer via
+/// [`call_get_record_for_action`] — to let a conductor that cannot retrieve the
+/// target declare it anyway. The coordinator consults it ONLY on a local miss,
+/// and only after re-deriving the action hash, author signature, and
+/// entry↔action binding in wasm.
 pub async fn call_declare_canonical_content_head(
     hc: &Arc<HcClient>,
     id: &str,
     head_action_hash: String,
+    carried_record: Option<Vec<u8>>,
 ) -> Result<ContentHeadWire, StorageError> {
     let input = DeclareCanonicalHeadInput {
         id: id.to_string(),
         head_action_hash,
+        carried_record,
     };
     let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
         StorageError::Internal(format!(
@@ -361,6 +403,40 @@ pub async fn call_declare_canonical_content_head(
     let out: ContentHeadWire = rmp_serde::from_slice(&bytes).map_err(|e| {
         StorageError::Serialization(format!(
             "conductor_writes: decode ContentHeadWire (declare_canonical): {e}"
+        ))
+    })?;
+    Ok(out)
+}
+
+/// Fetch the full serialized `Record` for an action from THIS conductor's local
+/// DHT view via `content_store::get_record_for_action` — the SOURCE half of
+/// declare-carries-Record.
+///
+/// The authoring peer answers `Some(..)`; a peer that cannot retrieve the
+/// action answers `Ok(None)` (honest absence, not an error — the caller then
+/// declares without a carried record and gets the classic behaviour).
+///
+/// A `fn-not-found`-class conductor error propagates verbatim: it is the
+/// hot-swap probe signal telling the caller this peer still runs a pre-sprint-3
+/// coordinator.
+pub async fn call_get_record_for_action(
+    hc: &Arc<HcClient>,
+    action_hash: &str,
+) -> Result<Option<CarriedRecordWire>, StorageError> {
+    let input = GetRecordForActionInput {
+        action_hash: action_hash.to_string(),
+    };
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode GetRecordForActionInput: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "get_record_for_action", payload)
+        .await?;
+    let out: Option<CarriedRecordWire> = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode CarriedRecordWire (get_record_for_action): {e}"
         ))
     })?;
     Ok(out)

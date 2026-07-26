@@ -4151,6 +4151,14 @@ impl HttpServer {
             // Entity-nested notary-HEAD authority: /db/content/{cid}/head
             // (HEAD-election, Plan C3 / Leg 3). Must precede the generic
             // content/{id} catch-all below.
+            // Entity-nested head-RECORD service: /db/content/{cid}/head-record
+            // (declare-carries-Record SOURCE half). MUST precede the "/head"
+            // suffix arm below — "/head-record" does not end in "/head", but
+            // keeping the more specific suffix first makes the ordering
+            // intent explicit and survives a future "/head*" widening.
+            if let Some(cid) = rest.strip_suffix("/head-record") {
+                return self.handle_content_head_record(method, cid, &app_ctx).await;
+            }
             if let Some(cid) = rest.strip_suffix("/head") {
                 return self.handle_content_head(req, method, cid, &app_ctx).await;
             }
@@ -5376,11 +5384,20 @@ impl HttpServer {
         /// POST body: the explicit action to declare as the cross-root
         /// canonical head. REQUIRED — a cross-root declaration always names
         /// its explicit target (mirrors the zome's `DeclareCanonicalHeadInput`).
+        ///
+        /// `record` is the OPTIONAL declare-carries-Record payload: the
+        /// standard-base64 encoding of the target's serialized `Record`, as
+        /// served by `GET /db/content/{id}/head-record` on the AUTHORING peer.
+        /// Supplying it lets this conductor declare a head it cannot retrieve
+        /// itself (the full-arc gossip-gap case); omitting it is the classic
+        /// behaviour, unchanged.
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct DeclareCanonicalHeadBody {
             #[serde(default)]
             head_action_hash: Option<String>,
+            #[serde(default)]
+            record: Option<String>,
         }
 
         if method != Method::POST {
@@ -5395,30 +5412,52 @@ impl HttpServer {
             .get()
             .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
 
-        // (a) Parse body { headActionHash: String } — missing or empty → 400.
+        // (a) Parse body { headActionHash: String, record?: base64 } —
+        // headActionHash missing or empty → 400. `record` is optional; a
+        // malformed base64 is a caller error (400) rather than a silent drop,
+        // because silently declaring without the carried record would surface
+        // as the confusing "not retrievable" refusal the carry exists to cure.
         let body_bytes = req
             .into_body()
             .collect()
             .await
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
             .to_bytes();
-        let head_action_hash: String = if body_bytes.is_empty() {
-            return Ok(response::bad_request(
-                "headActionHash is required to declare a canonical content head",
-            ));
-        } else {
-            match serde_json::from_slice::<DeclareCanonicalHeadBody>(&body_bytes) {
-                Ok(b) => match b.head_action_hash {
-                    Some(h) if !h.trim().is_empty() => h,
-                    _ => {
-                        return Ok(response::bad_request(
-                            "headActionHash is required to declare a canonical content head",
-                        ))
+        let (head_action_hash, carried_record): (String, Option<Vec<u8>>) =
+            if body_bytes.is_empty() {
+                return Ok(response::bad_request(
+                    "headActionHash is required to declare a canonical content head",
+                ));
+            } else {
+                match serde_json::from_slice::<DeclareCanonicalHeadBody>(&body_bytes) {
+                    Ok(b) => {
+                        let head = match b.head_action_hash {
+                            Some(h) if !h.trim().is_empty() => h,
+                            _ => return Ok(response::bad_request(
+                                "headActionHash is required to declare a canonical content head",
+                            )),
+                        };
+                        let carried =
+                            match b.record.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                                Some(b64) => {
+                                    use base64::{engine::general_purpose::STANDARD, Engine as _};
+                                    match STANDARD.decode(b64) {
+                                        Ok(bytes) => Some(bytes),
+                                        Err(e) => {
+                                            return Ok(response::bad_request(&format!(
+                                                "record must be standard base64 of a serialized \
+                                         Record: {e}"
+                                            )))
+                                        }
+                                    }
+                                }
+                                None => None,
+                            };
+                        (head, carried)
                     }
-                },
-                Err(e) => return Ok(response::bad_request(&format!("Invalid JSON: {}", e))),
-            }
-        };
+                    Err(e) => return Ok(response::bad_request(&format!("Invalid JSON: {}", e))),
+                }
+            };
 
         // (b) Resolve the lamad conductor bridge.
         let hc = match self.hc_registry.as_ref().and_then(|r| r.lamad_client()) {
@@ -5437,6 +5476,7 @@ impl HttpServer {
             &hc,
             content_id,
             head_action_hash,
+            carried_record,
         )
         .await
         {
@@ -5511,6 +5551,108 @@ impl HttpServer {
                 "Content not found: {}",
                 content_id
             ))),
+        }
+    }
+
+    /// GET /db/content/{id}/head-record — serve THIS peer's local DHT `Record`
+    /// for the id's head action (the SOURCE half of declare-carries-Record).
+    ///
+    /// The authoring peer holds the head record; a peer with a full-arc gossip
+    /// gap cannot fetch it from the network (the `get` cascade short-circuits
+    /// at authority, so absence is terminal, not slow). This route lets a
+    /// coordinator-level caller ask the peer that HAS the record for the bytes,
+    /// then carry them to the peer that does not, which re-verifies them in
+    /// wasm before honoring the declaration.
+    ///
+    /// Response `200 { headActionHash, record }` where `record` is standard
+    /// base64 of the serialized `Record` — an OPAQUE token to every layer
+    /// between the two conductors. `404` when this peer has no head for the id
+    /// or cannot retrieve the head action itself (honest absence: the caller
+    /// then declares without a carried record, exactly as before).
+    async fn handle_content_head_record(
+        &self,
+        method: Method,
+        content_id: &str,
+        app_ctx: &db::AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        let pool = self
+            .db_pool
+            .as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not available".into()))?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        // (a) Resolve the head action hash from the projection — the SAME
+        // answer GET /db/content/{id}/head gives, so the carried record always
+        // matches the hash the caller read from this peer a moment earlier.
+        let head_action_hash = match db::content_diesel::get_content_with_tags(
+            &mut conn,
+            app_ctx,
+            content_id,
+            db::content_diesel::MinTrust::Invisible,
+        )? {
+            None => {
+                return Ok(response::not_found(&format!(
+                    "Content not found: {}",
+                    content_id
+                )))
+            }
+            Some(cwt) => match crate::views::content_head_view_from_content(&cwt.content) {
+                Some(view) => view.head_action_hash,
+                None => {
+                    return Ok(response::not_found(
+                        "no notarized head declared for this content",
+                    ))
+                }
+            },
+        };
+        drop(conn);
+
+        // (b) Resolve the lamad conductor bridge.
+        let hc = match self.hc_registry.as_ref().and_then(|r| r.lamad_client()) {
+            Some(hc) => hc,
+            None => {
+                return Ok(response::service_unavailable(
+                    "Conductor bridge unavailable; cannot serve a head record",
+                ));
+            }
+        };
+
+        // (c) Ask the conductor for the record. A conductor-level error
+        // (including fn-not-found on a pre-cure coordinator) surfaces verbatim
+        // as 502 so the caller can distinguish "this peer is too old to serve
+        // records" from "this peer does not hold the record".
+        let served = match crate::services::conductor_writes::call_get_record_for_action(
+            &hc,
+            &head_action_hash,
+        )
+        .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                return Ok(response::json_response(
+                    StatusCode::BAD_GATEWAY,
+                    &serde_json::json!({ "error": e.to_string() }),
+                ));
+            }
+        };
+
+        match served {
+            Some(carried) => {
+                use base64::{engine::general_purpose::STANDARD, Engine as _};
+                Ok(response::ok(&serde_json::json!({
+                    "headActionHash": carried.action_hash,
+                    "record": STANDARD.encode(&carried.record),
+                })))
+            }
+            None => Ok(response::not_found(
+                "this peer cannot retrieve the head action; no record to serve",
+            )),
         }
     }
 
@@ -12742,6 +12884,20 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         .route(
             Route::post("/db/content/{id}/canonical-head")
                 .handler("declare_canonical_content_head")
+                .auth_required()
+                .build(),
+        )
+        // Declare-carries-Record SOURCE half: serve this peer's local DHT
+        // Record for the id's head action so a peer that cannot retrieve it
+        // (full-arc gossip gap) can be handed verifiable bytes instead of
+        // waiting on gossip that will never arrive. cache_ttl(0) for the same
+        // reason as /head — the head can move on any declare, and a cached
+        // record would hand out a superseded target. Dispatch lives in
+        // handle_content_head_record.
+        .route(
+            Route::get("/db/content/{id}/head-record")
+                .handler("get_content_head_record")
+                .cache_ttl(0)
                 .auth_required()
                 .build(),
         )
