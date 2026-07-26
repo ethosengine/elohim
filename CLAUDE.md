@@ -154,6 +154,10 @@ Frontend review/refinement is eyes-first: render before reading source. Rails av
 
 When using `finishing-a-development-branch`, invoke `story-harvest` between Step 1 (tests pass) and Step 3 (present options). When using `systematic-debugging` and a root cause is identified and fixed, invoke `story-harvest` before closing the debugging session. The skill identifies engineering constraints discovered during development — especially parameter-bearing discoveries (memory limits, concurrency thresholds, cache sizes) that inform operator presets and peer diversity configuration — and scaffolds a2o regression scenarios to preserve them.
 
+### Story-Graph Maintainer (every agent, in flight)
+
+Every agent working inside a value chain (a2o chapters, valueflow commitments, spec gaps) also maintains the chain itself. A seam discovered mid-flight — one assertion that proves to be a pipeline of truths, or an unnamed precondition between two nodes — is a **missing node between named atoms**, not prose for a report. Capture it at discovery in mintable shape: `chain / between A→C / missing node B: <assertion + probe> / current state`. Depth and scaffolding: the `story-harvest` skill ("The Maintainer Role — Atom Perspective" — station decomposition keeps the finish-line assertion untouched and adds stations before it). Minted nodes become measured nodes automatically (`epr flow project` re-mints commitments from the recipes).
+
 ### P2P Design Gate (MANDATORY)
 
 Before proposing design approaches for ANY feature involving data entities (tables, models, routes, sync messages), invoke the `p2p-design-gate` skill — gates brainstorming step 3. This exists because AI agents default to relational-DB patterns (UUID primary keys, REST-first, CID-as-column); the protocol requires P2P-native thinking (DHT entry types first, content addressing for identity, storage as projection not truth).
@@ -215,7 +219,7 @@ Build before elohim-app builds; the `prebuild` script checks. Run: `cd sophia &&
 All TypeScript/Node.js projects use pnpm workspaces (sophia excluded — submodule). Target packages with `pnpm --filter <name> <cmd>`. The `libsodium-wrappers` package is overridden to `^0.8.2` in root `package.json` to fix a broken ESM relative import in 0.7.x that fails with pnpm's strict module resolution.
 
 ### libp2p API (steward/node + elohim-storage)
-Both crates declare `version = "0.54"` and resolve `0.54.1` (Cargo.lock verified 2026-06-11 — the earlier "node 0.53 vs storage 0.54" split is STALE). Requires `macros` + `ed25519` features. `request_response` behaviours are constructed via `Behaviour::new([(Proto, ProtocolSupport::Full)], cfg)` — `with_codec()` was a pre-0.54 idiom, no longer used. Swarm event loop uses `StreamExt::next()` (not the deprecated `select_next_event()`).
+Both crates declare `version = "0.54"` and resolve `0.54.1` (Cargo.lock verified 2026-06-11 — the earlier "node 0.53 vs storage 0.54" split is STALE). Requires `macros` + `ed25519` features. Both `request_response` constructors are live on 0.54: `Behaviour::new([(Proto, ProtocolSupport::Full)], cfg)` for default-codec protocols (steward/node's `p2p/transport.rs`), and `RequestResponse::with_codec(codec, …)` where a custom codec is needed (elohim-storage's `BlobCodec` / `ViewFederationCodec` at `elohim/elohim-storage/src/p2p/behaviour.rs`) — reach for `with_codec()` only for a non-default codec. Swarm event loop uses `StreamExt::next()` (not the deprecated `select_next_event()`).
 
 ## CI/CD
 
