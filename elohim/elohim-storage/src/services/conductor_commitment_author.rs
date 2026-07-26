@@ -98,9 +98,14 @@ impl ConductorCommitmentAuthor {
 /// one-window alias the coordinator + projection both honor alongside the
 /// renamed `replicates-content`).
 ///
-/// Deliberately carries NO `epr_scope` and NO `ratio_attestation` (those belong
-/// to `delegates-compute` / `replicates-dwelling`, not a content re-publish).
-/// `closure_rule` is optional and omitted here.
+/// Carries `bounds.epr_scope: [head_ref]` — the bounds validator's scope check
+/// (4b) reads `epr_scope` as an array and refuses an event whose target isn't
+/// covered, so a payload without it can notarise but never announce (defect
+/// surfaced live 2026-07-26 on the first real authoring). Same bridge
+/// convention as `mishpat_projection`'s bounds_json synthesis. Still NO
+/// `ratio_attestation` (that belongs to `delegates-compute` /
+/// `replicates-dwelling`, not a content re-publish); `closure_rule` optional
+/// and omitted here.
 pub fn build_content_payload(
     provider: &str,
     head_ref: &str,
@@ -119,6 +124,9 @@ pub fn build_content_payload(
             // reach_ceiling stays commons — the offer bound + hash-neutrality
             // invariant; the content's own `reach` (above) is what generalizes.
             "reach_ceiling": "commons",
+            // Scope the offer to the one EPR it re-publishes; the bounds
+            // validator's scope check (4b) requires this array.
+            "epr_scope": [head_ref],
         },
         "provider": provider,
         "valid_from": valid_from,
