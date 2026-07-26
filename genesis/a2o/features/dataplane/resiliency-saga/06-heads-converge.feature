@@ -5,11 +5,29 @@
 # notary-authority.feature's "resolves the same canonical head across peers" step
 # for the same distinction at the notary layer).
 #
-# Proof signal (local): alpha-A's own reconcile pass reports caughtUp=true and
-#   divergentAnchor<=0 on /health.
+# Proof signal (local): alpha-A's own reconcile pass reports caughtUp=true, has
+#   healed at least once (elohim_projection_heal_outcomes_total{outcome="healed"}),
+#   and its own per-sweep convergence gauge (elohim_projection_reconcile_converged)
+#   reads 1 (2026-07-26 reframe — see below).
 # Proof signal (cross-node): the served head for elohim-host-landing matches the
 #   declared head on BOTH alpha-A and elohim.host (reused verbatim from
 #   served-projected-head.feature's Track-4 T4-2 step).
+#
+# Reframe (2026-07-26): the local scenario previously asserted `/health
+# divergentAnchor <= 0` — a value the health handler recomputes from a live
+# ~2000-row windowed scan on every single request, so it oscillates between
+# requests even when the mesh's TRUE convergence state is stable (chronic
+# flappiness, not a real regression). elohim-storage's own reconcile sweep
+# already folds the same pending/exhausted/divergent bookkeeping into
+# `elohim_projection_reconcile_converged` (elohim-storage/src/metrics.rs) —
+# an IntGauge set ONCE per sweep, not once per HTTP poll — plus the
+# `elohim_projection_heal_outcomes_total{stream,outcome}` counter (outcome ∈
+# healed | timeout_retried | timeout_exhausted | missing | failed | refreshed
+# | refused_declared | refused_stale | no_row) that names WHICH class of row
+# outcome is happening, not merely a folded pass/fail bit. Reading the
+# per-sweep gauge and the monotonic heal counter instead of the per-request
+# windowed field keeps the same invariant (this peer isn't stuck divergent)
+# while dropping the sampling noise.
 #
 # Status today: GREEN locally. The cross-node scenario needs the full alpha fabric
 # to be meaningful (comparing two independently-operated federation doorways), so it
@@ -24,9 +42,10 @@ Feature: Chapter 6 — blobs sync to one head
   Background:
     Given peer "alpha-A" at "alpha-A"
 
-  Scenario: alpha-A's reconcile pass is caught up with zero divergent anchors
+  Scenario: alpha-A's reconcile pass is healing forward and locally converged
     Then peer "alpha-A" /health p2p.caughtUp is true
-    And peer "alpha-A" /health divergentAnchor <= 0
+    And labeled metric "elohim_projection_heal_outcomes_total" with label "outcome" "healed" on peer "alpha-A" >= 1
+    And metric "elohim_projection_reconcile_converged" on peer "alpha-A" >= 1
 
   # Station (minted 2026-07-26): the interstitial node the cure sprint could only
   # find by log archaeology. Both projections CLAIM a notarized anchor for the
@@ -41,6 +60,61 @@ Feature: Chapter 6 — blobs sync to one head
   Scenario: Both conductors anchor elohim-host-landing at the same root
     Given peer "elohim.host" at "elohim.host"
     Then peers "alpha-A" and "elohim.host" hold the same DHT anchor for content "elohim-host-landing"
+
+  # ---------------------------------------------------------------------------
+  # STATIONS (minted 2026-07-26, story-harvest of live Loki evidence in the
+  # elohim-alpha namespace, ~14:0x-14:2x UTC 2026-07-26): gate 1 (the
+  # ghost-witness sweep, projection_reconcile.rs's re-author loop, cited by
+  # the station above) has two recurring PER-ROW failure classes plus a
+  # PER-SWEEP budget failure — all three visible today only by tailing Loki,
+  # none of them counted in Prometheus. These are the missing nodes BETWEEN
+  # "ghost detected" (the station above) and "gate 1 succeeded": each one
+  # names the assertion the eventual fix should make true and the counter
+  # that would measure it.
+  #
+  #   chain: saga-06-heads-converge
+  #   between: ghost detected (station above, red) -> gate 1 succeeds (the
+  #     re-author lands and the anchor-equality station goes green)
+  #   missing node A: adam-alpha's re-author call races a ~1-commit/sec writer
+  #     on adam's OWN chain ("Source chain error: source chain head has
+  #     moved", observed seq 7096->7476 in ~6 min, adam-alpha, ~14:0x UTC) —
+  #     non-fatal + retried per-row, but a chronically busy chain livelocks
+  #     that row forever. Probe (proposed, not yet wired):
+  #     elohim_content_witness_reauthor_failed_total{class="chain_head_moved"}.
+  #   missing node B: jessica-alpha's re-author create COLLIDES with content
+  #     that already exists locally ("Content with id '...' already exists.
+  #     Use update_content to modify existing entries", jessica-alpha,
+  #     ~14:1x UTC) — the stale-anchor heal path's create assumed the row
+  #     never already has a local entry; it does. Probe (proposed, not yet
+  #     wired): elohim_content_witness_reauthor_failed_total{class="already_exists"}.
+  #   missing node C: sweeps on shem-node conductors frequently exceed the
+  #     120s wall-clock budget ("sweep exceeded wall-clock budget — abandoned,
+  #     resumes next sweep", candidate counts oscillating) — a
+  #     saturated/slow conductor drops the WHOLE sweep's progress for that
+  #     tick, not just one row. Probe (proposed, not yet wired):
+  #     elohim_content_witness_sweep_abandoned_total.
+  #   current state: RED by the Loki evidence above; PENDING by the (not yet
+  #     existing) probe — none of these three counters are registered in
+  #     elohim-storage/src/metrics.rs today, so every Then below reads
+  #     "metric not present in scrape" forever, not merely "not yet swept".
+  #     That absence — the sweep's failure modes are OBSERVED (non-fatal,
+  #     logged, retried) but not COUNTED — is itself the finding: instrument
+  #     first, then this sprint's cure work becomes measurable instead of
+  #     Loki archaeology. @wip (not `elohim_`-metric-absent poll cost) until
+  #     the counters exist; remove @wip the same commit that wires them.
+  # ---------------------------------------------------------------------------
+
+  @wip
+  Scenario: Chain-contention livelock on a busy writer chain is counted, not silent
+    Then labeled metric "elohim_content_witness_reauthor_failed_total" with label "class" "chain_head_moved" on peer "alpha-A" >= 0
+
+  @wip
+  Scenario: Stale-anchor re-author collisions with existing local content are counted
+    Then labeled metric "elohim_content_witness_reauthor_failed_total" with label "class" "already_exists" on peer "alpha-A" >= 0
+
+  @wip
+  Scenario: A wall-clock-budget-exceeded sweep is visible without tailing Loki
+    Then metric "elohim_content_witness_sweep_abandoned_total" on peer "alpha-A" >= 0
 
   @requires:alpha-cluster-6peer
   Scenario: alpha-A and elohim.host serve the same converged head for elohim-host-landing

@@ -54,6 +54,8 @@ import {
   probeConductorDiagnostics,
   probeServedBundleHead,
   agentKeyMatchesDiagnosticAgent,
+  pollForGauge,
+  GAUGE_SWEEP_POLL_TIMEOUT_MS,
   type ParsedMetrics,
 } from '../src/framework/dataplane/surfaces.js';
 import { E2EWorld } from '../src/framework/world.js';
@@ -858,6 +860,14 @@ Then(
  */
 Then(
   'metric {string} on peer {string} {word} {float}',
+  // Default cucumber step timeout (30s) is shorter than the storage-owned
+  // branch's own bounded gauge poll (up to GAUGE_SWEEP_POLL_TIMEOUT_MS =
+  // 6 minutes) — without an explicit override cucumber would kill the step
+  // long before the poll's own deadline governor fires (same 30s-vs-longer-
+  // poll trap as the commitment/pull polling steps in
+  // steps/dataplane/resiliency-saga.steps.ts). +15s margin over the poll's
+  // own timeout, matching that file's convention.
+  { timeout: GAUGE_SWEEP_POLL_TIMEOUT_MS + 15_000 },
   async function (
     this: E2EWorld,
     metricName: string,
@@ -875,13 +885,22 @@ Then(
     const storageUrl = resolveStorageUrl(peerName);
 
     let metricsBaseUrl: string;
-    if (process.env[metricsEnvKey]) {
-      metricsBaseUrl = process.env[metricsEnvKey]!;
-    } else if (
+    // elohim_-prefixed metrics (identity-fill, custody-class, custodian
+    // capacity — resiliency-saga chapters 2/8) are registered in
+    // elohim-storage's own metrics.rs and NEVER proxied by doorway's
+    // port-8080 /metrics; they were missing from this list (only
+    // p2p_/reconcile_/dedup_ were routed to storage), so a chapter-2/8
+    // assertion silently probed the WRONG endpoint (doorway:8080) and read
+    // "metric not present in scrape" — a routing bug, not the sweep-timing
+    // race the pending message implied.
+    const isStorageOwned =
       metricName.startsWith('p2p_') ||
       metricName.startsWith('reconcile_') ||
-      metricName.startsWith('dedup_')
-    ) {
+      metricName.startsWith('dedup_') ||
+      metricName.startsWith('elohim_');
+    if (process.env[metricsEnvKey]) {
+      metricsBaseUrl = process.env[metricsEnvKey]!;
+    } else if (isStorageOwned) {
       // Storage metric — needs direct storage URL
       if (!storageUrl) {
         // eslint-disable-next-line no-console
@@ -903,25 +922,41 @@ Then(
       }
     }
 
-    let metrics: ParsedMetrics;
-    try {
-      metrics = await probeMetrics(metricsBaseUrl);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.log(
-        `  PENDING: metric "${metricName}" on ${peerName} — /metrics not reachable: ${String(err)}`
-      );
-      return 'pending';
+    let actual: number | undefined;
+    if (isStorageOwned) {
+      // Storage-owned gauges (elohim_/p2p_/reconcile_/dedup_) can be
+      // populated by a periodic sweep with a multi-minute cadence rather
+      // than on every scrape — poll rather than declaring pending on the
+      // first miss. Doorway metrics (below) have no such sweep-cadence gap
+      // and keep the original single-probe behavior.
+      actual = await pollForGauge(async () => {
+        const metrics = await probeMetrics(metricsBaseUrl);
+        return metrics.get(metricName);
+      });
+    } else {
+      let metrics: ParsedMetrics;
+      try {
+        metrics = await probeMetrics(metricsBaseUrl);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.log(
+          `  PENDING: metric "${metricName}" on ${peerName} — /metrics not reachable: ${String(err)}`
+        );
+        return 'pending';
+      }
+      actual = metrics.get(metricName);
     }
 
-    const actual = metrics.get(metricName);
     if (actual === undefined) {
-      // Metric absent from scrape — a typo'd name would silently false-pass a >= 0 assertion.
-      // Treat as an observability gap (pending), not a confirmed zero measurement.
+      // Metric absent (or /metrics unreachable) through the full poll budget —
+      // a typo'd name would silently false-pass a >= 0 assertion, and a gauge
+      // that's genuinely never been swept is an honest observability gap, not
+      // a confirmed zero measurement. Treat both as pending, never a failure.
       // eslint-disable-next-line no-console
       console.log(
         `  PENDING: metric "${metricName}" on ${peerName} — ` +
-          `metric not present in scrape (typo? not yet emitted?)`
+          `not present after polling up to ${GAUGE_SWEEP_POLL_TIMEOUT_MS / 1000}s ` +
+          `(typo? /metrics unreachable? sweep genuinely hasn't run yet?)`
       );
       return 'pending';
     }

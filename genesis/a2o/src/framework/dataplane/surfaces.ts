@@ -80,10 +80,22 @@ export function resolvePeerUrl(peerName: string): string {
  * Resolve the direct elohim-storage URL for a peer.
  * Only available when E2E_STORAGE_ALPHA (or similar) is set; used for
  * /p2p/status and storage /metrics which are NOT proxied by doorway.
+ *
+ * alpha-A also falls back to E2E_STORAGE_URL — the generic "the" storage var
+ * several OTHER step files already read directly (resilience.steps.ts,
+ * delivery-admin.steps.ts, acquisition-pins.steps.ts) — because the
+ * Dataplane Validation stage (scripts/ci/run-dataplane-validation.sh) sets
+ * ONLY E2E_STORAGE_URL (default: matthew-alpha's storage svc — matthew being
+ * alpha-A's genesis/author peer), never the peer-alias-scoped
+ * E2E_STORAGE_ALPHA. Without this fallback every alpha-A gauge-metric
+ * assertion that routes through here (resiliency-saga chapters 2/7/8) hit
+ * the "storage metrics URL not set" pending BEFORE ever reaching a probe —
+ * an env-wiring gap, not the sweep-cadence timing this function's callers
+ * were previously assumed to be racing.
  */
 export function resolveStorageUrl(peerName: string): string | null {
   if (peerName === 'alpha-A') {
-    return process.env['E2E_STORAGE_ALPHA'] ?? null;
+    return process.env['E2E_STORAGE_ALPHA'] ?? process.env['E2E_STORAGE_URL'] ?? null;
   }
   return process.env[`E2E_STORAGE_${peerName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`] ?? null;
 }
@@ -632,6 +644,56 @@ export async function probeMetrics(metricsBaseUrl: string): Promise<ParsedMetric
     throw new Error(`GET ${metricsBaseUrl}/metrics returned ${status}`);
   }
   return parsePrometheusMetrics(text);
+}
+
+// ---------------------------------------------------------------------------
+// Periodic-sweep gauge poll (resiliency-saga chapters 2, 7, 8)
+// ---------------------------------------------------------------------------
+
+/**
+ * elohim-storage populates several Prometheus gauges (identity-fill,
+ * custody-class, custodian capacity) from a periodic background sweep with a
+ * ~5-minute cadence — NOT on every /metrics scrape. The Dataplane Validation
+ * stage runs these gauge assertions early in its cucumber run, roughly 2
+ * minutes after the edge restart — before the first sweep has had a chance
+ * to run — so a single-shot probe reads a genuinely-not-yet-populated gauge
+ * as a false pending. `pollForGauge` absorbs that startup race: it re-probes
+ * every `intervalMs` (default 30s) until the deadline (`timeoutMs`, default
+ * 6 minutes — one sweep cadence plus margin) instead of giving up after one
+ * attempt. Once the cure for a chapter's sweep lands, the probe finds the
+ * gauge on its first attempt and this adds zero cost — it only spends time
+ * when the gauge is genuinely still absent, which is exactly the case that
+ * used to false-pend instantly.
+ *
+ * A thrown probe error is treated the same as an absent value (keep
+ * polling) — the caller decides what "still absent at the deadline" means
+ * (pending, never a hard failure: an honest "cannot observe yet", never a
+ * measured zero).
+ */
+export const GAUGE_SWEEP_POLL_INTERVAL_MS = 30_000;
+export const GAUGE_SWEEP_POLL_TIMEOUT_MS = 6 * 60_000;
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export async function pollForGauge<T>(
+  probe: () => Promise<T | undefined | null>,
+  opts: { intervalMs?: number; timeoutMs?: number } = {}
+): Promise<T | undefined> {
+  const intervalMs = opts.intervalMs ?? GAUGE_SWEEP_POLL_INTERVAL_MS;
+  const deadline = Date.now() + (opts.timeoutMs ?? GAUGE_SWEEP_POLL_TIMEOUT_MS);
+  for (;;) {
+    let value: T | undefined | null;
+    try {
+      value = await probe();
+    } catch {
+      value = undefined;
+    }
+    if (value !== undefined && value !== null) return value;
+    if (Date.now() >= deadline) return undefined;
+    await sleep(Math.min(intervalMs, deadline - Date.now()));
+  }
 }
 
 // ---------------------------------------------------------------------------

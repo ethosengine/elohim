@@ -50,6 +50,8 @@ import {
   getRaw,
   resolveStorageUrl,
   parseLabeledPrometheusMetric,
+  pollForGauge,
+  GAUGE_SWEEP_POLL_TIMEOUT_MS,
 } from '../../src/framework/dataplane/surfaces.js';
 import { PROTOCOL_OMNI } from '../../src/framework/pages/selectors.js';
 import { retry } from '../../src/framework/utils/retry.js';
@@ -108,6 +110,12 @@ function resolveMetricsBaseUrl(world: E2EWorld, peerName: string, metricName: st
  */
 Then(
   'labeled metric {string} with label {string} {string} on peer {string} {word} {float}',
+  // Default cucumber step timeout (30s) is shorter than the bounded gauge
+  // poll below (up to GAUGE_SWEEP_POLL_TIMEOUT_MS = 6 minutes) — without an
+  // explicit override cucumber would kill the step long before the poll's
+  // own deadline governor fires (same trap the 60s commitment/pull polling
+  // steps below document; +15s margin, matching their convention).
+  { timeout: GAUGE_SWEEP_POLL_TIMEOUT_MS + 15_000 },
   async function (
     this: E2EWorld,
     metricName: string,
@@ -127,32 +135,26 @@ Then(
       return 'pending';
     }
 
-    let text: string;
-    try {
+    // elohim_-prefixed series (identity-fill, custody-class) are populated by
+    // elohim-storage's periodic multi-minute sweep, not on every scrape —
+    // poll rather than declaring pending on the first miss. A non-200
+    // response or network error is treated the same as "series absent yet"
+    // (keep polling — the endpoint may still be coming up post-restart);
+    // GAUGE_SWEEP_POLL_TIMEOUT_MS bounds the total wait either way.
+    const actual = await pollForGauge(async () => {
       const { status, text: body } = await getRaw(`${base}/metrics`);
       if (status !== 200) {
-        // eslint-disable-next-line no-console
-        console.log(
-          `  PENDING: labeled metric "${metricName}" on ${peerName} — ` +
-            `GET ${base}/metrics returned ${status}`
-        );
-        return 'pending';
+        throw new Error(`GET ${base}/metrics returned ${status}`);
       }
-      text = body;
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.log(
-        `  PENDING: labeled metric "${metricName}" on ${peerName} — /metrics unreachable: ${String(err)}`
-      );
-      return 'pending';
-    }
+      return parseLabeledPrometheusMetric(body, metricName, labelKey, labelValue);
+    });
 
-    const actual = parseLabeledPrometheusMetric(text, metricName, labelKey, labelValue);
-    if (actual === null) {
+    if (actual === undefined) {
       // eslint-disable-next-line no-console
       console.log(
         `  PENDING: labeled metric "${metricName}{${labelKey}="${labelValue}"}" on ${peerName} — ` +
-          `series or label combination not present in the scrape (not yet emitted?)`
+          `series/label combination not present after polling up to ` +
+          `${GAUGE_SWEEP_POLL_TIMEOUT_MS / 1000}s (/metrics unreachable, or the sweep genuinely hasn't run yet)`
       );
       return 'pending';
     }
