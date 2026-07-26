@@ -26,6 +26,14 @@ omission. And finally: the resilience card rendered on `elohim.host` and on alph
 must tell the SAME truth — two doorways, one truth, or the card is worthless as a
 felt-safety signal.
 
+A chapter is not always one node. When a sprint discovers that a chapter is really a
+pipeline of nodes — or that an unnamed node sits between two chapters — those nodes
+are **minted into the story as stations**, so the next sprint measures them directly
+instead of re-deriving them by log archaeology, and so earned progress is visible
+rather than hidden behind a single flat red (story-refinement discipline, born
+2026-07-26). A station is a capability proof inside a chapter; a green station is
+never a green chapter — the chapter's finish line stays exactly where it was.
+
 ## Chapter / concern / proof table
 
 | # | Chapter | Concern tag | Proof signal | Status today |
@@ -34,7 +42,7 @@ felt-safety signal.
 | 2 | The household forms | `@concern:saga-02-household-forms` | `elohim_identity_fill_discovered_cids >= 1` + labeled `elohim_identity_fill_total{action="created"} >= 1` | RED — born red until the identity-fill ceremony cure deploys |
 | 3 | matthew uploads elohim-host-landing into his eprfs | `@concern:saga-03-eprfs-upload` | served head matches declared head + blobHash non-null on alpha-A | GREEN — matthew is the deploy-time author peer |
 | 4 | The doorway serves | `@concern:saga-04-doorway-serves` | `GET /` → 200 with the rendered SPA shell | GREEN |
-| 5 | adam co-stewards via a rea-agreement | `@concern:saga-05-co-steward-agreement` | `GET /api/v1/commitments?action=replicates-commons&state=active` reports ≥1 row within 60s | **RED — born red**: the notarize→mirror path (`rea_commitments::mirror_replication_commitment`) is wired — the row is absent because no `replicates-commons` commitment has actually been authored/notarized for adam on alpha yet, not because the projection is missing |
+| 5 | adam co-stewards via a rea-agreement | `@concern:saga-05-co-steward-agreement` | **Decomposed into stations (2026-07-26).** Station A: an active item pin on `/api/v1/pins` references the content **and** `/api/v1/pins/{id}/pull` reports `caughtUp`. Station B: `/api/v1/commitments/facing/rea` carries ≥1 `replicates-commons` row in state `active`. Finish line (unchanged): `GET /api/v1/commitments?action=replicates-commons&state=active` reports ≥1 row within 60s | **Chapter still RED at its finish line** — but no longer flat-red. The cure sprint proved this chapter is a *pipeline* (pin → provide tick → mishpat notarization → bounds-validated announce → graduation → mishpat→rea mirror → rea projection), with eight stacked defects along it. Stations A and B are **green-expected** on alpha and pin down the earned links; the **mirror is the open frontier** — a commitment is live and `active` in the mishpat ledger but was never minted into `rea_commitments`, which is exactly what a green-B-with-red-finish-line localises |
 | 6 | Blobs sync to one head | `@concern:saga-06-heads-converge` | `/health` `divergentAnchor<=0` + `caughtUp=true` locally; served head matches on both federation doorways | GREEN locally; cross-node scenario needs `@requires:alpha-cluster-6peer` |
 | 7 | Custody is witnessed | `@concern:saga-07-custody-witnessed` | labeled `elohim_custody_class_count{class="stocked"} >= 1` | **RED/PENDING — born red**: the gauge is registered and wired to the `/api/v1/weave` sweep (`emit_custody_class_gauges`, gated on an active local session) — red means the sweep hasn't populated the series on alpha yet, not that the gauge is unbuilt |
 | 8 | Capacity is reported | `@concern:saga-08-capacity-reported` | `elohim_custodian_free_bytes > 0` (also `stewarded_bytes >= 0`) | Live infrastructure; free-bytes expected non-zero, stewarded-bytes gated on chapter 2 |

@@ -39,7 +39,7 @@ id: "sprint-result-2026-07-26-resiliency-saga-overnight-cure"
 
 ## A/B convergence — where it truly stands
 
-The blocker is **not** deploy lag and **not** the heal plane. App #1642's canonical-head propagation (DECLARE_ONLY, full 24-attempt ladder) fired at elohim.host and **B's conductor refused it**: `declare_canonical_head: no content found for id` — B's content rows are db-projections with **no conductor entry** (the DHT-anchor gap class), and DHT gossip of A's entry isn't reaching B (the spine's standing `notary-authority` red). Until B's conductor holds an entry for the id — via gossip heal or a local anchor step — no canonical channel can move B's head. That is the day-scale arc for A/B convergence; everything reachable around it was cured tonight.
+The blocker is **not** deploy lag and **not** the heal plane. App #1642's canonical-head propagation (DECLARE_ONLY, full 24-attempt ladder) fired at elohim.host and **B's conductor refused it**: `declare_canonical_head: no content found for id`. **CORRECTION (2026-07-26 pm, story-refinement leg live-verified):** B is NOT missing a conductor entry — B holds his OWN notarized anchor (`uhCkkl4C9…`, trust notarized) while A holds `uhCkkh_Gb…`: a **two-root split**. The refusal means *A's entry isn't resolvable on B's conductor* (cross-conductor entry resolvability — the spine's standing `notary-authority` red), not that B has none. The convergence node is `A.dhtAnchorHash == B.dhtAnchorHash` (now minted as a ch06 station, born red). That is the day-scale arc for A/B convergence; everything reachable around it was cured tonight.
 
 ## Security finding (morning priority #1)
 

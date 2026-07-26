@@ -28,6 +28,20 @@ Feature: Chapter 6 — blobs sync to one head
     Then peer "alpha-A" /health p2p.caughtUp is true
     And peer "alpha-A" /health divergentAnchor <= 0
 
+  # Station (minted 2026-07-26): the interstitial node the cure sprint could only
+  # find by log archaeology. Both projections CLAIM a notarized anchor for the
+  # content id, but the claims diverge (alpha-A uhCkkh_Gb… vs elohim.host
+  # uhCkkl4C9…) — and elohim.host's is a GHOST: an anchor string that outlived
+  # the conductor incarnation that authored it (DNA reinstall re-key), so the
+  # current conductor holds no chain and the canonical-head declare channel is
+  # refused with "no content found". Born red; the ghost-witness sweep re-authors
+  # B's side (gate 1), and the anchor EQUALITY this station asserts flips when
+  # cross-conductor record retrievability (notary-authority arc, or the
+  # declare-carries-Record coordinator change) lands (gate 2).
+  Scenario: Both conductors anchor elohim-host-landing at the same root
+    Given peer "elohim.host" at "elohim.host"
+    Then peers "alpha-A" and "elohim.host" hold the same DHT anchor for content "elohim-host-landing"
+
   @requires:alpha-cluster-6peer
   Scenario: alpha-A and elohim.host serve the same converged head for elohim-host-landing
     Given peer "elohim.host" at "elohim.host"

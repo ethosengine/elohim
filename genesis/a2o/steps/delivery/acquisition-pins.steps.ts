@@ -243,3 +243,61 @@ When('peer A pins {string} as a peer', function (_headRef: string) {
 Then('peer B fetched the bytes from peer A', function () {
   return 'pending';
 });
+
+// ---------------------------------------------------------------------------
+// Acquisition constraint regressions (@wip @regression @requires:household-nodes)
+//
+// Harvested 2026-07-26 from the resiliency-saga overnight cure sprint. Both
+// defects lived inside the eight-deep chapter-5 deadlock chain and neither
+// announced itself — acquisition just went quiet.
+//
+// The BINDING regressions are Rust unit tests, not these stubs:
+//   * retry rotation — elohim/elohim-storage/src/p2p/mod.rs,
+//     mod acquisition_rotation_tests
+//     (successive_retries_of_a_stable_position_walk_distinct_peers). Parameters:
+//     MAX_RETRIES=3, 6-peer fabric, 60s retry-on-next-cycle reconcile.
+//   * in-flight budget release — elohim/elohim-storage/src/p2p/reconcile_rails.rs
+//     (dispatch_budget_caps_inflight) + the ShardResponse::Error arm in
+//     p2p/mod.rs. Parameters: MAX_ACQUISITION_INFLIGHT=25; 25 leaked slots wedge
+//     acquisition permanently and silently.
+//
+// These cucumber steps stay pending until a household-scale acquisition fixture
+// (a 6-peer fabric with injectable failure responses) exists — the same
+// scaffolded-pending posture as the two-node scenarios above.
+// ---------------------------------------------------------------------------
+
+Given('an acquisition fabric of {int} connected peers', function (_peerCount: number) {
+  // Pending: needs a multi-peer household stack with an injectable peer set.
+  return 'pending';
+});
+
+Given('{string} sits at a stable position in the acquisition batch', function (_headRef: string) {
+  // Pending: the stable batch position comes from list_active_pins' DB order —
+  // reproducing it needs control over the pin table, not just the HTTP surface.
+  return 'pending';
+});
+
+When('its acquisition retries until the retry budget is exhausted', function () {
+  // Pending: MAX_RETRIES=3 attempts across 3 x 60s reconcile cycles.
+  return 'pending';
+});
+
+Then('the item was probed on {int} distinct peers', function (_distinctPeers: number) {
+  return 'pending';
+});
+
+When(
+  '{int} acquisition dispatches are answered with an error-class shard response',
+  function (_count: number) {
+    // Pending: needs a peer that can be told to answer ShardResponse::Error.
+    return 'pending';
+  }
+);
+
+Then('the available dispatch budget returns to {int}', function (_available: number) {
+  return 'pending';
+});
+
+Then('a subsequent acquisition drain dispatches at least one request', function () {
+  return 'pending';
+});

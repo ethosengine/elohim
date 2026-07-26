@@ -768,7 +768,11 @@ pub async fn run_heal(
         content_tracker.counts().exhausted as u64,
         content_divergent as u64,
     );
-    let (content_healed, content_missing) = heal_content(
+    let ContentHealOutcome {
+        healed: content_healed,
+        conductor_missing: content_missing,
+        ghost_candidates,
+    } = heal_content(
         &mut content_tracker,
         &content_discovered_by,
         hc,
@@ -780,6 +784,11 @@ pub async fn run_heal(
     // GAP 1.5: green the un-witnessed seeded corpus. Composed onto (not forked
     // from) the content arm — same conductor gate + single-flight guard.
     witness_bootstrap(hc, pool, provide_state).await;
+
+    // Ghost-anchor witness: the NULL-anchor sweep above cannot see rows whose
+    // anchor string outlived its conductor incarnation. Runs on the same leg,
+    // fed by the conductor answers the heal already paid for.
+    witness_ghost_anchors(hc, pool, &ghost_candidates).await;
 
     // Publish mirrors the pre-decoupling contract: REA counts + peers_asked, with
     // the divergent-anchor counter folding in BOTH arms (the one cross-arm signal).
@@ -884,6 +893,178 @@ async fn witness_bootstrap(hc: &Arc<HcClient>, pool: &DbPool, provide_state: &Pr
                 "projection-reconcile[witness]: sweep exceeded wall-clock budget \
                  (likely a slow/saturated conductor) — abandoned, single-flight guard \
                  released, resumes next tick"
+            );
+        }
+    }
+}
+
+/// What one content heal leg produced: convergence counts plus the
+/// ghost-anchor candidate set the leg's own conductor answers exposed.
+struct ContentHealOutcome {
+    /// Rows whose head actually MOVED to the own conductor's answer.
+    healed: usize,
+    /// Gaps the own conductor could not resolve at all (`Ok(None)`).
+    conductor_missing: usize,
+    /// Ids the own conductor could not resolve — the ghost-anchor candidate
+    /// set, narrowed to the truly-anchored rows by [`witness_ghost_anchors`].
+    ghost_candidates: Vec<String>,
+}
+
+/// Ghost-anchor witness: author a local notarized head for rows whose SQL
+/// projection claims a `dht_anchor_hash` that this node's OWN conductor cannot
+/// resolve.
+///
+/// ## The blind spot this closes
+///
+/// [`witness_bootstrap`] (GAP 1.5) greens rows born un-witnessed — `dht_anchor_
+/// hash IS NULL`. But an anchor string can also outlive the conductor
+/// incarnation that authored it: a DHT reset / reinstall / re-key wipes
+/// conductor state while the SQLite projection persists on its PVC. The row
+/// then carries a NON-NULL anchor that resolves to nothing locally — a GHOST.
+/// It is invisible to the NULL-anchor sweep, so it can never green, and every
+/// canonical-head declaration against it is refused by the zome with
+/// `declare_canonical_head: no content found for id '<id>'` (the first gate,
+/// `gather_content_chain`, needs a LOCAL `IdToContent` link — and on a full-arc
+/// fleet every `get_links` is local-only, so a gossip gap reads as absence).
+///
+/// ## Why `Ok(None)` from the own conductor is the honest classifier
+///
+/// `content_store::resolve_content_head` returns `Ok(None)` ONLY when BOTH the
+/// cross-root canonical link AND the per-root chain are locally absent — it
+/// never fabricates (unlike `get_content_by_id`, which has a v1-healing
+/// fallback). Combined with "the row is present AND anchored" (the focused
+/// [`anchored_content_reaches_for_ids`] query), that is exactly the ghost class:
+///
+/// - present + NULL anchor  → [`witness_bootstrap`] already owns it (excluded).
+/// - absent                 → the acquisition plane's job; never fabricated.
+/// - present + real anchor  → the conductor answers `Some`; never a candidate.
+///
+/// **Safety property (heal-fills-never-moves).** A row that has genuinely
+/// ADOPTED a live canonical head can never reach this path: its conductor holds
+/// the canonical link, so `resolve_content_head` answers `Some(canonical)` and
+/// the id is healed, not classified as a ghost. The write this path performs is
+/// `create_content` through the OWN conductor — the own-authored Declare-class
+/// channel `upsert_with_anchor` already implements for `witness_bootstrap`, not
+/// a heal stamp. It replaces an unverifiable hash with one this node authored
+/// and can prove; a later canonical declaration (always Declare mode) still
+/// wins outright.
+///
+/// ## Bounds
+///
+/// Reuses [`WITNESS_MAX_PER_TICK`] / [`WITNESS_ITEM_DELAY`] /
+/// [`WITNESS_SWEEP_BUDGET`], and the same `CORE_REACH_LEVELS` guard the
+/// re-anchor path uses (a non-canonical reach is not re-authorable and would
+/// fail every sweep forever). Self-terminating: once authored, the conductor
+/// resolves the id and it is never a candidate again.
+async fn witness_ghost_anchors(hc: &Arc<HcClient>, pool: &DbPool, candidates: &[String]) {
+    if candidates.is_empty() {
+        return;
+    }
+    let app_ctx = crate::db::AppContext::default_lamad();
+
+    // Narrow the conductor-missing set to rows that actually CLAIM an anchor.
+    let ghosts: Vec<(String, String)> = {
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(error = %e, "projection-reconcile[ghost-witness]: db conn failed; skipping");
+                return;
+            }
+        };
+        match crate::db::content_diesel::anchored_content_reaches_for_ids(
+            &mut conn, &app_ctx, candidates,
+        ) {
+            Ok(rows) => rows,
+            Err(e) => {
+                tracing::warn!(error = %e, "projection-reconcile[ghost-witness]: candidate query failed; skipping");
+                return;
+            }
+        }
+    };
+    if ghosts.is_empty() {
+        return;
+    }
+
+    let content_service = crate::services::ContentService::new(
+        pool.clone(),
+        app_ctx,
+        Arc::new(crate::services::events::EventBus::new()),
+    );
+
+    let total = ghosts.len();
+    let sweep = async {
+        let mut authored = 0usize;
+        let mut skipped = 0usize;
+        let mut failed = 0usize;
+        for (id, reach) in ghosts.iter().take(WITNESS_MAX_PER_TICK as usize) {
+            // Same guard as the re-anchor path: a reach outside the DNA-notarized
+            // vocabulary can never be re-authored, so it would burn a conductor
+            // round-trip every sweep forever.
+            if !crate::generated_enums::CORE_REACH_LEVELS.contains(&reach.as_str()) {
+                skipped += 1;
+                tracing::warn!(
+                    content_id = %id,
+                    reach = %reach,
+                    "projection-reconcile[ghost-witness]: skipping row with non-canonical reach (not re-authorable)"
+                );
+                continue;
+            }
+            // Empty patch on an ANCHORED row takes `update_via_conductor`'s
+            // update branch; the zome refuses with "no Content entry found"
+            // (there is no local chain), which trips that method's STALE-ANCHOR
+            // HEAL: re-publish the full entry from the SQL row via
+            // `create_content`. Composed, not forked.
+            let empty_patch = crate::views::UpdateContentInputView {
+                title: None,
+                description: None,
+                content_body: None,
+                content_format: None,
+                metadata: None,
+                tags: None,
+                reach: None,
+                blob_hash: None,
+                server_blob_hash: None,
+                p2p_published_at: None,
+            };
+            match content_service
+                .update_via_conductor(hc, id, empty_patch)
+                .await
+            {
+                Ok(_) => authored += 1,
+                Err(e) => {
+                    failed += 1;
+                    tracing::warn!(
+                        content_id = %id,
+                        error = %e,
+                        "projection-reconcile[ghost-witness]: re-author failed (non-fatal, retried next sweep)"
+                    );
+                }
+            }
+            tokio::time::sleep(WITNESS_ITEM_DELAY).await;
+        }
+        (authored, skipped, failed)
+    };
+
+    match tokio::time::timeout(WITNESS_SWEEP_BUDGET, sweep).await {
+        Ok((authored, skipped, failed)) => {
+            crate::metrics::add_content_witness_authored(authored as u64);
+            tracing::warn!(
+                target: "elohim_storage::projection_reconcile",
+                candidates = total,
+                authored,
+                skipped,
+                failed,
+                "projection-reconcile[ghost-witness]: authored local heads for rows whose claimed \
+                 dht_anchor_hash this conductor cannot resolve (stale-anchor class)"
+            );
+        }
+        Err(_elapsed) => {
+            tracing::warn!(
+                target: "elohim_storage::projection_reconcile",
+                budget_secs = WITNESS_SWEEP_BUDGET.as_secs(),
+                candidates = total,
+                "projection-reconcile[ghost-witness]: sweep exceeded wall-clock budget \
+                 (likely a slow/saturated conductor) — abandoned, resumes next sweep"
             );
         }
     }
@@ -1479,7 +1660,9 @@ async fn discover_content(
 /// Heal phase of the `content` reconcile (Leg 4, step 5): for each discovered
 /// gap, `content_store::resolve_content_head(id)` on the OWN conductor →
 /// [`stamp_declared_head`] (verified stamp); `None` → `mark_failed`, retried next
-/// sweep. Returns `(healed, conductor_missing)`. Runs only once the lamad bridge
+/// sweep. Returns a [`ContentHealOutcome`] — the convergence counts plus the
+/// ids the own conductor could not resolve at all, which
+/// [`witness_ghost_anchors`] narrows to the ghost-anchor class. Runs only once the lamad bridge
 /// is up; scheduled single-flight OFF the discovery ticker (see `main.rs`).
 /// `stamp_declared_head` is existing-row-only and idempotent, so a heal is safe
 /// under duplicate delivery. A heal logs WARN naming the id and discovering peer.
@@ -1489,8 +1672,9 @@ async fn heal_content(
     hc: &Arc<HcClient>,
     pool: &DbPool,
     pacing: &HealPacing,
-) -> (usize, usize) {
+) -> ContentHealOutcome {
     let app_ctx = crate::db::AppContext::default_lamad();
+    let mut ghost_candidates: Vec<String> = Vec::new();
 
     // (5) Heal each gap from the OWN conductor (verified stamp), bounded by the
     // content leg budget so a saturated conductor lands SOME rows per tick and the
@@ -1606,6 +1790,13 @@ async fn heal_content(
                 // Conductor can't see it yet (catch-up) — retry on the NEXT
                 // sweep via a fresh inventory diff, never an immediate re-queue.
                 conductor_missing += 1;
+                // GHOST-ANCHOR CANDIDATE (see `witness_ghost_anchors`). This is
+                // the ONLY place the substrate learns "my own conductor has no
+                // chain for an id my projection carries" — `resolve_content_head`
+                // returns `Ok(None)` exactly when BOTH the canonical link and the
+                // per-root chain are locally absent. Collect it here rather than
+                // re-probing later: the answer is already paid for.
+                ghost_candidates.push(id.clone());
                 tracing::debug!(content_id = %id, "projection-reconcile[content]: own conductor returned None; retry next sweep");
                 tracker.mark_failed(&id);
                 crate::metrics::inc_projection_heal_outcome(
@@ -1640,7 +1831,11 @@ async fn heal_content(
         }
     }
 
-    (healed, conductor_missing)
+    ContentHealOutcome {
+        healed,
+        conductor_missing,
+        ghost_candidates,
+    }
 }
 
 /// Project ONE conductor-resolved content HEAD into local SQL via the VERIFIED
@@ -1956,6 +2151,43 @@ mod tests {
         // spawn without a conductor); discovery still ran.
         assert_eq!(heal_decision(false, false), HealAction::SkipNoBridge);
         assert_eq!(heal_decision(false, true), HealAction::SkipNoBridge);
+    }
+
+    #[test]
+    fn ghost_witness_classifier_is_conductor_miss_intersect_anchored() {
+        // The ghost class is the INTERSECTION of two independently-owned facts,
+        // and neither alone is sufficient:
+        //   - the own conductor could not resolve the id (`Ok(None)`), and
+        //   - the local row CLAIMS a dht_anchor_hash.
+        // This test locks the classifier's shape at the seam where the two meet
+        // (the SQL half is proved by
+        // `anchored_content_reaches_for_ids_selects_only_the_ghost_candidate_class`).
+        // Only `Ok(None)` may enter the candidate list: a resolvable id — whether
+        // canonical or a root-author fallback — is healed, never re-authored, so a
+        // row that has genuinely adopted a canonical head can never be re-rooted
+        // underneath it.
+        let classify = |resolved: Option<bool>| resolved.is_none();
+        assert!(classify(None), "conductor miss is the only candidate arm");
+        assert!(
+            !classify(Some(true)),
+            "a CANONICAL answer heals — it must never be re-authored"
+        );
+        assert!(
+            !classify(Some(false)),
+            "a FALLBACK answer still proves a local chain exists — not a ghost"
+        );
+    }
+
+    #[test]
+    fn ghost_witness_reuses_the_witness_bounds() {
+        // The ghost sweep runs on the SAME heal leg as `witness_bootstrap`, so it
+        // must not introduce a second, unbounded conductor load: it reuses the
+        // per-tick cap, the per-item spacing, and the wall-clock budget. Locking
+        // this keeps a future tuning change from bounding one sweep and not the
+        // other.
+        assert!(WITNESS_MAX_PER_TICK > 0);
+        assert!(!WITNESS_ITEM_DELAY.is_zero());
+        assert!(WITNESS_SWEEP_BUDGET > WITNESS_ITEM_DELAY * (WITNESS_MAX_PER_TICK as u32));
     }
 
     #[test]

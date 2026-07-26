@@ -1232,6 +1232,43 @@ pub fn content_reaches_for_ids(
         .load(conn)
 }
 
+/// `(id, reach)` for the subset of `ids` that are locally present AND carry a
+/// NON-NULL `dht_anchor_hash` — the GHOST-ANCHOR candidate query.
+///
+/// A row in this set claims notarized provenance in SQL. When this node's OWN
+/// conductor cannot resolve the same id (`resolve_content_head` → `Ok(None)`),
+/// the claim is a ghost: the anchor string outlived the conductor incarnation
+/// that authored it (a DHT reset / reinstall / re-key wipes conductor state
+/// while the SQLite projection persists on its PVC). The row then sits in a
+/// blind spot: `reanchor_backfill`'s witness sweep only selects
+/// `dht_anchor_hash IS NULL`, so an anchored-but-unwitnessed row is never a
+/// candidate and can never green — while every canonical-head declaration
+/// against it is refused by the zome (`no content found for id`, because
+/// `gather_content_chain`'s `IdToContent` link does not exist locally either).
+///
+/// Deliberately a FOCUSED query, not a filter bolted onto
+/// [`content_reaches_for_ids`]: the anchored predicate is the whole point of
+/// this candidate class, and conflating the two would let a NULL-anchor row
+/// (which the witness sweep already owns) enter the ghost path twice.
+///
+/// NOTE: same SQLITE_MAX_VARIABLE_NUMBER caveat as [`content_ids_present`] —
+/// chunk large id sets.
+pub fn anchored_content_reaches_for_ids(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    ids: &[String],
+) -> QueryResult<Vec<(String, String)>> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::id.eq_any(ids))
+        .filter(content::dht_anchor_hash.is_not_null())
+        .select((content::id, content::reach))
+        .load(conn)
+}
+
 /// Reach tiers admitted into a CROSS-PEER content inventory — the broadcast
 /// family only.
 ///
@@ -1762,6 +1799,66 @@ mod tests {
 
         // Empty ids → empty.
         assert!(content_reaches_for_ids(&mut conn, &ctx, &[])
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn anchored_content_reaches_for_ids_selects_only_the_ghost_candidate_class() {
+        // The ghost-anchor witness class is EXACTLY "present + anchored". A
+        // NULL-anchor row belongs to `reanchor_backfill`'s existing sweep and
+        // must NOT be double-claimed here; an absent row is the acquisition
+        // plane's business and must never be fabricated.
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let mk = |id: &str, reach: &str, anchor: Option<&str>| CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: reach.to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+            dht_anchor_hash: anchor.map(str::to_string),
+        };
+        create_content(
+            &mut conn,
+            &ctx,
+            mk("ghost-1", "commons", Some("uhCkk-ghost")),
+        )
+        .unwrap();
+        create_content(&mut conn, &ctx, mk("unanchored-1", "commons", None)).unwrap();
+
+        let ids = vec![
+            "ghost-1".to_string(),
+            "unanchored-1".to_string(),
+            "absent-1".to_string(),
+        ];
+        let rows = anchored_content_reaches_for_ids(&mut conn, &ctx, &ids).unwrap();
+        let map: std::collections::HashMap<String, String> = rows.into_iter().collect();
+        assert_eq!(
+            map.len(),
+            1,
+            "only the present+anchored row is a ghost candidate"
+        );
+        assert_eq!(map.get("ghost-1").map(String::as_str), Some("commons"));
+        assert!(
+            !map.contains_key("unanchored-1"),
+            "a NULL-anchor row is the existing witness sweep's candidate, not a ghost"
+        );
+        assert!(
+            !map.contains_key("absent-1"),
+            "an absent id must never enter the authoring path"
+        );
+
+        // Empty ids → empty (no all-rows leak).
+        assert!(anchored_content_reaches_for_ids(&mut conn, &ctx, &[])
             .unwrap()
             .is_empty());
     }

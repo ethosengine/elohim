@@ -1054,7 +1054,6 @@ async fn async_main(
                     let db_pool = db_pool.clone();
                     let peer_policy_path = peer_policy_path.clone();
                     let device_archetype = config.device_archetype.clone();
-                    let infra_app_id = args.app_id.clone();
                     // GENESIS BOOTSTRAP STOPGAP captures (operator-authorized,
                     // default OFF). Cloned out of `config` here because the
                     // spawned task is `async move` and must not move all of
@@ -1456,9 +1455,28 @@ async fn async_main(
                         // and rea graduation never fires. (Pre-existing 2a gap: the
                         // projection was only ever exercised by direct-row test
                         // fixtures, never a live signal subscriber. Wired here.)
+                        //
+                        // `app_id` here is the PROJECTION NAMESPACE (the
+                        // `h_app_id` scoping column on `rea_commitments` /
+                        // `gate_decision_challenges` / `challenge_outcomes`) —
+                        // NOT the conductor's installed-hApp id. Passing
+                        // `infra_app_id` (`HOLOCHAIN_APP_ID`, "elohim" on every
+                        // deployed node) stamped rows into a namespace NO reader
+                        // scopes to: `api::extract_app_context` defaults to
+                        // "lamad" and nothing in the tree sends `X-App-Id`, and
+                        // every in-process reader uses `default_lamad()`. The
+                        // rows landed correctly shaped and correctly anchored,
+                        // and were invisible to `GET /api/v1/commitments`, to the
+                        // resilience snapshot's `commitment_backed_collectives`
+                        // join, and to every distribution view. `id` is the sole
+                        // PK on `rea_commitments`, so a mis-filed row also BLOCKS
+                        // the correct insert — see
+                        // `services::mishpat_mirror_backfill`, the level-triggered
+                        // half that heals commitments notarized before this fix.
                         if let Some(subscriber_pool) = db_pool.clone() {
                             let hc_sub = hc.clone();
-                            let mishpat_app_id = infra_app_id.clone();
+                            let mishpat_app_id =
+                                elohim_storage::db::AppContext::default_lamad().h_app_id;
                             tokio::spawn(async move {
                                 let pool = subscriber_pool;
                                 let app_id = mishpat_app_id;
@@ -1497,6 +1515,53 @@ async fn async_main(
                              — live-authored commitments will create DHT entries but never \
                              project to mishpat_commitments (provide-loop dedup stays empty)"
                             );
+                        }
+
+                        // ── Level-triggered half: heal history ───────────────
+                        //
+                        // The namespace fix above is EDGE-triggered — it only
+                        // helps commitments notarized after it ships. A
+                        // commitment already in the notarized ledger never
+                        // re-signals, so its mis-filed (or missing) mirror would
+                        // stay dark forever. This one-shot sweep diffs the live
+                        // `replicates-*` rows of `mishpat_commitments` against
+                        // `rea_commitments` at the canonical namespace and
+                        // re-files or inserts each derived id. Idempotent (a
+                        // clean node's second run is a pure no-op), bounded by
+                        // the notarized ledger, and non-fatal.
+                        if let Some(backfill_pool) = db_pool.clone() {
+                            tokio::spawn(async move {
+                                let canonical =
+                                    elohim_storage::db::AppContext::default_lamad().h_app_id;
+                                match backfill_pool.get() {
+                                    Ok(mut conn) => {
+                                        match elohim_storage::services::mishpat_mirror_backfill::run_once(
+                                            &mut conn, &canonical,
+                                        ) {
+                                            Ok(report) if report.healed_anything() => info!(
+                                                candidates = report.candidates,
+                                                mirrors_inserted = report.mirrors_inserted,
+                                                mirrors_refiled = report.mirrors_refiled,
+                                                provides_inserted = report.provides_inserted,
+                                                provides_refiled = report.provides_refiled,
+                                                "mishpat_mirror_backfill: replication mirrors healed into the canonical projection namespace"
+                                            ),
+                                            Ok(report) => info!(
+                                                candidates = report.candidates,
+                                                "mishpat_mirror_backfill: replication mirrors already coherent (no-op)"
+                                            ),
+                                            Err(e) => warn!(
+                                                error = %e,
+                                                "mishpat_mirror_backfill failed (non-fatal; retries next boot)"
+                                            ),
+                                        }
+                                    }
+                                    Err(e) => warn!(
+                                        error = %e,
+                                        "mishpat_mirror_backfill skipped: db pool unavailable"
+                                    ),
+                                }
+                            });
                         }
                     });
                 }

@@ -8,7 +8,8 @@
  * "response field ... is at least" pair) — see resiliency-saga/README.md's
  * "Reuse over reinvention" section for the full map.
  *
- * Four concerns are covered here:
+ * Five concerns are covered here (2b was added by the 2026-07-26 story-harvest,
+ * which decomposed chapter 5 from one node into an observable pipeline):
  *   1. A label-aware Prometheus step (chapters 2, 7) — pins ONE label combination
  *      on a *Vec metric, and routes elohim_-prefixed metric names to the direct
  *      storage URL (they are emitted by elohim-storage's own /metrics, never the
@@ -19,6 +20,13 @@
  *      /api/v1/commitments?action=...&state=active — resilience.steps.ts's
  *      "I list active {string} commitments" reads this same surface once, with no
  *      retry budget; this chapter needs the "within N seconds" polling idiom.
+ *  2b. Chapter-5 STATION steps — an active-item-pin check (/api/v1/pins), a
+ *      per-EPR pull-rollup caught-up poll (/api/v1/pins/{id}/pull), and a
+ *      rea-FACING commitment check (/api/v1/commitments/facing/rea, the
+ *      mishpat-sourced view — deliberately a different home from concern 2's
+ *      rea-PROJECTION read). None of these surfaces had a step; the pin steps in
+ *      steps/delivery/acquisition-pins.steps.ts are own-node (E2E_STORAGE_URL)
+ *      POST-then-read flows, not doorway-proxied read-only assertions.
  *   3. A raw-body query pair (chapter 4) — the existing generic "When I query"
  *      step's captured body is private to dataplane.steps.ts with no
  *      body-substring assertion, and delivery.steps.ts's "the response is HTML
@@ -247,6 +255,202 @@ Then(
 );
 
 // ---------------------------------------------------------------------------
+// 2b. Chapter-5 station steps (added 2026-07-26 — story-harvest of the cure
+//     sprint that proved chapter 5 is a PIPELINE, not a single node).
+//
+//     The chain: explicit pin (consent) -> provide tick -> mishpat notarization
+//     -> bounds-validated ProvideAnnounce -> graduation -> mishpat->rea mirror
+//     -> the rea projection the chapter's finish-line step reads. Eight stacked
+//     defects sat along it. These stations read the EARNED links at their own
+//     sources so a red names which link broke, instead of the whole chain
+//     collapsing onto one opaque "0 rows" assertion.
+//
+//     Constraint (carried from the step below, and the reason both polling
+//     station steps declare it): cucumber's DEFAULT step timeout is 30s, which
+//     is SHORTER than a 60s poll — without an explicit { timeout: 75_000 },
+//     cucumber kills the step at 30s before the poll's own deadline governor
+//     fires. retry()'s own maxAttempts default (10) likewise exhausts a 60s
+//     budget in ~21s at this backoff schedule, so maxAttempts is set high and
+//     timeoutMs is left as the only real governor.
+//
+//     Constraint (route cache): the commitments routes are cached 30s, so a
+//     freshly-notarized row can lag a read by up to one cache window. Station
+//     reads are steady-state measurements, never just-authored ones.
+// ---------------------------------------------------------------------------
+
+/**
+ * Assert the named doorway lists at least one ACTIVE, item-kind pin whose
+ * head_ref references the given content id — the explicit-consent leg of the
+ * co-steward chain (GET /api/v1/pins, doorway-proxied since edge #1238).
+ *
+ * NAMESPACE RULE (the defect this guards): pin head_refs are `epr:`-prefixed
+ * ("epr:elohim-host-landing") while content ids elsewhere — notably the
+ * /api/v1/pins/{id}/pull route below — are BARE. The provide tick compared
+ * prefixed head_refs against bare content ids, so its desired set was EMPTY for
+ * every pin that ever existed. This step accepts EITHER spelling deliberately:
+ * the assertion is "a pin references this content", not "a pin spells it my way".
+ *
+ * Single read, not a poll: a pin either exists or it does not — there is no
+ * settling window to wait out.
+ *
+ * Example:
+ *   Then doorway "alpha-A" has an active item pin whose head references "elohim-host-landing"
+ */
+Then(
+  'doorway {string} has an active item pin whose head references {string}',
+  async function (this: E2EWorld, peerName: string, contentId: string) {
+    const doorway = this.getDoorway(peerName);
+    const url = `${doorway.url}/api/v1/pins`;
+    const { status, text } = await getRaw(url);
+    assert.strictEqual(status, 200, `GET /api/v1/pins on ${peerName}: HTTP ${status}`);
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      throw new Error(`GET /api/v1/pins on ${peerName}: response is not valid JSON`);
+    }
+    const pins = (payload as { pins?: unknown }).pins;
+    assert.ok(
+      Array.isArray(pins),
+      `GET /api/v1/pins on ${peerName}: expected a "pins" array, got: ${text.slice(0, 160)}`
+    );
+
+    // Accept the prefixed and bare spellings of the same reference.
+    const accepted = new Set([contentId, `epr:${contentId}`]);
+    const match = (pins as Record<string, unknown>[]).find(
+      p => accepted.has(String(p['headRef'])) && p['status'] === 'active' && p['kind'] === 'item'
+    );
+    assert.ok(
+      match,
+      `No active item pin references "${contentId}" on ${peerName} — ` +
+        `no household has declared consent to steward it (${(pins as unknown[]).length} pins listed).`
+    );
+  }
+);
+
+/**
+ * Assert the per-EPR pull rollup reports caughtUp — the bytes-have-landed leg.
+ * GET /api/v1/pins/{contentId}/pull (BARE id, per the namespace rule above).
+ *
+ * Byte-arrival, never inventory-arrival: `caughtUp` is the pull queue's own
+ * verdict that the pinned bytes are on disk, not that a peer claims to hold
+ * them (see project_inventory_exchange_not_byte_replication).
+ *
+ * Example:
+ *   Then within 60 seconds doorway "alpha-A" reports the pull for "elohim-host-landing" is caught up
+ */
+Then(
+  'within {int} seconds doorway {string} reports the pull for {string} is caught up',
+  // See the 30s-vs-60s constraint note above: cucumber's default step timeout
+  // would kill this at 30s, before the 60s poll's own governor fires.
+  { timeout: 75_000 },
+  async function (this: E2EWorld, seconds: number, peerName: string, contentId: string) {
+    const doorway = this.getDoorway(peerName);
+    await retry(
+      async () => {
+        const { status, text } = await getRaw(
+          `${doorway.url}/api/v1/pins/${encodeURIComponent(contentId)}/pull`
+        );
+        assert.strictEqual(
+          status,
+          200,
+          `GET /api/v1/pins/${contentId}/pull on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})`
+        );
+        let body: Record<string, unknown>;
+        try {
+          body = JSON.parse(text) as Record<string, unknown>;
+        } catch {
+          throw new Error(
+            `GET /api/v1/pins/${contentId}/pull on ${peerName}: response is not valid JSON`
+          );
+        }
+        assert.strictEqual(
+          body['caughtUp'],
+          true,
+          `pull rollup for "${contentId}" on ${peerName} is not caught up: ${JSON.stringify(body)}`
+        );
+      },
+      {
+        timeoutMs: seconds * 1000,
+        initialDelayMs: 1000,
+        backoffFactor: 1.2,
+        maxDelayMs: 5000,
+        maxAttempts: 1000,
+      }
+    );
+  }
+);
+
+/**
+ * Assert the rea-FACING commitment ledger carries at least one active row for the
+ * given action — GET /api/v1/commitments/facing/rea.
+ *
+ * Deliberately a DIFFERENT surface from the chapter's finish-line step: that one
+ * reads /api/v1/commitments (the `rea_commitments` PROJECTION); this one reads
+ * the mishpat-sourced facing view. Same word, two homes, one mirror between them.
+ * A green here with a red finish line localises the break to the mishpat->rea
+ * mirror rather than to the notarize/announce/graduate path — which is exactly
+ * the state alpha was in on 2026-07-26 (commitment uhCEkd2ZZTOht... active in
+ * mishpat, never mirrored into rea_commitments).
+ *
+ * A 200 with zero matching rows is an honest FAILURE, not pending: the surface
+ * works, nothing has been notarized.
+ *
+ * Example:
+ *   Then within 60 seconds doorway "alpha-A" has at least one active "replicates-commons" commitment in the rea-facing ledger
+ */
+Then(
+  'within {int} seconds doorway {string} has at least one active {string} commitment in the rea-facing ledger',
+  { timeout: 75_000 },
+  async function (this: E2EWorld, seconds: number, peerName: string, action: string) {
+    const doorway = this.getDoorway(peerName);
+    await retry(
+      async () => {
+        const { status, text } = await getRaw(`${doorway.url}/api/v1/commitments/facing/rea`);
+        assert.strictEqual(
+          status,
+          200,
+          `GET /api/v1/commitments/facing/rea on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})`
+        );
+        let rows: unknown;
+        try {
+          rows = JSON.parse(text);
+        } catch {
+          throw new Error(
+            `GET /api/v1/commitments/facing/rea on ${peerName}: response is not valid JSON: ${text.slice(0, 120)}`
+          );
+        }
+        assert.ok(
+          Array.isArray(rows),
+          `GET /api/v1/commitments/facing/rea on ${peerName}: expected a bare JSON array, got: ${text.slice(0, 120)}`
+        );
+        const active = (rows as Record<string, unknown>[]).filter(
+          r => r['action'] === action && r['state'] === 'active'
+        );
+        assert.ok(
+          active.length >= 1,
+          `No active "${action}" commitment in the rea-facing ledger on ${peerName} — ` +
+            `the notarize -> announce -> graduate path has not completed ` +
+            `(${(rows as unknown[]).length} rows, states: ${JSON.stringify(
+              (rows as Record<string, unknown>[]).map(
+                r => `${String(r['action'])}:${String(r['state'])}`
+              )
+            )}).`
+        );
+      },
+      {
+        timeoutMs: seconds * 1000,
+        initialDelayMs: 1000,
+        backoffFactor: 1.2,
+        maxDelayMs: 5000,
+        maxAttempts: 1000,
+      }
+    );
+  }
+);
+
+// ---------------------------------------------------------------------------
 // 3. Raw-body query pair (chapter 4)
 // ---------------------------------------------------------------------------
 
@@ -347,6 +551,57 @@ Then(
       a,
       b,
       `stewardingCollectives diverges: ${peerA}=${a} vs ${peerB}=${b} — the two doorways don't tell the same truth`
+    );
+  }
+);
+
+/**
+ * One root, not two: read dhtAnchorHash (GET /db/content/{id}) from TWO peers
+ * and assert both (a) are present (non-null, non-empty — each conductor holds
+ * a notarized entry) and (b) are EQUAL (one converged root). Presence alone
+ * false-passes the two-root split discovered 2026-07-26 (alpha-A uhCkkh_Gb… vs
+ * elohim.host uhCkkl4C9… — each doorway independently rooted the same content
+ * id, which is exactly why the canonical-head declare channel is refused with
+ * "no content found": the OTHER peer's entry isn't resolvable locally). This is
+ * the interstitial node between upload and heads-converge — a red here explains
+ * a red on chapter 10's cross-doorway compare.
+ *
+ * Example:
+ *   Then peers "alpha-A" and "elohim.host" hold the same DHT anchor for content "elohim-host-landing"
+ */
+Then(
+  'peers {string} and {string} hold the same DHT anchor for content {string}',
+  async function (this: E2EWorld, peerA: string, peerB: string, contentId: string) {
+    const readAnchor = async (peerName: string): Promise<string> => {
+      const doorway = this.getDoorway(peerName);
+      const { status, text } = await getRaw(
+        `${doorway.url}/db/content/${encodeURIComponent(contentId)}`
+      );
+      assert.strictEqual(
+        status,
+        200,
+        `GET /db/content/${contentId} on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})`
+      );
+      let body: Record<string, unknown>;
+      try {
+        body = JSON.parse(text) as Record<string, unknown>;
+      } catch {
+        throw new Error(`GET /db/content/${contentId} on ${peerName}: response is not valid JSON`);
+      }
+      const anchor = body['dhtAnchorHash'];
+      assert.ok(
+        typeof anchor === 'string' && anchor.length > 0,
+        `dhtAnchorHash on ${peerName} is missing/null for ${contentId} — the conductor holds no notarized entry`
+      );
+      return anchor;
+    };
+
+    const a = await readAnchor(peerA);
+    const b = await readAnchor(peerB);
+    assert.strictEqual(
+      a,
+      b,
+      `DHT anchor diverges for ${contentId}: ${peerA}=${a} vs ${peerB}=${b} — two independently-rooted entries, not one converged root`
     );
   }
 );

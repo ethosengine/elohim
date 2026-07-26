@@ -666,6 +666,42 @@ pub fn mirror_replication_commitment(
     Ok(inserted > 0)
 }
 
+/// The `h_app_id` a row currently carries, looked up by PRIMARY KEY **without**
+/// any namespace filter.
+///
+/// `rea_commitments.id` is the sole PRIMARY KEY (`h_app_id` is a scoping column,
+/// not part of the key), so a row written under the WRONG namespace is
+/// simultaneously (a) invisible to every namespace-scoped reader and (b) an
+/// insert-blocking duplicate for an `insert_or_ignore` that would write it
+/// correctly. This lookup is the namespace-repair reconciler's discriminator:
+/// `None` = genuinely missing (insert it), `Some(other)` = present but mis-filed
+/// (re-file it via [`set_h_app_id`]).
+pub fn h_app_id_of(conn: &mut SqliteConnection, id: &str) -> Result<Option<String>, StorageError> {
+    rea_commitments::table
+        .filter(rea_commitments::id.eq(id))
+        .select(rea_commitments::h_app_id)
+        .first::<String>(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("h_app_id lookup failed: {e}")))
+}
+
+/// Re-file one row under `h_app_id`, keyed by PRIMARY KEY.
+///
+/// The repair half of [`h_app_id_of`]. Deliberately narrow: keyed by the exact
+/// id the caller derived from the notarized `mishpat_commitments` ledger, never
+/// a blanket `WHERE h_app_id = 'x'` sweep — a row this node did not project must
+/// never be moved between namespaces as collateral.
+pub fn set_h_app_id(
+    conn: &mut SqliteConnection,
+    id: &str,
+    h_app_id: &str,
+) -> Result<usize, StorageError> {
+    diesel::update(rea_commitments::table.filter(rea_commitments::id.eq(id)))
+        .set(rea_commitments::h_app_id.eq(h_app_id))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("h_app_id repair failed: {e}")))
+}
+
 /// Cancel the mirrored replication row for a revoked commitment.
 ///
 /// The revoke half of [`mirror_replication_commitment`]: a `revokes-commitment`

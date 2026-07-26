@@ -759,6 +759,19 @@ pub fn decode_mishpat_signal(bytes: &[u8]) -> Result<MishpatSignal, SignalDecode
 /// `db::*` module. Keep this function thin — the per-entity projection
 /// logic belongs next to its Diesel model.
 ///
+/// ## `app_id` is the PROJECTION NAMESPACE
+///
+/// It becomes the `h_app_id` scoping column on `rea_commitments`,
+/// `gate_decision_challenges` and `challenge_outcomes` — so it MUST be the
+/// namespace those tables' readers scope to
+/// (`AppContext::default_lamad().h_app_id`), NEVER the conductor's installed-hApp
+/// id (`HOLOCHAIN_APP_ID`). Handing this the installed-hApp id files every
+/// projected row under a namespace no reader queries: the rows land correctly
+/// shaped and correctly anchored, and are invisible. Worse, `rea_commitments.id`
+/// is the sole PRIMARY KEY, so a mis-filed row also silently blocks the
+/// `insert_or_ignore` that would write it correctly — see
+/// [`crate::services::mishpat_mirror_backfill`] for the level-triggered repair.
+///
 /// ## Doorway signal-absorption verdict (Task 4.3)
 ///
 /// Doorway's `ProjectionEngine` (`doorway/doorway-service/src/projection/engine.rs`)

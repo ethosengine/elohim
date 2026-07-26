@@ -55,3 +55,59 @@ Feature: Acquisition pins — the device pin and the pull queue (slice 1)
     And the pull queue drains
     Then peer B's pull status shows fetched 1 of total 1
     And peer B fetched the bytes from peer A
+
+  # --- Acquisition constraint regressions -----------------------------------
+  # Harvested from the 2026-07-26 resiliency-saga overnight cure sprint, where
+  # both defects below sat INSIDE the eight-deep chapter-5 deadlock chain: each
+  # was invisible until the one above it was cured, and neither announced itself
+  # — acquisition simply went quiet. These scenarios name the constraints so the
+  # quiet has a witness.
+  #
+  # The BINDING regressions are the Rust unit tests (same convention as the
+  # two-node scenarios above — cucumber cannot yet stand up a 6-peer fabric):
+  #   * rotation: elohim/elohim-storage/src/p2p/mod.rs, mod acquisition_rotation_tests
+  #     (successive_retries_of_a_stable_position_walk_distinct_peers)
+  #   * budget:   elohim/elohim-storage/src/p2p/reconcile_rails.rs
+  #     (dispatch_budget_caps_inflight) + the ShardResponse::Error release arm in
+  #     p2p/mod.rs
+  # These cucumber scenarios are the human-facing statement of the same
+  # constraints, scaffolded pending until a household-scale acquisition fixture
+  # exists.
+
+  @requires:household-nodes @wip @regression
+  Scenario: Retries of one item probe distinct peers, never one peer three times
+    Given an acquisition fabric of 6 connected peers
+    And "epr:elohim-host-landing" sits at a stable position in the acquisition batch
+    When its acquisition retries until the retry budget is exhausted
+    Then the item was probed on 3 distinct peers
+    # THE DEFECT: peer choice was `batch_position % peer_count`. The acquisition
+    # queue is rebuilt every 60s reconcile from list_active_pins in stable DB
+    # order, so an item's batch position is STABLE — meaning all 3 retries went to
+    # the SAME peer, and the item exhausted its budget having probed 1/6 of the
+    # fabric. Live alpha read pull:{total:36, fetched:0, failed:36}.
+    # Operational parameters: MAX_RETRIES=3 (p2p/acquisition.rs), 6-peer fabric,
+    # 60s reconcile cycle (retry-on-NEXT-cycle, not immediate re-queue).
+    # Informs: minimum peer diversity for a pin to be considered fairly probed —
+    # a fabric with fewer peers than MAX_RETRIES cannot rotate through distinct
+    # providers, which is a real operator-facing floor.
+    # Review after: any change to MAX_RETRIES, the reconcile cadence, or the
+    # queue's ordering guarantee (stable DB order is load-bearing here).
+
+  @requires:household-nodes @wip @regression
+  Scenario: An error-class shard response releases its in-flight dispatch slot
+    Given an acquisition fabric of 6 connected peers
+    When 25 acquisition dispatches are answered with an error-class shard response
+    Then the available dispatch budget returns to 25
+    And a subsequent acquisition drain dispatches at least one request
+    # THE DEFECT: only the success arm removed the entry from
+    # pending_acquisition_fetches; a ShardResponse::Error leaked its slot. After
+    # exactly MAX_ACQUISITION_INFLIGHT errors the budget's available() returned 0
+    # and drain_acquisition_queue returned early on EVERY subsequent tick —
+    # acquisition wedged permanently, silently, with no error and no log line.
+    # Operational parameters: MAX_ACQUISITION_INFLIGHT=25 (p2p/acquisition.rs),
+    # 6-peer fabric, 25 error responses = full wedge.
+    # Informs: the in-flight ceiling is a HARD wedge boundary, not a soft
+    # throttle — any new response arm on this path must release its slot, and any
+    # future budget tuning changes how many failures it takes to wedge.
+    # Review after: new ShardResponse variants, changes to
+    # MAX_ACQUISITION_INFLIGHT, or any new caller of DispatchBudget.
