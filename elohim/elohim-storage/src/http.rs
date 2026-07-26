@@ -4152,10 +4152,11 @@ impl HttpServer {
             // (HEAD-election, Plan C3 / Leg 3). Must precede the generic
             // content/{id} catch-all below.
             // Entity-nested head-RECORD service: /db/content/{cid}/head-record
-            // (declare-carries-Record SOURCE half). MUST precede the "/head"
-            // suffix arm below — "/head-record" does not end in "/head", but
-            // keeping the more specific suffix first makes the ordering
-            // intent explicit and survives a future "/head*" widening.
+            // (declare-carries-Record SOURCE half). Kept first for readability —
+            // there is no real collision with the "/head" suffix arm below, since
+            // strip_suffix("/head") never matches "…/head-record"; keeping the
+            // more specific suffix first makes the ordering intent explicit and
+            // survives a future "/head*" widening.
             if let Some(cid) = rest.strip_suffix("/head-record") {
                 return self.handle_content_head_record(method, cid, &app_ctx).await;
             }

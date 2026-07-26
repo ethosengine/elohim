@@ -58,19 +58,29 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
     # about to declare — a mismatch means the head moved between the two reads,
     # and carrying a record for a different action would be refused anyway.
     #
-    # bash + coreutils ONLY here (scripts/ci/.epr-meta deploy-script invariant):
-    # both fields are base64/base64url, so they contain no `"` and need no JSON
-    # escaping — sed extraction and printf construction are exact.
+    # This carried-record extraction is pure sed (bash + coreutils), honoring
+    # the scripts/ci/.epr-meta deploy-script invariant — the head read further
+    # up falls back to a python3 one-liner, but that is a SEPARATE pre-existing
+    # usage, not a license to add python here. Both fields are base64/base64url,
+    # so they contain no `"` and need no JSON escaping — sed extraction and
+    # printf construction are exact.
+    #
+    # The two sed patterns are ANCHORED at the start of line (`^{`) so the
+    # greedy `.*` prefix binds to the SINGLE top-level object rather than the
+    # LAST occurrence of each key: a source that returned a decoy nested
+    # "headActionHash"/"record" could otherwise be mis-matched by an unanchored
+    # `.*"key"`. The /head-record body is a flat one-object response, so the
+    # anchor pins each key to that object.
     record_b64=""
     record_head=""
     head_record_json=$(curl -fSs -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
         "${SRC}/db/content/${SLUG}/head-record" 2>/dev/null) || head_record_json=""
     if [ -n "${head_record_json}" ]; then
         record_head=$(printf '%s' "${head_record_json}" \
-            | sed -n 's/.*"headActionHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+            | sed -n 's/^{.*"headActionHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
         if [ "${record_head}" = "${head_hash}" ]; then
             record_b64=$(printf '%s' "${head_record_json}" \
-                | sed -n 's/.*"record"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+                | sed -n 's/^{.*"record"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
         fi
     fi
     # Build the declare body in a file: a multi-KB base64 payload must not ride

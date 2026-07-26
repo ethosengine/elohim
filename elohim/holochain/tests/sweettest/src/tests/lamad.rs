@@ -14,7 +14,7 @@
 use anyhow::Result;
 // `Record` is used by the declare-carries-Record test to decode a served
 // record and construct the entry-swap forgery the coordinator must refuse.
-use hdk::prelude::Record;
+use hdk::prelude::{Record, Timestamp};
 use holo_hash::{ActionHash, ActionHashB64, AgentPubKey};
 use holochain::sweettest::{await_consistency, SweetConductor};
 use serde::{Deserialize, Serialize};
@@ -150,14 +150,17 @@ struct CarriedRecordOutput {
 }
 
 /// Mirrors the fields of `content_store::ContentHeadOutput` these tests assert.
-/// The wire struct carries more (entry_hash, declared_at); holochain serializes
-/// structs as MessagePack maps, so this subset deserializes — extra keys are
-/// ignored (same pattern as `ContentOutput`/`WireContent` above).
+/// The wire struct carries more (entry_hash); holochain serializes structs as
+/// MessagePack maps, so this subset deserializes — extra keys are ignored (same
+/// pattern as `ContentOutput`/`WireContent` above). `declared_at` is included so
+/// the declare-carries-Record test can assert the carried-branch timestamp is
+/// the local declaration time, not the carried action's own timestamp.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ContentHeadOutput {
     pub content_id: String,
     pub head_action_hash: ActionHash,
     pub author: AgentPubKey,
+    pub declared_at: Timestamp,
     pub supersedes: Option<ActionHash>,
     pub content: WireContent,
 }
@@ -1216,6 +1219,13 @@ async fn declare_carries_record_for_unretrievable_target() -> Result<()> {
         swapped_declare.is_err(),
         "a genuine action paired with a SWAPPED entry must be refused"
     );
+    let swapped_err = format!("{:?}", swapped_declare.unwrap_err());
+    assert!(
+        swapped_err.contains("does not match the action's entry hash"),
+        "the entry↔action binding gate (check 3) must name the entry-hash \
+         mismatch — that binding is the ONLY check that catches a genuine \
+         signed action with substituted Content bytes; got: {swapped_err}"
+    );
 
     // --- (e) NEGATIVE: byte-tampered record. Either the decode fails or a hash
     // check does; both are refusals, and neither may write a canonical link.
@@ -1263,6 +1273,31 @@ async fn declare_carries_record_for_unretrievable_target() -> Result<()> {
     assert_ne!(
         a1, a2,
         "the two agents must be distinct for (f) to mean anything"
+    );
+
+    // HEAL-GUARD LOCKOUT GUARD: declared_at on the CARRIED branch is stamped
+    // with the DECLARING conductor's LOCAL sys_time — never copied from the
+    // carried action's own timestamp. If the carried timestamp propagated
+    // verbatim, a carried action stamped at i64::MAX would flow into
+    // declared_head_at and permanently lock out the storage monotonic heal
+    // guard (which keys off declared_at), starving the deploy-path heal. The
+    // carried record proves the target BYTES, not WHEN this head was declared.
+    // The genuine carried action (root_a) was authored strictly BEFORE this
+    // declaration, so its timestamp must NOT equal declared_at — and WITHOUT
+    // the sys_time override it would equal it EXACTLY (a verbatim copy), so
+    // this assert_ne! is a tight regression catch.
+    let carried_ts = genuine.action().timestamp();
+    assert_ne!(
+        declared.declared_at, carried_ts,
+        "declared_at must be the local declaration time, NOT the carried \
+         action's own timestamp (heal-guard lockout guard)"
+    );
+    assert!(
+        declared.declared_at >= carried_ts,
+        "declared_at ({:?}, local sys_time at declare) must be >= the carried \
+         action's timestamp ({:?})",
+        declared.declared_at,
+        carried_ts
     );
 
     // --- (g) The link is REAL, not just a 200. `resolve_content_head` cannot

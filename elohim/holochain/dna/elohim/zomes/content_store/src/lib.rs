@@ -2641,7 +2641,12 @@ pub struct DeclareCanonicalHeadInput {
     pub head_action_hash: holo_hash::ActionHashB64,
     /// `holochain_serialized_bytes`-encoded [`Record`] of the target action.
     /// `None` (or absent) → local-`get`-only, the pre-sprint-3 behaviour.
-    #[serde(default)]
+    ///
+    /// `serde_bytes` keeps the multi-KB payload a MessagePack `bin` (compact)
+    /// rather than an array-of-ints (~2x bloat). rmp_serde decodes both forms
+    /// interchangeably, so this is additive and wire-compatible with an old
+    /// caller that sent the array shape.
+    #[serde(default, with = "serde_bytes")]
     pub carried_record: Option<Vec<u8>>,
 }
 
@@ -2663,6 +2668,10 @@ pub struct GetRecordForActionInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CarriedRecordOutput {
     pub action_hash: holo_hash::ActionHashB64,
+    /// `serde_bytes` keeps the multi-KB `Record` encoding a MessagePack `bin`
+    /// (compact) rather than an array-of-ints (~2x bloat). Matched by the
+    /// storage mirror `CarriedRecordWire.record`.
+    #[serde(with = "serde_bytes")]
     pub record: Vec<u8>,
 }
 
@@ -3367,10 +3376,10 @@ fn declare_canonical_head_inner(
     // wait for) — hence the unchanged "not retrievable" error when the caller
     // carried nothing, which is the honest diagnostic the CI ladder reads.
     let target = ActionHash::from(head_action_hash);
-    let target_record = match get(target.clone(), GetOptions::default())? {
-        Some(record) => record,
+    let (target_record, from_carried) = match get(target.clone(), GetOptions::default())? {
+        Some(record) => (record, false),
         None => match carried_record {
-            Some(bytes) => validate_carried_record(&target, &bytes)?,
+            Some(bytes) => (validate_carried_record(&target, &bytes)?, true),
             None => {
                 return Err(wasm_error!(WasmErrorInner::Guest(format!(
                     "declare_canonical_head: target action {target:?} is not retrievable"
@@ -3406,7 +3415,19 @@ fn declare_canonical_head_inner(
     // Record the canonical-head link (coordinator-only, gossips to all peers).
     create_canonical_head_link(id, &target, tag)?;
 
-    let out = build_content_head_output(id, &target_record, true)?;
+    let mut out = build_content_head_output(id, &target_record, true)?;
+    // DECLARE-CARRIES-RECORD hardening: on the CARRIED branch the target
+    // action's OWN timestamp is attacker-influenced — a carried action stamped
+    // at i64::MAX would flow verbatim into `declared_at` and permanently lock
+    // out the storage monotonic heal guard (which keys `declared_head_at` off
+    // this value), and the deploy path depends on that heal to converge. The
+    // carried record is EVIDENCE of the target bytes, not of WHEN this head
+    // was declared — so stamp `declared_at` with THIS conductor's local
+    // `sys_time`, the moment the declaration is witnessed here. The local-`get`
+    // branch (`from_carried == false`) keeps the real conductor timestamp.
+    if from_carried {
+        out.declared_at = sys_time()?;
+    }
     // Reuse the existing declared-head projection signal — storage's
     // `stamp_declared_head` path stamps the canonical head + blob on every peer.
     emit_signal(ProjectionSignal::ContentHeadDeclared {

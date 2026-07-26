@@ -279,7 +279,11 @@ pub struct DeclareContentHeadInput {
 pub struct DeclareCanonicalHeadInput {
     pub id: String,
     pub head_action_hash: String,
-    #[serde(default)]
+    /// `serde_bytes` keeps the multi-KB carried record a MessagePack `bin`
+    /// (compact) rather than an array-of-ints (~2x bloat). MUST match the
+    /// coordinator's `content_store::DeclareCanonicalHeadInput.carried_record`,
+    /// which is also `#[serde(default, with = "serde_bytes")]`.
+    #[serde(default, with = "serde_bytes")]
     pub carried_record: Option<Vec<u8>>,
 }
 
@@ -297,6 +301,11 @@ pub struct GetRecordForActionInput {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CarriedRecordWire {
     pub action_hash: String,
+    /// `serde_bytes` keeps the opaque `Record` encoding a MessagePack `bin`
+    /// (compact) rather than an array-of-ints (~2x bloat). MUST match the
+    /// coordinator's `content_store::CarriedRecordOutput.record`, which is also
+    /// `#[serde(with = "serde_bytes")]`.
+    #[serde(with = "serde_bytes")]
     pub record: Vec<u8>,
 }
 

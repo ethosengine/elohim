@@ -11,6 +11,7 @@ name = "content_store"
 hdk.workspace = true
 holochain_serialized_bytes.workspace = true
 serde.workspace = true
+serde_bytes.workspace = true
 serde_json.workspace = true
 doorway-client.workspace = true
 content_store_integrity = { path = "../content_store_integrity" }

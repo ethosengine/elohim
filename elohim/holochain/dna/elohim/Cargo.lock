@@ -140,6 +140,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "lamad-types",
  "serde",
+ "serde_bytes",
  "serde_json",
  "shefa-types",
 ]
