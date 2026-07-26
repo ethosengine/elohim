@@ -437,12 +437,20 @@ pub async fn create_commitment_returning_cid(
 /// Wire mirror of the `mishpat::get_commitment` output. Used by
 /// [`crate::services::commitment_fetcher::ConductorCommitmentFetcher::fetch`] to
 /// read a notarized commitment back.
+///
+/// Like [`CreateCommitmentOutput`], the coordinator returns native
+/// `ActionHash`/`EntryHash` HoloHash types over the zome-call wire (msgpack
+/// byte arrays) — `String` fields here fail decode with "invalid value: byte
+/// array, expected a string" (the 2026-06-13 signal-decode class, resurfaced
+/// live 2026-07-26 when the read-back bounds check first executed against a
+/// real conductor). Callers derive the canonical base64 `uhCkk…`/`uhCEk…`
+/// strings via the HoloHash `Display` impl.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GetCommitmentOutput {
-    /// Base64 action hash — the value the projection stores as `dht_anchor_hash`.
-    pub action_hash: String,
-    /// Base64 entry hash — the storage `cid`.
-    pub entry_hash: String,
+    /// Action hash — the value the projection stores (base64) as `dht_anchor_hash`.
+    pub action_hash: holochain_types::prelude::ActionHash,
+    /// Entry hash — the storage `cid` (base64 via `Display`).
+    pub entry_hash: holochain_types::prelude::EntryHash,
     pub action: String,
     pub payload_json: String,
     pub signed_at: String,

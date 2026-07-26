@@ -122,7 +122,7 @@ impl CommitmentFetcher for ConductorCommitmentFetcher {
         };
 
         Ok(Some(CommitmentRecord {
-            cid: out.entry_hash,
+            cid: format!("{}", out.entry_hash),
             scope: derive_scope(&out.action, || str_field("scope")),
             action: out.action,
             provider: str_field("provider"),
