@@ -27,6 +27,14 @@
 //! extraction is here to prevent. `tests/sync_libp2p_convergence.rs` must call
 //! [`round_opener`] rather than hand-rolling a second construction site, or it
 //! measures its own mirror instead of the wire.
+//!
+//! # Gate growth, never convergence.
+//!
+//! When a budget or admission gate lands on the storage plane, the HEAL path
+//! must be exempt from it. Freenet #4868: an over-budget peer permanently
+//! diverges because the growth UPDATE *and* its ResyncResponse heal hit the same
+//! admission gate, so no convergence path exists while over budget. A node that
+//! cannot heal is worse than a node that is over budget.
 
 use crate::p2p::sync_protocol::SyncRequest;
 use libp2p::request_response::OutboundFailure;

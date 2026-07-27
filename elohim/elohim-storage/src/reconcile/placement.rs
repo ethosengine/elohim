@@ -13,6 +13,18 @@
 //! (commitments + `shard_locations` use it). The XOR metric NEVER crosses
 //! namespaces (the all-zeros incident); callers resolve libp2p ids → `agent_cid`
 //! before building the candidate set.
+//!
+//! # XOR distance is a PLACEMENT input, never a RETENTION input.
+//!
+//! Distance decides *where a new copy goes*. It must never enter an eviction or
+//! retention ranking. Prior art (Freenet's demand-driven hosting design, surveyed
+//! 2026-07-27): distance's causal pull on demand already flows through subscriber
+//! count via routing gravity, so ranking on both double-counts it — and locality
+//! is delivered by routing, not by the retention decision. They demoted their own
+//! distance-derived demand estimator to telemetry-only for exactly this reason.
+//!
+//! Our arc factor IS a distance input. Keep it on the authority plane; do not let
+//! it become the storage plane's retention rule.
 
 /// A candidate holder for blob placement. Carries the context intentional
 /// strategies weigh; the MVP [`XorDistanceStrategy`] reads ONLY `agent_cid`.
