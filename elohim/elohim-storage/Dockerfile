@@ -290,6 +290,12 @@ COPY elohim/elohim-storage/benches ./benches
 # ../../config/peer-policy.example.toml) — test-only, so the release path
 # never needed it and edge #1137's first test-layer run failed compile on it.
 COPY elohim/elohim-storage/config ./config
+# bridges/did/schemas: same class — services/did_identity_store.rs cfg(test)
+# include_str!("../../../../bridges/did/schemas/did-document-1.1.schema.json")
+# clamps to the container-absolute /bridges/did/schemas from /app/src/services,
+# so the release path never needed it but cargo test --lib does (mirrors
+# doorway/doorway-service/Dockerfile). Kept UNSTABLE since the Wave C1 DID work.
+COPY bridges/did/schemas /bridges/did/schemas
 COPY elohim/sdk /sdk
 RUN cargo fmt --check
 RUN CARGO_INCREMENTAL=0 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib
