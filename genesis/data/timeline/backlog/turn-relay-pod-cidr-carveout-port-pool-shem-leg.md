@@ -78,6 +78,28 @@ client.
    Re-measure ALLOCATE 508 rate afterward; if fault 1's fix eliminated the
    permission-failure retry churn, pressure may already be much lower.
 
+## Post-deploy verification (2026-07-27 ~17:10Z, edge #1245)
+
+Both coturn Deployments rolled at ~15:16Z (conf-revision annotation worked;
+Jenkins log shows `configmap … configured` + `deployment … configured`).
+Verified live:
+
+- **Fault 1 CLOSED**: `403: Forbidden IP` stopped (last occurrence 16:17Z,
+  zero in the following 50+ min; previously ~460/h). adam's heal sweeps now
+  COMPLETE instead of aborting on the 15s conductor timeout.
+- **Fault 2 quiet**: zero `508: Cannot create socket` in 45 min post-roll —
+  consistent with the prediction that permission-retry churn was inflating
+  allocation pressure. Re-measure before deciding the port-pool widening is
+  still needed.
+- **NEW residual class**: ~490×/45min `CreatePermission error 400: Bad
+  Request` on coturn-ethosengine, surfacing in adam as `Fail to refresh
+  permissions … (error 400: Bad Request)` plus continuing kitsune2
+  `Initiated round timed out` toward signal.doorway-alpha peers. Different
+  class from the fixed 403 (candidate suspects: peer-address family mismatch
+  now that the rolled pods bind IPv6 listeners, or malformed/stale-allocation
+  CreatePermission) — needs its own Phase-1 investigation; do NOT fold it
+  into fault 1's fix.
+
 ## Open question for the dataplane conversation
 
 adam's reconcile counters read `content_divergent_anchor: 3585` with
