@@ -17,6 +17,15 @@
 # catchError→UNSTABLE + a 45-minute stage-local timeout.
 set -euo pipefail
 
+WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# Dead-config lint first — cheap (grep-only, no toolchain), and a knob with no
+# reader is a design defect worth catching before spending Docker build time.
+# See dead-config-lint.sh: ListDocumentsSince + AnnounceChange were fully
+# handled on the receive side and never constructed for months (spine node
+# sync-scale-honesty) before this check existed.
+bash "$WORKSPACE_ROOT/scripts/ci/dead-config-lint.sh"
+
 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
 # Tagged so superseded gate runs become prunable dangling images instead of
