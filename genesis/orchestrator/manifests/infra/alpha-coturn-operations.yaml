@@ -107,8 +107,22 @@ data:
     no-cli
     no-multicast-peers
     # Do not relay to private/link-local/loopback ranges (SSRF hygiene on a
-    # public relay). Deliberately NO allowed-peer-ip — an allow-list here would
-    # block relay to ~all real internet peers (the bug this replaces fixed).
+    # public relay). coturn is allow-by-default: allowed-peer-ip is an
+    # EXCEPTION carved out of the denied ranges (whitelist checked first in
+    # good_peer_addr, verified against coturn 4.6.2 source), NOT a global
+    # allow-list — non-listed public peers stay relayable. The earlier
+    # "allowed-peer-ip whitelist bug" removal (59fd85582) assumed the
+    # opposite semantics.
+    #
+    # Carve-out: the cluster's own conductor pods (Calico pod CIDR
+    # 10.1.0.0/16). Without it, CreatePermission for in-cluster ICE
+    # candidates gets 403 Forbidden IP (observed 226x: eve/gertrude/susan/
+    # jessica/james pod IPs), tx5 permission refresh fails, and conductor<->
+    # conductor relay through this leg is dead. The household LAN
+    # (192.168.86.0/24, incl. the router at .1) stays DENIED deliberately —
+    # the static in-repo TURN credential would otherwise expose the LAN
+    # admin surface to any TURN client.
+    allowed-peer-ip=10.1.0.0-10.1.255.255
     denied-peer-ip=10.0.0.0-10.255.255.255
     denied-peer-ip=172.16.0.0-172.31.255.255
     denied-peer-ip=192.168.0.0-192.168.255.255
@@ -151,6 +165,11 @@ spec:
       environment: alpha
   template:
     metadata:
+      annotations:
+        # Bump when the base ConfigMap changes: the beacon re-renders
+        # /run/turnserver.conf only on WAN-IP change, so a conf edit without a
+        # pod restart never reaches the running relay.
+        elohim.host/conf-revision: "2026-07-27-pod-cidr-carveout"
       labels:
         app: coturn
         relay-leg: ethosengine
