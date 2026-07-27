@@ -799,6 +799,17 @@ fn decode_collective_cid(cid: &str) -> Result<Vec<u8>, StorageError> {
             "collective CID must start with 'collective:'; got: {cid}"
         ))
     })?;
+    // PANIC GUARD — load-bearing, not defensive noise. `holo_hash::encode::
+    // holo_hash_decode` opens with `&s[..1]`, which PANICS on an empty string
+    // (every other malformation is length-checked and returns Err). This value
+    // is HTTP-reachable (client-supplied collective CID), so an empty suffix
+    // (`"collective:"`) would panic the request handler. Reject it here,
+    // before the decoder sees it. Mirrors `conductor_writes::decode_collective_cid`.
+    if !raw.starts_with('u') {
+        return Err(StorageError::InvalidInput(format!(
+            "invalid collective CID '{cid}': hash must be a 'u'-prefixed HoloHash"
+        )));
+    }
     ActionHash::try_from(raw)
         .map(|h| h.get_raw_39().to_vec())
         .map_err(|e| StorageError::InvalidInput(format!("invalid collective CID '{cid}': {e}")))
@@ -958,6 +969,43 @@ mod tests {
                 governance_terms.is_none(),
                 "governance_terms for '{}' should be None",
                 empty_val
+            );
+        }
+    }
+
+    /// An empty-suffix collective CID (`"collective:"`) must return an
+    /// `InvalidInput` error, never panic. `holo_hash::encode::holo_hash_decode`
+    /// opens with `&s[..1]`, which panics on an empty string; this value is
+    /// HTTP-reachable (client-supplied), so the guard must reject it before the
+    /// decoder ever sees it.
+    #[test]
+    fn decode_collective_cid_empty_suffix_errors_not_panics() {
+        let result = decode_collective_cid("collective:");
+        assert!(
+            result.is_err(),
+            "empty-suffix collective CID must error, not decode"
+        );
+        assert!(
+            matches!(result, Err(StorageError::InvalidInput(_))),
+            "empty-suffix collective CID must be InvalidInput"
+        );
+    }
+
+    /// A short, malformed (non-`u`-prefixed) collective CID suffix must also
+    /// return an `InvalidInput` error rather than panicking or being accepted.
+    #[test]
+    fn decode_collective_cid_short_suffix_errors_not_panics() {
+        for short in &["collective:x", "collective:ab", "collective:notahash"] {
+            let result = decode_collective_cid(short);
+            assert!(
+                result.is_err(),
+                "short/malformed collective CID '{}' must error, not decode",
+                short
+            );
+            assert!(
+                matches!(result, Err(StorageError::InvalidInput(_))),
+                "short/malformed collective CID '{}' must be InvalidInput",
+                short
             );
         }
     }

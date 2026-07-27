@@ -420,7 +420,7 @@ impl SelfHouseholdCidSource for ConductorSelfHouseholdCids {
         })?;
         let bytes = self
             .hc
-            .call_zome(IMAGODEI_ZOME, SELF_HOUSEHOLD_CIDS_FN, payload)
+            .call_zome_imagodei(IMAGODEI_ZOME, SELF_HOUSEHOLD_CIDS_FN, payload)
             .await?;
         let cids: Vec<String> = rmp_serde::from_slice(&bytes).map_err(|e| {
             StorageError::Serialization(format!(

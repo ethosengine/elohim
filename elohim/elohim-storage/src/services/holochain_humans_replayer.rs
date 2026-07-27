@@ -111,7 +111,7 @@ impl MembershipReader for ConductorMembershipReader {
         })?;
         let bytes = self
             .hc_client
-            .call_zome(IMAGODEI_ZOME, LIST_MEMBERSHIPS_FN, payload)
+            .call_zome_imagodei(IMAGODEI_ZOME, LIST_MEMBERSHIPS_FN, payload)
             .await?;
         // `Vec<Record>` decodes through the typed Record deserializer — the
         // holo_hash fields inside each SignedActionHashed survive because we do
