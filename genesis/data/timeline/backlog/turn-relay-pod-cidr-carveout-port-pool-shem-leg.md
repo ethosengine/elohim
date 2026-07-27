@@ -91,14 +91,26 @@ Verified live:
   consistent with the prediction that permission-retry churn was inflating
   allocation pressure. Re-measure before deciding the port-pool widening is
   still needed.
-- **NEW residual class**: ~490×/45min `CreatePermission error 400: Bad
-  Request` on coturn-ethosengine, surfacing in adam as `Fail to refresh
-  permissions … (error 400: Bad Request)` plus continuing kitsune2
-  `Initiated round timed out` toward signal.doorway-alpha peers. Different
-  class from the fixed 403 (candidate suspects: peer-address family mismatch
-  now that the rolled pods bind IPv6 listeners, or malformed/stale-allocation
-  CreatePermission) — needs its own Phase-1 investigation; do NOT fold it
-  into fault 1's fix.
+- **Residual 400 class — CHARACTERIZED (2026-07-27 ~17:40Z, source-grounded),
+  not manifest-fixable**: the `CreatePermission error 400: Bad Request` lines
+  (~100-170/15min, ALL 7 conductors, rate unchanged pre/post-roll — it ran in
+  parallel with the 403 class all along) are a coturn 4.6.2 handler asymmetry:
+  `handle_turn_create_permission` (ns_turn_server.c:3011) sets no err_code
+  when `is_allocation_valid()` is false (unlike REFRESH/CONNECT, which answer
+  `437 Allocation Mismatch`), so the request falls to the generic post-switch
+  400 fallback (~:3809) — diagnostic signature: method logged as generic
+  `message`, not `CREATE_PERMISSION`. The dying allocations are STANDBY ICE
+  relay legs: tx5/pion allocates on both legs of the dual-relay pair, only one
+  candidate pair is nominated, the standby allocation moves zero bytes
+  (`rp=0, rb=0, sp=0, sb=0`) and expires on TURN lifetime while the client
+  keeps refreshing permissions against it. No allowed/denied-peer-ip range
+  (v4 or v6) is causal — the request dies before XOR-PEER-ADDRESS is
+  inspected; no IPv6 involvement found. Impact: standby-leg redundancy is
+  chronically degraded (the dual-relay design's failover margin), and it is
+  the most plausible feeder of the flat ~100-140/30min kitsune2 round-timeout
+  rate; nominated legs carry traffic and gossip converges. Levers live in
+  coturn allocation-lifetime behavior or tx5/go-pion standby-leg refresh
+  scheduling — upstream, not this repo's manifests.
 
 ## Open question for the dataplane conversation
 
