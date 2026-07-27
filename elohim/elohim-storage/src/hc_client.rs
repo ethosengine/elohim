@@ -95,6 +95,15 @@ pub struct HcClient {
     /// `call_zome_mishpat` then returns a legible NotFound instead of the
     /// misleading ZomeNotFound.
     mishpat_cell_id: Option<CellId>,
+    /// The imagodei role's cell, when the installed happ provisions one.
+    ///
+    /// Same routing hazard as [`Self::mishpat_cell_id`]: the `imagodei` zome
+    /// (identity, qahal collectives + memberships) lives in the imagodei DNA, so
+    /// an `imagodei` zome call routed through the default `call_zome` targets the
+    /// lamad cell and dies `ZomeNotFound: imagodei` — AND fails signing, because
+    /// the signer is per-cell. `call_zome_imagodei` is the correct route.
+    /// `None` when the happ has no imagodei role (minimal local-dev bundles).
+    imagodei_cell_id: Option<CellId>,
     /// Signing credentials
     signer: Arc<ClientAgentSigner>,
 }
@@ -215,6 +224,25 @@ impl HcClient {
             None => info!("No mishpat role in installed happ — mishpat zome calls unavailable"),
         }
 
+        // Resolve the imagodei role's cell for the same reason: the imagodei
+        // zome (qahal collectives/memberships, identity) lives in the imagodei
+        // DNA, so routing those calls at the lamad cell dies ZomeNotFound.
+        let imagodei_cell_id = app_info
+            .cell_info
+            .get("imagodei")
+            .and_then(|cells| cells.first())
+            .and_then(|cell| match cell {
+                holochain_client::CellInfo::Provisioned(p) => Some(p.cell_id.clone()),
+                _ => None,
+            });
+        match &imagodei_cell_id {
+            Some(ic) => info!(
+                dna_hash = %hex::encode(&ic.dna_hash().get_raw_39()[..8]),
+                "Found imagodei cell"
+            ),
+            None => info!("No imagodei role in installed happ — imagodei zome calls unavailable"),
+        }
+
         // Create signing credentials
         let signer = ClientAgentSigner::default();
 
@@ -249,6 +277,24 @@ impl HcClient {
                 })?;
             signer.add_credentials(mc.clone(), mishpat_credentials);
         }
+
+        // Same for imagodei — without per-cell credentials a role-targeted
+        // imagodei call fails at signing rather than at dispatch.
+        if let Some(ic) = &imagodei_cell_id {
+            let imagodei_credentials = admin_ws
+                .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
+                    cell_id: ic.clone(),
+                    functions: None,
+                })
+                .await
+                .map_err(|e| {
+                    StorageError::Connection(format!(
+                        "authorize_signing_credentials (imagodei) failed: {}",
+                        e
+                    ))
+                })?;
+            signer.add_credentials(ic.clone(), imagodei_credentials);
+        }
         info!("Signing credentials authorized");
 
         // Get app auth token
@@ -275,8 +321,48 @@ impl HcClient {
             app_ws,
             cell_id,
             mishpat_cell_id,
+            imagodei_cell_id,
             signer: signer_arc,
         })
+    }
+
+    /// Make a signed zome call against the IMAGODEI cell (identity/qahal DNA).
+    ///
+    /// The default [`Self::call_zome`] targets the configured role's cell (lamad
+    /// in production), whose DNA has no `imagodei` zome — routing identity /
+    /// qahal calls there fails `ZomeNotFound` on every live conductor (and would
+    /// fail signing first, the signer being per-cell). Mirrors
+    /// [`Self::call_zome_mishpat`] exactly.
+    pub async fn call_zome_imagodei(
+        &self,
+        zome_name: &str,
+        fn_name: &str,
+        payload: Vec<u8>,
+    ) -> Result<Vec<u8>, StorageError> {
+        let cell_id = self.imagodei_cell_id.clone().ok_or_else(|| {
+            StorageError::NotFound(
+                "imagodei cell not provisioned in installed happ — identity/qahal zome calls \
+                 unavailable on this node"
+                    .to_string(),
+            )
+        })?;
+        debug!(
+            zome = %zome_name,
+            fn_name = %fn_name,
+            payload_len = payload.len(),
+            "Making signed zome call (imagodei cell)"
+        );
+        let result = self
+            .app_ws
+            .call_zome(
+                ZomeCallTarget::CellId(cell_id),
+                zome_name.into(),
+                fn_name.into(),
+                ExternIO::from(payload),
+            )
+            .await
+            .map_err(|e| StorageError::Conductor(format!("Zome call failed: {}", e)))?;
+        Ok(result.into_vec())
     }
 
     /// Make a signed zome call against the MISHPAT cell (governance DNA).

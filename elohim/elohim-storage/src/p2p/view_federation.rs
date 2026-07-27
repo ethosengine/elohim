@@ -65,6 +65,19 @@ pub const PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS: &str = "rea_commitments";
 /// consumer's projection.
 pub const PROJECTION_INVENTORY_TABLE_CONTENT: &str = "content";
 
+/// The COLLECTIVES projection table (cross-peer collective-identity reconcile).
+/// Serves the `(id, collective_cid)` inventory of this peer's DHT-anchored,
+/// non-dissolved collectives, so a peer that never saw a `CollectiveCommitted`
+/// signal (post_commit fires only on the AUTHORING conductor) can discover WHICH
+/// collective cids exist and resolve each against its OWN conductor.
+///
+/// The `dhtAnchorHash` slot carries the `collective:{action_hash}` CID — that IS
+/// the reconciliation identity; the `id` slot carries this peer's local routing
+/// alias (see `db::collectives::list_collective_cid_inventory` for why
+/// NULL-cid rows are excluded). Discovery-only: the advertised cid is never
+/// written into a consumer's projection without an own-conductor read.
+pub const PROJECTION_INVENTORY_TABLE_COLLECTIVES: &str = "collectives";
+
 /// Protocol identifier for federated view-slice fetch.
 pub const VIEW_FEDERATION_PROTOCOL_ID: &str = "/elohim/view-federation/1.0.0";
 
@@ -432,6 +445,7 @@ fn build_inventory_payload(
     // unknown table yields an honest empty inventory.
     if table != PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS
         && table != PROJECTION_INVENTORY_TABLE_CONTENT
+        && table != PROJECTION_INVENTORY_TABLE_COLLECTIVES
     {
         return empty();
     }
@@ -503,6 +517,73 @@ fn build_inventory_payload(
                         served = payload.entries.len(),
                         "ProjectionInventory: content inventory trimmed to byte budget \
                          (dropped the cold tail so the serialized frame stays under MAX_PAYLOAD)"
+                    );
+                }
+                tracing::info!(
+                    target: "elohim_storage::view_federation",
+                    table = %table,
+                    entries = payload.entries.len(),
+                    total,
+                    "ProjectionInventory: serving local inventory"
+                );
+                (
+                    serde_json::to_value(payload).unwrap_or(serde_json::Value::Null),
+                    FreshnessState::Live,
+                )
+            }
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::view_federation",
+                    table = %table,
+                    error = %e,
+                    "ProjectionInventory: local inventory query failed; returning empty"
+                );
+                empty()
+            }
+        };
+    }
+
+    // Collectives (cross-peer collective-identity reconcile) — DHT-anchored,
+    // non-dissolved rows only. The corpus is small (dozens), so the cap is
+    // effectively never reached; the truncation/byte guards below are the same
+    // belt-and-suspenders the other tables carry, not an expected path.
+    if table == PROJECTION_INVENTORY_TABLE_COLLECTIVES {
+        return match crate::db::collectives::list_collective_cid_inventory(
+            &mut conn,
+            &app_ctx,
+            i64::from(offset),
+            PROJECTION_INVENTORY_CAP,
+        ) {
+            Ok((rows, db_total)) => {
+                let total = usize::try_from(db_total).unwrap_or(usize::MAX);
+                let served = rows.len();
+                let cap_truncated = (offset as usize).saturating_add(served) < total;
+                let entries = rows
+                    .into_iter()
+                    // The `dhtAnchorHash` slot carries the collective CID — the
+                    // reconciliation identity for this table.
+                    .map(|(id, collective_cid)| ProjectionInventoryEntry {
+                        id,
+                        dht_anchor_hash: collective_cid,
+                    })
+                    .collect();
+                let mut payload = ProjectionInventoryPayload {
+                    table: table.to_string(),
+                    total,
+                    entries,
+                };
+                let byte_dropped = fit_inventory_to_budget(&mut payload, INVENTORY_PAYLOAD_BUDGET);
+                if cap_truncated || byte_dropped > 0 {
+                    tracing::warn!(
+                        target: "elohim_storage::view_federation",
+                        table = %table,
+                        cap = PROJECTION_INVENTORY_CAP,
+                        offset = offset,
+                        dropped = byte_dropped,
+                        served = payload.entries.len(),
+                        total,
+                        "ProjectionInventory: collectives inventory windowed/trimmed \
+                         (honest total on the wire lets the requester window the remainder)"
                     );
                 }
                 tracing::info!(
@@ -747,6 +828,57 @@ mod tests {
         let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
         assert_eq!(payload.table, "agreements");
         assert!(payload.entries.is_empty());
+    }
+
+    /// Responder contract for the `collectives` table (reconcile ruling 1): a
+    /// real pool serves ONLY DHT-anchored, non-dissolved rows, `Live`, with the
+    /// `collective_cid` in the `dhtAnchorHash` slot. A pre-coherence (NULL-cid)
+    /// row has no DHT identity to reconcile on and must never reach the wire.
+    #[test]
+    fn collectives_inventory_served_from_pool_excludes_unanchored() {
+        use crate::db::collectives::{create_collective, CreateCollectiveInput};
+        let pool = crate::test_util::test_pool();
+        let ctx = crate::db::AppContext::default_lamad();
+        const CID: &str = "collective:uhCkkAlphaCollectiveActionHash00000000000";
+        {
+            let mut conn = pool.get().expect("pool conn");
+            let mk = |id: &str| CreateCollectiveInput {
+                id: id.to_string(),
+                name: id.to_string(),
+                description: None,
+                governance_layer: "family".to_string(),
+                constitutional_parent_id: None,
+                reach: "trusted".to_string(),
+                region: None,
+                metadata_json: None,
+                created_by: None,
+            };
+            create_collective(&mut conn, &ctx, &mk("anchored")).unwrap();
+            create_collective(&mut conn, &ctx, &mk("preco")).unwrap();
+            use crate::db::diesel_schema::collectives;
+            use diesel::prelude::*;
+            diesel::update(collectives::table.filter(collectives::id.eq("anchored")))
+                .set(collectives::collective_cid.eq(Some(CID)))
+                .execute(&mut conn)
+                .unwrap();
+        }
+
+        let (val, state) =
+            build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_COLLECTIVES, 0);
+        assert_eq!(state, FreshnessState::Live);
+        let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
+        assert_eq!(payload.table, "collectives");
+        let ids: Vec<&str> = payload.entries.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["anchored"],
+            "only the DHT-anchored row is advertised (ruling 1: NULL cid = nothing to reconcile on)"
+        );
+        assert_eq!(
+            payload.entries[0].dht_anchor_hash, CID,
+            "the collective CID rides the dhtAnchorHash slot — it IS the reconciliation identity"
+        );
+        assert_eq!(payload.total, 1);
     }
 
     #[test]

@@ -25,5 +25,11 @@ check "SyncRequest::ListDocumentsSince" "elohim/elohim-storage/src/p2p/sync_roun
       "the round opener must construct it (spine sync-scale-honesty)"
 check "inc_sync_in_sync" "elohim/elohim-storage/src/p2p" \
       "the InSync client arm must count the shortcut"
+check "PROJECTION_INVENTORY_TABLE_COLLECTIVES" "elohim/elohim-storage/src/p2p/projection_reconcile.rs" \
+      "the collectives reconcile arm must ASK for the table the responder serves \
+(a served table nobody requests is a claim, not a feature)"
+check "call_zome_imagodei" "elohim/elohim-storage/src/services" \
+      "the imagodei cell route must have a caller — an unrouted cell is the \
+ZomeNotFound class this method exists to close"
 
 exit $fail

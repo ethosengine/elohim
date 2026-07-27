@@ -713,7 +713,9 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         &mut self,
         signal: CollectiveProjectedSignal,
     ) -> Result<(), ReconcileError> {
-        use crate::db::collectives::{create_collective, CreateCollectiveInput};
+        use crate::db::collectives::{
+            project_collective, CollectiveProjection, CollectiveStampMode,
+        };
         use crate::db::context::AppContext;
 
         let pool = match self.db_pool.as_ref() {
@@ -744,132 +746,40 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         // need a different scope should extend this with a configurable field.
         let ctx = AppContext::new("lamad");
 
-        // Household coherence (2026-06-04 formation spec §5.4): a charter that
-        // declares {"kind":"household"} projects as governance_layer='family',
-        // and a declared slugAlias merges onto the pre-coherence seed row
-        // (one household, one row — slug is the display alias, CID canonical).
-        #[derive(serde::Deserialize, Default)]
-        struct CharterHints {
-            #[serde(default)]
-            kind: Option<String>,
-            #[serde(default, rename = "slugAlias")]
-            slug_alias: Option<String>,
-        }
-        let hints: CharterHints = signal
-            .charter
-            .as_deref()
-            .and_then(|c| {
-                serde_json::from_str(c)
-                    .map_err(|e| {
-                        warn!(
-                            collective_cid = %signal.collective_cid,
-                            error = %e,
-                            "on_collective_projected: charter is not valid JSON — \
-                             defaulting to community governance"
-                        );
-                    })
-                    .ok()
-            })
-            .unwrap_or_default();
-        let is_household = hints.kind.as_deref() == Some("household");
-        let layer = if is_household {
-            crate::db::models::governance_layers::FAMILY.to_string()
-        } else {
-            crate::db::models::governance_layers::COMMUNITY.to_string()
-        };
-
-        // Slug-alias merge: if a row already exists under the alias id, stamp
-        // it instead of creating a duplicate.
-        if let Some(alias) = hints.slug_alias.as_deref() {
-            use crate::db::diesel_schema::collectives;
-            use diesel::prelude::*;
-            let stamped = diesel::update(
-                collectives::table
-                    .filter(collectives::h_app_id.eq(&ctx.h_app_id))
-                    .filter(collectives::id.eq(alias)),
-            )
-            .set((
-                collectives::collective_cid.eq(Some(signal.collective_cid.as_str())),
-                collectives::slug.eq(Some(alias)),
-                collectives::governance_layer.eq(&layer),
-            ))
-            .execute(&mut conn)
-            .map_err(|e| {
-                warn!(
-                    collective_cid = %signal.collective_cid,
-                    alias = %alias,
-                    error = %e,
-                    "on_collective_projected: slug-alias merge UPDATE failed (non-fatal) — \
-                     falls through to CREATE; redelivery re-attempts the merge"
-                );
-            })
-            .unwrap_or(0);
-            if stamped > 0 {
-                debug!(
-                    collective_cid = %signal.collective_cid,
-                    alias = %alias,
-                    "household collective merged onto pre-coherence row"
-                );
-                return Ok(());
-            }
-        }
-
-        let input = CreateCollectiveInput {
-            id: signal.collective_cid.clone(),
-            name: signal.display_name.clone(),
-            description: None,
-            governance_layer: layer,
-            constitutional_parent_id: None,
-            // TODO: replace with a canonical collective-reach constant once the
-            // reach vocabulary is reconciled (roadmap #13 — don't bake new literals).
-            reach: if is_household {
-                "trusted".to_string()
-            } else {
-                "community".to_string()
+        // Household coherence (2026-06-04 formation spec §5.4) and the
+        // slug-alias merge now live in the SHARED mapping
+        // `db::collectives::project_collective`, which the cross-peer
+        // `projection_reconcile` collectives arm also funnels through — one
+        // charter→governance derivation, not two that can drift.
+        //
+        // `Declare` mode: a post-commit signal is the own-conductor canonical
+        // channel, so it may re-point a row that carries a different cid. Only
+        // the reconcile heal is fill-only (`GapFill`).
+        match project_collective(
+            &mut conn,
+            &ctx,
+            &CollectiveProjection {
+                collective_cid: &signal.collective_cid,
+                display_name: &signal.display_name,
+                founder_agent_cid: Some(&signal.founder_agent_cid),
+                charter: signal.charter.as_deref(),
+                merge_onto_id: None,
+                mode: CollectiveStampMode::Declare,
             },
-            region: None,
-            metadata_json: None,
-            created_by: Some(signal.founder_agent_cid.clone()),
-            // collective_cid is set to the canonical CID so the resolver can
-            // find the row both by id and by collective_cid.
-        };
-
-        // create_collective is an upsert (idempotent on id).  After the upsert
-        // we also stamp the collective_cid column so the Wave-2 resolver can
-        // locate rows by canonical CID.
-        match create_collective(&mut conn, &ctx, &input) {
-            Ok(_) => {
-                // Stamp collective_cid + slug on the freshly created row.
-                use crate::db::diesel_schema::collectives;
-                use diesel::prelude::*;
-                let _ = diesel::update(
-                    collectives::table
-                        .filter(collectives::h_app_id.eq(&ctx.h_app_id))
-                        .filter(collectives::id.eq(&signal.collective_cid)),
-                )
-                .set((
-                    collectives::collective_cid.eq(Some(&signal.collective_cid)),
-                    // slug left NULL; steward sets it post-coherence.
-                ))
-                .execute(&mut conn)
-                .map_err(|e| {
-                    warn!(
-                        collective_cid = %signal.collective_cid,
-                        error = %e,
-                        "on_collective_projected: collective_cid stamp failed (non-fatal)"
-                    );
-                });
+        ) {
+            Ok(outcome) => {
                 debug!(
                     collective_cid = %signal.collective_cid,
                     display_name = %signal.display_name,
-                    "collectives row upserted from DHT signal"
+                    ?outcome,
+                    "collectives row projected from DHT signal"
                 );
             }
             Err(e) => {
                 warn!(
                     collective_cid = %signal.collective_cid,
                     error = %e,
-                    "on_collective_projected: create_collective upsert failed"
+                    "on_collective_projected: projection failed"
                 );
             }
         }

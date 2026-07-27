@@ -52,6 +52,122 @@ use crate::signals::HoloHashB64;
 /// `elohim/holochain/dna/elohim/workdir/happ.yaml:24`).
 const ZOME_NAME: &str = "content_store";
 
+/// Zome name hosting the qahal Collective/Membership coordinator functions.
+/// Lives in the `imagodei` role of the elohim hApp — a DIFFERENT cell from
+/// [`ZOME_NAME`], so these calls MUST route through
+/// [`HcClient::call_zome_imagodei`] (see that method's doc for the
+/// ZomeNotFound/signing hazard).
+const IMAGODEI_ZOME: &str = "imagodei";
+
+/// Prefix the imagodei coordinator stamps onto a Collective's canonical CID
+/// (`qahal_coordinator::action_hash_to_cid` — `format!("collective:{hash}")`).
+pub const COLLECTIVE_CID_PREFIX: &str = "collective:";
+
+/// Wire mirror of `imagodei_integrity::qahal::Collective` — the DHT entry body
+/// as it arrives inside a `Record`'s `Entry::App` msgpack bytes.
+///
+/// Deliberately a LOCAL mirror rather than a dependency on the integrity crate:
+/// elohim-storage does not link the DNA crates, and the mirror makes the wire
+/// contract explicit at the seam (the same convention
+/// `holochain_humans_replayer::MembershipWire` uses).
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct CollectiveWire {
+    pub founder_agent_cid: String,
+    pub charter: String,
+    pub display_name: String,
+    #[serde(default)]
+    pub created_at_block_height: u64,
+    #[serde(default)]
+    pub salt: String,
+    #[serde(default)]
+    pub anchor_agreement_cid: Option<String>,
+}
+
+/// Resolve a `collective:{action_hash}` CID against the OWN conductor's
+/// imagodei cell (`get_collective_by_action`).
+///
+/// This is the collectives arm's analogue of
+/// [`call_resolve_content_head`]: the reconcile leg learns WHICH cids exist
+/// from peers (discovery), then reads the entry BODY exclusively from its own
+/// conductor's DHT view. On a full-arc fleet every conductor holds the
+/// authoring agent's `Collective` entry, so a non-authoring peer can answer for
+/// itself — no peer bytes are ever written into the projection.
+///
+/// `Ok(None)` means the own conductor cannot see the entry (not yet gossiped in,
+/// or a foreign-DHT cid) — retried on the NEXT sweep, never immediately.
+/// A malformed cid is an `InvalidInput` error, not a miss: it can never resolve,
+/// so re-attempting it every sweep would burn a conductor round-trip forever.
+pub async fn get_collective_by_cid(
+    hc: &Arc<HcClient>,
+    collective_cid: &str,
+) -> Result<Option<CollectiveWire>, StorageError> {
+    let action_hash = decode_collective_cid(collective_cid)?;
+    // HoloHash serializes as msgpack `bin` (holo_hash::ser — `serialize_bytes`
+    // over the raw 39 bytes), which is exactly what the coordinator's
+    // `ActionHash` parameter deserializes.
+    let payload = rmp_serde::to_vec_named(&action_hash).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode ActionHash for get_collective_by_action: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome_imagodei(IMAGODEI_ZOME, "get_collective_by_action", payload)
+        .await?;
+    // Decode through the TYPED `Record` deserializer — a `serde_json::Value`
+    // pre-pass or a hand-rolled mirror would drop the holo_hash fields inside
+    // `SignedActionHashed` (the msgpack raw-bytes decode class).
+    let record: Option<holochain_types::prelude::Record> =
+        rmp_serde::from_slice(&bytes).map_err(|e| {
+            StorageError::Serialization(format!(
+                "conductor_writes: decode Option<Record> from get_collective_by_action: {e}"
+            ))
+        })?;
+    let Some(record) = record else {
+        return Ok(None);
+    };
+    // A record whose entry is absent (a delete/tombstone) is not a Collective.
+    let Some(holochain_types::prelude::Entry::App(eb)) = record.entry.as_option() else {
+        return Ok(None);
+    };
+    let collective: CollectiveWire = rmp_serde::from_slice(eb.bytes()).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode Collective entry for {collective_cid}: {e}"
+        ))
+    })?;
+    Ok(Some(collective))
+}
+
+/// Decode a `collective:{HoloHash-display}` CID back to its `ActionHash`.
+///
+/// Pure + total: every failure mode is a legible `InvalidInput`. Exposed for the
+/// reconcile arm's up-front validation (a cid it cannot decode is never enqueued
+/// as a gap).
+pub fn decode_collective_cid(
+    collective_cid: &str,
+) -> Result<holochain_types::prelude::ActionHash, StorageError> {
+    let raw = collective_cid
+        .strip_prefix(COLLECTIVE_CID_PREFIX)
+        .ok_or_else(|| {
+            StorageError::InvalidInput(format!(
+                "collective CID must start with '{COLLECTIVE_CID_PREFIX}'; got: {collective_cid}"
+            ))
+        })?;
+    // PANIC GUARD — load-bearing, not defensive noise. `holo_hash::encode::
+    // holo_hash_decode` opens with `&s[..1]`, which PANICS on an empty string
+    // (every other malformation is length-checked and returns Err). This value
+    // arrives from a PEER's advertised inventory, so an empty suffix
+    // (`"collective:"`) would abort the whole reconcile task — the
+    // one-poisoned-row class. Reject it here, before the decoder sees it.
+    if !raw.starts_with('u') {
+        return Err(StorageError::InvalidInput(format!(
+            "invalid collective CID '{collective_cid}': hash must be a 'u'-prefixed HoloHash"
+        )));
+    }
+    holochain_types::prelude::ActionHash::try_from(raw).map_err(|e| {
+        StorageError::InvalidInput(format!("invalid collective CID '{collective_cid}': {e}"))
+    })
+}
+
 /// Round-trip `create_rea_commitment` through the local conductor.
 ///
 /// Returns raw MessagePack bytes encoding `shefa_types::ReaCommitmentOutput`.
@@ -617,6 +733,103 @@ pub async fn get_commitment(
         StorageError::Serialization(format!("conductor_writes: decode GetCommitmentOutput: {e}"))
     })?;
     Ok(out)
+}
+
+#[cfg(test)]
+mod collective_cid_tests {
+    use super::*;
+
+    /// The reconcile arm drops an undecodable peer cid at DISCOVERY rather than
+    /// enqueuing it — an id that can never resolve would otherwise burn a
+    /// conductor round-trip every sweep forever. This pins the classifier those
+    /// drops are made on, and the round-trip through the coordinator's own
+    /// `format!("collective:{hash}")` encoding.
+    #[test]
+    fn decode_collective_cid_round_trips_and_rejects_junk() {
+        // `from_raw_32` COMPUTES the 4 DHT-location bytes; `from_raw_36` would
+        // leave them as supplied and the base64 form then fails `try_from`'s
+        // checksum — i.e. the decoder really does validate, which is why an
+        // undecodable peer cid is safe to drop at discovery.
+        let hash = holochain_types::prelude::ActionHash::from_raw_32(vec![0x5A; 32]);
+        let cid = format!("{COLLECTIVE_CID_PREFIX}{hash}");
+        assert_eq!(
+            decode_collective_cid(&cid).expect("round-trips the coordinator encoding"),
+            hash
+        );
+
+        for bad in [
+            "",
+            "uhCkkNoPrefix",
+            "agreement:uhCkkWrongPrefix",
+            // `collective:` (empty suffix) PANICKED inside holo_hash_decode's
+            // `&s[..1]` before the guard in `decode_collective_cid` — and this
+            // value comes off a peer's wire, so it would have aborted the whole
+            // reconcile task. This case is the regression pin.
+            "collective:",
+            "collective:not-a-hash",
+            "collective:uhCAkWrongHashType0000000000000000000000000",
+            // Right prefix, right shape, WRONG checksum — the decoder really
+            // validates, which is what makes dropping an undecodable peer cid at
+            // discovery safe rather than lossy.
+            &format!(
+                "{COLLECTIVE_CID_PREFIX}{}",
+                holochain_types::prelude::ActionHash::from_raw_36(vec![0x5A; 36])
+            ),
+        ] {
+            assert!(
+                decode_collective_cid(bad).is_err(),
+                "'{bad}' must be rejected up front, never enqueued as a gap"
+            );
+        }
+    }
+
+    /// The `Collective` entry mirror decodes the coordinator's msgpack body,
+    /// and tolerates an older sender that omits the additive tail fields.
+    #[test]
+    fn collective_wire_decodes_entry_body() {
+        #[derive(serde::Serialize)]
+        struct ZomeCollective<'a> {
+            founder_agent_cid: &'a str,
+            charter: &'a str,
+            display_name: &'a str,
+            created_at_block_height: u64,
+            salt: &'a str,
+            anchor_agreement_cid: Option<&'a str>,
+        }
+        let bytes = rmp_serde::to_vec_named(&ZomeCollective {
+            founder_agent_cid: "uhCAkFounder0001",
+            charter: r#"{"kind":"household","slugAlias":"household-dowell"}"#,
+            display_name: "Dowell Household",
+            created_at_block_height: 42,
+            salt: "s",
+            anchor_agreement_cid: None,
+        })
+        .expect("encode");
+        let wire: CollectiveWire = rmp_serde::from_slice(&bytes).expect("decode");
+        assert_eq!(wire.display_name, "Dowell Household");
+        assert_eq!(wire.founder_agent_cid, "uhCAkFounder0001");
+        assert_eq!(wire.created_at_block_height, 42);
+        assert!(wire.anchor_agreement_cid.is_none());
+        // Household-ness rides the charter string through to the shared mapping.
+        assert!(crate::db::collectives::CharterHints::parse(Some(&wire.charter)).is_household());
+
+        // Additive-tail tolerance: a sender without the optional fields decodes.
+        #[derive(serde::Serialize)]
+        struct Minimal<'a> {
+            founder_agent_cid: &'a str,
+            charter: &'a str,
+            display_name: &'a str,
+        }
+        let bytes = rmp_serde::to_vec_named(&Minimal {
+            founder_agent_cid: "uhCAkFounder0002",
+            charter: "{}",
+            display_name: "Bare",
+        })
+        .expect("encode");
+        let wire: CollectiveWire = rmp_serde::from_slice(&bytes).expect("decode minimal");
+        assert_eq!(wire.display_name, "Bare");
+        assert_eq!(wire.created_at_block_height, 0);
+    }
 }
 
 #[cfg(test)]

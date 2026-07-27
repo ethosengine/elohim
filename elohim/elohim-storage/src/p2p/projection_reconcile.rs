@@ -55,6 +55,43 @@
 //! cross-arm health signal); its heal/miss detail is log-observable, because
 //! extending the ts-rs-exported [`ProjectionReconcileStatus`] with content
 //! fields would change the `p2p-status` wire shape (owned elsewhere).
+//!
+//! ## The collectives arm (cross-peer collective identity)
+//!
+//! Same shape again for the `collectives` projection ([`discover_collectives`] +
+//! [`heal_collectives`]). `CollectiveCommitted` post-commit signals fire ONLY on
+//! the AUTHORING conductor, so a non-authoring peer never acquires the row at
+//! all — `household_resilience` then renders a collective its neighbours can see
+//! and it cannot. Peers advertise `(routing-alias id, collective_cid)`; the cid
+//! is resolved against the OWN conductor's imagodei cell
+//! ([`crate::services::conductor_writes::get_collective_by_cid`] →
+//! `imagodei::get_collective_by_action`), which on a full-arc fleet holds every
+//! authoring agent's `Collective` entry. Both the signal arm and this arm funnel
+//! through ONE mapping, [`crate::db::collectives::project_collective`], so the
+//! charter→governance derivation and the slug-alias merge cannot drift apart.
+//!
+//! Three decisions are load-bearing and deliberately recorded here:
+//!
+//! - **NULL-`collective_cid` rows are excluded from the inventory** — both from
+//!   the local snapshot this arm diffs and from
+//!   [`crate::db::collectives::list_collective_cid_inventory`] on the responder
+//!   side. A pre-coherence seed row has no DHT identity to reconcile ON;
+//!   replicating it would mean adopting a peer's local routing alias as truth,
+//!   which is worse than a gap. Such rows stay upgradable IN PLACE — the
+//!   `slugAlias` merge in `project_collective` (and this arm's
+//!   [`CollectiveGap::CidGap`] fill) stamps the real cid the moment it arrives.
+//! - **Own [`GapTracker`], own [`HealPacing`] budget, ordered LAST** (after REA
+//!   and content) so it can never starve the two arms that came before it.
+//! - **The identity is `collective_cid`; the diesel `id` is a routing alias.**
+//!   The tracker is keyed by cid. A local row under the advertised alias that
+//!   carries a DIFFERENT cid is [`CollectiveGap::Divergent`]: counted and WARN-
+//!   logged, never enqueued — `collectives` carries no declaration-ordering
+//!   column, so a heal can never prove a forward move and an enqueue would be a
+//!   guaranteed no-op conductor round-trip every sweep. Heal fills, never moves.
+//!
+//! `h_app_id` partition: this arm reads AND writes `lamad`
+//! (`AppContext::default_lamad()`) — the same scope
+//! `ReconcileController::on_collective_projected` projects signals into.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -67,8 +104,8 @@ use crate::db::DbPool;
 use crate::hc_client::HcClient;
 use crate::p2p::reconcile_rails::GapTracker;
 use crate::p2p::view_federation::{
-    PROJECTION_INVENTORY_CAP, PROJECTION_INVENTORY_TABLE_CONTENT,
-    PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
+    PROJECTION_INVENTORY_CAP, PROJECTION_INVENTORY_TABLE_COLLECTIVES,
+    PROJECTION_INVENTORY_TABLE_CONTENT, PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
 };
 use crate::p2p::P2PHandle;
 use crate::services::provide_loop_status::ProvideLoopState;
@@ -152,6 +189,13 @@ const REA_LEG_BUDGET: Duration = Duration::from_secs(45);
 /// sweep so a saturated conductor lands SOME rows per tick instead of one grind).
 const CONTENT_LEG_BUDGET: Duration = Duration::from_secs(120);
 
+/// Per-leg wall-clock budget for the collectives arm. Runs LAST with the
+/// smallest reserved slice: the collectives corpus is tiny (dozens of rows, one
+/// conductor round-trip each) and the two arms ahead of it own the fleet's real
+/// backlog — a generous budget here could only ever starve a future arm, never
+/// help this one.
+const COLLECTIVES_LEG_BUDGET: Duration = Duration::from_secs(30);
+
 /// Injectable pacing for the heal legs (retry + budget). Defaults come from the
 /// consts above; tests override with a fast profile (no real sleeps, generous
 /// budgets) so the retry/outcome logic is exercised without wall-clock waits.
@@ -163,6 +207,7 @@ pub struct HealPacing {
     pub backoff_span: Duration,
     pub rea_leg_budget: Duration,
     pub content_leg_budget: Duration,
+    pub collectives_leg_budget: Duration,
 }
 
 impl Default for HealPacing {
@@ -174,6 +219,7 @@ impl Default for HealPacing {
             backoff_span: HEAL_BACKOFF_SPAN,
             rea_leg_budget: REA_LEG_BUDGET,
             content_leg_budget: CONTENT_LEG_BUDGET,
+            collectives_leg_budget: COLLECTIVES_LEG_BUDGET,
         }
     }
 }
@@ -191,6 +237,7 @@ impl HealPacing {
             backoff_span: Duration::ZERO,
             rea_leg_budget: Duration::from_secs(3600),
             content_leg_budget: Duration::from_secs(3600),
+            collectives_leg_budget: Duration::from_secs(3600),
         }
     }
 
@@ -473,6 +520,7 @@ impl ReaDiscovery {
 pub struct SweepPlan {
     rea: ReaDiscovery,
     content: ContentDiscovery,
+    collectives: CollectivesDiscovery,
 }
 
 /// What the per-tick heal scheduler should do, given whether the lamad bridge is
@@ -692,6 +740,7 @@ pub async fn run_discovery(
 ) -> SweepPlan {
     let rea = discover_rea(p2p, pool, window).await;
     let content = discover_content(p2p, pool, window).await;
+    let collectives = discover_collectives(p2p, pool, window).await;
 
     tracing::info!(
         target: "elohim_storage::projection_reconcile",
@@ -705,10 +754,19 @@ pub async fn run_discovery(
         content_gaps = content.tracker.counts().pending,
         content_divergent_anchor = content.divergent_anchor,
         content_local_anchored = content.local_anchored,
+        collectives_peers_asked = collectives.peers_asked,
+        collectives_ids_discovered = collectives.ids_discovered,
+        collectives_gaps = collectives.tracker.counts().pending,
+        collectives_divergent_cid = collectives.divergent_cid,
+        collectives_local_anchored = collectives.local_anchored,
         "projection-reconcile: discovery complete (heal scheduled separately)"
     );
 
-    SweepPlan { rea, content }
+    SweepPlan {
+        rea,
+        content,
+        collectives,
+    }
 }
 
 /// One heal pass over BOTH arms, consuming a [`SweepPlan`] from [`run_discovery`].
@@ -729,7 +787,11 @@ pub async fn run_heal(
     state: &ProjectionReconcileState,
     provide_state: &ProvideLoopState,
 ) {
-    let SweepPlan { rea, content } = plan;
+    let SweepPlan {
+        rea,
+        content,
+        collectives,
+    } = plan;
     // Bounded heal pacing (per-row transient retry + per-leg wall-clock budget).
     // REA runs FIRST with its own reserved budget so its small backlog is never
     // starved behind the large content queue (the incident).
@@ -781,6 +843,37 @@ pub async fn run_heal(
     )
     .await;
 
+    // Collectives arm — LAST, with its own reserved budget, so it can never
+    // starve REA or content (both of which carry the fleet's real backlog).
+    let CollectivesDiscovery {
+        tracker: mut collectives_tracker,
+        alias_by_cid,
+        discovered_by: collectives_discovered_by,
+        divergent_cid: collectives_divergent,
+        peers_asked: collectives_peers_asked,
+        ids_discovered: collectives_ids_discovered,
+        local_anchored: collectives_local_anchored,
+    } = collectives;
+    crate::metrics::set_projection_reconcile_gauges(
+        "collectives",
+        collectives_tracker.counts().pending as u64,
+        collectives_local_anchored as u64,
+        collectives_tracker.counts().exhausted as u64,
+        collectives_divergent as u64,
+    );
+    let CollectivesHealOutcome {
+        healed: collectives_healed,
+        conductor_missing: collectives_missing,
+    } = heal_collectives(
+        &mut collectives_tracker,
+        &alias_by_cid,
+        &collectives_discovered_by,
+        hc,
+        pool,
+        &pacing,
+    )
+    .await;
+
     // GAP 1.5: green the un-witnessed seeded corpus. Composed onto (not forked
     // from) the content arm — same conductor gate + single-flight guard.
     witness_bootstrap(hc, pool, provide_state).await;
@@ -811,6 +904,12 @@ pub async fn run_heal(
         content_missing,
         content_divergent_anchor = content_divergent,
         content_local_anchored = local_anchored,
+        collectives_peers_asked,
+        collectives_ids_discovered,
+        collectives_healed,
+        collectives_missing,
+        collectives_divergent_cid = collectives_divergent,
+        collectives_local_anchored,
         "projection-reconcile: heal complete"
     );
 }
@@ -1906,6 +2005,629 @@ fn heal_content_one(
         Some(patch),
         mode,
     )
+}
+
+// ============================================================================
+// Collectives reconcile arm (cross-peer collective identity)
+// ============================================================================
+
+/// Discovery-side output for the collectives arm. Mirrors [`ContentDiscovery`];
+/// the tracker is keyed by `collective_cid` (the reconciliation identity), NOT
+/// by the diesel row id (a peer-local routing alias).
+pub struct CollectivesDiscovery {
+    tracker: GapTracker,
+    /// cid → the FIRST peer-advertised routing alias for it. Passed to the heal
+    /// as a merge CANDIDATE: honored only when a local row exists under that id
+    /// AND carries no cid (see [`crate::db::collectives::CollectiveProjection`]).
+    alias_by_cid: std::collections::HashMap<String, String>,
+    /// cid → the first peer that advertised it (for the heal WARN).
+    discovered_by: std::collections::HashMap<String, String>,
+    /// Advertised cids whose local alias row already carries a DIFFERENT cid.
+    /// Counted + WARN-logged, never enqueued (see the module doc).
+    divergent_cid: usize,
+    peers_asked: usize,
+    ids_discovered: usize,
+    local_anchored: usize,
+}
+
+impl CollectivesDiscovery {
+    /// Empty discovery (db unavailable this tick) — the heal leg has nothing to
+    /// do. `peers_asked` records how many peers answered before the db failure
+    /// so the discovery log stays honest.
+    fn empty(peers_asked: usize) -> Self {
+        Self {
+            tracker: GapTracker::new(MAX_RETRIES),
+            alias_by_cid: std::collections::HashMap::new(),
+            discovered_by: std::collections::HashMap::new(),
+            divergent_cid: 0,
+            peers_asked,
+            ids_discovered: 0,
+            local_anchored: 0,
+        }
+    }
+}
+
+/// How ONE advertised `(routing-alias id, collective_cid)` pair classifies
+/// against the local `collectives` projection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CollectiveGap {
+    /// The cid is held under no local id, and no local row exists under the
+    /// advertised alias either. Heal CREATES a cid-keyed row from the own
+    /// conductor's `Collective` entry. Unlike the content arm — which refuses to
+    /// fabricate because content BYTES are the acquisition plane's job — a
+    /// `Collective` entry is carried whole by the DHT, so on a full-arc fleet the
+    /// own conductor can answer for it without any peer's bytes.
+    AbsentLocal,
+    /// A local row exists under the advertised alias but carries NO cid — the
+    /// pre-coherence seed row. Heal STAMPS the conductor-verified cid onto it
+    /// (one household, one row).
+    CidGap,
+    /// A local row exists under the advertised alias and already carries a
+    /// DIFFERENT cid. Heal refuses: `collectives` has no declaration-ordering
+    /// column, so no forward move is provable. Counted + logged, not enqueued.
+    Divergent,
+    /// The cid is already anchored locally under some id, or the peer advertised
+    /// no cid at all (a NULL-cid row should never be advertised — see ruling 1 —
+    /// but an empty value is treated as no evidence, never as a gap).
+    InSync,
+}
+
+/// Pure diff for ONE advertised `(id, peer_cid)` pair.
+///
+/// - `local_cids` — every `collective_cid` this peer holds, under any id (from
+///   the NOT-NULL inventory). Membership here means "I already have this
+///   collective", regardless of which routing alias it sits under.
+/// - `present` — reach-agnostic local presence of the advertised diesel `id`.
+/// - `local_cid_by_id` — `id → cid` for anchored rows only; an id present in
+///   `present` but ABSENT here is an un-anchored (NULL-cid) row.
+pub(crate) fn classify_collective_gap(
+    id: &str,
+    peer_cid: Option<&str>,
+    local_cids: &std::collections::HashSet<String>,
+    present: &std::collections::HashSet<String>,
+    local_cid_by_id: &std::collections::HashMap<String, String>,
+) -> CollectiveGap {
+    // Ruling 1: a row with no DHT identity carries nothing to reconcile ON.
+    // Responders never advertise one; an empty value here is defensive.
+    let Some(cid) = peer_cid.map(str::trim).filter(|c| !c.is_empty()) else {
+        return CollectiveGap::InSync;
+    };
+    if local_cids.contains(cid) {
+        return CollectiveGap::InSync;
+    }
+    if !present.contains(id) {
+        return CollectiveGap::AbsentLocal;
+    }
+    match local_cid_by_id.get(id) {
+        None => CollectiveGap::CidGap,
+        Some(_) => CollectiveGap::Divergent,
+    }
+}
+
+/// Discovery phase of the `collectives` reconcile. No conductor call happens
+/// here — [`heal_collectives`] owns that.
+///
+/// 1. Build the local anchored inventory (`id → collective_cid`, NOT-NULL only).
+/// 2. Ask every connected peer for its `ProjectionInventory { collectives }`.
+/// 3. One `collective_ids_present` query resolves local presence for every
+///    advertised routing alias.
+/// 4. Classify each advertised pair via [`classify_collective_gap`]; absent +
+///    cid-gap ids feed a per-sweep [`GapTracker`] keyed by cid.
+///
+/// A cid this node cannot even DECODE (`collective:{action_hash}` malformed, or
+/// a foreign prefix) is dropped at discovery rather than enqueued: it can never
+/// resolve, so enqueuing it would burn a conductor round-trip every sweep
+/// forever.
+async fn discover_collectives(
+    p2p: &P2PHandle,
+    pool: &DbPool,
+    window: &mut InventoryWindow,
+) -> CollectivesDiscovery {
+    let app_ctx = crate::db::AppContext::default_lamad();
+    let sweep_offset = window.offset_for(PROJECTION_INVENTORY_TABLE_COLLECTIVES);
+    let mut max_peer_total: u64 = 0;
+
+    // (1) Local anchored inventory. Offset 0 / i64::MAX: the LOCAL diff needs the
+    // WHOLE local set (the rotating window only bounds the PEER ask).
+    let local_cid_by_id: std::collections::HashMap<String, String> = {
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(error = %e, "projection-reconcile[collectives]: db conn failed; skipping sweep");
+                return CollectivesDiscovery::empty(0);
+            }
+        };
+        match crate::db::collectives::list_collective_cid_inventory(
+            &mut conn,
+            &app_ctx,
+            0,
+            i64::MAX,
+        ) {
+            Ok((rows, _total)) => rows.into_iter().collect(),
+            Err(e) => {
+                tracing::warn!(error = %e, "projection-reconcile[collectives]: local inventory failed; skipping sweep");
+                return CollectivesDiscovery::empty(0);
+            }
+        }
+    };
+    let local_anchored = local_cid_by_id.len();
+    let local_cids: std::collections::HashSet<String> = local_cid_by_id.values().cloned().collect();
+
+    // (2) Ask connected peers.
+    let peers = p2p.list_peers().await;
+    let mut peers_asked = 0usize;
+    let mut ids_discovered = 0usize;
+    // Advertised (id, cid) pairs, first-writer-wins per id.
+    let mut advertised: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    let mut advertised_by: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+
+    for peer in &peers {
+        let peer_id = match peer.peer_id.parse::<libp2p::PeerId>() {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+        let request = ViewFederationRequest {
+            view_kind: ViewKind::ProjectionInventory {
+                table: PROJECTION_INVENTORY_TABLE_COLLECTIVES.to_string(),
+            },
+            agent_cid: p2p.agent_pubkey().to_string(),
+            request_id: uuid::Uuid::new_v4().to_string(),
+            inventory_offset: Some(sweep_offset),
+        };
+        let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
+            Ok(r) => r,
+            Err(_) => continue, // peer offline/timeout — discovery is best-effort
+        };
+        peers_asked += 1;
+
+        let payload: ProjectionInventoryPayload = match serde_json::from_value(
+            resp.slice.payload.0.clone(),
+        ) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::projection_reconcile",
+                    peer = %peer.peer_id,
+                    error = %e,
+                    "projection-reconcile[collectives]: peer inventory payload undecodable; skipping peer"
+                );
+                continue;
+            }
+        };
+
+        max_peer_total = max_peer_total.max(payload.total as u64);
+        let windowed =
+            (sweep_offset as usize).saturating_add(payload.entries.len()) < payload.total;
+
+        tracing::info!(
+            target: "elohim_storage::projection_reconcile",
+            peer = %peer.peer_id,
+            entries = payload.entries.len(),
+            peer_total = payload.total,
+            offset = sweep_offset,
+            windowed = windowed,
+            "projection-reconcile[collectives]: peer inventory received"
+        );
+
+        ids_discovered += payload.entries.len();
+        for entry in &payload.entries {
+            if entry.dht_anchor_hash.trim().is_empty() {
+                continue; // ruling 1 — no DHT identity, nothing to reconcile on
+            }
+            advertised
+                .entry(entry.id.clone())
+                .or_insert_with(|| entry.dht_anchor_hash.clone());
+            advertised_by
+                .entry(entry.id.clone())
+                .or_insert_with(|| peer.peer_id.clone());
+        }
+    }
+
+    window.advance(
+        PROJECTION_INVENTORY_TABLE_COLLECTIVES,
+        sweep_offset,
+        max_peer_total,
+    );
+
+    // (3) One presence query for the advertised routing aliases.
+    let advertised_ids: Vec<String> = advertised.keys().cloned().collect();
+    let present: std::collections::HashSet<String> = {
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(error = %e, "projection-reconcile[collectives]: db conn failed for presence; skipping heal");
+                return CollectivesDiscovery::empty(peers_asked);
+            }
+        };
+        // Chunk under SQLITE_MAX_VARIABLE_NUMBER (see `collective_ids_present`).
+        const PRESENCE_CHUNK: usize = 500;
+        let mut acc = std::collections::HashSet::new();
+        for chunk in advertised_ids.chunks(PRESENCE_CHUNK) {
+            match crate::db::collectives::collective_ids_present(&mut conn, &app_ctx, chunk) {
+                Ok(s) => acc.extend(s),
+                Err(e) => {
+                    tracing::warn!(error = %e, "projection-reconcile[collectives]: presence query failed; skipping heal");
+                    return CollectivesDiscovery::empty(peers_asked);
+                }
+            }
+        }
+        acc
+    };
+
+    // (4) Classify → gap set, keyed by cid.
+    let mut gap_cids: Vec<String> = Vec::new();
+    let mut alias_by_cid: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    let mut discovered_by: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    let mut divergent_cid = 0usize;
+    let mut undecodable = 0usize;
+
+    for (id, cid) in &advertised {
+        match classify_collective_gap(
+            id,
+            Some(cid.as_str()),
+            &local_cids,
+            &present,
+            &local_cid_by_id,
+        ) {
+            CollectiveGap::InSync => {}
+            CollectiveGap::Divergent => {
+                divergent_cid += 1;
+                tracing::warn!(
+                    target: "elohim_storage::projection_reconcile",
+                    collective_id = %id,
+                    peer_cid = %cid,
+                    local_cid = %local_cid_by_id.get(id).map(String::as_str).unwrap_or(""),
+                    "projection-reconcile[collectives]: DIVERGENT cid on the same routing alias — \
+                     heal fills, never moves (no declaration ordering on `collectives` to prove a \
+                     forward move); a canonical channel must resolve this"
+                );
+            }
+            CollectiveGap::AbsentLocal | CollectiveGap::CidGap => {
+                // A cid we cannot decode can never resolve — never enqueue it.
+                if let Err(e) = crate::services::conductor_writes::decode_collective_cid(cid) {
+                    undecodable += 1;
+                    tracing::warn!(
+                        target: "elohim_storage::projection_reconcile",
+                        collective_id = %id,
+                        peer_cid = %cid,
+                        error = %e,
+                        "projection-reconcile[collectives]: undecodable peer cid; not enqueued"
+                    );
+                    continue;
+                }
+                if alias_by_cid.contains_key(cid) {
+                    continue; // already enqueued under another routing alias
+                }
+                alias_by_cid.insert(cid.clone(), id.clone());
+                if let Some(peer) = advertised_by.get(id) {
+                    discovered_by.insert(cid.clone(), peer.clone());
+                }
+                gap_cids.push(cid.clone());
+            }
+        }
+    }
+
+    if undecodable > 0 {
+        tracing::warn!(
+            target: "elohim_storage::projection_reconcile",
+            undecodable,
+            "projection-reconcile[collectives]: dropped undecodable peer cids this sweep"
+        );
+    }
+
+    let mut tracker = GapTracker::new(MAX_RETRIES);
+    tracker.discover(gap_cids);
+
+    CollectivesDiscovery {
+        tracker,
+        alias_by_cid,
+        discovered_by,
+        divergent_cid,
+        peers_asked,
+        ids_discovered,
+        local_anchored,
+    }
+}
+
+/// What one collectives heal leg produced.
+struct CollectivesHealOutcome {
+    /// Rows that actually converged (created, or an alias row filled).
+    healed: usize,
+    /// Gaps the own conductor could not resolve at all (`Ok(None)`).
+    conductor_missing: usize,
+}
+
+/// Heal phase of the `collectives` reconcile: for each discovered cid, read the
+/// OWN conductor's `imagodei::get_collective_by_action` and project through the
+/// SHARED mapping in `GapFill` mode. `None` → `mark_failed`, retried next sweep.
+///
+/// Row content comes EXCLUSIVELY from the own conductor's `Collective` entry;
+/// the only peer-derived value that reaches the projection is the routing-alias
+/// merge CANDIDATE, and that is honored only when a local row already exists
+/// under it AND carries no cid (fills, never moves).
+async fn heal_collectives(
+    tracker: &mut GapTracker,
+    alias_by_cid: &std::collections::HashMap<String, String>,
+    discovered_by: &std::collections::HashMap<String, String>,
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    pacing: &HealPacing,
+) -> CollectivesHealOutcome {
+    use crate::db::collectives::CollectiveProjectionOutcome as Outcome;
+
+    let app_ctx = crate::db::AppContext::default_lamad();
+    let leg_start = std::time::Instant::now();
+    let mut healed = 0usize;
+    let mut conductor_missing = 0usize;
+
+    for cid in tracker.pending_ids() {
+        let attempt = call_with_retry(pacing, || {
+            crate::services::conductor_writes::get_collective_by_cid(hc, &cid)
+        })
+        .await;
+        match attempt.result {
+            Ok(Some(wire)) => {
+                let merge_onto = alias_by_cid.get(&cid).map(String::as_str);
+                match heal_collective_one(&cid, &wire, merge_onto, pool, &app_ctx) {
+                    Ok(outcome @ (Outcome::Created | Outcome::AliasMerged)) => {
+                        tracker.mark_completed(&cid);
+                        healed += 1;
+                        let peer = discovered_by
+                            .get(&cid)
+                            .cloned()
+                            .unwrap_or_else(|| "unknown".to_string());
+                        tracing::warn!(
+                            target: "elohim_storage::projection_reconcile",
+                            collective_cid = %cid,
+                            discovered_via_peer = %peer,
+                            retried = attempt.retried,
+                            ?outcome,
+                            "projection-reconcile[collectives]: HEALED collective from own conductor (peer discovery)"
+                        );
+                        crate::metrics::inc_projection_heal_outcome(
+                            "collectives",
+                            if attempt.retried {
+                                HealOutcomeKind::TimeoutRetried.label()
+                            } else {
+                                HealOutcomeKind::Healed.label()
+                            },
+                        );
+                    }
+                    Ok(Outcome::Refreshed) => {
+                        // The row already carried this cid — value fields were
+                        // refreshed but nothing converged. Deliberately NOT
+                        // counted as healed (the `Refreshed` discipline the
+                        // content arm learned: a no-op counted as a cure hides
+                        // a spinning heal plane).
+                        tracker.mark_completed(&cid);
+                        tracing::info!(
+                            target: "elohim_storage::projection_reconcile",
+                            collective_cid = %cid,
+                            "projection-reconcile[collectives]: row already anchored to this cid — refreshed, nothing converged"
+                        );
+                        crate::metrics::inc_projection_heal_outcome(
+                            "collectives",
+                            HealOutcomeKind::Refreshed.label(),
+                        );
+                    }
+                    Ok(Outcome::SkippedDeclared) => {
+                        tracker.mark_completed(&cid);
+                        tracing::info!(
+                            target: "elohim_storage::projection_reconcile",
+                            collective_cid = %cid,
+                            "projection-reconcile[collectives]: alias row already carries a different cid — heal left it to the canonical channels"
+                        );
+                        crate::metrics::inc_projection_heal_outcome(
+                            "collectives",
+                            HealOutcomeKind::RefusedDeclared.label(),
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!(collective_cid = %cid, error = %e, "projection-reconcile[collectives]: projection failed; retry next sweep");
+                        tracker.mark_failed(&cid);
+                        crate::metrics::inc_projection_heal_outcome(
+                            "collectives",
+                            HealOutcomeKind::Failed.label(),
+                        );
+                    }
+                }
+            }
+            Ok(None) => {
+                // Conductor can't see it yet (not gossiped in / foreign DHT) —
+                // retried on the NEXT sweep via a fresh inventory diff.
+                conductor_missing += 1;
+                tracing::debug!(collective_cid = %cid, "projection-reconcile[collectives]: own conductor returned None; retry next sweep");
+                tracker.mark_failed(&cid);
+                crate::metrics::inc_projection_heal_outcome(
+                    "collectives",
+                    HealOutcomeKind::Missing.label(),
+                );
+            }
+            Err(e) => {
+                let transient = is_transient_conductor_error(&e);
+                tracing::warn!(collective_cid = %cid, error = %e, transient, "projection-reconcile[collectives]: conductor resolve failed; retry next sweep");
+                tracker.mark_failed(&cid);
+                crate::metrics::inc_projection_heal_outcome(
+                    "collectives",
+                    if transient {
+                        HealOutcomeKind::TimeoutExhausted.label()
+                    } else {
+                        HealOutcomeKind::Failed.label()
+                    },
+                );
+            }
+        }
+
+        // Per-leg budget: yield so the leg recycles next sweep (see `heal_rea`).
+        if leg_start.elapsed() >= pacing.collectives_leg_budget {
+            tracing::info!(
+                target: "elohim_storage::projection_reconcile",
+                budget_secs = pacing.collectives_leg_budget.as_secs(),
+                healed,
+                "projection-reconcile[collectives]: heal hit leg budget — yielding, remaining gaps resume next sweep"
+            );
+            break;
+        }
+    }
+
+    CollectivesHealOutcome {
+        healed,
+        conductor_missing,
+    }
+}
+
+/// Project ONE conductor-read `Collective` into local SQL via the SHARED
+/// mapping in `GapFill` mode (heal fills, never moves).
+fn heal_collective_one(
+    collective_cid: &str,
+    wire: &crate::services::conductor_writes::CollectiveWire,
+    merge_onto_id: Option<&str>,
+    pool: &DbPool,
+    app_ctx: &crate::db::AppContext,
+) -> Result<crate::db::collectives::CollectiveProjectionOutcome, crate::error::StorageError> {
+    let mut conn = pool
+        .get()
+        .map_err(|e| crate::error::StorageError::Internal(format!("pool: {e}")))?;
+    crate::db::collectives::project_collective(
+        &mut conn,
+        app_ctx,
+        &crate::db::collectives::CollectiveProjection {
+            collective_cid,
+            display_name: &wire.display_name,
+            founder_agent_cid: Some(&wire.founder_agent_cid),
+            charter: Some(&wire.charter),
+            merge_onto_id,
+            mode: crate::db::collectives::CollectiveStampMode::GapFill,
+        },
+    )
+}
+
+#[cfg(test)]
+mod collectives_gap_tests {
+    use super::*;
+    use std::collections::{HashMap, HashSet};
+
+    const CID_A: &str = "collective:uhCkkAlphaCollectiveActionHash00000000000";
+    const CID_B: &str = "collective:uhCkkBravoCollectiveActionHash00000000000";
+
+    /// (local_cids, present, local_cid_by_id) from an anchored inventory plus
+    /// extra un-anchored ids that exist locally.
+    fn fixture(
+        anchored: &[(&str, &str)],
+        unanchored_ids: &[&str],
+    ) -> (HashSet<String>, HashSet<String>, HashMap<String, String>) {
+        let local_cid_by_id: HashMap<String, String> = anchored
+            .iter()
+            .map(|(id, cid)| (id.to_string(), cid.to_string()))
+            .collect();
+        let local_cids: HashSet<String> = local_cid_by_id.values().cloned().collect();
+        let mut present: HashSet<String> = local_cid_by_id.keys().cloned().collect();
+        present.extend(unanchored_ids.iter().map(|s| s.to_string()));
+        (local_cids, present, local_cid_by_id)
+    }
+
+    #[test]
+    fn absent_local_when_neither_cid_nor_alias_is_held() {
+        let (cids, present, by_id) = fixture(&[], &[]);
+        assert_eq!(
+            classify_collective_gap("household-dowell", Some(CID_A), &cids, &present, &by_id),
+            CollectiveGap::AbsentLocal,
+            "a collective this peer has never seen is healable — the own conductor \
+             carries the entry on a full-arc fleet"
+        );
+    }
+
+    #[test]
+    fn cid_gap_when_alias_row_is_present_but_unanchored() {
+        // The scenario-2 shape: a pre-coherence seed row under the slug, whose
+        // real cid only exists on the AUTHORING conductor.
+        let (cids, present, by_id) = fixture(&[], &["household-dowell"]);
+        assert_eq!(
+            classify_collective_gap("household-dowell", Some(CID_A), &cids, &present, &by_id),
+            CollectiveGap::CidGap
+        );
+    }
+
+    #[test]
+    fn divergent_when_alias_row_carries_a_different_cid() {
+        let (cids, present, by_id) = fixture(&[("household-dowell", CID_A)], &[]);
+        assert_eq!(
+            classify_collective_gap("household-dowell", Some(CID_B), &cids, &present, &by_id),
+            CollectiveGap::Divergent,
+            "heal must not move an anchored row: `collectives` has no declaration \
+             ordering to prove a forward move"
+        );
+    }
+
+    #[test]
+    fn in_sync_when_the_cid_is_already_held_under_the_same_alias() {
+        let (cids, present, by_id) = fixture(&[("household-dowell", CID_A)], &[]);
+        assert_eq!(
+            classify_collective_gap("household-dowell", Some(CID_A), &cids, &present, &by_id),
+            CollectiveGap::InSync
+        );
+    }
+
+    /// The identity is the CID, not the routing alias: holding the cid under a
+    /// DIFFERENT local id is still in-sync — healing would duplicate the row.
+    #[test]
+    fn in_sync_when_the_cid_is_held_under_a_different_alias() {
+        let (cids, present, by_id) = fixture(&[(CID_A, CID_A)], &[]);
+        assert_eq!(
+            classify_collective_gap("household-dowell", Some(CID_A), &cids, &present, &by_id),
+            CollectiveGap::InSync,
+            "cid-keyed local row must satisfy a slug-keyed peer advertisement"
+        );
+    }
+
+    /// Ruling 1: a NULL / empty `collective_cid` carries no DHT identity, so it
+    /// is never a gap — not even when the alias is locally absent. Responders
+    /// never advertise such a row; this pins the consumer-side guard too.
+    #[test]
+    fn null_or_empty_peer_cid_is_never_a_gap() {
+        let (cids, present, by_id) = fixture(&[], &[]);
+        for peer_cid in [None, Some(""), Some("   ")] {
+            assert_eq!(
+                classify_collective_gap("household-dowell", peer_cid, &cids, &present, &by_id),
+                CollectiveGap::InSync,
+                "un-anchored advertisement {peer_cid:?} must not become a gap"
+            );
+        }
+    }
+
+    /// A pre-coherence row is upgradable IN PLACE: the same alias that reads
+    /// InSync while un-advertised becomes a CidGap the moment a peer advertises
+    /// a real cid for it, and InSync again once stamped.
+    #[test]
+    fn unanchored_row_upgrades_in_place_then_settles() {
+        let (cids, present, by_id) = fixture(&[], &["household-dowell"]);
+        assert_eq!(
+            classify_collective_gap("household-dowell", Some(CID_A), &cids, &present, &by_id),
+            CollectiveGap::CidGap
+        );
+        // …after the heal stamps it, the same advertisement is in-sync.
+        let (cids, present, by_id) = fixture(&[("household-dowell", CID_A)], &[]);
+        assert_eq!(
+            classify_collective_gap("household-dowell", Some(CID_A), &cids, &present, &by_id),
+            CollectiveGap::InSync
+        );
+    }
+
+    /// The collectives leg budget is reserved and SMALLEST — it runs last and
+    /// must never be able to starve the two arms ahead of it.
+    #[test]
+    fn collectives_leg_budget_is_the_smallest_reserved_slice() {
+        let p = HealPacing::default();
+        assert!(
+            p.collectives_leg_budget <= p.rea_leg_budget
+                && p.collectives_leg_budget <= p.content_leg_budget,
+            "collectives runs last with the smallest reserved budget"
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------

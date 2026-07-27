@@ -313,6 +313,329 @@ pub fn create_collective(
         .ok_or_else(|| StorageError::Internal("Failed to retrieve created collective".into()))
 }
 
+// ============================================================================
+// Shared collective projection mapping (signal arm + reconcile arm)
+// ============================================================================
+
+/// Hints a `Collective`'s charter carries for the local projection.
+///
+/// Household coherence (2026-06-04 formation spec §5.4): a charter that declares
+/// `{"kind":"household"}` projects as `governance_layer='family'`, and a declared
+/// `slugAlias` merges onto the pre-coherence seed row (one household, one row —
+/// the slug is the display alias, the CID is canonical).
+///
+/// Parsing is total: a malformed / absent charter yields the community defaults
+/// rather than an error, because the projection must still land.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct CharterHints {
+    #[serde(default)]
+    pub kind: Option<String>,
+    #[serde(default, rename = "slugAlias")]
+    pub slug_alias: Option<String>,
+}
+
+impl CharterHints {
+    /// Parse a charter string; a non-JSON or absent charter yields defaults.
+    pub fn parse(charter: Option<&str>) -> Self {
+        charter
+            .and_then(|c| serde_json::from_str::<Self>(c).ok())
+            .unwrap_or_default()
+    }
+
+    pub fn is_household(&self) -> bool {
+        self.kind.as_deref() == Some("household")
+    }
+
+    /// Household-ness is the ONLY DNA-derived governance layer; everything else
+    /// projects as `community` (steward/seed set it otherwise).
+    pub fn governance_layer(&self) -> String {
+        if self.is_household() {
+            governance_layers::FAMILY.to_string()
+        } else {
+            governance_layers::COMMUNITY.to_string()
+        }
+    }
+
+    // TODO: replace with canonical collective-reach constants once the reach
+    // vocabulary is reconciled (roadmap #13 — don't bake new literals).
+    pub fn reach(&self) -> String {
+        if self.is_household() {
+            "trusted".to_string()
+        } else {
+            "community".to_string()
+        }
+    }
+
+    /// The declared slug alias, trimmed and normalized to `None` when empty.
+    pub fn slug_alias(&self) -> Option<&str> {
+        self.slug_alias
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+    }
+}
+
+/// How a collective-CID projection may interact with an already-anchored row.
+///
+/// Mirrors `content_diesel::StampMode`, minus a `HealCanonical` tier: the
+/// `collectives` table carries NO declaration-ordering column, so a heal can
+/// never PROVE a forward move. "When in doubt do not move" therefore collapses
+/// the two heal tiers into one fill-only mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CollectiveStampMode {
+    /// Canonical channel (post-commit `CollectiveProjected` signal, seed POST):
+    /// always writes, including re-pointing a row that already carries a
+    /// DIFFERENT cid. These channels are own-authored or request-borne.
+    Declare,
+    /// Reconcile heal: FILLS absence only — creates a missing row, or stamps a
+    /// cid onto a row that carries none. A row already carrying a DIFFERENT
+    /// non-empty cid is left untouched (heal fills, never moves).
+    GapFill,
+}
+
+/// Outcome of [`project_collective`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CollectiveProjectionOutcome {
+    /// No local row carried this cid; a new cid-keyed row was inserted.
+    Created,
+    /// An existing un-anchored row (the charter's `slugAlias`, or a caller-
+    /// supplied routing alias) was stamped with this cid. Convergence.
+    AliasMerged,
+    /// A row already carried EXACTLY this cid; value fields were refreshed but
+    /// nothing converged.
+    Refreshed,
+    /// `GapFill` mode and the candidate alias row already carries a DIFFERENT
+    /// cid — left to the canonical channels. A correct refusal, not an error.
+    SkippedDeclared,
+}
+
+/// Everything the shared mapping needs to project ONE `Collective` DHT entry.
+#[derive(Debug, Clone)]
+pub struct CollectiveProjection<'a> {
+    /// Canonical `collective:{action_hash}` identity. THE reconciliation key.
+    pub collective_cid: &'a str,
+    pub display_name: &'a str,
+    pub founder_agent_cid: Option<&'a str>,
+    /// Raw charter string from the entry (drives governance layer + slug alias).
+    pub charter: Option<&'a str>,
+    /// An ADDITIONAL local-row id to consider merging onto, beyond the charter's
+    /// declared `slugAlias` — the reconcile arm passes the peer-advertised
+    /// routing alias here. Honored ONLY when a row under that id exists locally
+    /// AND carries no cid, so it can fill an un-anchored seed row but can never
+    /// re-point an anchored one. Peer bytes never enter the row body; this is a
+    /// pointer to a LOCAL row, and every value field still comes from the own
+    /// conductor's entry.
+    pub merge_onto_id: Option<&'a str>,
+    pub mode: CollectiveStampMode,
+}
+
+/// The ONE mapping from a conductor-read `Collective` entry to the local
+/// `collectives` projection — shared by the post-commit signal arm
+/// (`ReconcileController::on_collective_projected`, `Declare` mode) and the
+/// cross-peer reconcile arm (`p2p::projection_reconcile`, `GapFill` mode).
+///
+/// Resolution order (first match wins):
+/// 1. A row already carrying this exact cid → refresh value fields.
+/// 2. An alias candidate (charter `slugAlias`, then `merge_onto_id`) that exists
+///    locally → stamp the cid onto it, subject to the mode's move guard.
+/// 3. Otherwise insert a cid-keyed row (`id = collective_cid`), the shape a
+///    steward later re-slugs.
+pub fn project_collective(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    p: &CollectiveProjection<'_>,
+) -> Result<CollectiveProjectionOutcome, StorageError> {
+    let hints = CharterHints::parse(p.charter);
+    let layer = hints.governance_layer();
+    let reach = hints.reach();
+
+    // (1) Already anchored to this cid, under whatever id — refresh only.
+    if let Some(existing_id) = id_for_collective_cid(conn, ctx, p.collective_cid)? {
+        diesel::update(
+            collectives::table
+                .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+                .filter(collectives::id.eq(&existing_id)),
+        )
+        .set((
+            collectives::name.eq(p.display_name),
+            collectives::governance_layer.eq(&layer),
+            collectives::updated_at.eq(current_timestamp()),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Collective refresh failed: {}", e)))?;
+        return Ok(CollectiveProjectionOutcome::Refreshed);
+    }
+
+    // (2) Alias merge onto an existing local row.
+    for alias in [hints.slug_alias(), p.merge_onto_id].into_iter().flatten() {
+        let Some(current_cid) = collective_cid_of_id(conn, ctx, alias)? else {
+            continue; // no local row under this alias
+        };
+        if current_cid.is_some() && p.mode == CollectiveStampMode::GapFill {
+            // Row carries a DIFFERENT cid (step 1 already excluded "same cid").
+            // Heal fills, never moves — the canonical channels own this.
+            return Ok(CollectiveProjectionOutcome::SkippedDeclared);
+        }
+        diesel::update(
+            collectives::table
+                .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+                .filter(collectives::id.eq(alias)),
+        )
+        .set((
+            collectives::collective_cid.eq(Some(p.collective_cid)),
+            collectives::slug.eq(Some(alias)),
+            collectives::governance_layer.eq(&layer),
+            collectives::updated_at.eq(current_timestamp()),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Collective alias merge failed: {}", e)))?;
+        return Ok(CollectiveProjectionOutcome::AliasMerged);
+    }
+
+    // (3) Insert a cid-keyed row (idempotent upsert on id), then stamp the cid.
+    let input = CreateCollectiveInput {
+        id: p.collective_cid.to_string(),
+        name: p.display_name.to_string(),
+        description: None,
+        governance_layer: layer,
+        constitutional_parent_id: None,
+        reach,
+        region: None,
+        metadata_json: None,
+        created_by: p.founder_agent_cid.map(str::to_string),
+    };
+    create_collective(conn, ctx, &input)?;
+    diesel::update(
+        collectives::table
+            .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+            .filter(collectives::id.eq(p.collective_cid)),
+    )
+    .set(collectives::collective_cid.eq(Some(p.collective_cid)))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Collective cid stamp failed: {}", e)))?;
+    Ok(CollectiveProjectionOutcome::Created)
+}
+
+/// The `collectives.id` of the row carrying `collective_cid` in this app scope,
+/// if any. Empty-string cids are treated as absent (never an identity).
+pub fn id_for_collective_cid(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    collective_cid: &str,
+) -> Result<Option<String>, StorageError> {
+    collectives::table
+        .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+        .filter(collectives::collective_cid.eq(collective_cid))
+        .select(collectives::id)
+        .first::<String>(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// `Ok(None)` — no row under `id` in this scope. `Ok(Some(None))` — row present
+/// but un-anchored. `Ok(Some(Some(cid)))` — row present and anchored.
+pub fn collective_cid_of_id(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+) -> Result<Option<Option<String>>, StorageError> {
+    collectives::table
+        .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+        .filter(collectives::id.eq(id))
+        .select(collectives::collective_cid)
+        .first::<Option<String>>(conn)
+        .optional()
+        .map(|outer| outer.map(|inner| inner.filter(|s| !s.trim().is_empty())))
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+// ============================================================================
+// Cross-peer reconcile support (p2p::projection_reconcile collectives arm)
+// ============================================================================
+
+/// `(id, collective_cid)` inventory for the `collectives` reconcile stream, plus
+/// the honest whole-corpus total (offset-invariant, so a requester can detect a
+/// windowed page).
+///
+/// **NULL-`collective_cid` rows are EXCLUDED, by design.** A pre-coherence seed
+/// row has no DHT identity to reconcile ON: advertising it would invite peers to
+/// diff against a slug that names nothing notarized, and healing from it would
+/// mean adopting a peer's local routing alias as truth — strictly worse than a
+/// gap. Such rows remain upgradable in place: the `slugAlias` merge in
+/// [`project_collective`] stamps them the moment their real cid arrives, and
+/// they enter the inventory on the next sweep.
+///
+/// Dissolved collectives are excluded for the same reason `list_collectives`
+/// defaults to `active_only`: a dissolved row is not something to converge peers
+/// onto. Ordered `updated_at DESC, id ASC` — hot set first, mirroring
+/// `content_diesel::list_content_anchor_inventory`.
+pub fn list_collective_cid_inventory(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    offset: i64,
+    cap: i64,
+) -> Result<(Vec<(String, String)>, i64), StorageError> {
+    let total: i64 = collectives::table
+        .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+        .filter(collectives::collective_cid.is_not_null())
+        .filter(collectives::collective_cid.ne(""))
+        .filter(collectives::dissolved_at.is_null())
+        .count()
+        .get_result(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!("collective cid inventory count failed: {e}"))
+        })?;
+
+    let rows: Vec<(String, Option<String>)> = collectives::table
+        .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+        .filter(collectives::collective_cid.is_not_null())
+        .filter(collectives::collective_cid.ne(""))
+        .filter(collectives::dissolved_at.is_null())
+        .order((collectives::updated_at.desc(), collectives::id.asc()))
+        .offset(offset.max(0))
+        .limit(cap)
+        .select((collectives::id, collectives::collective_cid))
+        .load(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!("collective cid inventory load failed: {e}"))
+        })?;
+
+    // `IS NOT NULL` guarantees `Some`; `filter_map` discards defensively rather
+    // than unwrap (the same discipline the content inventory uses).
+    let entries = rows
+        .into_iter()
+        .filter_map(|(id, cid)| cid.map(|c| (id, c)))
+        .collect();
+    Ok((entries, total))
+}
+
+/// Which of `ids` exist in the local `collectives` projection for this scope.
+///
+/// App-scoped deliberately, so it agrees with
+/// [`list_collective_cid_inventory`]: a scope-agnostic presence probe (see
+/// [`collective_id_exists`], which exists for FK purposes) paired with a
+/// scope-bound inventory would classify a foreign-scope row as "present but
+/// un-anchored" and try to stamp a cid onto a row this reconcile never reads.
+///
+/// NOTE: same `SQLITE_MAX_VARIABLE_NUMBER` caveat as
+/// `content_diesel::content_ids_present` — callers must chunk large id sets.
+pub fn collective_ids_present(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    ids: &[String],
+) -> Result<std::collections::HashSet<String>, StorageError> {
+    if ids.is_empty() {
+        return Ok(Default::default());
+    }
+    let found: Vec<String> = collectives::table
+        .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+        .filter(collectives::id.eq_any(ids))
+        .select(collectives::id)
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("collective presence query failed: {e}")))?;
+    Ok(found.into_iter().collect())
+}
+
 /// Dissolve a collective (sets dissolved_at timestamp)
 pub fn dissolve_collective(
     conn: &mut SqliteConnection,
@@ -734,6 +1057,361 @@ mod tests {
         assert_eq!(
             converged.name, "Dowell Household",
             "upsert updated the stub"
+        );
+    }
+
+    // ========================================================================
+    // Shared projection mapping + reconcile support
+    // ========================================================================
+
+    const CID_A: &str = "collective:uhCkkAlphaCollectiveActionHash00000000000";
+    const CID_B: &str = "collective:uhCkkBravoCollectiveActionHash00000000000";
+
+    fn seed_row(conn: &mut SqliteConnection, ctx: &AppContext, id: &str, cid: Option<&str>) {
+        create_collective(
+            conn,
+            ctx,
+            &CreateCollectiveInput {
+                id: id.to_string(),
+                name: format!("seed {id}"),
+                description: None,
+                governance_layer: "community".to_string(),
+                constitutional_parent_id: None,
+                reach: "community".to_string(),
+                region: None,
+                metadata_json: None,
+                created_by: None,
+            },
+        )
+        .expect("seed row");
+        if let Some(cid) = cid {
+            diesel::update(
+                collectives::table
+                    .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+                    .filter(collectives::id.eq(id)),
+            )
+            .set(collectives::collective_cid.eq(Some(cid)))
+            .execute(conn)
+            .expect("stamp cid");
+        }
+    }
+
+    /// Household coherence: `{"kind":"household"}` drives `family` + `trusted`;
+    /// anything else (including a malformed charter) stays community. Parsing is
+    /// total — a projection must land even for an unreadable charter.
+    #[test]
+    fn charter_hints_derive_governance_totally() {
+        let household = CharterHints::parse(Some(r#"{"kind":"household","slugAlias":"fam-x"}"#));
+        assert!(household.is_household());
+        assert_eq!(household.governance_layer(), "family");
+        assert_eq!(household.reach(), "trusted");
+        assert_eq!(household.slug_alias(), Some("fam-x"));
+
+        for charter in [
+            None,
+            Some("not json"),
+            Some("{}"),
+            Some(r#"{"kind":"guild"}"#),
+        ] {
+            let h = CharterHints::parse(charter);
+            assert!(!h.is_household(), "charter {charter:?} is not a household");
+            assert_eq!(h.governance_layer(), "community");
+            assert_eq!(h.reach(), "community");
+            assert_eq!(h.slug_alias(), None);
+        }
+        // An empty/whitespace alias is normalized away, never merged onto "".
+        assert_eq!(
+            CharterHints::parse(Some(r#"{"slugAlias":"   "}"#)).slug_alias(),
+            None
+        );
+    }
+
+    /// GapFill FILL: an absent collective is created cid-keyed from conductor
+    /// truth (the AbsentLocal heal — a non-authoring peer acquiring the row).
+    #[test]
+    fn gapfill_creates_absent_collective_cid_keyed() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        let outcome = project_collective(
+            &mut conn,
+            &ctx,
+            &CollectiveProjection {
+                collective_cid: CID_A,
+                display_name: "Dowell Household",
+                founder_agent_cid: Some("uhCAkFounder0001"),
+                charter: Some(r#"{"kind":"household"}"#),
+                merge_onto_id: None,
+                mode: CollectiveStampMode::GapFill,
+            },
+        )
+        .expect("project");
+        assert_eq!(outcome, CollectiveProjectionOutcome::Created);
+
+        let row = get_collective(&mut conn, &ctx, CID_A)
+            .expect("get")
+            .expect("Some");
+        assert_eq!(row.collective_cid.as_deref(), Some(CID_A));
+        assert_eq!(row.name, "Dowell Household");
+        assert_eq!(
+            row.governance_layer, "family",
+            "household charter drives family layer through the SHARED mapping"
+        );
+        assert_eq!(row.created_by.as_deref(), Some("uhCAkFounder0001"));
+    }
+
+    /// GapFill FILL onto an alias: a pre-coherence seed row (NULL cid) is
+    /// stamped in place rather than duplicated — one household, one row. Both
+    /// the charter's declared `slugAlias` and the reconcile's peer-advertised
+    /// routing alias reach the same guard.
+    #[test]
+    fn gapfill_merges_onto_unanchored_alias_row_not_a_duplicate() {
+        for use_charter_alias in [true, false] {
+            let pool = test_pool();
+            let mut conn = pool.get().expect("conn");
+            let ctx = make_ctx();
+            seed_row(&mut conn, &ctx, "household-dowell", None);
+
+            let charter = if use_charter_alias {
+                r#"{"kind":"household","slugAlias":"household-dowell"}"#.to_string()
+            } else {
+                r#"{"kind":"household"}"#.to_string()
+            };
+            let merge_onto = if use_charter_alias {
+                None
+            } else {
+                Some("household-dowell")
+            };
+
+            let outcome = project_collective(
+                &mut conn,
+                &ctx,
+                &CollectiveProjection {
+                    collective_cid: CID_A,
+                    display_name: "Dowell Household",
+                    founder_agent_cid: None,
+                    charter: Some(&charter),
+                    merge_onto_id: merge_onto,
+                    mode: CollectiveStampMode::GapFill,
+                },
+            )
+            .expect("project");
+            assert_eq!(outcome, CollectiveProjectionOutcome::AliasMerged);
+
+            let row = get_collective(&mut conn, &ctx, "household-dowell")
+                .expect("get")
+                .expect("Some");
+            assert_eq!(row.collective_cid.as_deref(), Some(CID_A));
+            assert_eq!(row.slug.as_deref(), Some("household-dowell"));
+            assert_eq!(row.governance_layer, "family");
+            assert!(
+                get_collective(&mut conn, &ctx, CID_A)
+                    .expect("get")
+                    .is_none(),
+                "the alias merge must NOT also mint a cid-keyed duplicate"
+            );
+        }
+    }
+
+    /// REFRESH: a row already carrying this exact cid is refreshed, never
+    /// duplicated and never counted as convergence.
+    #[test]
+    fn same_cid_is_refreshed_not_reconverged() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+        seed_row(&mut conn, &ctx, "household-dowell", Some(CID_A));
+
+        let outcome = project_collective(
+            &mut conn,
+            &ctx,
+            &CollectiveProjection {
+                collective_cid: CID_A,
+                display_name: "Renamed Household",
+                founder_agent_cid: None,
+                charter: Some(r#"{"kind":"household"}"#),
+                merge_onto_id: Some("household-dowell"),
+                mode: CollectiveStampMode::GapFill,
+            },
+        )
+        .expect("project");
+        assert_eq!(outcome, CollectiveProjectionOutcome::Refreshed);
+
+        let row = get_collective(&mut conn, &ctx, "household-dowell")
+            .expect("get")
+            .expect("Some");
+        assert_eq!(row.name, "Renamed Household", "value fields refresh");
+        assert_eq!(row.collective_cid.as_deref(), Some(CID_A), "cid unmoved");
+    }
+
+    /// REFUSE-MOVE: heal fills, never moves. An alias row already carrying a
+    /// DIFFERENT cid is left untouched under `GapFill` — `collectives` has no
+    /// declaration-ordering column, so no forward move is ever provable.
+    /// `Declare` (the canonical post-commit channel) may still re-point it.
+    #[test]
+    fn gapfill_refuses_to_move_an_anchored_alias_declare_may() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+        seed_row(&mut conn, &ctx, "household-dowell", Some(CID_A));
+
+        let refused = project_collective(
+            &mut conn,
+            &ctx,
+            &CollectiveProjection {
+                collective_cid: CID_B,
+                display_name: "Impostor",
+                founder_agent_cid: None,
+                charter: Some(r#"{"kind":"household","slugAlias":"household-dowell"}"#),
+                merge_onto_id: Some("household-dowell"),
+                mode: CollectiveStampMode::GapFill,
+            },
+        )
+        .expect("project");
+        assert_eq!(refused, CollectiveProjectionOutcome::SkippedDeclared);
+        let row = get_collective(&mut conn, &ctx, "household-dowell")
+            .expect("get")
+            .expect("Some");
+        assert_eq!(
+            row.collective_cid.as_deref(),
+            Some(CID_A),
+            "heal must not move an anchored row"
+        );
+        assert_eq!(row.name, "seed household-dowell", "no value write either");
+
+        // The canonical channel (post-commit signal) MAY re-point it.
+        let declared = project_collective(
+            &mut conn,
+            &ctx,
+            &CollectiveProjection {
+                collective_cid: CID_B,
+                display_name: "Re-pointed",
+                founder_agent_cid: None,
+                charter: Some(r#"{"kind":"household","slugAlias":"household-dowell"}"#),
+                merge_onto_id: None,
+                mode: CollectiveStampMode::Declare,
+            },
+        )
+        .expect("project");
+        assert_eq!(declared, CollectiveProjectionOutcome::AliasMerged);
+        assert_eq!(
+            get_collective(&mut conn, &ctx, "household-dowell")
+                .expect("get")
+                .expect("Some")
+                .collective_cid
+                .as_deref(),
+            Some(CID_B)
+        );
+    }
+
+    /// Ruling 1: the reconcile inventory advertises ONLY rows with a non-NULL,
+    /// non-empty `collective_cid`, and never a dissolved one. A pre-coherence
+    /// seed row has no DHT identity to reconcile on.
+    #[test]
+    fn inventory_excludes_null_empty_and_dissolved_cids() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        seed_row(&mut conn, &ctx, "anchored", Some(CID_A));
+        seed_row(&mut conn, &ctx, "null-cid", None);
+        seed_row(&mut conn, &ctx, "empty-cid", Some(""));
+        seed_row(&mut conn, &ctx, "dissolved", Some(CID_B));
+        dissolve_collective(&mut conn, &ctx, "dissolved").expect("dissolve");
+        // A row under a DIFFERENT app scope must not leak into this inventory.
+        seed_row(
+            &mut conn,
+            &AppContext::new("other-app"),
+            "foreign",
+            Some(CID_B),
+        );
+
+        let (rows, total) =
+            list_collective_cid_inventory(&mut conn, &ctx, 0, 100).expect("inventory");
+        assert_eq!(
+            rows,
+            vec![("anchored".to_string(), CID_A.to_string())],
+            "only the anchored, non-dissolved, in-scope row is advertised"
+        );
+        assert_eq!(total, 1, "honest total matches the filtered set");
+
+        // Presence is scope-bound too, and reach-agnostic over cid state.
+        let present = collective_ids_present(
+            &mut conn,
+            &ctx,
+            &[
+                "anchored".to_string(),
+                "null-cid".to_string(),
+                "foreign".to_string(),
+                "nope".to_string(),
+            ],
+        )
+        .expect("presence");
+        assert!(present.contains("anchored"));
+        assert!(
+            present.contains("null-cid"),
+            "an un-anchored row IS present — that is what makes it a CidGap, not AbsentLocal"
+        );
+        assert!(!present.contains("foreign"), "other scope is not present");
+        assert!(!present.contains("nope"));
+    }
+
+    /// The inventory windows like the other reconcile tables: honest
+    /// offset-invariant total, page-bounded rows.
+    #[test]
+    fn inventory_total_is_offset_invariant() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+        for i in 0..5 {
+            seed_row(
+                &mut conn,
+                &ctx,
+                &format!("c{i}"),
+                Some(&format!("{CID_A}{i}")),
+            );
+        }
+        let (page, total) = list_collective_cid_inventory(&mut conn, &ctx, 0, 2).expect("page 0");
+        assert_eq!(page.len(), 2);
+        assert_eq!(total, 5, "total is the whole corpus, not the served page");
+        let (page2, total2) = list_collective_cid_inventory(&mut conn, &ctx, 4, 2).expect("page 2");
+        assert_eq!(page2.len(), 1, "final page carries the remainder");
+        assert_eq!(total2, 5, "total is offset-invariant");
+    }
+
+    /// `id_for_collective_cid` / `collective_cid_of_id` are the two lookups the
+    /// shared mapping and the reconcile diff are built on.
+    #[test]
+    fn cid_and_id_lookups_distinguish_absent_from_unanchored() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+        seed_row(&mut conn, &ctx, "anchored", Some(CID_A));
+        seed_row(&mut conn, &ctx, "null-cid", None);
+
+        assert_eq!(
+            id_for_collective_cid(&mut conn, &ctx, CID_A).expect("q"),
+            Some("anchored".to_string())
+        );
+        assert_eq!(
+            id_for_collective_cid(&mut conn, &ctx, CID_B).expect("q"),
+            None
+        );
+
+        assert_eq!(
+            collective_cid_of_id(&mut conn, &ctx, "anchored").expect("q"),
+            Some(Some(CID_A.to_string()))
+        );
+        assert_eq!(
+            collective_cid_of_id(&mut conn, &ctx, "null-cid").expect("q"),
+            Some(None),
+            "present-but-un-anchored is Some(None), NOT None"
+        );
+        assert_eq!(
+            collective_cid_of_id(&mut conn, &ctx, "missing").expect("q"),
+            None,
+            "absent row is the outer None"
         );
     }
 
