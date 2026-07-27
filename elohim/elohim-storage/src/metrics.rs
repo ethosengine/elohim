@@ -586,6 +586,16 @@ lazy_static! {
         &["result"],
     )
     .unwrap();
+
+    /// Sync rounds that short-circuited on a matching corpus digest — the
+    /// converged steady state where the opener costs O(1) instead of O(corpus).
+    /// A flat-zero value after the digest opener lands means the shortcut never
+    /// fires and the optimisation is inert.
+    pub static ref SYNC_IN_SYNC_TOTAL: IntCounter = IntCounter::new(
+        "elohim_sync_in_sync_total",
+        "Sync rounds where a peer answered InSync (digest match, nothing enumerated).",
+    )
+    .unwrap();
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -640,6 +650,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(SYNC_DOCS_ENUMERATED.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUEST_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_OUTCOMES.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_IN_SYNC_TOTAL.clone()));
     });
 }
 
@@ -770,6 +781,14 @@ pub fn add_sync_docs_enumerated(n: u64) {
 /// label.
 pub fn inc_sync_request_outcome(result: &str) {
     SYNC_REQUEST_OUTCOMES.with_label_values(&[result]).inc();
+}
+
+/// Counts sync rounds that short-circuited on a matching corpus digest —
+/// the converged steady state where the opener costs O(1) instead of O(corpus).
+/// A flat-zero value after the digest opener lands means the shortcut never
+/// fires and the optimisation is inert.
+pub fn inc_sync_in_sync() {
+    SYNC_IN_SYNC_TOTAL.inc();
 }
 
 /// Record one acquisition (pull-leg) outcome ("fetched" | "fetch_error" |

@@ -6920,6 +6920,23 @@ impl P2PNode {
             SyncResponse::Error { message } => {
                 warn!(peer = %peer, request_id = ?request_id, error = %message, "Sync error from peer");
             }
+            SyncResponse::InSync {
+                h_app_id,
+                corpus_digest,
+            } => {
+                // Digest-equal steady state: the peer enumerated nothing and there is
+                // nothing to apply. This arm exists so the shortcut is INTENTIONAL and
+                // counted — before it, InSync fell into the catch-all and read as
+                // "Unhandled sync response type", which is how an inert optimisation
+                // hides. The page cursor was already reclaimed at the top of this fn.
+                crate::metrics::inc_sync_in_sync();
+                debug!(
+                    peer = %peer,
+                    h_app_id = %h_app_id,
+                    digest = %corpus_digest,
+                    "Sync round InSync — peer holds the same corpus, nothing enumerated"
+                );
+            }
             _ => {
                 debug!(peer = %peer, request_id = ?request_id, "Unhandled sync response type");
             }
