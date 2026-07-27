@@ -10,22 +10,23 @@
 //! production actually sends. See spine node `sync-scale-honesty`
 //! (`genesis/manifests/spine.yaml`) and `tests/sync_scale_honesty.rs`.
 //!
-//! **Known-unsatisfied invariant (standing red).** The plane is poll-only and its
-//! steady-state cost is proportional to corpus size, not to the number of changes:
+//! **Cured 2026-07-27 (was a standing red).** The plane was poll-only with cost
+//! proportional to corpus size, not to the number of changes:
 //!
-//! - [`round_opener`] ignores `local` — it opens every round with an unconditional
-//!   full-corpus enumeration, so a converged peer-pair still exchanges the entire
-//!   document list every tick (`p2p/mod.rs`, hardcoded 60s).
-//! - [`announcements_for_local_change`] returns nothing — `SyncRequest::AnnounceChange`
-//!   is defined and handled by both transports, but no send site exists, so the poll
-//!   is the only propagation path.
+//! - [`round_opener`] now carries [`corpus_digest`] of `local`, so a converged
+//!   peer-pair exchanges one hash (`InSync`) instead of the entire document list
+//!   every tick (`p2p/mod.rs`, hardcoded 60s). Divergent peers fall through to
+//!   exactly the previous `ListDocuments` enumeration path.
+//! - [`announcements_for_local_change`] is sent from `p2p/mod.rs:3612` on a local
+//!   change, so the poll is no longer the only propagation path.
 //!
-//! Both are honest reproductions of today's behavior, not stubs to be "filled in"
-//! independently of the wire. **Binding requirement for whoever cures this:** these
-//! functions must stay the ONLY place the round opener and the announce requests are
-//! constructed. Making `announcements_for_local_change` return requests without a
-//! caller that sends them turns the test green while nothing propagates — the exact
-//! fake-green the extraction is here to prevent.
+//! **Binding requirement for whoever touches this next:** these functions must
+//! stay the ONLY place the round opener and the announce requests are
+//! constructed. Making either return requests without a caller that sends them
+//! turns a test green while nothing propagates — the exact fake-green the
+//! extraction is here to prevent. `tests/sync_libp2p_convergence.rs` must call
+//! [`round_opener`] rather than hand-rolling a second construction site, or it
+//! measures its own mirror instead of the wire.
 
 use crate::p2p::sync_protocol::SyncRequest;
 use libp2p::request_response::OutboundFailure;
@@ -140,18 +141,21 @@ pub fn corpus_digest(local: &LocalCorpusState) -> String {
     format!("sha256:{:x}", h.finalize())
 }
 
-/// The request that opens a sync round with one peer.
+/// The single request that opens a sync round with one peer.
 ///
-/// Today: an unconditional `ListDocuments` from offset 0 — identical whether we
-/// hold the entire corpus or nothing at all, which is why the peer must enumerate
-/// everything back to us on every tick. `local` is accepted (and ignored) so the
-/// cure is a body change here rather than a signature change rippling through
-/// every call site.
-pub fn round_opener(h_app_id: &str, _local: &LocalCorpusState) -> SyncRequest {
-    SyncRequest::ListDocuments {
+/// Carries a digest of what we already hold, so a converged peer answers
+/// `InSync` with one hash instead of enumerating its whole corpus. Divergent
+/// peers fall through to exactly the previous `ListDocuments` path, so
+/// correctness in the divergent case is unchanged — only the CONVERGED steady
+/// state gets cheap, which is where a healthy mesh spends nearly all its time.
+///
+/// `limit` is the page size the responder uses IF the digests differ; it must
+/// stay `SYNC_LIST_PAGE_LIMIT` so the fallback paginates exactly as before.
+pub fn round_opener(h_app_id: &str, local: &LocalCorpusState) -> SyncRequest {
+    SyncRequest::ListDocumentsSince {
         h_app_id: h_app_id.to_string(),
         prefix: None,
-        offset: 0,
+        corpus_digest: corpus_digest(local),
         limit: SYNC_LIST_PAGE_LIMIT,
     }
 }

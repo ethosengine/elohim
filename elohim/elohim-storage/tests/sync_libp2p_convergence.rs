@@ -5,7 +5,9 @@
 //! authored on node A via the REAL producer (`sync::projector::project_content_doc`)
 //! converges into node B's DocStore over a REAL libp2p swarm
 //! (`/elohim/storage-sync/1.0.0`), exercising
-//! `ListDocuments → DocumentList → SyncChanges → Changes → apply_changes`.
+//! `ListDocumentsSince → DocumentList → SyncChanges → Changes → apply_changes`
+//! (the digest-mismatch fallback path — a fresh node's empty corpus digest never
+//! matches, so it always falls through to enumeration, same as before).
 //!
 //! The harness is a slim copy of `tests/harness/mod.rs`'s SwarmBuilder pattern
 //! with the behaviour swapped to the production `SyncCodec`. The request/response
@@ -21,6 +23,7 @@ use elohim_storage::db::content_diesel::{self, CreateContentInput, MinTrust};
 use elohim_storage::db::context::AppContext;
 use elohim_storage::db::models::Content;
 use elohim_storage::db::DbPool;
+use elohim_storage::p2p::sync_round;
 use elohim_storage::p2p::{DocumentInfo, SyncCodec, SyncProtocol, SyncRequest, SyncResponse};
 use elohim_storage::sync::projector::{project_content_doc, reverse_project_content_doc};
 use elohim_storage::sync::{DocStore, DocStoreConfig, StreamTracker, SyncManager};
@@ -51,8 +54,9 @@ struct SyncBehaviour {
 enum Command {
     Dial(Multiaddr, oneshot::Sender<Result<(), String>>),
     HasConnection(PeerId, oneshot::Sender<bool>),
-    /// Drive one sync round: send ListDocuments to every connected peer
-    /// (mirrors `P2PNode::initiate_sync_round`, p2p/mod.rs:6982).
+    /// Drive one sync round: open with `sync_round::round_opener` (the sole
+    /// legal construction site) to every connected peer, mirroring
+    /// `P2PNode::initiate_sync_round`, p2p/mod.rs:6982.
     InitiateSync,
 }
 
@@ -208,14 +212,33 @@ async fn run_driver(
                 }
                 Command::InitiateSync => {
                     let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
+                    if peers.is_empty() {
+                        continue;
+                    }
+                    // Call the SAME construction site production uses
+                    // (p2p/sync_round.rs is the only legal opener constructor) so
+                    // this harness exercises the wire, not a hand-rolled mirror.
+                    let local = match sync
+                        .list_documents(SYNC_NS, None, 0, sync_round::SYNC_LIST_PAGE_LIMIT)
+                        .await
+                    {
+                        Ok((docs, _total)) => sync_round::LocalCorpusState {
+                            docs: docs
+                                .into_iter()
+                                .map(|d| sync_round::DocHead {
+                                    doc_id: d.doc_id,
+                                    heads: d.heads,
+                                })
+                                .collect(),
+                        },
+                        Err(_) => sync_round::LocalCorpusState::default(),
+                    };
+                    let req = sync_round::round_opener(SYNC_NS, &local);
                     for peer in peers {
-                        let req = SyncRequest::ListDocuments {
-                            h_app_id: SYNC_NS.to_string(),
-                            prefix: None,
-                            offset: 0,
-                            limit: 1000,
-                        };
-                        swarm.behaviour_mut().sync_protocol.send_request(&peer, req);
+                        swarm
+                            .behaviour_mut()
+                            .sync_protocol
+                            .send_request(&peer, req.clone());
                     }
                 }
             },
@@ -319,6 +342,64 @@ async fn handle_request(sync: &SyncManager, request: SyncRequest) -> SyncRespons
                 message: format!("get_changes_since: {e}"),
             },
         },
+        // Mirrors P2PNode's ListDocumentsSince arm (p2p/mod.rs:6656): equal
+        // digests answer InSync and enumerate nothing; divergent digests fall
+        // through to exactly the ListDocuments behaviour above.
+        SyncRequest::ListDocumentsSince {
+            h_app_id,
+            prefix,
+            corpus_digest,
+            limit,
+        } => match sync
+            .list_documents(
+                &h_app_id,
+                prefix.as_deref(),
+                0,
+                sync_round::SYNC_LIST_PAGE_LIMIT,
+            )
+            .await
+        {
+            Ok((docs, total)) => {
+                let local = sync_round::LocalCorpusState {
+                    docs: docs
+                        .iter()
+                        .map(|d| sync_round::DocHead {
+                            doc_id: d.doc_id.clone(),
+                            heads: d.heads.clone(),
+                        })
+                        .collect(),
+                };
+                let ours = sync_round::corpus_digest(&local);
+                if ours == corpus_digest {
+                    SyncResponse::InSync {
+                        h_app_id,
+                        corpus_digest: ours,
+                    }
+                } else {
+                    let documents: Vec<DocumentInfo> = docs
+                        .into_iter()
+                        .take(limit as usize)
+                        .map(|d| DocumentInfo {
+                            doc_id: d.doc_id,
+                            doc_type: d.doc_type,
+                            change_count: d.change_count,
+                            last_modified: d.last_modified,
+                            heads: d.heads,
+                        })
+                        .collect();
+                    let has_more = (documents.len() as u64) < total;
+                    SyncResponse::DocumentList {
+                        h_app_id,
+                        documents,
+                        total,
+                        has_more,
+                    }
+                }
+            }
+            Err(e) => SyncResponse::Error {
+                message: format!("list_documents (digest compare): {e}"),
+            },
+        },
         _ => SyncResponse::Error {
             message: "unhandled sync request in test harness".to_string(),
         },
@@ -366,6 +447,8 @@ async fn handle_response(
             }
             let _ = sync.apply_changes(&h_app_id, &doc_id, changes).await;
         }
+        // Digest-equal steady state: nothing enumerated, nothing to apply.
+        SyncResponse::InSync { .. } => {}
         _ => {}
     }
 }
