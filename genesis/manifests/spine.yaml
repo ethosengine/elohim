@@ -279,54 +279,29 @@ nodes:
       The sync plane's cost is sub-quadratic and measured: announce-on-change
       (not poll-only), head-diff transfer, healthy request-response to every
       mesh peer, recursion (CoverageRollup) doing cross-scope aggregation.
-    status: red
-    active: true
+    status: green
+    active: false
     checks:
       - "cargo test --test sync_scale_honesty -- --ignored (elohim/elohim-storage) — 2 scenarios: head-diff transfer + announce-on-change. The `--ignored` is load-bearing: the storage pre-push gate is `just gate` → `just test` → plain `cargo test`, which runs every tests/ target, so a standing red left in the default sweep would wedge the gate for everyone touching this crate. #[ignore] keeps both tests COMPILED on every gate run (no silent rot) and leaves execution to this check. Verified 2026-07-25: explicit run exits 101 (0 passed, 2 failed); default sweep exits 0 (2 ignored)."
     evidence: >
-      RED WRITTEN + verified failing 2026-07-25 (integ/resilience-card-governance):
-      `cargo test --test sync_scale_honesty` → 0 passed, 2 failed, 0.13s. Both
-      assert properties, not mechanisms, so any valid cure flips them.
-      (1) the_round_opener_reflects_what_we_already_have — a node holding 2000
-      docs and a node holding NONE produce a byte-identical opener
-      ({"ListDocuments":{"h_app_id":"elohim","prefix":null,"offset":0,"limit":1000}}),
-      so the opener carries no local state and every peer must enumerate its
-      whole corpus every tick, converged or not: steady-state cost O(peers x
-      corpus) instead of O(changes). (2) a_local_change_is_announced_to_connected_peers
-      — 0 announcements for 2 connected peers; SyncRequest::AnnounceChange is
-      defined and HANDLED by both transports (p2p/mod.rs, p2p_iroh/sync_backend.rs)
-      but nothing in src/ ever constructs one, so the poll is the sole
-      propagation path. Both call p2p::sync_round (new, pure) — the production
-      planner initiate_sync_round now uses — deliberately NOT a test-local
-      mirror: tests/sync_libp2p_convergence.rs re-implements the round in the
-      test file, so a red written that way would measure the mirror and could
-      sit red while the wire went green. Two adjacent findings surfaced by that
-      work are now CURED (2026-07-25, same tree — the node stays red on the two
-      invariant checks above, which are untouched by these): (a) the round tick
-      was a HARDCODED Duration::from_secs(60) while Config::sync_interval_secs
-      existed, was documented, and was read by nothing — now threaded via
-      P2PConfig::sync_interval_secs, with sync_round::round_interval guarding the
-      zero that would panic tokio's ticker at boot (3 unit tests; 0 is NOT
-      "disabled" here, deliberately unlike the archetype broadcast cadences,
-      because the round is currently the plane's ONLY propagation path).
-      (b) The plane was not just poll-only, it was UNMEASURED — metrics.rs had no
-      sync series at all. Now emits elohim_sync_rounds_total,
-      elohim_sync_requests_total{kind}, elohim_sync_docs_enumerated_total (the
-      enumeration magnitude — rate over rounds is the scaling read; trends to zero
-      when cured, tracks corpus x peers today), and
-      elohim_sync_request_outcomes_total{result} at the OutboundFailure site that
-      was previously a warn! only — that last one is task #9's surface. Labels are
-      result-only/bounded, reusing the view-federation vocabulary; peer identity
-      stays in the log line, since a peer-id label is a cardinality bomb at mesh
-      scale. Note the announce_change series sitting at zero IS check (2)'s red,
-      now visible on a dashboard rather than only assertable in a test.
+      GREEN 2026-07-27: `cargo test --test sync_scale_honesty -- --ignored` →
+      2 passed, 0 failed. Cure = round_opener now emits
+      ListDocumentsSince{corpus_digest} (p2p/sync_round.rs), so a converged
+      peer answers InSync with one hash and enumerates nothing; divergent
+      peers fall through to the unchanged ListDocuments path. InSync is an
+      explicit counted client arm (elohim_sync_in_sync_total) rather than a
+      catch-all fallthrough.
+      CORRECTION to the prior evidence block (written 2026-07-25, "0 passed,
+      2 failed"): the announce leg was already cured before this work — the
+      send site exists at p2p/mod.rs:3612 and
+      a_local_change_is_announced_to_connected_peers was ALREADY passing on
+      2026-07-27. Only the head-diff half was outstanding.
     guard: >
-      Fake-green risk on check (2): making announcements_for_local_change return
-      requests WITHOUT a caller that sends them turns the test green while
-      nothing propagates. The planner must stay the only constructor of the
-      round opener and the announce requests, and the cure must wire a real send
-      site at the local-change path (sync::projector::project_content_doc returns
-      Ok(true) exactly when a local change was written).
+      Regression risk = a second construction site for the opener. p2p/sync_round.rs
+      must remain the ONLY constructor; tests/sync_libp2p_convergence.rs must call
+      round_opener rather than hand-rolling a mirror, or the test measures the
+      mirror instead of the wire. Watch elohim_sync_in_sync_total: a flat zero in
+      a converged mesh means the shortcut never fires and the cure is inert.
     refs:
       - "task #9 (sync-timeout peers: 12D3KooWNguL…/GPmV…/Rnj3…) — still unwritten as a health scenario; needs a /health sync-outcome field that does not exist yet, and adding a failing scenario to the edge Dataplane Validation tag set changes what a CI-gated measure counts (operator call, per the blob-durability precedent)"
       - "memory: project_weave_epic_arc (CoverageRollup built, unconsumed)"
