@@ -371,7 +371,7 @@ def getEnvConfig() {
             // behavior; alpha's per-human routing rule overrides this for both
             // family-three and remote personas via doorwayA/doorwayB below.
             bootstrapUrl: 'https://doorway-alpha.elohim.host/bootstrap',
-            signalUrl: 'wss://signal.doorway-alpha.elohim.host',
+            signalUrl: 'wss://signal.alpha.elohim.host',
             // Per-human primary doorway routing (alpha only — staging/prod still
             // run single-doorway envs and use the fallback pair above). Selection
             // rule lives in deployHumanManifest: humanConfig.nodeTypes containing
@@ -381,7 +381,7 @@ def getEnvConfig() {
             // — change in lockstep with those files if either side moves.
             doorwayA: [
                 bootstrapUrl: 'https://doorway-alpha.elohim.host/bootstrap',
-                signalUrl: 'wss://signal.doorway-alpha.elohim.host',
+                signalUrl: 'wss://signal.alpha.elohim.host',
             ],
             doorwayB: [
                 bootstrapUrl: 'https://elohim.host/bootstrap',
@@ -716,7 +716,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // doorwayB sub-maps (alpha today), route based on nodeTypes containing
     // 'remote': shem-side personas → doorwayB (elohim.host / signal.elohim.host),
     // on-prem family-three → doorwayA (doorway-alpha.elohim.host /
-    // signal.doorway-alpha.elohim.host). Single-doorway envs (staging, prod)
+    // signal.alpha.elohim.host). Single-doorway envs (staging, prod)
     // fall back to envConfig.bootstrapUrl/signalUrl. This is the single-primary
     // shape — multi-registration / DNS failover deferred pending the federation
     // audit (see genesis/docs/superpowers/sprints/2026-05-27-federation-wiring-audit.md

@@ -368,7 +368,13 @@ post-deploy the apex flips to shem's WAN; adam's names (`doorway`, `signal.elohi
 follow the apex; matthew's names are already safely re-homed on `alpha.elohim.host`.
 
 *After verifying the flip (`dig elohim.host` → 136.50.16.133; `beacon-init` exited 0 on
-both legs; `dig alpha.elohim.host` → 136.51.77.49):*
+both legs; `dig alpha.elohim.host` → 136.51.77.49; **and** `doorway-alpha-tls` was
+reissued with the `signal.alpha.elohim.host` SAN —
+`openssl s_client -connect 136.51.77.49:443 -servername signal.alpha.elohim.host`
+must show a valid LE cert, not self-signed. Until reissue completes, doorwayA-routed
+conductors fail the signal TLS handshake; the legacy `signal.doorway-alpha` host is the
+rollback path. A silent cert-order failure — e.g. LE rate limit — leaves the old
+secret serving and the new host broken: check `kubectl`-side or just probe the SAN):*
 
 5. **Delete** `turn.elohim.host` and `turn-shem.elohim.host` by hand. A beacon rename
    does **not** remove the old record; both would linger unmanaged, pointing at

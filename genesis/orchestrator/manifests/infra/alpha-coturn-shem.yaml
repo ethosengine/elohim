@@ -28,18 +28,26 @@
 # 192.168.1.100); the public WAN IP is DYNAMIC. external-ip is NOT hand-set
 # here: the relay-addr-beacon sidecar/initContainer discovers the current
 # public IP at runtime and writes it into the live turnserver.conf
-# (coturn-run emptyDir), and keeps Cloudflare DNS (turn-shem.elohim.host)
+# (coturn-run emptyDir), and keeps Cloudflare DNS (the elohim.host APEX —
+# this premises IS adam's doorway; name by premises/role, never by node)
 # pointed at it as the WAN IP drifts.
 #
 # ┌─ OPERATOR DEPLOY-TIME ACTIONS (irreducible, cluster/network-owned) ───────┐
 # │ 1. Port-forward on the shem router/gateway, targeting this node's LAN IP  │
 # │    (with a DHCP reservation so the forward doesn't go stale):            │
 # │        3478/udp   3478/tcp        (STUN/TURN)                            │
-# │        49160-49200/udp            (relay media range, matches conf below)│
-# │ 2. DNS: turn-shem.elohim.host is Cloudflare-managed; the relay-addr-beacon│
+# │        49160-49200/udp            (relay media range, matches conf below;│
+# │        GFiber cannot edit this range — it is the standing contract)      │
+# │        80/tcp   443/tcp           (the beacon owns the elohim.host APEX  │
+# │        — this premises serves doorway-B HTTP + ACME on those ports)      │
+# │ 2. DNS: the elohim.host APEX is Cloudflare-managed; the relay-addr-beacon │
 # │    sidecar keeps its A record synced to this node's current public WAN   │
 # │    IP via the Cloudflare API token below — no manual DNS edits needed    │
-# │    once the beacon is running.                                          │
+# │    once the beacon is running. LIFECYCLE COUPLING: the apex A record's   │
+# │    freshness now depends on THIS POD — if coturn-shem is evicted or     │
+# │    scaled to 0 the apex goes stale at TTL 60 on the next WAN-IP move    │
+# │    (website + doorway-B + CI gates). The apex is also pinned            │
+# │    proxied:false forever (the sink hard-writes it; mandatory for UDP).  │
 # │ 3. Secret: provision `relay-addr-beacon-cloudflare` (key `token`) in the │
 # │    elohim-alpha namespace with a Cloudflare API token scoped to edit DNS │
 # │    on the elohim.host zone. Shared with the operations leg; referenced  │
@@ -195,7 +203,7 @@ spec:
       initContainers:
         # Renders the live turnserver.conf (base + current external-ip) BEFORE
         # coturn starts, so coturn never boots advertising a stale/absent
-        # external-ip. Also does a one-shot DNS sync so turn-shem.elohim.host
+        # external-ip. Also does a one-shot DNS sync so the elohim.host apex
         # is correct even if the pod was down across a WAN-IP change.
         - name: beacon-init
           image: harbor.ethosengine.com/ethosengine/relay-addr-beacon:dev-latest
@@ -207,7 +215,7 @@ spec:
             - "--sink"
             - "cloudflare"
             - "--record-name"
-            - "turn-shem.elohim.host"
+            - "elohim.host"
             - "--cf-zone"
             - "elohim.host"
             - "--coturn-base-conf"
@@ -304,7 +312,7 @@ spec:
             - "--sink"
             - "cloudflare"
             - "--record-name"
-            - "turn-shem.elohim.host"
+            - "elohim.host"
             - "--cf-zone"
             - "elohim.host"
             - "--coturn-base-conf"

@@ -35,7 +35,7 @@
 # external-ip is NOT
 # hand-set here: the relay-addr-beacon sidecar/initContainer discovers the
 # current public IP at runtime and writes it into the live turnserver.conf
-# (coturn-run emptyDir), and keeps Cloudflare DNS (turn.elohim.host) pointed
+# (coturn-run emptyDir), and keeps Cloudflare DNS (alpha.elohim.host) pointed
 # at it as the WAN IP drifts.
 #
 # ┌─ OPERATOR DEPLOY-TIME ACTIONS (irreducible, cluster/network-owned) ───────┐
@@ -43,10 +43,13 @@
 # │    the INTEL-NUC 192.168.86.102 (DHCP-reserve .102 so it can't drift):    │
 # │        3478/udp   3478/tcp        (STUN/TURN)                            │
 # │        49160-49200/udp            (relay media range, matches conf below)│
-# │ 2. DNS: turn.elohim.host is Cloudflare-managed; the relay-addr-beacon     │
+# │ 2. DNS: alpha.elohim.host is Cloudflare-managed; the relay-addr-beacon    │
 # │    sidecar keeps its A record synced to this node's current public WAN   │
 # │    IP via the Cloudflare API token below — no manual DNS edits needed    │
-# │    once the beacon is running.                                          │
+# │    once the beacon is running. LIFECYCLE COUPLING: alpha.elohim.host is  │
+# │    ALSO the alpha web-app ingress host (elohim-app/alpha/ingress.yaml)   │
+# │    and the App-pipeline E2E target — its A-record freshness now depends  │
+# │    on THIS POD, and the name is pinned proxied:false (sink hard-writes). │
 # │ 3. Secret: provision `relay-addr-beacon-cloudflare` (key `token`) in the │
 # │    elohim-alpha namespace with a Cloudflare API token scoped to edit DNS │
 # │    on the elohim.host zone. Referenced below, not created here.         │
@@ -55,10 +58,10 @@
 # └────────────────────────────────────────────────────────────────────────┘
 #
 # NAT HAIRPIN (confirm at smoke-test, not a pre-req): matthew's conductor on
-# ethosengine reaching turn.elohim.host (its own shared WAN IP) to hit this
+# ethosengine reaching alpha.elohim.host (its own shared WAN IP) to hit this
 # relay needs the household router to do NAT hairpin/loopback. If it doesn't,
-# ICE just forms the candidate pair through turn-shem.elohim.host instead
-# (cross-WAN, no hairpin; adam lives on shem) — the dual-relay redundancy.
+# ICE just forms the candidate pair through elohim.host (the apex = shem leg)
+# instead (cross-WAN, no hairpin; adam lives on shem) — the dual-relay redundancy.
 #
 # IMAGE PREREQUISITE: the coturn Deployment below references
 # relay-addr-beacon:dev-latest, which a prior NORMAL (non-DEPLOY_ONLY)
@@ -200,7 +203,7 @@ spec:
       initContainers:
         # Renders the live turnserver.conf (base + current external-ip) BEFORE
         # coturn starts, so coturn never boots advertising a stale/absent
-        # external-ip. Also does a one-shot DNS sync so turn.elohim.host is
+        # external-ip. Also does a one-shot DNS sync so alpha.elohim.host is
         # correct even if the pod was down across a WAN-IP change.
         - name: beacon-init
           image: harbor.ethosengine.com/ethosengine/relay-addr-beacon:dev-latest
@@ -212,7 +215,7 @@ spec:
             - "--sink"
             - "cloudflare"
             - "--record-name"
-            - "turn.elohim.host"
+            - "alpha.elohim.host"
             - "--cf-zone"
             - "elohim.host"
             - "--coturn-base-conf"
@@ -309,7 +312,7 @@ spec:
             - "--sink"
             - "cloudflare"
             - "--record-name"
-            - "turn.elohim.host"
+            - "alpha.elohim.host"
             - "--cf-zone"
             - "elohim.host"
             - "--coturn-base-conf"

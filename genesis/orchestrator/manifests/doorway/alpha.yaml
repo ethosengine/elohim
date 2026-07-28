@@ -190,7 +190,7 @@ spec:
             - name: BOOTSTRAP_URL
               value: "https://doorway-alpha.elohim.host/bootstrap"
             - name: SIGNAL_URL
-              value: "wss://signal.doorway-alpha.elohim.host"
+              value: "wss://signal.alpha.elohim.host"
             - name: INSTALLED_APP_ID
               value: "elohim"
             - name: HAPP_BUNDLE_PATH
@@ -492,7 +492,8 @@ spec:
 ---
 # Public Ingress - routes all traffic through authenticated Doorway Gateway
 # Supports: /admin, /app/*, /bootstrap/*, /api/v1/*, /operator/*
-# Signal subdomain: signal.doorway-alpha.elohim.host (tx5/SBD protocol)
+# Signal subdomain: signal.alpha.elohim.host (tx5/SBD protocol; the legacy
+# signal.doorway-alpha.elohim.host host is kept serving for transition compat)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -532,6 +533,9 @@ metadata:
 # here has today (verified 2026-07-22 by live probe: doorway-alpha.elohim.host,
 # elohim.host, doorway.elohim.host all resolve to 136.51.77.49/operations
 # only; turn-shem.elohim.host is the sole shem-WAN-resolving name).
+# (Superseded 2026-07-28: the apex is now the shem-leg beacon's owned record —
+# elohim.host resolves to the SHEM WAN; matthew's names re-homed onto
+# alpha.elohim.host. See SHEM.md §5.4.)
 # ACME HTTP-01 works unmodified for this multi-A name because both WANs
 # terminate at the SAME shared ingress-nginx controller (shem is WireGuard-
 # joined into the one cluster, and already answers 443 with the identical
@@ -554,6 +558,7 @@ spec:
   tls:
     - hosts:
         - doorway-alpha.elohim.host
+        - signal.alpha.elohim.host
         - signal.doorway-alpha.elohim.host
         - doorways.elohim.host
       secretName: doorway-alpha-tls
@@ -583,9 +588,23 @@ spec:
                 name: elohim-doorway-alpha
                 port:
                   number: 8080
+    - host: signal.alpha.elohim.host
+      http:
+        paths:
+          # Role-named signal endpoint (2026-07-28) — matches SIGNAL_URL above
+          # and the operations premises' alpha.elohim.host A record.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: elohim-doorway-alpha
+                port:
+                  number: 8080
     - host: signal.doorway-alpha.elohim.host
       http:
         paths:
+          # Legacy signal host — transition compat while peers/config migrate
+          # to signal.alpha.elohim.host; remove after the fleet stops using it.
           - path: /
             pathType: Prefix
             backend:

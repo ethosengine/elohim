@@ -117,17 +117,19 @@ data:
           # pair — `genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml`,
           # `alpha-coturn-shem.yaml`. Keep the credential in sync with those
           # ConfigMaps' `user=`.
-          # Dual-WAN ICE failover: ethosengine (on-prem) relay primary, shem
-          # relay redundant — either works, ICE gathers candidates from both.
-          # turns:5349 TLS is a later phase; this phase is 3478-first.
+          # Dual-WAN ICE failover: operations (on-prem, alpha.elohim.host) relay
+          # primary, shem (the apex — adam's premises) redundant — either works,
+          # ICE gathers candidates from both. Role-named DNS (2026-07-28): no
+          # node names in public DNS; each name is beacon-managed and
+          # dynamic-IP-safe. turns:5349 TLS is a later phase; 3478-first.
           - urls:
-              - "turn:turn.elohim.host:3478?transport=udp"
-              - "turn:turn.elohim.host:3478?transport=tcp"
+              - "turn:alpha.elohim.host:3478?transport=udp"
+              - "turn:alpha.elohim.host:3478?transport=tcp"
             username: "elohim"
             credential: "alpha-turn-commons-2026"
           - urls:
-              - "turn:turn-shem.elohim.host:3478?transport=udp"
-              - "turn:turn-shem.elohim.host:3478?transport=tcp"
+              - "turn:elohim.host:3478?transport=udp"
+              - "turn:elohim.host:3478?transport=tcp"
             username: "elohim"
             credential: "alpha-turn-commons-2026"
       # Slow-WAN peer resilience (2026-07-20): a production node on a slow
