@@ -30,7 +30,7 @@ network:
   enable_mdns: false
   enable_relaying: true
   webrtc_config:
-    ice_servers:
+    iceServers:
       - urls: ["stun:stun.cloudflare.com:3478"]
       - urls: ["stun:stun.l.google.com:19302"]
   # Slow-WAN peer resilience (2026-07-20): a production node on a slow link
