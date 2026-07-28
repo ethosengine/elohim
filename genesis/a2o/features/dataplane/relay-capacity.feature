@@ -27,9 +27,11 @@ Feature: TURN relay capacity bounds doorway-operator serviceable scale
   # diversity presets and operator docs must carry.
   #
   # Informs: NodeCapabilities / operator presets (relay_port_pool size per premises
-  # tier), SHEM.md ports contract, seam-map device-spectrum (router class is part of
-  # the premises tier). Review after: fleet size changes, coturn lifetime tuning,
-  # arc-factor changes (less relay demand), or any router swap at either premises.
+  # tier), the coturn manifests' operator port-forward blocks
+  # (genesis/orchestrator/manifests/infra/alpha-coturn-{operations,shem}.yaml), and
+  # the seam-map device-spectrum (router class is part of the premises tier).
+  # Review after: fleet size changes, coturn lifetime tuning, arc-factor changes
+  # (less relay demand), or any router swap at either premises.
 
   Background:
     Given peer "alpha-A" at "alpha-A"

@@ -42,7 +42,12 @@
 # │ 1. Port-forward on matthew's household Google-Fiber router (.86 LAN) to  │
 # │    the INTEL-NUC 192.168.86.102 (DHCP-reserve .102 so it can't drift):    │
 # │        3478/udp   3478/tcp        (STUN/TURN)                            │
-# │        49160-49200/udp            (relay media range, matches conf below)│
+# │        49152-49999/udp            (relay media range, matches conf below;│
+# │        widened 2026-07-28 — was 49160-49200, 41 ports, chronically       │
+# │        exhausted at 52-85% ALLOCATE error-508 with 7 conductors +        │
+# │        2 doorways. The shem leg intentionally stays 49160-49200: its     │
+# │        GFiber router cannot edit forward ranges. Legs need not match      │
+# │        each other — each leg's conf must only match ITS OWN router.)     │
 # │ 2. DNS: alpha.elohim.host is Cloudflare-managed; the relay-addr-beacon    │
 # │    sidecar keeps its A record synced to this node's current public WAN   │
 # │    IP via the Cloudflare API token below — no manual DNS edits needed    │
@@ -91,8 +96,8 @@ data:
     # restarts coturn on WAN-IP change thereafter).
     listening-port=3478
     # Relay media port range — MUST match the operator port-forward (see header).
-    min-port=49160
-    max-port=49200
+    min-port=49152
+    max-port=49999
     # Long-term-credential mechanism with a static realm user. tx5 takes a static
     # username/credential (it cannot do the time-limited REST flow), so use LTC,
     # not use-auth-secret.
@@ -275,7 +280,7 @@ spec:
               containerPort: 3478
               protocol: TCP
               hostPort: 3478
-            # Relay media range (49160-49200/udp) is not individually declared
+            # Relay media range (49152-49999/udp) is not individually declared
             # here — hostNetwork=true binds whatever coturn opens directly; the
             # operator port-forward (see header) is what actually gates it.
           volumeMounts:

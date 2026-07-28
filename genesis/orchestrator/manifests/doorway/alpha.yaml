@@ -535,7 +535,8 @@ metadata:
 # only; turn-shem.elohim.host is the sole shem-WAN-resolving name).
 # (Superseded 2026-07-28: the apex is now the shem-leg beacon's owned record —
 # elohim.host resolves to the SHEM WAN; matthew's names re-homed onto
-# alpha.elohim.host. See SHEM.md §5.4.)
+# alpha.elohim.host. Sequencing + rationale: the coturn manifests' operator
+# blocks and the feat(dns) commit message.)
 # ACME HTTP-01 works unmodified for this multi-A name because both WANs
 # terminate at the SAME shared ingress-nginx controller (shem is WireGuard-
 # joined into the one cluster, and already answers 443 with the identical
