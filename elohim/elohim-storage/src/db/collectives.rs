@@ -445,24 +445,34 @@ pub fn project_collective(
     ctx: &AppContext,
     p: &CollectiveProjection<'_>,
 ) -> Result<CollectiveProjectionOutcome, StorageError> {
+    conn.immediate_transaction(|conn| project_collective_within_txn(conn, ctx, p))
+}
+
+/// Body of [`project_collective`], run inside the caller's `BEGIN IMMEDIATE`
+/// transaction so the step-1 existence check and the eventual write are
+/// atomic against another connection racing the same `collective_cid` — the
+/// TOCTOU a non-unique `idx_collectives_cid` let through (two concurrent
+/// callers each pass step 1 before either commits, each minting its own
+/// cid-bearing row). Migration `2026-07-28-090000_collectives_cid_unique_index`
+/// backstops this with a real `UNIQUE` constraint for any write path that
+/// still reaches `collectives` outside this function (e.g. a direct
+/// `create_collective` call with a pre-set `collective_cid`). If a write
+/// below trips that constraint anyway, a concurrent writer won the race
+/// between our read and our write — re-read and take the refresh branch
+/// instead of bubbling a hard error; that row existing under someone else's
+/// write is exactly the condition step 1 checks for.
+fn project_collective_within_txn(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    p: &CollectiveProjection<'_>,
+) -> Result<CollectiveProjectionOutcome, StorageError> {
     let hints = CharterHints::parse(p.charter);
     let layer = hints.governance_layer();
     let reach = hints.reach();
 
     // (1) Already anchored to this cid, under whatever id — refresh only.
     if let Some(existing_id) = id_for_collective_cid(conn, ctx, p.collective_cid)? {
-        diesel::update(
-            collectives::table
-                .filter(collectives::h_app_id.eq(&ctx.h_app_id))
-                .filter(collectives::id.eq(&existing_id)),
-        )
-        .set((
-            collectives::name.eq(p.display_name),
-            collectives::governance_layer.eq(&layer),
-            collectives::updated_at.eq(current_timestamp()),
-        ))
-        .execute(conn)
-        .map_err(|e| StorageError::Internal(format!("Collective refresh failed: {}", e)))?;
+        refresh_collective_row(conn, ctx, &existing_id, p.display_name, &layer)?;
         return Ok(CollectiveProjectionOutcome::Refreshed);
     }
 
@@ -476,7 +486,7 @@ pub fn project_collective(
             // Heal fills, never moves — the canonical channels own this.
             return Ok(CollectiveProjectionOutcome::SkippedDeclared);
         }
-        diesel::update(
+        let stamped = diesel::update(
             collectives::table
                 .filter(collectives::h_app_id.eq(&ctx.h_app_id))
                 .filter(collectives::id.eq(alias)),
@@ -487,9 +497,15 @@ pub fn project_collective(
             collectives::governance_layer.eq(&layer),
             collectives::updated_at.eq(current_timestamp()),
         ))
-        .execute(conn)
-        .map_err(|e| StorageError::Internal(format!("Collective alias merge failed: {}", e)))?;
-        return Ok(CollectiveProjectionOutcome::AliasMerged);
+        .execute(conn);
+        return match stamped {
+            Ok(_) => Ok(CollectiveProjectionOutcome::AliasMerged),
+            Err(e) if is_cid_unique_violation(&e) => recover_from_cid_race(conn, ctx, p, &layer),
+            Err(e) => Err(StorageError::Internal(format!(
+                "Collective alias merge failed: {}",
+                e
+            ))),
+        };
     }
 
     // (3) Insert a cid-keyed row (idempotent upsert on id), then stamp the cid.
@@ -497,7 +513,7 @@ pub fn project_collective(
         id: p.collective_cid.to_string(),
         name: p.display_name.to_string(),
         description: None,
-        governance_layer: layer,
+        governance_layer: layer.clone(),
         constitutional_parent_id: None,
         reach,
         region: None,
@@ -505,15 +521,73 @@ pub fn project_collective(
         created_by: p.founder_agent_cid.map(str::to_string),
     };
     create_collective(conn, ctx, &input)?;
-    diesel::update(
+    let stamped = diesel::update(
         collectives::table
             .filter(collectives::h_app_id.eq(&ctx.h_app_id))
             .filter(collectives::id.eq(p.collective_cid)),
     )
     .set(collectives::collective_cid.eq(Some(p.collective_cid)))
+    .execute(conn);
+    match stamped {
+        Ok(_) => Ok(CollectiveProjectionOutcome::Created),
+        Err(e) if is_cid_unique_violation(&e) => recover_from_cid_race(conn, ctx, p, &layer),
+        Err(e) => Err(StorageError::Internal(format!(
+            "Collective cid stamp failed: {}",
+            e
+        ))),
+    }
+}
+
+/// A write above hit the `idx_collectives_cid_unique` constraint: another
+/// writer committed a row under this exact `collective_cid` between our
+/// step-1 read and our write. Re-read (the violation proves a row now
+/// exists) and converge onto it via the same refresh step 1 would have
+/// taken had it run a moment later — never a duplicate insert.
+fn recover_from_cid_race(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    p: &CollectiveProjection<'_>,
+    layer: &str,
+) -> Result<CollectiveProjectionOutcome, StorageError> {
+    let existing_id = id_for_collective_cid(conn, ctx, p.collective_cid)?.ok_or_else(|| {
+        StorageError::Internal(format!(
+            "Collective cid {} raced a unique-constraint violation but no row carries it on re-read",
+            p.collective_cid
+        ))
+    })?;
+    refresh_collective_row(conn, ctx, &existing_id, p.display_name, layer)?;
+    Ok(CollectiveProjectionOutcome::Refreshed)
+}
+
+fn is_cid_unique_violation(err: &diesel::result::Error) -> bool {
+    matches!(
+        err,
+        diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::UniqueViolation, _)
+    )
+}
+
+/// Shared value-field refresh for a row already anchored to the target cid
+/// (step 1's normal path, and the race-recovery path's converge branch).
+fn refresh_collective_row(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    display_name: &str,
+    layer: &str,
+) -> Result<(), StorageError> {
+    diesel::update(
+        collectives::table
+            .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+            .filter(collectives::id.eq(id)),
+    )
+    .set((
+        collectives::name.eq(display_name),
+        collectives::governance_layer.eq(layer),
+        collectives::updated_at.eq(current_timestamp()),
+    ))
     .execute(conn)
-    .map_err(|e| StorageError::Internal(format!("Collective cid stamp failed: {}", e)))?;
-    Ok(CollectiveProjectionOutcome::Created)
+    .map_err(|e| StorageError::Internal(format!("Collective refresh failed: {}", e)))?;
+    Ok(())
 }
 
 /// The `collectives.id` of the row carrying `collective_cid` in this app scope,
@@ -1302,6 +1376,86 @@ mod tests {
                 .collective_cid
                 .as_deref(),
             Some(CID_B)
+        );
+    }
+
+    /// TOCTOU regression (review of commit 33225a8ae, LOW finding): two
+    /// `project_collective` calls for the SAME `collective_cid`, routed
+    /// through DIFFERENT local ids (the first mints the cid-keyed row via
+    /// step 3; the second names a distinct, non-existent alias that would
+    /// otherwise reach step 3's own insert path too) must converge onto ONE
+    /// row, never mint a second cid-bearing row. The second call's outcome
+    /// must be in the refresh/alias class (`Refreshed`), not `Created`.
+    #[test]
+    fn same_cid_via_different_ids_never_duplicates_row() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        // First call: no alias, no existing row → step 3 inserts a cid-keyed
+        // row under id == CID_A.
+        let first = project_collective(
+            &mut conn,
+            &ctx,
+            &CollectiveProjection {
+                collective_cid: CID_A,
+                display_name: "Dowell Household",
+                founder_agent_cid: None,
+                charter: Some(r#"{"kind":"household"}"#),
+                merge_onto_id: None,
+                mode: CollectiveStampMode::GapFill,
+            },
+        )
+        .expect("first project");
+        assert_eq!(first, CollectiveProjectionOutcome::Created);
+
+        // Second call: SAME cid, a DIFFERENT candidate local id via
+        // merge_onto_id — one that names no local row, so absent the step-1
+        // guard this call would fall through to step 3 and mint its own
+        // second cid-keyed row (a duplicate under a different id).
+        let second = project_collective(
+            &mut conn,
+            &ctx,
+            &CollectiveProjection {
+                collective_cid: CID_A,
+                display_name: "Renamed Household",
+                founder_agent_cid: None,
+                charter: Some(r#"{"kind":"household"}"#),
+                merge_onto_id: Some("household-not-yet-local"),
+                mode: CollectiveStampMode::GapFill,
+            },
+        )
+        .expect("second project");
+        assert_eq!(
+            second,
+            CollectiveProjectionOutcome::Refreshed,
+            "second call must converge (refresh), never mint a duplicate"
+        );
+
+        // Exactly one row in this app scope carries CID_A.
+        let cid_bearing_count: i64 = collectives::table
+            .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+            .filter(collectives::collective_cid.eq(CID_A))
+            .count()
+            .get_result(&mut conn)
+            .expect("count");
+        assert_eq!(
+            cid_bearing_count, 1,
+            "exactly one row must carry collective_cid = CID_A"
+        );
+
+        // The value fields converged from the second call.
+        let row = get_collective(&mut conn, &ctx, CID_A)
+            .expect("get")
+            .expect("Some");
+        assert_eq!(row.name, "Renamed Household");
+
+        // And no row was ever created under the alias id that never existed.
+        assert!(
+            get_collective(&mut conn, &ctx, "household-not-yet-local")
+                .expect("get")
+                .is_none(),
+            "the never-local alias id must never have been materialized"
         );
     }
 
