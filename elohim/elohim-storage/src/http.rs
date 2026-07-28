@@ -5591,7 +5591,7 @@ impl HttpServer {
         // (a) Resolve the head action hash from the projection — the SAME
         // answer GET /db/content/{id}/head gives, so the carried record always
         // matches the hash the caller read from this peer a moment earlier.
-        let head_action_hash = match db::content_diesel::get_content_with_tags(
+        let cwt = match db::content_diesel::get_content_with_tags(
             &mut conn,
             app_ctx,
             content_id,
@@ -5603,14 +5603,33 @@ impl HttpServer {
                     content_id
                 )))
             }
-            Some(cwt) => match crate::views::content_head_view_from_content(&cwt.content) {
-                Some(view) => view.head_action_hash,
-                None => {
-                    return Ok(response::not_found(
-                        "no notarized head declared for this content",
-                    ))
-                }
-            },
+            Some(cwt) => cwt,
+        };
+
+        // REACH GATE — mirrors the P2P responder's gate in
+        // `p2p::view_federation::build_content_head_record_payload`: a
+        // non-distribution-safe reach is answered as ABSENCE — byte-identical
+        // to an unknown id — so this cross-peer surface can never be used to
+        // probe whether a scoped id exists on this HTTP-reachable peer either.
+        if !db::content_diesel::is_distribution_safe_reach(&cwt.content.reach) {
+            tracing::debug!(
+                target: "elohim_storage::http",
+                content_id = %content_id,
+                "GET .../head-record: scoped-tier reach — answering as absent (no cross-peer surface)"
+            );
+            return Ok(response::not_found(&format!(
+                "Content not found: {}",
+                content_id
+            )));
+        }
+
+        let head_action_hash = match crate::views::content_head_view_from_content(&cwt.content) {
+            Some(view) => view.head_action_hash,
+            None => {
+                return Ok(response::not_found(
+                    "no notarized head declared for this content",
+                ))
+            }
         };
         drop(conn);
 
@@ -15126,6 +15145,139 @@ mod session_exchange_tests {
             resp.status, 201,
             "provide pin on a peer-capable node must succeed"
         );
+    }
+}
+
+// =============================================================================
+// GET /db/content/{id}/head-record — HTTP-path reach gate tests.
+//
+// The HTTP route is a pre-existing twin of the P2P responder gated in
+// `p2p::view_federation::build_content_head_record_payload` (2175f2b60): both
+// read the SAME projection row, so a scoped-tier id must be just as
+// unprobeable over this HTTP surface as it is over the P2P one. These tests
+// pin (a) a scoped-tier id answers byte-identically to an unknown id, and (b)
+// the reach gate does NOT regress the distribution-safe path that
+// scripts/ci/stage-spa-blob.sh depends on for elohim-host-landing (community/
+// public reach) — that id must still clear the gate and reach the
+// conductor-bridge step (which 503s here for lack of a wired hc_registry,
+// never a 404 "not found").
+// =============================================================================
+#[cfg(test)]
+mod content_head_record_reach_gate_tests {
+    use super::*;
+    use crate::db::content_diesel::{create_content, stamp_declared_head, CreateContentInput};
+    use crate::test_util::test_pool;
+    use http_body_util::BodyExt;
+
+    async fn test_server() -> HttpServer {
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_db_pool(test_pool())
+    }
+
+    fn seed(pool: &DbPool, id: &str, reach: &str) {
+        let ctx = AppContext::default_lamad();
+        let mut conn = pool.get().unwrap();
+        create_content(
+            &mut conn,
+            &ctx,
+            CreateContentInput {
+                id: id.to_string(),
+                title: id.to_string(),
+                description: None,
+                content_type: "concept".to_string(),
+                content_format: "markdown".to_string(),
+                blob_hash: None,
+                blob_cid: None,
+                content_size_bytes: None,
+                metadata_json: None,
+                reach: reach.to_string(),
+                created_by: None,
+                tags: vec![],
+                content_body: None,
+                dht_anchor_hash: Some(format!("anc-{id}")),
+            },
+        )
+        .unwrap();
+        stamp_declared_head(&mut conn, &ctx, id, &format!("uhCkk-{id}"), None, None).unwrap();
+    }
+
+    async fn status_and_body(resp: Response<Full<Bytes>>) -> (StatusCode, serde_json::Value) {
+        let status = resp.status();
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        let json = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
+        (status, json)
+    }
+
+    /// A scoped-tier (private) id must respond byte-identically to a truly
+    /// unknown id — no distinguishable refusal that would let a caller probe
+    /// for the existence of a scoped id via this route. Uses the SAME id
+    /// string across two independent DB states (one where it exists as a
+    /// private-reach row, one where it was never created) so the comparison
+    /// is a genuine byte-for-byte match, not merely "same template".
+    #[tokio::test]
+    async fn scoped_tier_reach_answers_identically_to_unknown_id() {
+        const PROBE_ID: &str = "hr-http:probe";
+        let ctx = AppContext::default_lamad();
+
+        // State A: the id exists, but is scoped (private) reach.
+        let scoped_server = test_server().await;
+        seed(&scoped_server.db_pool.clone().unwrap(), PROBE_ID, "private");
+        let scoped = scoped_server
+            .handle_content_head_record(Method::GET, PROBE_ID, &ctx)
+            .await
+            .unwrap();
+        let (scoped_status, scoped_body) = status_and_body(scoped).await;
+
+        // State B: the id was never created at all.
+        let unknown_server = test_server().await;
+        let unknown = unknown_server
+            .handle_content_head_record(Method::GET, PROBE_ID, &ctx)
+            .await
+            .unwrap();
+        let (unknown_status, unknown_body) = status_and_body(unknown).await;
+
+        assert_eq!(scoped_status, StatusCode::NOT_FOUND);
+        assert_eq!(scoped_status, unknown_status);
+        assert_eq!(
+            scoped_body, unknown_body,
+            "a scoped-tier id's refusal must be byte-identical to an unknown id \
+             for the SAME id string — existence must not be probeable"
+        );
+    }
+
+    /// A distribution-safe (community/public) reach id must still clear the
+    /// gate — this is the path `scripts/ci/stage-spa-blob.sh` depends on for
+    /// elohim-host-landing. No hc_registry is wired in this test server, so a
+    /// gate-cleared request reaches the conductor-bridge step and 503s there
+    /// (service_unavailable), never the 404 "Content not found" shape a
+    /// gated/unknown id gets.
+    #[tokio::test]
+    async fn distribution_safe_reach_still_clears_the_gate() {
+        let server = test_server().await;
+        let pool = server.db_pool.clone().unwrap();
+        let ctx = AppContext::default_lamad();
+
+        for (id, reach) in [
+            ("hr-http:community", "community"),
+            ("hr-http:public", "public"),
+        ] {
+            seed(&pool, id, reach);
+            let resp = server
+                .handle_content_head_record(Method::GET, id, &ctx)
+                .await
+                .unwrap();
+            let (status, body) = status_and_body(resp).await;
+            assert_eq!(
+                status,
+                StatusCode::SERVICE_UNAVAILABLE,
+                "reach={reach} must clear the gate and reach the conductor-bridge \
+                 step, not be turned away as not-found: {body:?}"
+            );
+        }
     }
 }
 
