@@ -410,6 +410,21 @@ pub async fn build_response_slice(
 /// The head hash comes from the LOCAL PROJECTION (the same answer
 /// `GET /db/content/{id}/head` gives), so the carried record always matches the
 /// hash a caller read from this peer's inventory a moment earlier.
+///
+/// ## Reach gate (cross-peer surface)
+///
+/// This responder serves an action hash AND the full serialized DHT `Record`
+/// bytes to any connected peer, so it carries the SAME reach obligation as the
+/// projection inventory: *"scoped-tier ids must NEVER appear in a cross-peer
+/// surface"* ([`crate::db::content_diesel::list_content_anchor_inventory`]
+/// enforces it in SQL). A non-distribution-safe reach is answered as ABSENCE —
+/// byte-identical to an unknown id — so the response cannot be used to probe
+/// whether a scoped id exists on this peer.
+///
+/// A reach-gated id can never legitimately be asked for here anyway: the adopt
+/// pre-flight only ever asks about ids a peer ADVERTISED, and the inventory that
+/// advertises them is already reach-filtered. The gate is defence in depth
+/// against a hand-crafted request.
 async fn build_content_head_record_payload(
     pool: Option<&crate::db::DbPool>,
     hc_registry: Option<&crate::hc_client_registry::HcClientRegistry>,
@@ -447,6 +462,16 @@ async fn build_content_head_record_payload(
         // this peer's truth about the id).
         _ => return absent(FreshnessState::Live),
     };
+    // REACH GATE — identical shape to the not-found answer above, deliberately:
+    // a distinguishable refusal would leak the existence of a scoped id.
+    if !crate::db::content_diesel::is_distribution_safe_reach(&row.content.reach) {
+        tracing::debug!(
+            target: "elohim_storage::view_federation",
+            content_id = %content_id,
+            "ContentHeadRecord: scoped-tier reach — answering as absent (no cross-peer surface)"
+        );
+        return absent(FreshnessState::Live);
+    }
     let declared_at = row.content.declared_head_at;
     let Some(view) = crate::views::content_head_view_from_content(&row.content) else {
         return absent(FreshnessState::Live);
@@ -1080,6 +1105,81 @@ mod tests {
         );
         assert_eq!(payload.entries[0].dht_anchor_hash, "anc-1");
         assert_eq!(payload.total, 1);
+    }
+
+    /// Reach gate on the head-record responder — the mirror of the inventory's
+    /// scoped-tier test above, at the surface that serves the actual DHT
+    /// `Record` bytes.
+    ///
+    /// The inventory filters scoped tiers in SQL; this responder resolves a row
+    /// BY ID, so it needs its own gate or the reach filter is a front door with
+    /// the back door open. A scoped id must answer byte-identically to an
+    /// unknown id: a distinguishable refusal would let any connected peer probe
+    /// which private ids this peer holds.
+    #[tokio::test]
+    async fn head_record_responder_refuses_scoped_tier_as_absent() {
+        use crate::db::content_diesel::{create_content, stamp_declared_head, CreateContentInput};
+        let pool = crate::test_util::test_pool();
+        let ctx = crate::db::AppContext::default_lamad();
+        {
+            let mut conn = pool.get().expect("pool conn");
+            let mk = |id: &str, reach: &str| CreateContentInput {
+                id: id.to_string(),
+                title: id.to_string(),
+                description: None,
+                content_type: "concept".to_string(),
+                content_format: "markdown".to_string(),
+                blob_hash: None,
+                blob_cid: None,
+                content_size_bytes: None,
+                metadata_json: None,
+                reach: reach.to_string(),
+                created_by: None,
+                tags: vec![],
+                content_body: None,
+                dht_anchor_hash: Some(format!("anc-{id}")),
+            };
+            // Both rows are anchored AND declared — so the ONLY thing separating
+            // them is reach.
+            for (id, reach) in [("hr:public", "public"), ("hr:private", "private")] {
+                create_content(&mut conn, &ctx, mk(id, reach)).unwrap();
+                stamp_declared_head(&mut conn, &ctx, id, &format!("uhCkk-{id}"), None, None)
+                    .unwrap();
+            }
+        }
+
+        // Distribution-safe → the head hash IS served (no conductor wired, so
+        // the record bytes are absent, which is the honest hash-only answer).
+        let (val, state) = build_content_head_record_payload(Some(&pool), None, "hr:public").await;
+        assert_eq!(state, FreshnessState::Live);
+        let served: ContentHeadRecordPayload = serde_json::from_value(val).unwrap();
+        assert_eq!(
+            served.head_action_hash.as_deref(),
+            Some("uhCkk-hr:public"),
+            "a distribution-safe id still serves its head"
+        );
+
+        // Scoped tier → absent.
+        let (val, state) = build_content_head_record_payload(Some(&pool), None, "hr:private").await;
+        assert_eq!(state, FreshnessState::Live);
+        let refused: ContentHeadRecordPayload = serde_json::from_value(val).unwrap();
+        assert!(
+            refused.head_action_hash.is_none() && refused.record.is_none(),
+            "a scoped-tier id must never expose its head hash or Record bytes on \
+             a cross-peer surface: {refused:?}"
+        );
+
+        // Existence must not be inferable: byte-identical to an unknown id.
+        let (unknown_val, unknown_state) =
+            build_content_head_record_payload(Some(&pool), None, "hr:does-not-exist").await;
+        assert_eq!(unknown_state, state);
+        let unknown: ContentHeadRecordPayload = serde_json::from_value(unknown_val).unwrap();
+        assert_eq!(
+            unknown.head_action_hash, refused.head_action_hash,
+            "the scoped-tier refusal must be indistinguishable from an unknown id"
+        );
+        assert_eq!(unknown.record, refused.record);
+        assert_eq!(unknown.declared_at, refused.declared_at);
     }
 
     #[test]

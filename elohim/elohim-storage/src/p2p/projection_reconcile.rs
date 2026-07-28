@@ -323,6 +323,19 @@ enum HealOutcomeKind {
     /// converge them — only a canonical channel can. That diagnosis was
     /// previously indistinguishable from real healing.
     Refreshed,
+    /// Content arm: a NON-canonical (fallback / root-author-election) answer would
+    /// have `GapFill`-ed an UNDECLARED row with THIS node's own root, while a peer
+    /// advertises a real declaration for the id. The stamp was SKIPPED and the id
+    /// handed to the adopt-before-author arm instead.
+    ///
+    /// This is the third site of the self-election defect, and the most insidious:
+    /// unlike the re-anchor and ghost sweeps (which the pre-flight guards), a
+    /// GapFill self-election is TERMINAL. Once the row carries this node's own
+    /// root as its declaration it is anchored (so the re-anchor sweep skips it)
+    /// and conductor-resolvable (so the ghost sweep skips it), and the decision
+    /// rule then answers `Hold` forever. The divergence goes quiet, permanently,
+    /// with `elohim_content_head_adopted_total` flat — invisible.
+    DeferredToAdopt,
 }
 
 impl HealOutcomeKind {
@@ -337,8 +350,47 @@ impl HealOutcomeKind {
             HealOutcomeKind::RefusedStale => "refused_stale",
             HealOutcomeKind::NoRow => "no_row",
             HealOutcomeKind::Refreshed => "refreshed",
+            HealOutcomeKind::DeferredToAdopt => "deferred_to_adopt",
         }
     }
+}
+
+/// Would a `GapFill` stamp of a NON-canonical own-conductor answer amount to
+/// SELF-ELECTION over a peer's real declaration?
+///
+/// Pure + total so the exact live trace is testable without a conductor:
+/// cross-root id lands NULL-anchored on peer B at boot → the re-anchor sweep
+/// authors a non-declaring root (correct, guarded) → P2P comes up → discovery
+/// classifies the id Divergent against peer A's anchor → `heal_content` runs
+/// FIRST in `run_heal`, ahead of both pre-flight-guarded sweeps → B's conductor
+/// cannot resolve A's canonical link across the gossip gap, so it answers
+/// `canonical == false` with B's OWN fallback root → `GapFill` fills the
+/// undeclared row with it.
+///
+/// That write is terminal. The row is now anchored (invisible to the re-anchor
+/// sweep) and conductor-resolvable (invisible to the ghost sweep), so it never
+/// reaches [`crate::services::head_adoption::try_adopt_canonical_head`] again,
+/// and if it did the rule would answer `Hold`. A's declaration is ignored
+/// forever and nothing counts it.
+///
+/// Three conditions, all required:
+/// - **`!answer_canonical`** — a canonical answer carries real authority and
+///   keeps `HealCanonical` semantics untouched.
+/// - **`peer_advertises_declaration`** — with no peer hint there is no better
+///   claim to defer to, so `GapFill` remains the right, unchanged behaviour.
+/// - **`local_declared.is_none()`** — only an UNDECLARED row is at risk;
+///   `GapFill` on a declared row already refuses (`SkippedDeclared`).
+///
+/// This does not widen `Declare` and does not change what `GapFill` writes. It
+/// keys on the authority the write CARRIES — a fallback self-root is the weakest
+/// authority there is, and filling with it while a peer advertises a real
+/// declaration is squatting, not filling absence.
+fn gapfill_would_self_elect(
+    answer_canonical: bool,
+    peer_advertises_declaration: bool,
+    local_declared: Option<&str>,
+) -> bool {
+    !answer_canonical && peer_advertises_declaration && local_declared.is_none()
 }
 
 /// Outcome of the bounded-retry conductor call for one row: the final result plus
@@ -837,12 +889,14 @@ pub async fn run_heal(
         healed: content_healed,
         conductor_missing: content_missing,
         ghost_candidates,
+        adopt_candidates,
     } = heal_content(
         &mut content_tracker,
         &content_discovered_by,
         hc,
         pool,
         &pacing,
+        &peer_head_hints,
     )
     .await;
 
@@ -886,6 +940,12 @@ pub async fn run_heal(
         hints: &peer_head_hints,
         fetcher: Some(&head_record_fetcher),
     };
+
+    // Deferred adoptions FIRST: these are ids the heal leg just refused to
+    // GapFill, and they are unreachable by both witness sweeps below (anchored,
+    // and conductor-resolvable). Running them here is what turns the refusal
+    // into convergence rather than into a permanent gap.
+    adopt_deferred_heads(hc, pool, &adopt_candidates, &adopt).await;
 
     // GAP 1.5: green the un-witnessed seeded corpus. Composed onto (not forked
     // from) the content arm — same conductor gate + single-flight guard.
@@ -1028,6 +1088,15 @@ struct ContentHealOutcome {
     /// Ids the own conductor could not resolve — the ghost-anchor candidate
     /// set, narrowed to the truly-anchored rows by [`witness_ghost_anchors`].
     ghost_candidates: Vec<String>,
+    /// Ids whose `GapFill` was SKIPPED because it would have self-elected over a
+    /// peer's advertised declaration ([`gapfill_would_self_elect`]). Handed to
+    /// [`adopt_deferred_heads`] in the same sweep.
+    ///
+    /// Collected here rather than adopted inline for the same reason
+    /// `ghost_candidates` is: the heal leg has no fetcher (the head-record
+    /// transport is assembled in [`run_heal`] alongside the peer hints), and the
+    /// answer this leg already paid for is enough to classify without re-probing.
+    adopt_candidates: Vec<String>,
 }
 
 /// Ghost-anchor witness: author a local notarized head for rows whose SQL
@@ -1919,9 +1988,11 @@ async fn heal_content(
     hc: &Arc<HcClient>,
     pool: &DbPool,
     pacing: &HealPacing,
+    peer_head_hints: &crate::services::head_adoption::PeerHeadHints,
 ) -> ContentHealOutcome {
     let app_ctx = crate::db::AppContext::default_lamad();
     let mut ghost_candidates: Vec<String> = Vec::new();
+    let mut adopt_candidates: Vec<String> = Vec::new();
 
     // (5) Heal each gap from the OWN conductor (verified stamp), bounded by the
     // content leg budget so a saturated conductor lands SOME rows per tick and the
@@ -1936,6 +2007,45 @@ async fn heal_content(
         })
         .await;
         match attempt.result {
+            // GAPFILL SELF-ELECTION GUARD. Checked BEFORE the stamp, because the
+            // stamp is what makes the divergence terminal (see
+            // `gapfill_would_self_elect`). The extra projection read is paid only
+            // on the narrow suspicious path — a non-canonical answer for an id a
+            // peer is advertising a declaration for.
+            Ok(Some(ref head))
+                if !head.canonical && peer_head_hints.contains_key(&id) && {
+                    // Read failure DEFERS (conservative): deferring writes
+                    // nothing and the next sweep retries, whereas guessing
+                    // "undeclared" and stamping is irreversible.
+                    let local_declared = pool.get().ok().and_then(|mut c| {
+                        crate::db::content_diesel::declared_head_for(&mut c, &app_ctx, &id).ok()
+                    });
+                    match local_declared {
+                        Some(d) => gapfill_would_self_elect(false, true, d.as_deref()),
+                        None => true,
+                    }
+                } =>
+            {
+                let peer = discovered_by
+                    .get(&id)
+                    .cloned()
+                    .unwrap_or_else(|| "unknown".to_string());
+                tracing::warn!(
+                    target: "elohim_storage::projection_reconcile",
+                    content_id = %id,
+                    discovered_via_peer = %peer,
+                    fallback_head = %head.head_action_hash,
+                    "projection-reconcile[content]: REFUSED to GapFill an undeclared row with \
+                     this node's own fallback root while a peer advertises a declaration — \
+                     deferred to the adopt-before-author arm"
+                );
+                tracker.mark_completed(&id);
+                adopt_candidates.push(id.clone());
+                crate::metrics::inc_projection_heal_outcome(
+                    "content",
+                    HealOutcomeKind::DeferredToAdopt.label(),
+                );
+            }
             Ok(Some(head)) => match heal_content_one(&head, pool, &app_ctx) {
                 Ok(crate::db::content_diesel::StampOutcome::Stamped) => {
                     tracker.mark_completed(&id);
@@ -2082,7 +2192,96 @@ async fn heal_content(
         healed,
         conductor_missing,
         ghost_candidates,
+        adopt_candidates,
     }
+}
+
+/// Run the adopt-before-author pre-flight over ids whose `GapFill` was refused by
+/// [`gapfill_would_self_elect`].
+///
+/// These rows are NOT reachable by either witness sweep — they are anchored (so
+/// the re-anchor sweep skips them) and conductor-resolvable (so the ghost sweep
+/// skips them). Without this arm, refusing the GapFill would only convert a
+/// terminal wrong answer into a terminal absent one. This is what actually
+/// converges them.
+///
+/// `LocalResolve::Known(None)` is exact, not a shortcut: the own conductor DID
+/// answer, but with a non-canonical fallback, so there is no canonical head to
+/// adopt locally — which is precisely what `Known(None)` states. The decision
+/// rule then sees `(canonical=false, peer=true, local=None)` → `AdoptPeer`.
+///
+/// Never authors. An `Author` verdict here means the peer's head could not be
+/// declared this sweep (no usable carried record yet); the row keeps its
+/// non-declaring anchor and the next sweep retries. `AuthorThenAdopt` cannot
+/// normally occur — the conductor answered, so it HAS a local chain — and is
+/// treated as a no-op rather than a licence to re-author outside the guarded
+/// sweeps.
+async fn adopt_deferred_heads(
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    candidates: &[String],
+    adopt: &crate::services::head_adoption::AdoptContext<'_>,
+) {
+    if candidates.is_empty() {
+        return;
+    }
+    let app_ctx = crate::db::AppContext::default_lamad();
+    let total = candidates.len();
+    let mut adopted = 0usize;
+    let mut held = 0usize;
+    let mut retry = 0usize;
+
+    let sweep = async {
+        for id in candidates.iter().take(WITNESS_MAX_PER_TICK as usize) {
+            match crate::services::head_adoption::try_adopt_canonical_head(
+                hc,
+                pool,
+                &app_ctx,
+                id,
+                crate::services::head_adoption::LocalResolve::Known(None),
+                adopt,
+            )
+            .await
+            {
+                crate::services::head_adoption::AdoptOutcome::Adopted => adopted += 1,
+                crate::services::head_adoption::AdoptOutcome::Held => held += 1,
+                crate::services::head_adoption::AdoptOutcome::Author => retry += 1,
+                crate::services::head_adoption::AdoptOutcome::AuthorThenAdopt { .. } => {
+                    retry += 1;
+                    tracing::warn!(
+                        content_id = %id,
+                        "projection-reconcile[adopt-deferred]: conductor reports no local chain \
+                         for an id it just resolved — not authoring here; retried next sweep"
+                    );
+                }
+            }
+            tokio::time::sleep(WITNESS_ITEM_DELAY).await;
+        }
+    };
+
+    if tokio::time::timeout(WITNESS_SWEEP_BUDGET, sweep)
+        .await
+        .is_err()
+    {
+        tracing::warn!(
+            target: "elohim_storage::projection_reconcile",
+            budget_secs = WITNESS_SWEEP_BUDGET.as_secs(),
+            candidates = total,
+            "projection-reconcile[adopt-deferred]: sweep exceeded wall-clock budget — \
+             abandoned, resumes next sweep"
+        );
+        return;
+    }
+
+    tracing::warn!(
+        target: "elohim_storage::projection_reconcile",
+        candidates = total,
+        adopted,
+        held,
+        retry,
+        "projection-reconcile[adopt-deferred]: adopted peer-declared heads for rows whose \
+         GapFill was refused as self-election"
+    );
 }
 
 /// Project ONE conductor-resolved content HEAD into local SQL via the VERIFIED
@@ -3046,6 +3245,69 @@ mod tests {
             !classify(Some(false)),
             "a FALLBACK answer still proves a local chain exists — not a ghost"
         );
+    }
+
+    /// The exact live trace the GapFill self-election guard exists to stop.
+    ///
+    /// Cross-root id NULL-anchored on peer B at boot → the re-anchor sweep
+    /// authors a non-declaring root (correct) → P2P comes up → discovery
+    /// classifies the id Divergent against peer A's anchor → `heal_content` runs
+    /// FIRST in `run_heal`, ahead of both pre-flight-guarded sweeps → B's
+    /// conductor cannot resolve A's canonical link across the gossip gap, so it
+    /// answers `canonical == false` with B's OWN fallback root.
+    ///
+    /// Without the guard, `GapFill` fills the undeclared row with B's own root
+    /// and the divergence becomes PERMANENT and QUIET: the row is anchored (so
+    /// the re-anchor sweep skips it), conductor-resolvable (so the ghost sweep
+    /// skips it), and `decide_head_action` answers `Hold` forever, with
+    /// `elohim_content_head_adopted_total` flat.
+    #[test]
+    fn gapfill_refuses_to_self_elect_over_a_peers_declaration() {
+        assert!(
+            gapfill_would_self_elect(
+                false, // own conductor answered with its own fallback root
+                true,  // peer A advertises a real declaration
+                None,  // this row carries no declaration yet
+            ),
+            "a non-canonical answer must NOT crown this node's own root on an \
+             undeclared row while a peer advertises a declaration — that write is \
+             terminal and removes the row from every adopt path"
+        );
+    }
+
+    #[test]
+    fn gapfill_is_unchanged_without_a_peer_hint() {
+        assert!(
+            !gapfill_would_self_elect(false, false, None),
+            "with no peer advertising a declaration there is no better claim to \
+             defer to — GapFill on an undeclared row stays exactly as it was"
+        );
+    }
+
+    #[test]
+    fn gapfill_guard_never_fires_on_a_canonical_answer() {
+        // A canonical answer carries real authority; HealCanonical semantics
+        // (fill / same-head refresh / provably-forward move) are untouched.
+        for peer in [false, true] {
+            for local in [None, Some("uhCkk-LOCAL")] {
+                assert!(
+                    !gapfill_would_self_elect(true, peer, local),
+                    "canonical answers keep HealCanonical behavior (peer={peer}, local={local:?})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn gapfill_guard_never_fires_on_an_already_declared_row() {
+        // GapFill already refuses to MOVE a declared row (SkippedDeclared), so
+        // there is nothing for this guard to protect and deferring would only
+        // lose the value-field refresh.
+        assert!(!gapfill_would_self_elect(
+            false,
+            true,
+            Some("uhCkk-ALREADY-DECLARED")
+        ));
     }
 
     #[test]

@@ -1416,6 +1416,21 @@ pub fn anchored_content_reaches_for_ids(
 /// `content_anchor_inventory_excludes_scoped_reach` test below.
 const DISTRIBUTION_SAFE_REACH: [&str; 3] = ["community", "public", "commons"];
 
+/// True when `reach` may cross a peer boundary.
+///
+/// The Rust-side twin of the `reach.eq_any(DISTRIBUTION_SAFE_REACH)` SQL filter
+/// in [`list_content_anchor_inventory`], for cross-peer surfaces that resolve a
+/// row by id rather than by query — currently the `ContentHeadRecord`
+/// view-federation responder, which serves an action hash plus full serialized
+/// DHT `Record` bytes and so carries exactly the same obligation.
+///
+/// Deliberately reads the SAME constant rather than restating the tiers: two
+/// copies of a reach whitelist is precisely how a scoped tier eventually leaks
+/// out of one of them.
+pub fn is_distribution_safe_reach(reach: &str) -> bool {
+    DISTRIBUTION_SAFE_REACH.contains(&reach)
+}
+
 /// `(id, dht_anchor_hash)` pairs for the CROSS-PEER content-anchor inventory
 /// (notary-authority Leg 4 — the cross-peer reconcile arm).
 ///
