@@ -6020,7 +6020,17 @@ impl HttpServer {
                     (true, Some(hc)) => {
                         services
                             .content
-                            .update_via_conductor(&hc, content_id, view)
+                            // DECLARE: this is a request-borne re-notarization —
+                            // a deploy PATCHing {blobHash, reach} IS the
+                            // head-declaration act, and it must keep moving the
+                            // head deliberately. The heal-class re-author sweeps
+                            // preserve instead; see `HeadElection`.
+                            .update_via_conductor(
+                                &hc,
+                                content_id,
+                                view,
+                                db::content_diesel::HeadElection::Declare,
+                            )
                             .await
                     }
                     (true, None) => {

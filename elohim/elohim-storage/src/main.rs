@@ -1933,12 +1933,21 @@ async fn async_main(
                         );
                         let cfg =
                             elohim_storage::services::reanchor_backfill::ReanchorConfig::default();
+                        // The BOOT pass runs before P2P discovery, so the
+                        // adopt-before-author pre-flight has no peer hints and no
+                        // transport to fetch a head Record with. That degrades it
+                        // to the local-DHT arm alone — which is the arm that
+                        // matters here, since a restarting peer's own conductor is
+                        // exactly what may already hold the canonical head this
+                        // sweep was about to re-author over.
+                        let adopt = elohim_storage::services::head_adoption::AdoptContext::none();
                         match elohim_storage::services::reanchor_backfill::run_once(
                             &pool,
                             &content_service,
                             &hc,
                             &reanchor_state,
                             &cfg,
+                            &adopt,
                         )
                         .await
                         {
@@ -1947,6 +1956,8 @@ async fn async_main(
                                     candidates = report.candidates,
                                     reanchored = report.reanchored,
                                     already_anchored = report.already_anchored,
+                                    adopted = report.adopted,
+                                    held = report.held,
                                     failed = report.failed,
                                     remaining = report.remaining,
                                     "reanchor_backfill: cold-seed recovery sweep done"
@@ -2276,6 +2287,15 @@ async fn async_main(
 
         // Create P2P node with blob store access
         let mut p2p_node = P2PNode::new(identity, p2p_config, blob_store.clone()).await?;
+
+        // Adopt-before-author, responder half: this node must be able to serve a
+        // peer the serialized head Record behind its declared head, so the peer
+        // can declare a head its own conductor cannot retrieve. `lamad_client()`
+        // is interior-mutable, so a bridge that connects LATE is picked up here
+        // without re-plumbing.
+        if let Some(registry) = hc_registry_for_http.as_ref() {
+            p2p_node = p2p_node.with_hc_registry(registry.clone());
+        }
 
         // Wire DB pool for EPR Head resolution (if content DB is available).
         // Reuses the shared process-wide pool.
@@ -2612,7 +2632,7 @@ async fn async_main(
         // into a unified handle. View-fed responses are verifiable by
         // the receiver against the agent CID's public key (which is
         // the same ed25519 key in both transport modes).
-        let view_fed_service = Arc::new(ViewFedService::new(
+        let mut view_fed_service_inner = ViewFedService::new(
             iroh_node_id_str.clone(),
             iroh_node_id_str.clone(),
             view_fed_signer,
@@ -2621,7 +2641,14 @@ async fn async_main(
             } else {
                 None
             },
-        ));
+        );
+        // Adopt-before-author, responder half on the iroh stack — parity with the
+        // libp2p node's `with_hc_registry` above, so the same request gets the
+        // same answer whichever transport carried it.
+        if let Some(registry) = hc_registry_for_http.as_ref() {
+            view_fed_service_inner = view_fed_service_inner.with_hc_registry(registry.clone());
+        }
+        let view_fed_service = Arc::new(view_fed_service_inner);
         let view_fed_backend: Arc<dyn elohim_storage::p2p_iroh::ViewFederationBackend> = Arc::new(
             ViewFedServiceBackend::new(view_fed_service, iroh_node_id_str.clone()),
         );
@@ -3951,6 +3978,12 @@ async fn async_main(
                                             let heal_pool = pool.clone();
                                             let heal_state = state.clone();
                                             let heal_provide = provide_for_reconcile.clone();
+                                            // The heal leg's adopt-before-author
+                                            // pre-flight fetches head Records from
+                                            // the peers that advertised a
+                                            // declaration, so it needs the same
+                                            // handle discovery just used.
+                                            let heal_p2p = handle.clone();
                                             let flag = heal_inflight.clone();
                                             tokio::spawn(async move {
                                                 // RAII release: the guard's Drop
@@ -3969,6 +4002,7 @@ async fn async_main(
                                                     &heal_pool,
                                                     &heal_state,
                                                     &heal_provide,
+                                                    &heal_p2p,
                                                 )
                                                 .await;
                                             });

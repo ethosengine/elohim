@@ -64,6 +64,7 @@ pub mod genesis_self_heal; // OPERATOR-AUTHORIZED genesis bootstrap — self-hea
 pub mod gossip_flood;
 pub mod governance_health;
 pub mod hazard;
+pub mod head_adoption; // adopt-before-author — consult the substrate for an existing canonical head BEFORE minting a local root
 pub mod holochain_humans_replayer;
 pub mod household_backfill;
 pub mod household_resilience;

@@ -35,6 +35,7 @@ use std::time::Duration;
 
 use crate::db::DbPool;
 use crate::generated_enums::{ALL_CONTENT_TYPES, CORE_REACH_LEVELS};
+use crate::services::head_adoption::{AdoptContext, AdoptOutcome};
 use crate::services::provide_loop_status::ProvideLoopState;
 use crate::services::ContentService;
 use crate::StorageError;
@@ -90,6 +91,11 @@ pub struct ReanchorReport {
     pub already_anchored: usize,
     /// Rows that errored re-authoring (non-fatal, retried next boot).
     pub failed: usize,
+    /// Rows where the adopt-before-author pre-flight found an existing canonical
+    /// head and ADOPTED it instead of minting a competing local root.
+    pub adopted: usize,
+    /// Rows the pre-flight left alone because they already carry a declaration.
+    pub held: usize,
     /// Rows skipped because their stored reach is non-canonical — not
     /// re-authorable (the DNA rejects it), so re-attempting would fail
     /// every sweep and saturate the conductor. Fix via the seed data.
@@ -139,6 +145,16 @@ pub(crate) enum RowOutcome {
     SkippedNonCanonicalContentType,
     /// Genuine, retryable failure — healed on a future boot's sweep.
     Failed,
+    /// The adopt-before-author pre-flight found a canonical head already
+    /// declared for this id (on the own conductor, or advertised by a peer and
+    /// then declared through the own conductor), so NO local root was minted.
+    /// The whole point of the pre-flight — counted apart from `reanchored` so
+    /// "how much did we stop re-authoring" is directly readable.
+    Adopted,
+    /// The pre-flight held: this row already carries a declaration and nothing
+    /// provably supersedes it. Neither adopted nor authored; the canonical
+    /// channels own it.
+    Held,
 }
 
 impl ReanchorReport {
@@ -150,6 +166,8 @@ impl ReanchorReport {
             RowOutcome::SkippedNonCanonicalReach => self.skipped += 1,
             RowOutcome::SkippedNonCanonicalContentType => self.skipped += 1,
             RowOutcome::Failed => self.failed += 1,
+            RowOutcome::Adopted => self.adopted += 1,
+            RowOutcome::Held => self.held += 1,
         }
     }
 }
@@ -183,12 +201,19 @@ pub(crate) fn decide_outcome(
 /// Returns the sweep report and publishes it to `state` for `/p2p/status`.
 /// Soft-fail throughout: a single row's failure is logged and counted, never
 /// propagated — the goal is to heal as many rows as the conductor will accept.
+/// `adopt` carries the peer-advertised declarations (and the transport to fetch
+/// a head `Record` with) for the adopt-before-author pre-flight. The one-shot
+/// BOOT pass passes [`AdoptContext::none`] — it runs before P2P discovery, so
+/// only the local-DHT arm can fire; the sweep-driven caller
+/// (`p2p::projection_reconcile::witness_bootstrap`) passes the hints its
+/// inventory diff just collected.
 pub async fn run_once(
     pool: &DbPool,
     content_service: &ContentService,
     hc: &Arc<crate::hc_client::HcClient>,
     state: &ProvideLoopState,
     cfg: &ReanchorConfig,
+    adopt: &AdoptContext<'_>,
 ) -> Result<ReanchorReport, StorageError> {
     let app_ctx = crate::db::AppContext::default_lamad();
 
@@ -250,6 +275,39 @@ pub async fn run_once(
             );
             continue;
         }
+        // ADOPT-BEFORE-AUTHOR PRE-FLIGHT. Before minting a root for this id, ask
+        // the substrate whether one is already crowned. `Probe` because this
+        // sweep has NOT paid for a resolve (unlike the ghost sweep, which
+        // classifies its candidates from exactly that answer).
+        let preflight = crate::services::head_adoption::try_adopt_canonical_head(
+            hc,
+            pool,
+            &app_ctx,
+            id,
+            crate::services::head_adoption::LocalResolve::Probe,
+            adopt,
+        )
+        .await;
+        let pending_adopt = match preflight {
+            AdoptOutcome::Adopted => {
+                report.record(RowOutcome::Adopted);
+                continue;
+            }
+            AdoptOutcome::Held => {
+                report.record(RowOutcome::Held);
+                continue;
+            }
+            AdoptOutcome::Author => None,
+            // The peer's head is adoptable but this conductor has no local chain
+            // to hang the declaration on. Author first (non-declaring), then
+            // finish the adoption below.
+            AdoptOutcome::AuthorThenAdopt {
+                head_action_hash,
+                carried_record,
+                peer_id,
+            } => Some((head_action_hash, carried_record, peer_id)),
+        };
+
         // Empty patch → for a NULL-anchor row, update_via_conductor takes the
         // bootstrap branch: re-publishes the full entry from the existing SQL
         // row via create_content and projects dht_anchor_hash.
@@ -266,7 +324,15 @@ pub async fn run_once(
             p2p_published_at: None,
         };
         let reauthor = content_service
-            .update_via_conductor(hc, id, empty_patch)
+            // PRESERVE: re-authoring is a heal, not a declaration. Before this,
+            // every boot's sweep crowned its own fresh root and silently
+            // un-adopted whatever canonical head this peer had converged on.
+            .update_via_conductor(
+                hc,
+                id,
+                empty_patch,
+                crate::db::content_diesel::HeadElection::PreserveExistingDeclaration,
+            )
             .await
             .map(|_| ());
 
@@ -280,12 +346,42 @@ pub async fn run_once(
         // conductor read for the already-exists class — genuine errors skip it
         // and retry next boot.
         let recovery = if matches!(&reauthor, Err(e) if is_already_anchored_error(e)) {
-            Some(content_service.project_existing_anchor(hc, id).await)
+            Some(
+                content_service
+                    .project_existing_anchor(
+                        hc,
+                        id,
+                        crate::db::content_diesel::HeadElection::PreserveExistingDeclaration,
+                    )
+                    .await,
+            )
         } else {
             None
         };
 
-        let outcome = decide_outcome(&reauthor, recovery.as_ref());
+        let mut outcome = decide_outcome(&reauthor, recovery.as_ref());
+
+        // AUTHOR-THEN-ADOPT, second half. The conductor now has a local chain for
+        // this id, so the declaration it refused a moment ago can land. A failure
+        // here is non-fatal by design: the row stays anchored-and-undeclared,
+        // which the next sweep's pre-flight picks straight back up.
+        if let Some((head_action_hash, carried_record, peer_id)) = pending_adopt {
+            if outcome != RowOutcome::Failed {
+                let finished = crate::services::head_adoption::finish_author_then_adopt(
+                    hc,
+                    pool,
+                    &app_ctx,
+                    id,
+                    &head_action_hash,
+                    carried_record,
+                    &peer_id,
+                )
+                .await;
+                if finished == AdoptOutcome::Adopted {
+                    outcome = RowOutcome::Adopted;
+                }
+            }
+        }
         if outcome == RowOutcome::Failed {
             tracing::warn!(
                 content_id = %id,
@@ -313,12 +409,13 @@ pub async fn run_once(
         crate::db::content_diesel::count_unanchored_content(&mut conn, &app_ctx)? as usize
     };
 
-    // `completed` = rows brought to the anchored state this sweep. Both fresh
-    // re-authors AND already-anchored recoveries are healed rows, so both count
-    // toward progress; `remaining` (recounted above) already excludes them.
+    // `completed` = rows brought to a settled state this sweep. Fresh re-authors,
+    // already-anchored recoveries, ADOPTED heads and HELD rows are all rows that
+    // no longer need this sweep's attention, so all four count toward progress;
+    // `remaining` (recounted above) already excludes the anchored ones.
     state
         .publish_reanchor_sweep(
-            report.reanchored + report.already_anchored,
+            report.reanchored + report.already_anchored + report.adopted + report.held,
             report.failed,
             report.remaining,
         )
@@ -327,6 +424,8 @@ pub async fn run_once(
     tracing::info!(
         reanchored = report.reanchored,
         already_anchored = report.already_anchored,
+        adopted = report.adopted,
+        held = report.held,
         failed = report.failed,
         remaining = report.remaining,
         "reanchor_backfill: sweep complete"

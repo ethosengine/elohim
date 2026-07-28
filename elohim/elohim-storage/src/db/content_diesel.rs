@@ -796,6 +796,39 @@ fn apply_content_patch_fields(
     Ok(())
 }
 
+/// Whether an own-conductor anchor projection also ELECTS the row's
+/// notary-declared head.
+///
+/// The two acts were fused (every commit crowned itself); splitting them is the
+/// substrate half of adopt-before-author. Callers pick explicitly — this is
+/// deliberately NOT inferable from the row, because "the row already has a
+/// declaration" is true both for a head this peer legitimately adopted and for
+/// one it wrongly self-elected on a previous boot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeadElection {
+    /// Deliberate, request-borne (or otherwise authority-bearing) write: the
+    /// committed action BECOMES the declared head. `declared_head_at` is NULLed
+    /// alongside it because a commit signal carries no declaration `Timestamp`,
+    /// and a stale ordering left over from a prior declaration would misorder
+    /// every later heal-monotonicity check (the next timestamped declare
+    /// restores it).
+    ///
+    /// Reserved for channels whose whole job is to MOVE the head: the HTTP
+    /// re-notarize PATCH, and the declare routes' own eager stamps.
+    Declare,
+    /// Heal-class write: stamp the ANCHOR, leave the DECLARATION exactly as it
+    /// was — including leaving it ABSENT. A row with no declaration stays
+    /// undeclared (a self-authored root is not an election, so any later
+    /// canonical declaration wins outright); a row that already carries one
+    /// keeps BOTH `declared_head_action_hash` and `declared_head_at` untouched.
+    ///
+    /// Every re-author path uses this: the boot re-anchor sweep, the ghost-anchor
+    /// witness, and the `ContentCommitted` projection those sweeps trigger. Without
+    /// the last one the fix would be cosmetic — the async signal would re-crown the
+    /// row moments after the eager write preserved it.
+    PreserveExistingDeclaration,
+}
+
 /// Upsert a content row with a DHT anchor hash. Used by the post-commit
 /// signal handler in rea_projection to project ContentCommitted signals
 /// from the lamad DNA into local SQL.
@@ -816,21 +849,36 @@ fn apply_content_patch_fields(
 /// even on the update branch, so re-projection after entry-update
 /// (post update_content zome fn) advances the anchor to the new ActionHash.
 ///
-/// HEAD-election rule (author-only auto-declare, Plan C3): every `ContentCommitted`
-/// also advances `declared_head_action_hash` to the committed action. In the
-/// single-author model the author's latest commit IS the declared HEAD, and this
-/// path fires ONLY for own-conductor-witnessed commits (the authoring conductor
-/// emits `ContentCommitted` only for locally-authored commits), so writing the
-/// notary-declared HEAD here is authorized by construction. Thus both
-/// `dht_anchor_hash` AND `declared_head_action_hash` are set to the passed action.
-/// The reconcile leg's verified-stamp entrypoint is [`stamp_declared_head`]; the
-/// HEAD is NEVER written from CRDT/gossip input.
+/// HEAD-election rule: an own-conductor commit is NOT automatically a
+/// declaration — the caller elects, via [`HeadElection`].
+///
+/// ## Why this is a parameter and not a rule (the adopt-before-author fix)
+///
+/// This path used to ALWAYS self-declare: every own-conductor commit set
+/// `declared_head_action_hash = dht_anchor_hash` and NULLed `declared_head_at`.
+/// The justification was a "single-author model" — the author's latest commit
+/// IS the head. That justification is FALSE for cross-root ids: two peers can
+/// each hold a root for `elohim-host-landing`, and each restart's re-anchor /
+/// ghost-witness sweep re-authored a fresh root and immediately crowned it,
+/// clobbering a canonical head the peer had already adopted. The peer could
+/// never converge because its own heal loop kept re-electing itself.
+///
+/// The cure is to make authoring and declaring separate acts. A heal-class
+/// author (re-anchor, ghost witness, projection of a commit those sweeps
+/// caused) stamps the ANCHOR only and leaves the declaration alone; a
+/// deliberate, request-borne channel declares. Which one applies is decided
+/// EXPLICITLY at the call site — never inferred from row state, because the row
+/// state is exactly what the bug corrupted.
+///
+/// The reconcile leg's verified-stamp entrypoint stays [`stamp_declared_head`];
+/// the HEAD is NEVER written from CRDT/gossip input on any election.
 pub fn upsert_with_anchor(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     id: &str,
     patch: ContentProjectionPatch,
     dht_anchor_hash: &str,
+    election: HeadElection,
 ) -> Result<(), StorageError> {
     use diesel::dsl::sql;
     use diesel::sql_types::Text;
@@ -850,26 +898,41 @@ pub fn upsert_with_anchor(
         // wrapped in the same transaction by the caller (the signal handler
         // takes a pooled connection; this fn runs inside a single statement
         // sequence).
-        diesel::update(
-            content::table
-                .filter(content::h_app_id.eq(&ctx.h_app_id))
-                .filter(content::id.eq(id)),
-        )
-        .set((
-            content::dht_anchor_hash.eq(dht_anchor_hash),
-            // HEAD-election rule: an own-conductor-witnessed commit advances the
-            // notary-declared HEAD to the committed action (see the invariant doc
-            // above). Author-only auto-declare — set alongside the anchor. The
-            // commit signal carries no declaration Timestamp, so the stored
-            // ordering is NULLed with it: a stale `declared_head_at` left over
-            // from a prior declaration would misorder every later
-            // heal-monotonicity check (the next timestamped declare restores it).
-            content::declared_head_action_hash.eq(dht_anchor_hash),
-            content::declared_head_at.eq(None::<i64>),
-            content::updated_at.eq(sql::<Text>("CURRENT_TIMESTAMP")),
-        ))
-        .execute(conn)
-        .map_err(|e| StorageError::Internal(format!("Update anchor failed: {}", e)))?;
+        //
+        // Two SET shapes rather than one dynamic clause: `PreserveExistingDeclaration`
+        // must not NAME the declaration columns at all, so an in-flight declare
+        // landing between these statements can never be clobbered by a stale value
+        // this heal read a moment ago.
+        match election {
+            HeadElection::Declare => {
+                diesel::update(
+                    content::table
+                        .filter(content::h_app_id.eq(&ctx.h_app_id))
+                        .filter(content::id.eq(id)),
+                )
+                .set((
+                    content::dht_anchor_hash.eq(dht_anchor_hash),
+                    content::declared_head_action_hash.eq(dht_anchor_hash),
+                    content::declared_head_at.eq(None::<i64>),
+                    content::updated_at.eq(sql::<Text>("CURRENT_TIMESTAMP")),
+                ))
+                .execute(conn)
+                .map_err(|e| StorageError::Internal(format!("Update anchor failed: {}", e)))?;
+            }
+            HeadElection::PreserveExistingDeclaration => {
+                diesel::update(
+                    content::table
+                        .filter(content::h_app_id.eq(&ctx.h_app_id))
+                        .filter(content::id.eq(id)),
+                )
+                .set((
+                    content::dht_anchor_hash.eq(dht_anchor_hash),
+                    content::updated_at.eq(sql::<Text>("CURRENT_TIMESTAMP")),
+                ))
+                .execute(conn)
+                .map_err(|e| StorageError::Internal(format!("Update anchor failed: {}", e)))?;
+            }
+        }
 
         apply_content_patch_fields(conn, ctx, id, &patch)?;
     } else {
@@ -908,23 +971,86 @@ pub fn upsert_with_anchor(
             .execute(conn)
             .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
 
-        // Set anchor + notary-declared HEAD on the just-inserted row (author-only
-        // auto-declare — this defensive insert path is still an own-conductor
-        // ContentCommitted projection, so the HEAD election applies).
-        diesel::update(
-            content::table
-                .filter(content::h_app_id.eq(&ctx.h_app_id))
-                .filter(content::id.eq(id)),
-        )
-        .set((
-            content::dht_anchor_hash.eq(dht_anchor_hash),
-            content::declared_head_action_hash.eq(dht_anchor_hash),
-        ))
-        .execute(conn)
-        .map_err(|e| StorageError::Internal(format!("Set anchor on insert failed: {}", e)))?;
+        // Set the anchor on the just-inserted row, and the declared HEAD only
+        // when the caller's election says so. A freshly-inserted row has no
+        // declaration to preserve, but `PreserveExistingDeclaration` still
+        // leaves it UNDECLARED on purpose: an anchor this node authored during
+        // a heal is not an election, and leaving the slot empty is what lets a
+        // later canonical declaration win outright instead of being refused as
+        // "row already declared".
+        match election {
+            HeadElection::Declare => {
+                diesel::update(
+                    content::table
+                        .filter(content::h_app_id.eq(&ctx.h_app_id))
+                        .filter(content::id.eq(id)),
+                )
+                .set((
+                    content::dht_anchor_hash.eq(dht_anchor_hash),
+                    content::declared_head_action_hash.eq(dht_anchor_hash),
+                ))
+                .execute(conn)
+                .map_err(|e| {
+                    StorageError::Internal(format!("Set anchor on insert failed: {}", e))
+                })?;
+            }
+            HeadElection::PreserveExistingDeclaration => {
+                diesel::update(
+                    content::table
+                        .filter(content::h_app_id.eq(&ctx.h_app_id))
+                        .filter(content::id.eq(id)),
+                )
+                .set(content::dht_anchor_hash.eq(dht_anchor_hash))
+                .execute(conn)
+                .map_err(|e| {
+                    StorageError::Internal(format!("Set anchor on insert failed: {}", e))
+                })?;
+            }
+        }
     }
 
     Ok(())
+}
+
+/// One row of the cross-peer content anchor inventory (see
+/// [`list_content_anchor_inventory`]). Named rather than a 4-tuple because the
+/// anchor and the declaration are semantically different claims that read
+/// identically as `String`s — a positional swap between them would be a silent
+/// authority bug, not a compile error.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContentAnchorInventoryRow {
+    pub id: String,
+    /// "the action my projection last saw" — never empty here (the query filters
+    /// `IS NOT NULL`), though `""` is admitted as a legal non-divergent value.
+    pub dht_anchor_hash: String,
+    /// "the action a canonical channel elected", when this peer has one.
+    /// `None` on a peer that has only ever anchored, never declared.
+    pub declared_head_action_hash: Option<String>,
+    /// Ordering the declaration carried. NOT comparable across peers — see
+    /// `ProjectionInventoryEntry::declared_head_at`.
+    pub declared_head_at: Option<i64>,
+}
+
+/// Read the notary-declared HEAD this row currently carries, if any.
+///
+/// `Ok(None)` covers BOTH "no such row" and "row exists but is undeclared" —
+/// the adopt-before-author decision treats them identically (nothing local to
+/// preserve), so collapsing them keeps the caller's rule a pure three-input
+/// function instead of a four-state one.
+pub fn declared_head_for(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+) -> Result<Option<String>, StorageError> {
+    let found: Option<Option<String>> = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::id.eq(id))
+        .select(content::declared_head_action_hash)
+        .first::<Option<String>>(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("declared head lookup failed: {e}")))?;
+    // An empty-string declaration is a corrupt write, not a declaration.
+    Ok(found.flatten().filter(|h| !h.trim().is_empty()))
 }
 
 /// Stamp the notary-declared HEAD onto an EXISTING content row — the reconcile
@@ -1317,13 +1443,16 @@ const DISTRIBUTION_SAFE_REACH: [&str; 3] = ["community", "public", "commons"];
 /// writes into its own projection comes EXCLUSIVELY from its OWN conductor
 /// (`content_store::resolve_content_head`), never from the advertised pair. Peer
 /// bytes are never laundered into notary provenance — the same P1 discipline as
-/// `rea_commitments::inventory_for_reconcile`.
+/// `rea_commitments::inventory_for_reconcile`. The `declared_head_*` columns
+/// this now also carries are subject to the SAME rule with no exception: they
+/// are a HINT that a peer HAS a declaration, which triggers a verified
+/// conductor-side declare — never a value stamped into a row.
 pub fn list_content_anchor_inventory(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     offset: i64,
     cap: i64,
-) -> Result<(Vec<(String, String)>, i64), StorageError> {
+) -> Result<(Vec<ContentAnchorInventoryRow>, i64), StorageError> {
     // Honest total: the TRUE count of anchored + distribution-safe rows (the same
     // predicates the page query below filters on), NOT the served page length.
     // A responder that reports served-count as total makes truncation invisible on
@@ -1339,14 +1468,20 @@ pub fn list_content_anchor_inventory(
             StorageError::Internal(format!("content anchor inventory count failed: {e}"))
         })?;
 
-    let rows: Vec<(String, Option<String>)> = content::table
+    type InventoryTuple = (String, Option<String>, Option<String>, Option<i64>);
+    let rows: Vec<InventoryTuple> = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::dht_anchor_hash.is_not_null())
         .filter(content::reach.eq_any(DISTRIBUTION_SAFE_REACH))
         .order((content::updated_at.desc(), content::id.asc()))
         .offset(offset.max(0))
         .limit(cap)
-        .select((content::id, content::dht_anchor_hash))
+        .select((
+            content::id,
+            content::dht_anchor_hash,
+            content::declared_head_action_hash,
+            content::declared_head_at,
+        ))
         .load(conn)
         .map_err(|e| {
             StorageError::Internal(format!("content anchor inventory load failed: {e}"))
@@ -1357,7 +1492,16 @@ pub fn list_content_anchor_inventory(
     // as-is — the consumer's diff treats an empty peer anchor as non-divergence.
     let entries = rows
         .into_iter()
-        .filter_map(|(id, anchor)| anchor.map(|a| (id, a)))
+        .filter_map(|(id, anchor, declared_head, declared_at)| {
+            anchor.map(|dht_anchor_hash| ContentAnchorInventoryRow {
+                id,
+                dht_anchor_hash,
+                // An empty-string declaration is a corrupt write, not a
+                // declaration — never advertise one as a hint.
+                declared_head_action_hash: declared_head.filter(|h| !h.trim().is_empty()),
+                declared_head_at: declared_at,
+            })
+        })
         .collect();
     Ok((entries, total))
 }
@@ -1959,7 +2103,7 @@ mod tests {
         .unwrap();
 
         let (inv, total) = list_content_anchor_inventory(&mut conn, &ctx, 0, i64::MAX).unwrap();
-        let ids: Vec<&str> = inv.iter().map(|(id, _)| id.as_str()).collect();
+        let ids: Vec<&str> = inv.iter().map(|r| r.id.as_str()).collect();
 
         // Exactly the three anchored distribution-safe rows, ordered updated_at
         // DESC (hot set first) — the reconcile-hot ordering, not id-asc.
@@ -1971,7 +2115,8 @@ mod tests {
         // Honest total counts exactly the anchored distribution-safe rows.
         assert_eq!(total, 3, "total counts the anchored distribution-safe rows");
         // Anchor value carried through verbatim (discovery pair).
-        let map: std::collections::HashMap<String, String> = inv.into_iter().collect();
+        let map: std::collections::HashMap<String, String> =
+            inv.into_iter().map(|r| (r.id, r.dht_anchor_hash)).collect();
         assert_eq!(map.get("c:public").map(String::as_str), Some("anc-public"));
         // Scoped-tier ids must NEVER appear in a cross-peer inventory.
         assert!(!map.contains_key("c:private"));
@@ -1985,7 +2130,7 @@ mod tests {
         // but the honest `total` still reports the full 3 so truncation is
         // visible on the wire (the structural non-convergence fix).
         let (capped, capped_total) = list_content_anchor_inventory(&mut conn, &ctx, 0, 2).unwrap();
-        let capped_ids: Vec<&str> = capped.iter().map(|(id, _)| id.as_str()).collect();
+        let capped_ids: Vec<&str> = capped.iter().map(|r| r.id.as_str()).collect();
         assert_eq!(
             capped_ids,
             vec!["c:public", "c:community"],
@@ -2001,7 +2146,7 @@ mod tests {
         // corpus, not just the perpetual hot set.
         let (windowed, windowed_total) =
             list_content_anchor_inventory(&mut conn, &ctx, 2, 2).unwrap();
-        let windowed_ids: Vec<&str> = windowed.iter().map(|(id, _)| id.as_str()).collect();
+        let windowed_ids: Vec<&str> = windowed.iter().map(|r| r.id.as_str()).collect();
         assert_eq!(
             windowed_ids,
             vec!["c:commons"],
@@ -2048,7 +2193,7 @@ mod tests {
         }
 
         let (inv, _total) = list_content_anchor_inventory(&mut conn, &ctx, 0, i64::MAX).unwrap();
-        let ids: Vec<&str> = inv.iter().map(|(id, _)| id.as_str()).collect();
+        let ids: Vec<&str> = inv.iter().map(|r| r.id.as_str()).collect();
         assert_eq!(
             ids,
             vec!["c:alpha", "c:mid", "c:zeta"],
@@ -3034,9 +3179,10 @@ mod tests {
         }
     }
 
-    /// HEAD-election (i): `upsert_with_anchor` (the own-conductor `ContentCommitted`
-    /// projection) now advances `declared_head_action_hash` to the committed action
-    /// alongside `dht_anchor_hash` — author-only auto-declare.
+    /// HEAD-election (i), `Declare` mode: unchanged behavior — the committed
+    /// action advances `declared_head_action_hash` alongside `dht_anchor_hash`.
+    /// This is the regression guard for the DELIBERATE channels (the HTTP
+    /// re-notarize PATCH); the adopt-before-author fix must not disarm them.
     #[test]
     fn upsert_with_anchor_sets_declared_head() {
         let mut conn = setup_test_db();
@@ -3060,6 +3206,7 @@ mod tests {
                 ..Default::default()
             },
             "uhCkk-head-action-1",
+            HeadElection::Declare,
         )
         .unwrap();
 
@@ -3070,9 +3217,181 @@ mod tests {
         assert_eq!(
             row.declared_head_action_hash.as_deref(),
             Some("uhCkk-head-action-1"),
-            "upsert_with_anchor must advance declared_head_action_hash to the committed action"
+            "Declare mode must advance declared_head_action_hash to the committed action"
         );
         assert_eq!(row.title, "Head v2", "patch value field still applied");
+    }
+
+    /// Adopt-before-author (a): `PreserveExistingDeclaration` on a row that
+    /// ALREADY carries a declaration stamps the anchor and leaves BOTH
+    /// declaration columns untouched.
+    ///
+    /// This is the exact shape of the live defect: peer B had adopted alpha-A's
+    /// canonical head for `elohim-host-landing`, then its own restart sweep
+    /// re-authored a local root and the projection crowned that root — silently
+    /// un-adopting A's head. The anchor may move (that IS what the sweep
+    /// healed); the crown may not.
+    #[test]
+    fn preserve_election_leaves_an_existing_declaration_untouched() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let id = "elohim-host-landing";
+
+        create_content(&mut conn, &ctx, mk_plain(id)).unwrap();
+        // Peer B adopted alpha-A's canonical head, ordering and all.
+        stamp_declared_head(
+            &mut conn,
+            &ctx,
+            id,
+            "uhCkk-ALPHA-A-CANONICAL",
+            Some(1_753_000_000_000_000),
+            None,
+        )
+        .unwrap();
+
+        // A restart's re-anchor sweep re-authors a LOCAL root.
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            id,
+            ContentProjectionPatch {
+                title: Some("Re-authored on boot".to_string()),
+                ..Default::default()
+            },
+            "uhCkk-LOCAL-REAUTHORED-ROOT",
+            HeadElection::PreserveExistingDeclaration,
+        )
+        .unwrap();
+
+        let row = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.dht_anchor_hash.as_deref(),
+            Some("uhCkk-LOCAL-REAUTHORED-ROOT"),
+            "the anchor still advances — the row IS now witnessed locally"
+        );
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-ALPHA-A-CANONICAL"),
+            "the adopted canonical head must survive a local re-author"
+        );
+        assert_eq!(
+            row.declared_head_at,
+            Some(1_753_000_000_000_000),
+            "declaration ORDERING must survive too — NULLing it silently disarms \
+             every later heal-monotonicity check"
+        );
+        assert_eq!(row.title, "Re-authored on boot", "value fields still patch");
+    }
+
+    /// Adopt-before-author (b): `PreserveExistingDeclaration` on an UNDECLARED
+    /// row stamps the anchor and leaves the row still undeclared.
+    ///
+    /// Deliberate: a self-authored root is not an election. Leaving the crown
+    /// empty is what lets a later canonical declaration win OUTRIGHT rather than
+    /// being refused as "row already declared" (`StampOutcome::SkippedDeclared`).
+    #[test]
+    fn preserve_election_does_not_create_a_declaration() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let id = "cid-fresh-heal";
+
+        create_content(&mut conn, &ctx, mk_plain(id)).unwrap();
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            id,
+            ContentProjectionPatch::default(),
+            "uhCkk-HEAL-AUTHORED",
+            HeadElection::PreserveExistingDeclaration,
+        )
+        .unwrap();
+
+        let row = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.dht_anchor_hash.as_deref(),
+            Some("uhCkk-HEAL-AUTHORED"),
+            "anchor stamped — the row reaches trust=green (which gates on the \
+             ANCHOR, not the declaration)"
+        );
+        assert!(
+            row.declared_head_action_hash.is_none(),
+            "a heal-class author must NOT crown itself"
+        );
+        assert!(row.declared_head_at.is_none());
+
+        // And the defensive INSERT branch behaves identically.
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "cid-never-seeded",
+            ContentProjectionPatch {
+                title: Some("Authored on a peer that never seeded".to_string()),
+                ..Default::default()
+            },
+            "uhCkk-INSERTED",
+            HeadElection::PreserveExistingDeclaration,
+        )
+        .unwrap();
+        let inserted = get_content(&mut conn, &ctx, "cid-never-seeded", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(inserted.dht_anchor_hash.as_deref(), Some("uhCkk-INSERTED"));
+        assert!(
+            inserted.declared_head_action_hash.is_none(),
+            "the insert branch must respect the election too — it is the same \
+             heal-class write on a row that simply did not exist yet"
+        );
+    }
+
+    /// The inventory a peer advertises carries its DECLARATION alongside its
+    /// anchor, and never advertises an empty-string declaration as a hint.
+    #[test]
+    fn anchor_inventory_advertises_the_declaration() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        let mut declared = mk_plain("cid-declared");
+        declared.dht_anchor_hash = Some("uhCkk-anchor".to_string());
+        create_content(&mut conn, &ctx, declared).unwrap();
+        stamp_declared_head(
+            &mut conn,
+            &ctx,
+            "cid-declared",
+            "uhCkk-CANONICAL",
+            Some(1_753_000_000_000_000),
+            None,
+        )
+        .unwrap();
+
+        let mut anchored_only = mk_plain("cid-anchored-only");
+        anchored_only.dht_anchor_hash = Some("uhCkk-anchor-2".to_string());
+        create_content(&mut conn, &ctx, anchored_only).unwrap();
+
+        let (rows, _total) = list_content_anchor_inventory(&mut conn, &ctx, 0, 100).unwrap();
+
+        let declared_row = rows
+            .iter()
+            .find(|r| r.id == "cid-declared")
+            .expect("declared row advertised");
+        assert_eq!(
+            declared_row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-CANONICAL"),
+            "a peer must advertise its declaration so a restarting peer can ADOPT it"
+        );
+        assert_eq!(declared_row.declared_head_at, Some(1_753_000_000_000_000));
+
+        let plain_row = rows
+            .iter()
+            .find(|r| r.id == "cid-anchored-only")
+            .expect("anchored-only row advertised");
+        assert!(
+            plain_row.declared_head_action_hash.is_none(),
+            "anchored-but-undeclared advertises no hint — it has no crown to offer"
+        );
     }
 
     /// HEAD-election (ii): `stamp_declared_head` stamps an EXISTING row (both hashes)

@@ -31,5 +31,15 @@ check "PROJECTION_INVENTORY_TABLE_COLLECTIVES" "elohim/elohim-storage/src/p2p/pr
 check "call_zome_imagodei" "elohim/elohim-storage/src/services" \
       "the imagodei cell route must have a caller — an unrouted cell is the \
 ZomeNotFound class this method exists to close"
+check "inc_content_head_adopted" "elohim/elohim-storage/src/services/head_adoption.rs" \
+      "the adopt-before-author pre-flight must COUNT its adoptions — a flat-zero \
+elohim_content_head_adopted_total is how 'we now adopt instead of re-authoring' \
+stays an unfalsifiable claim"
+check "HeadElection::PreserveExistingDeclaration" "elohim/elohim-storage/src/services/reanchor_backfill.rs" \
+      "the re-author sweep must elect PRESERVE — a heal-class author that declares \
+re-crowns its own root every restart, which IS the divergence defect"
+check "ViewKind::ContentHeadRecord" "elohim/elohim-storage/src/p2p/head_record_client.rs" \
+      "a view kind the responder serves but nobody requests is a claim, not a feature \
+(same rule as PROJECTION_INVENTORY_TABLE_COLLECTIVES above)"
 
 exit $fail

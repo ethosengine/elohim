@@ -269,11 +269,16 @@ impl ContentService {
     /// Field naming: HTTP wire / storage diesel use `blob_hash`, DNA entry
     /// uses `blob_cid` (Phase 0 refactor — same SHA256 SemEantically).
     /// Translation happens here.
+    /// `election` decides whether the committed action also becomes this row's
+    /// NOTARY-DECLARED head, and is required at every call site rather than
+    /// defaulted — see [`content_diesel::HeadElection`]. Request-borne
+    /// re-notarization declares; the heal-class re-author sweeps preserve.
     pub async fn update_via_conductor(
         &self,
         hc: &Arc<HcClient>,
         id: &str,
         view: crate::views::UpdateContentInputView,
+        election: content_diesel::HeadElection,
     ) -> Result<crate::db::models::ContentWithTags, StorageError> {
         let existing = {
             let mut conn = self.conn()?;
@@ -450,7 +455,14 @@ impl ContentService {
         };
         {
             let mut conn = self.conn()?;
-            content_diesel::upsert_with_anchor(&mut conn, &self.ctx, id, patch, &action_hash_str)?;
+            content_diesel::upsert_with_anchor(
+                &mut conn,
+                &self.ctx,
+                id,
+                patch,
+                &action_hash_str,
+                election,
+            )?;
         }
 
         // `server_blob_hash` is a deploy-projection field, not part of the
@@ -509,10 +521,16 @@ impl ContentService {
     /// the conductor unexpectedly has no entry for the id (the "already exists"
     /// claim could not be corroborated) — the caller keeps the row as a
     /// retryable failure, never fabricating an anchor.
+    ///
+    /// `election` is required for the same reason as on
+    /// [`Self::update_via_conductor`]: recovering an anchor is a heal-class act,
+    /// and its only caller (the re-anchor sweep) passes
+    /// `PreserveExistingDeclaration` so a recovery can never crown a head.
     pub async fn project_existing_anchor(
         &self,
         hc: &Arc<HcClient>,
         id: &str,
+        election: content_diesel::HeadElection,
     ) -> Result<bool, StorageError> {
         let Some(output) = conductor_writes::get_content_by_id(hc, id).await? else {
             return Ok(false);
@@ -539,7 +557,14 @@ impl ContentService {
         };
         {
             let mut conn = self.conn()?;
-            content_diesel::upsert_with_anchor(&mut conn, &self.ctx, id, patch, &action_hash_str)?;
+            content_diesel::upsert_with_anchor(
+                &mut conn,
+                &self.ctx,
+                id,
+                patch,
+                &action_hash_str,
+                election,
+            )?;
         }
         Ok(true)
     }

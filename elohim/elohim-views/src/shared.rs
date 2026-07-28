@@ -172,6 +172,56 @@ pub enum ViewKind {
     ProjectionInventory {
         table: String,
     },
+    /// P2P twin of `GET /db/content/{id}/head-record`: ask the responder for
+    /// the serialized DHT `Record` behind ITS declared head for `content_id`,
+    /// so a peer with a full-arc gossip gap can declare a head it cannot
+    /// retrieve itself (declare-carries-Record). Not agent-scoped — like
+    /// `ProjectionInventory`, the answer is "what THIS peer holds".
+    ///
+    /// ## Wire-compatibility (load-bearing)
+    ///
+    /// This variant is ADDITIVE but NOT backward-decodable: an externally
+    /// tagged enum has no `#[serde(other)]` escape, so a pre-cure peer's
+    /// `ViewKind` decode FAILS on this request and the transport surfaces a
+    /// codec/inbound error. Requesters MUST treat that error as an explicit
+    /// "this peer is too old to serve head records", log it once, and fall
+    /// through to the author path — never retry-loop, never panic. See
+    /// `p2p::head_record_client`.
+    ContentHeadRecord {
+        content_id: String,
+    },
+}
+
+/// Response payload (carried in `ViewSlice.payload`) for a
+/// [`ViewKind::ContentHeadRecord`] request — the P2P twin of the
+/// `GET /db/content/{id}/head-record` response body.
+///
+/// All fields are optional so an HONEST ABSENCE ("I have no head for that id",
+/// or "I have a head but my conductor cannot retrieve its Record") is a
+/// well-formed answer rather than a transport error: the requester then
+/// declares without a carried record, or falls through to the author path.
+///
+/// `record` is standard base64 of the serialized `Record` — an OPAQUE token to
+/// every layer between the two conductors, re-verified in wasm by the
+/// receiving conductor before the declaration is honored.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ContentHeadRecordPayload {
+    /// Echoes the requested content id.
+    pub content_id: String,
+    /// The responder's declared head action, when it has one.
+    #[serde(default)]
+    pub head_action_hash: Option<String>,
+    /// Holochain `Timestamp` (i64 microseconds) of the responder's declaration,
+    /// when its projection carries the ordering.
+    #[serde(default)]
+    #[ts(type = "number | null")]
+    pub declared_at: Option<i64>,
+    /// Standard-base64 serialized `Record` for `head_action_hash`, when this
+    /// peer's conductor could retrieve it.
+    #[serde(default)]
+    pub record: Option<String>,
 }
 
 /// One discovered projection row in a [`ProjectionInventoryPayload`]: the
@@ -187,6 +237,35 @@ pub struct ProjectionInventoryEntry {
     /// (un-anchored bulk-seed row). An empty anchor still counts as "present"
     /// for discovery — the reconciler heals it from its own conductor.
     pub dht_anchor_hash: String,
+    /// ADDITIVE (adopt-before-author): the responder's NOTARY-DECLARED head for
+    /// this id, when it carries one. Distinct from `dht_anchor_hash` — an anchor
+    /// is "the action my projection last saw", a declaration is "the action a
+    /// canonical channel elected". A peer advertising this is what lets a
+    /// restarting peer ADOPT rather than re-author its own root.
+    ///
+    /// `#[serde(default)]` (and no `deny_unknown_fields` on this struct) makes
+    /// this bidirectionally wire-compatible: a pre-cure peer omits the key and
+    /// it decodes to `None`; a pre-cure peer receiving it ignores the key. No
+    /// protocol-version bump.
+    ///
+    /// **HINT, never truth.** This value is NEVER stamped into a local row. It
+    /// only triggers a verified fetch (own-conductor resolve, then a
+    /// `ContentHeadRecord` fetch → declare-with-carried-record through the
+    /// conductor). See `services::head_adoption`.
+    #[serde(default)]
+    pub declared_head_action_hash: Option<String>,
+    /// Holochain `Timestamp` (i64 microseconds) the responder's declaration
+    /// carries, when its projection has the ordering. Additive, same
+    /// compatibility rules as `declared_head_action_hash`.
+    ///
+    /// **Not globally comparable.** The zome substitutes the RECEIVING
+    /// conductor's `sys_time` on the carried-record branch, so this must never
+    /// be used to order declarations ACROSS peers. It is carried for
+    /// observability and for the conductor to arbitrate, never for a
+    /// Rust-side "newest wins" election.
+    #[serde(default)]
+    #[ts(type = "number | null")]
+    pub declared_head_at: Option<i64>,
 }
 
 /// Response payload (carried in `ViewSlice.payload`) for a `ProjectionInventory`
@@ -391,5 +470,122 @@ mod inventory_offset_wire_compat_tests {
         let bytes = rmp_serde::to_vec_named(&req).unwrap();
         let back: ViewFederationRequest = rmp_serde::from_slice(&bytes).unwrap();
         assert_eq!(back, req);
+    }
+
+    /// Yesterday's `ProjectionInventoryEntry` — the two declared-head fields
+    /// did not exist. Kept as a literal so the compat assertions below test the
+    /// REAL old shape rather than a `skip_serializing_if` trick on the new one.
+    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+    #[serde(rename_all = "camelCase")]
+    struct OldProjectionInventoryEntry {
+        id: String,
+        dht_anchor_hash: String,
+    }
+
+    #[test]
+    fn new_peer_decodes_old_inventory_entry_defaulting_declared_head_to_none() {
+        // OLD peer emits {id, dhtAnchorHash}; the NEW struct must decode it with
+        // both additive fields defaulting to None — the adopt path then simply
+        // has no hint from that peer and falls through to today's behavior.
+        let old = OldProjectionInventoryEntry {
+            id: "elohim-host-landing".into(),
+            dht_anchor_hash: "uhCkkOLD".into(),
+        };
+
+        let msgpack = rmp_serde::to_vec_named(&old).unwrap();
+        let via_msgpack: ProjectionInventoryEntry =
+            rmp_serde::from_slice(&msgpack).expect("new struct defaults the missing declared head");
+        assert_eq!(via_msgpack.id, "elohim-host-landing");
+        assert_eq!(via_msgpack.dht_anchor_hash, "uhCkkOLD");
+        assert_eq!(via_msgpack.declared_head_action_hash, None);
+        assert_eq!(via_msgpack.declared_head_at, None);
+
+        // The inventory rides the ViewSlice payload as JSON before the frame is
+        // msgpack'd, so the JSON leg must default identically.
+        let json = serde_json::to_string(&old).unwrap();
+        let via_json: ProjectionInventoryEntry =
+            serde_json::from_str(&json).expect("JSON leg defaults the missing declared head too");
+        assert_eq!(via_json.declared_head_action_hash, None);
+        assert_eq!(via_json.declared_head_at, None);
+    }
+
+    #[test]
+    fn old_peer_decodes_new_inventory_entry_ignoring_declared_head_keys() {
+        // NEW peer advertises a declaration; an OLD peer must still decode the
+        // entry at yesterday's behavior rather than erroring the WHOLE payload
+        // (one undecodable entry drops the peer for the sweep — see
+        // `projection_reconcile`'s "peer inventory payload undecodable" arm).
+        let new = ProjectionInventoryEntry {
+            id: "elohim-host-landing".into(),
+            dht_anchor_hash: "uhCkkANCHOR".into(),
+            declared_head_action_hash: Some("uhCkkDECLARED".into()),
+            declared_head_at: Some(1_753_000_000_000_000),
+        };
+
+        let msgpack = rmp_serde::to_vec_named(&new).unwrap();
+        let old: OldProjectionInventoryEntry =
+            rmp_serde::from_slice(&msgpack).expect("old struct tolerates the unknown keys");
+        assert_eq!(old.id, "elohim-host-landing");
+        assert_eq!(old.dht_anchor_hash, "uhCkkANCHOR");
+
+        let json = serde_json::to_string(&new).unwrap();
+        let old_json: OldProjectionInventoryEntry =
+            serde_json::from_str(&json).expect("old struct tolerates the unknown keys over JSON");
+        assert_eq!(old_json.dht_anchor_hash, "uhCkkANCHOR");
+    }
+
+    #[test]
+    fn declared_head_round_trips_when_present() {
+        let entry = ProjectionInventoryEntry {
+            id: "elohim-host-landing".into(),
+            dht_anchor_hash: "uhCkkANCHOR".into(),
+            declared_head_action_hash: Some("uhCkkDECLARED".into()),
+            declared_head_at: Some(-42),
+        };
+        let bytes = rmp_serde::to_vec_named(&entry).unwrap();
+        let back: ProjectionInventoryEntry = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(back, entry);
+    }
+
+    #[test]
+    fn content_head_record_payload_round_trips_and_tolerates_absence() {
+        // Honest absence is a well-formed answer, not a transport error.
+        let absent = ContentHeadRecordPayload {
+            content_id: "elohim-host-landing".into(),
+            head_action_hash: None,
+            declared_at: None,
+            record: None,
+        };
+        let bytes = rmp_serde::to_vec_named(&absent).unwrap();
+        let back: ContentHeadRecordPayload = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(back, absent);
+
+        let present = ContentHeadRecordPayload {
+            content_id: "elohim-host-landing".into(),
+            head_action_hash: Some("uhCkkDECLARED".into()),
+            declared_at: Some(1_753_000_000_000_000),
+            record: Some("YmFzZTY0".into()),
+        };
+        let json = serde_json::to_value(&present).unwrap();
+        assert!(
+            json.get("headActionHash").is_some(),
+            "payload must be camelCase on the wire"
+        );
+        let back: ContentHeadRecordPayload = serde_json::from_value(json).unwrap();
+        assert_eq!(back, present);
+    }
+
+    #[test]
+    fn content_head_record_view_kind_is_snake_case_tagged() {
+        let kind = ViewKind::ContentHeadRecord {
+            content_id: "elohim-host-landing".into(),
+        };
+        let json = serde_json::to_value(&kind).unwrap();
+        assert!(
+            json.get("content_head_record").is_some(),
+            "ViewKind stays snake_case-tagged: {json}"
+        );
+        let back: ViewKind = serde_json::from_value(json).unwrap();
+        assert_eq!(back, kind);
     }
 }

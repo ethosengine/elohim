@@ -36,8 +36,8 @@ use libp2p::request_response;
 use std::io;
 
 use crate::views::{
-    Freshness, FreshnessState, JsonVal, ProjectionInventoryEntry, ProjectionInventoryPayload,
-    ViewFederationRequest, ViewFederationResponse, ViewKind, ViewSlice,
+    ContentHeadRecordPayload, Freshness, FreshnessState, JsonVal, ProjectionInventoryEntry,
+    ProjectionInventoryPayload, ViewFederationRequest, ViewFederationResponse, ViewKind, ViewSlice,
 };
 
 /// v1 cap on entries returned in a single `ProjectionInventory` slice. A content
@@ -257,6 +257,15 @@ pub struct SliceContext<'a> {
     /// view kinds. Lets successive reconcile sweeps window across the whole
     /// corpus instead of re-serving only the capped hot set.
     pub inventory_offset: Option<u32>,
+    /// Conductor registry for the `ContentHeadRecord` view kind, which must ask
+    /// THIS peer's conductor for the serialized `Record` behind its declared
+    /// head. `None` in test contexts and wherever the bridge is not wired — the
+    /// responder then answers an honest empty record rather than erroring.
+    ///
+    /// A registry rather than an `HcClient`, deliberately: `lamad_client()` is
+    /// interior-mutable, so a bridge that connects LATE (the common case on a
+    /// slow conductor) is picked up without re-plumbing this context.
+    pub hc_registry: Option<&'a crate::hc_client_registry::HcClientRegistry>,
 }
 
 /// Build a signed [`ViewFederationResponse`] for an inbound request.
@@ -313,19 +322,51 @@ pub async fn build_response_slice(
         });
     }
 
+    // ContentHeadRecord: not agent-scoped either. "What head Record does THIS
+    // peer hold for this id" is a property of the responder, not of whoever
+    // asked — same exception as ProjectionInventory, and for the same reason.
+    if let ViewKind::ContentHeadRecord { content_id } = &view_kind {
+        let (payload, state) =
+            build_content_head_record_payload(ctx.pool, ctx.hc_registry, content_id).await;
+        let mut slice = ViewSlice {
+            peer_id: ctx.local_peer_id,
+            view_kind: view_kind.clone(),
+            freshness: Freshness {
+                state,
+                stale_since_ms: None,
+            },
+            payload: JsonVal(payload),
+            signature: String::new(),
+        };
+        let canonical = slice.canonical_bytes_for_signing();
+        let sig_bytes = ctx.keypair.sign(&canonical)?;
+        slice.signature = base64::engine::general_purpose::STANDARD.encode(&sig_bytes);
+        return Ok(ViewFederationResponse {
+            view_kind,
+            agent_cid: ctx.agent_cid,
+            request_id: ctx.request_id,
+            slice,
+        });
+    }
+
     let owns_agent = ctx.agent_cid == ctx.local_agent_cid;
     let payload = if owns_agent {
-        match ctx.pool {
-            Some(p) => match view_kind {
-                ViewKind::Cluster => crate::services::cluster_view::build_local_slice(p).await,
-                ViewKind::PeerTopology => {
+        match view_kind {
+            ViewKind::Cluster => match ctx.pool {
+                Some(p) => crate::services::cluster_view::build_local_slice(p).await,
+                None => serde_json::json!({}),
+            },
+            ViewKind::PeerTopology => match ctx.pool {
+                Some(p) => {
                     crate::services::peer_topology_view::build_local_slice(p, ctx.connected_peers)
                         .await
                 }
-                // Handled above by the early-return.
-                ViewKind::ProjectionInventory { .. } => unreachable!(),
+                None => serde_json::json!({}),
             },
-            None => serde_json::json!({}),
+            // Both handled above by their early-returns.
+            ViewKind::ProjectionInventory { .. } | ViewKind::ContentHeadRecord { .. } => {
+                unreachable!()
+            }
         }
     } else {
         serde_json::Value::Null
@@ -354,6 +395,105 @@ pub async fn build_response_slice(
         request_id: ctx.request_id,
         slice,
     })
+}
+
+/// Build the `(payload_json, freshness)` for a [`ViewKind::ContentHeadRecord`]
+/// request — the P2P twin of `GET /db/content/{id}/head-record`.
+///
+/// EVERY failure is an honest ABSENCE, never a transport error: no pool, no
+/// conductor bridge, no row, no declared head, or a conductor that cannot
+/// retrieve its own head action all answer a well-formed payload with
+/// `headActionHash: null`. The requester then falls through to the author path.
+/// Erroring instead would make a peer's inability to serve a record look like a
+/// network fault, and the caller would retry it forever.
+///
+/// The head hash comes from the LOCAL PROJECTION (the same answer
+/// `GET /db/content/{id}/head` gives), so the carried record always matches the
+/// hash a caller read from this peer's inventory a moment earlier.
+async fn build_content_head_record_payload(
+    pool: Option<&crate::db::DbPool>,
+    hc_registry: Option<&crate::hc_client_registry::HcClientRegistry>,
+    content_id: &str,
+) -> (serde_json::Value, FreshnessState) {
+    let absent = |state: FreshnessState| {
+        (
+            serde_json::to_value(ContentHeadRecordPayload {
+                content_id: content_id.to_string(),
+                head_action_hash: None,
+                declared_at: None,
+                record: None,
+            })
+            .unwrap_or(serde_json::Value::Null),
+            state,
+        )
+    };
+
+    let Some(p) = pool else {
+        return absent(FreshnessState::Offline);
+    };
+    let Ok(mut conn) = p.get() else {
+        return absent(FreshnessState::Offline);
+    };
+    let app_ctx = crate::db::AppContext::default_lamad();
+
+    let row = match crate::db::content_diesel::get_content_with_tags(
+        &mut conn,
+        &app_ctx,
+        content_id,
+        crate::db::content_diesel::MinTrust::Invisible,
+    ) {
+        Ok(Some(cwt)) => cwt,
+        // No row, or an unreadable one — honest absence, still Live (this IS
+        // this peer's truth about the id).
+        _ => return absent(FreshnessState::Live),
+    };
+    let declared_at = row.content.declared_head_at;
+    let Some(view) = crate::views::content_head_view_from_content(&row.content) else {
+        return absent(FreshnessState::Live);
+    };
+    let head_action_hash = view.head_action_hash;
+    drop(conn);
+
+    // Ask this peer's own conductor for the serialized Record. Without a bridge
+    // we still serve the HASH — a requester whose own conductor can retrieve the
+    // target does not need the bytes.
+    let record_b64 = match hc_registry.and_then(|r| r.lamad_client()) {
+        Some(hc) => {
+            match crate::services::conductor_writes::call_get_record_for_action(
+                &hc,
+                &head_action_hash,
+            )
+            .await
+            {
+                Ok(Some(carried)) => {
+                    Some(base64::engine::general_purpose::STANDARD.encode(&carried.record))
+                }
+                Ok(None) => None,
+                Err(e) => {
+                    tracing::debug!(
+                        target: "elohim_storage::view_federation",
+                        content_id = %content_id,
+                        error = %e,
+                        "ContentHeadRecord: conductor could not serve the record; \
+                         answering with the head hash alone"
+                    );
+                    None
+                }
+            }
+        }
+        None => None,
+    };
+
+    (
+        serde_json::to_value(ContentHeadRecordPayload {
+            content_id: content_id.to_string(),
+            head_action_hash: Some(head_action_hash),
+            declared_at,
+            record: record_b64,
+        })
+        .unwrap_or(serde_json::Value::Null),
+        FreshnessState::Live,
+    )
 }
 
 /// Fixed headroom reserved for everything in the serialized frame that is NOT the
@@ -479,9 +619,15 @@ fn build_inventory_payload(
                 let cap_truncated = (offset as usize).saturating_add(served) < total;
                 let entries = rows
                     .into_iter()
-                    .map(|(id, dht_anchor_hash)| ProjectionInventoryEntry {
-                        id,
-                        dht_anchor_hash,
+                    .map(|r| ProjectionInventoryEntry {
+                        id: r.id,
+                        dht_anchor_hash: r.dht_anchor_hash,
+                        // ADOPT-BEFORE-AUTHOR: advertise the DECLARATION too, so a
+                        // restarting peer can adopt this one instead of minting a
+                        // competing root. Additive on the wire — a pre-cure
+                        // requester simply ignores the keys.
+                        declared_head_action_hash: r.declared_head_action_hash,
+                        declared_head_at: r.declared_head_at,
                     })
                     .collect();
                 let mut payload = ProjectionInventoryPayload {
@@ -565,6 +711,11 @@ fn build_inventory_payload(
                     .map(|(id, collective_cid)| ProjectionInventoryEntry {
                         id,
                         dht_anchor_hash: collective_cid,
+                        // Declared-head hints are a CONTENT-table concept — the
+                        // collectives arm reconciles on CID identity and has no
+                        // notary-head election of its own.
+                        declared_head_action_hash: None,
+                        declared_head_at: None,
                     })
                     .collect();
                 let mut payload = ProjectionInventoryPayload {
@@ -623,6 +774,9 @@ fn build_inventory_payload(
                 .map(|(id, dht_anchor_hash)| ProjectionInventoryEntry {
                     id,
                     dht_anchor_hash,
+                    // REA commitments have no notary-head election either.
+                    declared_head_action_hash: None,
+                    declared_head_at: None,
                 })
                 .collect();
             let mut payload = ProjectionInventoryPayload {
@@ -991,6 +1145,11 @@ mod tests {
             id: format!("epr:commons:lamad/atomic-concept/really-long-content-slug-{i:010}"),
             // 53-char anchor (`uhCEk` + 48 base64-ish chars), like a real ActionHash.
             dht_anchor_hash: format!("uhCEk{}", "A".repeat(48)),
+            // Worst case for the byte-budget guard: a peer that declares EVERY
+            // row widens each entry by a second ActionHash + a timestamp, which
+            // is exactly the width growth `fit_inventory_to_budget` must absorb.
+            declared_head_action_hash: Some(format!("uhCkk{}", "B".repeat(48))),
+            declared_head_at: Some(1_753_000_000_000_000),
         }
     }
 
@@ -1079,14 +1238,20 @@ mod tests {
                 ProjectionInventoryEntry {
                     id: "epr:a".to_string(),
                     dht_anchor_hash: "anc-a".to_string(),
+                    declared_head_action_hash: None,
+                    declared_head_at: None,
                 },
                 ProjectionInventoryEntry {
                     id: "epr:b".to_string(),
                     dht_anchor_hash: "anc-b".to_string(),
+                    declared_head_action_hash: None,
+                    declared_head_at: None,
                 },
                 ProjectionInventoryEntry {
                     id: "epr:c".to_string(),
                     dht_anchor_hash: "anc-c".to_string(),
+                    declared_head_action_hash: None,
+                    declared_head_at: None,
                 },
             ],
         };

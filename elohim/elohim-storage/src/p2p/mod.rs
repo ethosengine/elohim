@@ -43,6 +43,7 @@ pub mod epr_protocol;
 pub mod fanout;
 pub mod feedback_signal;
 pub mod gossip_dispatch;
+pub mod head_record_client; // adopt-before-author — fetch a peer's head Record over view-federation
 pub mod identity_binding_gossip;
 pub mod identity_handshake;
 pub mod identity_map;
@@ -590,6 +591,11 @@ pub struct P2PNode {
     command_tx: mpsc::Sender<P2PCommand>,
     /// Database pool for EPR Head construction from content records
     db_pool: Option<DbPool>,
+    /// Conductor bridge for view-federation kinds that must ask this peer's own
+    /// conductor — currently `ContentHeadRecord` (adopt-before-author's
+    /// declare-carries-Record source half). Absent ⇒ that view kind serves the
+    /// head hash without the proving bytes, never an error.
+    hc_registry: Option<Arc<crate::hc_client_registry::HcClientRegistry>>,
     /// Policy enforcement for content filtering on P2P path
     policy_enforcement: Option<Arc<crate::db::policy_cache::PolicyEnforcement>>,
     /// Per-connection trust context cache for ambient authorization
@@ -2237,6 +2243,7 @@ impl P2PNode {
             command_rx: Arc::new(tokio::sync::Mutex::new(command_rx)),
             command_tx,
             db_pool: None,
+            hc_registry: None,
             policy_enforcement: None,
             peer_trust_cache: trust_cache::PeerTrustCache::new(),
             pending_epr_resolves: Arc::new(tokio::sync::Mutex::new(
@@ -2335,6 +2342,17 @@ impl P2PNode {
             pool.clone(),
         ));
         self.db_pool = Some(pool);
+        self
+    }
+
+    /// Wire the conductor bridge so this node can SERVE `ContentHeadRecord`
+    /// view-federation requests — the bytes a peer needs to declare a canonical
+    /// head its own conductor cannot retrieve (adopt-before-author).
+    pub fn with_hc_registry(
+        mut self,
+        registry: Arc<crate::hc_client_registry::HcClientRegistry>,
+    ) -> Self {
+        self.hc_registry = Some(registry);
         self
     }
 
@@ -5835,6 +5853,7 @@ impl P2PNode {
                             keypair,
                             pool: pool_ref,
                             inventory_offset,
+                            hc_registry: self.hc_registry.as_deref(),
                         },
                     )
                     .await

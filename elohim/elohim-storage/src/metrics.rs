@@ -257,6 +257,22 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Canonical heads ADOPTED rather than re-authored, by the adopt-before-author
+    /// pre-flight (`services::head_adoption`) — either resolved canonical from this
+    /// node's own conductor, or fetched from an advertising peer and declared
+    /// through the own conductor (declare-carries-Record).
+    ///
+    /// Reads AGAINST `elohim_content_witness_authored_total`: on a peer that keeps
+    /// re-minting its own root for a cross-root id, authored climbs every restart
+    /// and adopted stays flat. The cure signal is adopted climbing ONCE per id and
+    /// then both going quiet — a converged corpus adopts nothing because there is
+    /// nothing left to adopt.
+    pub static ref CONTENT_HEAD_ADOPTED: IntCounter = IntCounter::new(
+        "elohim_content_head_adopted_total",
+        "Canonical content heads adopted from the substrate instead of re-authored locally.",
+    )
+    .unwrap();
+
     /// Provide-loop author calls SKIPPED because no candidate (active local
     /// session key nor the pod's own conductor cell key) yielded an `agent_cid`
     /// (`uhCAk…`) provider. The CID-hardening guard (rung 3) refuses to write a
@@ -628,6 +644,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_OUTBOUND.clone()));
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_INBOUND_SERVED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_AUTHORED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_HEAD_ADOPTED.clone()));
         let _ = REGISTRY.register(Box::new(PROVIDE_PROVIDER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(SALVAGE_PROVIDER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_KEY_SUPERSEDE.clone()));
@@ -806,6 +823,12 @@ pub fn inc_acquisition_outcome(outcome: &str) {
 /// Record `n` content heads freshly authored by the witness-bootstrap sweep.
 pub fn add_content_witness_authored(n: u64) {
     CONTENT_WITNESS_AUTHORED.inc_by(n);
+}
+
+/// Record one canonical head ADOPTED (own-conductor resolve, or a peer's head
+/// declared through the own conductor) instead of re-authored locally.
+pub fn inc_content_head_adopted() {
+    CONTENT_HEAD_ADOPTED.inc();
 }
 
 /// Record one provide-loop author skipped because no `agent_cid` provider was

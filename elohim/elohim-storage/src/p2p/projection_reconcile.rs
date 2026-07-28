@@ -102,6 +102,7 @@ use ts_rs::TS;
 
 use crate::db::DbPool;
 use crate::hc_client::HcClient;
+use crate::p2p::head_record_client::PeerHeadRecordFetcher;
 use crate::p2p::reconcile_rails::GapTracker;
 use crate::p2p::view_federation::{
     PROJECTION_INVENTORY_CAP, PROJECTION_INVENTORY_TABLE_COLLECTIVES,
@@ -786,6 +787,7 @@ pub async fn run_heal(
     pool: &DbPool,
     state: &ProjectionReconcileState,
     provide_state: &ProvideLoopState,
+    p2p: &P2PHandle,
 ) {
     let SweepPlan {
         rea,
@@ -822,6 +824,7 @@ pub async fn run_heal(
         peers_asked: content_peers_asked,
         ids_discovered: content_ids_discovered,
         local_anchored,
+        peer_head_hints,
     } = content;
     crate::metrics::set_projection_reconcile_gauges(
         "content",
@@ -874,14 +877,24 @@ pub async fn run_heal(
     )
     .await;
 
+    // ADOPT-BEFORE-AUTHOR context for BOTH witness sweeps below. They are the
+    // two paths that MINT roots, so they are the two that must first ask whether
+    // a canonical head already exists. The fetcher rides the same view-federation
+    // plane the inventory hints came from.
+    let head_record_fetcher = PeerHeadRecordFetcher::new(p2p.clone());
+    let adopt = crate::services::head_adoption::AdoptContext {
+        hints: &peer_head_hints,
+        fetcher: Some(&head_record_fetcher),
+    };
+
     // GAP 1.5: green the un-witnessed seeded corpus. Composed onto (not forked
     // from) the content arm — same conductor gate + single-flight guard.
-    witness_bootstrap(hc, pool, provide_state).await;
+    witness_bootstrap(hc, pool, provide_state, &adopt).await;
 
     // Ghost-anchor witness: the NULL-anchor sweep above cannot see rows whose
     // anchor string outlived its conductor incarnation. Runs on the same leg,
     // fed by the conductor answers the heal already paid for.
-    witness_ghost_anchors(hc, pool, &ghost_candidates).await;
+    witness_ghost_anchors(hc, pool, &ghost_candidates, &adopt).await;
 
     // Publish mirrors the pre-decoupling contract: REA counts + peers_asked, with
     // the divergent-anchor counter folding in BOTH arms (the one cross-arm signal).
@@ -935,7 +948,12 @@ pub async fn run_heal(
 ///
 /// Runs only inside [`run_heal`], so the OnceLock conductor gate + single-flight
 /// guard already guarantee it never fires bridge-absent or concurrently.
-async fn witness_bootstrap(hc: &Arc<HcClient>, pool: &DbPool, provide_state: &ProvideLoopState) {
+async fn witness_bootstrap(
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    provide_state: &ProvideLoopState,
+    adopt: &crate::services::head_adoption::AdoptContext<'_>,
+) {
     // A lamad-scoped ContentService drives the canonical re-anchor path
     // (`update_via_conductor` null-anchor branch). The EventBus is a throwaway:
     // the only event this path emits is `ContentUpdated` (cache invalidation);
@@ -960,6 +978,7 @@ async fn witness_bootstrap(hc: &Arc<HcClient>, pool: &DbPool, provide_state: &Pr
         hc,
         provide_state,
         &cfg,
+        adopt,
     );
     match tokio::time::timeout(WITNESS_SWEEP_BUDGET, sweep).await {
         Ok(Ok(report)) if report.candidates > 0 => {
@@ -969,6 +988,8 @@ async fn witness_bootstrap(hc: &Arc<HcClient>, pool: &DbPool, provide_state: &Pr
                 candidates = report.candidates,
                 authored = report.reanchored,
                 already_witnessed = report.already_anchored,
+                adopted = report.adopted,
+                held = report.held,
                 skipped = report.skipped,
                 failed = report.failed,
                 remaining = report.remaining,
@@ -1056,7 +1077,12 @@ struct ContentHealOutcome {
 /// non-canonical reach or content_type is not re-authorable and would fail
 /// every sweep forever). Self-terminating: once authored, the conductor
 /// resolves the id and it is never a candidate again.
-async fn witness_ghost_anchors(hc: &Arc<HcClient>, pool: &DbPool, candidates: &[String]) {
+async fn witness_ghost_anchors(
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    candidates: &[String],
+    adopt: &crate::services::head_adoption::AdoptContext<'_>,
+) {
     if candidates.is_empty() {
         return;
     }
@@ -1092,10 +1118,13 @@ async fn witness_ghost_anchors(hc: &Arc<HcClient>, pool: &DbPool, candidates: &[
     );
 
     let total = ghosts.len();
+    let ghost_ctx = crate::db::AppContext::default_lamad();
     let sweep = async {
         let mut authored = 0usize;
         let mut skipped = 0usize;
         let mut failed = 0usize;
+        let mut adopted = 0usize;
+        let mut held = 0usize;
         for (id, reach, content_type) in ghosts.iter().take(WITNESS_MAX_PER_TICK as usize) {
             // Same guard as the re-anchor path: a reach outside the DNA-notarized
             // vocabulary can never be re-authored, so it would burn a conductor
@@ -1123,6 +1152,44 @@ async fn witness_ghost_anchors(hc: &Arc<HcClient>, pool: &DbPool, candidates: &[
                 );
                 continue;
             }
+            // ADOPT-BEFORE-AUTHOR PRE-FLIGHT. `LocalResolve::Known(None)` — NOT
+            // `Probe`: a ghost candidate is BY CONSTRUCTION an id whose
+            // `resolve_content_head` answered `Ok(None)` moments ago in
+            // `heal_content`. Re-probing would burn a conductor round-trip per
+            // ghost per sweep to re-learn an answer we already hold, and on a
+            // saturated conductor that is exactly the cost that makes a heal leg
+            // grind. So the local-DHT arm is pre-answered "nothing here" and the
+            // pre-flight goes straight to the peer arm — which is the arm that
+            // matters for a ghost, since another peer is usually the one holding
+            // the crown this node was about to overwrite.
+            let preflight = crate::services::head_adoption::try_adopt_canonical_head(
+                hc,
+                pool,
+                &ghost_ctx,
+                id,
+                crate::services::head_adoption::LocalResolve::Known(None),
+                adopt,
+            )
+            .await;
+            let pending_adopt = match preflight {
+                crate::services::head_adoption::AdoptOutcome::Adopted => {
+                    adopted += 1;
+                    tokio::time::sleep(WITNESS_ITEM_DELAY).await;
+                    continue;
+                }
+                crate::services::head_adoption::AdoptOutcome::Held => {
+                    held += 1;
+                    tokio::time::sleep(WITNESS_ITEM_DELAY).await;
+                    continue;
+                }
+                crate::services::head_adoption::AdoptOutcome::Author => None,
+                crate::services::head_adoption::AdoptOutcome::AuthorThenAdopt {
+                    head_action_hash,
+                    carried_record,
+                    peer_id,
+                } => Some((head_action_hash, carried_record, peer_id)),
+            };
+
             // Empty patch on an ANCHORED row takes `update_via_conductor`'s
             // update branch; the zome refuses with "no Content entry found"
             // (there is no local chain), which trips that method's STALE-ANCHOR
@@ -1141,10 +1208,38 @@ async fn witness_ghost_anchors(hc: &Arc<HcClient>, pool: &DbPool, candidates: &[
                 p2p_published_at: None,
             };
             match content_service
-                .update_via_conductor(hc, id, empty_patch)
+                // PRESERVE: replacing an unresolvable anchor with one this node
+                // can prove is a heal. It must not also re-crown the row — that
+                // is what un-adopted a peer's canonical head on every restart.
+                .update_via_conductor(
+                    hc,
+                    id,
+                    empty_patch,
+                    crate::db::content_diesel::HeadElection::PreserveExistingDeclaration,
+                )
                 .await
             {
-                Ok(_) => authored += 1,
+                Ok(_) => {
+                    authored += 1;
+                    // AUTHOR-THEN-ADOPT, second half: the conductor now has a
+                    // local chain, so the declaration it refused can land.
+                    if let Some((head_action_hash, carried_record, peer_id)) = pending_adopt {
+                        if crate::services::head_adoption::finish_author_then_adopt(
+                            hc,
+                            pool,
+                            &ghost_ctx,
+                            id,
+                            &head_action_hash,
+                            carried_record,
+                            &peer_id,
+                        )
+                        .await
+                            == crate::services::head_adoption::AdoptOutcome::Adopted
+                        {
+                            adopted += 1;
+                        }
+                    }
+                }
                 Err(e) => {
                     failed += 1;
                     tracing::warn!(
@@ -1156,11 +1251,11 @@ async fn witness_ghost_anchors(hc: &Arc<HcClient>, pool: &DbPool, candidates: &[
             }
             tokio::time::sleep(WITNESS_ITEM_DELAY).await;
         }
-        (authored, skipped, failed)
+        (authored, skipped, failed, adopted, held)
     };
 
     match tokio::time::timeout(WITNESS_SWEEP_BUDGET, sweep).await {
-        Ok((authored, skipped, failed)) => {
+        Ok((authored, skipped, failed, adopted, held)) => {
             crate::metrics::add_content_witness_authored(authored as u64);
             tracing::warn!(
                 target: "elohim_storage::projection_reconcile",
@@ -1168,6 +1263,8 @@ async fn witness_ghost_anchors(hc: &Arc<HcClient>, pool: &DbPool, candidates: &[
                 authored,
                 skipped,
                 failed,
+                adopted,
+                held,
                 "projection-reconcile[ghost-witness]: authored local heads for rows whose claimed \
                  dht_anchor_hash this conductor cannot resolve (stale-anchor class)"
             );
@@ -1502,6 +1599,14 @@ pub struct ContentDiscovery {
     peers_asked: usize,
     ids_discovered: usize,
     local_anchored: usize,
+    /// Peer-ADVERTISED canonical-head declarations harvested from this sweep's
+    /// inventory responses — the input to the adopt-before-author pre-flight's
+    /// peer arm.
+    ///
+    /// Populated for EVERY advertised id, not just the gap set: a row this peer
+    /// has no anchor for is not a "gap" the heal leg tracks, yet it is precisely
+    /// the row the witness sweeps are about to mint a competing root for.
+    peer_head_hints: crate::services::head_adoption::PeerHeadHints,
 }
 
 impl ContentDiscovery {
@@ -1516,6 +1621,7 @@ impl ContentDiscovery {
             peers_asked,
             ids_discovered: 0,
             local_anchored: 0,
+            peer_head_hints: crate::services::head_adoption::PeerHeadHints::new(),
         }
     }
 }
@@ -1610,7 +1716,10 @@ async fn discover_content(
             0,
             i64::MAX,
         ) {
-            Ok((rows, _total)) => rows.into_iter().collect(),
+            Ok((rows, _total)) => rows
+                .into_iter()
+                .map(|r| (r.id, r.dht_anchor_hash))
+                .collect(),
             Err(e) => {
                 tracing::warn!(error = %e, "projection-reconcile[content]: local inventory failed; skipping sweep");
                 return ContentDiscovery::empty(0);
@@ -1630,6 +1739,10 @@ async fn discover_content(
     // id → first NON-EMPTY advertised anchor (for divergence diffing).
     let mut advertised_anchor: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
+    // id → first advertised DECLARATION (adopt-before-author hint). Kept apart
+    // from `advertised_anchor` on purpose: an anchor and a declaration are
+    // different claims, and only the latter authorizes an adoption attempt.
+    let mut peer_head_hints = crate::services::head_adoption::PeerHeadHints::new();
 
     for peer in &peers {
         let peer_id = match peer.peer_id.parse::<libp2p::PeerId>() {
@@ -1697,6 +1810,25 @@ async fn discover_content(
                 advertised_anchor
                     .entry(entry.id.clone())
                     .or_insert_with(|| entry.dht_anchor_hash.clone());
+            }
+            // Additive field — absent from a pre-cure peer, which simply
+            // contributes no hint. First advertiser wins (same or-insert
+            // discipline as the anchor above): the pre-flight asks exactly one
+            // peer for the Record and, if that fails, retries next sweep rather
+            // than fanning out.
+            if let Some(head) = entry
+                .declared_head_action_hash
+                .as_deref()
+                .map(str::trim)
+                .filter(|h| !h.is_empty())
+            {
+                peer_head_hints.entry(entry.id.clone()).or_insert_with(|| {
+                    crate::services::head_adoption::PeerHeadHint {
+                        head_action_hash: head.to_string(),
+                        declared_at: entry.declared_head_at,
+                        peer_id: peer.peer_id.clone(),
+                    }
+                });
             }
         }
     }
@@ -1768,6 +1900,7 @@ async fn discover_content(
         peers_asked,
         ids_discovered,
         local_anchored,
+        peer_head_hints,
     }
 }
 

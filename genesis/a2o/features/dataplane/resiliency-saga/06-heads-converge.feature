@@ -57,6 +57,31 @@ Feature: Chapter 6 — blobs sync to one head
   # B's side (gate 1), and the anchor EQUALITY this station asserts flips when
   # cross-conductor record retrievability (notary-authority arc, or the
   # declare-carries-Record coordinator change) lands (gate 2).
+  # Station (minted 2026-07-27): the missing node between "ghost detected" and
+  # the anchor-equality finish line below. Anchor equality is the LAST thing to
+  # flip — it needs both peers to hold the same authored root. But the peer's
+  # HEAD can converge FIRST and independently: elohim.host does not need to hold
+  # alpha-A's root to ADOPT alpha-A's declaration of it.
+  #
+  # The defect this names: on every restart, elohim.host's re-anchor and
+  # ghost-witness sweeps authored a fresh local root AND immediately crowned it
+  # (the projection's own-commit path self-declared unconditionally), so B
+  # re-elected itself forever and could never converge on A's head no matter how
+  # many heal sweeps ran. Adopt-before-author splits authoring from declaring:
+  # the sweeps now ask the substrate for an existing canonical head first, and a
+  # root they do author is no longer a declaration.
+  #
+  #   chain: saga-06-heads-converge
+  #   between: ghost detected (station above) -> anchor equality (finish line below)
+  #   missing node: elohim.host ADOPTS alpha-A's declared head — declared:true
+  #     and headActionHash equal to alpha-A's — while the two roots may still
+  #     differ. Probe: GET /db/content/elohim-host-landing/head on both doorways.
+  #   current state: born red until the adopt-before-author sweep has run on a
+  #     restarted elohim.host (one reconcile cadence past restart-churn).
+  Scenario: elohim.host adopts alpha-A's declared head after a restart
+    Given peer "elohim.host" at "elohim.host"
+    Then peer "elohim.host" resolves the declared head for content "elohim-host-landing" equal to peer "alpha-A"
+
   Scenario: Both conductors anchor elohim-host-landing at the same root
     Given peer "elohim.host" at "elohim.host"
     Then peers "alpha-A" and "elohim.host" hold the same DHT anchor for content "elohim-host-landing"

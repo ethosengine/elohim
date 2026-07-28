@@ -707,12 +707,24 @@ pub fn handle_rea_signal(
                 reach: Some(content.reach),
                 metadata_json: Some(content.metadata_json),
             };
+            // HEAD-ELECTION: the async own-conductor commit signal stamps the
+            // ANCHOR only — it is NOT a declaration channel.
+            //
+            // This arm fires for EVERY own-conductor commit, including the ones
+            // the heal sweeps cause (boot re-anchor, ghost witness). If it
+            // declared, the adopt-before-author fix would be cosmetic: the eager
+            // write would preserve the adopted head and this signal would re-crown
+            // the freshly-authored local root milliseconds later, exactly
+            // reproducing the defect. Declaration is the job of the explicit
+            // channels — `ContentHeadDeclared` (the arm directly below), the
+            // declare routes, and the adopt-before-author pre-flight.
             content_diesel::upsert_with_anchor(
                 &mut conn,
                 ctx,
                 &content.id,
                 patch,
                 action_hash.as_str(),
+                content_diesel::HeadElection::PreserveExistingDeclaration,
             )?;
         }
         ReaProjectionSignal::ContentHeadDeclared {

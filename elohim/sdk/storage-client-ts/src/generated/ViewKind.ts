@@ -10,4 +10,4 @@
  * `agreements` / `economic_events` later. The inventory itself rides in the
  * `ViewSlice.payload` as a [`ProjectionInventoryPayload`].
  */
-export type ViewKind = "cluster" | "peer_topology" | { "projection_inventory": { table: string, } };
+export type ViewKind = "cluster" | "peer_topology" | { "projection_inventory": { table: string, } } | { "content_head_record": { content_id: string, } };

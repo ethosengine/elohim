@@ -41,6 +41,10 @@ pub struct ViewFedService {
     local_peer_id: String,
     keypair: Keypair,
     db_pool: Option<DbPool>,
+    /// Conductor bridge for the `ContentHeadRecord` view kind (adopt-before-author's
+    /// declare-carries-Record source half). `None` leaves that view kind answering
+    /// an honest hash-only payload — never an error.
+    hc_registry: Option<std::sync::Arc<crate::hc_client_registry::HcClientRegistry>>,
 }
 
 impl std::fmt::Debug for ViewFedService {
@@ -65,7 +69,21 @@ impl ViewFedService {
             local_peer_id,
             keypair,
             db_pool,
+            hc_registry: None,
         }
+    }
+
+    /// Wire the conductor bridge so this peer can SERVE head records to peers
+    /// adopting its canonical heads. Without it the node still advertises its
+    /// declarations in the inventory — it just cannot hand over the proving
+    /// bytes, which only matters for a requester whose own conductor cannot
+    /// retrieve the target.
+    pub fn with_hc_registry(
+        mut self,
+        registry: std::sync::Arc<crate::hc_client_registry::HcClientRegistry>,
+    ) -> Self {
+        self.hc_registry = Some(registry);
+        self
     }
 
     /// Build a signed [`ViewFederationResponse`] for `request`. Pass
@@ -86,6 +104,7 @@ impl ViewFedService {
             keypair: &self.keypair,
             pool: self.db_pool.as_ref(),
             inventory_offset: request.inventory_offset,
+            hc_registry: self.hc_registry.as_deref(),
         };
         build_response_slice(request.view_kind, ctx).await
     }

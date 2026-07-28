@@ -12,4 +12,34 @@ export type ProjectionInventoryEntry = { id: string,
  * (un-anchored bulk-seed row). An empty anchor still counts as "present"
  * for discovery — the reconciler heals it from its own conductor.
  */
-dhtAnchorHash: string, };
+dhtAnchorHash: string, 
+/**
+ * ADDITIVE (adopt-before-author): the responder's NOTARY-DECLARED head for
+ * this id, when it carries one. Distinct from `dht_anchor_hash` — an anchor
+ * is "the action my projection last saw", a declaration is "the action a
+ * canonical channel elected". A peer advertising this is what lets a
+ * restarting peer ADOPT rather than re-author its own root.
+ *
+ * `#[serde(default)]` (and no `deny_unknown_fields` on this struct) makes
+ * this bidirectionally wire-compatible: a pre-cure peer omits the key and
+ * it decodes to `None`; a pre-cure peer receiving it ignores the key. No
+ * protocol-version bump.
+ *
+ * **HINT, never truth.** This value is NEVER stamped into a local row. It
+ * only triggers a verified fetch (own-conductor resolve, then a
+ * `ContentHeadRecord` fetch → declare-with-carried-record through the
+ * conductor). See `services::head_adoption`.
+ */
+declaredHeadActionHash: string | null, 
+/**
+ * Holochain `Timestamp` (i64 microseconds) the responder's declaration
+ * carries, when its projection has the ordering. Additive, same
+ * compatibility rules as `declared_head_action_hash`.
+ *
+ * **Not globally comparable.** The zome substitutes the RECEIVING
+ * conductor's `sys_time` on the carried-record branch, so this must never
+ * be used to order declarations ACROSS peers. It is carried for
+ * observability and for the conductor to arbitrate, never for a
+ * Rust-side "newest wins" election.
+ */
+declaredHeadAt: number | null, };

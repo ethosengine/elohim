@@ -608,6 +608,83 @@ Then(
   }
 );
 
+/**
+ * ADOPT, don't re-author: read the notary HEAD (GET /db/content/{id}/head,
+ * ContentHeadView) from the adopting peer and the declaring peer, and assert the
+ * adopter (a) reports `declared: true` and (b) names the SAME `headActionHash`.
+ *
+ * Both halves are load-bearing and neither alone is sufficient:
+ *
+ * - `headActionHash` equality ALONE false-passes, because that field FALLS BACK
+ *   to `dhtAnchorHash` when no declaration exists (see
+ *   `content_head_view_from_content`). Two peers that merely converged their
+ *   anchors would pass without any declaration having been adopted at all.
+ * - `declared: true` ALONE false-passes the defect this station exists to catch:
+ *   before adopt-before-author, the adopting peer's restart sweeps authored a
+ *   fresh local root and CROWNED IT, so `declared` was true while pointing at
+ *   the peer's own competing root — self-election reading as convergence.
+ *
+ * Deliberately WEAKER than the anchor-equality finish line that follows it: the
+ * adopter need not hold the declarer's root to adopt its declaration (that is
+ * the whole point of declare-carries-Record). So this station can — and should —
+ * flip green BEFORE anchor equality does.
+ *
+ * Example:
+ *   Then peer "elohim.host" resolves the declared head for content "elohim-host-landing" equal to peer "alpha-A"
+ */
+Then(
+  'peer {string} resolves the declared head for content {string} equal to peer {string}',
+  async function (this: E2EWorld, adopter: string, contentId: string, declarer: string) {
+    const readHead = async (
+      peerName: string
+    ): Promise<{ headActionHash: string; declared: boolean }> => {
+      const doorway = this.getDoorway(peerName);
+      const { status, text } = await getRaw(
+        `${doorway.url}/db/content/${encodeURIComponent(contentId)}/head`
+      );
+      assert.strictEqual(
+        status,
+        200,
+        `GET /db/content/${contentId}/head on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})`
+      );
+      let body: Record<string, unknown>;
+      try {
+        body = JSON.parse(text) as Record<string, unknown>;
+      } catch {
+        throw new Error(
+          `GET /db/content/${contentId}/head on ${peerName}: response is not valid JSON`
+        );
+      }
+      const headActionHash = body['headActionHash'];
+      assert.ok(
+        typeof headActionHash === 'string' && headActionHash.length > 0,
+        `headActionHash on ${peerName} is missing/empty for ${contentId} — the notary has no HEAD answer`
+      );
+      return { headActionHash, declared: body['declared'] === true };
+    };
+
+    const declared = await readHead(declarer);
+    assert.ok(
+      declared.declared,
+      `${declarer} reports declared=false for ${contentId} — there is no canonical declaration for ${adopter} to adopt yet, ` +
+        `so this station cannot distinguish adoption from anchor convergence`
+    );
+
+    const adopted = await readHead(adopter);
+    assert.ok(
+      adopted.declared,
+      `${adopter} reports declared=false for ${contentId} — it holds only an anchor fallback, ` +
+        `never having adopted ${declarer}'s canonical head`
+    );
+    assert.strictEqual(
+      adopted.headActionHash,
+      declared.headActionHash,
+      `declared head diverges for ${contentId}: ${adopter}=${adopted.headActionHash} vs ${declarer}=${declared.headActionHash} — ` +
+        `${adopter} crowned its own root instead of adopting ${declarer}'s declaration`
+    );
+  }
+);
+
 const lookResults = new WeakMap<E2EWorld, LookResult>();
 const lookErrors = new WeakMap<E2EWorld, string>();
 
