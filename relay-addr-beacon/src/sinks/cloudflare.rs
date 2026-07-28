@@ -6,9 +6,12 @@
 //!
 //! Two lanes compose, both driven from the same detected [`AddrUpdate`]:
 //!
-//! - **Exclusive lane** (`--record-name`) — one beacon owns the name outright;
-//!   unchanged since the single-record design, byte-identical wire shape (no
-//!   `comment`).
+//! - **Exclusive lane** (`--record-name`) — one beacon owns the name outright.
+//!   Since 2026-07-28 its writes carry the same ownership stamp as the shared
+//!   lane, and unchanged-address cycles run a freshness verification that
+//!   re-asserts the record if an external writer clobbered or deleted it
+//!   (the apex-clobber incident: a forgotten ddclient reverted the record 25s
+//!   after publish and the drift stood undetected).
 //! - **Shared lane** (`--shared-record-name` / `--record-owner`) — the
 //!   protocol primitive "address-set contribution with ownership +
 //!   freshness": multiple beacon instances, one per WAN, each maintain their
@@ -36,10 +39,9 @@ const RECORD_TTL: u32 = 60;
 /// The JSON body used to create/update a Cloudflare DNS record. Pure and
 /// serialization-tested so the wire shape is verifiable without the network.
 ///
-/// `comment` is `None` for the exclusive lane (legacy — the field is omitted
-/// from the serialized body entirely, keeping that wire shape byte-identical)
-/// and `Some(..)` for the shared lane, where it carries the
-/// ownership+freshness stamp.
+/// `comment` carries the ownership+freshness stamp on both lanes (exclusive
+/// since 2026-07-28); `None` omits the field from the serialized body
+/// entirely.
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct DnsRecordBody {
     #[serde(rename = "type")]
@@ -52,15 +54,9 @@ pub struct DnsRecordBody {
     pub comment: Option<String>,
 }
 
-/// Build the record body for a Cloudflare upsert. `ttl=60`, `proxied=false`,
-/// no comment (the exclusive-lane / legacy shape).
-pub fn build_record_body(record_type: &str, name: &str, content: &str) -> DnsRecordBody {
-    build_record_body_with_comment(record_type, name, content, None)
-}
-
-/// Build the record body with an explicit `comment` (the shared lane's
-/// ownership+freshness stamp). `comment: None` produces the identical shape
-/// to [`build_record_body`].
+/// Build the record body for a Cloudflare upsert: `ttl=60`, `proxied=false`,
+/// and an optional `comment` (both lanes carry an ownership+freshness stamp
+/// since 2026-07-28; `comment: None` omits the key entirely).
 pub fn build_record_body_with_comment(
     record_type: &str,
     name: &str,
@@ -332,10 +328,31 @@ impl CloudflareSink {
         Ok(records.into_iter().next().map(|r| r.id))
     }
 
-    /// Exclusive-lane upsert: unchanged from the single-record design, no
-    /// `comment` — byte-identical wire shape.
+    /// Ownership stamp for exclusive-lane writes: the shared-lane owner slug
+    /// when configured (both alpha beacons set one), else a generic tool tag.
+    /// Written into the record `comment` so the zone itself names its writer —
+    /// the 2026-07-28 apex clobber was undiagnosable from the zone alone
+    /// because the exclusive lane wrote no provenance.
+    fn exclusive_stamp(&self) -> String {
+        let owner = self
+            .shared
+            .as_ref()
+            .map(|s| s.owner.as_str())
+            .unwrap_or("relay-addr-beacon");
+        format_owner_comment(owner, now_unix())
+    }
+
+    /// Exclusive-lane upsert. Since 2026-07-28 the body carries an ownership
+    /// stamp in `comment` (see [`Self::exclusive_stamp`]); before that it was
+    /// deliberately comment-less ("byte-identical to the single-record
+    /// design"), which left exclusive records with zero audit provenance.
     async fn upsert(&self, zone_id: &str, record_type: &str, content: &str) -> Result<()> {
-        let body = build_record_body(record_type, &self.record_name, content);
+        let body = build_record_body_with_comment(
+            record_type,
+            &self.record_name,
+            content,
+            Some(self.exclusive_stamp()),
+        );
         match self.existing_record_id(zone_id, record_type).await? {
             Some(record_id) => {
                 let url = format!("{}/zones/{zone_id}/dns_records/{record_id}", self.api_base);
@@ -566,10 +583,12 @@ impl CloudflareSink {
         Ok(())
     }
 
-    /// Run ONLY the shared lane (no exclusive `--record-name` upsert). Used by
-    /// the main loop's unchanged-address cycle so a freshness-only refresh
-    /// never re-touches the exclusive record or other sinks. A true no-op
-    /// (`Ok(())`, zero network calls) when this instance has no shared config.
+    /// Run ONLY the shared lane (no exclusive `--record-name` upsert). The
+    /// production unchanged-address path is [`Self::verify_freshness`] (which
+    /// covers BOTH lanes since the 2026-07-28 apex clobber); this remains the
+    /// shared-lane-only seam the shared-lane test suite isolates against.
+    /// A true no-op (`Ok(())`, zero network calls) with no shared config.
+    #[allow(dead_code)]
     pub async fn publish_shared_only(&self, update: &AddrUpdate) -> Result<()> {
         let Some(shared) = &self.shared else {
             return Ok(());
@@ -581,6 +600,98 @@ impl CloudflareSink {
             if let Some(v6) = update.wan_v6 {
                 self.publish_shared_lane(&zone_id, shared, "AAAA", &v6.to_string())
                     .await?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Exclusive-lane freshness verification (added after the 2026-07-28 apex
+    /// clobber: an external writer — a forgotten ddclient — PATCHed the
+    /// beacon-owned apex back 25s after publish, and the beacon never noticed
+    /// because the exclusive lane only wrote on a detected-address change; the
+    /// drift stood until a human diffed the zone). On unchanged-address
+    /// cycles this re-reads the record and re-asserts it if an external
+    /// writer clobbered or deleted it — read-only when everything matches,
+    /// so it adds one GET per cycle and writes only on actual drift. It also
+    /// backfills the ownership stamp onto adopted/hand-created records the
+    /// first time it sees them.
+    async fn verify_exclusive(
+        &self,
+        zone_id: &str,
+        record_type: &str,
+        content: &str,
+    ) -> Result<()> {
+        let records = self
+            .list_records(zone_id, record_type, &self.record_name)
+            .await?;
+        match records.first() {
+            None => {
+                warn!(
+                    record = %self.record_name,
+                    record_type,
+                    content,
+                    "cloudflare: exclusive record MISSING — re-asserting (externally deleted?)"
+                );
+                self.upsert(zone_id, record_type, content).await
+            }
+            Some(rec) if rec.content != content => {
+                warn!(
+                    record = %self.record_name,
+                    record_type,
+                    expected = content,
+                    observed = %rec.content,
+                    "cloudflare: exclusive record DRIFTED — re-asserting. An external writer clobbered it; if this repeats every cycle, two controllers are fighting over the record — find and retire the competing writer"
+                );
+                self.upsert(zone_id, record_type, content).await
+            }
+            Some(rec)
+                if rec
+                    .comment
+                    .as_deref()
+                    .and_then(parse_owner_comment)
+                    .is_none() =>
+            {
+                info!(
+                    record = %self.record_name,
+                    record_type,
+                    "cloudflare: exclusive record correct but unstamped — backfilling ownership provenance comment"
+                );
+                self.upsert(zone_id, record_type, content).await
+            }
+            Some(_) => {
+                debug!(
+                    record = %self.record_name,
+                    record_type,
+                    "cloudflare: exclusive record fresh — no-op"
+                );
+                Ok(())
+            }
+        }
+    }
+
+    /// Full freshness pass for an unchanged-address cycle: verify (and only
+    /// on drift, re-assert) the exclusive lane, then run the shared lane's
+    /// stamp refresh + sibling reap. This is the sink's self-healing surface —
+    /// [`Sink::publish`] handles address changes, this handles the world
+    /// changing underneath an unchanged address.
+    pub async fn verify_freshness(&self, update: &AddrUpdate) -> Result<()> {
+        let zone_id = self.zone_id().await?;
+        self.verify_exclusive(&zone_id, "A", &update.wan_v4.to_string())
+            .await?;
+        if self.enable_v6 {
+            if let Some(v6) = update.wan_v6 {
+                self.verify_exclusive(&zone_id, "AAAA", &v6.to_string())
+                    .await?;
+            }
+        }
+        if let Some(shared) = &self.shared {
+            self.publish_shared_lane(&zone_id, shared, "A", &update.wan_v4.to_string())
+                .await?;
+            if self.enable_v6 {
+                if let Some(v6) = update.wan_v6 {
+                    self.publish_shared_lane(&zone_id, shared, "AAAA", &v6.to_string())
+                        .await?;
+                }
             }
         }
         Ok(())
@@ -622,7 +733,7 @@ mod tests {
 
     #[test]
     fn a_record_body_shape() {
-        let body = build_record_body("A", "turn.elohim.host", "203.0.113.7");
+        let body = build_record_body_with_comment("A", "turn.elohim.host", "203.0.113.7", None);
         let value = serde_json::to_value(&body).unwrap();
         assert_eq!(
             value,
@@ -634,15 +745,15 @@ mod tests {
                 "proxied": false
             })
         );
-        // Regression: the legacy/exclusive-lane body must never carry a
-        // `comment` key at all (not even `null`) — the wire shape stays
-        // byte-identical to the pre-shared-mode design.
+        // `comment: None` must omit the key entirely (not even `null`). NOTE:
+        // since 2026-07-28 the exclusive-lane upsert itself always passes a
+        // stamp (see exclusive_upsert_carries_owner_stamp).
         assert!(!value.as_object().unwrap().contains_key("comment"));
     }
 
     #[test]
     fn aaaa_record_body_shape() {
-        let body = build_record_body("AAAA", "turn.elohim.host", "2001:db8::1");
+        let body = build_record_body_with_comment("AAAA", "turn.elohim.host", "2001:db8::1", None);
         let value = serde_json::to_value(&body).unwrap();
         assert_eq!(value["type"], "AAAA");
         assert_eq!(value["content"], "2001:db8::1");
@@ -1265,9 +1376,13 @@ mod shared_lane_tests {
         );
     }
 
-    // (h) legacy exclusive lane requests carry NO comment field.
+    // (h) exclusive-lane requests carry an ownership stamp (2026-07-28: the
+    // pre-incident design wrote NO comment, which left beacon-owned records
+    // with zero audit provenance — the apex clobber was undiagnosable from
+    // the zone alone). With no shared owner configured, the stamp falls back
+    // to the generic tool slug.
     #[tokio::test]
-    async fn exclusive_lane_body_has_no_comment_field() {
+    async fn exclusive_upsert_carries_owner_stamp() {
         let server = MockServer::start().await;
         mount_zone_lookup(&server).await;
         // Exclusive-lane list: empty -> POST create.
@@ -1306,9 +1421,176 @@ mod shared_lane_tests {
             .expect("expected a POST create request");
         let body: serde_json::Value = create.body_json().unwrap();
         assert!(
-            !body.as_object().unwrap().contains_key("comment"),
-            "exclusive-lane body must never carry a comment field: {body:?}"
+            body["comment"]
+                .as_str()
+                .expect("exclusive-lane body must carry an ownership stamp comment")
+                .starts_with("beacon-owner=relay-addr-beacon; ts="),
+            "exclusive-lane stamp malformed: {body:?}"
         );
+    }
+
+    /// Mounts the exclusive-name list GET for the "A" type, returning
+    /// `records` verbatim.
+    async fn mount_exclusive_list(server: &MockServer, records: serde_json::Value) {
+        Mock::given(method("GET"))
+            .and(path(format!("/zones/{ZONE_ID}/dns_records")))
+            .and(query_param("type", "A"))
+            .and(query_param("name", EXCLUSIVE_NAME))
+            .respond_with(ResponseTemplate::new(200).set_body_json(envelope_ok(records)))
+            .mount(server)
+            .await;
+    }
+
+    /// Exclusive-lane-only sink (no shared config) — isolates verify_freshness
+    /// to the exclusive lane.
+    fn sink_exclusive_only(server: &MockServer) -> CloudflareSink {
+        CloudflareSink::new(
+            reqwest::Client::new(),
+            "test-token".to_string(),
+            ZONE.to_string(),
+            EXCLUSIVE_NAME.to_string(),
+            false,
+            None,
+        )
+        .with_api_base(server.uri())
+    }
+
+    // (j) freshness verify: fresh record with a valid stamp -> zero mutation.
+    #[tokio::test]
+    async fn verify_freshness_is_readonly_when_record_fresh() {
+        let server = MockServer::start().await;
+        mount_zone_lookup(&server).await;
+        mount_exclusive_list(
+            &server,
+            json!([
+                { "id": "excl-1", "content": "203.0.113.7", "comment": format_owner_comment("relay-addr-beacon", 1_700_000_000) },
+            ]),
+        )
+        .await;
+        // No PATCH/POST mounted — any mutating attempt 404s and fails the call.
+
+        let s = sink_exclusive_only(&server);
+        s.verify_freshness(&update([203, 0, 113, 7])).await.unwrap();
+
+        assert_eq!(
+            count_requests(&server, "POST", &format!("/zones/{ZONE_ID}/dns_records")).await,
+            0
+        );
+    }
+
+    // (k) freshness verify: external writer clobbered the content -> re-assert
+    //     via PATCH. THE regression for the 2026-07-28 ddclient apex clobber.
+    #[tokio::test]
+    async fn verify_freshness_reasserts_on_external_clobber() {
+        let server = MockServer::start().await;
+        mount_zone_lookup(&server).await;
+        mount_exclusive_list(
+            &server,
+            json!([
+                { "id": "excl-1", "content": "198.51.100.9", "comment": format_owner_comment("relay-addr-beacon", 1_700_000_000) },
+            ]),
+        )
+        .await;
+        mount_patch(&server, "excl-1").await;
+
+        let s = sink_exclusive_only(&server);
+        s.verify_freshness(&update([203, 0, 113, 7])).await.unwrap();
+
+        assert_eq!(
+            count_requests(
+                &server,
+                "PATCH",
+                &format!("/zones/{ZONE_ID}/dns_records/excl-1")
+            )
+            .await,
+            1
+        );
+        // And the re-asserted body carries the corrected content + stamp.
+        let requests = server.received_requests().await.unwrap();
+        let patch = requests
+            .iter()
+            .find(|r| r.method.as_str() == "PATCH")
+            .unwrap();
+        let body: serde_json::Value = patch.body_json().unwrap();
+        assert_eq!(body["content"], "203.0.113.7");
+        assert!(body["comment"]
+            .as_str()
+            .unwrap()
+            .starts_with("beacon-owner="));
+    }
+
+    // (l) freshness verify: record externally deleted -> re-create via POST.
+    #[tokio::test]
+    async fn verify_freshness_recreates_missing_record() {
+        let server = MockServer::start().await;
+        mount_zone_lookup(&server).await;
+        mount_exclusive_list(&server, json!([])).await;
+        mount_create(&server, "excl-new").await;
+
+        let s = sink_exclusive_only(&server);
+        s.verify_freshness(&update([203, 0, 113, 7])).await.unwrap();
+
+        assert_eq!(
+            count_requests(&server, "POST", &format!("/zones/{ZONE_ID}/dns_records")).await,
+            1
+        );
+    }
+
+    // (m) freshness verify: content correct but no ownership stamp (adopted
+    //     hand-created record) -> one-time provenance backfill PATCH.
+    #[tokio::test]
+    async fn verify_freshness_backfills_missing_stamp() {
+        let server = MockServer::start().await;
+        mount_zone_lookup(&server).await;
+        mount_exclusive_list(
+            &server,
+            json!([
+                { "id": "excl-1", "content": "203.0.113.7", "comment": serde_json::Value::Null },
+            ]),
+        )
+        .await;
+        mount_patch(&server, "excl-1").await;
+
+        let s = sink_exclusive_only(&server);
+        s.verify_freshness(&update([203, 0, 113, 7])).await.unwrap();
+
+        assert_eq!(
+            count_requests(
+                &server,
+                "PATCH",
+                &format!("/zones/{ZONE_ID}/dns_records/excl-1")
+            )
+            .await,
+            1
+        );
+    }
+
+    // (n) freshness verify with shared mode: both lanes run off ONE zone
+    //     lookup — exclusive verified, shared stamp refreshed.
+    #[tokio::test]
+    async fn verify_freshness_runs_both_lanes_with_single_zone_lookup() {
+        let server = MockServer::start().await;
+        mount_zone_lookup(&server).await;
+        let now = now_unix();
+        mount_exclusive_list(
+            &server,
+            json!([
+                { "id": "excl-1", "content": "203.0.113.7", "comment": format_owner_comment(OWNER, now - 5) },
+            ]),
+        )
+        .await;
+        mount_shared_list(
+            &server,
+            json!([
+                { "id": "mine", "content": "203.0.113.7", "comment": format_owner_comment(OWNER, now - 5) },
+            ]),
+        )
+        .await;
+
+        let s = sink(&server, shared_cfg());
+        s.verify_freshness(&update([203, 0, 113, 7])).await.unwrap();
+
+        assert_eq!(count_requests(&server, "GET", "/zones").await, 1);
     }
 
     // (i) FIX 3: AAAA shared lane, create-when-absent. Proves the AAAA list

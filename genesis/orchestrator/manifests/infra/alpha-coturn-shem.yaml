@@ -164,7 +164,7 @@ spec:
         # Bump when the base ConfigMap changes: the beacon re-renders
         # /run/turnserver.conf only on WAN-IP change, so a conf edit without a
         # pod restart never reaches the running relay.
-        elohim.host/conf-revision: "2026-07-27-pod-cidr-carveout"
+        elohim.host/conf-revision: "2026-07-28-beacon-freshness-verify"
       labels:
         app: coturn
         relay-leg: shem

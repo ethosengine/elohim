@@ -187,24 +187,27 @@ async fn run_sinks(sinks: &[ActiveSink], update: &AddrUpdate) -> bool {
     all_ok
 }
 
-/// Run ONLY the Cloudflare sink's shared "logical anycast" lane (skips its
-/// exclusive `--record-name` lane and every other sink entirely). Used on an
-/// unchanged-address cycle when shared mode is configured, so the periodic
-/// freshness-stamp refresh (and stale-sibling reap) doesn't starve — without
-/// re-touching sinks that have nothing to do. See `cycle`'s doc comment for
-/// why this is the least-churn structure.
-async fn run_shared_refresh_only(sinks: &[ActiveSink], update: &AddrUpdate) -> bool {
+/// Run ONLY the Cloudflare sink's freshness verification (every other sink is
+/// untouched). Used on an unchanged-address cycle: verifies the exclusive
+/// `--record-name` record still holds what we published (re-asserting on
+/// external clobber/deletion — the 2026-07-28 apex incident: a forgotten
+/// ddclient PATCHed the beacon-owned apex back 25s after publish and the
+/// drift stood undetected), and runs the shared lane's periodic
+/// freshness-stamp refresh + stale-sibling reap. Read-only when nothing
+/// drifted. See `cycle`'s doc comment for why this is the least-churn
+/// structure.
+async fn run_freshness_verify(sinks: &[ActiveSink], update: &AddrUpdate) -> bool {
     let mut all_ok = true;
     for sink in sinks {
         if let ActiveSink::Cloudflare(cf) = sink {
-            match cf.publish_shared_only(update).await {
-                Ok(()) => info!(sink = cf.name(), "shared-lane freshness refresh ok"),
+            match cf.verify_freshness(update).await {
+                Ok(()) => info!(sink = cf.name(), "cloudflare freshness verify ok"),
                 Err(e) => {
                     all_ok = false;
                     error!(
                         sink = cf.name(),
                         error = %format!("{e:#}"),
-                        "shared-lane freshness refresh failed"
+                        "cloudflare freshness verify failed"
                     );
                 }
             }
@@ -216,21 +219,23 @@ async fn run_shared_refresh_only(sinks: &[ActiveSink], update: &AddrUpdate) -> b
 /// One detect->(maybe publish)->persist cycle. `force` runs sinks regardless of
 /// change (used by `--once`). Returns true if the cycle is fully healthy.
 ///
-/// Unchanged-address branching: with NO shared mode configured, this is
-/// unchanged legacy behavior — a no-op cycle skips every sink. With shared
-/// mode configured, a global skip would starve the shared lane's periodic
-/// freshness-stamp refresh and stale-sibling reap (a beacon whose WAN IP
-/// never changes must still periodically re-stamp, or a sibling would
-/// eventually reap it as abandoned). The alternative — running every sink
-/// unconditionally every cycle — was rejected: the pkarr sink re-signs and
-/// PUTs on every call with no idempotency check, and the Cloudflare exclusive
-/// lane's `upsert` unconditionally PATCHes/POSTs with no content-diff guard,
-/// so both would needlessly hammer their APIs every poll interval forever
-/// (coturn's sink *does* already no-op on an identical rendered config, but
-/// that alone doesn't make "run everything" churn-free). So on an unchanged
-/// cycle with shared mode configured, only the Cloudflare shared lane runs;
-/// state is not persisted (the address itself is unchanged, so there is
-/// nothing new to persist) and no other sink is touched.
+/// Unchanged-address branching: with a Cloudflare sink enabled, an unchanged
+/// cycle runs its FRESHNESS VERIFICATION — a read-mostly pass that (a)
+/// re-reads the exclusive `--record-name` record and re-asserts it only if an
+/// external writer clobbered or deleted it (2026-07-28: a forgotten ddclient
+/// reverted the beacon-owned apex 25s after publish, and the old
+/// publish-only-on-address-change design left the drift standing
+/// indefinitely), and (b) runs the shared lane's periodic freshness-stamp
+/// refresh and stale-sibling reap (a beacon whose WAN IP never changes must
+/// still re-stamp, or a sibling would eventually reap it as abandoned). The
+/// alternative — running every sink unconditionally every cycle — remains
+/// rejected: the pkarr sink re-signs and PUTs on every call with no
+/// idempotency check, and the Cloudflare `upsert` unconditionally
+/// PATCHes/POSTs, so both would hammer their APIs every poll interval
+/// (verification only WRITES on observed drift). State is not persisted on
+/// these cycles (the address itself is unchanged) and no other sink is
+/// touched; with no Cloudflare sink enabled, an unchanged cycle skips every
+/// sink as before.
 async fn cycle(
     cfg: &Config,
     client: &reqwest::Client,
@@ -255,11 +260,12 @@ async fn cycle(
     );
 
     if !changed && !force {
-        if cfg.shared_record_name.is_some() {
+        let has_cloudflare = sinks.iter().any(|s| matches!(s, ActiveSink::Cloudflare(_)));
+        if has_cloudflare {
             info!(
-                "no change since last publish — running cloudflare shared-lane freshness refresh only"
+                "no change since last publish — running cloudflare freshness verification (exclusive + shared lanes)"
             );
-            return Ok(run_shared_refresh_only(sinks, &update).await);
+            return Ok(run_freshness_verify(sinks, &update).await);
         }
         info!("no change since last publish — skipping sinks");
         return Ok(true);
