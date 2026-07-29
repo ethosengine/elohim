@@ -78,6 +78,27 @@ Feature: Chapter 6 — blobs sync to one head
   #     differ. Probe: GET /db/content/elohim-host-landing/head on both doorways.
   #   current state: born red until the adopt-before-author sweep has run on a
   #     restarted elohim.host (one reconcile cadence past restart-churn).
+  # Station (minted 2026-07-29, DoD-1 probe evidence): the adopt station's
+  # premise — B is headless and should take A's declaration — no longer holds.
+  # Probed live: BOTH doorways answer /db/content/elohim-host-landing/head
+  # with declared:true, trust:notarized — A=uhCkk78Z… (declaredAt 08:56:34Z)
+  # vs B=uhCkkl4C9… (10:30:38Z, NEWER, different blobHash). Heal is
+  # structurally forbidden from moving a declared head (fills-never-moves),
+  # so "B adopts A" as written would demand a backward move the invariants
+  # correctly refuse.
+  #
+  #   chain: saga-06-heads-converge
+  #   between: adopt station (above) -> anchor equality (finish line below)
+  #   missing node: a declared-vs-declared conflict rule — when two peers
+  #     each hold a declared, notarized head for the same id, which
+  #     declaration wins? The forward-ordering guard (declared_at newer)
+  #     says B's; the operator's deploy intent may say A's. Probe: both
+  #     /head responses declared:true with unequal headActionHash — today
+  #     that state is invisible (each side reads locally-green).
+  #   current state: OPEN — blocked behind the shem-conductor DHT silence
+  #     (backlog: shem-conductors-signal-hairpin-suspect-dht-silent) and an
+  #     operator head-direction decision; the canonical channel (declare
+  #     with carried record) is the lever once both are resolved.
   Scenario: elohim.host adopts alpha-A's declared head after a restart
     Given peer "elohim.host" at "elohim.host"
     Then peer "elohim.host" resolves the declared head for content "elohim-host-landing" equal to peer "alpha-A"
