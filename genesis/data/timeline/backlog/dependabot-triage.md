@@ -7,14 +7,14 @@ title: "Triage Dependabot backlog — 191 vulnerabilities (1 critical, 113 high)
 slug: "dependabot-triage"
 written: "2026-06-02"
 author: "cartographer"
-status: "backlog"
+status: "wip"
 priority: "high"
 area: "cargo"
 recurrence: 2
 source_shifts:
   - "2026-05-17"
 domain: "operator"
-deprecation_status: blocked
+deprecation_status: triaged
 severity: security
 fingerprints: [c4bc9714e080]
 relatedNodeIds:
@@ -106,9 +106,44 @@ cargo traps:
 4. **Vendored subrepos** (`rust-ipfs`/`brit`/`rakia`) — decide whether their advisories are
    in-scope (we build them) or should be excluded from the top-level surface.
 
-## Current decision (blocked — operator-initiated sprint)
+## Current decision (2026-07-29 — IN FLIGHT, campaign underway)
 
-**BLOCKED.** This is a security-class concern whose remediation crosses a dependency-major /
+**The operator-initiated sprint this entry called for has started.** The alert surface is now
+decomposed into eleven write-disjoint cluster files at repo root,
+`VULNERABILITY_CLUSTER_{01..10,12}_*.md` (there is no cluster 11) — clusters 01–06 npm,
+07–10 + 12 cargo. Cluster 06 is the sole permitted `pnpm-lock.yaml` writer; 01–05 hand it
+target ranges. Clusters 09 and 10 have landed real remediations with locked-check evidence.
+
+Three inherited "hard blockers" were re-probed on 2026-07-29 and **two were environment
+artifacts, not upstream constraints**:
+
+1. **"Missing Nexus package versions" — partly stale.** The `elohim-mirror` Nexus cargo group
+   is reachable and serving (it fetched ~30 crates during verification). Transient outages had
+   been recorded as permanent blockers in clusters 07/08. Nexus is a fetch layer only, so it
+   was never the right lever for a *resolution* conflict either way.
+2. **"pnpm blocked" — false in this environment.** Cluster 06's `ENOENT ... mkdir
+   '/nix/xdg/cache/pnpm/store/v11'` was one agent's sandbox. Here `pnpm config get registry`
+   → `https://nexus.ethosengine.com/repository/npm/` and `pnpm store path` →
+   `/projects/.pnpm-store/v11`. **All ~195 npm alerts are actionable.**
+3. **"Holochain's serde pin blocks `time`" — real conflict, wrong verdict.** The mechanism is
+   a `serde_derive` exact-pin collision (`holochain_serialized_bytes 0.0.56` → `serde
+   =1.0.219` → `serde_derive =1.0.219`), not `serde` vs `serde_core`. But **hsb `0.0.57`
+   declares `serde = "=1.0.228"`**, and the Holochain 0.7 family moved `-dev.N` → `-rc.N` with
+   every rc requiring hsb `=0.0.57`. serde 1.0.228 satisfies `jsonwebtoken 10.3.0`,
+   `time 0.3.47` and `serde_with 3.19` — so a dev→rc bump closes that advisory class. **This is
+   our decision, not upstream's.** Recorded in `memory:project_serde_wall_escapable_via_hsb_057`.
+
+**The remaining operator ceiling is the Tier-2 half of that bump.** 16 lockfiles sit on hsb
+0.0.56. Tier 1 (native services: doorway, elohim-storage, steward/node) is agent-executable —
+separate workspaces, no DNA hash movement — though a client-library dev→rc bump cannot
+self-certify wire compatibility against a dev-line conductor. Tier 2 (the 5 DNAs,
+`holochain/rna/rust`, `tests/sweettest`, the 6 `sdk/domains/*/types` crates) moves the DNA hash
+→ `ALLOW_DNA_REINSTALL`, new agent keys, prod migration/lineage. **That is the operator call
+this entry still guards.**
+
+### Prior decision (2026-06-06 — superseded by the above)
+
+This is a security-class concern whose remediation crosses a dependency-major /
 >20-file surface (33 Cargo.lock files, ~1,398 crates, two large pnpm trees) and whose core
 work — per-advisory disposition and any risk-acceptance — is explicitly an operator/maintainer
 decision. Per the deprecation-triage hard rule ("if the fix would touch >20 files or change a
@@ -125,6 +160,14 @@ that changes the org-wide update cadence is itself an operator policy choice.
 
 ## Acceptance
 
-All 191 alerts have a reviewed disposition; the critical+high-severity reachable subset has a
-remediation plan. Re-check trigger: the next push banner whose count differs from 191 (the
-sentinel will re-capture as a new fingerprint), or operator pickup of the shift_objective.
+Every alert has a reviewed disposition; the critical+high-severity reachable subset has a
+remediation plan. Re-check trigger: the next push banner whose count differs (the sentinel will
+re-capture as a new fingerprint), or operator pickup of the shift_objective.
+
+**Campaign surface as decomposed (2026-07-29): 304 unique alert IDs, span #482–#785** — larger
+than the 191 in this entry's title, which is the historical 2026-06-06 push banner. Per-cluster:
+01/15 · 02/34 · 03/88 · 04/57 · 05/1 · 06/15 · 07/36 · 08/31 · 09/21 · 10/11 · 12/10. The
+authoritative live list remains the cited GitHub security tab (an operator-token read — `gh` CLI
+and the dependabot alerts API are both unavailable from the dev environment). Per-cluster
+disposition and evidence live in the cluster files, which are the working surface; this entry
+tracks the campaign's decision state and the operator ceiling only.
