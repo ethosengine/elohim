@@ -289,6 +289,99 @@ fn a_red_report_with_no_prior_green_is_skipped_not_dismissed() {
 }
 
 #[test]
+fn regression_re_commitment_re_produces_after_a_dismissed_regression() {
+    let dir = fixture();
+    let root = dir.path();
+    let recipes = root.join(".claude/epr-meta/recipes.yaml");
+    project::project(root, &recipes).expect("project runs");
+
+    // Produce: initial green fulfillment discharges the commitment.
+    let green_report = root.join("report-green.json");
+    write_report(
+        root,
+        "report-green.json",
+        "2026-07-25T00:00:00Z",
+        "run-1",
+        0,
+        0,
+        1,
+    );
+    fulfill(root, &green_report, &FulfillOptions::default()).expect("green run");
+
+    // Dismiss: a later red run regresses the discharged commitment.
+    let red_report = root.join("report-red.json");
+    write_report(
+        root,
+        "report-red.json",
+        "2026-07-25T02:00:00Z",
+        "run-2",
+        1,
+        0,
+        0,
+    );
+    fulfill(root, &red_report, &FulfillOptions::default()).expect("red run");
+
+    // Recovery: a fresh all-green report must re-produce, NOT count already_fulfilled —
+    // this is the regression re-commitment the bug leaves sticky forever.
+    let recovered_report = root.join("report-recovered.json");
+    write_report(
+        root,
+        "report-recovered.json",
+        "2026-07-25T04:00:00Z",
+        "run-3",
+        0,
+        0,
+        1,
+    );
+    let summary =
+        fulfill(root, &recovered_report, &FulfillOptions::default()).expect("recovery run");
+
+    assert_eq!(
+        summary.refulfilled, 1,
+        "regression re-commitment counted distinctly from fulfilled_new/already_fulfilled"
+    );
+    assert_eq!(
+        summary.fulfilled_new, 0,
+        "not a brand-new commitment fulfillment"
+    );
+    assert_eq!(summary.already_fulfilled, 0);
+
+    let store = SidecarFlowStore::open(root).unwrap();
+    let produce_events: Vec<_> = store
+        .events()
+        .unwrap()
+        .into_iter()
+        .filter(|(_, e)| e.action == ReaVerb::Produce && !e.fulfills.is_empty())
+        .collect();
+    assert_eq!(
+        produce_events.len(),
+        2,
+        "the original fulfilling Produce plus the recovery Produce"
+    );
+
+    // Re-running the SAME recovered report is a true no-op — idempotent, no duplicate.
+    let second = fulfill(root, &recovered_report, &FulfillOptions::default()).expect("rerun");
+    assert_eq!(second.refulfilled, 0);
+    assert_eq!(
+        second.already_fulfilled, 1,
+        "latest event is now Produce again — steady state, no re-commitment needed"
+    );
+
+    let produce_events_2: Vec<_> = SidecarFlowStore::open(root)
+        .unwrap()
+        .events()
+        .unwrap()
+        .into_iter()
+        .filter(|(_, e)| e.action == ReaVerb::Produce && !e.fulfills.is_empty())
+        .collect();
+    assert_eq!(
+        produce_events_2.len(),
+        2,
+        "no duplicate Produce appended on rerun"
+    );
+}
+
+#[test]
 fn ambiguous_surface_errors_instead_of_guessing() {
     let dir = fixture();
     let root = dir.path();

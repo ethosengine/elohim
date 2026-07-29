@@ -9,7 +9,18 @@
 //!
 //! - **all-green** (`failed==0 && pending==0 && passed>0`) and not yet discharged → append a
 //!   `Produce` `FlowEvent` fulfilling the commitment (unit `green-run`).
-//! - **already discharged** → no-op, counted `already_fulfilled`.
+//! - **all-green**, discharged, and the LATEST event associated with the commitment (in
+//!   sidecar append order — `records()`'s order) is a `Dismiss` → **regression re-commitment**:
+//!   append a fresh `Produce` `FlowEvent` (unit `green-run`) re-fulfilling it, counted
+//!   `refulfilled` — distinct from `fulfilled_new` (a first-ever fulfillment) and
+//!   `already_fulfilled` (steady-state, nothing to do). Without this, a chapter that regresses
+//!   once (a red run after a prior green) stays "regressed" forever even after CI goes green
+//!   again, because the ordinary `discharged` check only asks "was there ever a Produce", not
+//!   "is the LATEST event a Produce" — `.claude/scripts/saga-status.py` reads the same sidecar
+//!   and derives its `regressed` state from that same latest-event question (its
+//!   `index_flow_state`), so the two tools must agree on "latest".
+//! - **all-green**, discharged, and the latest associated event is a `Produce` (no intervening
+//!   regression, or a regression already re-committed) → no-op, counted `already_fulfilled`.
 //! - **red** (`failed>0`) and discharged → append a `Dismiss` `FlowEvent` (unit `red-run`,
 //!   `fulfills` empty) — a regression on a previously-green chapter.
 //! - **red** and never discharged → no-op, counted `skipped_red` (nothing to reverse).
@@ -18,9 +29,12 @@
 //! Identity is the atom CID exactly as everywhere else in this crate: an event's CID is
 //! fully determined by its fields (including `occurred_at`, sourced from the report's own
 //! `generatedAt` — never a wall-clock read), so re-running the SAME report is naturally a
-//! no-op (the CID is already in the sidecar) and a DIFFERENT green report against an
-//! already-discharged commitment is a no-op via the `discharged` check before an event is
-//! even constructed. `--dry-run` runs the full matching pass and skips only the append.
+//! no-op. For a first-ever fulfillment this is the `discharged`-set check before an event is
+//! even constructed; for a regression re-commitment, re-running the SAME recovery report
+//! finds the LATEST event is now the recovery `Produce` itself (not a `Dismiss` anymore), so
+//! the second run falls into the ordinary `already_fulfilled` no-op path without ever
+//! re-examining the atom-CID dedupe — the state-machine already advanced. `--dry-run` runs the
+//! full matching pass and skips only the append.
 
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
@@ -102,6 +116,10 @@ pub struct FulfillSummary {
     pub dry_run: bool,
     pub fulfilled_new: usize,
     pub already_fulfilled: usize,
+    /// A regression re-commitment: the commitment was discharged, then regressed (its
+    /// LATEST associated event was a `Dismiss`), and this all-green report re-fulfills it
+    /// with a fresh `Produce` — distinct from a first-ever `fulfilled_new`.
+    pub refulfilled: usize,
     pub skipped_red: usize,
     pub skipped_pending: usize,
     pub regressions_dismissed: usize,
@@ -118,6 +136,7 @@ impl FulfillSummary {
             println!("  (dry run — no records appended)");
         }
         println!("  fulfilled (new):       {}", self.fulfilled_new);
+        println!("  re-fulfilled (recovery): {}", self.refulfilled);
         println!("  already fulfilled:     {}", self.already_fulfilled);
         println!("  skipped (red):         {}", self.skipped_red);
         println!("  skipped (pending):     {}", self.skipped_pending);
@@ -193,6 +212,7 @@ pub fn fulfill(
         dry_run: opts.dry_run,
         fulfilled_new: 0,
         already_fulfilled: 0,
+        refulfilled: 0,
         skipped_red: 0,
         skipped_pending: 0,
         regressions_dismissed: 0,
@@ -242,7 +262,37 @@ pub fn fulfill(
 
             if all_green {
                 if discharged.contains(commit_cid) {
-                    summary.already_fulfilled += 1;
+                    if commitment_latest_action(&records, commit_cid) == Some(ReaVerb::Dismiss) {
+                        // Regression re-commitment: discharged, then regressed, now green
+                        // again — a fresh Produce re-fulfills it (module doc above).
+                        let resource = body_cid_of_file(&root.join(commit_path))
+                            .ok_or_else(|| FlowError::UnknownResource(commit_path.clone()))?;
+                        let event = FlowEvent {
+                            action: ReaVerb::Produce,
+                            provider: AgentRef(CI_AGENT.to_string()),
+                            receiver: repo_agent(),
+                            resource,
+                            quantity: Magnitude::Count {
+                                value: 1.0,
+                                unit: "green-run".to_string(),
+                            },
+                            process: None,
+                            in_scope_of: repo_scope,
+                            fulfills: vec![*commit_cid],
+                            satisfies: Vec::new(),
+                            occurred_at: report.generated_at.clone(),
+                        };
+                        stage_or_count(
+                            event,
+                            &existing_cids,
+                            &mut staged_cids,
+                            &mut to_append,
+                            &mut summary.refulfilled,
+                            &mut summary.already_fulfilled,
+                        )?;
+                    } else {
+                        summary.already_fulfilled += 1;
+                    }
                     continue;
                 }
                 let resource = body_cid_of_file(&root.join(commit_path))
@@ -316,6 +366,37 @@ pub fn fulfill(
     }
 
     Ok(summary)
+}
+
+/// The action of the LATEST event associated with a commitment, in sidecar append order
+/// (`records()`'s own order — the file's line order, since `SidecarFlowStore::append` is
+/// strictly append-only). An event is "associated" the same way `saga-status.py`'s
+/// `index_flow_state` associates one: a `Produce` naming `commit_cid` directly in its
+/// `fulfills`, or a `Dismiss` whose `resource` matches the resource FIRST learned from such a
+/// `Produce` (Dismiss events carry an empty `fulfills` — see the module doc). Returns `None`
+/// if the commitment has no associated events at all (never called on an undischarged
+/// commitment in practice, since callers gate on the `discharged` set first).
+fn commitment_latest_action(records: &[(Cid, FlowRecord)], commit_cid: &Cid) -> Option<ReaVerb> {
+    let mut resource: Option<Cid> = None;
+    let mut latest: Option<ReaVerb> = None;
+    for (_, record) in records {
+        let FlowRecord::Event(e) = record else {
+            continue;
+        };
+        match e.action {
+            ReaVerb::Produce if e.fulfills.contains(commit_cid) => {
+                if resource.is_none() {
+                    resource = Some(e.resource);
+                }
+                latest = Some(ReaVerb::Produce);
+            }
+            ReaVerb::Dismiss if resource == Some(e.resource) => {
+                latest = Some(ReaVerb::Dismiss);
+            }
+            _ => {}
+        }
+    }
+    latest
 }
 
 /// Stage a freshly-built event for append unless its atom CID is already present (either in
