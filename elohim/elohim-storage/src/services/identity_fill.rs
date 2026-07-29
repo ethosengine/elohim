@@ -313,46 +313,6 @@ pub async fn discover_household_pairs(
 
     crate::metrics::set_identity_fill_discovered_cids(union.len() as u64);
 
-    // Gap-fill the LOCAL collectives row's NULL collective_cid from this same
-    // discovered union — the other half of the collectives-arm bootstrap gap
-    // (`backlog-collectives-arm-bootstrap-gap-no-stamped-cid-anywhere`).
-    // Discovery alone fills `humans.household_id`/`agent_pub_key`; nothing
-    // else stamps the LOCAL `collectives` row, so its inventory (filtered
-    // `collective_cid IS NOT NULL`) never had anything to advertise and the
-    // cross-peer collectives reconcile arm stayed at zero fleet-wide.
-    // Best-effort: a pool checkout or write failure degrades to a WARN,
-    // never aborting discovery (the membership snapshot read below is the
-    // primary product of this function).
-    if !union.is_empty() {
-        match pool.get() {
-            Ok(mut conn) => {
-                match crate::db::collectives::gap_fill_household_collective_cid_from_discovery(
-                    &mut conn, ctx, &union,
-                ) {
-                    Ok(crate::db::collectives::HouseholdCidGapFillOutcome::Stamped) => {
-                        crate::metrics::inc_identity_fill_collective_cid_stamped();
-                    }
-                    Ok(_) => {
-                        // AlreadyKnown / NoCandidateRow / Mismatch / Ambiguous /
-                        // RacedElsewhere — all non-error, no metric to bump.
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            error = %e,
-                            "identity_fill: household collective_cid gap-fill failed (non-fatal, retried next sweep)"
-                        );
-                    }
-                }
-            }
-            Err(e) => {
-                tracing::warn!(
-                    error = %e,
-                    "identity_fill: pool checkout for collective_cid gap-fill failed (non-fatal)"
-                );
-            }
-        }
-    }
-
     if union.is_empty() {
         // Previously DEBUG-only (see also `holochain_humans_replayer.rs`'s
         // `snapshot_household_ids_for_cids` empty-cids early return), this case
@@ -370,7 +330,75 @@ pub async fn discover_household_pairs(
             "identity_fill: discovered household collective cids (projection ∪ source-chain)"
         );
     }
-    snapshot_household_ids_for_cids(reader, &union).await
+
+    let snapshot = snapshot_household_ids_for_cids(reader, &union).await?;
+
+    // Gap-fill the LOCAL collectives row's NULL collective_cid from this SAME
+    // membership snapshot — the other half of the collectives-arm bootstrap
+    // gap (`backlog-collectives-arm-bootstrap-gap-no-stamped-cid-anywhere`).
+    // Discovery alone fills `humans.household_id`/`agent_pub_key`; nothing
+    // else stamps the LOCAL `collectives` row, so its inventory (filtered
+    // `collective_cid IS NOT NULL`) never had anything to advertise and the
+    // cross-peer collectives reconcile arm stayed at zero fleet-wide.
+    //
+    // The genesis seed data plants MANY un-anchored `governance_layer=family`
+    // rows locally (one per real+fixture household in the shared reference
+    // dataset), so a cardinality guard ("the lone un-anchored row") never
+    // holds in production. Instead, resolve deterministically THROUGH the
+    // household's own membership: group the snapshot pairs by household cid
+    // and let `gap_fill_household_collective_cid_via_membership` join each
+    // cid's members to their EXISTING `humans` rows (the same agent-key
+    // lookup `apply_membership_fill`'s short-circuit performs) to recover a
+    // slug-form `household_id` unambiguously.
+    //
+    // Best-effort per household: a pool checkout or write failure degrades to
+    // a WARN, never aborting discovery (the membership snapshot is the
+    // primary product of this function).
+    if !snapshot.pairs.is_empty() {
+        match pool.get() {
+            Ok(mut conn) => {
+                let mut members_by_cid: std::collections::HashMap<&str, Vec<String>> =
+                    std::collections::HashMap::new();
+                for (member_cid, household_cid) in &snapshot.pairs {
+                    members_by_cid
+                        .entry(household_cid.as_str())
+                        .or_default()
+                        .push(member_cid.clone());
+                }
+                for (cid, member_cids) in &members_by_cid {
+                    match crate::db::collectives::gap_fill_household_collective_cid_via_membership(
+                        &mut conn,
+                        ctx,
+                        cid,
+                        member_cids,
+                    ) {
+                        Ok(crate::db::collectives::HouseholdCidGapFillOutcome::Stamped) => {
+                            crate::metrics::inc_identity_fill_collective_cid_stamped();
+                        }
+                        Ok(_) => {
+                            // AlreadyKnown / NoCandidateRow / Mismatch / Ambiguous /
+                            // RacedElsewhere — all non-error, no metric to bump.
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                collective_cid = %cid,
+                                error = %e,
+                                "identity_fill: household collective_cid gap-fill failed (non-fatal, retried next sweep)"
+                            );
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "identity_fill: pool checkout for collective_cid gap-fill failed (non-fatal)"
+                );
+            }
+        }
+    }
+
+    Ok(snapshot)
 }
 
 /// Run one fill sweep: fetch the current membership pairs from `source`, then
@@ -1139,23 +1167,116 @@ mod tests {
     // `backlog-collectives-arm-bootstrap-gap-no-stamped-cid-anywhere`: discovery
     // alone fills `humans.household_id`/`agent_pub_key`; these tests prove
     // `discover_household_pairs` ALSO stamps the local `collectives` row's NULL
-    // `collective_cid` from the same discovered cid, closing the other half of
-    // the bootstrap circle (the peer's ProjectionInventory then has a row to
-    // advertise). See `db::collectives::gap_fill_household_collective_cid_from_discovery`
+    // `collective_cid`, closing the other half of the bootstrap circle (the
+    // peer's ProjectionInventory then has a row to advertise).
+    //
+    // The genesis seed data plants MANY un-anchored `governance_layer=family`
+    // rows locally (one per real+fixture household in the shared reference
+    // dataset every doorway seeds) — a cardinality guard ("the lone un-anchored
+    // row") never holds in production, so the sweep resolves the row
+    // DETERMINISTICALLY through the household's own membership: one member
+    // (eve, mirroring a genesis-self-healed row) already has a local `humans`
+    // row carrying the slug `household-dowell`; that is what the join reads.
+    // See `db::collectives::gap_fill_household_collective_cid_via_membership`
     // for the full fills-never-moves contract (unit-tested there directly).
 
     /// THE ADAM CASE, extended: the local `collectives` seed row exists
     /// (governance_layer=family, collective_cid NULL — the pre-coherence seed
-    /// shape) but the projection never received the live signal. Source-chain
-    /// discovery names the household cid; the sweep stamps the seed row's NULL
-    /// collective_cid from it, in the SAME pass that lights the membership pairs.
+    /// shape); a SECOND fixture household's row ALSO exists un-anchored (proving
+    /// cardinality alone could not have picked the right one). Source-chain
+    /// discovery names adam's household cid; eve (a household member with an
+    /// already-healed `humans` row carrying the slug) resolves the membership
+    /// join, and the sweep stamps `household-dowell`'s NULL collective_cid from
+    /// it, in the SAME pass that lights the membership pairs.
     #[tokio::test]
-    async fn discovery_gap_fills_local_collectives_row_from_source_chain_cid() {
+    async fn discovery_gap_fills_local_collectives_row_via_membership_join() {
         let _guard = lock_discovered_cids_gauge();
         let p = pool();
         let ctx = AppContext::default_lamad();
 
-        // The pre-coherence seed row: family-layer, no collective_cid yet.
+        {
+            use crate::db::collectives::{create_collective, CreateCollectiveInput};
+            use crate::db::humans::{create_human, CreateHumanInput};
+            use crate::db::models::governance_layers;
+            let mut conn = p.get().unwrap();
+
+            // TWO un-anchored family rows locally — the realistic shared-seed
+            // shape; cardinality alone cannot tell them apart.
+            let mut dowell = CreateCollectiveInput::stub("household-dowell");
+            dowell.governance_layer = governance_layers::FAMILY.to_string();
+            create_collective(&mut conn, &ctx, &dowell).expect("seed dowell household row");
+            let mut gertrude = CreateCollectiveInput::stub("household-gertrude");
+            gertrude.governance_layer = governance_layers::FAMILY.to_string();
+            create_collective(&mut conn, &ctx, &gertrude).expect("seed gertrude household row");
+
+            // eve's row is already healed (genesis_self_heal-shaped): agent key
+            // SET, household_id the SLUG — the row the membership join reads.
+            create_human(
+                &mut conn,
+                CreateHumanInput {
+                    id: "human-eve-firstwoman".to_string(),
+                    agent_pub_key: Some("uhCAkEVE".to_string()),
+                    display_name: "Eve".to_string(),
+                    bio: None,
+                    affinities: "[]".to_string(),
+                    profile_reach: "commons".to_string(),
+                    location: None,
+                    profile_photo_url: None,
+                    h_app_id: "imagodei".to_string(),
+                    household_id: Some("household-dowell".to_string()),
+                },
+            )
+            .expect("seed eve's healed row");
+        }
+
+        let self_cids = FakeSelfCids {
+            cids: vec!["collective:eden".to_string()],
+        };
+        let mut by_cid = HashMap::new();
+        by_cid.insert(
+            "collective:eden".to_string(),
+            vec![
+                person("agent:uhCAkADAM", "collective:eden"),
+                person("agent:uhCAkEVE", "collective:eden"),
+            ],
+        );
+        let reader = FakeReader { by_cid };
+
+        discover_household_pairs(&p, &ctx, &self_cids, &reader)
+            .await
+            .expect("discover");
+
+        let mut conn = p.get().unwrap();
+        let dowell = crate::db::collectives::get_collective(&mut conn, &ctx, "household-dowell")
+            .unwrap()
+            .expect("dowell seed row still present");
+        assert_eq!(
+            dowell.collective_cid.as_deref(),
+            Some("collective:eden"),
+            "the membership-join-resolved row's NULL collective_cid is stamped from the SAME \
+             discovered cid that lit the membership pairs"
+        );
+        let gertrude =
+            crate::db::collectives::get_collective(&mut conn, &ctx, "household-gertrude")
+                .unwrap()
+                .expect("gertrude seed row still present");
+        assert!(
+            gertrude.collective_cid.is_none(),
+            "the unrelated fixture household's row is never touched"
+        );
+    }
+
+    /// Without ANY member resolving to an existing `humans` row (no slug to
+    /// join through), the sweep must NOT guess from cardinality alone — even
+    /// when only ONE un-anchored family row exists locally. This is the
+    /// regression the membership-join rewrite closes: a lone-row shortcut
+    /// would have (wrongly, in production) stamped this.
+    #[tokio::test]
+    async fn discovery_does_not_stamp_when_no_member_resolves_a_slug() {
+        let _guard = lock_discovered_cids_gauge();
+        let p = pool();
+        let ctx = AppContext::default_lamad();
+
         {
             use crate::db::collectives::{create_collective, CreateCollectiveInput};
             use crate::db::models::governance_layers;
@@ -1183,11 +1304,9 @@ mod tests {
         let row = crate::db::collectives::get_collective(&mut conn, &ctx, "household-dowell")
             .unwrap()
             .expect("seed row still present");
-        assert_eq!(
-            row.collective_cid.as_deref(),
-            Some("collective:eden"),
-            "the seed row's NULL collective_cid is stamped from the SAME discovered cid \
-             that lit the membership pairs"
+        assert!(
+            row.collective_cid.is_none(),
+            "no member resolved a slug — the sweep must abstain, never guess from cardinality"
         );
     }
 
@@ -1204,6 +1323,7 @@ mod tests {
         {
             use crate::db::collectives::{create_collective, CreateCollectiveInput};
             use crate::db::diesel_schema::collectives;
+            use crate::db::humans::{create_human, CreateHumanInput};
             use crate::db::models::governance_layers;
             use diesel::prelude::*;
             let mut conn = p.get().unwrap();
@@ -1214,6 +1334,23 @@ mod tests {
                 .set(collectives::collective_cid.eq(Some("collective:already-anchored")))
                 .execute(&mut conn)
                 .expect("pre-anchor the row");
+
+            create_human(
+                &mut conn,
+                CreateHumanInput {
+                    id: "human-eve-firstwoman".to_string(),
+                    agent_pub_key: Some("uhCAkEVE".to_string()),
+                    display_name: "Eve".to_string(),
+                    bio: None,
+                    affinities: "[]".to_string(),
+                    profile_reach: "commons".to_string(),
+                    location: None,
+                    profile_photo_url: None,
+                    h_app_id: "imagodei".to_string(),
+                    household_id: Some("household-dowell".to_string()),
+                },
+            )
+            .expect("seed eve's healed row");
         }
 
         let self_cids = FakeSelfCids {
@@ -1222,7 +1359,10 @@ mod tests {
         let mut by_cid = HashMap::new();
         by_cid.insert(
             "collective:eden".to_string(),
-            vec![person("agent:uhCAkADAM", "collective:eden")],
+            vec![
+                person("agent:uhCAkADAM", "collective:eden"),
+                person("agent:uhCAkEVE", "collective:eden"),
+            ],
         );
         let reader = FakeReader { by_cid };
 
@@ -1237,7 +1377,8 @@ mod tests {
         assert_eq!(
             row.collective_cid.as_deref(),
             Some("collective:already-anchored"),
-            "an already-anchored row is never moved by a disagreeing discovery"
+            "an already-anchored row is never moved by a disagreeing discovery, even when the \
+             membership join resolves cleanly"
         );
     }
 }
