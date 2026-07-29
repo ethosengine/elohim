@@ -102,3 +102,14 @@ Overnight (waves 1-3):
 
 No blockers; no shift-scoped settings entries were added (durable palette
 sufficed under the operator's push grant).
+
+## Close addendum (13:00Z)
+
+Wave 3 in flight at budget close: edge #1256 BUILDING (ships the
+collectives stamp + carries the published happ with the batch-get);
+genesis #1386 queued behind it (formation with the cure — its
+"Results: N/3 affirmed" line is the first morning read). B caughtUp
+still false at close; anchor field oscillating (windowed-scan noise,
+not signal). Genesis #1385 (pre-cure, mid-night): bindings stage 7/7
+failed again — reinforces the bindings-triage ceiling item; formation
+stage unaffected by the cure until #1386.
