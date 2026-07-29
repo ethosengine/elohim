@@ -81,7 +81,17 @@ push.
 - susan's storage failed the steward-peers manifest fetch (`:8090/manifest`)
   during the refresh — uninvestigated.
 - doorway-A conductor-diagnostics transportStats errors
-  `missing field 'is_direct'` whenever connections exist — bounded serde fix
-  in doorway-service, unclaimed.
+  `missing field 'is_direct'` whenever connections exist — investigated
+  (Codex): the deserializer lives in locked kitsune2_api 0.4 while the
+  checked-in Kitsune source is incompatible 0.3, so the safe fix is a
+  0.4-compatible vendored/forked API patch, not doorway route code. BLOCKED
+  pending that decision.
+- Review pass over the sprint window landed two fixes: `0038aaa78`
+  (formation entrypoint was CWD-dependent) and an epr-cli ordering-rule
+  alignment (fulfill's "latest event" was append-order while saga-status is
+  occurredAt-order — replay/backfill could permanently re-wedge "regressed";
+  fix + out-of-order regression tests in flight at handoff time). Also
+  landed: `b0150a4cc` gherkin pre-push lint (parses all 159 features before
+  E2E; manifest-routed with husky fallback).
 - `projection_reconcile.rs` is over the 3000-line soft LoC ceiling —
   modularization backlog when the tail drains.
