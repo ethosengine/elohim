@@ -82,14 +82,33 @@ control test to example.com shows no blanket 443 interception.
   pins shem's node IP into the pod spec — fine while shem-pinned; if a
   pod schedules elsewhere the alias is slow, not broken.
 
-## Sequence
+## RECOVERED 2026-07-29 ~04:02Z (live patch, all three signals green)
 
-1. Operator: live-patch hostAliases (validation probe; podspec change
-   rolls the pods, which they need anyway). Recovery = the
-   "Not updating agent info" lines STOP on all four, B's
-   conductor-diagnostics `agentCount > 0`, bootstrap store grows past 15.
-2. Land the same hostAliases in genesis/orchestrator manifests (repo is
-   the durable home; a live patch reverts on the next Jenkins build).
+Recovery order adam → eve → gertrude → susan (04:02 last). Post-patch:
+"Not updating agent info" 0 on all four (was 46/115/150/3 per 30min);
+bootstrap census 5 → 7 of 7 agents, store rows 20 → 32 climbing toward
+35 (= 7 agents × 5 spaces full mesh); all four http=200 verify=0 on both
+bootstrap and signal; doorway-B conductor peer store 0 → 28+ agents.
+Durable home landed in-repo same night (hostAliases via isRemote-gated
+HOST_ALIASES_PLACEHOLDER, commit 8dafdfafd).
+
+Two non-blocking discoveries from the recovery, preserved:
+
+- **Gossip peer URLs ride a THIRD hostname**: adam's sessions are with
+  `wss://signal.alpha.elohim.host:443/<pubkey>` — alpha.elohim.host →
+  the OTHER WAN (136.51.77.49), not hairpinned, resolves fine from shem.
+  So leave-alpha-alone is load-bearing TWICE: aliasing it shem-local
+  would break live gossip peer URLs, not just TURN. (Comment now lives
+  in the render template too.)
+- **Scriptable agentCount check**: /db/p2p/conductor-diagnostics serves
+  the doorway HTTP surface, but the k8s-side equivalent with no REST
+  route is the mongo bootstrap census —
+  `elohim-bootstrap.k2_bootstrap` distinct-agent count is the direct
+  query (same population the panel reads).
+
+- App-WS 4445 auth timeouts seen during diagnosis are FLEET-WIDE, not
+  shem: filed separately as
+  `app-port-4445-auth-timeout-fleet-wide.md`.
 3. THEN DoD-1 is one HTTP lever away — but decide head direction first
    (see the declared-vs-declared finding in saga ch06: A's head is OLDER,
    08:56:34Z, than B's, 10:30:38Z, and they point at different SPA blobs;

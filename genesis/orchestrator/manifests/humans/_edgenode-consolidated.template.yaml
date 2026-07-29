@@ -240,6 +240,14 @@ spec:
       # empty ([]) for on-prem humans (matthew/jessica/james) and for envs with
       # no doorwayB split (staging/prod). See
       # genesis/data/timeline/backlog/shem-conductors-signal-hairpin-suspect-dht-silent.md.
+      # CAVEAT: 10.99.0.2 is shem's NODE IP hardcoded into the pod spec —
+      # correct while these pods stay shem-pinned (nodeAffinity). If one ever
+      # schedules elsewhere the alias goes SLOW-BUT-ROUTABLE over WireGuard
+      # rather than failing loudly — hard to spot later; check here first when
+      # a shem-placed conductor gets mysteriously slow after a reschedule.
+      # NEVER alias alpha.elohim.host: it rides the other WAN (not hairpinned)
+      # AND gossip peer URLs are minted on wss://signal.alpha.elohim.host —
+      # aliasing it shem-local would break live gossip sessions, not just TURN.
       hostAliases: HOST_ALIASES_PLACEHOLDER
       # Init container fetches hApp from Harbor registry using oras
       initContainers:
