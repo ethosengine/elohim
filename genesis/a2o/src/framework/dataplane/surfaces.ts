@@ -652,8 +652,11 @@ export async function probeMetrics(metricsBaseUrl: string): Promise<ParsedMetric
 
 /**
  * elohim-storage populates several Prometheus gauges (identity-fill,
- * custody-class, custodian capacity) from a periodic background sweep with a
- * ~5-minute cadence — NOT on every /metrics scrape. The Dataplane Validation
+ * custodian capacity) from a periodic background sweep with a ~5-minute
+ * cadence — NOT on every /metrics scrape. (custody-class is the exception:
+ * it has NO periodic loop — it is emitted only as a side-effect of serving
+ * GET /api/v1/weave, so its chapter-7 scenario issues that GET itself
+ * before polling; discovered 2026-07-29.) The Dataplane Validation
  * stage runs these gauge assertions early in its cucumber run, roughly 2
  * minutes after the edge restart — before the first sweep has had a chance
  * to run — so a single-shot probe reads a genuinely-not-yet-populated gauge
