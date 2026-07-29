@@ -2179,6 +2179,31 @@ impl HttpServer {
             .await
             .insert(manifest.blob_hash.clone(), manifest.clone());
 
+        // Blob ingestion is also a producer for the operational
+        // shard->blob relation. The generated manifest used to remain only in
+        // this in-memory cache, leaving persisted shard locations impossible
+        // for the custody-facing fold to resolve after a restart. This is a
+        // Category-C projection of bytes we just verified and stored, not a
+        // new content record or a DHT write.
+        if let Some(pool) = self.db_pool.as_ref() {
+            let projection_id = format!("blob:{}", manifest.blob_cid);
+            let mut conn = pool.get().map_err(|e| {
+                StorageError::Internal(format!("Failed to get manifest DB connection: {e}"))
+            })?;
+            if let Err(e) = crate::db::shard_manifests::record_generated_manifest(
+                &mut conn,
+                &projection_id,
+                "lamad",
+                &manifest,
+            ) {
+                warn!(
+                    blob_hash = %manifest.blob_hash,
+                    error = %e,
+                    "Failed to persist generated shard manifest"
+                );
+            }
+        }
+
         info!(
             blob_hash = %manifest.blob_hash,
             total_size = manifest.total_size,

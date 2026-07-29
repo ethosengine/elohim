@@ -7,6 +7,7 @@ import {
   resolveCustodyPeerIds,
   type CommitmentClient,
   type CustodyPair,
+  type CustodyPeerIds,
 } from '../seed-commitments.js';
 import { clearPeerIdCache, deterministicPeerId, resolvePeerId, storageUrlForHuman } from '../peer-id.js';
 
@@ -19,22 +20,28 @@ describe('buildCustodyCommitmentBody', () => {
     blobHash: 'sha256-deadbeef',
     blobSizeBytes: 12345,
   };
+  const agentCids: CustodyPeerIds = {
+    provider: 'uhCAkmatthewagentkey',
+    receiver: 'uhCAkterrenceagentkey',
+  };
 
   it('action is exactly "custody-blob"', () => {
-    const body = buildCustodyCommitmentBody(pair);
+    const body = buildCustodyCommitmentBody(pair, agentCids);
     expect(body.action).toBe('custody-blob');
   });
 
-  it('provider and receiver are 12D3KooW peer_ids, not human-* cids', () => {
-    const body = buildCustodyCommitmentBody(pair);
-    expect(body.provider).toMatch(/^12D3KooW[a-f0-9]{38}$/);
-    expect(body.receiver).toMatch(/^12D3KooW[a-f0-9]{38}$/);
+  it('provider and receiver are Holochain agent CIDs, not human slugs or transport IDs', () => {
+    const body = buildCustodyCommitmentBody(pair, agentCids);
+    expect(body.provider).toMatch(/^uhCAk/);
+    expect(body.receiver).toMatch(/^uhCAk/);
     expect(body.provider).not.toMatch(/^human-/);
     expect(body.receiver).not.toMatch(/^human-/);
+    expect(body.provider).not.toMatch(/^12D3/);
+    expect(body.receiver).not.toMatch(/^12D3/);
   });
 
   it('resourceClassifiedAs is a ValueFlows list holding the sha256- blob hash', () => {
-    const body = buildCustodyCommitmentBody(pair);
+    const body = buildCustodyCommitmentBody(pair, agentCids);
     // List shape per CreateReaCommitmentInputView (ValueFlows resourceClassifiedAs
     // is a classification list) — stored as a JSON array so ReaCommitmentView's
     // parse-as-array round-trips it.
@@ -42,33 +49,38 @@ describe('buildCustodyCommitmentBody', () => {
   });
 
   it('resourceQuantity uses bytes-as-integer with hasUnit "B"', () => {
-    const body = buildCustodyCommitmentBody(pair);
+    const body = buildCustodyCommitmentBody(pair, agentCids);
     expect(body.resourceQuantity.hasNumericalValue).toBe(12345);
     expect(body.resourceQuantity.hasUnit).toBe('B');
   });
 
   it('id is distinct per (provider_peer, receiver_peer, blob_hash) tuple', () => {
-    const a = buildCustodyCommitmentBody(pair);
-    const b = buildCustodyCommitmentBody({ ...pair, blobHash: 'sha256-feedface' });
+    const a = buildCustodyCommitmentBody(pair, agentCids);
+    const b = buildCustodyCommitmentBody(
+      {
+        ...pair,
+        blobHash: 'sha256-feedface',
+      },
+      agentCids,
+    );
     expect(a.id).not.toBe(b.id);
   });
 
   it('id is deterministic — same tuple → same id (idempotent re-runs)', () => {
-    const a = buildCustodyCommitmentBody(pair);
-    const b = buildCustodyCommitmentBody(pair);
+    const a = buildCustodyCommitmentBody(pair, agentCids);
+    const b = buildCustodyCommitmentBody(pair, agentCids);
     expect(a.id).toBe(b.id);
   });
 
-  it('uses resolved REAL peer ids when provided (and the content-addressed id follows)', () => {
+  it('uses resolved Holochain agent keys when provided (and the content-addressed id follows)', () => {
     const resolved = {
-      provider: '12D3KooWQAaKDy1JkpBNLHEP7KjazhAmDCSUzVyLUQ62eftF73N4',
-      receiver: '12D3KooWBhYqzhQ8XK2v9PqQ7TZxGw7vM1nRkLs5uJcDeFgHiJkL',
+      provider: 'uhCAkmatthewagentkey',
+      receiver: 'uhCAkjessicaagentkey',
     };
     const body = buildCustodyCommitmentBody(pair, resolved);
     expect(body.provider).toBe(resolved.provider);
     expect(body.receiver).toBe(resolved.receiver);
-    // Different peer-id tuple → different content-addressed id than Stage 1.
-    expect(body.id).not.toBe(buildCustodyCommitmentBody(pair).id);
+    expect(body.id).not.toBe(buildCustodyCommitmentBody(pair, agentCids).id);
   });
 });
 
@@ -87,24 +99,28 @@ describe('resolvePeerId (Stage 2)', () => {
 
   it('happy path: returns the real peerId from GET <host>/p2p/status', async () => {
     const fetchImpl = okFetch();
-    const id = await resolvePeerId('human-matthew-manager', 'desktop', { fetchImpl });
+    const id = await resolvePeerId('human-matthew-manager', 'desktop', {
+      fetchImpl,
+    });
     expect(id).toBe(REAL_ID);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(fetchImpl.mock.calls[0][0]).toBe(
-      `${storageUrlForHuman('human-matthew-manager')}/p2p/status`
-    );
+    expect(fetchImpl.mock.calls[0][0]).toBe(`${storageUrlForHuman('human-matthew-manager')}/p2p/status`);
   });
 
   it('derives the storage host from the humanId short name (alpha convention)', () => {
     expect(storageUrlForHuman('human-matthew-manager')).toBe(
-      'http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090'
+      'http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090',
     );
   });
 
   it('caches per host within a run — one probe serves repeated resolutions', async () => {
     const fetchImpl = okFetch();
-    const a = await resolvePeerId('human-matthew-manager', 'desktop', { fetchImpl });
-    const b = await resolvePeerId('human-matthew-manager', 'desktop', { fetchImpl });
+    const a = await resolvePeerId('human-matthew-manager', 'desktop', {
+      fetchImpl,
+    });
+    const b = await resolvePeerId('human-matthew-manager', 'desktop', {
+      fetchImpl,
+    });
     expect(a).toBe(b);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
@@ -114,7 +130,9 @@ describe('resolvePeerId (Stage 2)', () => {
     const fetchImpl = vi.fn(async () => {
       throw new Error('connect ECONNREFUSED');
     });
-    const id = await resolvePeerId('human-jessica-spouse', 'desktop', { fetchImpl });
+    const id = await resolvePeerId('human-jessica-spouse', 'desktop', {
+      fetchImpl,
+    });
     expect(id).toBe(deterministicPeerId('human-jessica-spouse', 'desktop'));
     expect(warn).toHaveBeenCalledTimes(1);
     const message = warn.mock.calls[0][0] as string;
@@ -125,7 +143,9 @@ describe('resolvePeerId (Stage 2)', () => {
   it('fallback: 200 response missing peerId → deterministic Stage-1 id', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const fetchImpl = vi.fn(async () => new Response('{}', { status: 200 }));
-    const id = await resolvePeerId('human-jessica-spouse', 'desktop', { fetchImpl });
+    const id = await resolvePeerId('human-jessica-spouse', 'desktop', {
+      fetchImpl,
+    });
     expect(id).toBe(deterministicPeerId('human-jessica-spouse', 'desktop'));
   });
 
@@ -140,14 +160,16 @@ describe('resolvePeerId (Stage 2)', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it('resolveCustodyPeerIds preserves role semantics: provider human → provider id', async () => {
+  it('resolveCustodyPeerIds preserves role semantics in the agent-CID namespace', async () => {
     const ids: Record<string, string> = {
-      'http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090/p2p/status': REAL_ID,
-      'http://elohim-jessica-alpha.elohim-alpha.svc.cluster.local:8090/p2p/status':
-        '12D3KooWBhYqzhQ8XK2v9PqQ7TZxGw7vM1nRkLs5uJcDeFgHiJkL',
+      'http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090/auth/me': 'uhCAkmatthewagentkey',
+      'http://elohim-jessica-alpha.elohim-alpha.svc.cluster.local:8090/auth/me': 'uhCAkjessicaagentkey',
     };
     const fetchImpl = vi.fn(
-      async (url: string) => new Response(JSON.stringify({ peerId: ids[url] }), { status: 200 })
+      async (url: string) =>
+        new Response(JSON.stringify({ agentPubKey: ids[url] }), {
+          status: 200,
+        }),
     );
     const resolved = await resolveCustodyPeerIds(
       {
@@ -158,10 +180,27 @@ describe('resolvePeerId (Stage 2)', () => {
         blobHash: 'sha256-deadbeef',
         blobSizeBytes: 1,
       },
-      { fetchImpl }
+      { fetchImpl },
     );
-    expect(resolved.provider).toBe(REAL_ID);
-    expect(resolved.receiver).toBe('12D3KooWBhYqzhQ8XK2v9PqQ7TZxGw7vM1nRkLs5uJcDeFgHiJkL');
+    expect(resolved.provider).toBe('uhCAkmatthewagentkey');
+    expect(resolved.receiver).toBe('uhCAkjessicaagentkey');
+  });
+
+  it('refuses a transport peer ID rather than creating an unjoinable commitment', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ agentPubKey: REAL_ID }), { status: 200 }));
+    await expect(
+      resolveCustodyPeerIds(
+        {
+          providerHumanId: 'human-matthew-manager',
+          providerArchetype: 'desktop',
+          receiverHumanId: 'human-jessica-spouse',
+          receiverArchetype: 'desktop',
+          blobHash: 'sha256-deadbeef',
+          blobSizeBytes: 1,
+        },
+        { fetchImpl },
+      ),
+    ).rejects.toThrow('Holochain agentPubKey');
   });
 });
 
@@ -192,8 +231,8 @@ describe('activationDecision (idempotent activation rule)', () => {
   });
 });
 
-describe('activateCustodyCommitments (offline, injected client + peer probe)', () => {
-  const REAL = '12D3KooWQAaKDy1JkpBNLHEP7KjazhAmDCSUzVyLUQ62eftF73N4';
+describe('activateCustodyCommitments (offline, injected client + agent-key probe)', () => {
+  const REAL = 'uhCAkmatthewagentkey';
   const pair: CustodyPair = {
     providerHumanId: 'human-matthew-manager',
     providerArchetype: 'desktop',
@@ -206,22 +245,29 @@ describe('activateCustodyCommitments (offline, injected client + peer probe)', (
   beforeEach(() => clearPeerIdCache());
   afterEach(() => vi.restoreAllMocks());
 
-  // Every /p2p/status probe returns the same real id → deterministic body ids
+  // Every /auth/me probe returns the same agent key → deterministic body ids
   // computed offline; no live pods touched.
-  const peerFetch = () =>
-    vi.fn(async () => new Response(JSON.stringify({ peerId: REAL }), { status: 200 }));
+  const peerFetch = () => vi.fn(async () => new Response(JSON.stringify({ agentPubKey: REAL }), { status: 200 }));
 
   it('already-active commitment: recognized via GET, NOT re-PATCHed', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    const expectedId = buildCustodyCommitmentBody(pair, { provider: REAL, receiver: REAL }).id;
+    const expectedId = buildCustodyCommitmentBody(pair, {
+      provider: REAL,
+      receiver: REAL,
+    }).id;
 
     const getCommitment = vi.fn(
-      async (id: string) => new Response(JSON.stringify({ id, state: 'active' }), { status: 200 })
+      async (id: string) => new Response(JSON.stringify({ id, state: 'active' }), { status: 200 }),
     );
     const patchCommitmentState = vi.fn();
-    const client = { getCommitment, patchCommitmentState } as unknown as CommitmentClient;
+    const client = {
+      getCommitment,
+      patchCommitmentState,
+    } as unknown as CommitmentClient;
 
-    await activateCustodyCommitments(client, [pair], { fetchImpl: peerFetch() });
+    await activateCustodyCommitments(client, [pair], {
+      fetchImpl: peerFetch(),
+    });
 
     expect(getCommitment).toHaveBeenCalledWith(expectedId);
     expect(patchCommitmentState).not.toHaveBeenCalled();
@@ -230,14 +276,20 @@ describe('activateCustodyCommitments (offline, injected client + peer probe)', (
   it('proposed commitment: PATCHed to active exactly once', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const getCommitment = vi.fn(
-      async (id: string) => new Response(JSON.stringify({ id, state: 'proposed' }), { status: 200 })
+      async (id: string) =>
+        new Response(JSON.stringify({ id, state: 'proposed' }), {
+          status: 200,
+        }),
     );
-    const patchCommitmentState = vi.fn(
-      async (_id: string, _state: string) => new Response('{}', { status: 200 })
-    );
-    const client = { getCommitment, patchCommitmentState } as unknown as CommitmentClient;
+    const patchCommitmentState = vi.fn(async (_id: string, _state: string) => new Response('{}', { status: 200 }));
+    const client = {
+      getCommitment,
+      patchCommitmentState,
+    } as unknown as CommitmentClient;
 
-    await activateCustodyCommitments(client, [pair], { fetchImpl: peerFetch() });
+    await activateCustodyCommitments(client, [pair], {
+      fetchImpl: peerFetch(),
+    });
 
     expect(patchCommitmentState).toHaveBeenCalledTimes(1);
     expect(patchCommitmentState.mock.calls[0][1]).toBe('active');
@@ -247,9 +299,14 @@ describe('activateCustodyCommitments (offline, injected client + peer probe)', (
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const getCommitment = vi.fn(async () => new Response('not found', { status: 404 }));
     const patchCommitmentState = vi.fn();
-    const client = { getCommitment, patchCommitmentState } as unknown as CommitmentClient;
+    const client = {
+      getCommitment,
+      patchCommitmentState,
+    } as unknown as CommitmentClient;
 
-    await activateCustodyCommitments(client, [pair], { fetchImpl: peerFetch() });
+    await activateCustodyCommitments(client, [pair], {
+      fetchImpl: peerFetch(),
+    });
 
     expect(patchCommitmentState).not.toHaveBeenCalled();
   });
@@ -276,20 +333,27 @@ describe('defaultCustodyPairs triad fixture', () => {
     // 2 M1 pairs (matthew<->jessica) + 4 fixture pairs (james with each parent, both directions)
     expect(pairs).toHaveLength(6);
     const jamesPairs = pairs.filter(
-      p => p.providerHumanId === 'human-james-son' || p.receiverHumanId === 'human-james-son'
+      (p) => p.providerHumanId === 'human-james-son' || p.receiverHumanId === 'human-james-son',
     );
     expect(jamesPairs).toHaveLength(4);
     for (const p of jamesPairs) expect(p.fixture).toBe('formation-output');
-    const nonFixturePairs = pairs.filter(p => !p.fixture);
+    const nonFixturePairs = pairs.filter((p) => !p.fixture);
     expect(nonFixturePairs).toHaveLength(2);
   });
 
   it('stamps fixture provenance into the commitment body metadata', () => {
-    const body = buildCustodyCommitmentBody({
-      providerHumanId: 'human-jessica-spouse', providerArchetype: 'desktop',
-      receiverHumanId: 'human-james-son', receiverArchetype: 'mobile',
-      blobHash: 'sha256-deadbeef', blobSizeBytes: 1, fixture: 'formation-output',
-    });
+    const body = buildCustodyCommitmentBody(
+      {
+        providerHumanId: 'human-jessica-spouse',
+        providerArchetype: 'desktop',
+        receiverHumanId: 'human-james-son',
+        receiverArchetype: 'mobile',
+        blobHash: 'sha256-deadbeef',
+        blobSizeBytes: 1,
+        fixture: 'formation-output',
+      },
+      { provider: 'uhCAkjessicaagentkey', receiver: 'uhCAkjamesagentkey' },
+    );
     expect(body.metadata.fixture).toBe('formation-output');
     expect(body.metadata.retireAt).toBe('ceremony-landing');
   });

@@ -1,12 +1,11 @@
 /**
  * Seed REA Custody-Blob Commitments
  *
- * Writes peer_id-keyed custody-blob commitments via the doorway REST POST
+ * Writes agent-CID-keyed custody-blob commitments via the doorway REST POST
  * /api/v1/commitments handler. The shape exactly matches what
- * `reciprocity_view`, `cluster_view`, and `distribution_view` SQL filters
- * expect:
+ * the custody-facing fold expects:
  *   action = "custody-blob"
- *   provider, receiver = 12D3KooW... peer_ids (NOT human-* agent_cids)
+ *   provider, receiver = Holochain agent keys (uhCAk…)
  *   resource_classified_as = "sha256-<blob_hash>"
  *   resource_quantity_value = bytes count
  *
@@ -31,12 +30,7 @@ import { createHash } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DoorwayClient } from './doorway-client.js';
-import {
-  deterministicPeerId,
-  resolvePeerId,
-  type Archetype,
-  type ResolvePeerIdOptions,
-} from './peer-id.js';
+import { storageUrlForHuman, type Archetype, type ResolvePeerIdOptions } from './peer-id.js';
 
 // =============================================================================
 // Suspended-persona guard
@@ -60,7 +54,9 @@ function loadSuspendedHumanPrefixes(): Set<string> {
     const here = dirname(fileURLToPath(import.meta.url));
     const jsonPath = resolve(here, '../../orchestrator/data/deployments.json');
     const raw = readFileSync(jsonPath, 'utf-8');
-    const data = JSON.parse(raw) as { humans?: { name: string; suspended?: boolean }[] };
+    const data = JSON.parse(raw) as {
+      humans?: { name: string; suspended?: boolean }[];
+    };
     const suspended = new Set<string>();
     for (const h of data.humans ?? []) {
       if (h.suspended) suspended.add(`human-${h.name.toLowerCase()}`);
@@ -72,22 +68,19 @@ function loadSuspendedHumanPrefixes(): Set<string> {
 }
 
 /** Exit 1 when any pair references a suspended persona (exported for tests). */
-export function assertPairsNotSuspended(
-  pairs: CustodyPair[],
-  suspended: Set<string>
-): string[] {
+export function assertPairsNotSuspended(pairs: CustodyPair[], suspended: Set<string>): string[] {
   const offenders = [
     ...new Set(
       pairs
-        .flatMap(p => [p.providerHumanId, p.receiverHumanId])
-        .filter(id => [...suspended].some(prefix => id.startsWith(prefix)))
+        .flatMap((p) => [p.providerHumanId, p.receiverHumanId])
+        .filter((id) => [...suspended].some((prefix) => id.startsWith(prefix))),
     ),
   ];
   if (offenders.length > 0) {
     console.error(
       `ERROR: custody pair(s) reference SUSPENDED persona(s): ${offenders.join(', ')}.\n` +
         `deployments.json suspends them — seeding custody for non-deployed peers is dead data.\n` +
-        `Fix the pair set (or un-suspend the persona) before seeding.`
+        `Fix the pair set (or un-suspend the persona) before seeding.`,
     );
     process.exit(1);
   }
@@ -103,7 +96,7 @@ export interface CustodyPair {
   providerArchetype: Archetype;
   receiverHumanId: string;
   receiverArchetype: Archetype;
-  blobHash: string;       // raw hex (no prefix), or full "sha256-<hex>"
+  blobHash: string; // raw hex (no prefix), or full "sha256-<hex>"
   blobSizeBytes: number;
   /** Formation provenance marker — present only on interim fixtures. */
   fixture?: string;
@@ -130,28 +123,43 @@ function normalizeBlobHash(input: string): string {
   return input.startsWith('sha256-') ? input : `sha256-${input}`;
 }
 
-/** Resolved provider/receiver peer-id pair for one custody commitment. */
+/** Resolved provider/receiver agent-CID pair for one custody commitment. */
 export interface CustodyPeerIds {
   provider: string;
   receiver: string;
 }
 
 /**
- * Resolve the REAL libp2p peer ids for a custody pair from each human's live
- * storage pod (Stage 2 — peer-id.ts). Role semantics are untouched: the
- * pair's providerHumanId stays the provider, receiverHumanId the receiver;
- * only the id VALUE changes from the Stage-1 deterministic fake to the pod's
- * real peer id. This is what makes the row actionable: elohim-storage's
- * custody sweep kicks a blob fetch iff commitment.provider == the node's
- * REAL peer id, which a Stage-1 fake id can never equal.
+ * Resolve the Holochain agent CIDs for a custody pair from each human's
+ * storage pod. shard_locations.peer_id is agent-CID keyed, so authoring a
+ * transport peer ID here leaves an active commitment unjoinable by the
+ * custody-facing fold. Unlike the older transport resolver, this has no
+ * deterministic fallback: an unavailable local session is an honest seed
+ * failure, not authority to mint a row in the wrong identity namespace.
  */
 export async function resolveCustodyPeerIds(
   pair: CustodyPair,
-  opts: ResolvePeerIdOptions = {}
+  opts: ResolvePeerIdOptions = {},
 ): Promise<CustodyPeerIds> {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const resolveAgentCid = async (humanId: string): Promise<string> => {
+    const storageUrl = opts.storageUrl ?? storageUrlForHuman(humanId);
+    const response = await fetchImpl(`${storageUrl.replace(/\/+$/, '')}/auth/me`, {
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 5000),
+    });
+    if (!response.ok) {
+      throw new Error(`${humanId}: /auth/me returned HTTP ${response.status}`);
+    }
+    const body = (await response.json()) as { agentPubKey?: unknown };
+    if (typeof body.agentPubKey !== 'string' || !body.agentPubKey.startsWith('uhCAk')) {
+      throw new Error(`${humanId}: /auth/me did not return a Holochain agentPubKey`);
+    }
+    return body.agentPubKey;
+  };
+
   return {
-    provider: await resolvePeerId(pair.providerHumanId, pair.providerArchetype, opts),
-    receiver: await resolvePeerId(pair.receiverHumanId, pair.receiverArchetype, opts),
+    provider: await resolveAgentCid(pair.providerHumanId),
+    receiver: await resolveAgentCid(pair.receiverHumanId),
   };
 }
 
@@ -163,18 +171,14 @@ export async function resolveCustodyPeerIds(
  * doorway POST handler returns 409 (idempotent). Distinct tuples produce
  * distinct ids so genuine shape drift surfaces as 400 (fail-fast).
  *
- * `peerIds` carries the resolved REAL peer ids (resolveCustodyPeerIds); when
- * omitted the body falls back to Stage-1 deterministic ids — isolated
- * shape-tests only. The live seed path always resolves first.
+ * `peerIds` must be the resolved Holochain agent CIDs from
+ * `resolveCustodyPeerIds`. Making this explicit prevents callers from
+ * accidentally reviving the transport-peer-ID namespace that cannot join
+ * `shard_locations`.
  */
-export function buildCustodyCommitmentBody(
-  pair: CustodyPair,
-  peerIds?: CustodyPeerIds
-): CommitmentBody {
-  const providerPeerId =
-    peerIds?.provider ?? deterministicPeerId(pair.providerHumanId, pair.providerArchetype);
-  const receiverPeerId =
-    peerIds?.receiver ?? deterministicPeerId(pair.receiverHumanId, pair.receiverArchetype);
+export function buildCustodyCommitmentBody(pair: CustodyPair, peerIds: CustodyPeerIds): CommitmentBody {
+  const providerPeerId = peerIds.provider;
+  const receiverPeerId = peerIds.receiver;
   const blob = normalizeBlobHash(pair.blobHash);
 
   const idDigest = createHash('sha256')
@@ -215,9 +219,7 @@ export function defaultCustodyPairs(): CustodyPair[] {
   const blobSizeBytes = parseInt(process.env.CONTENT_BLOB_SIZE_BYTES || '0', 10);
 
   if (!blobHash || blobSizeBytes <= 0) {
-    console.error(
-      'ERROR: CONTENT_BLOB_HASH and CONTENT_BLOB_SIZE_BYTES must be set (or pass CUSTODY_PAIRS_JSON).',
-    );
+    console.error('ERROR: CONTENT_BLOB_HASH and CONTENT_BLOB_SIZE_BYTES must be set (or pass CUSTODY_PAIRS_JSON).');
     process.exit(1);
   }
 
@@ -227,35 +229,47 @@ export function defaultCustodyPairs(): CustodyPair[] {
   return [
     // M1 named-pair flag (anti-drift, stays after fixture retirement)
     {
-      providerHumanId: 'human-matthew-manager', providerArchetype: 'desktop',
-      receiverHumanId: 'human-jessica-spouse', receiverArchetype: 'desktop',
+      providerHumanId: 'human-matthew-manager',
+      providerArchetype: 'desktop',
+      receiverHumanId: 'human-jessica-spouse',
+      receiverArchetype: 'desktop',
       ...m1,
     },
     {
-      providerHumanId: 'human-jessica-spouse', providerArchetype: 'desktop',
-      receiverHumanId: 'human-matthew-manager', receiverArchetype: 'desktop',
+      providerHumanId: 'human-jessica-spouse',
+      providerArchetype: 'desktop',
+      receiverHumanId: 'human-matthew-manager',
+      receiverArchetype: 'desktop',
       ...m1,
     },
     // INTERIM FIXTURES (2026-06-04 fork: emergent + marked fixtures) — retired at
     // ceremony landing (stage-1 plan Task 10). Loud provenance via metadata.
     {
-      providerHumanId: 'human-matthew-manager', providerArchetype: 'desktop',
-      receiverHumanId: 'human-james-son', receiverArchetype: 'mobile',
+      providerHumanId: 'human-matthew-manager',
+      providerArchetype: 'desktop',
+      receiverHumanId: 'human-james-son',
+      receiverArchetype: 'mobile',
       ...fixture,
     },
     {
-      providerHumanId: 'human-james-son', providerArchetype: 'mobile',
-      receiverHumanId: 'human-matthew-manager', receiverArchetype: 'desktop',
+      providerHumanId: 'human-james-son',
+      providerArchetype: 'mobile',
+      receiverHumanId: 'human-matthew-manager',
+      receiverArchetype: 'desktop',
       ...fixture,
     },
     {
-      providerHumanId: 'human-jessica-spouse', providerArchetype: 'desktop',
-      receiverHumanId: 'human-james-son', receiverArchetype: 'mobile',
+      providerHumanId: 'human-jessica-spouse',
+      providerArchetype: 'desktop',
+      receiverHumanId: 'human-james-son',
+      receiverArchetype: 'mobile',
       ...fixture,
     },
     {
-      providerHumanId: 'human-james-son', providerArchetype: 'mobile',
-      receiverHumanId: 'human-jessica-spouse', receiverArchetype: 'desktop',
+      providerHumanId: 'human-james-son',
+      providerArchetype: 'mobile',
+      receiverHumanId: 'human-jessica-spouse',
+      receiverArchetype: 'desktop',
       ...fixture,
     },
   ];
@@ -280,11 +294,7 @@ export class CommitmentClient extends DoorwayClient {
     return this.fetch(`/api/v1/commitments/${id}`, { method: 'GET' });
   }
 
-  async patchCommitmentState(
-    id: string,
-    state: string,
-    metadata?: Record<string, unknown>,
-  ): Promise<Response> {
+  async patchCommitmentState(id: string, state: string, metadata?: Record<string, unknown>): Promise<Response> {
     return this.fetch(`/api/v1/commitments/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -299,10 +309,7 @@ export class CommitmentClient extends DoorwayClient {
 // Seeding (fail-fast on non-409 errors)
 // =============================================================================
 
-export async function seedCustodyCommitments(
-  client: CommitmentClient,
-  pairs: CustodyPair[],
-): Promise<void> {
+export async function seedCustodyCommitments(client: CommitmentClient, pairs: CustodyPair[]): Promise<void> {
   console.log(`[seed-commitments] Seeding ${pairs.length} custody-blob commitments...`);
 
   let created = 0;
@@ -336,9 +343,7 @@ export async function seedCustodyCommitments(
     process.exit(1);
   }
 
-  console.log(
-    `[seed-commitments] Done. created=${created} already-exists=${alreadyExists} total=${pairs.length}`,
-  );
+  console.log(`[seed-commitments] Done. created=${created} already-exists=${alreadyExists} total=${pairs.length}`);
 
   await activateCustodyCommitments(client, pairs);
 }
@@ -359,9 +364,7 @@ export async function seedCustodyCommitments(
  * `''`/unknown states fall through to `activate` (fail toward the write, never
  * silently skip a row that isn't demonstrably active).
  */
-export function activationDecision(
-  currentState: string | null | undefined,
-): 'skip-active' | 'activate' | 'missing' {
+export function activationDecision(currentState: string | null | undefined): 'skip-active' | 'activate' | 'missing' {
   if (currentState == null) return 'missing';
   return currentState === 'active' ? 'skip-active' : 'activate';
 }

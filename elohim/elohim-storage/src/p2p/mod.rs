@@ -1768,6 +1768,21 @@ impl P2PHandle {
             .create_shards(blob_data, &manifest.encoding)
             .map_err(|e| format!("shard data encode: {e}"))?;
 
+        // The location rows below are custody evidence, so write the exact
+        // manifest they describe before attempting a placement. Without this
+        // projection the custody-facing fold cannot resolve a placed shard
+        // back to the blob named by a custody-blob commitment. Refuse the
+        // placement rather than creating an unsearchable location row.
+        {
+            let mut conn = pool
+                .get()
+                .map_err(|e| format!("shard manifest DB connection: {e}"))?;
+            crate::db::shard_manifests::record_generated_manifest(
+                &mut conn, content_id, h_app_id, &manifest,
+            )
+            .map_err(|e| format!("shard manifest projection: {e}"))?;
+        }
+
         let total_shards = shards.len();
 
         // Run the contract-aware diverse selector. The liveness staleness window
