@@ -23,6 +23,7 @@
 //! Local store presence is queried via the trait `LocalBlobStore` so the
 //! reconcile pass can be unit-tested without a real blob store.
 
+use crate::blob_store::BlobStore;
 use crate::db::diesel_schema::{economic_events, peer_blob_inventory, rea_commitments};
 use crate::db::models::{NewEconomicEvent, ReaCommitment};
 use crate::error::StorageError;
@@ -492,6 +493,273 @@ pub fn salvage_pass(
         author.author_custody_blob(&blob, self_write_cid, &want.receiver)?;
         outcome.commitments_authored += 1;
     }
+
+    Ok(outcome)
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Custody manifest + self-held evidence backfill.
+//
+// `services::shard_manifest_backfill` heals CONTENT rows (walks the `content`
+// table for a `blob_hash` with no matching `shard_manifests` row). That leaves
+// a gap: blobs stored through the raw blob-plane ingest path (`PUT /blob/{hash}`
+// → `http.rs::put_blob_bytes`) that predate the manifest producer (commit
+// 123fd4bd5) have NO content row to anchor on at all, so the content-table scan
+// can never see them. This pass instead enumerates the BLOB STORE directly
+// (`BlobStore::list_hashes`) — the same surface the inventory broadcaster and
+// `BlobStoreSnapshot` already use — so it also catches those content-less
+// legacy blobs.
+//
+// For each blob missing a `shard_manifests` row it derives + persists a
+// manifest the EXACT way `put_blob_bytes` does (same `ShardEncoder`, same
+// `record_generated_manifest` call, same `blob:{cid}` projection key), then —
+// new — records self-held evidence for the shard(s) this node just verified it
+// holds (`services::self_stewardship::record_self_held_shard`). This flips the
+// custody fold's `unknown` class to a real class (`stocked`, when an active
+// custody-blob commitment names the holder) WITHOUT a fresh PUT or a
+// `distribute_shards` round.
+//
+// Reconciliation, not conscription: this is bytes-we-already-hold, so it is
+// NEVER gated behind `salvage_capacity_enabled` (that flag governs volunteering
+// for NEW custody). It has its own config flag (`Config::manifest_backfill_enabled`,
+// default ON) wired in `main.rs`.
+// ────────────────────────────────────────────────────────────────────────
+
+/// Per-pass cap on blobs actually ENCODED + PERSISTED (the missing-manifest
+/// candidate set), not on the raw scan. The candidacy pre-filter
+/// (`hash → CID → existing-manifest?`) is a cheap DB-only check with no byte
+/// I/O, so it walks every hash the store reports; only the genuine gap is
+/// capped. This mirrors `shard_manifest_backfill::REDISTRIBUTE_CAP_PER_BOOT`'s
+/// reasoning: a huge already-manifested pantry can never starve later hashes
+/// across ticks, because the cap only ever bites the real candidates.
+pub const MANIFEST_BACKFILL_BATCH_CAP: usize = 256;
+
+/// Outcome counters for one [`manifest_backfill_pass`] run; logged verbatim by
+/// the caller and useful for tests.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct ManifestBackfillOutcome {
+    /// Total blob hashes the local store reported this pass.
+    pub blobs_scanned: usize,
+    /// New `shard_manifests` rows persisted.
+    pub manifests_written: usize,
+    /// New `shard_locations` self-held rows recorded.
+    pub self_held_recorded: usize,
+    /// Candidates that turned out to already have a manifest (pre-filter hit,
+    /// or a race detected at the write-time re-check).
+    pub skipped_existing: usize,
+    /// Lookup/read/encode/persist failures, or a local-bytes hash-verification
+    /// failure (never a fatal abort — logged and the pass continues).
+    pub errors: usize,
+}
+
+/// Trivial [`LocalBlobStore`] naming exactly one hash: the bytes this pass just
+/// read and hash-verified. Avoids a second full store listing — the candidate
+/// bytes are already in hand and proven authentic by the time self-held
+/// evidence is considered.
+struct VerifiedShardProbe<'a>(&'a str);
+
+impl LocalBlobStore for VerifiedShardProbe<'_> {
+    fn has(&self, hash: &str) -> bool {
+        hash == self.0
+    }
+}
+
+/// Run one bounded custody-backfill pass. Idempotent — safe to call on every
+/// tick; a blob that gained a manifest (and self-held row) on a prior pass is
+/// no longer a candidate on the next.
+///
+/// `self_agent_cid` is this node's resolved `agent_cid` (`uhCAk…`), obtained by
+/// the caller EXACTLY the way `distribute_shards` does
+/// (`reconcile::custody::resolve_self_agent_cid`, re-resolved fresh every
+/// tick — see `p2p/mod.rs`'s self-stewardship seam). `None` skips self-held
+/// recording for the pass (manifests are still backfilled); `record_self_held_shard`
+/// itself refuses anything that is not a well-formed `agent_cid`, so a
+/// transport id passed here is inert, never written.
+pub async fn manifest_backfill_pass(
+    conn: &mut SqliteConnection,
+    blob_store: &BlobStore,
+    self_agent_cid: Option<&str>,
+    h_app_id: &str,
+    batch_cap: usize,
+) -> Result<ManifestBackfillOutcome, StorageError> {
+    let mut outcome = ManifestBackfillOutcome::default();
+
+    let hashes = blob_store.list_hashes()?;
+    outcome.blobs_scanned = hashes.len();
+
+    // Cheap pre-filter: derive the blob CID from the hash string ALONE (no byte
+    // I/O — `hash_to_cid` is a pure function of the sha256 digest already
+    // encoded in the filename) and check for an existing manifest under the
+    // same `blob:{cid}` key `put_blob_bytes` writes. Only hashes that are
+    // genuinely missing a manifest become candidates for the (comparatively
+    // expensive) read + encode + persist below.
+    let mut candidates: Vec<(String, String)> = Vec::new(); // (hash, content_id)
+    for hash in &hashes {
+        if candidates.len() >= batch_cap {
+            break;
+        }
+        let cid = match BlobStore::hash_to_cid(hash) {
+            Ok(c) => c.to_string(),
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::reconcile",
+                    hash = %hash,
+                    error = %e,
+                    "custody-backfill: hash→CID derivation failed; skipping"
+                );
+                outcome.errors += 1;
+                continue;
+            }
+        };
+        let content_id = format!("blob:{cid}");
+        match crate::db::shard_manifests::get_manifest(conn, h_app_id, &content_id) {
+            Ok(Some(_)) => {
+                outcome.skipped_existing += 1;
+            }
+            Ok(None) => candidates.push((hash.clone(), content_id)),
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::reconcile",
+                    hash = %hash,
+                    error = %e,
+                    "custody-backfill: manifest lookup failed; skipping"
+                );
+                outcome.errors += 1;
+            }
+        }
+    }
+
+    let encoder = crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default());
+
+    for (hash, content_id) in candidates {
+        let data = match blob_store.get(&hash).await {
+            Ok(d) => d,
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::reconcile",
+                    hash = %hash,
+                    error = %e,
+                    "custody-backfill: blob bytes unreadable; skipping"
+                );
+                outcome.errors += 1;
+                continue;
+            }
+        };
+
+        // Never manifest unverified bytes: recompute the hash and require it
+        // to match the filename before deriving anything from the content.
+        let recomputed = BlobStore::compute_hash(&data);
+        if recomputed != hash {
+            tracing::warn!(
+                target: "elohim_storage::reconcile",
+                hash = %hash,
+                recomputed = %recomputed,
+                "custody-backfill: local bytes FAILED hash verification; skipping \
+                 (never manifesting unverified/corrupt bytes)"
+            );
+            outcome.errors += 1;
+            continue;
+        }
+
+        // Same derivation `put_blob_bytes` uses — same `ShardEncoder`, same
+        // config, same `create_manifest` call — so the encoding decision and
+        // shard hashes can never drift between the ingest path and this
+        // backfill. Mime type is unknown for a raw enumerate (no request
+        // header to read); this is metadata only and does not affect encoding
+        // or shard-hash derivation (`ShardEncoder::determine_encoding` is
+        // purely size-based).
+        let manifest = match encoder.create_manifest(&data, "application/octet-stream", "commons") {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::reconcile",
+                    hash = %hash,
+                    error = %e,
+                    "custody-backfill: manifest encoding failed; skipping"
+                );
+                outcome.errors += 1;
+                continue;
+            }
+        };
+
+        // Defensive re-check: a concurrent writer (a fresh PUT, another pass)
+        // may have raced a manifest into existence since the pre-filter above.
+        match crate::db::shard_manifests::get_manifest(conn, h_app_id, &content_id) {
+            Ok(Some(_)) => {
+                outcome.skipped_existing += 1;
+                continue;
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::reconcile",
+                    hash = %hash,
+                    error = %e,
+                    "custody-backfill: manifest re-check failed; skipping"
+                );
+                outcome.errors += 1;
+                continue;
+            }
+        }
+
+        if let Err(e) = crate::db::shard_manifests::record_generated_manifest(
+            conn,
+            &content_id,
+            h_app_id,
+            &manifest,
+        ) {
+            tracing::warn!(
+                target: "elohim_storage::reconcile",
+                hash = %hash,
+                error = %e,
+                "custody-backfill: manifest persist failed"
+            );
+            outcome.errors += 1;
+            continue;
+        }
+        outcome.manifests_written += 1;
+
+        // Self-held evidence — only for `encoding == "none"`, where the single
+        // shard IS the whole blob: bytes this node has just read and
+        // hash-verified. Larger (`chunked` / `rs-*`) encodings produce derived
+        // shard payloads that are NOT present in the local store under their
+        // own hash (see `services::self_stewardship` module docs), so no
+        // self-held claim is made for them here.
+        if manifest.encoding == "none" {
+            if let (Some(agent_cid), Some(shard_hash)) =
+                (self_agent_cid, manifest.shard_hashes.first())
+            {
+                let probe = VerifiedShardProbe(shard_hash.as_str());
+                match crate::services::self_stewardship::record_self_held_shard(
+                    conn, &probe, shard_hash, agent_cid, h_app_id,
+                ) {
+                    Ok(crate::services::self_stewardship::SelfHeldOutcome::Recorded) => {
+                        outcome.self_held_recorded += 1;
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!(
+                            target: "elohim_storage::reconcile",
+                            hash = %hash,
+                            error = %e,
+                            "custody-backfill: self-held recording failed"
+                        );
+                        outcome.errors += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    tracing::info!(
+        target: "elohim_storage::reconcile",
+        blobs_scanned = outcome.blobs_scanned,
+        manifests_written = outcome.manifests_written,
+        self_held_recorded = outcome.self_held_recorded,
+        skipped_existing = outcome.skipped_existing,
+        errors = outcome.errors,
+        "custody-backfill: pass complete"
+    );
 
     Ok(outcome)
 }

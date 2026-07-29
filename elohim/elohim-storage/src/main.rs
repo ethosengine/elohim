@@ -444,6 +444,16 @@ async fn async_main(
         }
     }
 
+    // Custody manifest + self-held evidence backfill (reconciliation of bytes
+    // already held — NOT gated behind the salvage opt-in consent floor). Default
+    // ON; env DISABLES it: 0/false/off/no.
+    if let Ok(v) = std::env::var("MANIFEST_BACKFILL_ENABLED") {
+        config.manifest_backfill_enabled = !matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "off" | "no"
+        );
+    }
+
     // Iroh parallel-stack toggle (see plan
     // genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md).
     // Default `Libp2p` — existing deployments unaffected. `iroh` selects
@@ -3842,6 +3852,96 @@ async fn async_main(
                     }
                 }
             });
+        }
+
+        // Custody manifest + self-held evidence backfill (periodic) — the
+        // companion to the one-shot content-anchored backfill just above. That
+        // pass walks the `content` table for a `blob_hash` with no manifest;
+        // THIS pass instead enumerates the BLOB STORE directly
+        // (`reconcile::custody::manifest_backfill_pass`), so it also catches
+        // blobs stored via the raw blob-plane ingest path (`PUT /blob/{hash}`)
+        // that predate the manifest producer (commit 123fd4bd5) and have NO
+        // content row to anchor on at all. For each such blob it persists a
+        // `shard_manifests` row (same derivation `put_blob_bytes` uses) and —
+        // new — self-held `shard_locations` evidence for shards this node
+        // verifiably holds, flipping the custody fold's `unknown` class to a
+        // real class without a fresh PUT or a `distribute_shards` round.
+        //
+        // Deliberately its OWN gate (`manifest_backfill_enabled`, default ON)
+        // — NEVER `salvage_capacity_enabled`. That flag is the opt-in consent
+        // gate for volunteering to take on NEW custody (a node is never
+        // conscripted); this pass only projects bytes the node ALREADY holds,
+        // which is reconciliation, not conscription.
+        //
+        // Identity mirrors the self-held call site in `distribute_shards`
+        // exactly (`p2p/mod.rs`'s self-stewardship seam,
+        // `P2PHandle::agent_pubkey()` resolved through
+        // `reconcile::custody::resolve_self_agent_cid` fresh every tick, so a
+        // session that logs in after boot is picked up without a restart).
+        // `tokio::time::interval`'s first tick fires immediately, so the pass
+        // also runs once shortly after boot — not only after the first long
+        // interval.
+        if config.manifest_backfill_enabled {
+            let backfill_pool = db_pool.clone();
+            let backfill_blob_store = blob_store.clone();
+            let backfill_handle = p2p_handle.clone();
+            let backfill_seconds: u64 = std::env::var("MANIFEST_BACKFILL_SECONDS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(300);
+            let mut manifest_backfill_shutdown = shutdown_tx.subscribe();
+            tokio::spawn(async move {
+                use tokio::time::{interval, Duration, MissedTickBehavior};
+                let mut ticker = interval(Duration::from_secs(backfill_seconds.max(1)));
+                ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                loop {
+                    tokio::select! {
+                        _ = ticker.tick() => {
+                            let Some(pool) = backfill_pool.clone() else { continue };
+                            let mut conn = match pool.get() {
+                                Ok(c) => c,
+                                Err(e) => {
+                                    warn!(error = %e, "custody-backfill: db conn failed (retry next tick)");
+                                    continue;
+                                }
+                            };
+                            // Mirrors `distribute_shards`' self-stewardship seam
+                            // (`p2p/mod.rs`) EXACTLY: the node's transport handle's
+                            // `agent_pubkey()` is the cellkey-snapshot candidate,
+                            // re-resolved against the active session on every tick.
+                            let self_agent_cid: Option<String> = backfill_handle
+                                .as_ref()
+                                .and_then(|h| {
+                                    elohim_storage::reconcile::custody::resolve_self_agent_cid(
+                                        &mut conn,
+                                        Some(h.agent_pubkey()),
+                                    )
+                                });
+                            if let Err(e) = elohim_storage::reconcile::custody::manifest_backfill_pass(
+                                &mut conn,
+                                &backfill_blob_store,
+                                self_agent_cid.as_deref(),
+                                "lamad",
+                                elohim_storage::reconcile::custody::MANIFEST_BACKFILL_BATCH_CAP,
+                            )
+                            .await
+                            {
+                                warn!(error = %e, "custody-backfill: pass failed (retry next tick)");
+                            }
+                        }
+                        _ = manifest_backfill_shutdown.recv() => {
+                            tracing::debug!("custody-backfill: shutdown signal received, exiting");
+                            break;
+                        }
+                    }
+                }
+            });
+            info!(
+                recheck_seconds = backfill_seconds,
+                "custody-backfill: manifest + self-held evidence backfill tick started"
+            );
+        } else {
+            info!("custody-backfill: manifest + self-held evidence backfill tick disabled (manifest_backfill_enabled=false)");
         }
 
         // genesis #1122 fix (lamad heal leg): DON'T gate task spawn on a

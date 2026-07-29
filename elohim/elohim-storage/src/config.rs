@@ -307,6 +307,27 @@ pub struct Config {
     /// `DEMAND_AUTOPIN_THROTTLE_SECONDS`.
     #[serde(default = "default_demand_autopin_throttle_seconds")]
     pub demand_autopin_throttle_seconds: u64,
+
+    /// Custody manifest + self-held evidence backfill
+    /// (`reconcile::custody::manifest_backfill_pass`): enumerates the local
+    /// blob store directly and, for blobs missing a `shard_manifests` row
+    /// (legacy blobs that predate the manifest producer, commit 123fd4bd5),
+    /// derives + persists the manifest and records self-held
+    /// `shard_locations` evidence for shards this node verifiably holds — no
+    /// fresh PUT or `distribute_shards` round required.
+    ///
+    /// Default **true**, deliberately, and NOT tied to
+    /// `salvage_capacity_enabled`: unlike salvage (which volunteers a node for
+    /// NEW custody it does not yet hold — the imago-dei consent floor keeps
+    /// that opt-in), this pass only projects bytes the node ALREADY holds.
+    /// That is reconciliation, not conscription, so it ships on by default
+    /// like `demand_autopin_enabled`.
+    ///
+    /// To disable: set env `MANIFEST_BACKFILL_ENABLED` to `0`/`false`/`off`
+    /// (or `manifest_backfill_enabled = false` in config.toml). Loaded from
+    /// env `MANIFEST_BACKFILL_ENABLED`.
+    #[serde(default = "default_true")]
+    pub manifest_backfill_enabled: bool,
 }
 
 fn default_peer_policy_path() -> PathBuf {
@@ -439,6 +460,7 @@ impl Default for Config {
             salvage_diversity_placement: default_true(),
             demand_autopin_enabled: default_true(),
             demand_autopin_throttle_seconds: default_demand_autopin_throttle_seconds(),
+            manifest_backfill_enabled: default_true(),
         }
     }
 }
@@ -536,6 +558,14 @@ mod transport_backend_tests {
         let cfg = super::Config::default();
         assert!(cfg.demand_autopin_enabled);
         assert_eq!(cfg.demand_autopin_throttle_seconds, 300);
+    }
+
+    #[test]
+    fn manifest_backfill_defaults_on() {
+        // Reconciliation of bytes already held, never conscription for new
+        // custody — unlike `salvage_capacity_enabled` this ships ON. A flipped
+        // default must not pass silently.
+        assert!(super::Config::default().manifest_backfill_enabled);
     }
 
     #[test]
