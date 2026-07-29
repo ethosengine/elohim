@@ -39,7 +39,7 @@ never a green chapter — the chapter's finish line stays exactly where it was.
 | # | Chapter | Concern tag | Proof signal | Status today |
 |---|---------|-------------|---------------|---------------|
 | 1 | The device awakens | `@concern:saga-01-device-awakens` | `GET /health` `conductor.connected=true` + peer healthy | GREEN — stable baseline |
-| 2 | The household forms | `@concern:saga-02-household-forms` | `elohim_identity_fill_discovered_cids >= 1` + labeled `elohim_identity_fill_total{action="created"} >= 1` | RED — born red until the identity-fill ceremony cure deploys |
+| 2 | The household forms | `@concern:saga-02-household-forms` | `/db/humans` rows for the household members carry non-null `agentPubKey` + `householdId=household-dowell` (finish line re-aimed 2026-07-29 off the activity-shaped fill gauges — see Measurement-timing cause 4); sweep-liveness station: `elohim_identity_fill_total{action="skipped_present"} >= 1` | Durable truth live on alpha-A (probe 2026-07-29: all three members filled, `stewardingCollectives=1`); awaiting first recorded run of the re-aimed finish line |
 | 3 | matthew uploads elohim-host-landing into his eprfs | `@concern:saga-03-eprfs-upload` | served head matches declared head + blobHash non-null on alpha-A | GREEN — matthew is the deploy-time author peer |
 | 4 | The doorway serves | `@concern:saga-04-doorway-serves` | `GET /` → 200 with the rendered SPA shell | GREEN |
 | 5 | adam co-stewards via a rea-agreement | `@concern:saga-05-co-steward-agreement` | **Decomposed into stations (2026-07-26).** Station A: an active item pin on `/api/v1/pins` references the content **and** `/api/v1/pins/{id}/pull` reports `caughtUp`. Station B: `/api/v1/commitments/facing/rea` carries ≥1 `replicates-commons` row in state `active`. Finish line (unchanged): `GET /api/v1/commitments?action=replicates-commons&state=active` reports ≥1 row within 60s | **Chapter still RED at its finish line** — but no longer flat-red. The cure sprint proved this chapter is a *pipeline* (pin → provide tick → mishpat notarization → bounds-validated announce → graduation → mishpat→rea mirror → rea projection), with eight stacked defects along it. Stations A and B are **green-expected** on alpha and pin down the earned links; the **mirror is the open frontier** — a commitment is live and `active` in the mishpat ledger but was never minted into `rea_commitments`, which is exactly what a green-B-with-red-finish-line localises |
@@ -61,9 +61,11 @@ section for how the loop reads this).
 ## Measurement-timing fix for the gauge-backed chapters (2026-07-26)
 
 Chapters 2, 7, and 8 read `elohim_`-prefixed gauges that elohim-storage populates
-from a periodic background sweep (~5-minute cadence), not on every scrape. Their
-chronic "pending-env / metric not reachable" status had THREE compounding causes,
-only the last of which was the sweep-cadence race originally suspected:
+from a periodic background sweep (~5-minute cadence for identity-fill and
+custodian-capacity; custody-class is request-triggered — see cause 4 and the
+chapter-7 feature header), not on every scrape. Their chronic "pending-env /
+metric not reachable" status had FOUR compounding causes,
+the third being the sweep-cadence race originally suspected:
 
 1. **Env-wiring gap**: `resolveStorageUrl('alpha-A')` (`src/framework/dataplane/surfaces.ts`)
    read only `E2E_STORAGE_ALPHA`, which the Dataplane Validation stage never sets
@@ -84,6 +86,21 @@ only the last of which was the sweep-cadence race originally suspected:
    by both the bare and labeled metric steps. A populated gauge resolves on the
    FIRST attempt (zero added cost); a genuinely-still-unswept gauge polls the full
    budget before declaring pending — never a hard failure.
+
+4. **Activity-vs-truth trap** (found 2026-07-29, chapter 2): the original chapter-2
+   proof signals were *activity-shaped* and structurally unable to stay green after
+   the cure succeeded — `elohim_identity_fill_discovered_cids` is a per-sweep
+   overwrite `IntGauge` (zeroed by every restart until a tick lands) and
+   `identity_fill_total{action="created"}` reads 0 forever once every member row
+   exists (the already-present short-circuit). A fully cured pod was
+   indistinguishable from a never-run one, so the cure's success *regressed* the
+   gauge. Fixed by re-aiming the finish line at the durable state the sweep
+   produces (`/db/humans` row fields) and keeping a steady-state-nonzero liveness
+   station (`action="skipped_present"`). The general rule: a chapter's finish line
+   asserts the OUTCOME state; activity metrics are stations that prove the
+   machinery ran, never the pass/fail proof. (Chapter 7's request-triggered
+   custody-class gauge, fixed the same day, is the sibling instance: an
+   emit-on-request gauge asserted as though a background sweep populated it.)
 
 Chose a bounded in-step poll over a harness-level second pass because both step
 definitions already had the `resolveStorageUrl`/`retry()` machinery to extend, the

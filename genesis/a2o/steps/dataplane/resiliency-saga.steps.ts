@@ -727,3 +727,119 @@ Then('the rendered card capture has no HTTP errors and a screenshot', function (
   );
   assert.ok(existsSync(result.shotPath), `no screenshot written at ${result.shotPath}`);
 });
+
+// ---------------------------------------------------------------------------
+// 5. Chapter-2 humans-row STATE check (re-aimed 2026-07-29).
+//
+//    The chapter's original proof signals were activity-shaped and structurally
+//    unable to stay green after the cure succeeds: `discovered_cids` is a
+//    per-sweep overwrite gauge (zeroed by every restart until a tick lands) and
+//    `identity_fill_total{action="created"}` is 0 forever once every member row
+//    exists (apply_membership_fill's already-present short-circuit). A fully
+//    cured pod was indistinguishable from a never-run one — the 4th compounding
+//    measurement cause on this chapter (see README "Measurement-timing" section).
+//
+//    The durable truth the sweep exists to produce is the humans ROWS: non-null
+//    agent_pub_key + household id, served at /db/humans ({items:[...]} envelope,
+//    doorway-proxied). No existing step does a find-row-by-id field assertion on
+//    that surface, hence this glue.
+// ---------------------------------------------------------------------------
+
+async function fetchHumansRow(
+  world: E2EWorld,
+  peerName: string,
+  rowId: string
+): Promise<Record<string, unknown>> {
+  const doorway = world.getDoorway(peerName);
+  const { status, text } = await getRaw(`${doorway.url}/db/humans`);
+  assert.strictEqual(
+    status,
+    200,
+    `GET /db/humans on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})`
+  );
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error(
+      `GET /db/humans on ${peerName}: response is not valid JSON: ${text.slice(0, 120)}`
+    );
+  }
+  // Service may return a bare array or an {items: []} envelope — accept both
+  // (same tolerance as resilience.steps.ts's humans listing).
+  const items = Array.isArray(parsed) ? parsed : (parsed as { items?: unknown[] }).items;
+  assert.ok(
+    Array.isArray(items),
+    `GET /db/humans on ${peerName}: expected an array or {items: []}, got: ${text.slice(0, 120)}`
+  );
+  const row = (items as Record<string, unknown>[]).find(h => h.id === rowId);
+  assert.ok(row, `humans row "${rowId}" not found on ${peerName} (${items.length} rows served)`);
+  return row;
+}
+
+/**
+ * Assert a humans row exists and carries a non-null, non-empty field — the
+ * durable state the identity-fill sweep writes (agentPubKey, householdId).
+ *
+ * Example:
+ *   Then the humans row "human-james-son" on doorway "alpha-A" has "agentPubKey" set
+ */
+Then(
+  'the humans row {string} on doorway {string} has {string} set',
+  { timeout: 75_000 },
+  async function (this: E2EWorld, rowId: string, peerName: string, fieldName: string) {
+    await retry(
+      async () => {
+        const row = await fetchHumansRow(this, peerName, rowId);
+        const value = row[fieldName];
+        assert.ok(
+          value !== null && value !== undefined && value !== '',
+          `humans row "${rowId}" on ${peerName}: field "${fieldName}" is not set (got: ${JSON.stringify(value)}) — the identity-fill sweep has not produced this row's truth yet`
+        );
+      },
+      {
+        timeoutMs: 60_000,
+        initialDelayMs: 1000,
+        backoffFactor: 1.2,
+        maxDelayMs: 5000,
+        maxAttempts: 1000,
+      }
+    );
+  }
+);
+
+/**
+ * Exact-value sibling — pins the household the member row was filled INTO.
+ *
+ * Example:
+ *   Then the humans row "human-james-son" on doorway "alpha-A" has "householdId" equal to "household-dowell"
+ */
+Then(
+  'the humans row {string} on doorway {string} has {string} equal to {string}',
+  { timeout: 75_000 },
+  async function (
+    this: E2EWorld,
+    rowId: string,
+    peerName: string,
+    fieldName: string,
+    expected: string
+  ) {
+    await retry(
+      async () => {
+        const row = await fetchHumansRow(this, peerName, rowId);
+        assert.strictEqual(
+          String(row[fieldName]),
+          expected,
+          `humans row "${rowId}" on ${peerName}: field "${fieldName}"`
+        );
+      },
+      {
+        timeoutMs: 60_000,
+        initialDelayMs: 1000,
+        backoffFactor: 1.2,
+        maxDelayMs: 5000,
+        maxAttempts: 1000,
+      }
+    );
+  }
+);
