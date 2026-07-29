@@ -453,6 +453,41 @@ pub async fn call_resolve_content_head(
     Ok(out)
 }
 
+/// [`call_resolve_content_head`] restricted to the conductor's LOCAL databases,
+/// via the `content_store::resolve_content_head_local` coordinator.
+///
+/// FOR THE HEAL LOOP ONLY. A `Network` resolve cannot complete on a node whose
+/// storage arc has not reconverged since its last restart: authority follows the
+/// agent's CURRENT arc, kitsune2 resets that arc to `Empty` on every conductor
+/// start, and until a gossip round promotes it back to FULL every `get_links`
+/// leaves the box and dies on the conductor's request timeout. The heal traffic
+/// is itself what keeps the fetch queue from draining, so the stall is
+/// self-sustaining; reading local breaks it.
+///
+/// CONTRACT — `Ok(None)` here means "not in this conductor's local view YET",
+/// **not** "does not exist". Never use it to gate authorship, deny a declare, or
+/// answer a 404. The HTTP author gate and the adoption pre-flight deliberately
+/// keep calling [`call_resolve_content_head`] (Network) for exactly that reason.
+pub async fn call_resolve_content_head_local(
+    hc: &Arc<HcClient>,
+    id: &str,
+) -> Result<Option<ContentHeadWire>, StorageError> {
+    let payload = rmp_serde::to_vec_named(&id.to_string()).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode resolve_content_head_local id: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "resolve_content_head_local", payload)
+        .await?;
+    let out: Option<ContentHeadWire> = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode ContentHeadWire (resolve local): {e}"
+        ))
+    })?;
+    Ok(out)
+}
+
 /// Declare (or advance) the notary HEAD for a content `id` via the
 /// `content_store::declare_content_head` coordinator (lamad role). `head_action_hash =
 /// None` lets the coordinator resolve the author's latest committed action as the HEAD

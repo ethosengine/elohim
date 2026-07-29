@@ -2185,7 +2185,11 @@ async fn heal_content(
     let mut circuit = HealCircuit::new(pacing.circuit_timeout_threshold);
     for id in tracker.pending_ids() {
         let attempt = call_with_retry(pacing, || {
-            crate::services::conductor_writes::call_resolve_content_head(hc, &id)
+            // LOCAL-only resolve — the heal loop must not stall on a cold arc.
+            // `Ok(None)` from this variant is "not in my local view YET", never
+            // authoritative absence; the HTTP author gate and the adoption
+            // pre-flight keep using the Network variant for that reason.
+            crate::services::conductor_writes::call_resolve_content_head_local(hc, &id)
         })
         .await;
         circuit.record(&attempt.result);
@@ -2421,16 +2425,29 @@ async fn heal_content(
 /// terminal wrong answer into a terminal absent one. This is what actually
 /// converges them.
 ///
-/// `LocalResolve::Known(None)` is exact, not a shortcut: the own conductor DID
-/// answer, but with a non-canonical fallback, so there is no canonical head to
-/// adopt locally — which is precisely what `Known(None)` states. The decision
-/// rule then sees `(canonical=false, peer=true, local=None)` → `AdoptPeer`.
+/// CONTRACT DEVIATION — `candidates` now carries TWO provenances, and
+/// `LocalResolve::Known(None)` is exact for only the first:
+///
+/// 1. GAPFILL-REFUSED (the original): the own conductor DID answer, but with a
+///    non-canonical fallback, so there is no canonical head to adopt locally —
+///    precisely what `Known(None)` states. The decision rule then sees
+///    `(canonical=false, peer=true, local=None)` → `AdoptPeer`.
+/// 2. TIMEOUT-ROUTED (2026-07-29, [`timeout_should_route_to_adopt`]): the
+///    conductor did NOT answer. Absence was not observed, only unestablished —
+///    so here `Known(None)` is a conservative STAND-IN, not an observation.
+///
+/// The stand-in is safe because it can only ever FORECLOSE the `AdoptLocal` arm,
+/// never assert absence: both provenances are gated on a peer hint existing, so
+/// the reachable verdicts are `AdoptPeer` / `Hold`. Preserve that. If a future
+/// arm needs to act on "the conductor observed nothing", split the variant (see
+/// the `LocalResolve::Known` doc) rather than letting a timeout read as an
+/// observed absence.
 ///
 /// Never authors. An `Author` verdict here means the peer's head could not be
 /// declared this sweep (no usable carried record yet); the row keeps its
-/// non-declaring anchor and the next sweep retries. `AuthorThenAdopt` cannot
-/// normally occur — the conductor answered, so it HAS a local chain — and is
-/// treated as a no-op rather than a licence to re-author outside the guarded
+/// non-declaring anchor and the next sweep retries. `AuthorThenAdopt` is
+/// EXPECTED for a timeout-routed candidate (we never confirmed a local chain)
+/// and remains a no-op — never a licence to re-author outside the guarded
 /// sweeps.
 async fn adopt_deferred_heads(
     hc: &Arc<HcClient>,

@@ -131,6 +131,28 @@ pub enum LocalResolve<'a> {
     /// Not yet asked — the pre-flight calls `resolve_content_head` itself.
     Probe,
     /// Already known. `None` means the conductor could not resolve the id at all.
+    ///
+    /// CONTRACT DEVIATION (2026-07-29) — `Known(None)` now carries TWO
+    /// provenances, and the second is weaker than this doc implies:
+    ///
+    /// 1. OBSERVED absence — the ghost sweep saw `resolve_content_head` return
+    ///    `Ok(None)`. This is the original, literal meaning.
+    /// 2. UNKNOWN — the heal loop's resolve TIMED OUT (see
+    ///    `projection_reconcile::timeout_should_route_to_adopt`). We never got an
+    ///    answer, so absence was not observed; it is merely not established.
+    ///
+    /// This is safe TODAY only because both provenances lead to the same place:
+    /// `None` forecloses the `AdoptLocal` arm and leaves `AdoptPeer` / `Hold`,
+    /// and the timeout route is gated on a peer hint existing — so a timed-out
+    /// candidate always has a peer to adopt FROM, and can only `AdoptPeer` or
+    /// `Hold`. Neither outcome asserts absence.
+    ///
+    /// ASSUMPTION A FUTURE EDITOR MUST PRESERVE: do not make `Known(None)` mean
+    /// anything AUTHORITATIVE — do not let it author, delete, tombstone, or
+    /// otherwise treat the id as proven-absent. If a new arm needs to
+    /// distinguish "observed absent" from "unknown", split this variant
+    /// (e.g. `Known(None)` vs `Unresolved`) rather than adding behaviour that
+    /// silently reads the timeout case as observed absence.
     Known(Option<&'a ContentHeadWire>),
 }
 

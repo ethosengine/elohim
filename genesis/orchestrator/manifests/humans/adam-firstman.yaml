@@ -135,15 +135,16 @@ data:
         k2Gossip:
           roundTimeoutMs: 15000
           maxConcurrentAcceptedRounds: 10
-    # Fail FAST rather than hang (2026-07-29). Top-level conductor key (NOT under
-    # `network:`) — holochain_p2p registers a sender-drop timer per outbound
-    # request at this value. At the 60s default, elohim-storage's 15s per-attempt
-    # heal deadline could never win: every projection-reconcile call was abandoned
-    # while the conductor kept executing it, so heal reported healed=0 forever and
-    # doorway B stayed `catching-up`. 10s puts the conductor's own give-up UNDER
-    # the heal deadline, so a cold-arc read surfaces as a fast, countable failure
-    # the circuit breaker can shed instead of a wedge.
-    request_timeout_s: 10
+    # NOTE — `request_timeout_s` was CONSIDERED AND DROPPED here (2026-07-29).
+    # Lowering it from the 60s default was proposed to keep the conductor's own
+    # give-up under elohim-storage's 15s heal deadline. Rejected on review: this
+    # key is CONDUCTOR-WIDE, and tx5 first-contact alone can burn 45-60s in
+    # WebRTC connect, so a 10s cap would fast-fail the declare paths we
+    # deliberately keep on the Network strategy, plus every other DNA's network
+    # gets across all of adam's hosted agents. With the heal read path now Local
+    # (`resolve_content_head_local`), the cap has no remaining purpose. The
+    # convergence-relevant knobs are the k2Gossip ones above. Do not re-propose
+    # this without a per-call timeout mechanism rather than a conductor-wide one.
     data_root_path: "/var/local/lib/holochain"
     keystore:
       type: lair_server_in_proc

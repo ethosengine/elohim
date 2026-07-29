@@ -123,15 +123,25 @@ Four bounded changes, none requiring a DNA reinstall or a re-key:
    timeout (`should_retry_attempt` / `is_synthetic_attempt_timeout`), plus a
    per-leg `HealCircuit` that sheds the remainder of a leg after 3 consecutive
    synthetic timeouts and closes on the first success.
-2. **Cure 1 — the read path goes local** (`content_store` **coordinator** zome).
+2. **Cure 1 — a SEPARATE local read path** (`content_store` **coordinator** zome).
    `GetStrategy` is threaded through `gather_canonical_head_record` /
-   `gather_content_chain` / `resolve_root_author`; `resolve_content_head` passes
-   `Local`, and the DECLARE paths keep `Network` (a `Local` author gate would
-   reject legitimate declares with "not in the version chain"). Turns a 60s hang
-   into a sub-millisecond `None` — which is already this resolver's documented
-   degrade — and stops feeding the fetch queue that blocks arc convergence.
-   **Coordinator-only: the DNA hash does not move**; it ships via the
-   `update_coordinators` hot-swap under `ALLOW_COORDINATOR_UPDATE`.
+   `gather_content_chain` / `resolve_root_author`, and the head election is
+   shared by two externs: `resolve_content_head` (**`Network`**, unchanged
+   semantics) and a new `resolve_content_head_local` (**`Local`**). Only the
+   storage heal loop calls the local variant. The DECLARE paths keep `Network` (a
+   `Local` author gate would reject legitimate declares with "not in the version
+   chain"). Turns a 60s heal hang into a sub-millisecond `None` and stops feeding
+   the fetch queue that blocks arc convergence. **Coordinator-only: the DNA hash
+   does not move**; ships via `update_coordinators` under `ALLOW_COORDINATOR_UPDATE`.
+
+   > **Review catch (2026-07-29):** the first cut switched the single shared
+   > `resolve_content_head` extern to `Local`. That extern also backs the HTTP
+   > author gate (`POST /db/content/{id}/head`, `http.rs`), which turns `None`
+   > into `404 "content has no version chain on this notary"` — so on a cold-arc
+   > node it would have fast-404'd legitimate authors by reading a Local `None`
+   > as authoritative absence. Splitting the externs is what makes the local read
+   > safe. **Invariant to preserve: a Local `None` is "not in my view YET", never
+   > proof of absence — never use it to gate authorship, deny a declare, or 404.**
 3. **Cure 2 — timed-out rows reach the peer-adoption arm.** A transient failure
    with a `PeerHeadHint` now routes to `adopt_candidates`
    (`timeout_should_route_to_adopt`) instead of falling out of both candidate
@@ -140,12 +150,32 @@ Four bounded changes, none requiring a DNA reinstall or a re-key:
    declare with `carried_record`, which `validate_carried_record` checks for
    action-hash binding, author signature, and entry↔action binding. Evidence, not
    authority: the DHT stays the manifest and **no stamp mode changed**.
-4. **Cure 4 — adam's conductor config only** (`adam-firstman.yaml`). Top-level
-   `request_timeout_s: 10` so the conductor gives up *under* the heal deadline;
-   `k2Gossip` reverted to upstream defaults (`roundTimeoutMs` 60000→15000,
-   `maxConcurrentAcceptedRounds` 4→10). The household slow-WAN profile those
-   values came from (2026-07-20) is still correct for households and stays in
-   `_edgenode-consolidated.template.yaml` — **do not propagate this revert there.**
+
+   > **Known contract deviation (documented at both ends, 2026-07-29):** these
+   > candidates reach `try_adopt_canonical_head` as `LocalResolve::Known(None)`,
+   > whose doc means *observed* absence. A timed-out row is **unknown**, not
+   > observed-absent. It is conservative-safe only because `None` merely
+   > forecloses the `AdoptLocal` arm, and the timeout route is gated on a peer
+   > hint — so the reachable verdicts are `AdoptPeer` / `Hold`, neither of which
+   > asserts absence. **A future arm that needs "the conductor observed nothing"
+   > must split the variant** (`Known(None)` vs `Unresolved`) rather than let a
+   > timeout read as an observation. Noted on `LocalResolve::Known` and on
+   > `adopt_deferred_heads`.
+4. **Cure 4 — adam's conductor config only** (`adam-firstman.yaml`). `k2Gossip`
+   reverted to upstream defaults (`roundTimeoutMs` 60000→15000,
+   `maxConcurrentAcceptedRounds` 4→10) — the convergence-relevant part. The
+   household slow-WAN profile those values came from (2026-07-20) is still
+   correct for households and stays in `_edgenode-consolidated.template.yaml` —
+   **do not propagate this revert there.**
+
+   > **Considered and DROPPED (2026-07-29): lowering `request_timeout_s` to 10.**
+   > Proposed so the conductor's give-up would land under storage's 15s heal
+   > deadline. Rejected on review: the key is **conductor-wide**, and tx5
+   > first-contact alone can burn 45–60s in WebRTC connect — a 10s cap would
+   > fast-fail the declare paths deliberately kept on `Network`, plus every other
+   > DNA's network gets across all of adam's hosted agents. With the heal read
+   > path now Local, the cap has no remaining purpose. Do not re-propose without
+   > a **per-call** timeout mechanism instead of a conductor-wide one.
 
 ## The real ceiling (operator decision — replaces the old one)
 

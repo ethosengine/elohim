@@ -3130,36 +3130,24 @@ fn build_content_head_output(
     })
 }
 
-/// Resolve the author-filtered HEAD of a content id's version DAG.
-///
-/// Root author = author of the Create at the base of the update chain. HEAD =
-/// the newest (by action timestamp) linked record the ROOT author authored —
-/// a non-author's update or link refresh is excluded, so recency alone cannot
-/// hijack the head. Degrades to the newest RETRIEVABLE author-authored record
-/// when the newest target has not gossiped in yet; `None` if the id is unknown
-/// or nothing is retrievable.
-#[hdk_extern]
-pub fn resolve_content_head(id: String) -> ExternResult<Option<ContentHeadOutput>> {
+/// Shared body of [`resolve_content_head`] (Network) and
+/// [`resolve_content_head_local`] (Local). The election logic is IDENTICAL for
+/// both; only the retrieval strategy differs, so the two externs can never drift
+/// in how they pick a head.
+fn resolve_content_head_inner(
+    id: &str,
+    strategy: GetStrategy,
+) -> ExternResult<Option<ContentHeadOutput>> {
     // CROSS-ROOT canonical override (notary-authority convergence, Model B).
     // A declared canonical head wins over the per-root election, so every peer
     // that has gossiped the canonical link — regardless of which root its own
     // IdToContent points at — resolves the SAME head. When undeclared (or the
     // canonical target has not gossiped in yet), fall through to the unchanged
     // root-author-newest election below: preserves prior behavior exactly.
-    //
-    // READ PATH = `GetStrategy::Local`. This resolver answers from what this
-    // conductor actually HOLDS; it never blocks on a network fetch. See the
-    // STRATEGY section on `gather_content_chain` for the full rationale (the
-    // short version: `Network` only stays local for a hash this agent is an
-    // authority for, authority follows the CURRENT storage arc, and that arc is
-    // reset to `Empty` on every conductor restart — so `Network` here means a
-    // 60s stall per call until gossip re-converges the arc, which on a
-    // multi-tenant conductor can take hours). Degrading to `None` is this
-    // function's documented contract; stalling is not.
-    if let Some(record) = gather_canonical_head_record(&id, GetStrategy::Local)? {
-        return Ok(Some(build_content_head_output(&id, &record, true)?));
+    if let Some(record) = gather_canonical_head_record(id, strategy)? {
+        return Ok(Some(build_content_head_output(id, &record, true)?));
     }
-    let (root_author, records) = match gather_content_chain(&id, GetStrategy::Local)? {
+    let (root_author, records) = match gather_content_chain(id, strategy)? {
         Some(x) => x,
         None => return Ok(None),
     };
@@ -3168,9 +3156,52 @@ pub fn resolve_content_head(id: String) -> ExternResult<Option<ContentHeadOutput
         .filter(|r| *r.action().author() == root_author)
         .max_by_key(|r| r.action().timestamp());
     match head {
-        Some(record) => Ok(Some(build_content_head_output(&id, &record, false)?)),
+        Some(record) => Ok(Some(build_content_head_output(id, &record, false)?)),
         None => Ok(None),
     }
+}
+
+/// Resolve the author-filtered HEAD of a content id's version DAG.
+///
+/// Root author = author of the Create at the base of the update chain. HEAD =
+/// the newest (by action timestamp) linked record the ROOT author authored —
+/// a non-author's update or link refresh is excluded, so recency alone cannot
+/// hijack the head. Degrades to the newest RETRIEVABLE author-authored record
+/// when the newest target has not gossiped in yet; `None` if the id is unknown
+/// or nothing is retrievable.
+///
+/// STRATEGY = `Network` (the authoritative answer). `None` from THIS extern is
+/// read by callers as authoritative absence, so it must never be a cold-arc
+/// artefact: the HTTP author gate (`POST /db/content/{id}/head`) turns `None`
+/// into `404 "content has no version chain on this notary"`, and answering
+/// `Local` there would 404 a legitimate author on any node whose storage arc has
+/// not reconverged since its last restart. A caller that can tolerate
+/// "what I hold right now" — and that must not stall — asks
+/// [`resolve_content_head_local`] instead, explicitly.
+#[hdk_extern]
+pub fn resolve_content_head(id: String) -> ExternResult<Option<ContentHeadOutput>> {
+    resolve_content_head_inner(&id, GetStrategy::Network)
+}
+
+/// [`resolve_content_head`] restricted to THIS conductor's local databases — the
+/// same election, never a network fetch.
+///
+/// Exists for the projection heal loop, which must not stall. `Network` only
+/// stays local for a hash this agent is an AUTHORITY for, authority follows the
+/// agent's CURRENT storage arc, and kitsune2 resets that arc to `Empty` on every
+/// conductor restart (promoting it to FULL only after a gossip round completes
+/// with zero mismatched sectors). Until that lands, a `Network` resolve leaves
+/// the box and dies on the conductor's 60s request timeout — and the heal
+/// traffic itself keeps the fetch queue from draining, which is what blocks the
+/// arc from reconverging. Reading `Local` breaks that deadlock.
+///
+/// CONTRACT — `None` here means "not in my local view YET", **not** "does not
+/// exist". It is NOT an authority answer and MUST NOT be used to gate authorship,
+/// deny a declare, or 404 a caller. Once the arc is FULL this returns exactly
+/// what [`resolve_content_head`] returns.
+#[hdk_extern]
+pub fn resolve_content_head_local(id: String) -> ExternResult<Option<ContentHeadOutput>> {
+    resolve_content_head_inner(&id, GetStrategy::Local)
 }
 
 /// Declare (notarize) the HEAD of a content id's version DAG. Author-gated:
