@@ -382,6 +382,184 @@ fn regression_re_commitment_re_produces_after_a_dismissed_regression() {
 }
 
 #[test]
+fn out_of_order_backfill_does_not_re_produce_over_a_newer_dismiss() {
+    let dir = fixture();
+    let root = dir.path();
+    let recipes = root.join(".claude/epr-meta/recipes.yaml");
+    project::project(root, &recipes).expect("project runs");
+
+    // Produce at T1: initial green fulfillment discharges the commitment.
+    let green_report = root.join("report-green.json");
+    write_report(
+        root,
+        "report-green.json",
+        "2026-07-25T00:00:00Z", // T1
+        "run-1",
+        0,
+        0,
+        1,
+    );
+    fulfill(root, &green_report, &FulfillOptions::default()).expect("green run (T1)");
+
+    // Dismiss at T3: a later red run regresses the discharged commitment.
+    let red_report = root.join("report-red.json");
+    write_report(
+        root,
+        "report-red.json",
+        "2026-07-25T03:00:00Z", // T3
+        "run-2",
+        1,
+        0,
+        0,
+    );
+    fulfill(root, &red_report, &FulfillOptions::default()).expect("red run (T3)");
+
+    // Backfill: an all-green report whose generatedAt (T2) is BETWEEN T1 and T3 arrives
+    // AFTER the Dismiss in append order — the exact divergence scenario the bug reintroduced.
+    // Append-order "latest" would say Produce (T2 was appended last); time-order — the same
+    // rule saga-status.py uses — says the Dismiss (T3) is still latest, so this must NOT
+    // re-produce.
+    let backfilled_report = root.join("report-backfilled.json");
+    write_report(
+        root,
+        "report-backfilled.json",
+        "2026-07-25T02:00:00Z", // T2 (T1 < T2 < T3)
+        "run-backfill",
+        0,
+        0,
+        1,
+    );
+    let summary =
+        fulfill(root, &backfilled_report, &FulfillOptions::default()).expect("backfill run (T2)");
+
+    assert_eq!(
+        summary.skipped_stale_recovery, 1,
+        "a backfilled green older than the standing Dismiss must not re-produce"
+    );
+    assert_eq!(summary.refulfilled, 0);
+    assert_eq!(summary.already_fulfilled, 0);
+
+    let store = SidecarFlowStore::open(root).unwrap();
+    let produce_events: Vec<_> = store
+        .events()
+        .unwrap()
+        .into_iter()
+        .filter(|(_, e)| e.action == ReaVerb::Produce && !e.fulfills.is_empty())
+        .collect();
+    assert_eq!(
+        produce_events.len(),
+        1,
+        "only the original T1 Produce — no recovery Produce appended for the stale backfill"
+    );
+
+    // Latest-by-time is still the Dismiss: a fresh all-green report appended right now
+    // (without advancing past T3) would STILL see the regression as latest and skip, proving
+    // the Dismiss, not the backfilled Produce, is what the state machine currently reads as
+    // "latest" — exactly what saga-status.py's time-ordered index_flow_state also concludes.
+    let restate_report = root.join("report-restate.json");
+    write_report(
+        root,
+        "report-restate.json",
+        "2026-07-25T02:30:00Z", // still < T3
+        "run-restate",
+        0,
+        0,
+        1,
+    );
+    let restate_summary =
+        fulfill(root, &restate_report, &FulfillOptions::default()).expect("restate run");
+    assert_eq!(
+        restate_summary.skipped_stale_recovery, 1,
+        "still older than the Dismiss (T3) — still stale"
+    );
+}
+
+#[test]
+fn recovery_after_backfill_re_produces_once_truly_newer_than_the_dismiss() {
+    let dir = fixture();
+    let root = dir.path();
+    let recipes = root.join(".claude/epr-meta/recipes.yaml");
+    project::project(root, &recipes).expect("project runs");
+
+    // Produce at T1.
+    let green_report = root.join("report-green.json");
+    write_report(
+        root,
+        "report-green.json",
+        "2026-07-25T00:00:00Z", // T1
+        "run-1",
+        0,
+        0,
+        1,
+    );
+    fulfill(root, &green_report, &FulfillOptions::default()).expect("green run (T1)");
+
+    // Dismiss at T3.
+    let red_report = root.join("report-red.json");
+    write_report(
+        root,
+        "report-red.json",
+        "2026-07-25T03:00:00Z", // T3
+        "run-2",
+        1,
+        0,
+        0,
+    );
+    fulfill(root, &red_report, &FulfillOptions::default()).expect("red run (T3)");
+
+    // Stale backfill at T2 (T1 < T2 < T3) — must be skipped (proven by the sibling test
+    // above; repeated here so this test is self-contained about the starting state).
+    let backfilled_report = root.join("report-backfilled.json");
+    write_report(
+        root,
+        "report-backfilled.json",
+        "2026-07-25T02:00:00Z", // T2
+        "run-backfill",
+        0,
+        0,
+        1,
+    );
+    let stale = fulfill(root, &backfilled_report, &FulfillOptions::default()).expect("T2 run");
+    assert_eq!(stale.skipped_stale_recovery, 1);
+
+    // Recovery at T4 (> T3): a TRULY newer all-green report must fire the recovery Produce.
+    let recovered_report = root.join("report-recovered.json");
+    write_report(
+        root,
+        "report-recovered.json",
+        "2026-07-25T04:00:00Z", // T4
+        "run-3",
+        0,
+        0,
+        1,
+    );
+    let summary =
+        fulfill(root, &recovered_report, &FulfillOptions::default()).expect("recovery run (T4)");
+
+    assert_eq!(
+        summary.refulfilled, 1,
+        "T4 is strictly newer than the T3 Dismiss — recovery must fire"
+    );
+    assert_eq!(summary.skipped_stale_recovery, 0);
+    assert_eq!(summary.fulfilled_new, 0);
+    assert_eq!(summary.already_fulfilled, 0);
+
+    let store = SidecarFlowStore::open(root).unwrap();
+    let produce_events: Vec<_> = store
+        .events()
+        .unwrap()
+        .into_iter()
+        .filter(|(_, e)| e.action == ReaVerb::Produce && !e.fulfills.is_empty())
+        .collect();
+    assert_eq!(
+        produce_events.len(),
+        2,
+        "exactly two fulfilling Produce events: the original T1 Produce plus the T4 recovery \
+         Produce — the stale T2 backfill never appended a third"
+    );
+}
+
+#[test]
 fn ambiguous_surface_errors_instead_of_guessing() {
     let dir = fixture();
     let root = dir.path();

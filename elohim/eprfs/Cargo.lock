@@ -397,6 +397,7 @@ dependencies = [
 name = "elohim-epr-cli"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "cid",
  "elohim-epr-rea",
  "eprfs-core",
