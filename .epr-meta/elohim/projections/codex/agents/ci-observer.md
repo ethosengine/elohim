@@ -98,12 +98,29 @@ If the orchestrator's prompt asks you for multiple candidates in a single dispat
 
 ### Validate mode
 
-Caller passes a **predicted pipeline set** (typically from `node genesis/orchestrator/graph-walker.mjs` on the diff before push) AND a `build_id` for the orchestrator run. You:
+Caller passes a **predicted pipeline set** (typically from node genesis/orchestrator/preview.mjs on the diff before push) and a build_id for the orchestrator run. The local graph walker returns fine-grained gate-project names, while the orchestrator log names downstream Jenkins jobs. **Normalize every predicted gate project through the table below before comparing sets.** A missing gate-project name is a mapping gap and requires ci-investigator; do not call it under_built.
 
-1. `getBuild` on the orchestrator job for status.
-2. `getBuildLog` (paginated) to find the "Determine Build Plan" stage. Extract the **dispatched-downstream list** — names only. This is structural data Jenkins emits, not synthesized content.
-3. Compute the verdict (set comparison only — no narrative): `expected` / `over_built` / `under_built` / `mixed` / `recovery_fallback`.
-4. Populate `dispatch_drift` with verdict, predicted, actual, extras, missing — all just lists of pipeline names.
+| build-manifest gate project | downstream Jenkins job |
+|---|---|
+| elohim-app, elohim-library | elohim |
+| elohim-storybook | elohim-storybook |
+| doorway-app | elohim-doorway-app |
+| elohim-compute | elohim-compute |
+| elohim-epr, epr-ts | elohim-epr |
+| eprfs | elohim-eprfs |
+| doorway, elohim-storage | elohim-edge |
+| schema-dna, manifest-hygiene, sweettest-check | elohim-holochain |
+| genesis, schema-validate, schema-codegen, constants-sync, genesis-a2o, gherkin-prepush-lint | elohim-genesis |
+| orchestrator | elohim-orchestrator |
+| sophia | elohim-sophia |
+| steward-node | elohim-steward |
+
+The table is the stable manifest-project-to-job vocabulary for this comparison, not a statement about which jobs ran in a particular build. Treat aliases and tag syntax as input conveniences only; dispatch_drift lists the canonical Jenkins job names above.
+
+1. getBuild on the orchestrator job for status.
+2. getBuildLog (paginated) to find the "Determine Build Plan" stage. Extract the **dispatched-downstream list** — names only. This is structural data Jenkins emits, not synthesized content.
+3. Normalize predicted gate-project names with the table, then compute the verdict (set comparison only — no narrative): expected / over_built / under_built / mixed / recovery_fallback.
+4. Populate dispatch_drift with verdict, predicted, actual, extras, missing — all just lists of canonical Jenkins job names.
 
 ### Visual triage mode
 
