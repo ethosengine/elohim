@@ -2679,9 +2679,18 @@ pub struct CarriedRecordOutput {
 /// author. Every update chains from the prior head, so any chain member
 /// resolves to the same root author. `None` if a link in the chain is not
 /// retrievable from the local DHT view.
-fn resolve_root_author(mut action_hash: ActionHash) -> ExternResult<Option<AgentPubKey>> {
+///
+/// `strategy` is threaded from the caller — see [`gather_content_chain`] for why
+/// the READ path passes `Local` and the DECLARE path passes `Network`. This walk
+/// is the most timeout-exposed of the three helpers: it is a SEQUENTIAL `get` per
+/// link in the update chain, so a chain of depth D costs D network round-trips
+/// under `Network`.
+fn resolve_root_author(
+    mut action_hash: ActionHash,
+    strategy: GetStrategy,
+) -> ExternResult<Option<AgentPubKey>> {
     loop {
-        let record = match get(action_hash.clone(), GetOptions::default())? {
+        let record = match get(action_hash.clone(), GetOptions::from(strategy))? {
             Some(r) => r,
             None => return Ok(None),
         };
@@ -2698,11 +2707,38 @@ fn resolve_root_author(mut action_hash: ActionHash) -> ExternResult<Option<Agent
 /// missing targets are skipped, not errors — the caller degrades to the
 /// newest retrievable author-authored record. `None` when nothing is
 /// retrievable yet.
-fn gather_content_chain(id: &str) -> ExternResult<Option<(AgentPubKey, Vec<Record>)>> {
+///
+/// STRATEGY (2026-07-29) — the READ path passes `Local`, the DECLARE path
+/// passes `Network`, and the split is load-bearing:
+///
+/// - `GetStrategy::Network` (the HDK default) only stays local when this agent
+///   is an AUTHORITY for the base hash, and authority is decided by the agent's
+///   **current** storage arc, not its target. kitsune2 resets every local
+///   agent's current arc to `Empty` on join — i.e. on every conductor restart —
+///   and only promotes it to FULL after a gossip round completes with zero
+///   mismatched sectors. Until that lands, `target_arc_factor = 1`
+///   notwithstanding, EVERY `get`/`get_links` here leaves the box and dies on
+///   the conductor's 60s `request_timeout_s`. On a multi-tenant conductor the
+///   arc can take hours to converge, so the read path stalls indefinitely.
+/// - `resolve_content_head` therefore reads `Local`: a full-arc node's honest
+///   answer is "what I actually hold", and this function's contract ALREADY
+///   degrades to the newest retrievable record (or `None`). `Local` makes that
+///   documented degrade the fast path instead of a 60s hang, and — because the
+///   heal traffic is what keeps the fetch queue from draining — it lets the
+///   gossip that converges the arc actually run. Once the arc is FULL, `Local`
+///   and `Network` return identical results.
+/// - The DECLARE paths keep `Network`. Their use of this function is an AUTHOR
+///   GATE and a chain-membership check: answering `Local` on a cold conductor
+///   would reject a legitimate declare with "not in the version chain". A write
+///   may pay the network cost; a read may not.
+fn gather_content_chain(
+    id: &str,
+    strategy: GetStrategy,
+) -> ExternResult<Option<(AgentPubKey, Vec<Record>)>> {
     let anchor = StringAnchor::new("content_id", id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let links = get_links(query, strategy)?;
     if links.is_empty() {
         return Ok(None);
     }
@@ -2712,14 +2748,15 @@ fn gather_content_chain(id: &str) -> ExternResult<Option<(AgentPubKey, Vec<Recor
             Ok(h) => h,
             Err(_) => continue,
         };
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get(action_hash, GetOptions::from(strategy))? {
             records.push(record);
         }
     }
     if records.is_empty() {
         return Ok(None);
     }
-    let root_author = match resolve_root_author(records[0].action_hashed().hash.clone())? {
+    let root_author = match resolve_root_author(records[0].action_hashed().hash.clone(), strategy)?
+    {
         Some(a) => a,
         None => return Ok(None),
     };
@@ -2871,11 +2908,11 @@ fn select_canonical_winner(mut candidates: Vec<CanonicalCandidate>) -> Option<Ca
 /// older earned). The newer earned declaration is the authority's current,
 /// visible choice and supersedes the older; degrading to the root-author election
 /// is partition-correct and converges on the newer target once it gossips in.
-fn gather_canonical_head_record(id: &str) -> ExternResult<Option<Record>> {
+fn gather_canonical_head_record(id: &str, strategy: GetStrategy) -> ExternResult<Option<Record>> {
     let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let links = get_links(query, strategy)?;
     let candidates: Vec<CanonicalCandidate> = links
         .into_iter()
         .filter_map(|link| {
@@ -2900,7 +2937,7 @@ fn gather_canonical_head_record(id: &str) -> ExternResult<Option<Record>> {
     // yet, return None so `resolve_content_head` degrades to the root-author
     // election — never walk to an older/lower-tier declaration (see the
     // superseded-head nuance in the doc-comment above).
-    match get(winner.target, GetOptions::default())? {
+    match get(winner.target, GetOptions::from(strategy))? {
         Some(record) => Ok(Some(record)),
         None => Ok(None),
     }
@@ -3109,10 +3146,20 @@ pub fn resolve_content_head(id: String) -> ExternResult<Option<ContentHeadOutput
     // IdToContent points at — resolves the SAME head. When undeclared (or the
     // canonical target has not gossiped in yet), fall through to the unchanged
     // root-author-newest election below: preserves prior behavior exactly.
-    if let Some(record) = gather_canonical_head_record(&id)? {
+    //
+    // READ PATH = `GetStrategy::Local`. This resolver answers from what this
+    // conductor actually HOLDS; it never blocks on a network fetch. See the
+    // STRATEGY section on `gather_content_chain` for the full rationale (the
+    // short version: `Network` only stays local for a hash this agent is an
+    // authority for, authority follows the CURRENT storage arc, and that arc is
+    // reset to `Empty` on every conductor restart — so `Network` here means a
+    // 60s stall per call until gossip re-converges the arc, which on a
+    // multi-tenant conductor can take hours). Degrading to `None` is this
+    // function's documented contract; stalling is not.
+    if let Some(record) = gather_canonical_head_record(&id, GetStrategy::Local)? {
         return Ok(Some(build_content_head_output(&id, &record, true)?));
     }
-    let (root_author, records) = match gather_content_chain(&id)? {
+    let (root_author, records) = match gather_content_chain(&id, GetStrategy::Local)? {
         Some(x) => x,
         None => return Ok(None),
     };
@@ -3143,12 +3190,16 @@ pub fn resolve_content_head(id: String) -> ExternResult<Option<ContentHeadOutput
 #[hdk_extern]
 pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<ContentHeadOutput> {
     // AUTHOR GATE FIRST — resolve the current chain, then reject non-authors.
-    let (root_author, records) = gather_content_chain(&input.id)?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "declare_content_head: no content found for id '{}'",
-            input.id
-        )))
-    })?;
+    // WRITE PATH = `GetStrategy::Network`. This is the AUTHOR GATE: answering
+    // from a cold local view would reject a legitimate author. See the STRATEGY
+    // section on `gather_content_chain`.
+    let (root_author, records) = gather_content_chain(&input.id, GetStrategy::Network)?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "declare_content_head: no content found for id '{}'",
+                input.id
+            )))
+        })?;
     let me = agent_info()?.agent_initial_pubkey;
     if me != root_author {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -3358,7 +3409,9 @@ fn declare_canonical_head_inner(
     carried_record: Option<Vec<u8>>,
 ) -> ExternResult<ContentHeadOutput> {
     // The id must exist as content (guards typos / declaring a phantom id).
-    if gather_content_chain(id)?.is_none() {
+    // WRITE PATH = `GetStrategy::Network` (see `gather_content_chain`): a cold
+    // local view must not make a real id look phantom.
+    if gather_content_chain(id, GetStrategy::Network)?.is_none() {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "declare_canonical_head: no content found for id '{id}'"
         ))));

@@ -107,21 +107,43 @@ data:
               - "turn:elohim.host:3478?transport=tcp"
             username: "elohim"
             credential: "alpha-turn-commons-2026"
-      # Slow-WAN peer resilience (2026-07-20): a production node on a slow
-      # link was timing out kitsune2 gossip rounds at the 15s default and
-      # thrash-retrying, while up to 10 concurrently accepted rounds piled up
-      # write pressure on the conductor's SQLite write guard (PTxnGuard held
-      # 500-1500ms at ~45/min, a ~50% write-guard duty cycle). Let slow
-      # rounds run to completion instead of retrying, and bound concurrent
-      # accepted rounds so gossip write pressure stays sane. Do not
-      # "clean up" these away from their upstream defaults without
-      # re-checking WAN conditions on the affected nodes. Leave initiate
-      # intervals at defaults — only round completion and accepted-round
-      # concurrency need tuning here.
+      # ARC-CONVERGENCE tuning — REVERTED TO UPSTREAM DEFAULTS for adam only
+      # (2026-07-29). This host previously carried the household slow-WAN
+      # profile (roundTimeoutMs 60000, maxConcurrentAcceptedRounds 4, added
+      # 2026-07-20 for a slow-link node whose SQLite write guard was saturated
+      # by concurrent gossip rounds). That profile is WRONG for a multi-tenant
+      # conductor, and it is still correct for households — it stays in
+      # `_edgenode-consolidated.template.yaml`; do not propagate this revert
+      # there.
+      #
+      # Why: a cell is only an authority for a hash when its CURRENT storage arc
+      # covers it, and kitsune2 resets every local agent's current arc to Empty
+      # on join — i.e. on every conductor restart (kitsune2_core
+      # factories/core_space.rs `local_agent_join`). The arc is promoted to FULL
+      # only when a gossip round completes with zero mismatched sectors
+      # (kitsune2_gossip storage_arc.rs). Until then, `target_arc_factor: 1`
+      # notwithstanding, every zome get/get_links leaves the box and dies on
+      # `request_timeout_s`. Probed on adam 2026-07-29: ONE "Updating storage arc
+      # to full" line in the 44 minutes after a 10:57Z boot, across ~28 hosted
+      # agents — arc convergence, not corpus size, is this node's bottleneck.
+      #
+      # The household profile actively slowed that convergence here: a stalled
+      # round held its slot 4× longer (60s vs 15s) while inbound accept slots
+      # were cut 10 → 4, on the one host in the fleet with the most cells
+      # sharing a single per-space gossip initiate slot.
       advanced:
         k2Gossip:
-          roundTimeoutMs: 60000
-          maxConcurrentAcceptedRounds: 4
+          roundTimeoutMs: 15000
+          maxConcurrentAcceptedRounds: 10
+    # Fail FAST rather than hang (2026-07-29). Top-level conductor key (NOT under
+    # `network:`) — holochain_p2p registers a sender-drop timer per outbound
+    # request at this value. At the 60s default, elohim-storage's 15s per-attempt
+    # heal deadline could never win: every projection-reconcile call was abandoned
+    # while the conductor kept executing it, so heal reported healed=0 forever and
+    # doorway B stayed `catching-up`. 10s puts the conductor's own give-up UNDER
+    # the heal deadline, so a cold-arc read surfaces as a fast, countable failure
+    # the circuit breaker can shed instead of a wedge.
+    request_timeout_s: 10
     data_root_path: "/var/local/lib/holochain"
     keystore:
       type: lair_server_in_proc

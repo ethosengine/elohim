@@ -3,77 +3,170 @@ id: "backlog-self-heal-adam-projection-catchup-exhaustion"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "adam (B / elohim.host) projection catch-up stalls after a deploy restart — full-arc heal conductor calls exceed the 15s per-attempt timeout, doorway stays 503 catching-up for 80min+, retry-exhausting cross-doorway declares"
+title: "adam (B / elohim.host) projection catch-up stalls after a deploy restart — cells are NOT authorities until their storage arc reconverges, so every heal get_links leaves the box and dies on the 60s conductor request timeout"
 slug: "self-heal-adam-projection-catchup-exhaustion-full-arc"
 written: "2026-07-27"
-author: "claude (resiliency-saga sprint-3 delivery — ch06 runtime blocker RCA)"
-status: "open"
+updated: "2026-07-29"
+author: "claude (resiliency-saga sprint-3 delivery — ch06 runtime blocker RCA); mechanism corrected 2026-07-29 (rust-architect, probe-confirmed)"
+status: "wip"
 priority: "high"
 ci_status: blocked
 jobs: [elohim-edge]
-tags: [self-heal-exhaustion, projection-reconcile, catch-up, full-arc, target-arc-factor, adam, shem, restart-churn, heal-timeout, ch06, declare]
+tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare]
 cites:
   - resiliency-saga-sprint3-objective | Resiliency Saga Sprint 3 Objective | path: genesis/docs/superpowers/plans/2026-07-26-resiliency-saga-sprint3-objective.md
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs
+  - elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+  - genesis/orchestrator/manifests/humans/adam-firstman.yaml
   - genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
 ---
 
-# adam's post-restart catch-up cannot complete under full-arc load
+# adam's post-restart catch-up cannot complete — corrected mechanism
 
-## The finding (2026-07-27, live, blocking ch06 delivery)
+> **2026-07-29 — SUPERSEDES the original diagnosis and its prescribed cure.**
+> The 2026-07-27 record attributed this to a full-arc working set (RAM/latency ∝
+> corpus) and prescribed **`target_arc_factor < 1` for adam**. That reading is
+> WRONG on mechanism, and acting on it would have deepened the outage — see
+> "The prescription that would have made it worse" below. The symptom record from
+> 2026-07-27 is preserved verbatim in the next section because it is accurate;
+> only the causal explanation and the cure change.
+
+## The symptoms (2026-07-27, live, blocking ch06 delivery — unchanged)
 
 After the sprint-3 coordinator hot-swap restarted the alpha conductors (edge
 #1243 deploy, ~23:40 UTC), **adam** (backing doorway B / elohim.host) entered a
-projection catch-up it has not completed 80+ minutes later — 4× the ~20-min
-restart-churn the substrate trust contract expects. Symptom chain:
+projection catch-up it had not completed 80+ minutes later — 4× the ~20-min
+restart-churn the substrate trust contract expects.
 
 - `GET https://elohim.host/db/content/*` → `503 {"status":"catching-up"}`; the
-  doorway `/health` is otherwise green (conductor connected, 7/7 pools healthy,
+  doorway `/health` otherwise green (conductor connected, 7/7 pools healthy,
   uptime advancing — not crash-looping).
-- adam's `projection-reconcile` logs each sweep (01:02, 01:05, 01:07):
-  `heal complete … caught_up: false, content_healed: 0,
-  content_local_anchored: 4188, content_divergent_anchor: 3599,
-  content_ids_discovered: 8717` — i.e. thousands of gaps, **zero healed**.
-- Cause, repeated every sweep: `projection-reconcile[content]: conductor
-  resolve failed; retry next sweep — Request timeout: heal conductor call
-  exceeded per-attempt timeout 15s (transient)`. Also on the REA leg
-  (`conductor get failed … 15s`).
+- adam's `projection-reconcile` logs each sweep: `heal complete … caught_up:
+  false, content_healed: 0, content_local_anchored: 4188,
+  content_divergent_anchor: 3599, content_ids_discovered: 8717` — thousands of
+  gaps, **zero healed**.
+- Repeated every sweep: `projection-reconcile[content]: conductor resolve
+  failed; retry next sweep — Request timeout: heal conductor call exceeded
+  per-attempt timeout 15s (transient)`. Also on the REA leg.
+- Conductor-internal, every ~15-30s, steady-state 2h+ past boot:
+  `get_links.rs:76 Host("Other: get_links response channel dropped: likely
+  response timeout")` from `content_store::resolve_content_head`.
+- NOT resource starvation: 1.9GiB of an 8GiB limit, 1.2–3.5 of 8 cores, light
+  throttling, no OOMKills. The conductor was busy-but-alive — *waiting*, not
+  computing.
 
-adam holds a **full-arc** working set (`target_arc_factor=1` → authority for
-every hash; RAM/latency ∝ corpus — see [[project_per_node_memory_is_conductor_authority_arc]],
-where james OOMed the same way). On the shem multi-tenant node, conductor
-calls routinely exceed the 15s heal timeout, so heal makes zero forward
-progress and the projection never reaches `caught_up`. The `503 catching-up`
-gate then refuses all reads AND blocks the doorway from accepting a
-`declare_canonical_head` — so the declare-carries-Record cross-declare that
-would converge B's anchor (saga ch06) **cannot land**, and `authorHeadOnce`'s
-retry ladder (`DECLARE_MAX_ATTEMPTS=24` × ~30s ≈ 12 min) exhausts against the
-503 long before adam recovers.
+## The actual mechanism (2026-07-29, probe-confirmed)
 
-## Why this is a ceiling item, not a shift fix
+**adam is not slow because its arc is full. It is slow because its arc is NOT
+full — so every `get_links` leaves the box and dies on a 60s network timeout.**
 
-The sprint-3 code is delivered and verified working — hot-swap applied on all
-conductors, `/head-record` live, A re-authored its head, the declare mechanism
-is sound. The blocker is **substrate capacity**, not code:
+The chain, each link verified in source:
 
-- Can't be fixed from the dev seat (cluster ops are operator-owned; no kubectl).
-- A code-side redeploy would restart adam into the same catch-up storm.
-- The real levers are substrate decisions: **`target_arc_factor < 1` for adam**
-  (shrink the working set so conductor calls finish under 15s — the scale lever
-  named in [[project_per_node_memory_is_conductor_authority_arc]]), and/or
-  raising/backpressuring the 15s heal per-attempt timeout, and/or moving adam
-  off the contended shem node.
+1. **Every cell's storage arc resets to `Empty` on every conductor start.**
+   `kitsune2_core-0.3.2/src/factories/core_space.rs:419` — `local_agent_join`
+   calls `set_cur_storage_arc(DhtArc::Empty)`, regardless of `target_arc_factor`.
+2. **The arc only becomes FULL after a gossip round returns zero mismatched
+   sectors.** `kitsune2_gossip-0.3.2/src/storage_arc.rs:99-105` (the
+   `not(feature = "sharding")` arm — sharding is off). It logs
+   `tracing::info!("Updating storage arc to full")` at `:102`.
+3. **The authority check reads the CURRENT arc, not the target.**
+   `holochain_p2p/src/spawn/actor.rs` `authority_for_hash` tests
+   `agent.get_cur_storage_arc().contains(loc)`. Empty arc ⇒ `false`.
+4. **So the cascade takes the network branch.** `holochain_cascade/src/lib.rs:788-791`
+   — `if let GetStrategy::Network = strategy { if !authority { fetch_links(..) } }`.
+   This is the ONLY path that emits the observed error.
+5. **`GetStrategy::default()` is `Network`** (`holochain_zome_types/src/entry.rs:94-105`),
+   used at all 211 `get`/`get_links` sites in `content_store`; `GetStrategy::Local`
+   appeared **zero times in any DNA** before this fix.
+6. **Each network `get_links` fans out hard**: `PARALLEL_GET_AGENTS_COUNT = 3`
+   (`actor.rs:23`) × `.buffered(10)` (`host_fn/get_links.rs:67`) = up to 30
+   in-flight requests per zome call.
+7. **Each dies at `request_timeout_s` = 60s**, and the timer starts *before* the
+   send (`actor.rs:1155-1172`), which can itself burn 45–60s in tx5 WebRTC
+   connect. Channel drop ⇒ `actor.rs:1192`.
+8. **Storage's 15s deadline could never win, and abandoning did not shed load.**
+   `HcClient::call_zome` has no cancellation, so each of the 3 attempts kept
+   running in the conductor — 3 concurrent zome calls per row, ~30 network
+   requests each, for zero progress.
+9. **That traffic starved the gossip that would end it.**
+   `kitsune2_gossip-0.3.2/src/initiate.rs:66` — while any local agent is below
+   its target arc, the space waits on `fetch.notify_on_drained()` or a 120s
+   timeout (`:80-103`), and there is only **one initiated round per space at a
+   time** (`:104-107`).
 
-## What would land ch06 once adam is healthy
+**Positive-feedback deadlock:** the heal loop's own traffic prevented the arc
+convergence that would have made the heal loop's calls local.
 
-adam serving 200 (caught_up=true) → re-run the App pipeline's `authorHeadOnce`
-(a `[build:app]` push) so the declare-carries-Record cross-declare lands A's
-head on B against a responsive conductor. The mechanism is proven; it needs a
-declare cycle against a non-503 B.
+### The probe that confirmed it
 
-## Operator decision
+`Updating storage arc to full` in adam's conductor log. Since adam's 10:57Z boot
+on 2026-07-29: **exactly ONE such line (11:41:58Z, agent `uhCAk_hiBZ…`) across
+~28 hosted agents.** Arc convergence — not corpus size — is this node's
+bottleneck. Household nodes are fine because 1–2 agents over a small corpus
+complete a round quickly, after which everything resolves locally.
 
-1. Reduce adam's `target_arc_factor` below 1 (or relocate adam off shem) so
-   post-restart catch-up completes within the trust-contract window.
-2. Until then, every deploy that restarts adam re-opens an 80min+ 503 window on
-   elohim.host — the restart-churn contract (~20min) does not hold for this node.
+### The prescription that would have made it worse
+
+The original record recommended `target_arc_factor < 1` for adam. A lower arc
+factor makes the node authority for **less**, which sends **more** reads to the
+network; at `0` it is a leecher, authority for nothing, and *every* read becomes
+a 60s round-trip permanently. [[project_per_node_memory_is_conductor_authority_arc]]
+is correct that arc factor is the **memory** scale lever — but for **latency** it
+points the opposite way. Do not reach for it here.
+
+## The cure (implemented 2026-07-29, awaiting push + deploy verification)
+
+Four bounded changes, none requiring a DNA reinstall or a re-key:
+
+1. **Cure 3 — stop amplifying** (`elohim-storage/src/p2p/projection_reconcile.rs`).
+   Retry only *answered* transient errors, never our own synthetic per-attempt
+   timeout (`should_retry_attempt` / `is_synthetic_attempt_timeout`), plus a
+   per-leg `HealCircuit` that sheds the remainder of a leg after 3 consecutive
+   synthetic timeouts and closes on the first success.
+2. **Cure 1 — the read path goes local** (`content_store` **coordinator** zome).
+   `GetStrategy` is threaded through `gather_canonical_head_record` /
+   `gather_content_chain` / `resolve_root_author`; `resolve_content_head` passes
+   `Local`, and the DECLARE paths keep `Network` (a `Local` author gate would
+   reject legitimate declares with "not in the version chain"). Turns a 60s hang
+   into a sub-millisecond `None` — which is already this resolver's documented
+   degrade — and stops feeding the fetch queue that blocks arc convergence.
+   **Coordinator-only: the DNA hash does not move**; it ships via the
+   `update_coordinators` hot-swap under `ALLOW_COORDINATOR_UPDATE`.
+3. **Cure 2 — timed-out rows reach the peer-adoption arm.** A transient failure
+   with a `PeerHeadHint` now routes to `adopt_candidates`
+   (`timeout_should_route_to_adopt`) instead of falling out of both candidate
+   lists and being silently re-dropped every sweep. Adoption goes through the
+   existing verified path — `PeerHeadRecordFetcher` over view-federation, then
+   declare with `carried_record`, which `validate_carried_record` checks for
+   action-hash binding, author signature, and entry↔action binding. Evidence, not
+   authority: the DHT stays the manifest and **no stamp mode changed**.
+4. **Cure 4 — adam's conductor config only** (`adam-firstman.yaml`). Top-level
+   `request_timeout_s: 10` so the conductor gives up *under* the heal deadline;
+   `k2Gossip` reverted to upstream defaults (`roundTimeoutMs` 60000→15000,
+   `maxConcurrentAcceptedRounds` 4→10). The household slow-WAN profile those
+   values came from (2026-07-20) is still correct for households and stays in
+   `_edgenode-consolidated.template.yaml` — **do not propagate this revert there.**
+
+## The real ceiling (operator decision — replaces the old one)
+
+**Not `target_arc_factor`. Cap or shard doorway-B's agent provisioning onto adam.**
+
+Kitsune2 budgets gossip **per space**, not per agent: one outbound initiate round
+at a time (`initiate.rs:104-107`), and a single local agent still below its
+target arc holds the whole space in the slow initiate path (`initiate.rs:66`).
+Meanwhile `doorway/doorway-service/src/conductor/pool_map.rs:44`
+(`DEFAULT_MAX_AGENTS_PER_CONDUCTOR = 50`, no env lever) keeps adding agents to
+this one conductor. Arc-convergence cost therefore scales with hosted agents
+while the convergence budget does not. That ceiling is structural and cannot be
+tuned away.
+
+Also still true: adam re-opens this window on **every deploy restart** (step 1
+above), so the trust contract's ~20min restart-churn does not hold for this node
+until the hosted-agent count comes down.
+
+## What would land ch06
+
+adam serving 200 (`caught_up=true`) → re-run the App pipeline's `authorHeadOnce`
+(a `[build:app]` push) so the declare-carries-Record cross-declare lands A's head
+on B against a responsive conductor. The mechanism is proven; it needs a declare
+cycle against a non-503 B.

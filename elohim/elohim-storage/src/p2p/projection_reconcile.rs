@@ -170,6 +170,11 @@ const PEER_TIMEOUT: Duration = Duration::from_secs(10);
 /// on a single row. 2 retries ⇒ up to 3 attempts. A row that exhausts these stays
 /// a `mark_failed` gap (re-discovered next sweep), exactly as before — the retry
 /// only adds chances to catch a saturated conductor's free window WITHIN a sweep.
+///
+/// SCOPE (2026-07-29): these retries apply ONLY to an error the conductor
+/// actually ANSWERED with (a websocket timeout it reported back). They are
+/// deliberately NOT spent on our own synthetic per-attempt timeout — see
+/// [`should_retry_attempt`].
 const MAX_ROW_RETRIES: u32 = 2;
 
 /// Per-attempt deadline for one heal conductor call. Deliberately TIGHTER than the
@@ -177,6 +182,18 @@ const MAX_ROW_RETRIES: u32 = 2;
 /// retried (or the next row attempted) rather than burning ~60s of the leg budget
 /// on a single hung row. `HcClient::call_zome` has no timeout of its own.
 const HEAL_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// Stable marker embedded in the SYNTHETIC per-attempt timeout this module
+/// manufactures when `tokio::time::timeout` elapses on a heal call. Used both to
+/// BUILD that error and to RECOGNISE it in [`is_synthetic_attempt_timeout`], so
+/// the two can never drift apart.
+const HEAL_SYNTHETIC_TIMEOUT_MARKER: &str = "heal conductor call exceeded per-attempt timeout";
+
+/// Consecutive synthetic per-attempt timeouts that OPEN the leg circuit and shed
+/// the remainder of the leg. At the 15s per-attempt deadline this is ~45s of leg
+/// budget spent proving the conductor is not answering; past that, further rows
+/// only stack more abandoned-but-still-executing calls on it.
+const HEAL_CIRCUIT_TIMEOUT_THRESHOLD: u32 = 3;
 
 /// In-leg retry backoff floor / span for a transient row (jittered in `[min, min+span)`).
 const HEAL_BACKOFF_MIN: Duration = Duration::from_secs(2);
@@ -209,6 +226,9 @@ pub struct HealPacing {
     pub rea_leg_budget: Duration,
     pub content_leg_budget: Duration,
     pub collectives_leg_budget: Duration,
+    /// Consecutive synthetic per-attempt timeouts that shed the rest of a leg.
+    /// `0` disables the circuit (never opens).
+    pub circuit_timeout_threshold: u32,
 }
 
 impl Default for HealPacing {
@@ -221,6 +241,7 @@ impl Default for HealPacing {
             rea_leg_budget: REA_LEG_BUDGET,
             content_leg_budget: CONTENT_LEG_BUDGET,
             collectives_leg_budget: COLLECTIVES_LEG_BUDGET,
+            circuit_timeout_threshold: HEAL_CIRCUIT_TIMEOUT_THRESHOLD,
         }
     }
 }
@@ -239,6 +260,10 @@ impl HealPacing {
             rea_leg_budget: Duration::from_secs(3600),
             content_leg_budget: Duration::from_secs(3600),
             collectives_leg_budget: Duration::from_secs(3600),
+            // Circuit OFF by default in tests: the existing retry/outcome cases
+            // drive deliberate timeout streaks and must not be shed mid-set. The
+            // circuit's own tests opt in explicitly.
+            circuit_timeout_threshold: 0,
         }
     }
 
@@ -278,6 +303,97 @@ fn is_transient_conductor_error(err: &crate::error::StorageError) -> bool {
             m.contains("timeout") || m.contains("timed out")
         }
         _ => false,
+    }
+}
+
+/// True for the SYNTHETIC per-attempt timeout this module manufactures when
+/// `tokio::time::timeout` elapses on a heal call — as opposed to a timeout the
+/// conductor itself ANSWERED with.
+///
+/// The distinction is load-bearing (2026-07-29). `HcClient::call_zome` has no
+/// cancellation: when our `tokio::time::timeout` fires we stop AWAITING the call,
+/// but the conductor keeps executing it. Retrying therefore does not re-try
+/// anything — it stacks a SECOND (then third) concurrent zome call on a conductor
+/// that is already not answering, each of which fans out its own network
+/// `get_links` requests. On adam that turned one stalled row into 3× the
+/// conductor load for zero forward progress.
+fn is_synthetic_attempt_timeout(err: &crate::error::StorageError) -> bool {
+    matches!(
+        err,
+        crate::error::StorageError::Timeout(m) if m.contains(HEAL_SYNTHETIC_TIMEOUT_MARKER)
+    )
+}
+
+/// Whether a failed heal attempt is worth ANOTHER attempt within the leg.
+///
+/// Transient (timeout-class) AND answered — i.e. the conductor came back to us,
+/// so a retry genuinely re-tries. Our own synthetic per-attempt timeout is
+/// explicitly excluded (see [`is_synthetic_attempt_timeout`]): abandoning does not
+/// cancel the in-flight call, so a retry only amplifies load on an unresponsive
+/// conductor. Such a row stays a `mark_failed` gap and is re-discovered next
+/// sweep, exactly as an exhausted row always has been.
+fn should_retry_attempt(err: &crate::error::StorageError) -> bool {
+    is_transient_conductor_error(err) && !is_synthetic_attempt_timeout(err)
+}
+
+/// Per-leg circuit breaker over CONSECUTIVE synthetic per-attempt timeouts.
+///
+/// Purpose: stop feeding an unresponsive conductor. Once `threshold` heal calls in
+/// a row have been abandoned at the per-attempt deadline, the remainder of the leg
+/// is shed — un-attempted rows are re-discovered next sweep (the tracker is
+/// per-sweep), so nothing is lost, and the conductor gets a quiet window in which
+/// its own gossip/fetch queue can drain. On the alpha fleet that queue draining is
+/// precisely what lets a cell's storage arc converge to FULL, after which these
+/// calls resolve locally instead of leaving the box at all.
+///
+/// The circuit is created fresh per leg invocation, so "open" means "yield THIS
+/// leg", never a durable trip. Any ANSWERED call (success, or a failure the
+/// conductor returned) breaks the streak — the signal is unresponsiveness, not
+/// row-level failure.
+#[derive(Debug)]
+struct HealCircuit {
+    threshold: u32,
+    consecutive_timeouts: u32,
+    open: bool,
+}
+
+impl HealCircuit {
+    fn new(threshold: u32) -> Self {
+        Self {
+            threshold,
+            consecutive_timeouts: 0,
+            open: false,
+        }
+    }
+
+    /// Fold one attempt outcome into the circuit.
+    fn record<T>(&mut self, outcome: &Result<T, crate::error::StorageError>) {
+        match outcome {
+            // A success closes the circuit outright.
+            Ok(_) => {
+                self.consecutive_timeouts = 0;
+                self.open = false;
+            }
+            Err(e) if is_synthetic_attempt_timeout(e) => {
+                self.consecutive_timeouts = self.consecutive_timeouts.saturating_add(1);
+                if self.threshold > 0 && self.consecutive_timeouts >= self.threshold {
+                    self.open = true;
+                }
+            }
+            // The conductor ANSWERED (even if with an error): it is responsive, so
+            // the unresponsiveness streak breaks.
+            Err(_) => {
+                self.consecutive_timeouts = 0;
+            }
+        }
+    }
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn consecutive_timeouts(&self) -> u32 {
+        self.consecutive_timeouts
     }
 }
 
@@ -419,6 +535,25 @@ fn gapfill_would_self_elect(
     !answer_canonical && peer_advertises_declaration && local_declared.is_none()
 }
 
+/// Should a FAILED own-conductor resolve be handed to the adopt-before-author arm
+/// instead of simply dropped for the sweep?
+///
+/// Pure + total so the routing rule is testable without a conductor (same reason
+/// [`gapfill_would_self_elect`] is extracted).
+///
+/// YES exactly when the failure was TRANSIENT (timeout-class — our conductor is
+/// unresponsive, not authoritative-ly denying the row) AND a peer advertises a
+/// declaration for the id, i.e. there is a verified peer path to try. A
+/// non-transient failure is a decode/logic error that adoption cannot fix, and
+/// without a peer hint there is nothing to adopt FROM.
+///
+/// This closes the drop-forever hole: before this, a timed-out row landed in
+/// NEITHER the ghost list (that needs `Ok(None)`) nor the adopt list, so an
+/// unresponsive conductor meant the id was silently re-dropped every sweep.
+fn timeout_should_route_to_adopt(transient: bool, peer_advertises_declaration: bool) -> bool {
+    transient && peer_advertises_declaration
+}
+
 /// Outcome of the bounded-retry conductor call for one row: the final result plus
 /// whether any transient retry was taken (so a success-after-retry is countable).
 struct RetryResult<T> {
@@ -442,7 +577,7 @@ where
         let outcome = match tokio::time::timeout(pacing.attempt_timeout, op()).await {
             Ok(r) => r,
             Err(_elapsed) => Err(crate::error::StorageError::Timeout(format!(
-                "heal conductor call exceeded per-attempt timeout {:?}",
+                "{HEAL_SYNTHETIC_TIMEOUT_MARKER} {:?}",
                 pacing.attempt_timeout
             ))),
         };
@@ -454,9 +589,12 @@ where
                 }
             }
             Err(e) => {
-                // Only timeout-class errors are worth another attempt within the
-                // leg; anything else returns immediately (no free window fixes it).
-                if attempt < pacing.max_row_retries && is_transient_conductor_error(&e) {
+                // Only an ANSWERED timeout-class error is worth another attempt
+                // within the leg; anything else — including our own synthetic
+                // per-attempt timeout, which does not cancel the in-flight call —
+                // returns immediately (no free window fixes it, and retrying an
+                // uncancelled call only stacks load). See `should_retry_attempt`.
+                if attempt < pacing.max_row_retries && should_retry_attempt(&e) {
                     attempt += 1;
                     retried = true;
                     tokio::time::sleep(pacing.backoff()).await;
@@ -1573,11 +1711,13 @@ async fn heal_rea(
     // backlog is never starved behind the large content queue (the incident).
     let leg_start = std::time::Instant::now();
     let gap_ids = tracker.pending_ids();
+    let mut circuit = HealCircuit::new(pacing.circuit_timeout_threshold);
     for id in gap_ids {
         let attempt = call_with_retry(pacing, || {
             crate::services::conductor_writes::get_rea_commitment(hc, &id)
         })
         .await;
+        circuit.record(&attempt.result);
         let kind = match attempt.result {
             Ok(Some(output)) => match heal_one(&output, pool, &app_ctx) {
                 Ok(()) => {
@@ -1632,6 +1772,17 @@ async fn heal_rea(
                 target: "elohim_storage::projection_reconcile",
                 budget_secs = pacing.rea_leg_budget.as_secs(),
                 "projection-reconcile: rea heal hit leg budget — yielding, remaining gaps resume next sweep"
+            );
+            break;
+        }
+
+        // Unresponsive-conductor circuit: shed the rest of the leg rather than
+        // stack more abandoned-but-still-executing calls on it (see `HealCircuit`).
+        if circuit.is_open() {
+            tracing::warn!(
+                target: "elohim_storage::projection_reconcile",
+                consecutive_timeouts = circuit.consecutive_timeouts(),
+                "projection-reconcile: rea heal OPENED the unresponsive-conductor circuit — shedding the rest of the leg, remaining gaps resume next sweep"
             );
             break;
         }
@@ -2031,11 +2182,13 @@ async fn heal_content(
     let leg_start = std::time::Instant::now();
     let mut healed = 0usize;
     let mut conductor_missing = 0usize;
+    let mut circuit = HealCircuit::new(pacing.circuit_timeout_threshold);
     for id in tracker.pending_ids() {
         let attempt = call_with_retry(pacing, || {
             crate::services::conductor_writes::call_resolve_content_head(hc, &id)
         })
         .await;
+        circuit.record(&attempt.result);
         match attempt.result {
             // GAPFILL SELF-ELECTION GUARD. Checked BEFORE the stamp, because the
             // stamp is what makes the divergence terminal (see
@@ -2193,7 +2346,28 @@ async fn heal_content(
             }
             Err(e) => {
                 let transient = is_transient_conductor_error(&e);
-                tracing::warn!(content_id = %id, error = %e, transient, "projection-reconcile[content]: conductor resolve failed; retry next sweep");
+                // TIMEOUT → PEER-ADOPTION ROUTING (2026-07-29). A row whose own-
+                // conductor resolve timed out used to fall out of BOTH candidate
+                // lists — neither a ghost (we never got `Ok(None)`) nor an adopt
+                // candidate — so a conductor that cannot answer meant the id was
+                // simply dropped every sweep, forever. When a peer advertises a
+                // declaration for this id we already hold the verified path to it:
+                // `adopt_deferred_heads` fetches the peer's head Record over
+                // view-federation and declares it with `carried_record`, which the
+                // zome's `validate_carried_record` verifies (action-hash binding,
+                // author signature, entry↔action binding) before acceptance. That
+                // is evidence, not authority: the DHT stays the manifest, the
+                // declare still goes through the conductor, and the stamp modes are
+                // untouched — this only ADDS a candidate, it never widens `Declare`.
+                //
+                // The row stays `mark_failed` (honest: WE did not heal it) so it is
+                // re-discovered next sweep and `caught_up` is not falsely satisfied.
+                let routed_to_adopt =
+                    timeout_should_route_to_adopt(transient, peer_head_hints.contains_key(&id));
+                if routed_to_adopt {
+                    adopt_candidates.push(id.clone());
+                }
+                tracing::warn!(content_id = %id, error = %e, transient, routed_to_adopt, "projection-reconcile[content]: conductor resolve failed; retry next sweep");
                 tracker.mark_failed(&id);
                 crate::metrics::inc_projection_heal_outcome(
                     "content",
@@ -2213,6 +2387,18 @@ async fn heal_content(
                 budget_secs = pacing.content_leg_budget.as_secs(),
                 healed,
                 "projection-reconcile[content]: heal hit leg budget — yielding, remaining gaps resume next sweep"
+            );
+            break;
+        }
+
+        // Unresponsive-conductor circuit: shed the rest of the leg rather than
+        // stack more abandoned-but-still-executing calls on it (see `HealCircuit`).
+        if circuit.is_open() {
+            tracing::warn!(
+                target: "elohim_storage::projection_reconcile",
+                consecutive_timeouts = circuit.consecutive_timeouts(),
+                healed,
+                "projection-reconcile[content]: OPENED the unresponsive-conductor circuit — shedding the rest of the leg, remaining gaps resume next sweep"
             );
             break;
         }
@@ -2726,11 +2912,13 @@ async fn heal_collectives(
     let mut healed = 0usize;
     let mut conductor_missing = 0usize;
 
+    let mut circuit = HealCircuit::new(pacing.circuit_timeout_threshold);
     for cid in tracker.pending_ids() {
         let attempt = call_with_retry(pacing, || {
             crate::services::conductor_writes::get_collective_by_cid(hc, &cid)
         })
         .await;
+        circuit.record(&attempt.result);
         match attempt.result {
             Ok(Some(wire)) => {
                 let merge_onto = alias_by_cid.get(&cid).map(String::as_str);
@@ -2831,6 +3019,18 @@ async fn heal_collectives(
                 budget_secs = pacing.collectives_leg_budget.as_secs(),
                 healed,
                 "projection-reconcile[collectives]: heal hit leg budget — yielding, remaining gaps resume next sweep"
+            );
+            break;
+        }
+
+        // Unresponsive-conductor circuit: shed the rest of the leg rather than
+        // stack more abandoned-but-still-executing calls on it (see `HealCircuit`).
+        if circuit.is_open() {
+            tracing::warn!(
+                target: "elohim_storage::projection_reconcile",
+                consecutive_timeouts = circuit.consecutive_timeouts(),
+                healed,
+                "projection-reconcile[collectives]: OPENED the unresponsive-conductor circuit — shedding the rest of the leg, remaining gaps resume next sweep"
             );
             break;
         }
@@ -3628,5 +3828,156 @@ mod tests {
         assert!(r.result.is_err());
         assert!(!r.retried, "a non-transient error is never retried in-leg");
         assert_eq!(calls.get(), 1, "exactly one attempt for a logic error");
+    }
+
+    // ---- Cure 3: retry classification (synthetic vs answered timeout) --------
+    //
+    // The distinction exists because `HcClient::call_zome` has no cancellation:
+    // when OUR `tokio::time::timeout` fires we stop awaiting, but the conductor
+    // keeps executing the call. Retrying therefore stacks concurrent zome calls
+    // on an already-unresponsive conductor instead of re-trying anything.
+
+    #[test]
+    fn synthetic_attempt_timeout_is_distinguished_from_an_answered_one() {
+        use crate::error::StorageError;
+        // The exact shape `call_with_retry` manufactures on an elapsed deadline.
+        let synthetic = StorageError::Timeout(format!(
+            "{HEAL_SYNTHETIC_TIMEOUT_MARKER} {:?}",
+            Duration::from_secs(15)
+        ));
+        assert!(is_synthetic_attempt_timeout(&synthetic));
+        assert!(
+            is_transient_conductor_error(&synthetic),
+            "still transient — the metric label must not change"
+        );
+        assert!(
+            !should_retry_attempt(&synthetic),
+            "our own uncancelled-call timeout must NOT be retried"
+        );
+
+        // A timeout the conductor actually answered with stays retryable.
+        let answered = StorageError::Conductor("Websocket error: Timeout".into());
+        assert!(!is_synthetic_attempt_timeout(&answered));
+        assert!(should_retry_attempt(&answered));
+
+        // A bare Timeout that is not ours (e.g. another layer) is still retried.
+        let other_timeout = StorageError::Timeout("wedged".into());
+        assert!(!is_synthetic_attempt_timeout(&other_timeout));
+        assert!(should_retry_attempt(&other_timeout));
+
+        // A logic error is neither.
+        let logic = StorageError::Validation("bad".into());
+        assert!(!is_synthetic_attempt_timeout(&logic));
+        assert!(!should_retry_attempt(&logic));
+    }
+
+    #[tokio::test]
+    async fn call_with_retry_attempts_a_hung_call_exactly_once() {
+        use crate::error::StorageError;
+        // A conductor that never answers: the per-attempt deadline elapses.
+        let pacing = HealPacing {
+            attempt_timeout: Duration::from_millis(20),
+            ..HealPacing::test_fast()
+        };
+        let calls = std::cell::Cell::new(0u32);
+        let r = call_with_retry(&pacing, || {
+            calls.set(calls.get() + 1);
+            async {
+                // Never resolves within the deadline.
+                tokio::time::sleep(Duration::from_secs(30)).await;
+                Ok::<i32, StorageError>(1)
+            }
+        })
+        .await;
+
+        let err = r.result.expect_err("a hung call fails");
+        assert!(
+            is_synthetic_attempt_timeout(&err),
+            "the failure is our synthetic deadline, got: {err}"
+        );
+        assert_eq!(
+            calls.get(),
+            1,
+            "a hung (uncancellable) call is attempted ONCE — retrying it would \
+             stack concurrent zome calls on an unresponsive conductor"
+        );
+        assert!(!r.retried, "no retry was taken, so none is reported");
+    }
+
+    // ---- Cure 3: the unresponsive-conductor leg circuit ----------------------
+
+    /// Build the synthetic error the circuit counts.
+    fn synthetic_timeout_err() -> crate::error::StorageError {
+        crate::error::StorageError::Timeout(format!(
+            "{HEAL_SYNTHETIC_TIMEOUT_MARKER} {:?}",
+            Duration::from_secs(15)
+        ))
+    }
+
+    #[test]
+    fn heal_circuit_opens_on_consecutive_synthetic_timeouts() {
+        let mut c = HealCircuit::new(3);
+        for i in 1..3 {
+            c.record::<i32>(&Err(synthetic_timeout_err()));
+            assert!(!c.is_open(), "must not open before the threshold (i={i})");
+        }
+        c.record::<i32>(&Err(synthetic_timeout_err()));
+        assert!(c.is_open(), "opens at the threshold");
+        assert_eq!(c.consecutive_timeouts(), 3);
+    }
+
+    #[test]
+    fn heal_circuit_closes_on_first_success() {
+        let mut c = HealCircuit::new(2);
+        c.record::<i32>(&Err(synthetic_timeout_err()));
+        c.record::<i32>(&Err(synthetic_timeout_err()));
+        assert!(c.is_open());
+        c.record(&Ok(1));
+        assert!(!c.is_open(), "a success closes the circuit outright");
+        assert_eq!(c.consecutive_timeouts(), 0);
+    }
+
+    #[test]
+    fn heal_circuit_answered_failure_breaks_the_streak() {
+        use crate::error::StorageError;
+        let mut c = HealCircuit::new(3);
+        c.record::<i32>(&Err(synthetic_timeout_err()));
+        c.record::<i32>(&Err(synthetic_timeout_err()));
+        // The conductor ANSWERED — with an error, but it is responsive. The
+        // circuit tracks unresponsiveness, not row-level failure.
+        c.record::<i32>(&Err(StorageError::Validation("bad".into())));
+        assert_eq!(c.consecutive_timeouts(), 0, "streak broken by an answer");
+        c.record::<i32>(&Err(synthetic_timeout_err()));
+        assert!(!c.is_open(), "the streak restarted, so 1 < threshold 3");
+    }
+
+    #[test]
+    fn heal_circuit_threshold_zero_never_opens() {
+        let mut c = HealCircuit::new(0);
+        for _ in 0..50 {
+            c.record::<i32>(&Err(synthetic_timeout_err()));
+        }
+        assert!(!c.is_open(), "threshold 0 disables the circuit");
+    }
+
+    // ---- Cure 2: timeout → peer-adoption routing ----------------------------
+
+    #[test]
+    fn timeout_routes_to_adopt_only_with_a_peer_hint() {
+        // The hole this closes: a transient failure WITH a peer declaration used
+        // to land in neither candidate list and was silently dropped every sweep.
+        assert!(
+            timeout_should_route_to_adopt(true, true),
+            "transient + a peer advertising a declaration ⇒ hand to the adopt arm"
+        );
+        assert!(
+            !timeout_should_route_to_adopt(true, false),
+            "no peer hint ⇒ nothing to adopt FROM"
+        );
+        assert!(
+            !timeout_should_route_to_adopt(false, true),
+            "a decode/logic error is not something adoption can fix"
+        );
+        assert!(!timeout_should_route_to_adopt(false, false));
     }
 }
