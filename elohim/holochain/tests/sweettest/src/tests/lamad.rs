@@ -293,17 +293,29 @@ async fn content_visible_across_agents() -> Result<()> {
     let cell1 = app1.cells().first().unwrap().clone();
     let cell2 = app2.cells().first().unwrap().clone();
 
-    // Agent 1 creates content
-    let input = test_content("cross-agent-1");
+    // Agent 1 creates content. unique_id, not a fixed string: nextest retries
+    // share the process-global mem-bootstrap store, so a fixed id makes every
+    // retry re-join the first attempt's DHT residue and self-poison (dna #1357
+    // class — the #1379/#1380 in-build retries were doomed by this
+    // independently of the node-CPU contention the wider deadline absorbs).
+    let content_id = unique_id("cross-agent-1");
+    let input = test_content(&content_id);
     let output: ContentOutput = c1
         .call(&cell1.zome("content_store"), "create_content", input)
         .await;
-    assert_eq!(output.content.id, "cross-agent-1");
+    assert_eq!(output.content.id, content_id);
 
     // Poll c2 until the IdToContent link is gossipped, or panic on deadline.
     // Single-shot reads after a fixed sleep race the link-traversal path; see
     // tests/node_registry.rs admission_visible_across_agents for rationale.
-    let deadline = Instant::now() + Duration::from_secs(30);
+    //
+    // 120s, not 30s: CI packs 2-3 conductor-heavy sweettest shards onto one
+    // node (hostpath-PVC pinning), and at 95-99% node CPU the gossip round
+    // that carries this link can exceed 30s (#1376/#1379/#1380 all failed
+    // exactly here at 95%+ saturation; passes ran at 78-85%). The loop breaks
+    // on first success, so a healthy run never pays the wider budget — see
+    // backlog/ci-sweettest-shard-packing-contention.md for the node evidence.
+    let deadline = Instant::now() + Duration::from_secs(120);
     let zome = cell2.zome("content_store");
     let retrieved: ContentOutput = loop {
         let result: Option<ContentOutput> = c2
@@ -311,7 +323,7 @@ async fn content_visible_across_agents() -> Result<()> {
                 &zome,
                 "get_content_by_id",
                 QueryByIdInput {
-                    id: "cross-agent-1".to_string(),
+                    id: content_id.clone(),
                 },
             )
             .await;
@@ -319,13 +331,16 @@ async fn content_visible_across_agents() -> Result<()> {
             break out;
         }
         if Instant::now() >= deadline {
-            panic!("agent 2 could not see content 'cross-agent-1' within 30s");
+            panic!("agent 2 could not see content '{content_id}' within 120s");
         }
         sleep(Duration::from_millis(100)).await;
     };
 
-    assert_eq!(retrieved.content.id, "cross-agent-1");
-    assert_eq!(retrieved.content.title, "Test Concept cross-agent-1");
+    assert_eq!(retrieved.content.id, content_id);
+    assert_eq!(
+        retrieved.content.title,
+        format!("Test Concept {content_id}")
+    );
     assert_eq!(retrieved.content.content_type, "concept");
 
     Ok(())
