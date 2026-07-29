@@ -39,5 +39,11 @@ seed-conductors:
 seed-humans:
     pnpm run seed:humans
 
+# Run the canonical household-formation ceremony across its member conductors.
+# Set CONDUCTOR_URLS to comma-separated app WebSocket URLs; STORAGE_URL or
+# DOORWAY_URL enables the idempotent collective/projection probe.
+seed-household-formation:
+    bash ../scripts/ci/seed-household-formation.sh "${CONDUCTOR_URLS:-}"
+
 # Full seed: conductor identities first, then doorway registration
 seed: seed-conductors seed-humans
