@@ -37,6 +37,7 @@
     "lint:fix": "eslint . --fix",
     "format:check": "prettier --check \"**/*.{ts,js,json,mjs}\"",
     "format": "prettier --write \"**/*.{ts,js,json,mjs}\"",
+    "lint:gherkin": "node scripts/gherkin-prepush-lint.mjs",
     "scan:coverage": "tsx scripts/scan-coverage.ts",
     "scan:coverage:ci": "tsx scripts/scan-coverage.ts --ci",
     "explore": "tsx scripts/explore-session.ts",

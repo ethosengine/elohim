@@ -51,10 +51,7 @@
     "schema-validate": {
       "description": "Validate seed data against protocol schemas",
       "inputs": {
-        "sources": [
-          "genesis/seeds/**",
-          "elohim/sdk/schemas/**"
-        ],
+        "sources": ["genesis/seeds/**", "elohim/sdk/schemas/**"],
         "buildProcess": []
       },
       "outputs": { "artifacts": [], "verify": null },
@@ -101,6 +98,20 @@
       "depends": [],
       "executor": { "stage": "Lint A2O", "function": null }
     },
+    "gherkin-prepush-lint": {
+      "description": "Parse every A2O Gherkin feature before E2E execution",
+      "inputs": {
+        "sources": [
+          "genesis/a2o/features/**/*.feature",
+          "genesis/a2o/held/features/**/*.feature",
+          "genesis/a2o/scripts/gherkin-prepush-lint.mjs"
+        ],
+        "buildProcess": []
+      },
+      "outputs": { "artifacts": [], "verify": null },
+      "depends": [],
+      "executor": { "stage": "Lint Gherkin", "function": null }
+    },
     "gate-genesis": {
       "description": "Catch-all trigger for genesis directory quality gate (excludes orchestrator CI glue)",
       "inputs": {
@@ -121,11 +132,18 @@
   },
   "gate": {
     "projects": {
-      "genesis": { "dir": "genesis/seeder", "steps": ["validate-seeds", "seed-content", "gate-genesis"] },
+      "genesis": {
+        "dir": "genesis/seeder",
+        "steps": ["validate-seeds", "seed-content", "gate-genesis"]
+      },
       "schema-validate": { "dir": ".", "steps": ["schema-validate"] },
       "schema-codegen": { "dir": ".", "steps": ["schema-codegen"] },
       "constants-sync": { "dir": ".", "steps": ["constants-sync"] },
-      "genesis-a2o": { "dir": "genesis/a2o", "steps": ["lint-a2o"] }
+      "genesis-a2o": { "dir": "genesis/a2o", "steps": ["lint-a2o"] },
+      "gherkin-prepush-lint": {
+        "dir": "genesis/a2o",
+        "steps": ["gherkin-prepush-lint"]
+      }
     }
   },
   "deployment": {}

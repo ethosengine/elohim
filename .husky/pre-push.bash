@@ -50,6 +50,7 @@ set -o pipefail
 #   manifest-hygiene         → DNA manifest hygiene schema contract (any dna.yaml / happ.yaml / manifest-hygiene test change)
 #   sweettest-check          → Sweettest compile-check (any zome source or sweettest source change)
 #   genesis/a2o/             → E2E lint + typecheck
+#   gherkin-prepush-lint     → Parse every executable A2O feature before E2E can abort blank
 #   genesis/orchestrator/    → Jenkinsfile linting (any *Jenkinsfile* change)
 #
 # Falls back to inline commands if `just` is not installed.
@@ -665,7 +666,7 @@ run_gate() {
   fi
 
   # Schema checks run pnpm scripts directly — no justfile needed
-  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "reach-drift" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ] || [ "$PROJECT_NAME" = "cargo-coverage" ] || [ "$PROJECT_NAME" = "manifest-hygiene" ] || [ "$PROJECT_NAME" = "sweettest-check" ] || [ "$PROJECT_NAME" = "elements-codegen" ] || [ "$PROJECT_NAME" = "pipeline-list-fresh" ]; then
+  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "reach-drift" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ] || [ "$PROJECT_NAME" = "cargo-coverage" ] || [ "$PROJECT_NAME" = "manifest-hygiene" ] || [ "$PROJECT_NAME" = "sweettest-check" ] || [ "$PROJECT_NAME" = "elements-codegen" ] || [ "$PROJECT_NAME" = "pipeline-list-fresh" ] || [ "$PROJECT_NAME" = "gherkin-prepush-lint" ]; then
     case "$PROJECT_NAME" in
       schema-validate)
         echo "[$PROJECT_NAME] Validating seed data against protocol schemas..."
@@ -781,6 +782,11 @@ run_gate() {
         else
           rc=0
         fi
+        ;;
+      gherkin-prepush-lint)
+        echo "[$PROJECT_NAME] Parsing A2O Gherkin feature files..."
+        pnpm run lint:gherkin 2>&1
+        rc=$?
         ;;
     esac
   elif command -v just >/dev/null 2>&1 && [ -f justfile ]; then
@@ -947,6 +953,10 @@ run_gate() {
         pnpm run lint 2>&1 && pnpm run format:check 2>&1 && pnpm run typecheck 2>&1
         rc=$?
         ;;
+      gherkin-prepush-lint)
+        pnpm run lint:gherkin 2>&1
+        rc=$?
+        ;;
       manifest-hygiene)
         # Fast schema contract test over the 5 DNA manifests + happ.yaml.
         # Pure YAML parsing, no holochain dep, runs in milliseconds.
@@ -1082,6 +1092,7 @@ for PROJECT in $PROJECTS; do
       constants-sync)   PROJECT_DIR="." ;;
       reach-drift)      PROJECT_DIR="." ;;
       genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
+      gherkin-prepush-lint) PROJECT_DIR="genesis/a2o" ;;
       orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
       domain-types)     PROJECT_DIR="." ;;
       rakia-codegen)    PROJECT_DIR="." ;;
