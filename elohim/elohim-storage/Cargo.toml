@@ -286,6 +286,10 @@ ssr = ["dep:elohim-render", "reqwest/blocking"]
 tempfile = "3"
 jsonschema = "0.28"
 wiremock = "0.6"
+# Adds `test-util` (paused/advanced virtual time, e.g. `#[tokio::test(start_paused = true)]`)
+# on top of the main `tokio` dependency's "full" features for tests only — used by
+# identity_fill.rs's run_once_bounded timeout tests to prove a 120s budget without a real wait.
+tokio = { version = "1", features = ["test-util"] }
 # pkarr resolver e2e (gate #10): minimal in-process pkarr relay using
 # raw hyper (already a regular dep). Avoids dragging axum's serde >=1.0.220
 # transitive constraint, which conflicts with holochain_serialized_bytes

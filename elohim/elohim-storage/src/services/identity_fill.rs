@@ -98,6 +98,18 @@ pub const DEFAULT_FILL_SECS: u64 = 300;
 /// fan-in convention so boot projections + the boot backfill land first.
 pub const DEFAULT_SETTLE_SECS: u64 = 30;
 
+/// Wall-clock budget for one `run_once` sweep. Neither the client-side zome
+/// call (`hc_client::call_zome_imagodei`) nor the qahal coordinator's
+/// sequential per-link membership reads carry a timeout of their own, so an
+/// unbounded DHT stall previously hung `run_once` forever — the `tokio::select!`
+/// in `run_fill_loop` had already committed to this arm, so neither the ticker
+/// nor shutdown could fire again (jessica-alpha: task-started log at every pod
+/// restart, no discovery-result line ever after). 120s is well under the
+/// `DEFAULT_FILL_SECS` (300s) tick interval and generous for legitimate work;
+/// on elapse the `run_once` future is dropped, cancelling any in-flight
+/// (possibly hung) conductor call, so the next tick starts clean.
+pub const RUN_ONCE_BUDGET: Duration = Duration::from_secs(120);
+
 /// Outcome tallies for one fill sweep.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct FillStats {
@@ -334,6 +346,25 @@ pub async fn run_once<S: MembershipKeySource + ?Sized>(
     apply_membership_fill(&mut conn, &pairs)
 }
 
+/// [`run_once`] wrapped in a [`RUN_ONCE_BUDGET`] wall-clock bound. This is the
+/// unit `run_fill_loop` actually calls each tick — factored out so the timeout
+/// behavior is unit-testable without a real ticker/shutdown loop. On elapse the
+/// `run_once` future is dropped, cancelling any in-flight (possibly hung) fetch,
+/// and a [`StorageError::Timeout`] is returned so the loop's existing
+/// error-warn arm can log it distinctly from an ordinary fetch failure.
+pub async fn run_once_bounded<S: MembershipKeySource + ?Sized>(
+    pool: &DbPool,
+    source: &S,
+) -> Result<FillStats, StorageError> {
+    match tokio::time::timeout(RUN_ONCE_BUDGET, run_once(pool, source)).await {
+        Ok(result) => result,
+        Err(_elapsed) => Err(StorageError::Timeout(format!(
+            "identity_fill: run_once exceeded {}s budget — abandoned this tick, retrying next tick",
+            RUN_ONCE_BUDGET.as_secs()
+        ))),
+    }
+}
+
 /// The periodic fill loop. Mirrors `peer_status_fanout::run_fanout_loop`:
 /// `interval` + `MissedTickBehavior::Skip` + a shutdown branch, with a one-time
 /// settle delay before the first sweep. `fill_secs == 0` is handled by the caller
@@ -359,7 +390,7 @@ pub async fn run_fill_loop<S: MembershipKeySource + ?Sized>(
     loop {
         tokio::select! {
             _ = ticker.tick() => {
-                match run_once(&pool, source.as_ref()).await {
+                match run_once_bounded(&pool, source.as_ref()).await {
                     Ok(stats) => {
                         crate::metrics::inc_identity_fill("created", stats.created as u64);
                         crate::metrics::inc_identity_fill("filled", stats.filled as u64);
@@ -386,6 +417,13 @@ pub async fn run_fill_loop<S: MembershipKeySource + ?Sized>(
                                 "identity_fill swept (no new keys)"
                             );
                         }
+                    }
+                    Err(e @ StorageError::Timeout(_)) => {
+                        tracing::warn!(
+                            error = %e,
+                            budget_secs = RUN_ONCE_BUDGET.as_secs(),
+                            "identity_fill: run_once exceeded budget — abandoned this tick, retrying next tick"
+                        );
                     }
                     Err(e) => tracing::warn!(error = %e, "identity_fill sweep failed (retry next tick)"),
                 }
@@ -730,6 +768,80 @@ mod tests {
         let p = pool();
         let err = run_once(&p, &FailingSource).await;
         assert!(matches!(err, Err(StorageError::Conductor(_))));
+    }
+
+    // ---- run_once_bounded: the unwedge fix ----
+    //
+    // The prior hang: `run_once`'s chain (client-side `hc_client.rs` zome call,
+    // zome-side sequential per-link gets) carries no timeout anywhere, and
+    // `run_fill_loop`'s `tokio::select!` commits to the ticker arm for the
+    // duration of that await — so a stalled DHT get parked the loop forever,
+    // silencing BOTH the next tick and shutdown. These tests use paused virtual
+    // time so a source that never resolves is proven cut off without a real
+    // 120s wait: with `start_paused = true`, tokio fast-forwards to the next
+    // timer once every task is stalled — exactly the situation a genuinely
+    // hung `fetch_pairs` produces.
+
+    /// A source whose `fetch_pairs` never resolves (simulating an unbounded DHT
+    /// stall) is cut off by `RUN_ONCE_BUDGET`, not left to hang forever.
+    #[tokio::test(start_paused = true)]
+    async fn run_once_bounded_times_out_a_source_that_never_resolves() {
+        struct HangingSource;
+        #[async_trait]
+        impl MembershipKeySource for HangingSource {
+            async fn fetch_pairs(&self) -> Result<Vec<(String, String)>, StorageError> {
+                std::future::pending().await
+            }
+        }
+
+        let p = pool();
+        let result = run_once_bounded(&p, &HangingSource).await;
+        assert!(
+            matches!(result, Err(StorageError::Timeout(_))),
+            "a run_once that never resolves must be cut off by the timeout, not hang forever; got {result:?}"
+        );
+    }
+
+    /// End-to-end proof of the fix at the loop level: a source that never
+    /// resolves on its first (and second) call still lets `run_fill_loop`
+    /// reach a later tick — the defect this closes was the ticker NEVER firing
+    /// again after one stalled `run_once`. Also proves shutdown is still
+    /// observed afterward (the other half of the same defect).
+    #[tokio::test(start_paused = true)]
+    async fn loop_survives_a_timed_out_tick_and_ticks_again() {
+        struct CountingHangingSource {
+            calls: std::sync::atomic::AtomicUsize,
+        }
+        #[async_trait]
+        impl MembershipKeySource for CountingHangingSource {
+            async fn fetch_pairs(&self) -> Result<Vec<(String, String)>, StorageError> {
+                self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                std::future::pending().await
+            }
+        }
+
+        let p = pool();
+        let source = Arc::new(CountingHangingSource {
+            calls: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+
+        // fill_secs = 1: the tick cadence itself is irrelevant once a sweep is
+        // running (MissedTickBehavior::Skip collapses missed ticks to "fire
+        // again immediately"); what matters is that TWO calls happen, each
+        // separated by a full RUN_ONCE_BUDGET timeout.
+        let handle = tokio::spawn(run_fill_loop(p, source.clone(), 1, 0, shutdown_rx));
+
+        // Let virtual time fast-forward through settle + two timed-out ticks.
+        tokio::time::sleep(RUN_ONCE_BUDGET * 2 + Duration::from_secs(30)).await;
+
+        shutdown_tx.send(()).ok();
+        handle.await.expect("loop task panicked");
+
+        assert!(
+            source.calls.load(std::sync::atomic::Ordering::SeqCst) >= 2,
+            "the ticker must fire again after a timed-out tick — the loop must not hang forever"
+        );
     }
 
     // ---- discovery composition: source-chain cids route around empty projection ----
