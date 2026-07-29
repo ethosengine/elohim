@@ -49,22 +49,48 @@ humans, zero on-prem humans) matches the doorway-B signal URL exactly.
 Both hostnames answer correctly FROM OUTSIDE (WebSocket-upgrade 400s, TLS
 verified) — the break, if real, is inside shem.
 
-## Operator sequence (ceiling — no agent lever exists)
+## CONFIRMED 2026-07-29 (operator k8s-side diagnostic) — corrected mechanism
 
-1. From any shem-side pod: `curl -sv https://signal.elohim.host/` —
-   hang/refused ⇒ hairpin confirmed; clean 400 "requires WebSocket
-   upgrade" ⇒ hairpin theory dead, look at the conductor's rendered
-   signal_url and tx5 logs instead.
-2. If hairpin confirmed: split-horizon the name inside shem (CoreDNS
-   rewrite of `signal.elohim.host` → in-cluster ingress service IP, or pod
-   hostAliases) — repo manifests are the cleanup surface; the sprint that
-   picks this up should land it in the conductor/orchestrator manifests,
-   not live-only.
-3. Restart the four shem conductors (adam, eve, gertrude, susan), wait the
-   ~20min churn window.
-4. Pass signal: `GET https://elohim.host/db/p2p/conductor-diagnostics`
-   shows `agentCount > 0` with non-empty peer_urls.
-5. THEN DoD-1 is one HTTP lever away — but decide head direction first
+The hairpin is real but it does NOT hang: the GFiber router INTERCEPTS the
+hairpinned 443 and answers with its own web UI (self-signed cert
+`O=%Deaf3ef60`) — `curl` exits 60 with **ssl_verify_result=18** (and 403
+with -k). Key on verify=18, never on a hang (a hang test false-clears).
+Shem's pod egress IP (136.50.16.133) IS what the flipped names resolve to;
+control test to example.com shows no blanket 443 interception.
+
+- **Both flipped records are broken from shem, not just signal:**
+  `bootstrap_url https://elohim.host/bootstrap` AND
+  `signal_url wss://signal.elohim.host` (http=000 verify=18 from shem;
+  200 from main). Fixing signal alone leaves bootstrap dead.
+- **The conductors are not quiet — they're invisible.** Signature:
+  `kitsune2_core::factories::core_space: Not updating agent info because
+  we don't have a current url` (30min counts: adam 46, eve 115, gertrude
+  150, susan 3; on-prem trio 0). All four still publish ops with huge
+  republish backlogs (adam 64859/27943/26481) — "is it publishing?" reads
+  healthy while everything cycles into nothing.
+- **Validated fix:** `--resolve` to `10.99.0.2` (shem's node running BOTH
+  nginx-ingress and coturn-shem) gives bootstrap 200/verify 0 and signal
+  WS-upgrade 200/verify 0. CoreDNS rewrite is a TRAP here: node-local-dns
+  runs DIRECT mode (169.254.20.10 forwards external names upstream,
+  never consults coredns-ha), and it's one cluster-wide DaemonSet — a
+  rewrite there would send main-side pods across WireGuard (worse than
+  the bug). The scoped fix is **hostAliases on the four shem conductors +
+  doorway-B**:
+  `hostAliases: [{ip: 10.99.0.2, hostnames: [elohim.host, signal.elohim.host]}]`
+  Leave `alpha.elohim.host` ALONE — other WAN (136.51.77.49), not
+  hairpinned, verified good from shem (the working TURN leg). Caveat:
+  pins shem's node IP into the pod spec — fine while shem-pinned; if a
+  pod schedules elsewhere the alias is slow, not broken.
+
+## Sequence
+
+1. Operator: live-patch hostAliases (validation probe; podspec change
+   rolls the pods, which they need anyway). Recovery = the
+   "Not updating agent info" lines STOP on all four, B's
+   conductor-diagnostics `agentCount > 0`, bootstrap store grows past 15.
+2. Land the same hostAliases in genesis/orchestrator manifests (repo is
+   the durable home; a live patch reverts on the next Jenkins build).
+3. THEN DoD-1 is one HTTP lever away — but decide head direction first
    (see the declared-vs-declared finding in saga ch06: A's head is OLDER,
    08:56:34Z, than B's, 10:30:38Z, and they point at different SPA blobs;
    "B adopts A" as written would roll B backward).
