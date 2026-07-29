@@ -733,6 +733,172 @@ pub fn dissolve_collective(
 }
 
 // ============================================================================
+// Index-free self-discovery gap-fill (services::identity_fill)
+// ============================================================================
+
+/// Outcome of [`gap_fill_household_collective_cid_from_discovery`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HouseholdCidGapFillOutcome {
+    /// Exactly one local un-anchored (`collective_cid IS NULL`) FAMILY row and
+    /// exactly one discovered cid not already known locally — stamped.
+    Stamped,
+    /// Every discovered cid already matches SOME local `collective_cid` —
+    /// nothing to do (the common steady-state outcome after the first stamp).
+    AlreadyKnown,
+    /// No local FAMILY-governance-layer row exists at all — nothing to fill
+    /// onto (a node with no household seed row).
+    NoCandidateRow,
+    /// Exactly one local FAMILY row, and it already carries a DIFFERENT
+    /// non-NULL cid than the one novel discovery — fills-never-moves; left
+    /// untouched. Logged at WARN so a genuine household re-formation is
+    /// observable rather than silently swallowed.
+    Mismatch,
+    /// More than one candidate on either side (un-anchored rows or novel
+    /// discovered cids) — this pass cannot safely tell which cid belongs to
+    /// which row, so it abstains rather than guess a wrong pairing.
+    Ambiguous,
+    /// The NULL-guarded stamp UPDATE touched zero rows — another writer
+    /// (a live `CollectiveProjected` signal, a concurrent sweep) already
+    /// stamped this exact row between the read and the write. Converged,
+    /// not an error.
+    RacedElsewhere,
+}
+
+/// Stamp a local, un-anchored FAMILY-governance-layer `collectives` row from a
+/// household cid discovered via index-free own-conductor DHT enumeration
+/// (`identity_fill::discover_household_pairs`'s `get_my_household_collective_cids`
+/// read) — the other half of the collectives-arm bootstrap gap
+/// (`backlog-collectives-arm-bootstrap-gap-no-stamped-cid-anywhere`).
+///
+/// # Why this closes the bootstrap circle
+///
+/// `identity_fill` already discovers a pod's household cid(s) straight from
+/// DHT membership truth and fills `humans.agent_pub_key`/`humans.household_id`
+/// from it — verified live (a `humans` row created from membership truth,
+/// `created=1`). But nothing ever stamped that SAME cid onto the LOCAL
+/// `collectives` row, so [`list_collective_cid_inventory`] (which filters
+/// `collective_cid IS NOT NULL` BY DESIGN — a pre-coherence row has no DHT
+/// identity to reconcile on) advertised nothing, the cross-peer collectives
+/// reconcile arm had zero inventory to discover fleet-wide, and the stamp
+/// could never propagate to any peer — even one whose own self-discovery is
+/// silent. Fleet-wide evidence 2026-07-28: a fill sweep created a member row
+/// from membership truth at 08:29Z, yet `collectives_ids_discovered=0` on
+/// every doorway ~40 minutes later.
+///
+/// # fills-never-moves
+///
+/// Only a row whose `governance_layer == FAMILY` AND `collective_cid IS NULL`
+/// is ever written, and only when the pairing is UNAMBIGUOUS: exactly one such
+/// row locally, and exactly one discovered cid not already known as SOME local
+/// `collective_cid`. The current deployment topology is one-household-per-node
+/// (a pod's own `get_my_household_collective_cids` names the household(s) ITS
+/// OWN agent belongs to), so this is the common case, not a narrowed special
+/// case. A local FAMILY row that already carries a cid is invisible to the
+/// un-anchored candidate set by construction; when it is the SOLE local FAMILY
+/// row and disagrees with the sole novel discovery, that is reported as
+/// [`HouseholdCidGapFillOutcome::Mismatch`] (never touched). Any other
+/// multi-candidate shape abstains as [`HouseholdCidGapFillOutcome::Ambiguous`]
+/// — the same correct-or-abstain stance `membership_identity_reconcile` takes
+/// on a forced-bijection ambiguity, never a guessed pairing.
+pub fn gap_fill_household_collective_cid_from_discovery(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    discovered_cids: &[String],
+) -> Result<HouseholdCidGapFillOutcome, StorageError> {
+    if discovered_cids.is_empty() {
+        return Ok(HouseholdCidGapFillOutcome::NoCandidateRow);
+    }
+
+    let rows: Vec<(String, Option<String>)> = collectives::table
+        .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+        .filter(collectives::governance_layer.eq(governance_layers::FAMILY))
+        .filter(collectives::dissolved_at.is_null())
+        .select((collectives::id, collectives::collective_cid))
+        .load(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!(
+                "household collective_cid gap-fill: family row lookup failed: {e}"
+            ))
+        })?;
+
+    if rows.is_empty() {
+        return Ok(HouseholdCidGapFillOutcome::NoCandidateRow);
+    }
+
+    let known_cids: std::collections::HashSet<&str> =
+        rows.iter().filter_map(|(_, c)| c.as_deref()).collect();
+    let novel: Vec<&String> = discovered_cids
+        .iter()
+        .filter(|c| !known_cids.contains(c.as_str()))
+        .collect();
+
+    if novel.is_empty() {
+        return Ok(HouseholdCidGapFillOutcome::AlreadyKnown);
+    }
+
+    let unanchored: Vec<&str> = rows
+        .iter()
+        .filter(|(_, c)| c.is_none())
+        .map(|(id, _)| id.as_str())
+        .collect();
+
+    if unanchored.len() == 1 && novel.len() == 1 {
+        let id = unanchored[0];
+        let cid = novel[0].as_str();
+        let n = diesel::update(
+            collectives::table
+                .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+                .filter(collectives::id.eq(id))
+                .filter(collectives::collective_cid.is_null()),
+        )
+        .set((
+            collectives::collective_cid.eq(Some(cid)),
+            collectives::updated_at.eq(current_timestamp()),
+        ))
+        .execute(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!(
+                "household collective_cid gap-fill: stamp failed: {e}"
+            ))
+        })?;
+
+        return Ok(if n > 0 {
+            tracing::info!(
+                collective_id = %id,
+                collective_cid = %cid,
+                "identity_fill: stamped local household collectives row from discovered DHT truth"
+            );
+            HouseholdCidGapFillOutcome::Stamped
+        } else {
+            // Lost a race against another writer (live signal, concurrent
+            // sweep) between our SELECT and this NULL-guarded UPDATE.
+            HouseholdCidGapFillOutcome::RacedElsewhere
+        });
+    }
+
+    if unanchored.is_empty() && rows.len() == 1 && novel.len() == 1 {
+        // Exactly one local FAMILY row, already anchored, but to a DIFFERENT
+        // cid than the sole novel discovery. fills-never-moves: never touch
+        // it — but this divergence (household re-formation? stale local
+        // state?) is worth an operator's eyes.
+        tracing::warn!(
+            collective_id = %rows[0].0,
+            existing_cid = ?rows[0].1,
+            discovered_cid = %novel[0],
+            "identity_fill: local household collective already carries a DIFFERENT cid than discovered — fills-never-moves, leaving untouched"
+        );
+        return Ok(HouseholdCidGapFillOutcome::Mismatch);
+    }
+
+    tracing::warn!(
+        unanchored_candidates = unanchored.len(),
+        novel_cid_count = novel.len(),
+        "identity_fill: ambiguous household collective_cid gap-fill (multiple candidates) — abstaining rather than guessing a pairing"
+    );
+    Ok(HouseholdCidGapFillOutcome::Ambiguous)
+}
+
+// ============================================================================
 // Participation Read Operations
 // ============================================================================
 
@@ -1643,5 +1809,188 @@ mod tests {
             Some("uhCkkMembershipActionHash0001"),
             "dht_anchor_hash round-trips"
         );
+    }
+
+    // ========================================================================
+    // gap_fill_household_collective_cid_from_discovery
+    // (backlog-collectives-arm-bootstrap-gap-no-stamped-cid-anywhere)
+    // ========================================================================
+
+    const DISCOVERED_CID: &str = "collective:uhCkkDiscoveredActionHash00000000000000";
+    const OTHER_CID: &str = "collective:uhCkkOtherActionHash0000000000000000000";
+
+    fn seed_family_row(conn: &mut SqliteConnection, ctx: &AppContext, id: &str, cid: Option<&str>) {
+        create_collective(
+            conn,
+            ctx,
+            &CreateCollectiveInput {
+                id: id.to_string(),
+                name: format!("seed {id}"),
+                description: None,
+                governance_layer: governance_layers::FAMILY.to_string(),
+                constitutional_parent_id: None,
+                reach: "trusted".to_string(),
+                region: None,
+                metadata_json: None,
+                created_by: None,
+            },
+        )
+        .expect("seed family row");
+        if let Some(cid) = cid {
+            diesel::update(
+                collectives::table
+                    .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+                    .filter(collectives::id.eq(id)),
+            )
+            .set(collectives::collective_cid.eq(Some(cid)))
+            .execute(conn)
+            .expect("stamp cid");
+        }
+    }
+
+    /// The core bootstrap-gap case: a pre-coherence seed row (`household-dowell`,
+    /// governance_layer=family, collective_cid NULL) is the SOLE local family
+    /// row, and exactly one novel cid was discovered — it gets stamped.
+    #[test]
+    fn gap_fill_stamps_the_sole_unanchored_family_row() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        seed_family_row(&mut conn, &ctx, "household-dowell", None);
+
+        let outcome = gap_fill_household_collective_cid_from_discovery(
+            &mut conn,
+            &ctx,
+            &[DISCOVERED_CID.to_string()],
+        )
+        .expect("gap fill");
+        assert_eq!(outcome, HouseholdCidGapFillOutcome::Stamped);
+
+        let row = get_collective(&mut conn, &ctx, "household-dowell")
+            .expect("query")
+            .expect("row exists");
+        assert_eq!(
+            row.collective_cid.as_deref(),
+            Some(DISCOVERED_CID),
+            "the seed row's NULL collective_cid is stamped from discovery"
+        );
+        assert_eq!(row.id, "household-dowell", "the slug id is never moved");
+    }
+
+    /// fills-never-moves: the sole local family row already carries a
+    /// DIFFERENT cid than the sole novel discovery — reported as Mismatch and
+    /// left completely untouched (never overwritten).
+    #[test]
+    fn gap_fill_leaves_a_different_cid_untouched_and_reports_mismatch() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        seed_family_row(&mut conn, &ctx, "household-dowell", Some(OTHER_CID));
+
+        let outcome = gap_fill_household_collective_cid_from_discovery(
+            &mut conn,
+            &ctx,
+            &[DISCOVERED_CID.to_string()],
+        )
+        .expect("gap fill");
+        assert_eq!(outcome, HouseholdCidGapFillOutcome::Mismatch);
+
+        let row = get_collective(&mut conn, &ctx, "household-dowell")
+            .expect("query")
+            .expect("row exists");
+        assert_eq!(
+            row.collective_cid.as_deref(),
+            Some(OTHER_CID),
+            "the existing cid is never overwritten by a different discovery"
+        );
+    }
+
+    /// No local family row at all (e.g. a fixture-human pod, or a community-only
+    /// collective) — nothing to fill onto, a clean no-op.
+    #[test]
+    fn gap_fill_missing_row_is_a_noop() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        // A community-layer row exists, but no FAMILY row — must not be
+        // mistaken for a household candidate.
+        seed_row(&mut conn, &ctx, "some-community", None);
+
+        let outcome = gap_fill_household_collective_cid_from_discovery(
+            &mut conn,
+            &ctx,
+            &[DISCOVERED_CID.to_string()],
+        )
+        .expect("gap fill");
+        assert_eq!(outcome, HouseholdCidGapFillOutcome::NoCandidateRow);
+    }
+
+    /// The discovered cid already matches the local row's stamped cid (a
+    /// re-run after a prior successful stamp, or a live signal already landed
+    /// it) — idempotent no-op, not re-stamped or re-warned.
+    #[test]
+    fn gap_fill_already_known_cid_is_a_noop() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        seed_family_row(&mut conn, &ctx, "household-dowell", Some(DISCOVERED_CID));
+
+        let outcome = gap_fill_household_collective_cid_from_discovery(
+            &mut conn,
+            &ctx,
+            &[DISCOVERED_CID.to_string()],
+        )
+        .expect("gap fill");
+        assert_eq!(outcome, HouseholdCidGapFillOutcome::AlreadyKnown);
+    }
+
+    /// Ambiguous shape: TWO local un-anchored family rows and only ONE novel
+    /// discovered cid — this pass cannot safely tell which row the cid belongs
+    /// to, so it abstains rather than guess a wrong pairing. Neither row is
+    /// touched.
+    #[test]
+    fn gap_fill_multiple_unanchored_candidates_abstains() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        seed_family_row(&mut conn, &ctx, "household-dowell", None);
+        seed_family_row(&mut conn, &ctx, "household-gertrude", None);
+
+        let outcome = gap_fill_household_collective_cid_from_discovery(
+            &mut conn,
+            &ctx,
+            &[DISCOVERED_CID.to_string()],
+        )
+        .expect("gap fill");
+        assert_eq!(outcome, HouseholdCidGapFillOutcome::Ambiguous);
+
+        for id in ["household-dowell", "household-gertrude"] {
+            let row = get_collective(&mut conn, &ctx, id)
+                .expect("query")
+                .expect("row exists");
+            assert!(
+                row.collective_cid.is_none(),
+                "ambiguous pairing must never guess-write either candidate"
+            );
+        }
+    }
+
+    /// An empty discovered-cid set is a clean no-op (nothing to gap-fill from).
+    #[test]
+    fn gap_fill_empty_discovery_is_a_noop() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        seed_family_row(&mut conn, &ctx, "household-dowell", None);
+
+        let outcome = gap_fill_household_collective_cid_from_discovery(&mut conn, &ctx, &[])
+            .expect("gap fill");
+        assert_eq!(outcome, HouseholdCidGapFillOutcome::NoCandidateRow);
     }
 }

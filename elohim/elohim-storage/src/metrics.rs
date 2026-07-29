@@ -551,6 +551,20 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Local `collectives` rows whose NULL `collective_cid` was stamped from a
+    /// discovered household cid (`db::collectives::gap_fill_household_collective_cid_from_discovery`,
+    /// called from `services::identity_fill`'s discovery sweep). Closes the
+    /// other half of the collectives-arm bootstrap gap
+    /// (`backlog-collectives-arm-bootstrap-gap-no-stamped-cid-anywhere`): this
+    /// climbing off 0 is the direct cure signal that the peer's
+    /// `ProjectionInventory` now has a stamped row to advertise, unblocking the
+    /// cross-peer collectives reconcile arm's inventory discovery fleet-wide.
+    pub static ref IDENTITY_FILL_COLLECTIVE_CID_STAMPED: IntCounter = IntCounter::new(
+        "elohim_identity_fill_collective_cid_stamped_total",
+        "Local collectives rows whose NULL collective_cid was stamped from discovered household truth.",
+    )
+    .unwrap();
+
     /// Custody-announcement flow (the cross-pod `shard_locations` convergence).
     /// `shard_locations` is written only locally (self-held recording + push-ack),
     /// so custody claims never left the node and each doorway read a different
@@ -714,6 +728,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_LAST_WRITES.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_DISCOVERED_CIDS.clone()));
+        let _ = REGISTRY.register(Box::new(IDENTITY_FILL_COLLECTIVE_CID_STAMPED.clone()));
         let _ = REGISTRY.register(Box::new(CUSTODY_ANNOUNCE_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_ROUNDS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUESTS.clone()));
@@ -1030,6 +1045,12 @@ pub fn set_identity_fill_last_writes(writes: u64) {
 /// identity-fill sweep's `discover_household_pairs` union.
 pub fn set_identity_fill_discovered_cids(count: u64) {
     IDENTITY_FILL_DISCOVERED_CIDS.set(count as i64);
+}
+
+/// Record one local `collectives` row stamped from discovered household truth
+/// (`db::collectives::HouseholdCidGapFillOutcome::Stamped`).
+pub fn inc_identity_fill_collective_cid_stamped() {
+    IDENTITY_FILL_COLLECTIVE_CID_STAMPED.inc();
 }
 
 /// Publish the six custody-class buckets from one fold of the custody-observation

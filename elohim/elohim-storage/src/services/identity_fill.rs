@@ -312,6 +312,47 @@ pub async fn discover_household_pairs(
     }
 
     crate::metrics::set_identity_fill_discovered_cids(union.len() as u64);
+
+    // Gap-fill the LOCAL collectives row's NULL collective_cid from this same
+    // discovered union — the other half of the collectives-arm bootstrap gap
+    // (`backlog-collectives-arm-bootstrap-gap-no-stamped-cid-anywhere`).
+    // Discovery alone fills `humans.household_id`/`agent_pub_key`; nothing
+    // else stamps the LOCAL `collectives` row, so its inventory (filtered
+    // `collective_cid IS NOT NULL`) never had anything to advertise and the
+    // cross-peer collectives reconcile arm stayed at zero fleet-wide.
+    // Best-effort: a pool checkout or write failure degrades to a WARN,
+    // never aborting discovery (the membership snapshot read below is the
+    // primary product of this function).
+    if !union.is_empty() {
+        match pool.get() {
+            Ok(mut conn) => {
+                match crate::db::collectives::gap_fill_household_collective_cid_from_discovery(
+                    &mut conn, ctx, &union,
+                ) {
+                    Ok(crate::db::collectives::HouseholdCidGapFillOutcome::Stamped) => {
+                        crate::metrics::inc_identity_fill_collective_cid_stamped();
+                    }
+                    Ok(_) => {
+                        // AlreadyKnown / NoCandidateRow / Mismatch / Ambiguous /
+                        // RacedElsewhere — all non-error, no metric to bump.
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            error = %e,
+                            "identity_fill: household collective_cid gap-fill failed (non-fatal, retried next sweep)"
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "identity_fill: pool checkout for collective_cid gap-fill failed (non-fatal)"
+                );
+            }
+        }
+    }
+
     if union.is_empty() {
         // Previously DEBUG-only (see also `holochain_humans_replayer.rs`'s
         // `snapshot_household_ids_for_cids` empty-cids early return), this case
@@ -1090,6 +1131,113 @@ mod tests {
             crate::metrics::IDENTITY_FILL_DISCOVERED_CIDS.get(),
             2,
             "the gauge counts the discovered cid union, independent of member counts"
+        );
+    }
+
+    // ---- collectives-arm bootstrap gap: gap-fill the LOCAL collectives row ----
+    //
+    // `backlog-collectives-arm-bootstrap-gap-no-stamped-cid-anywhere`: discovery
+    // alone fills `humans.household_id`/`agent_pub_key`; these tests prove
+    // `discover_household_pairs` ALSO stamps the local `collectives` row's NULL
+    // `collective_cid` from the same discovered cid, closing the other half of
+    // the bootstrap circle (the peer's ProjectionInventory then has a row to
+    // advertise). See `db::collectives::gap_fill_household_collective_cid_from_discovery`
+    // for the full fills-never-moves contract (unit-tested there directly).
+
+    /// THE ADAM CASE, extended: the local `collectives` seed row exists
+    /// (governance_layer=family, collective_cid NULL — the pre-coherence seed
+    /// shape) but the projection never received the live signal. Source-chain
+    /// discovery names the household cid; the sweep stamps the seed row's NULL
+    /// collective_cid from it, in the SAME pass that lights the membership pairs.
+    #[tokio::test]
+    async fn discovery_gap_fills_local_collectives_row_from_source_chain_cid() {
+        let _guard = lock_discovered_cids_gauge();
+        let p = pool();
+        let ctx = AppContext::default_lamad();
+
+        // The pre-coherence seed row: family-layer, no collective_cid yet.
+        {
+            use crate::db::collectives::{create_collective, CreateCollectiveInput};
+            use crate::db::models::governance_layers;
+            let mut conn = p.get().unwrap();
+            let mut input = CreateCollectiveInput::stub("household-dowell");
+            input.governance_layer = governance_layers::FAMILY.to_string();
+            create_collective(&mut conn, &ctx, &input).expect("seed household row");
+        }
+
+        let self_cids = FakeSelfCids {
+            cids: vec!["collective:eden".to_string()],
+        };
+        let mut by_cid = HashMap::new();
+        by_cid.insert(
+            "collective:eden".to_string(),
+            vec![person("agent:uhCAkADAM", "collective:eden")],
+        );
+        let reader = FakeReader { by_cid };
+
+        discover_household_pairs(&p, &ctx, &self_cids, &reader)
+            .await
+            .expect("discover");
+
+        let mut conn = p.get().unwrap();
+        let row = crate::db::collectives::get_collective(&mut conn, &ctx, "household-dowell")
+            .unwrap()
+            .expect("seed row still present");
+        assert_eq!(
+            row.collective_cid.as_deref(),
+            Some("collective:eden"),
+            "the seed row's NULL collective_cid is stamped from the SAME discovered cid \
+             that lit the membership pairs"
+        );
+    }
+
+    /// fills-never-moves at the sweep level: a household row already anchored
+    /// to a DIFFERENT cid than what source-chain discovery names is left
+    /// completely untouched — discovery never overwrites a live-authoritative
+    /// stamp just because its own read disagrees.
+    #[tokio::test]
+    async fn discovery_never_overwrites_an_already_anchored_collectives_row() {
+        let _guard = lock_discovered_cids_gauge();
+        let p = pool();
+        let ctx = AppContext::default_lamad();
+
+        {
+            use crate::db::collectives::{create_collective, CreateCollectiveInput};
+            use crate::db::diesel_schema::collectives;
+            use crate::db::models::governance_layers;
+            use diesel::prelude::*;
+            let mut conn = p.get().unwrap();
+            let mut input = CreateCollectiveInput::stub("household-dowell");
+            input.governance_layer = governance_layers::FAMILY.to_string();
+            create_collective(&mut conn, &ctx, &input).expect("seed household row");
+            diesel::update(collectives::table.filter(collectives::id.eq("household-dowell")))
+                .set(collectives::collective_cid.eq(Some("collective:already-anchored")))
+                .execute(&mut conn)
+                .expect("pre-anchor the row");
+        }
+
+        let self_cids = FakeSelfCids {
+            cids: vec!["collective:eden".to_string()],
+        };
+        let mut by_cid = HashMap::new();
+        by_cid.insert(
+            "collective:eden".to_string(),
+            vec![person("agent:uhCAkADAM", "collective:eden")],
+        );
+        let reader = FakeReader { by_cid };
+
+        discover_household_pairs(&p, &ctx, &self_cids, &reader)
+            .await
+            .expect("discover");
+
+        let mut conn = p.get().unwrap();
+        let row = crate::db::collectives::get_collective(&mut conn, &ctx, "household-dowell")
+            .unwrap()
+            .expect("seed row still present");
+        assert_eq!(
+            row.collective_cid.as_deref(),
+            Some("collective:already-anchored"),
+            "an already-anchored row is never moved by a disagreeing discovery"
         );
     }
 }
