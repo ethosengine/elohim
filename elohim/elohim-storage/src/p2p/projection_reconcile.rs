@@ -281,6 +281,32 @@ fn is_transient_conductor_error(err: &crate::error::StorageError) -> bool {
     }
 }
 
+/// Classify a ghost-witness re-author failure into the Prometheus `class`
+/// label the saga-06-heads-converge stations count
+/// (`elohim_content_witness_reauthor_failed_total`) — `None` for a failure
+/// that fits neither counted class (still bumps the sweep's local `failed`
+/// tally and the WARN line, just not a labeled series).
+///
+/// The already-exists check DELEGATES to
+/// `reanchor_backfill::is_already_anchored_error` rather than re-deriving a
+/// second substring match — this ghost-witness sweep and the boot-time
+/// re-anchor sweep hit the exact same conductor error text
+/// (`create_content`'s duplicate-id Guest error) and must never classify it
+/// differently. The chain-head-moved check is a substring match on the same
+/// verbatim conductor text the WARN line already logs ("Source chain error:
+/// source chain head has moved …", HDK's `SourceChainError::HeadMoved`
+/// surfaced through `HcClient::call_zome`) — a chronically busy own-chain
+/// writer racing this node's own re-author call (station A).
+fn classify_reauthor_failure_class(err: &crate::error::StorageError) -> Option<&'static str> {
+    if crate::services::reanchor_backfill::is_already_anchored_error(err) {
+        Some("already_exists")
+    } else if err.to_string().contains("source chain head has moved") {
+        Some("chain_head_moved")
+    } else {
+        None
+    }
+}
+
 /// The classified result of healing ONE row, for the `/metrics` outcome counter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HealOutcomeKind {
@@ -1311,6 +1337,9 @@ async fn witness_ghost_anchors(
                 }
                 Err(e) => {
                     failed += 1;
+                    if let Some(class) = classify_reauthor_failure_class(&e) {
+                        crate::metrics::inc_content_witness_reauthor_failed(class);
+                    }
                     tracing::warn!(
                         content_id = %id,
                         error = %e,
@@ -1339,6 +1368,7 @@ async fn witness_ghost_anchors(
             );
         }
         Err(_elapsed) => {
+            crate::metrics::inc_content_witness_sweep_abandoned();
             tracing::warn!(
                 target: "elohim_storage::projection_reconcile",
                 budget_secs = WITNESS_SWEEP_BUDGET.as_secs(),
@@ -3320,6 +3350,42 @@ mod tests {
         // re-authorable here either, while its 'narrative' fix must be.
         assert!(!crate::services::reanchor_backfill::is_canonical_content_type("album"));
         assert!(crate::services::reanchor_backfill::is_canonical_content_type("narrative"));
+    }
+
+    #[test]
+    fn reauthor_failure_classifier_matches_the_two_counted_classes() {
+        use crate::error::StorageError;
+        // Station A: adam-alpha's re-author call races a busy own-chain
+        // writer — "Source chain error: source chain head has moved".
+        assert_eq!(
+            classify_reauthor_failure_class(&StorageError::Conductor(
+                "Zome call failed: Source chain error: source chain head has moved".into()
+            )),
+            Some("chain_head_moved")
+        );
+        // Station B: the create collides with content that already has a
+        // local entry. Delegates to `reanchor_backfill::is_already_anchored_error`
+        // so this sweep and the boot-time re-anchor sweep classify identically.
+        assert_eq!(
+            classify_reauthor_failure_class(&StorageError::Conductor(
+                "Zome call failed: Content with id 'e2e-2f1c' already exists. \
+                 Use update_content to modify existing entries"
+                    .into()
+            )),
+            Some("already_exists")
+        );
+        // A genuine, uncounted failure — still retried next sweep (bumps
+        // `failed` in the local tally), just not a labeled Prometheus class.
+        assert_eq!(
+            classify_reauthor_failure_class(&StorageError::Conductor(
+                "Guest(\"not the author\")".into()
+            )),
+            None
+        );
+        assert_eq!(
+            classify_reauthor_failure_class(&StorageError::Timeout("per-attempt".into())),
+            None
+        );
     }
 
     #[test]

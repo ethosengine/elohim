@@ -118,26 +118,24 @@ Feature: Chapter 6 — blobs sync to one head
   #     saturated/slow conductor drops the WHOLE sweep's progress for that
   #     tick, not just one row. Probe (proposed, not yet wired):
   #     elohim_content_witness_sweep_abandoned_total.
-  #   current state: RED by the Loki evidence above; PENDING by the (not yet
-  #     existing) probe — none of these three counters are registered in
-  #     elohim-storage/src/metrics.rs today, so every Then below reads
-  #     "metric not present in scrape" forever, not merely "not yet swept".
-  #     That absence — the sweep's failure modes are OBSERVED (non-fatal,
-  #     logged, retried) but not COUNTED — is itself the finding: instrument
-  #     first, then this sprint's cure work becomes measurable instead of
-  #     Loki archaeology. @wip (not `elohim_`-metric-absent poll cost) until
-  #     the counters exist; remove @wip the same commit that wires them.
+  #   current state: WIRED — all three counters are registered in
+  #     elohim-storage/src/metrics.rs (`elohim_content_witness_reauthor_failed_total`
+  #     with label `class` = "chain_head_moved" | "already_exists", and
+  #     `elohim_content_witness_sweep_abandoned_total`), incremented at the
+  #     wire sites in the ghost-witness re-author loop
+  #     (`p2p/projection_reconcile.rs::witness_ghost_anchors`), and both
+  #     `class` combos are pre-touched at registration so the label series
+  #     exist in `/metrics` from boot, not only after first fire. The sweep's
+  #     failure modes are now COUNTED, not merely OBSERVED — this sprint's cure
+  #     work is measurable instead of Loki archaeology.
   # ---------------------------------------------------------------------------
 
-  @wip
   Scenario: Chain-contention livelock on a busy writer chain is counted, not silent
     Then labeled metric "elohim_content_witness_reauthor_failed_total" with label "class" "chain_head_moved" on peer "alpha-A" >= 0
 
-  @wip
   Scenario: Stale-anchor re-author collisions with existing local content are counted
     Then labeled metric "elohim_content_witness_reauthor_failed_total" with label "class" "already_exists" on peer "alpha-A" >= 0
 
-  @wip
   Scenario: A wall-clock-budget-exceeded sweep is visible without tailing Loki
     Then metric "elohim_content_witness_sweep_abandoned_total" on peer "alpha-A" >= 0
 

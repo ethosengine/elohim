@@ -273,6 +273,45 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Ghost-witness re-author call FAILURES, by class — the two per-row
+    /// failure modes minted as saga-06-heads-converge stations (2026-07-26
+    /// story-harvest of live Loki evidence, elohim-alpha namespace): previously
+    /// visible only by tailing logs, never counted. labels: class =
+    ///   "chain_head_moved" — the zome call failed with "Source chain error:
+    ///     source chain head has moved" (adam-alpha, seq 7096->7476 in ~6 min):
+    ///     a chronically busy own-chain writer races the re-author call.
+    ///     Non-fatal + retried next sweep, but can livelock a row forever on a
+    ///     chain that never quiets.
+    ///   "already_exists" — the create collided with content that already has
+    ///     a local entry ("Content with id '…' already exists. Use
+    ///     update_content to modify existing entries", jessica-alpha): the
+    ///     stale-anchor heal path's create assumed the row never already has a
+    ///     local entry; it does.
+    /// Both label combos are pre-touched at registration (see `register_all`)
+    /// so the series exist in `/metrics` from boot, before either failure mode
+    /// has ever fired.
+    pub static ref CONTENT_WITNESS_REAUTHOR_FAILED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_witness_reauthor_failed_total",
+            "Ghost-witness re-author call failures by class (chain_head_moved | already_exists).",
+        ),
+        &["class"],
+    )
+    .unwrap();
+
+    /// Ghost-witness sweeps ABANDONED because the whole sweep exceeded its
+    /// wall-clock budget (`WITNESS_SWEEP_BUDGET`) — the third saga-06-heads-
+    /// converge station ("sweep exceeded wall-clock budget — abandoned,
+    /// resumes next sweep", shem-node conductors). A saturated/slow conductor
+    /// drops the WHOLE sweep's progress for that tick, not just one row —
+    /// distinct from (and additive to) the per-row `CONTENT_WITNESS_REAUTHOR_FAILED`
+    /// class above.
+    pub static ref CONTENT_WITNESS_SWEEP_ABANDONED: IntCounter = IntCounter::new(
+        "elohim_content_witness_sweep_abandoned_total",
+        "Ghost-witness sweeps abandoned after exceeding their wall-clock budget.",
+    )
+    .unwrap();
+
     /// Provide-loop author calls SKIPPED because no candidate (active local
     /// session key nor the pod's own conductor cell key) yielded an `agent_cid`
     /// (`uhCAk…`) provider. The CID-hardening guard (rung 3) refuses to write a
@@ -645,6 +684,20 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_INBOUND_SERVED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_AUTHORED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_HEAD_ADOPTED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_REAUTHOR_FAILED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_SWEEP_ABANDONED.clone()));
+        // Pre-touch both known `class` combos so both series exist in
+        // `/metrics` from boot. An `IntCounterVec` label combination only
+        // materialises after first touch — the saga-06-heads-converge stations
+        // assert the metric is PRESENT in the scrape (`>= 0`), which would
+        // otherwise stay unsatisfiable until the failure mode it counts had
+        // actually fired at least once.
+        CONTENT_WITNESS_REAUTHOR_FAILED
+            .with_label_values(&["chain_head_moved"])
+            .inc_by(0);
+        CONTENT_WITNESS_REAUTHOR_FAILED
+            .with_label_values(&["already_exists"])
+            .inc_by(0);
         let _ = REGISTRY.register(Box::new(PROVIDE_PROVIDER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(SALVAGE_PROVIDER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_KEY_SUPERSEDE.clone()));
@@ -829,6 +882,23 @@ pub fn add_content_witness_authored(n: u64) {
 /// declared through the own conductor) instead of re-authored locally.
 pub fn inc_content_head_adopted() {
     CONTENT_HEAD_ADOPTED.inc();
+}
+
+/// Record one ghost-witness re-author call failure of `class` — one of
+/// "chain_head_moved" | "already_exists" (see
+/// [`CONTENT_WITNESS_REAUTHOR_FAILED`]). Both label combos are already
+/// pre-touched at registration, so calling this only ever increments an
+/// existing series.
+pub fn inc_content_witness_reauthor_failed(class: &str) {
+    CONTENT_WITNESS_REAUTHOR_FAILED
+        .with_label_values(&[class])
+        .inc();
+}
+
+/// Record one ghost-witness sweep abandoned after exceeding its wall-clock
+/// budget (see [`CONTENT_WITNESS_SWEEP_ABANDONED`]).
+pub fn inc_content_witness_sweep_abandoned() {
+    CONTENT_WITNESS_SWEEP_ABANDONED.inc();
 }
 
 /// Record one provide-loop author skipped because no `agent_cid` provider was
@@ -1220,5 +1290,52 @@ mod tests {
             text.contains("elohim_peer_status_fanout_missed"),
             "peer_status fan-in missed gauge missing:\n{text}"
         );
+    }
+
+    // ── Ghost-witness sweep failure legibility (saga-06-heads-converge stations) ──
+
+    #[test]
+    fn content_witness_reauthor_failed_classes_are_pretouched_at_boot() {
+        register_all();
+
+        // CRITICAL: both `class` label combos must be present in the scrape
+        // from registration alone — before either failure mode has ever
+        // fired. An IntCounterVec label combination only materialises after
+        // first touch, and the saga-06-heads-converge scenarios assert the
+        // metric is PRESENT (`>= 0`), not merely that it eventually appears
+        // once a sweep hits that failure class.
+        let text = gather_text();
+        assert!(
+            text.contains("elohim_content_witness_reauthor_failed_total"),
+            "reauthor-failed counter missing:\n{text}"
+        );
+        assert!(
+            text.contains("class=\"chain_head_moved\""),
+            "chain_head_moved class not pre-touched at registration:\n{text}"
+        );
+        assert!(
+            text.contains("class=\"already_exists\""),
+            "already_exists class not pre-touched at registration:\n{text}"
+        );
+        // Plain IntCounter: registration alone suffices (no pre-touch needed —
+        // it has no labels to materialise).
+        assert!(
+            text.contains("elohim_content_witness_sweep_abandoned_total"),
+            "sweep-abandoned counter missing:\n{text}"
+        );
+    }
+
+    #[test]
+    fn content_witness_reauthor_failed_and_sweep_abandoned_increment() {
+        register_all();
+        inc_content_witness_reauthor_failed("chain_head_moved");
+        inc_content_witness_reauthor_failed("already_exists");
+        inc_content_witness_sweep_abandoned();
+
+        let text = gather_text();
+        assert!(text.contains("elohim_content_witness_reauthor_failed_total"));
+        assert!(text.contains("class=\"chain_head_moved\""), "{text}");
+        assert!(text.contains("class=\"already_exists\""), "{text}");
+        assert!(text.contains("elohim_content_witness_sweep_abandoned_total"));
     }
 }
