@@ -17,6 +17,20 @@
  * Agent EPR's holochain_agent_key — which holds because each human's seeder
  * call runs on their own conductor whose agent IS the human's agent.
  *
+ * Conductor affinity (the same genesis #1119 lesson seed-conductor-identities
+ * encodes): a human's bindings are written ONLY on their own pod, resolved by
+ * the `elohim-<name>-<env>` service convention. The original first-reachable-
+ * wins walk stopped at the FIRST url in CONDUCTOR_URLS whose app matched the
+ * `elohim` prefix — and every alpha conductor matches that prefix, so every
+ * human's bindings were attempted on `elohim-adam-alpha`. Two consequences:
+ * (1) one saturated conductor turned into a 7/7 stage failure even while the
+ * other pods answered call_zome fine in the same build, and (2) the header
+ * contract above was false — the calls did NOT run on each human's own
+ * conductor, so the signer-match gate could only ever have passed for adam,
+ * and the AgentToPeerBinding forward link would have been anchored on adam's
+ * pubkey for everyone (silently emptying the topology aggregation this
+ * seeder exists to feed).
+ *
  * Idempotency: re-running this seeder creates additional binding entries —
  * there is no Stage-1 dedup check inside the zome. peer_id derivation is
  * deterministic from (humanId, archetype), so re-runs produce identical
@@ -31,6 +45,7 @@
  * Output icons (mirrors seed-conductor-identities.ts):
  *   [+] created — binding(s) just written
  *   [=] exists  — (reserved for future dedup; unused at Stage 1)
+ *   [-] skipped — no conductor deployed for this human (soft, not a failure)
  *   [X] failed  — connection or zome error
  *
  *   seed-results-agent-bindings.json — structured per-human results,
@@ -51,6 +66,14 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AdminWebsocket, AppWebsocket } from '@holochain/client';
 import { deterministicPeerId, resolvePeerId, type Archetype } from './peer-id.js';
+// Conductor affinity is SHARED with seed-conductor-identities.ts on purpose:
+// these helpers are the genesis #1119 founder-FATAL fix, and re-copying them
+// is exactly how this seeder drifted back to first-reachable-wins.
+import {
+  conductorUrlForHuman,
+  humanShortName,
+  urlsAreNameAffine,
+} from './seed-conductor-identities.js';
 
 // Canonical artifact filename from build-artifacts.json — single source of
 // truth across Groovy + TypeScript + JS. See seed-conductor-identities.ts
@@ -89,7 +112,7 @@ interface CreateAgentPeerBindingInput {
   signature: Uint8Array;
 }
 
-type SeedResult = 'created' | 'exists' | 'failed';
+type SeedResult = 'created' | 'exists' | 'skipped' | 'failed';
 
 interface BindingResult {
   humanId: string;
@@ -257,11 +280,35 @@ async function callCreateBinding(
 // Per-human seeding
 // =============================================================================
 
+/** A call_zome that timed out — the conductor is saturated, not the payload. */
+export function isZomeTimeout(message: string): boolean {
+  return /Request timed out in \d+ ms/.test(message);
+}
+
 /**
- * Seed all bindings for one human across the available conductor URLs.
+ * The conductor URLs this human's bindings may be written on.
  *
- * Iterates conductor URLs until one responds with a matching app for this
- * human; then writes one AgentPeerBinding per archetype in the plan.
+ * Name-affine URL sets (alpha/CI) resolve to EXACTLY the human's own pod —
+ * an empty list means "no pod deployed", which is a skip, not a failure.
+ * Non-affine sets (local dev, a single `ws://localhost:4445`) keep the
+ * legacy walk.
+ */
+export function candidateConductorUrls(
+  humanId: string,
+  conductorUrls: string[],
+): string[] {
+  if (!urlsAreNameAffine(conductorUrls)) return conductorUrls;
+  const ownUrl = conductorUrlForHuman(humanId, conductorUrls);
+  return ownUrl ? [ownUrl] : [];
+}
+
+/**
+ * Seed all bindings for one human onto THEIR conductor (name-affine), or —
+ * when CONDUCTOR_URLS carries no name-affine URLs (local dev) — walk the list.
+ *
+ * Writes one AgentPeerBinding per archetype in the plan. A human with no
+ * deployed conductor is SKIPPED (soft), never charged as a failure against
+ * some other human's pod.
  */
 async function seedBindingsForHuman(
   human: HumansJsonHuman,
@@ -275,9 +322,25 @@ async function seedBindingsForHuman(
     plans,
   };
 
+  // Name-affine targeting: this human's own pod, or nothing. The legacy walk
+  // survives only for non-affine URL sets (local dev).
+  const candidates = candidateConductorUrls(human.id, conductorUrls);
+
+  if (candidates.length === 0) {
+    return {
+      ...base,
+      conductorUrl: '(none)',
+      created: 0,
+      errors: [
+        `no conductor deployed for this human (no elohim-${humanShortName(human.id)}-* in CONDUCTOR_URLS)`,
+      ],
+      result: 'skipped',
+    };
+  }
+
   let lastError: string | undefined;
 
-  for (const conductorUrl of conductorUrls) {
+  for (const conductorUrl of candidates) {
     let session: ConductorSession | null = null;
 
     try {
@@ -326,9 +389,20 @@ async function seedBindingsForHuman(
           await callCreateBinding(appWs, cellId, input);
           created += 1;
         } catch (err) {
-          errors.push(
-            `${archetype}: ${err instanceof Error ? err.message : String(err)}`,
-          );
+          const message = err instanceof Error ? err.message : String(err);
+          errors.push(`${archetype}: ${message}`);
+          // A call_zome timeout means this conductor is saturated; the
+          // remaining archetypes target the SAME cell and will burn another
+          // full 60s each (matthew's 3-archetype plan cost 3 minutes per
+          // build). Stop at the first timeout and report the rest as
+          // untried rather than re-proving the same fact.
+          if (isZomeTimeout(message)) {
+            const untried = plans.slice(plans.indexOf(archetype) + 1);
+            if (untried.length > 0) {
+              errors.push(`${untried.join('+')}: not attempted (conductor unresponsive)`);
+            }
+            break;
+          }
         }
       }
     } finally {
@@ -424,7 +498,10 @@ export async function main(): Promise<void> {
     results.push(result);
 
     const icon =
-      result.result === 'created' ? '+' : result.result === 'exists' ? '=' : 'X';
+      result.result === 'created' ? '+'
+      : result.result === 'exists' ? '='
+      : result.result === 'skipped' ? '-'
+      : 'X';
     const phase = (human.agencyPhase ?? '').padEnd(7);
     const name = result.displayName.padEnd(16);
     const planStr = `[${result.plans.join('+')}]`.padEnd(28);
@@ -436,11 +513,15 @@ export async function main(): Promise<void> {
 
   const totalCreated = results.reduce((sum, r) => sum + r.created, 0);
   const failed = results.filter(r => r.result === 'failed').length;
-  const succeeded = results.length - failed;
+  const skipped = results.filter(r => r.result === 'skipped').length;
+  // A skipped human has no pod to seed onto — they are out of the denominator,
+  // not a failure. Charging them made "0 of 7" unreachable even on a healthy
+  // fleet (pete/terrance have no elohim-<name>-alpha conductor at all).
+  const succeeded = results.length - failed - skipped;
 
   console.log('');
   console.log(
-    `=== Results: ${totalCreated} bindings written, ${succeeded} humans succeeded, ${failed} humans failed ===`,
+    `=== Results: ${totalCreated} bindings written, ${succeeded} humans succeeded, ${skipped} skipped, ${failed} humans failed ===`,
   );
 
   // Structured artifact for Jenkinsfile + orchestrator-level reconciliation.
@@ -453,12 +534,17 @@ export async function main(): Promise<void> {
     counts: {
       totalCreated,
       succeeded,
+      skipped,
       failed,
-      total: results.length,
+      // `total` is the SEEDABLE denominator the Jenkinsfile prints in the
+      // "0 of N humans seeded" message — skipped humans have no pod, so
+      // including them made the message claim a failure that never was.
+      total: results.length - skipped,
+      targeted: results.length,
     },
     partial: succeeded > 0 && failed > 0,
     allSucceeded: failed === 0,
-    allFailed: succeeded === 0 && results.length > 0,
+    allFailed: succeeded === 0 && failed > 0,
     results: results.map(r => ({
       humanId: r.humanId,
       displayName: r.displayName,
@@ -485,6 +571,21 @@ export async function main(): Promise<void> {
     // but the distinction lets external tooling route partial vs total
     // to different remediations.
     process.exit(succeeded > 0 ? 2 : 1);
+  }
+
+  // Lossy-measure guard (museum anti-pattern #1: a condition that reads as
+  // zero failures is not the same as success). Every targeted human being
+  // SKIPPED means CONDUCTOR_URLS resolved to no one's pod — a misconfigured
+  // stage, not a clean run. Fail loudly rather than exit 0 with 0 bindings.
+  if (results.length > 0 && succeeded === 0) {
+    console.error(
+      `\nERROR: no human resolved to a deployed conductor — all ${skipped} targeted humans were skipped.`,
+    );
+    console.error(
+      '  CONDUCTOR_URLS carries no `elohim-<name>-<env>` url matching any node/device/doorway human.',
+    );
+    console.error(`  CONDUCTOR_URLS = ${conductorUrls.join(', ')}`);
+    process.exit(1);
   }
 
   process.exit(0);
