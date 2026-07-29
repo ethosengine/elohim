@@ -724,13 +724,28 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // (matthew on-prem, adam shem) end up co-located with their respective
     // doorway, which removes the cross-WireGuard signaling hop the previous
     // single-doorway-for-everyone shape forced.
+    def isRemote = (humanConfig.nodeTypes ?: []).contains('remote')
     def primaryDoorway
     if (envConfig.doorwayA && envConfig.doorwayB) {
-        def isRemote = (humanConfig.nodeTypes ?: []).contains('remote')
         primaryDoorway = isRemote ? envConfig.doorwayB : envConfig.doorwayA
     } else {
         primaryDoorway = [bootstrapUrl: envConfig.bootstrapUrl, signalUrl: envConfig.signalUrl]
     }
+
+    // shem's GFiber router hairpin-intercepts hairpinned 443 for the apex
+    // hostnames (elohim.host, signal.elohim.host) back to its own WAN IP —
+    // the router answers with its self-signed web UI cert
+    // (ssl_verify_result=18) instead of proxying through. Route shem-placed
+    // conductors straight to shem's own ingress+coturn node (10.99.0.2)
+    // instead of out through the WAN and back. Scoped to exactly the humans
+    // whose primaryDoorway IS doorwayB (i.e. bootstrap_url/signal_url render
+    // to the hairpinned apex hostnames) — never matthew/jessica/james
+    // (doorwayA) and never staging/prod (no doorwayB split there, and
+    // 10.99.0.2 is shem's alpha-specific IP). See
+    // genesis/data/timeline/backlog/shem-conductors-signal-hairpin-suspect-dht-silent.md.
+    def hostAliases = (envConfig.doorwayA && envConfig.doorwayB && isRemote)
+        ? '[{ip: "10.99.0.2", hostnames: ["elohim.host", "signal.elohim.host"]}]'
+        : '[]'
 
     def sedArgs = [
         // Image tag placeholders
@@ -756,6 +771,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         "s|INSTANCE_PLACEHOLDER|${humanConfig.instance}|g",
         "s|BOOTSTRAP_URL_PLACEHOLDER|${primaryDoorway.bootstrapUrl}|g",
         "s|SIGNAL_URL_PLACEHOLDER|${primaryDoorway.signalUrl}|g",
+        "s|HOST_ALIASES_PLACEHOLDER|${hostAliases}|g",
         "s|P2P_BOOTSTRAP_NODES_PLACEHOLDER|${p2pNodes}|g",
         // Node-local storage class — P2P dataplane owns replication, not k8s.
         "s|STORAGE_CLASS_PLACEHOLDER|openebs-hostpath|g",

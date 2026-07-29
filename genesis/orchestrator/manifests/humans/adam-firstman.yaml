@@ -214,6 +214,16 @@ spec:
         - key: remote-wan
           operator: Exists
           effect: NoSchedule
+      # shem's GFiber router hairpin-intercepts the apex hostnames (elohim.host,
+      # signal.elohim.host) back to its own WAN IP instead of routing to shem's
+      # own ingress — the router answers with its self-signed web UI cert
+      # (ssl_verify_result=18) rather than proxying through. Rendered by
+      # deployHumanManifest via the same HOST_ALIASES_PLACEHOLDER token as the
+      # consolidated template — non-empty only when this env has a doorwayB
+      # split (alpha today); empty ([]) otherwise, so a future non-alpha
+      # placement for adam never bakes in shem's alpha-specific IP. See
+      # genesis/data/timeline/backlog/shem-conductors-signal-hairpin-suspect-dht-silent.md.
+      hostAliases: HOST_ALIASES_PLACEHOLDER
       # Init container fetches hApp from Harbor registry using oras
       initContainers:
         - name: happ-fetcher

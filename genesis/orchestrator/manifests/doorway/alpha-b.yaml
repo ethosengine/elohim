@@ -123,6 +123,21 @@ spec:
         - key: remote-wan
           operator: Exists
           effect: NoSchedule
+      # shem's GFiber router hairpin-intercepts the apex hostnames
+      # (elohim.host, signal.elohim.host — this doorway's own DOORWAY_URL /
+      # SIGNAL_URL below) back to its own WAN IP instead of routing to shem's
+      # own ingress — the router answers with its self-signed web UI cert
+      # (ssl_verify_result=18) rather than proxying through. Route straight to
+      # shem's own ingress+coturn node (10.99.0.2) instead of out through the
+      # WAN and back. This file is alpha-only (no template sharing across
+      # envs), so the alias is hardcoded rather than placeholder-driven — see
+      # the consolidated-template/adam-firstman render path in
+      # elohim/holochain/Jenkinsfile (deployHumanManifest) for the per-human
+      # equivalent on the shem conductors. See
+      # genesis/data/timeline/backlog/shem-conductors-signal-hairpin-suspect-dht-silent.md.
+      hostAliases:
+        - ip: "10.99.0.2"
+          hostnames: ["elohim.host", "signal.elohim.host"]
       containers:
         # Doorway Gateway - Rust WebSocket gateway with auth, worker pool
         - name: doorway
