@@ -477,6 +477,63 @@ export async function resolveExistingCollectiveCid(baseUrl: string): Promise<str
 }
 
 /**
+ * Founder-chain fallback for `resolveExistingCollectiveCid`: ask the
+ * founder's OWN conductor (their source chain, via
+ * `imagodei.get_my_household_collective_cids`) whether a household
+ * collective already exists, bypassing the storage/doorway projection
+ * entirely.
+ *
+ * This matters because the projection probe above can MISS even when a
+ * collective genuinely exists: its SQL stamp lags cross-conductor DHT
+ * gossip/reconcile — the same class of lag that races `affirm_membership`
+ * (see the settle-retry loop in the invite/affirm loop below). A genesis run
+ * that targets one doorway while the founder's OWN conductor authored the
+ * entry can outrun that settle window every time, so re-running never
+ * converges without a probe that stays on the founder's own chain.
+ *
+ * `get_my_household_collective_cids` already filters to Person memberships
+ * whose collective charter declares `{"kind":"household"}` (qahal_coordinator.rs).
+ * This ceremony is the sole author of `family-dowell` household charters for
+ * this founder identity in any one genesis environment, so every returned
+ * cid IS this household by construction — no further per-cid charter/
+ * slugAlias fetch-and-decode is needed (that would require a second msgpack
+ * decode pass over the raw DHT entry bytes, which the seeder carries no
+ * dependency for today).
+ *
+ * More than one cid means an earlier partial run minted an orphan collective
+ * before this reuse path existed (or before its own projection settled).
+ * `get_my_household_collective_cids` reads the founder's own source chain via
+ * `query()`, which preserves creation (action-sequence) order, so the LAST
+ * entry is the most recently authored — that one is reused; the rest are
+ * reported back as an orphan count for operator visibility.
+ *
+ * Returns `null` on any zome-call failure (no session, DNA fn not deployed
+ * yet, network hiccup) or an empty result — the caller falls through to
+ * `create_collective` exactly as before.
+ */
+export async function resolveFounderChainCollectiveCid(
+  founderSession: MemberSession,
+): Promise<{ cid: string; orphanCount: number } | null> {
+  try {
+    const cids = (await founderSession.session.appWs.callZome({
+      cell_id: founderSession.session.imagodeiCell,
+      zome_name: 'imagodei',
+      fn_name: 'get_my_household_collective_cids',
+      payload: null,
+    })) as string[];
+    if (!Array.isArray(cids) || cids.length === 0) {
+      return null;
+    }
+    return { cid: cids[cids.length - 1], orphanCount: cids.length - 1 };
+  } catch (err) {
+    console.warn(
+      `[!] get_my_household_collective_cids probe (non-fatal): ${err instanceof Error ? err.message : err}`,
+    );
+    return null;
+  }
+}
+
+/**
  * Pure settle predicate for the household-formation projection (genesis #1182
  * Cluster B). True iff the collective's `collective_cid` is stamped AND every
  * expected member id is present in the projected participants — i.e. the
@@ -654,9 +711,27 @@ async function main(): Promise<void> {
     probedCid = await resolveExistingCollectiveCid(probeBase);
   }
 
+  // Founder-chain fallback: the storage/doorway probe above can miss even
+  // when a collective genuinely exists (its stamp lags cross-conductor DHT
+  // gossip — see resolveFounderChainCollectiveCid docstring). Ask the
+  // founder's OWN conductor before minting a fresh one.
+  let founderChainOrphanCount = 0;
+  if (!probedCid) {
+    const founderChain = await resolveFounderChainCollectiveCid(founderSession);
+    if (founderChain) {
+      probedCid = founderChain.cid;
+      founderChainOrphanCount = founderChain.orphanCount;
+    }
+  }
+
   if (probedCid) {
     collectiveCid = probedCid;
     console.log(`[=] reusing existing household collective ${collectiveCid}`);
+    if (founderChainOrphanCount > 0) {
+      console.warn(
+        `[!] founder has ${founderChainOrphanCount} orphaned household collective(s) from prior partial runs — reused the newest`,
+      );
+    }
   } else {
     try {
       const collectiveHash = await founderSession.session.appWs.callZome({
@@ -683,6 +758,9 @@ async function main(): Promise<void> {
   }
 
   // -- 2. Invite + affirm each non-founder member -------------------------
+  // Backoff schedule for the issuer-stewardship DHT-settle race below
+  // (total ~4-5 min across 6 retries) — see the affirm_membership comment.
+  const STEWARD_SETTLE_BACKOFFS_MS = [10_000, 20_000, 30_000, 45_000, 60_000, 90_000];
   // Filter by humanId (not slice(1)) — the elected founder isn't guaranteed to
   // be HOUSEHOLD_MEMBERS[0] (see founder-election above).
   for (const member of HOUSEHOLD_MEMBERS.filter(m => m.humanId !== founder.humanId)) {
@@ -718,25 +796,61 @@ async function main(): Promise<void> {
     }
 
     // Member affirms on THEIR conductor (their agent authors the Membership).
-    try {
-      await memberSession.session.appWs.callZome({
-        cell_id: memberSession.session.imagodeiCell,
-        zome_name: 'imagodei',
-        fn_name: 'affirm_membership',
-        payload: { token },
-      });
+    //
+    // DHT-settle retry: affirm_membership's issuer-stewardship check
+    // (require_caller_is_steward_of, qahal_coordinator.rs:490-507) runs
+    // list_memberships_for_collective LOCALLY on the AFFIRMING member's
+    // conductor — a get_links + get pair that only sees what's already
+    // gossiped there. The founder's Steward Membership is minted seconds
+    // earlier on the FOUNDER's conductor, so the very first affirm can
+    // legitimately race DHT propagation and fail with "caller is not a
+    // current Steward of <cid>" (genesis #1382/#1383: both "1/3 affirmed").
+    // Mirrors findMemberSessions' DepMissingFromDht settle-retry above —
+    // only THIS error class is retried; every other failure (expired token,
+    // bad signature, already-consumed nonce) fails/settles on the first try.
+    let affirmSucceeded = false;
+    let affirmAlreadyConsumed = false;
+    let affirmLastErr: string | undefined;
+    for (let attempt = 1; attempt <= STEWARD_SETTLE_BACKOFFS_MS.length + 1; attempt++) {
+      try {
+        await memberSession.session.appWs.callZome({
+          cell_id: memberSession.session.imagodeiCell,
+          zome_name: 'imagodei',
+          fn_name: 'affirm_membership',
+          payload: { token },
+        });
+        affirmSucceeded = true;
+        affirmLastErr = undefined;
+        break;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        affirmLastErr = msg;
+        if (msg.includes('already consumed')) {
+          affirmAlreadyConsumed = true;
+          break;
+        }
+        const backoffMs = STEWARD_SETTLE_BACKOFFS_MS[attempt - 1];
+        if (msg.includes('not a current Steward of') && backoffMs !== undefined) {
+          console.warn(
+            `  [~] issuer stewardship not yet visible on ${member.humanId}'s conductor — DHT settle retry ${attempt}/${STEWARD_SETTLE_BACKOFFS_MS.length} (waiting ${backoffMs / 1000}s)`,
+          );
+          await new Promise(r => setTimeout(r, backoffMs));
+          continue;
+        }
+        break; // not a settle race, or retries exhausted
+      }
+    }
+
+    if (affirmSucceeded) {
       affirmed.add(member.humanId);
       console.log(`  [+] ${member.humanId} affirmed (${member.role})`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('already consumed')) {
-        // Idempotent re-run — the nonce anchor already exists, so the prior
-        // affirmation stands.
-        affirmed.add(member.humanId);
-        console.log(`  [=] ${member.humanId} already affirmed (idempotent re-run)`);
-      } else {
-        console.error(`  [X] affirm_membership for ${member.humanId}: ${msg}`);
-      }
+    } else if (affirmAlreadyConsumed) {
+      // Idempotent re-run — the nonce anchor already exists, so the prior
+      // affirmation stands.
+      affirmed.add(member.humanId);
+      console.log(`  [=] ${member.humanId} already affirmed (idempotent re-run)`);
+    } else {
+      console.error(`  [X] affirm_membership for ${member.humanId}: ${affirmLastErr}`);
     }
   }
   console.log('');
