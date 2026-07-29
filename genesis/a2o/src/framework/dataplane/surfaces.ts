@@ -524,6 +524,47 @@ export async function probeHealth(peerUrl: string): Promise<ProbeResult<HealthSu
   return getJson<HealthSurface>(`${peerUrl}/health`);
 }
 
+// ---------------------------------------------------------------------------
+// Bounded doorway-ready wait (resiliency-saga chapter 4 — deploy-window race)
+// ---------------------------------------------------------------------------
+
+/**
+ * The edge pipeline's Dataplane Validation stage runs immediately after
+ * "Deploy Edge Node - Alpha", so a raw GET / issued right at stage start can
+ * race the doorway pod restart — green live, red in-window (builds
+ * #1257/#1262). `waitForDoorwayReady` absorbs exactly that restart window: it
+ * polls GET /health every `intervalMs` until it reports `healthy: true`, up to
+ * `timeoutMs` total.
+ *
+ * Measurement hardening ONLY — this must never mask a genuinely-down doorway.
+ * On deadline expiry it returns `false` and the caller is expected to proceed
+ * to its real assertion anyway, so a truly-broken doorway still fails
+ * honestly (the wait only absorbs the KNOWN, bounded restart race, never
+ * substitutes for the assertion). A non-200 status, a non-`healthy` body, or
+ * a thrown network error are all treated as "not ready yet" and re-polled —
+ * mirrors pollForGauge's never-throw-mid-poll contract.
+ */
+export const DOORWAY_READY_POLL_INTERVAL_MS = 3_000;
+export const DOORWAY_READY_POLL_TIMEOUT_MS = 90_000;
+
+export async function waitForDoorwayReady(
+  peerUrl: string,
+  opts: { intervalMs?: number; timeoutMs?: number } = {}
+): Promise<boolean> {
+  const ready = await pollForGauge<true>(
+    async () => {
+      const { status, body } = await probeHealth(peerUrl);
+      if (status !== 200 || body?.healthy !== true) return undefined;
+      return true;
+    },
+    {
+      intervalMs: opts.intervalMs ?? DOORWAY_READY_POLL_INTERVAL_MS,
+      timeoutMs: opts.timeoutMs ?? DOORWAY_READY_POLL_TIMEOUT_MS,
+    }
+  );
+  return ready === true;
+}
+
 /**
  * GET /sync/v1/{hAppId}/docs on the given peer.
  * The sync API is proxied by doorway (post-2026-06-27 manifest flip).

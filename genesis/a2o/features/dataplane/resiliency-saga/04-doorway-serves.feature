@@ -11,7 +11,11 @@
 # body contains ...") — the existing generic "When I query" step's captured body is
 # private to dataplane.steps.ts and has no body-substring assertion, and
 # delivery.steps.ts's "the response is HTML containing ..." reads a DIFFERENT
-# capture store populated only by its own "When I request/fetch" steps.
+# capture store populated only by its own "When I request/fetch" steps. The raw
+# query step polls the peer's /health until ready (bounded) before issuing the
+# GET, absorbing the doorway-pod-restart window that immediately follows an edge
+# deploy without masking a genuine outage — see waitForDoorwayReady in
+# src/framework/dataplane/surfaces.ts.
 #
 # Status today: GREEN.
 @e2e @dataplane @concern:saga-04-doorway-serves

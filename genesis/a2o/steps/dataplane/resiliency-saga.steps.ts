@@ -31,7 +31,10 @@
  *      step's captured body is private to dataplane.steps.ts with no
  *      body-substring assertion, and delivery.steps.ts's "the response is HTML
  *      containing ..." reads a DIFFERENT capture store populated only by its own
- *      "When I request/fetch" steps.
+ *      "When I request/fetch" steps. Hardened 2026-07-29 with a bounded
+ *      doorway-/health-ready wait before the raw GET (see waitForDoorwayReady
+ *      in src/framework/dataplane/surfaces.ts) — absorbs the deploy-window
+ *      doorway-pod-restart race without masking a genuine outage.
  *   4. A cross-doorway truth-compare step + a runLook rendered-card verdict
  *      (chapter 10) — "two doorways, one truth" needs a same-value-AND-non-zero
  *      assertion across two peers in one step; no existing step does both. The
@@ -52,6 +55,8 @@ import {
   parseLabeledPrometheusMetric,
   pollForGauge,
   GAUGE_SWEEP_POLL_TIMEOUT_MS,
+  waitForDoorwayReady,
+  DOORWAY_READY_POLL_TIMEOUT_MS,
 } from '../../src/framework/dataplane/surfaces.js';
 import { PROTOCOL_OMNI } from '../../src/framework/pages/selectors.js';
 import { retry } from '../../src/framework/utils/retry.js';
@@ -469,13 +474,39 @@ const rawCapture = new WeakMap<E2EWorld, RawCapture>();
  * field. Self-contained: does not share state with dataplane.steps.ts's private
  * "When I query" capture or delivery.steps.ts's responseStore.
  *
+ * Measurement hardening (2026-07-29): the ONLY user of this step is chapter 4
+ * ("the doorway serves"), whose Dataplane Validation run sits immediately
+ * after the edge deploy restarts the doorway pod — a raw GET issued right at
+ * stage start can race that restart (green live, red in-window; builds
+ * #1257/#1262). Before the raw GET, this step polls the same peer's /health
+ * until it reports ready (bounded — up to DOORWAY_READY_POLL_TIMEOUT_MS, ~3s
+ * interval) and PROCEEDS TO THE GET REGARDLESS of whether the wait succeeded
+ * or timed out: this only absorbs the known restart window, it must never
+ * mask a genuinely-down doorway — a real outage still fails the assertions
+ * below honestly.
+ *
  * Example:
  *   When I query "/" on peer "elohim.host" expecting raw text
  */
 When(
   'I query {string} on peer {string} expecting raw text',
+  // DOORWAY_READY_POLL_TIMEOUT_MS (90s) exceeds cucumber's 30s default step
+  // timeout (steps/common.steps.ts's setDefaultTimeout) — without an explicit
+  // override cucumber would kill the step mid-wait, before the poll's own
+  // deadline governor (or the raw GET that follows it) ever runs. +15s margin
+  // matches this file's other bounded-poll steps' convention.
+  { timeout: DOORWAY_READY_POLL_TIMEOUT_MS + 15_000 },
   async function (this: E2EWorld, path: string, peerName: string) {
     const doorway = this.getDoorway(peerName);
+    const ready = await waitForDoorwayReady(doorway.url);
+    if (!ready) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `  doorway "${peerName}" did not report /health healthy within ` +
+          `${DOORWAY_READY_POLL_TIMEOUT_MS / 1000}s — proceeding to the raw GET anyway ` +
+          `(an honest failure below beats a masked outage).`
+      );
+    }
     const url = `${doorway.url}${path}`;
     const { status, text } = await getRaw(url);
     rawCapture.set(this, { status, text, url });
