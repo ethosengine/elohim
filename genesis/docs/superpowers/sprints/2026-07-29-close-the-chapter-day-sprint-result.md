@@ -75,6 +75,44 @@ live and in #1259/#1260; the validation races the doorway restart), 07
 (honest data gap: shard-manifest resolution + custody-blob commitment —
 producer shipped, legacy rows await re-distribution).
 
+## Evening close addendum (21:45Z)
+
+- Genesis #1388 stands as the bindings-fix confirmation (7 bindings / 4
+  succeeded / 2 skipped / 1 adam-residual vs the prior 0-of-7). #1390 UNSTABLE
+  (same shape); #1391 ABORTED mid-run by executor churn (bindings partial
+  before abort: 6/3/2/2 — fix still holding; formation stage never reached;
+  ABORTED ≠ regression, no successor build was dispatched).
+- B at close: cure ACTIVE (get_links channel-dropped class gone since the
+  hot-swap; gossip knobs restored) but the content-anchor drain has NOT yet
+  completed — caughtUp=false, anchor ~3232, no arc-to-full promotions in the
+  first ~30min post-restart. The next session's first read is unchanged:
+  adam's heal-complete lines for healed>0 + arc promotions, then B's caughtUp
+  flip. If no promotions appear after a few hours, the remaining suspect is
+  the per-space initiate serialization under 28 agents (the structural
+  provisioning ceiling — operator decision documented in
+  backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md).
+
+## Next sprint (pre-authored): the-last-two-chapters
+
+Target: ch07 custody-witnessed + ch04 doorway-serves stability → 10/10
+measurable board (ch04 flap cured, ch07 data supplied).
+
+1. **ch07 data supply** — drive a legitimate re-distribution + custody-blob
+   commitment seed so the shard-manifest producer (123fd4bd5) populates
+   shard→blob resolution and an active `custody-blob` commitment names the
+   custodian; `derive_class` then yields stocked>=1 and the (already-firing)
+   weave sweep records it. Design constraint: real write path
+   (self_stewardship / re-upload), NOT fixture backfill — legacy rows stay
+   unguessed by design. Check the p2p-design-gate before adding any new
+   entity or route.
+2. **ch04 flap cure** — the validation's GET / races the doorway restart
+   (green live, red in the deploy-window runs #1257/#1262). Add a bounded
+   doorway-ready wait (poll /health before the raw GET) in the ch04 step
+   path — measurement hardening, not an assertion change.
+3. **Carry-through watches**: B caughtUp flip (ch06 cross-node un-pends,
+   card diversity grows); genesis formation stays 2/3 until the operator's
+   UUID migration.
+
 ## Residue / next
 
 - B's content-anchor drain: cure active, error class gone; arc convergence +
