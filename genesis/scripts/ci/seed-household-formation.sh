@@ -15,6 +15,10 @@
 #   INSTALLED_APP_ID / HOUSEHOLD_SALT / HOUSEHOLD_NONCE_PREFIX
 set -euo pipefail
 
+# Entrypoints must not depend on the caller's CWD: resolve the seeder
+# directory from this script's own location (genesis/scripts/ci/ → genesis/seeder).
+SEEDER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../seeder" && pwd)"
+
 CONDUCTOR_URLS="${1:?usage: seed-household-formation.sh <conductor-app-ws-urls>}"
 
 echo "═══════════════════════════════════════════════════════════"
@@ -25,4 +29,5 @@ echo "Projection: ${STORAGE_URL:-${DOORWAY_URL:-<unset — re-run convergence pr
 echo "Custody blob: ${CONTENT_BLOB_HASH:-<unset — custody layer will self-skip>}"
 echo ""
 
-CONDUCTOR_URLS="${CONDUCTOR_URLS}" npx tsx src/seed-household-formation.ts
+cd "${SEEDER_DIR}"
+CONDUCTOR_URLS="${CONDUCTOR_URLS}" exec npx tsx src/seed-household-formation.ts
