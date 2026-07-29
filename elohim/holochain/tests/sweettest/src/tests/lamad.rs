@@ -7,6 +7,9 @@
 //! 3. `content_visible_across_agents`         — cross-agent DHT visibility after settle.
 //! 4. `declare_head_notarizes_and_supersedes` — notary-authority Leg 1: author-
 //!    filtered HEAD election, author gate, and republish (§5.6 REQ-F13).
+//! 5. `resolve_content_head_local_is_nonblocking_and_converges` — a cold
+//!    conductor returns local absence without a network wait, then returns the
+//!    elected head after its DHT view converges.
 //!
 //! The coordinator zome is `content_store` (per dna/elohim/dna.yaml).
 //! DNA artifact: `dna/elohim/workdir/lamad.dna`.
@@ -484,6 +487,79 @@ async fn declare_head_notarizes_and_supersedes() -> Result<()> {
     // It supersedes the prior author-authored head (A's update).
     assert_eq!(redeclared.supersedes, Some(a_update_action.clone()));
     assert_eq!(redeclared.author, a1);
+
+    Ok(())
+}
+
+/// The projection-heal read must only inspect the conductor's local view: on a
+/// cold storage arc it returns `None` promptly, rather than waiting for the
+/// network request timeout. After the normal peer exchange and DHT convergence,
+/// that same local read returns the root author's elected head.
+///
+/// This is deliberately an isolated two-conductor setup. It makes B's first
+/// answer a genuine local miss, rather than relying on a race with background
+/// gossip to simulate a cold conductor.
+#[tokio::test(flavor = "multi_thread")]
+async fn resolve_content_head_local_is_nonblocking_and_converges() -> Result<()> {
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors_isolated().await?;
+    let seed = network_seed(DNA);
+    let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
+    let app1 = c1
+        .setup_app_for_agent("lamad-app", a1, &[dna_file.clone()])
+        .await?;
+    let app2 = c2.setup_app_for_agent("lamad-app", a2, &[dna_file]).await?;
+    let cell1 = app1.cells().first().expect("cell installed").clone();
+    let cell2 = app2.cells().first().expect("cell installed").clone();
+    let zome1 = cell1.zome("content_store");
+    let zome2 = cell2.zome("content_store");
+    let id = unique_id("local-head");
+
+    // Initialize B's Wasm runtime without reading its DHT. The bounded call
+    // below now measures a cold LOCAL VIEW, not one-time Wasm initialization.
+    let schema_version: String = c2.call(&zome2, "export_schema_version", ()).await;
+    assert_eq!(schema_version, "v1");
+
+    // A creates while conductors are deliberately disconnected. B has no local
+    // IdToContent link or record for this id yet.
+    let created: ContentOutput = c1.call(&zome1, "create_content", test_content(&id)).await;
+
+    // A Local lookup must not turn this cold-view miss into a network fetch.
+    // The former Network implementation can wait for the conductor's 60s
+    // request timeout; two seconds is ample after Wasm initialization while
+    // making that regression fail decisively.
+    let cold: Option<ContentHeadOutput> = tokio::time::timeout(
+        Duration::from_secs(2),
+        c2.call(&zome2, "resolve_content_head_local", id.clone()),
+    )
+    .await
+    .map_err(|_| anyhow::anyhow!("local head lookup waited for the network on a cold peer"))?;
+    assert!(
+        cold.is_none(),
+        "a cold peer's local answer is an observation of local absence, not a network result"
+    );
+
+    // Integrate the peers explicitly, then wait until B's local DHT view has
+    // received both the link and target record.
+    tokio::time::timeout(Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&c1, &c2]).await {
+            sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
+    await_consistency(60, [&cell1, &cell2])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout after local-head create: {e}"))?;
+
+    let converged: Option<ContentHeadOutput> = c2
+        .call(&zome2, "resolve_content_head_local", id.clone())
+        .await;
+    let converged = converged.expect("integrated peer must resolve the local head");
+    assert_eq!(converged.content_id, id);
+    assert_eq!(
+        converged.head_action_hash, created.action_hash,
+        "once ops are integrated, Local and Network choose the same elected head"
+    );
 
     Ok(())
 }
