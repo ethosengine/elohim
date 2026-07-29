@@ -25,7 +25,14 @@
 # deployed fleet-wide and the leak persisted. The 2026-06-18 jemalloc-PROF debug build localized
 # it to glibc malloc arenas; the allocator swap is the fix. Details + the superseded-RCA trail:
 # .claude/data/conductor-leak-jemalloc-prod-changeset-2026-06-19.md.)
-ARG CONDUCTOR_SOURCE_IMAGE=harbor.ethosengine.com/ethosengine/elohim-edgenode@sha256:f7fcf7c0ed36d678519ee17863cad766fbba1050fb4a6727653dfd4725ac5347
+# ⚠ RETENTION: Harbor keeps only the most recent edgenode artifacts — a busy
+# multi-push day evicts older digests, and this pin then 404s the whole edge
+# build (edge #1261, 2026-07-29: pinned digest GC'd between two same-day runs).
+# When repointing: any current-day edgenode digest carries the jemalloc
+# conductor; prefer the dev-latest digest at repoint time. Structural cure
+# (same-run --build-arg + retention-protected pin tag) is backlog
+# ci-storage-conductor-pin-retention.
+ARG CONDUCTOR_SOURCE_IMAGE=harbor.ethosengine.com/ethosengine/elohim-edgenode@sha256:aab8403e63bdeabbe609c099dcd7c093033df0992ff05726c826e8e08e1ca91b
 FROM ${CONDUCTOR_SOURCE_IMAGE} AS conductor-source
 
 # Build stage
