@@ -121,22 +121,28 @@ pub fn get_collective_by_action(action_hash: ActionHash) -> ExternResult<Option<
 /// List all Membership records linked from a Collective's ActionHash.
 ///
 /// Traverses the `HasMembership` links from the given Collective ActionHash
-/// and fetches each Membership entry. Skipped entries (DHT hole, network
-/// partition) are silently omitted — callers should retry if the count is
-/// unexpected.
+/// and fetches the linked Membership entries in one batched DHT read. Skipped
+/// entries (DHT hole, network partition) are silently omitted — callers should
+/// retry if the count is unexpected.
 #[hdk_extern]
 pub fn list_memberships_for_collective(collective_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let query = LinkQuery::try_new(collective_hash, LinkTypes::HasMembership)?;
     let links = get_links(query, GetStrategy::default())?;
-    let mut out = Vec::new();
-    for link in links {
-        if let Some(membership_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(membership_hash, GetOptions::default())? {
-                out.push(record);
-            }
-        }
-    }
-    Ok(out)
+    let membership_hashes = links
+        .into_iter()
+        .filter_map(|link| link.target.into_action_hash())
+        .collect::<Vec<_>>();
+
+    let records = HDK.with(|h| {
+        h.borrow().get(
+            membership_hashes
+                .into_iter()
+                .map(|hash| GetInput::new(hash.into(), GetOptions::default()))
+                .collect(),
+        )
+    })?;
+
+    Ok(records.into_iter().flatten().collect())
 }
 
 // =============================================================================
