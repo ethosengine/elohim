@@ -147,6 +147,8 @@ Task(
 )
 ```
 
+**Set `effort` per tier, alongside the model.** Effort is a second dial independent of `subagent_type`'s model tier: sweep agents doing mechanical pattern replacement are `low` legs and deep agents doing contextual type-safety work are `medium` — use those liberally, they hold quality at a fraction of the tokens and latency. Reserve high or `xhigh` for the architect's judgment campaigns (TODO triage, identical-function consolidation, systemic-gap analysis), where the reasoning *is* the deliverable.
+
 ### 2.4 Assign Initial Campaigns
 
 For each spawned agent, assign their first campaign:
@@ -299,6 +301,8 @@ Report to user:
 - Deep → Architect: {count}
 - Architect → GitHub Issues: {count}
 ```
+
+That template is the whole report — the tables plus escalation counts. Match its length to what the campaign actually did; don't pad with per-campaign narrative, a restated prose before/after summary, or sections with nothing behind them.
 
 ---
 

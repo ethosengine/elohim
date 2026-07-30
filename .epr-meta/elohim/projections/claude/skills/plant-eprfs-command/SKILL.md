@@ -1,6 +1,6 @@
 ---
 name: plant-eprfs-command
-description: Plant ONE runtime-authored slash command in its elohim-native CommandPackage on the eprfs layer. The package becomes authoritative while the Claude and Codex command files remain byte-identical verbatim projections. The command member of the plant-eprfs family; fidelity-gate-guaranteed lossless.
+description: "Plant ONE runtime-authored slash command in its elohim-native CommandPackage on the eprfs layer. The package becomes authoritative while the Claude and Codex command files remain byte-identical verbatim projections. The command member of the plant-eprfs family; fidelity-gate-guaranteed lossless. Use when \"plant command X\", planting a .claude/commands slash command into its CommandPackage, moving a command to package authority, or finishing command projection coverage in the plant-eprfs suite. Siblings for other artifact types: plant-eprfs-skill (SKILL.md), plant-eprfs-agent (subagents), plant-eprfs-agentdoc (CLAUDE.md / AGENTS.md), plant-eprfs-hook (executable hooks)."
 metadata:
   sourceRuntime: elohim-agent
   master: package
@@ -23,11 +23,10 @@ Before planting, the fidelity gate proves `project(import(source)) === source` b
 1. Run `node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify`. Confirm `CommandPackage:X` is source-fidelity and its Claude source round-trips byte-for-byte. If the package does not exist, run the normal command import first.
 2. Snapshot the two command projections with `sha256sum .claude/commands/X.md .codex/commands/X.md`.
 3. Edit `.epr-meta/elohim/packages/commands/X.json` only. Preserve `metadata.sourceRuntime`; add `metadata.master: "package"` and `metadata.composedBy: "<your model id>"`. Ensure `metadata.governance` carries `eprRef: epr:elohim-agent/commands/X`, `policy: capability-governance@1`, gates `epr-meta-resolver` and `elohim-agent:packages:verify`, and ledger `.claude/data/governance-findings.jsonl`. Do not edit `source.body`.
-4. Regenerate only the target: `node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs project --write-fixtures --write-runtime --only CommandPackage:X`.
+4. Plant atomically with the replant wrapper: `node elohim/sdk/domains/elohim-agent/scripts/replant.mjs --compose X` (it resolves the package by `metadata.id` and always scopes the write with `--only X`, never a bare tree-wide `--write-runtime` that would rewrite every other package's runtime file). It runs project (fixtures then runtime) → `verify` → `compose-graph` as one step, snapshotting every file the plant could touch and restoring it byte-exactly if the plant introduces a verify failure that was NOT in the pre-plant baseline — a red plant leaves no half-planted tree, and a tree already red for unrelated reasons still lets a clean plant land. `--dry-run X` reports the file list first; several names plant one at a time and stop at the first failure (`--keep-going` continues). Underlying mechanism it runs for you: `package-projections.mjs project --write-fixtures --only X`, `... project --write-runtime --only X`, `... verify`, `eprfs-agent compose-graph .epr-meta/elohim/packages --projections-root .epr-meta/elohim/projections` (that last one warns-and-continues if `eprfs-agent` is absent, rather than failing a plant that already verified green).
 5. Re-run the hashes. Both runtime files and both projection fixtures must be byte-identical to `source.body`; any content diff is a STOP condition.
-6. Run `node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify`. `CommandPackage:X` must now report package-first and must not require a re-importable Claude source.
-7. Record composition with `eprfs-agent compose-graph .epr-meta/elohim/packages --projections-root .epr-meta/elohim/projections --composed-by "<your model id>"`. Confirm the command package has two projection edges and the verbatim `sourceDocCid` witness equals each projection CID.
-8. Commit the package path-scoped. Then plant the next command.
+6. Confirm what landed: `verify` reports `CommandPackage:X` package-first, no longer requiring a re-importable Claude source, and the composition record shows the command package with two projection edges whose verbatim `sourceDocCid` witness equals each projection CID (attribution comes from the `metadata.composedBy` set in step 3 — `replant.mjs` passes no `--composed-by`).
+7. Commit the package path-scoped. Then plant the next command.
 
 ## Invariants
 

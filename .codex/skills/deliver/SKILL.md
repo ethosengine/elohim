@@ -127,6 +127,8 @@ Match verdict to the capability needed. Dispatch the relevant skill — never re
 
 The table is illustrative, not exhaustive. When you hit a gap shape that doesn't match a row cleanly: (1) pick the least-bad match and dispatch with a flag noting it's an edge case, (2) journal the gap shape under "Proposed dispatch-table additions" in the sprint-result. The skill grows from real usage data, not guessed rows.
 
+**Set `effort` on every dispatch** — a second dial, independent of the agent's model tier. Tier-1 `ci-observer` visual triage, the deterministic CI-artifact reads, and `page-model`'s testid sweep are `low`/`medium` legs; spend high or `xhigh` only where the dispatch carries real judgment — `systematic-debugging` on a dead render, an architect writing cross-pillar glue, `brainstorming` an ambiguous manifesto. Use the cheap settings liberally wherever verdict quality holds; the tier-3 verdict stays yours regardless.
+
 ### 5. Fix
 Apply changes. Cross-pillar OK. Per-iteration commit with clear message + journal stanza recording the change boundary (which pillars touched, why).
 
@@ -314,6 +316,10 @@ When tier-3 verdict is `delivered` with stability:
    - Debugging journey (number of debug sessions, root causes)
    - Search trail (audit log)
    - Consent-asks made
+
+   Match the sprint-result's length to the delivery it records — every line either
+   cites evidence or names a change made. Skip padded narrative, restated summaries
+   of the sections above, and boilerplate headings with nothing behind them.
 3. **Append the final verdict to `.claude/deliver/manifest.json`** per the schema above. Latest-verdict-wins for the `feature_path`; older entries persist for audit. This is the single load-bearing handoff to the auto-poller — without it, the memory-ceremony group has to grep prose, and `/deliver`'s authority becomes guess-shaped.
 4. **Flip story + backlog frontmatter** for any linked artifacts: `delivery_status` + `delivery_status_updated` + `delivery_status_source: deliver` (+ `regression_from` if minting `regression`). This is the projection of the manifest row onto the read-side substrate.
 5. Print sprint-result path + manifest-append confirmation + one-paragraph summary.

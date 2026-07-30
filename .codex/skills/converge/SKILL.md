@@ -33,7 +33,7 @@ python3 .claude/scripts/converge/converge-apply.py    # Phase 3: operator-approv
 
 1. **Theme detection** (deterministic, `converge-scan.py`) — clusters BACKLOG items, dedupe pairs, plan-status cooling items, sprint-digest themes, and path-rename clusters by shared theme keywords (extracted from active plan filenames + filtered through stopwords + multi-source-type requirement). Outputs `.claude/memory-kit/<TODAY>/convergence-themes.md` with each theme's contributing items and a candidate canonical plan.
 
-2. **Synthesis** (LLM judgment, subagent dispatch) — when this skill is invoked after a fresh scan, dispatch a `general-purpose` subagent (opus) with the prompt below. Produces:
+2. **Synthesis** (LLM judgment, subagent dispatch) — when this skill is invoked after a fresh scan, dispatch a `general-purpose` subagent (opus) with the prompt below. Set `effort` as a second dial alongside model tier (both the `Agent` tool and workflow `agent()` accept it): this synthesis dispatch is a judgment leg — vision × readiness scoring plus the memorial-tier safeguards — so it warrants high effort, while any helper dispatch that only gathers evidence (the per-theme `git log` / sprint-result / dev-intent reads in PER-THEME WORK steps 1-5) is a `low`/`medium` leg. Use the cheaper settings liberally wherever quality holds. Produces:
    - Per-theme proposals at `.claude/memory-kit/<TODAY>/converge/<theme>-proposal.md` with structured edit blocks (mark-done, add-as-outstanding, merge-redundant, remove-obsolete, surface-question) — each operator-reviewable via `- [x] Accept` checkboxes.
    - The **next-actions menu** at `.claude/memory-kit/<TODAY>/next-actions.md` — top 3-5 ranked recommendations with vision × readiness scoring and pre-authored Objectives.
 
@@ -106,6 +106,10 @@ Edit kinds:
 
 Be conservative on mark-done: only mark when the deliverable is unambiguous
 (file exists at expected path; scenario passing; commit message references the task).
+
+Keep each proposal as long as its edit blocks require and no longer — a theme with
+two real edits gets a two-edit proposal. Do not pad with filler sections, restated
+theme summaries, or boilerplate; the menu below carries its own line caps.
 
 NEXT-ACTIONS MENU
 =================

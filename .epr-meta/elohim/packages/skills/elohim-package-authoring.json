@@ -5,8 +5,8 @@
     "id": "elohim-package-authoring",
     "name": "elohim-package-authoring",
     "version": "1.0.0",
-    "description": "Author and maintain Elohim-native skills and agents from .epr-meta/elohim/packages, treating Claude and Codex files as generated projections.",
-    "triggerDescription": "Use when creating or updating Elohim-native skills or agents, or when checking projection drift between .epr-meta/elohim/packages and Claude/Codex runtime surfaces.",
+    "description": "Author and maintain Elohim-native skills and agents from .epr-meta/elohim/packages, treating Claude and Codex files as generated projections. Use when creating or updating Elohim-native skills or agents, or when checking projection drift between .epr-meta/elohim/packages and Claude/Codex runtime surfaces.",
+    "triggerDescription": "Author and maintain Elohim-native skills and agents from .epr-meta/elohim/packages, treating Claude and Codex files as generated projections. Use when creating or updating Elohim-native skills or agents, or when checking projection drift between .epr-meta/elohim/packages and Claude/Codex runtime surfaces.",
     "runtimeTargets": [
       "claude",
       "codex"
@@ -35,7 +35,7 @@
       "path": ".claude/skills/elohim-package-authoring/SKILL.md",
       "frontmatter": {
         "name": "elohim-package-authoring",
-        "description": "Author and maintain Elohim-native skills and agents from .epr-meta/elohim/packages, treating Claude and Codex files as generated projections.",
+        "description": "Author and maintain Elohim-native skills and agents from .epr-meta/elohim/packages, treating Claude and Codex files as generated projections. Use when creating or updating Elohim-native skills or agents, or when checking projection drift between .epr-meta/elohim/packages and Claude/Codex runtime surfaces.",
         "metadata": {
           "author": "elohim-protocol",
           "version": "1.0.0",
@@ -48,7 +48,7 @@
       "path": ".codex/skills/elohim-package-authoring/SKILL.md",
       "frontmatter": {
         "name": "elohim-package-authoring",
-        "description": "Author and maintain Elohim-native skills and agents from .epr-meta/elohim/packages, treating Claude and Codex files as generated projections.",
+        "description": "Author and maintain Elohim-native skills and agents from .epr-meta/elohim/packages, treating Claude and Codex files as generated projections. Use when creating or updating Elohim-native skills or agents, or when checking projection drift between .epr-meta/elohim/packages and Claude/Codex runtime surfaces.",
         "metadata": {
           "runtime": "codex",
           "sourceRuntime": "elohim-agent",

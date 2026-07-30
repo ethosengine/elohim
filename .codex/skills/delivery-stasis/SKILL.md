@@ -1,6 +1,6 @@
 ---
 name: delivery-stasis
-description: "Drive the WHOLE development cycle to stasis against the developer docs in one loop — the operator-as-conveyor role, formalized. Each round reads the class-aware delivery scoreboard (delivery-scoreboard.py — per-job CI verdicts with env-red≠code-red, ledgers, placement headline, delivery distribution), dispatches the equipped station for the highest-leverage pressure (/converge ranking, /deliver verification, /close-loop capture, scope-reconcile, triage dispatches, memory loops; pre-authors /shift Objectives), re-measures, repeats until only ceiling items remain — then presents the ceiling menu (the 2-5 decisions only the operator can make). With explicit launch-time BUILD authorization (overnight /loop), each cycle adds a build leg: fire the top vision-ranked OPEN Objective as an agentic-developer arc (explore→plan→execute) and integrate it under an evidence-gated push lease — ambitious delivery between maintenance rounds, ceiling rails intact. Use when \"what should we do\", \"drive the dev cycle to stasis\", \"delivery stasis pass\", \"run the conveyor\", at session boundaries, or /loop'd overnight (grant build mode in the launch prompt to enable the build leg). NOT for a single station's work (invoke that station directly) or memory-only hygiene (use /memory-stasis-loop)."
+description: "Drives the whole development cycle to stasis against the developer docs in one loop — the operator-as-conveyor role, formalized. Each round reads the class-aware delivery scoreboard (per-job CI verdicts, env-red≠code-red, ledgers), dispatches the equipped station for the highest-leverage pressure (/converge, /deliver, /close-loop, scope-reconcile, triage, memory loops; pre-authors /shift Objectives), re-measures until only ceiling items remain — then presents the ceiling menu (the 2-5 decisions only the operator can make). Under explicit launch-time BUILD authorization (overnight /loop), each cycle adds a build leg: fires the top vision-ranked OPEN Objective as an agentic-developer arc under an evidence-gated push lease. Use when \"drive the dev cycle to stasis\", \"delivery stasis pass\", \"run the conveyor\", at session boundaries, or looped overnight with build mode granted. NOT for a single station's work (invoke it directly) or memory-only hygiene (use /memory-stasis-loop)."
 metadata:
   runtime: codex
   sourceRuntime: claude
@@ -63,6 +63,8 @@ conveyor mis-steers everything downstream).
 One station per round for coupled pressures; parallel background dispatches
 when independent. Broad goals, not procedures — each station owns its HOW.
 
+Effort (`low`/`medium`/`high`/`xhigh`) is the primary lever for a dispatch's token cost and latency — reach for `low`/`medium` liberally where quality holds, and reserve `xhigh` for the most demanding legs; both the `Agent` tool and workflow `agent()` accept it, complementing (not replacing) the model-tier discipline.
+
 **/deliver economics — bring-up paths are a maintained asset.** Render
 verification is the loop's most expensive station: the first proof of a
 surface costs a full local-stack bring-up. Hand /deliver the verified ladder
@@ -81,6 +83,8 @@ fire, pushes awaiting the integrator, env flips, spend commitments,
 brainstorm-shaped design questions — each with its evidence attached
 (scoreboard line, gap-item id, finding fp). The menu IS the close; never bury
 it under work narration.
+
+Match the length of written artifacts — reports, journaled decisions, pre-authored Objectives — to what the task needs: cover the substance, don't pad with filler sections, redundant summaries, or boilerplate.
 
 ## Ambition mode — the build leg (explicit launch authorization)
 

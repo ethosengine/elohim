@@ -1,6 +1,6 @@
 ---
 name: elohim-package-authoring
-description: Author and maintain Elohim-native skills and agents from .epr-meta/elohim/packages, treating Claude and Codex files as generated projections.
+description: Author and maintain Elohim-native skills and agents from .epr-meta/elohim/packages, treating Claude and Codex files as generated projections. Use when creating or updating Elohim-native skills or agents, or when checking projection drift between .epr-meta/elohim/packages and Claude/Codex runtime surfaces.
 metadata:
   sourceRuntime: elohim-agent
   master: package

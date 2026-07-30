@@ -45,7 +45,9 @@ The phases below define the ceremony's *content* regardless of how it's executed
   // returns paste-ready rewrites + diff-rationales
   ```
 
-  `opts.agentType` invokes the real memory-team agents (so each keeps its MemPalace MCP grants and lens-job definition); `opts.model` honors the tier discipline (`[[project_agentic_loop_economics]]`). **The workflow stops before the Phase 3 operator gate** — workflows take no mid-run input, so it returns the rewrites and the operator gates each one in conversation (approve / revise / decline). Phase 4 (apply + coherence-verify) then runs inline or as a second workflow, with Phase 4b's fresh-context coherence check as the adversarial-verify stage (never one of the four lenses). Only launch a workflow when the operator has opted in — it spawns many agents.
+  `opts.agentType` invokes the real memory-team agents (so each keeps its MemPalace MCP grants and lens-job definition); `opts.model` honors the tier discipline (`[[project_agentic_loop_economics]]`). **The workflow stops before the Phase 3 operator gate** — workflows take no mid-run input, so it returns the rewrites and the operator gates each one in conversation (approve / revise / decline). Phase 4 (apply + two-lens verify) then runs inline or as a second workflow, with Phase 4b's diff-regression review (`/code-review`) and fresh-context coherence check as the two adversarial-verify lenses (never one of the four content-lenses). Only launch a workflow when the operator has opted in — it spawns many agents.
+
+**Effort — a second dial, independent of model tier (both modes).** Task dispatches and workflow `agent()` both accept `effort` alongside `model`. Use `low`/`medium` liberally for the mechanical legs — the librarian's Phase-2a fact-verification, the Phase-1b deterministic currency readouts, the Phase-4d re-embed confirmation — where quality holds at a fraction of the tokens; reserve high or `xhigh` for the judgment legs: the storyteller's Phase-3 synthesis pen and Phase-4b's two adversarial-verify lenses.
 
 ## Phase 1 — Population-wide triage (~2 min)
 
@@ -142,7 +144,7 @@ Dispatch the storyteller (one Task per surface; in parallel if more than one) wi
 
 > "**Substrate-currency ceremony Phase 3 — synthesis pen.** Picked surface: `<path>`. Four inputs attached verbatim: (1) librarian verified-facts, (2) your Phase 2 narrative-coherence findings, (3) historian missing-citations, (4) cartographer coverage-gaps.
 >
-> Per your `Substrate-currency ceremony — rewrite-synthesis pen lens-job` Phase-3 sub-section, compose the paste-ready rewrite of `<path>`. Preserve structural skeleton (frontmatter, section headings) unless lens findings argue for restructure. Each addition must cite at least one input. Apply canonical vocabulary; apply `[[feedback_agent_prompts_no_process_status]]`.
+> Per your `Substrate-currency ceremony — rewrite-synthesis pen lens-job` Phase-3 sub-section, compose the paste-ready rewrite of `<path>`. Preserve structural skeleton (frontmatter, section headings) unless lens findings argue for restructure. A rewrite is not an expansion: match its length to the substrate it must carry, and do not pad with filler sections, redundant summaries, or boilerplate the original did not need. Each addition must cite at least one input. Apply canonical vocabulary; apply `[[feedback_agent_prompts_no_process_status]]`.
 >
 > Output: (a) full rewritten surface body, ready to paste, (b) 1-paragraph diff-rationale citing which findings drove which changes. Cap ~15 min. If the surface needs more, return what you have plus a one-sentence two-cycle-rewrite note for the operator to elevate as backlog."
 
@@ -156,15 +158,19 @@ This is the only operator gate in the ceremony. Surface only the rewrites, not t
 
 **Holds menu (operator-confirmed governance):** any edge the drain proposes to HOLD (`epr flow hold` — a declared deviation with reason + valid_from) is presented here as a menu item with the librarian's rationale, historian precedent if any, and the storyteller's graduation check. **The operator confirms each hold**; a hold is policy, never hygiene — no agent declares a deviation unilaterally.
 
-## Phase 4 — Apply + downstream-coherence verification (~10 min)
+## Phase 4 — Apply + two-lens verification (diff-review + downstream-coherence) (~10 min)
 
 ### Phase 4a — Apply approved rewrites
 
 For each approved rewrite, apply via Write (full-file replace) or Edit (section replace, when the rewrite preserves enough structure). Git diff IS the chronicle for what changed; do not duplicate diff content elsewhere.
 
-### Phase 4b — Coherence verification (fresh-context Explore agent)
+### Phase 4b — Two verification lenses (diff-review + coherence)
 
-Per `[[feedback_first_memory_team_ceremony]]` Phase 6d lesson — the only piece of the old ceremony worth preserving verbatim. Dispatch a fresh-context Explore agent (NOT one of the four memory agents, which carry confirmation bias from inside the ceremony):
+Two orthogonal adversarial checks run on the applied rewrites; **both must clear (GREEN, or YELLOW-resolved) before the chronicle.** They catch different failure classes — Lens 1 looks at the *change*, Lens 2 looks at the *primed surface* — and neither is one of the four content-lenses (which carry confirmation bias from inside the ceremony).
+
+**Lens 1 — Diff-regression review (the `/code-review` lens).** Dispatch a `code-reviewer` agent (the plain-working-diff analog of `/code-review`; the orchestrator cannot launch the billed `/code-review ultra` cloud variant itself) on each rewrite's `git diff`. Its job is REGRESSION, not coherence: did the rewrite introduce a defect *versus the original* — a factual claim the code doesn't support, a dropped-but-still-true statement, a broken or mis-repointed `[[slug]]`, an internal contradiction? Hand it the specific claims the rewrite CHANGED or ADDED, and require each ground-truthed against live source — because a content-lens, and even the orchestrator's own Phase-3 grounding, can trust a stale doc (e.g. CLAUDE.md) or misread a `#[cfg(test)]` fixture as the production write-path, and the diff-review is the check that catches exactly that. Findings ride the same GREEN/YELLOW/RED scale below. Treat an empty finding set as a real, valuable result — but do not assume it: this lens reliably surfaces regressions the four-lens read and the orchestrator's review both miss.
+
+**Lens 2 — Downstream-reader coherence (fresh-context Explore agent).** Per `[[feedback_first_memory_team_ceremony]]` Phase 6d lesson — the only piece of the old ceremony worth preserving verbatim. Dispatch a fresh-context Explore agent (NOT one of the four memory agents, which carry confirmation bias from inside the ceremony):
 
 > "You are a downstream implementation-sprint agent about to start work on **<plausible-next-topic>**. Read these files as your primed context:
 > - MEMORY.md
@@ -177,10 +183,10 @@ Per `[[feedback_first_memory_team_ceremony]]` Phase 6d lesson — the only piece
 
 Pick `<plausible-next-topic>` from cartographer's `/converge` backlog if active, otherwise from the substrate the rewritten surfaces describe (e.g., rewriting rust-architect.md → topic "elohim-storage view authoring" or "doorway endpoint addition").
 
-**Verdict handling**:
+**Verdict handling** (applies to both lenses — take the worse of the two):
 - **GREEN**: ceremony closes. Brief chronicle entry per Phase 4c.
-- **YELLOW**: the librarian closes the noise inline if it's mechanical (typo, dead-path, citation fix); larger-than-mechanical noise becomes a single backlog entry for next cycle. Then ceremony closes; chronicle records the YELLOW + resolution.
-- **RED**: the ceremony is NOT done. Re-dispatch the storyteller (or appropriate lens) to resolve the contradictions; re-apply; re-verify. RED is the highest-value signal the ceremony can produce — it means the four-lens deep-read missed cross-substrate impact. Do not paper over it.
+- **YELLOW**: the librarian closes the noise inline if it's mechanical (typo, dead-path, citation fix, a precise stale-clause correction grounded against source); larger-than-mechanical noise becomes a single backlog entry for next cycle. Then ceremony closes; chronicle records the YELLOW + resolution.
+- **RED** (from either lens): the ceremony is NOT done. Resolve the findings — re-dispatch the storyteller, or (for a precise, evidence-backed factual fix) correct inline against the ground-truthed source — then re-apply and re-verify. RED is the highest-value signal the ceremony can produce — it means the four-lens deep-read missed cross-substrate impact, which a diff-review finding confirmed against live source is exactly. Do not paper over it.
 
 ### Phase 4c — Lightweight chronicle write
 
@@ -197,7 +203,8 @@ ceremony: substrate-currency
 surfaces_rewritten:
   - <path>
   - <path>
-coherence_verdict: GREEN | YELLOW | RED
+diff_review_verdict: GREEN | YELLOW | RED   # Phase-4b Lens 1 (/code-review)
+coherence_verdict: GREEN | YELLOW | RED     # Phase-4b Lens 2 (fresh-context Explore)
 next_topic_sampled: <topic>
 ---
 
@@ -205,9 +212,9 @@ next_topic_sampled: <topic>
 
 <2-4 sentences naming the surfaces rewritten and the dominant lens-driver: which lens contributed the most weight to each rewrite. E.g., "rust-architect.md rewritten — cartographer's coverage-gap on iroh parallel stack was the driver; historian surfaced 4 missing canonical-discipline citations; librarian flagged 3 fictional path claims.">
 
-## Coherence-check sampling
+## Verification sampling (both Phase-4b lenses)
 
-<1-2 sentences naming the topic sampled, the verdict, and any non-GREEN findings + resolution.>
+<1-2 sentences per lens: the diff-review (`/code-review`) verdict + any confirmed regressions and their fix; and the coherence Explore's sampled topic + verdict + any non-GREEN findings + resolution.>
 
 ## Wisdom worth carrying forward
 
