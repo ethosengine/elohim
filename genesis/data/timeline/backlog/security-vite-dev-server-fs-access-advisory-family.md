@@ -165,25 +165,41 @@ working path — the `_authToken` in `.npmrc` is stale and returns 401):
 | `vite-6.4.1.tgz`, `vite-7.3.1.tgz` (the **vulnerable** versions, in the lock) | **200** |
 | `vite-6.4.2`, `6.4.3`, `7.3.2`, `7.3.3`, `7.3.5`, `7.3.6`, `5.4.19`, `5.4.21` | **404** |
 
-The controlling generalization — every version already resident in
-`pnpm-lock.yaml` fetches, every version not resident 404s regardless of what the
-packument advertises:
-
-| Probe | Result |
-|---|---|
-| `esbuild-0.25.4`, `esbuild-0.25.12`, `esbuild-0.27.3`, `rollup-4.59.0` (all in lock) | **200** |
-| `esbuild-0.28.0`, `rollup-4.61.0` (not in lock, both published) | **404** |
-
-So Nexus's npm proxy still proxies *metadata* (`npm view vite@7.3.2` resolves,
-which is why resolution succeeds) but no longer fetches *tarballs* from upstream
-— it serves its existing blob cache only. That independently reproduces the
-critical finding already recorded in
+Nexus's npm proxy still proxies *metadata* (`npm view vite@7.3.2` resolves,
+which is why resolution succeeds and only the install fails) but its **blob
+store is only partially populated and upstream tarball fetch is unreliable**.
+That independently reproduces the critical finding already recorded in
 `VULNERABILITY_CLUSTER_06_PNPM_LOCK_INTEGRATION.md` ("Nexus's npm-proxy cannot
 fetch new tarballs right now"), and it supersedes the "mirror hasn't synced past
 version X" readings in cluster 02 — the mirror's *metadata* is current; its
-*blob store* is frozen. This blocker is operator-side on Nexus and is not
-fixable from any manifest, lockfile, or override in this repo. It gates every
-npm security bump in the monorepo, not just Vite.
+*blob store* is not. This blocker is operator-side on Nexus and is not fixable
+from any manifest, lockfile, or override in this repo. It gates every npm
+security bump in the monorepo, not just Vite.
+
+**Availability is per-artifact — do not generalize it.** An earlier draft of
+this entry claimed "every version not in `pnpm-lock.yaml` 404s"; that is
+**false** and was corrected the same day after a sibling triage run
+(`e83cd3f2d7e3`) reported counter-examples. Measured:
+
+| Probe | Result |
+|---|---|
+| In-lock: `vite-6.4.1`, `vite-7.3.1`, `esbuild-0.25.4/0.25.12/0.27.3`, `rollup-4.59.0`, `glob-13.0.6`, `typescript-5.9.3` | **200** (every case tested) |
+| Not in lock, published: `esbuild-0.28.0`, `rollup-4.61.0`, `zone.js-0.16.0`, `rxjs-7.8.3`, `sass-1.98.0`, `tar-7.5.11`, `js-yaml-4.2.0`, `uuid-11.1.1`, `uuid-13.0.1` | **404** |
+| Not in lock, published: **`uuid-14.0.1`** | **200** ← the counter-example |
+
+So "in this repo's root lock ⇒ fetchable" held in every case tested (unsurprising
+— that is what installs consume), but the converse does **not**: the blob store
+holds some artifacts this repo's lock never resolved, presumably fetched by
+sophia's separate workspace, another consumer of the same Nexus, or an earlier
+remediation pass. The practical consequence: **re-probe the specific tarball you
+need on every sweep.** Availability can change with no action in this repo, and
+a blanket "the mirror is down" reading will both miss landable work (per the
+sibling run, `glob@13.0.6` is fetchable *now*) and mis-attribute genuine absences.
+
+For Vite specifically the absence is consistent and re-verified across two
+passes: `6.4.2`, `6.4.3`, `7.3.2`, `7.3.3`, `7.3.5`, `7.3.6`, `5.4.19`, `5.4.21`
+all 404, while the vulnerable `6.4.1` / `7.3.1` return 200. There is no
+fetchable patched Vite on any of the three lines, so both units stay blocked.
 
 The provisional edits were therefore **reverted** rather than committed: landing
 a lockfile that pins un-fetchable tarballs would break `pnpm install` for every
@@ -213,7 +229,12 @@ Not yet fixed, so nothing is claimed closed. What *was* proven this run:
 - Unit R recipe resolves clean: `pnpm install --lockfile-only` exit 0; lock holds
   only `vite@6.4.3` / `7.3.6`; zero references to `vite@6.4.1` or `vite@7.3.1`.
 - Blocker reproduced two ways (pnpm `ERR_PNPM_FETCH_404`, and direct tarball
-  probes with the in-lock/not-in-lock control pair above).
+  probes), and the patched-Vite absence re-verified on a second pass.
+- One claim in the first draft of this entry was **wrong and has been corrected**:
+  "not in the lockfile ⇒ 404" is falsified by `uuid-14.0.1` (200, absent from the
+  root lock). Mirror availability is per-artifact and must be re-probed per
+  sweep; see the caveat in *Current decision*. The blocked decision itself is
+  unaffected — no patched Vite tarball is fetchable on any line.
 - Revert verified byte-clean against `HEAD` (`git status --short` empty for all
   nine touched files) and `pnpm install` green afterward.
 
