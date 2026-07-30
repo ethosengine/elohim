@@ -74,7 +74,7 @@
           "options": {
             "host": "0.0.0.0",
             "port": 4300,
-            "allowedHosts": true
+            "allowedHosts": [".code.ethosengine.com"]
           },
           "configurations": {
             "production": {
