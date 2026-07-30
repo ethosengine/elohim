@@ -4,14 +4,13 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 
 @Component({
   selector: 'lamad-observer-diagram',
   standalone: true,
   imports: [CommonModule],
   templateUrl: './observer-diagram.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./observer-diagram.component.css'],
 })
 export class ObserverDiagramComponent implements OnInit, OnDestroy {
