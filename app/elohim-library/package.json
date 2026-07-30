@@ -26,7 +26,6 @@
     "@angular/core": "^22.1.0",
     "@angular/forms": "^22.1.0",
     "@angular/platform-browser": "^22.1.0",
-    "@angular/platform-browser-dynamic": "^22.1.0",
     "@angular/router": "^22.1.0",
     "@holochain/client": "0.20.0",
     "elohim-core": "workspace:*",
