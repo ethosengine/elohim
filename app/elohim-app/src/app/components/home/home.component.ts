@@ -44,6 +44,7 @@ import { VisionComponent } from '../vision/vision.component';
 export class HomeComponent implements OnInit, OnDestroy {
   private scrollListener?: () => void;
   private intersectionObserver?: IntersectionObserver;
+  private observeTimeoutId?: ReturnType<typeof setTimeout>;
   private rafId?: number;
   private isScrolling = false;
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
@@ -76,6 +77,9 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (this.scrollListener) {
       // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by isPlatformBrowser -- scrollListener only ever set inside setupParallaxScrolling, which is only reached after ngOnInit's isBrowser early return
       window.removeEventListener('scroll', this.scrollListener);
+    }
+    if (this.observeTimeoutId !== undefined) {
+      clearTimeout(this.observeTimeoutId);
     }
     if (this.intersectionObserver) {
       this.intersectionObserver.disconnect();
@@ -150,8 +154,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       });
     }, observerOptions);
 
-    // Observe all sections and cards after view init
-    setTimeout(() => {
+    // Observe all sections and cards after view init (tracked so ngOnDestroy
+    // can cancel it — an untracked timer outlives the component and fires
+    // observe() against a torn-down fixture)
+    this.observeTimeoutId = setTimeout(() => {
       const sections = this.el.nativeElement.querySelectorAll('.section-content');
       sections.forEach((section: HTMLElement) => {
         this.intersectionObserver?.observe(section);
