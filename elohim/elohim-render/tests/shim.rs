@@ -198,6 +198,52 @@ async fn url_searchparams_basic_ops() {
     assert_eq!(v, "1|2|false");
 }
 
+/// Regression: Angular 22's HTTP transfer-cache interceptor builds its cache key
+/// via `sortAndConcatParams` -> `new URLSearchParams(...).sort()`. The shim had no
+/// `sort()`, so EVERY HttpClient request threw `TypeError: ...sort is not a function`
+/// synchronously inside `HttpInterceptorHandler.handle()` -- after `PendingTasks.add()`
+/// but before `.pipe(finalize(removeTask))` was attached. Under
+/// `provideZonelessChangeDetection()` the leaked tasks made `ApplicationRef.whenStable()`
+/// (awaited by `renderApplication`) never resolve: a silent, total SSR stall on any route
+/// that issues HttpClient traffic.
+/// See `genesis/data/timeline/backlog/elohim-render-v22-elohim-app-stall.md`.
+#[tokio::test]
+async fn url_searchparams_sort_is_stable_by_name() {
+    let mut rt = JsRuntime::with_shims();
+    let v = rt
+        .eval_string(
+            r#"
+            const p = new URLSearchParams('c=3&a=1&b=2&a=0');
+            p.sort();
+            p.toString()
+            "#,
+        )
+        .await
+        .unwrap();
+    // Sorted by name; equal names keep their relative order (1 before 0).
+    assert_eq!(v, "a=1&a=0&b=2&c=3");
+}
+
+/// Regression: the same Angular code path does
+/// `new URLSearchParams(x instanceof URLSearchParams ? x : x.toString())`, so the
+/// shim's constructor must copy pairs from another instance rather than enumerating
+/// its own fields (which minted a single bogus `_params=...` entry).
+#[tokio::test]
+async fn url_searchparams_copy_constructor_and_size() {
+    let mut rt = JsRuntime::with_shims();
+    let v = rt
+        .eval_string(
+            r#"
+            const src = new URLSearchParams('a=1&b=2');
+            const copy = new URLSearchParams(src);
+            `${copy.toString()}|${copy.size}`
+            "#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(v, "a=1&b=2|2");
+}
+
 #[tokio::test]
 async fn url_ipv6_hostname_port() {
     let mut rt = JsRuntime::with_shims();

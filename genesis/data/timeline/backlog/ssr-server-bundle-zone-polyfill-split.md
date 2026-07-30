@@ -13,8 +13,10 @@ tags: [angular, ssr, zone.js, zoneless, bundle-size, elohim-render, performance]
 cites:
   - app/elohim-app/angular.json
   - app/lamad/angular.json
+  - app/elohim-app/scripts/ssr-shim-node.mjs
   - elohim/elohim-render/src/shim/mod.rs
   - genesis/data/timeline/backlog/onpush-eager-debt-inventory.md
+  - genesis/data/timeline/backlog/elohim-render-v22-elohim-app-stall.md
 ---
 
 ## What
@@ -90,3 +92,100 @@ side.
 
 **Owner:** angular-architect (builder/bundle-config surface) with rust-architect consult
 (elohim-render's isolate/async assumptions the server bundle runs under).
+
+## Investigation (2026-07-30) — measured on the branch's actual `@angular/build` 22.1.0
+
+Read the installed builder source, not the docs. Three findings; two of them correct this entry.
+
+### 1. There is NO server-specific polyfills option — but the split already exists, keyed off `zone.js`
+
+`@angular/build:application`'s schema (`node_modules/@angular/build/src/builders/application/schema.json`)
+still exposes exactly one `polyfills` array. `ssr` accepts only `{entry, platform}`. Confirmed: no
+`polyfills.server`, no `serverPolyfills`.
+
+BUT the builder does **not** reuse the app's polyfills array for the server bundle. It rebuilds it
+from scratch (`src/tools/esbuild/application-code-bundle.js`, `createServerPolyfillBundleOptions`):
+
+```js
+const serverPolyfills = [];
+if (!isZonelessApp(options.polyfills)) {
+  serverPolyfills.push(isNodePlatform ? 'zone.js/node' : 'zone.js');
+}
+if (localize) serverPolyfills.push('@angular/localize/init');
+serverPolyfills.push('@angular/platform-server/init');
+```
+
+and `isZonelessApp` (`src/tools/esbuild/utils.js:274`) is:
+
+```js
+return !polyfills?.some((p) => p === 'zone.js' || /\.[mc]?[jt]s$/.test(p));
+```
+
+So the server polyfill set is derived, and the ONLY lever is the browser `polyfills` array. Both apps
+declare `["zone.js"]`, so `zoneless === false` and `zone.js/node` is injected. Note the second clause:
+adding ANY local `.ts`/`.js` polyfill file would also force `zoneless === false` even with `zone.js`
+removed — relevant if a future change moves the SSR preamble into `polyfills`.
+
+**Consequence:** dropping zone.js from the server bundle is not a build-config task. It is exactly
+"make the browser zoneless too", i.e. `provideZonelessChangeDetection()` in `app.config.ts` +
+`"polyfills": []`. One switch, both outputs, no builder surgery. Track it there, not here.
+
+### 2. The `main.server.ts` no-op fallback is mechanically unavailable
+
+`createServerCodeBundleOptions` sets `banner: { js: "import './polyfills.server.mjs';" }`, and the
+built artifact confirms it — the first line of `dist/elohim-app/server/main.server.mjs` is
+`import './polyfills.server.mjs';`. zone.js has fully installed itself before a single byte of
+`main.server.ts` executes. Nothing at the SSR entry can pre-empt it. Fallback direction #2 in this
+entry's "Fix direction" is retired.
+
+(A postbuild strip is technically reachable — `app/elohim-app/scripts/ssr-shim-node.mjs` already
+rewrites `polyfills.server.mjs` to inject the SSR globals preamble — but it would mean surgically
+excising minified zone.js from a 296 KB concatenation. Not worth it for the payoff below.)
+
+### 3. The stated cost is ~8x too high — zone.js is ~33 KB, not ~267 KB
+
+Measured, minified, via esbuild from the app's own resolution root:
+
+| entry | bytes |
+|---|---|
+| `zone.js/node` | 32,675 |
+| `@angular/platform-server/init` | 234,528 |
+| SSR globals preamble (`scripts/ssr-globals-preamble.mjs`) | 28,937 |
+| **built `polyfills.server.mjs`** | **296,313** |
+
+The 267 KB figure this entry opened with is the polyfill bundle minus the preamble — and it is
+dominated by `@angular/platform-server/init`, which is mandatory. zone.js itself is **32.7 KB, about
+0.24% of the 13.5 MB server dist**. The bundle-size argument for this item is effectively void.
+
+### What the item is actually worth, restated
+
+Two non-size reasons survive, and one of them is new:
+
+1. **Async substrate risk** (the original, and still the real one): every `await` and every
+   `web_api.js` Promise in the isolate runs through `ZoneAwarePromise` instead of V8's native one,
+   keeping `[[feedback_zone_native_await_unhandled_rejection]]`'s drain-order hazard alive server-side
+   for no benefit.
+2. **NEW — zone.js also changes how the server bundle is COMPILED.** `getFeatureSupport(zoneless)`
+   (`src/tools/esbuild/utils.js:154`) sets `'async-await': zoneless`. With zone.js present, esbuild
+   **downlevels every `async`/`await`, async generator, and `for await...of` in the server bundle to
+   generator form** ("Native async/await is not supported with Zone.js"). This is visible in the
+   shipped output — SSR stack traces run through `Generator.next` and the `__async(this, null,
+   function*(){...})` helper rather than native frames. It costs code size beyond zone.js's own
+   33 KB, costs runtime, and makes isolate stack traces harder to read (it materially slowed the
+   `elohim-render-v22-elohim-app-stall` investigation). `createWasmPlugin({ allowAsync: zoneless })`
+   is gated on the same flag.
+3. `ssr.platform: "neutral"` would swap `zone.js/node` for plain `zone.js` (dropping Node-API
+   patching that is meaningless in the deno_core isolate), but it also stops esbuild treating Node
+   built-ins as external, which the server bundle currently relies on via `ssr-shim-node.mjs`. Not a
+   free win; noted only so the next reader does not re-derive it.
+
+### Status
+
+**Blocked as scoped — and should be re-scoped.** There is no builder-level split to implement on
+Angular 22.1, the entry-level no-op is impossible, and the size payoff is ~33 KB rather than ~267 KB.
+The genuine prize is the async-substrate + native-async-compilation change, and the only clean lever
+for it is the browser-zoneless migration (`onpush-eager-debt-inventory.md`'s neighbourhood). Recommend
+folding this entry into that migration as an acceptance criterion — "server bundle contains no
+`ZoneAwarePromise` and compiles with native async/await" — rather than pursuing it standalone.
+
+Applies identically to `app/lamad` (also `"polyfills": ["zone.js"]`, same builder, same derivation).

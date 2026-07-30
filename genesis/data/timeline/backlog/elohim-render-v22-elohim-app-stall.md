@@ -7,16 +7,19 @@ title: "elohim-render SSR: elohim-app '/' route stalls to the wall-time limit (H
 slug: "elohim-render-v22-elohim-app-stall"
 written: "2026-07-30"
 author: "angular22-campaign"
-status: "backlog"
+status: "wip"
 priority: "medium"
 tags: [elohim-render, ssr, deno-core, angular22, zoneless, whenstable]
 cites:
+  - elohim/elohim-render/src/shim/url.js
   - elohim/elohim-render/src/shim/web_api.js
   - elohim/elohim-render/src/shim/fetch.js
   - elohim/elohim-render/examples/render_url.rs
+  - elohim/elohim-render/tests/shim.rs
   - app/elohim-app/src/app/app.routes.ts
   - app/elohim-app/src/app/components/home/home.component.ts
   - app/elohim-app/src/app/app.config.server.ts
+  - app/elohim-app/src/app/elohim/interceptors/api-base-url.interceptor.ts
 ---
 
 ## What
@@ -330,3 +333,131 @@ server-appropriate base?) before touching the guard.
 Next probe, unchanged in priority: re-run with `ELOHIM_RENDER_DEBUG_HOOKS=1` after any candidate
 fix and confirm whether the 29 `EprRelationshipCardComponent` PendingTasks still accumulate — that
 distinguishes "guard not firing" from "blocker is downstream of the interceptor" in one run.
+
+## Fourth pass (2026-07-30) — ROOT CAUSE FIXED, `/` renders
+
+**The blocker was a one-method gap in elohim-render's WHATWG `URLSearchParams` shim. Nothing in
+`app/**` was wrong; the third pass's attribution to `api-base-url.interceptor.ts` is DISPROVEN and
+that file was not touched.**
+
+### The mechanism, end to end
+
+Angular 22 rewrote `sortAndConcatParams` (the transfer-cache cache-key builder,
+`@angular/common/fesm2022/http.mjs:180`) to route through a real `URLSearchParams`:
+
+```js
+function sortAndConcatParams(params) {
+  const searchParams = new URLSearchParams(params instanceof URLSearchParams ? params : params.toString());
+  searchParams.sort();          // <-- did not exist on elohim-render's shim
+  return searchParams.toString();
+}
+```
+
+`elohim/elohim-render/src/shim/url.js` implements a minimal `URLSearchParams` (append/delete/get/
+getAll/has/set/entries/keys/values/forEach/toString) with **no `sort()`**. So on EVERY HttpClient
+request, `transferCacheInterceptorFn` — installed as a root interceptor by `provideClientHydration()`
+and therefore unconditional — threw `TypeError: t.sort is not a function` **synchronously**.
+
+The synchronous throw is what made it lethal rather than merely noisy. `HttpInterceptorHandler.handle()`
+(Angular 22.1) is:
+
+```js
+const removeTask = this.pendingTasks.add();
+return untracked(() => chain(initialRequest, downstreamRequest => this.backend.handle(downstreamRequest)))
+  .pipe(finalize(removeTask));
+```
+
+`chain(...)` is invoked EAGERLY, so the throw escapes **after `add()` but before `.pipe(finalize(removeTask))`
+is ever attached**. The task can never be removed by any code path. Under
+`provideZonelessChangeDetection()` that permanently blocks `ApplicationRef.whenStable()`, which
+`renderApplication()` awaits — a silent, total stall. The error itself surfaced only as an ordinary
+observable error on the component's `forkJoin`, which the card swallows: hence "no console output,
+no unhandled rejection."
+
+This also explains every prior confusion:
+
+- **Zero fetches for HttpClient traffic** — the chain died before `interceptorChainEndFn`, so
+  `FetchBackend.handle()` was never even constructed, let alone subscribed.
+- **Route-specificity** — `/identity/login` and `/zzz-nonexistent` render because their traffic is
+  raw `globalThis.fetch`, never HttpClient. It was never a `HomeComponent` property.
+- **Why fix attempt 1 (platform-detect guard) changed nothing** — the custom interceptor is
+  upstream of the thrower and was passing requests through correctly all along.
+- **Why Node ground truth was healthy** — Node has a spec-complete `URLSearchParams`.
+- **Angular-22-only** — Angular 21's `sortAndConcatParams` used `[...params.keys()].sort()` on a
+  plain array and never touched `URLSearchParams.prototype.sort`.
+
+### How it was localized (reusable technique)
+
+`ELOHIM_RENDER_DEBUG_HOOKS=1` proved the 29 stuck tasks but not the break point. The decisive probe
+was patching a **copy** of the built server bundle (`cp -r dist/elohim-app/server $SCRATCH/probe`)
+and wrapping the minified `chainedInterceptorFn` with ENTER/NEXT/EXIT/THROW logging plus a `try/catch`
+that prints the error. That immediately printed:
+
+```
+[icept ENTER] Jt http://localhost/assets/config.json
+[icept THROW] Jt http://localhost/assets/config.json :: TypeError: t.sort is not a function
+```
+
+Counts over the whole render: 116 interceptor ENTERs, **0 EXITs, 116 THROWs, 0 chain-ends, 0
+FetchBackend.handle** — i.e. the failure was universal across all 42 requests, not card-specific.
+Patching the built bundle is far cheaper than an `ng build` per hypothesis; the minified anchors
+(`function At(r,t){return t(r)}` = `interceptorChainEndFn`,
+`function St(r,t,e){return(n,o)=>xe(e,()=>t(n,s=>r(s,o)))}` = `chainedInterceptorFn`) are stable
+enough to find by shape.
+
+### The fix (landed in `elohim/elohim-render/src/shim/url.js`)
+
+1. `URLSearchParams.prototype.sort()` — WHATWG semantics: order by name in UTF-16 code units,
+   stable for equal names.
+2. Constructor now accepts any **iterable** (arrays of pairs, `Map`, and — load-bearing — another
+   `URLSearchParams`) before falling back to own-key enumeration. Previously
+   `new URLSearchParams(otherUSP)` minted a single bogus `_params=...` entry, which is exactly the
+   second call shape in `sortAndConcatParams` (the `serializedBody instanceof URLSearchParams` branch).
+3. `size` getter (standard, same gap class).
+
+Regression tests added to `elohim/elohim-render/tests/shim.rs`:
+`url_searchparams_sort_is_stable_by_name`, `url_searchparams_copy_constructor_and_size`.
+
+Note the pre-existing `shim_js_files_are_pure_ascii` test — `deno_core::extension!` embeds shim JS as
+a one-byte V8 external string, so a non-ASCII character (an em dash in a comment) fails the BUILD with
+`evaluation panicked: assertion failed: buffer.is_ascii()`. Keep shim comments ASCII.
+
+### Verification (bundles unchanged — `app/elohim-app` working tree clean, no app source edited)
+
+| bundle | url | terminal | fetches | wall_ms | html bytes | vs. baseline |
+|---|---|---|---|---|---|---|
+| elohim-app | `/` | errored | **30** | **343** | **60856** | was TIMEOUT / 1 fetch / 0 bytes |
+| elohim-app | `/identity/login` | errored | 2 | 339 | 1378 | unchanged (1378 B) |
+| elohim-app | `/zzz-nonexistent` | errored | 1 | 315 | 5739 | unchanged (5739 B) |
+| lamad | `/lamad` | errored | 2 | 309 | 4208 | unchanged (4208 B) |
+
+`/` now matches Node ground truth on both axes that matter (30 fetches; ~60.8 KB vs Node's 60740 B).
+`terminal: errored` is the `render_url` FailFetcher's expected terminal — every fetch is rejected by
+design — the same value the healthy lamad row has always carried.
+
+`compose_check` against `dist/elohim-app/browser/index.csr.html`: `COMPOSE OK: 41901 bytes`,
+`composed ng-state=1`.
+
+Gates: `cargo test` 110/110 lib + all integration suites green (shim suite 10/10),
+`cargo fmt --check` clean, `cargo clippy --all-targets -D warnings` clean.
+
+### Residual / follow-ups (NOT blocking)
+
+- **The 10s wall-time clamp** from the second pass stays. It is correct defence-in-depth, but it no
+  longer masks this class: a synchronous interceptor throw leaks a PendingTask *permanently*, so any
+  future instance is again a full-budget stall. Consider a render-side diagnostic that reports
+  outstanding PendingTask count on timeout (the debug-hooks probe already computes it) so the next
+  occurrence names itself instead of being silent.
+- **The shim is minimal by design and Angular 22 moved the goalposts once already.** Other WHATWG
+  surfaces (`Headers`, `AbortSignal`, `ReadableStream`, `FormData`) carry the same "minimal until it
+  isn't" risk. A conformance sweep of the shims against the APIs Angular's `@angular/common/http` +
+  `@angular/core` actually touch would retire the class rather than the instance.
+- **SSR request targets**: with HttpClient traffic restored, `/` issues requests at
+  `http://localhost:8090/...` (the dev `environment.client.storageUrl`). That is byte-identical to
+  Node ground truth and therefore not a regression, but on a real render host the DataFetcher must
+  route those service-to-service. Worth confirming against the deployed doorway before relying on SSR
+  content for `/`; it is a render-contract question, not an app-layer one.
+- **`api-base-url.interceptor.ts` is NOT to be changed for this.** The "should SSR bypass the
+  interceptor or use it with a server-appropriate base?" design question raised by fix attempt 1 is
+  now known to be orthogonal to the stall. If it is ever revisited it should be justified on its own
+  merits (browser failover heuristics are meaningless server-side), not as a stall fix.

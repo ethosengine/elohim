@@ -109,12 +109,18 @@
             ]);
           }
         }
-      } else if (Array.isArray(init)) {
+      } else if (typeof init === "object" && typeof init[Symbol.iterator] === "function") {
+        // Sequence init: arrays of pairs, Maps, and -- load-bearing -- another
+        // URLSearchParams. Angular's transfer-cache key builder does
+        // `new URLSearchParams(x instanceof URLSearchParams ? x : x.toString())`,
+        // so the instance branch must copy pairs, not enumerate own fields
+        // (which would mint a single bogus `_params=...` entry).
         for (const [k, v] of init) this._params.push([String(k), String(v)]);
       } else if (typeof init === "object") {
         for (const k of Object.keys(init)) this._params.push([k, String(init[k])]);
       }
     }
+    get size() { return this._params.length; }
     append(k, v) { this._params.push([String(k), String(v)]); }
     delete(k) { this._params = this._params.filter(p => p[0] !== k); }
     get(k) { const p = this._params.find(p => p[0] === k); return p ? p[1] : null; }
@@ -128,6 +134,20 @@
         this._params[idx] = [String(k), String(v)];
         this._params = this._params.filter((p, i) => i === idx || p[0] !== k);
       }
+    }
+    // WHATWG `sort()`: order pairs by name (UTF-16 code units), preserving the
+    // relative order of equal names (Array#sort is stable since ES2019).
+    //
+    // Load-bearing, not cosmetic: Angular 22's transfer-cache interceptor
+    // (`sortAndConcatParams` -> `makeCacheKey`) calls this on EVERY HttpClient
+    // request. Without it the interceptor threw `TypeError: t.sort is not a
+    // function` synchronously inside `HttpInterceptorHandler.handle()` -- AFTER
+    // `PendingTasks.add()` but BEFORE `.pipe(finalize(removeTask))` was
+    // attached -- so every request leaked a PendingTask forever and, under
+    // `provideZonelessChangeDetection()`, `ApplicationRef.whenStable()` (which
+    // `renderApplication()` awaits) never resolved. Silent, total SSR stall.
+    sort() {
+      this._params.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
     }
     *entries() { for (const p of this._params) yield [p[0], p[1]]; }
     *keys()    { for (const p of this._params) yield p[0]; }
