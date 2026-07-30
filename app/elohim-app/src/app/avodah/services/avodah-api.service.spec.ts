@@ -81,10 +81,7 @@ describe('AvodahApiService', () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [
-        AvodahApiService,
-        { provide: StorageApiService, useValue: storageSpy },
-      ],
+      providers: [AvodahApiService, { provide: StorageApiService, useValue: storageSpy }],
     });
     service = TestBed.inject(AvodahApiService);
   });
@@ -135,7 +132,7 @@ describe('AvodahApiService', () => {
       metadata: { status: 'done' },
     });
     expect(storageSpy.createEconomicEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'work', contentId: 'story-1' }),
+      expect.objectContaining({ action: 'work', contentId: 'story-1' })
     );
   });
 
@@ -154,7 +151,7 @@ describe('AvodahApiService', () => {
           contentType: 'concept',
           title: 'Test Concept',
         },
-      ]),
+      ])
     );
     const attachments = await service.getAttachments('story-1');
     expect(storageSpy.getRelationships).toHaveBeenCalledWith({
@@ -173,7 +170,7 @@ describe('AvodahApiService', () => {
         sourceId: 'story-1',
         targetId: 'concept-abc',
         relationshipType: 'ATTACHED_TO',
-      }),
+      })
     );
   });
 
@@ -190,7 +187,7 @@ describe('AvodahApiService', () => {
         title: 'New task',
         contentType: 'work-story',
         metadata: expect.objectContaining({ projectId: 'proj-1', status: 'todo' }),
-      }),
+      })
     );
     expect(result.id).toBe('story-1');
   });

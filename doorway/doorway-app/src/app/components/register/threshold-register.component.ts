@@ -13,13 +13,7 @@
  * can be an identity provider for elohim-app.
  */
 
-import {
-  Component,
-  OnInit,
-  inject,
-  signal,
-  computed,
-} from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';

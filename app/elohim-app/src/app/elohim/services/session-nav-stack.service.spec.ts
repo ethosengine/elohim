@@ -37,7 +37,7 @@ describe('SessionNavStackService', () => {
     const fresh = new SessionNavStackService();
     expect(fresh.length()).toBe(1);
     expect(fresh.entries()[0]?.cid).toBe('abc');
-    expect(fresh.previous()).toBeNull();  // 1-entry stack has no "previous"
+    expect(fresh.previous()).toBeNull(); // 1-entry stack has no "previous"
   });
 
   it('returns null for previous() until the stack has at least 2 entries', () => {

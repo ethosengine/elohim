@@ -38,10 +38,7 @@ describe('LostKeyEntryComponent', () => {
     mockAccountService.account.set(baseAccount);
     await TestBed.configureTestingModule({
       imports: [LostKeyEntryComponent],
-      providers: [
-        provideRouter([]),
-        { provide: AccountService, useValue: mockAccountService },
-      ],
+      providers: [provideRouter([]), { provide: AccountService, useValue: mockAccountService }],
     }).compileComponents();
   });
 
@@ -63,7 +60,7 @@ describe('LostKeyEntryComponent', () => {
     const router = TestBed.inject(Router);
     const navigateSpy = vi.spyOn(router, 'navigate');
     const btn = fixture.nativeElement.querySelector(
-      '[data-testid="lost-key-recovery"]',
+      '[data-testid="lost-key-recovery"]'
     ) as HTMLButtonElement;
     btn.click();
     expect(navigateSpy).toHaveBeenCalledWith(['/identity/recover']);

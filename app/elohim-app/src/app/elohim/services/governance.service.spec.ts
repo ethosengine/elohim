@@ -661,10 +661,13 @@ describe('GovernanceService', () => {
 
         service.voteOnProposal(vote).subscribe(result => {
           expect(result).toBe(true);
-          expect(governanceApiMock.castVote).toHaveBeenCalledWith('proposal-1', expect.objectContaining({
-            humanId: 'test-session-123',
-            position: 'agree',
-          }));
+          expect(governanceApiMock.castVote).toHaveBeenCalledWith(
+            'proposal-1',
+            expect.objectContaining({
+              humanId: 'test-session-123',
+              position: 'agree',
+            })
+          );
           done();
         });
       }));

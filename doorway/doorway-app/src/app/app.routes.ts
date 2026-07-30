@@ -6,9 +6,7 @@ export const routes: Routes = [
   {
     path: '',
     loadComponent: () =>
-      import('./components/landing/doorway-landing.component').then(
-        m => m.DoorwayLandingComponent
-      ),
+      import('./components/landing/doorway-landing.component').then(m => m.DoorwayLandingComponent),
     title: 'Welcome',
   },
   {
@@ -23,9 +21,7 @@ export const routes: Routes = [
   {
     path: 'login',
     loadComponent: () =>
-      import('./components/login/threshold-login.component').then(
-        m => m.ThresholdLoginComponent
-      ),
+      import('./components/login/threshold-login.component').then(m => m.ThresholdLoginComponent),
     title: 'Sign In',
   },
   {
@@ -47,9 +43,7 @@ export const routes: Routes = [
   {
     path: 'account',
     loadComponent: () =>
-      import('./components/account/doorway-account.component').then(
-        m => m.DoorwayAccountComponent
-      ),
+      import('./components/account/doorway-account.component').then(m => m.DoorwayAccountComponent),
     title: 'My Account',
     canActivate: [authGuard],
   },

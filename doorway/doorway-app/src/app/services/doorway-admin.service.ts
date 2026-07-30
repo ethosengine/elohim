@@ -101,12 +101,14 @@ export class DoorwayAdminService {
   fetchCapabilities(): Observable<CapabilitiesResponse> {
     return this.http.get<CapabilitiesResponse>(`${this.baseUrl}/admin/capabilities`).pipe(
       timeout(this.timeout),
-      catchError(this.handleError<CapabilitiesResponse>('fetchCapabilities', {
-        orchestrator: false,
-        federation: false,
-        conductorPool: false,
-        nats: false,
-      }))
+      catchError(
+        this.handleError<CapabilitiesResponse>('fetchCapabilities', {
+          orchestrator: false,
+          federation: false,
+          conductorPool: false,
+          nats: false,
+        })
+      )
     );
   }
 
@@ -124,12 +126,14 @@ export class DoorwayAdminService {
   getRouteRegistry(): Observable<RouteRegistryResponse> {
     return this.http.get<RouteRegistryResponse>(`${this.baseUrl}/admin/routes`).pipe(
       timeout(this.timeout),
-      catchError(this.handleError<RouteRegistryResponse>('getRouteRegistry', {
-        totalRoutes: 0,
-        stewardRegistered: false,
-        stewardUrl: null,
-        routeSources: [],
-      }))
+      catchError(
+        this.handleError<RouteRegistryResponse>('getRouteRegistry', {
+          totalRoutes: 0,
+          stewardRegistered: false,
+          stewardUrl: null,
+          routeSources: [],
+        })
+      )
     );
   }
 
@@ -152,16 +156,22 @@ export class DoorwayAdminService {
     };
 
     return new Observable<NodesResponse>(subscriber => {
-      this.orchestratorCircuit.execute(() =>
-        firstValueFrom(
-          this.http.get<NodesResponse>(`${this.baseUrl}/admin/nodes`).pipe(
-            timeout(this.timeout)
+      this.orchestratorCircuit
+        .execute(() =>
+          firstValueFrom(
+            this.http.get<NodesResponse>(`${this.baseUrl}/admin/nodes`).pipe(timeout(this.timeout))
           )
         )
-      ).then(
-        result => { subscriber.next(result); subscriber.complete(); },
-        () => { subscriber.next(fallback); subscriber.complete(); }
-      );
+        .then(
+          result => {
+            subscriber.next(result);
+            subscriber.complete();
+          },
+          () => {
+            subscriber.next(fallback);
+            subscriber.complete();
+          }
+        );
     });
   }
 
@@ -169,11 +179,13 @@ export class DoorwayAdminService {
    * Get specific node details
    */
   getNode(nodeId: string): Observable<NodeDetails | null> {
-    return this.http.get<NodeDetails>(`${this.baseUrl}/admin/nodes/${nodeId}`).pipe(
-      timeout(this.timeout),
-      retry(2),
-      catchError(this.handleError<NodeDetails | null>('getNode', null))
-    );
+    return this.http
+      .get<NodeDetails>(`${this.baseUrl}/admin/nodes/${nodeId}`)
+      .pipe(
+        timeout(this.timeout),
+        retry(2),
+        catchError(this.handleError<NodeDetails | null>('getNode', null))
+      );
   }
 
   /**
@@ -181,16 +193,24 @@ export class DoorwayAdminService {
    */
   getClusterMetrics(): Observable<ClusterMetrics | null> {
     return new Observable<ClusterMetrics | null>(subscriber => {
-      this.orchestratorCircuit.execute(() =>
-        firstValueFrom(
-          this.http.get<ClusterMetrics>(`${this.baseUrl}/admin/cluster`).pipe(
-            timeout(this.timeout)
+      this.orchestratorCircuit
+        .execute(() =>
+          firstValueFrom(
+            this.http
+              .get<ClusterMetrics>(`${this.baseUrl}/admin/cluster`)
+              .pipe(timeout(this.timeout))
           )
         )
-      ).then(
-        result => { subscriber.next(result); subscriber.complete(); },
-        () => { subscriber.next(null); subscriber.complete(); }
-      );
+        .then(
+          result => {
+            subscriber.next(result);
+            subscriber.complete();
+          },
+          () => {
+            subscriber.next(null);
+            subscriber.complete();
+          }
+        );
     });
   }
 
@@ -199,16 +219,24 @@ export class DoorwayAdminService {
    */
   getResources(): Observable<ResourceSummary | null> {
     return new Observable<ResourceSummary | null>(subscriber => {
-      this.orchestratorCircuit.execute(() =>
-        firstValueFrom(
-          this.http.get<ResourceSummary>(`${this.baseUrl}/admin/resources`).pipe(
-            timeout(this.timeout)
+      this.orchestratorCircuit
+        .execute(() =>
+          firstValueFrom(
+            this.http
+              .get<ResourceSummary>(`${this.baseUrl}/admin/resources`)
+              .pipe(timeout(this.timeout))
           )
         )
-      ).then(
-        result => { subscriber.next(result); subscriber.complete(); },
-        () => { subscriber.next(null); subscriber.complete(); }
-      );
+        .then(
+          result => {
+            subscriber.next(result);
+            subscriber.complete();
+          },
+          () => {
+            subscriber.next(null);
+            subscriber.complete();
+          }
+        );
     });
   }
 
@@ -216,11 +244,13 @@ export class DoorwayAdminService {
    * Get custodian network overview
    */
   getCustodians(): Observable<CustodianNetwork | null> {
-    return this.http.get<CustodianNetwork>(`${this.baseUrl}/admin/custodians`).pipe(
-      timeout(this.timeout),
-      retry(2),
-      catchError(this.handleError<CustodianNetwork | null>('getCustodians', null))
-    );
+    return this.http
+      .get<CustodianNetwork>(`${this.baseUrl}/admin/custodians`)
+      .pipe(
+        timeout(this.timeout),
+        retry(2),
+        catchError(this.handleError<CustodianNetwork | null>('getCustodians', null))
+      );
   }
 
   // ============================================================================
@@ -234,12 +264,14 @@ export class DoorwayAdminService {
     return this.http.get<PipelineResponse>(`${this.baseUrl}/admin/pipeline`).pipe(
       timeout(this.timeout),
       retry(2),
-      catchError(this.handleError<PipelineResponse>('getPipeline', {
-        registered: 0,
-        hosted: 0,
-        graduating: 0,
-        steward: 0,
-      }))
+      catchError(
+        this.handleError<PipelineResponse>('getPipeline', {
+          registered: 0,
+          hosted: 0,
+          graduating: 0,
+          steward: 0,
+        })
+      )
     );
   }
 
@@ -251,31 +283,33 @@ export class DoorwayAdminService {
    * Get federated doorways for admin dashboard
    */
   getFederationDoorways(): Observable<FederationDoorwaysAdminResponse> {
-    return this.http.get<FederationDoorwaysAdminResponse>(
-      `${this.baseUrl}/api/v1/federation/doorways`
-    ).pipe(
-      timeout(this.timeout),
-      retry(2),
-      catchError(this.handleError<FederationDoorwaysAdminResponse>('getFederationDoorways', {
-        doorways: [],
-        total: 0,
-      }))
-    );
+    return this.http
+      .get<FederationDoorwaysAdminResponse>(`${this.baseUrl}/api/v1/federation/doorways`)
+      .pipe(
+        timeout(this.timeout),
+        retry(2),
+        catchError(
+          this.handleError<FederationDoorwaysAdminResponse>('getFederationDoorways', {
+            doorways: [],
+            total: 0,
+          })
+        )
+      );
   }
 
   /**
    * Get P2P peer connections
    */
   getP2PPeers(): Observable<P2PPeersResponse> {
-    return this.http.get<P2PPeersResponse>(
-      `${this.baseUrl}/api/v1/federation/p2p-peers`
-    ).pipe(
+    return this.http.get<P2PPeersResponse>(`${this.baseUrl}/api/v1/federation/p2p-peers`).pipe(
       timeout(this.timeout),
       retry(2),
-      catchError(this.handleError<P2PPeersResponse>('getP2PPeers', {
-        peers: [],
-        total: 0,
-      }))
+      catchError(
+        this.handleError<P2PPeersResponse>('getP2PPeers', {
+          peers: [],
+          total: 0,
+        })
+      )
     );
   }
 
@@ -283,57 +317,48 @@ export class DoorwayAdminService {
    * Get configured federation peer URLs with enriched status
    */
   getFederationPeerConfig(): Observable<FederationPeersConfigResponse> {
-    return this.http.get<FederationPeersConfigResponse>(
-      `${this.baseUrl}/admin/federation/peers`
-    ).pipe(
-      timeout(this.timeout),
-      retry(2),
-      catchError(this.handleError<FederationPeersConfigResponse>('getFederationPeerConfig', {
-        peers: [],
-        total: 0,
-        selfId: null,
-      }))
-    );
+    return this.http
+      .get<FederationPeersConfigResponse>(`${this.baseUrl}/admin/federation/peers`)
+      .pipe(
+        timeout(this.timeout),
+        retry(2),
+        catchError(
+          this.handleError<FederationPeersConfigResponse>('getFederationPeerConfig', {
+            peers: [],
+            total: 0,
+            selfId: null,
+          })
+        )
+      );
   }
 
   /**
    * Add a new federation peer URL
    */
   addFederationPeer(url: string): Observable<UserMutationResponse> {
-    return this.http.post<UserMutationResponse>(
-      `${this.baseUrl}/admin/federation/peers`,
-      { url }
-    ).pipe(
-      timeout(this.timeout),
-      catchError(this.handleMutationError('addFederationPeer'))
-    );
+    return this.http
+      .post<UserMutationResponse>(`${this.baseUrl}/admin/federation/peers`, { url })
+      .pipe(timeout(this.timeout), catchError(this.handleMutationError('addFederationPeer')));
   }
 
   /**
    * Remove a federation peer URL
    */
   removeFederationPeer(url: string): Observable<UserMutationResponse> {
-    return this.http.request<UserMutationResponse>(
-      'DELETE',
-      `${this.baseUrl}/admin/federation/peers`,
-      { body: { url } }
-    ).pipe(
-      timeout(this.timeout),
-      catchError(this.handleMutationError('removeFederationPeer'))
-    );
+    return this.http
+      .request<UserMutationResponse>('DELETE', `${this.baseUrl}/admin/federation/peers`, {
+        body: { url },
+      })
+      .pipe(timeout(this.timeout), catchError(this.handleMutationError('removeFederationPeer')));
   }
 
   /**
    * Force refresh of all federation peers
    */
   refreshFederationPeers(): Observable<UserMutationResponse> {
-    return this.http.post<UserMutationResponse>(
-      `${this.baseUrl}/admin/federation/peers/refresh`,
-      {}
-    ).pipe(
-      timeout(this.timeout),
-      catchError(this.handleMutationError('refreshFederationPeers'))
-    );
+    return this.http
+      .post<UserMutationResponse>(`${this.baseUrl}/admin/federation/peers/refresh`, {})
+      .pipe(timeout(this.timeout), catchError(this.handleMutationError('refreshFederationPeers')));
   }
 
   // ============================================================================
@@ -344,45 +369,45 @@ export class DoorwayAdminService {
    * Get users pending graduation
    */
   getGraduationPending(): Observable<GraduationPendingResponse> {
-    return this.http.get<GraduationPendingResponse>(
-      `${this.baseUrl}/admin/graduation/pending`
-    ).pipe(
-      timeout(this.timeout),
-      retry(1),
-      catchError(this.handleError<GraduationPendingResponse>('getGraduationPending', {
-        users: [],
-        total: 0,
-      }))
-    );
+    return this.http
+      .get<GraduationPendingResponse>(`${this.baseUrl}/admin/graduation/pending`)
+      .pipe(
+        timeout(this.timeout),
+        retry(1),
+        catchError(
+          this.handleError<GraduationPendingResponse>('getGraduationPending', {
+            users: [],
+            total: 0,
+          })
+        )
+      );
   }
 
   /**
    * Get users who have completed graduation
    */
   getGraduationCompleted(): Observable<GraduationCompletedResponse> {
-    return this.http.get<GraduationCompletedResponse>(
-      `${this.baseUrl}/admin/graduation/completed`
-    ).pipe(
-      timeout(this.timeout),
-      retry(1),
-      catchError(this.handleError<GraduationCompletedResponse>('getGraduationCompleted', {
-        users: [],
-        total: 0,
-      }))
-    );
+    return this.http
+      .get<GraduationCompletedResponse>(`${this.baseUrl}/admin/graduation/completed`)
+      .pipe(
+        timeout(this.timeout),
+        retry(1),
+        catchError(
+          this.handleError<GraduationCompletedResponse>('getGraduationCompleted', {
+            users: [],
+            total: 0,
+          })
+        )
+      );
   }
 
   /**
    * Force-graduate a user to steward
    */
   forceGraduate(agentKey: string): Observable<UserMutationResponse> {
-    return this.http.post<UserMutationResponse>(
-      `${this.baseUrl}/admin/graduation/force/${agentKey}`,
-      {}
-    ).pipe(
-      timeout(this.timeout),
-      catchError(this.handleMutationError('forceGraduate'))
-    );
+    return this.http
+      .post<UserMutationResponse>(`${this.baseUrl}/admin/graduation/force/${agentKey}`, {})
+      .pipe(timeout(this.timeout), catchError(this.handleMutationError('forceGraduate')));
   }
 
   // ============================================================================
@@ -393,20 +418,21 @@ export class DoorwayAdminService {
    * Get current user's account details
    */
   getAccount(): Observable<AccountResponse | null> {
-    return this.http.get<AccountResponse>(`${this.baseUrl}/auth/account`).pipe(
-      timeout(this.timeout),
-      catchError(this.handleError<AccountResponse | null>('getAccount', null))
-    );
+    return this.http
+      .get<AccountResponse>(`${this.baseUrl}/auth/account`)
+      .pipe(
+        timeout(this.timeout),
+        catchError(this.handleError<AccountResponse | null>('getAccount', null))
+      );
   }
 
   /**
    * Logout the current user (self-service)
    */
   logout(): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/auth/logout`, {}).pipe(
-      timeout(this.timeout),
-      catchError(this.handleError<void>('logout', undefined))
-    );
+    return this.http
+      .post<void>(`${this.baseUrl}/auth/logout`, {})
+      .pipe(timeout(this.timeout), catchError(this.handleError<void>('logout', undefined)));
   }
 
   /**
@@ -414,9 +440,7 @@ export class DoorwayAdminService {
    * Used to surface the "Manage from your steward" redirect.
    */
   async getPortalHostUrl(): Promise<PortalHostResponse> {
-    return firstValueFrom(
-      this.http.get<PortalHostResponse>(`${this.baseUrl}/auth/portal-host`)
-    );
+    return firstValueFrom(this.http.get<PortalHostResponse>(`${this.baseUrl}/auth/portal-host`));
   }
 
   /**
@@ -454,13 +478,15 @@ export class DoorwayAdminService {
     return this.http.get<UsersResponse>(url).pipe(
       timeout(this.timeout),
       retry(1),
-      catchError(this.handleError<UsersResponse>('listUsers', {
-        users: [],
-        total: 0,
-        page: 1,
-        limit: 20,
-        totalPages: 0,
-      }))
+      catchError(
+        this.handleError<UsersResponse>('listUsers', {
+          users: [],
+          total: 0,
+          page: 1,
+          limit: 20,
+          totalPages: 0,
+        })
+      )
     );
   }
 
@@ -468,101 +494,83 @@ export class DoorwayAdminService {
    * Get user details by ID
    */
   getUser(userId: string): Observable<UserDetails | null> {
-    return this.http.get<UserDetails>(`${this.baseUrl}/admin/users/${userId}`).pipe(
-      timeout(this.timeout),
-      retry(1),
-      catchError(this.handleError<UserDetails | null>('getUser', null))
-    );
+    return this.http
+      .get<UserDetails>(`${this.baseUrl}/admin/users/${userId}`)
+      .pipe(
+        timeout(this.timeout),
+        retry(1),
+        catchError(this.handleError<UserDetails | null>('getUser', null))
+      );
   }
 
   /**
    * Update user active status
    */
   updateUserStatus(userId: string, isActive: boolean): Observable<UserMutationResponse> {
-    return this.http.put<UserMutationResponse>(
-      `${this.baseUrl}/admin/users/${userId}/status`,
-      { isActive }
-    ).pipe(
-      timeout(this.timeout),
-      catchError(this.handleMutationError('updateUserStatus'))
-    );
+    return this.http
+      .put<UserMutationResponse>(`${this.baseUrl}/admin/users/${userId}/status`, { isActive })
+      .pipe(timeout(this.timeout), catchError(this.handleMutationError('updateUserStatus')));
   }
 
   /**
    * Force logout user (invalidate all tokens)
    */
   forceLogout(userId: string): Observable<UserMutationResponse> {
-    return this.http.post<UserMutationResponse>(
-      `${this.baseUrl}/admin/users/${userId}/force-logout`,
-      {}
-    ).pipe(
-      timeout(this.timeout),
-      catchError(this.handleMutationError('forceLogout'))
-    );
+    return this.http
+      .post<UserMutationResponse>(`${this.baseUrl}/admin/users/${userId}/force-logout`, {})
+      .pipe(timeout(this.timeout), catchError(this.handleMutationError('forceLogout')));
   }
 
   /**
    * Soft delete user
    */
   deleteUser(userId: string): Observable<UserMutationResponse> {
-    return this.http.delete<UserMutationResponse>(
-      `${this.baseUrl}/admin/users/${userId}`
-    ).pipe(
-      timeout(this.timeout),
-      catchError(this.handleMutationError('deleteUser'))
-    );
+    return this.http
+      .delete<UserMutationResponse>(`${this.baseUrl}/admin/users/${userId}`)
+      .pipe(timeout(this.timeout), catchError(this.handleMutationError('deleteUser')));
   }
 
   /**
    * Reset user password
    */
   resetPassword(userId: string, newPassword: string): Observable<UserMutationResponse> {
-    return this.http.post<UserMutationResponse>(
-      `${this.baseUrl}/admin/users/${userId}/reset-password`,
-      { newPassword }
-    ).pipe(
-      timeout(this.timeout),
-      catchError(this.handleMutationError('resetPassword'))
-    );
+    return this.http
+      .post<UserMutationResponse>(`${this.baseUrl}/admin/users/${userId}/reset-password`, {
+        newPassword,
+      })
+      .pipe(timeout(this.timeout), catchError(this.handleMutationError('resetPassword')));
   }
 
   /**
    * Update user permission level
    */
-  updatePermission(userId: string, permissionLevel: UserPermissionLevel): Observable<UserMutationResponse> {
-    return this.http.put<UserMutationResponse>(
-      `${this.baseUrl}/admin/users/${userId}/permission`,
-      { permissionLevel }
-    ).pipe(
-      timeout(this.timeout),
-      catchError(this.handleMutationError('updatePermission'))
-    );
+  updatePermission(
+    userId: string,
+    permissionLevel: UserPermissionLevel
+  ): Observable<UserMutationResponse> {
+    return this.http
+      .put<UserMutationResponse>(`${this.baseUrl}/admin/users/${userId}/permission`, {
+        permissionLevel,
+      })
+      .pipe(timeout(this.timeout), catchError(this.handleMutationError('updatePermission')));
   }
 
   /**
    * Update user quota limits
    */
   updateQuota(userId: string, quota: UpdateQuotaRequest): Observable<UserMutationResponse> {
-    return this.http.put<UserMutationResponse>(
-      `${this.baseUrl}/admin/users/${userId}/quota`,
-      quota
-    ).pipe(
-      timeout(this.timeout),
-      catchError(this.handleMutationError('updateQuota'))
-    );
+    return this.http
+      .put<UserMutationResponse>(`${this.baseUrl}/admin/users/${userId}/quota`, quota)
+      .pipe(timeout(this.timeout), catchError(this.handleMutationError('updateQuota')));
   }
 
   /**
    * Reset user usage counters
    */
   resetUsage(userId: string): Observable<UserMutationResponse> {
-    return this.http.post<UserMutationResponse>(
-      `${this.baseUrl}/admin/users/${userId}/usage/reset`,
-      {}
-    ).pipe(
-      timeout(this.timeout),
-      catchError(this.handleMutationError('resetUsage'))
-    );
+    return this.http
+      .post<UserMutationResponse>(`${this.baseUrl}/admin/users/${userId}/usage/reset`, {})
+      .pipe(timeout(this.timeout), catchError(this.handleMutationError('resetUsage')));
   }
 
   // ============================================================================
@@ -581,9 +589,7 @@ export class DoorwayAdminService {
 
     // Determine WebSocket URL
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = this.baseUrl
-      ? new URL(this.baseUrl).host
-      : window.location.host;
+    const host = this.baseUrl ? new URL(this.baseUrl).host : window.location.host;
     const wsUrl = `${wsProtocol}//${host}/admin/ws`;
 
     this.ws$ = webSocket<DashboardMessage | ClientMessage>({
@@ -603,13 +609,13 @@ export class DoorwayAdminService {
 
     // Subscribe to messages
     this.ws$.subscribe({
-      next: (msg) => {
+      next: msg => {
         if (this.isDashboardMessage(msg)) {
           this.handleMessage(msg);
           this.wsMessages$.next(msg);
         }
       },
-      error: (err) => {
+      error: err => {
         console.error('[DoorwayAdmin] WebSocket error:', err);
         this._connectionState.set('error');
         this.ws$ = null;

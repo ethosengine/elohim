@@ -210,7 +210,9 @@ describe('SpatialMapComponent', () => {
 
   it('toggleDashboardMode calls clearDashboardLayers and loadPlaces when turning off', () => {
     component.dashboardMode.set(true);
-    const clearSpy = vi.spyOn(component as any, 'clearDashboardLayers').mockImplementation(() => {});
+    const clearSpy = vi
+      .spyOn(component as any, 'clearDashboardLayers')
+      .mockImplementation(() => {});
     const loadSpy = vi.spyOn(component as any, 'loadPlaces').mockImplementation(() => {});
     component.toggleDashboardMode();
     expect(component.dashboardMode()).toBe(false);
@@ -253,7 +255,9 @@ describe('SpatialMapComponent', () => {
     component.selectedLayer.set('bioregional');
     vi.spyOn(component as any, 'addDashboardLayers').mockImplementation(() => {});
     component.loadDashboard();
-    expect(dashboardApiMock.getDashboard).toHaveBeenCalledWith({ constitutionalLayer: 'bioregional' });
+    expect(dashboardApiMock.getDashboard).toHaveBeenCalledWith({
+      constitutionalLayer: 'bioregional',
+    });
   });
 
   it('loadDashboard passes undefined query when selectedLayer is empty', () => {

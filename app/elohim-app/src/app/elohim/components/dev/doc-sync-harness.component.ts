@@ -28,7 +28,8 @@ import { ContentDocSyncService, type ContentDocFields } from '@elohim/service';
     <section class="doc-sync-harness" data-testid="docsync-harness">
       <h1>Content doc-sync harness</h1>
       <p>
-        Content id: <code data-testid="docsync-content-id">{{ contentId || '(none)' }}</code>
+        Content id:
+        <code data-testid="docsync-content-id">{{ contentId || '(none)' }}</code>
       </p>
 
       <p>
@@ -52,7 +53,9 @@ import { ContentDocSyncService, type ContentDocFields } from '@elohim/service';
       </dl>
 
       <ng-template #pending>
-        <p data-testid="docsync-pending">No doc yet — pending convergence (node:{{ contentId }}).</p>
+        <p data-testid="docsync-pending">
+          No doc yet — pending convergence (node:{{ contentId }}).
+        </p>
       </ng-template>
     </section>
   `,

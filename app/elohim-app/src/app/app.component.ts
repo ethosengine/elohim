@@ -1,12 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  Component,
-  ElementRef,
-  OnInit,
-  OnDestroy,
-  inject,
-  effect,
-} from '@angular/core';
+import { Component, ElementRef, OnInit, OnDestroy, inject, effect } from '@angular/core';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 
 import { filter } from 'rxjs/operators';

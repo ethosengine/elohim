@@ -60,9 +60,7 @@ describe('PortalHostDiscoveryService — reachability projection', () => {
   });
 
   it('reachablePortalHost is null when the only host has never been reachable', () => {
-    accountSignal.set(
-      makeAccount({ portalHosts: [makePortalHost({ lastReachableAt: null })] }),
-    );
+    accountSignal.set(makeAccount({ portalHosts: [makePortalHost({ lastReachableAt: null })] }));
     expect(service.reachablePortalHost()).toBeNull();
   });
 
@@ -73,7 +71,7 @@ describe('PortalHostDiscoveryService — reachability projection', () => {
           makePortalHost({ hostUrl: 'https://a.example', lastReachableAt: null }),
           makePortalHost({ hostUrl: 'https://b.example', lastReachableAt: '2026-06-04T00:00:00Z' }),
         ],
-      }),
+      })
     );
     expect(service.reachablePortalHost()?.hostUrl).toBe('https://b.example');
   });
@@ -89,7 +87,7 @@ describe('PortalHostDiscoveryService — reachability projection', () => {
   it('shouldOfferStewardRedirect requires BOTH isSteward and a reachable host', () => {
     // steward but unreachable
     accountSignal.set(
-      makeAccount({ isSteward: true, portalHosts: [makePortalHost({ lastReachableAt: null })] }),
+      makeAccount({ isSteward: true, portalHosts: [makePortalHost({ lastReachableAt: null })] })
     );
     expect(service.shouldOfferStewardRedirect()).toBe(false);
 

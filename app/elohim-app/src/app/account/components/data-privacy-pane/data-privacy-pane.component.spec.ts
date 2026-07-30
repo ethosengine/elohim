@@ -17,7 +17,9 @@ describe('DataPrivacyPaneComponent', () => {
   it('should render pane title with data-testid', () => {
     const fixture = TestBed.createComponent(DataPrivacyPaneComponent);
     fixture.detectChanges();
-    const title = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="pane-title-data-privacy"]');
+    const title = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="pane-title-data-privacy"]'
+    );
     expect(title).toBeTruthy();
     expect(title?.textContent?.trim()).toBe('Data & privacy');
   });

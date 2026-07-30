@@ -247,7 +247,13 @@ body[data-theme='dark'] {
    ============================================================================ */
 
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   background: var(--dw-bg-primary);
   color: var(--dw-text-primary);
   margin: 0;

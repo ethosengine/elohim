@@ -9,13 +9,21 @@ import { adaptHubResponse, adaptPeersResponse } from './topology-graphql.adapter
 // ---------------------------------------------------------------------------
 
 function makeFreshnessGql(
-  state: 'LIVE' | 'STALE' | 'OFFLINE' | 'CACHED_OFFLINE_UNTIL_RECONNECT' | 'UNVERIFIABLE' | 'ALL_OFFLINE',
-  staleSinceMs: string | null = null,
+  state:
+    | 'LIVE'
+    | 'STALE'
+    | 'OFFLINE'
+    | 'CACHED_OFFLINE_UNTIL_RECONNECT'
+    | 'UNVERIFIABLE'
+    | 'ALL_OFFLINE',
+  staleSinceMs: string | null = null
 ) {
   return { state, staleSinceMs };
 }
 
-function makeHubResponse(overrides: Partial<ViewerHubResponse['viewer']['hub']> = {}): ViewerHubResponse {
+function makeHubResponse(
+  overrides: Partial<ViewerHubResponse['viewer']['hub']> = {}
+): ViewerHubResponse {
   return {
     viewer: {
       agentCid: 'agent_test',
@@ -35,7 +43,9 @@ function makeHubResponse(overrides: Partial<ViewerHubResponse['viewer']['hub']> 
   };
 }
 
-function makePeersResponse(overrides: Partial<ViewerPeersResponse['viewer']['peers']> = {}): ViewerPeersResponse {
+function makePeersResponse(
+  overrides: Partial<ViewerPeersResponse['viewer']['peers']> = {}
+): ViewerPeersResponse {
   return {
     viewer: {
       agentCid: 'agent_test',
@@ -67,13 +77,17 @@ describe('adaptHubResponse', () => {
   });
 
   it('lowercases STALE freshness state', () => {
-    const view = adaptHubResponse(makeHubResponse({ freshness: makeFreshnessGql('STALE', '1234567890') }));
+    const view = adaptHubResponse(
+      makeHubResponse({ freshness: makeFreshnessGql('STALE', '1234567890') })
+    );
     expect(view.freshness.state).toBe('stale');
     expect(view.freshness.staleSinceMs).toBe(1234567890);
   });
 
   it('lowercases CACHED_OFFLINE_UNTIL_RECONNECT freshness state', () => {
-    const view = adaptHubResponse(makeHubResponse({ freshness: makeFreshnessGql('CACHED_OFFLINE_UNTIL_RECONNECT') }));
+    const view = adaptHubResponse(
+      makeHubResponse({ freshness: makeFreshnessGql('CACHED_OFFLINE_UNTIL_RECONNECT') })
+    );
     expect(view.freshness.state).toBe('cached_offline_until_reconnect');
   });
 
@@ -86,23 +100,27 @@ describe('adaptHubResponse', () => {
   });
 
   it('converts device byte fields from nullable string to optional number', () => {
-    const view = adaptHubResponse(makeHubResponse({
-      devices: [{
-        peerId: 'peer_1',
-        archetype: 'NODE',
-        displayName: null,
-        online: true,
-        freshness: makeFreshnessGql('LIVE'),
-        storageUsedBytes: '512000',
-        storageTotalBytes: '1024000',
-        memoryUsedBytes: null,
-        memoryTotalBytes: null,
-        hostingCount: 5,
-        projectingCount: null,
-        beaconAgeMs: '250',
-        compute: null,
-      }],
-    }));
+    const view = adaptHubResponse(
+      makeHubResponse({
+        devices: [
+          {
+            peerId: 'peer_1',
+            archetype: 'NODE',
+            displayName: null,
+            online: true,
+            freshness: makeFreshnessGql('LIVE'),
+            storageUsedBytes: '512000',
+            storageTotalBytes: '1024000',
+            memoryUsedBytes: null,
+            memoryTotalBytes: null,
+            hostingCount: 5,
+            projectingCount: null,
+            beaconAgeMs: '250',
+            compute: null,
+          },
+        ],
+      })
+    );
     const device = view.devices[0];
     expect(device.storageUsedBytes).toBe(512000);
     expect(device.storageTotalBytes).toBe(1024000);
@@ -114,65 +132,77 @@ describe('adaptHubResponse', () => {
   });
 
   it('lowercases device archetype', () => {
-    const view = adaptHubResponse(makeHubResponse({
-      devices: [{
-        peerId: 'peer_1',
-        archetype: 'DESKTOP',
-        displayName: 'My Laptop',
-        online: false,
-        freshness: makeFreshnessGql('OFFLINE'),
-        storageUsedBytes: null,
-        storageTotalBytes: null,
-        memoryUsedBytes: null,
-        memoryTotalBytes: null,
-        hostingCount: null,
-        projectingCount: null,
-        beaconAgeMs: null,
-        compute: null,
-      }],
-    }));
+    const view = adaptHubResponse(
+      makeHubResponse({
+        devices: [
+          {
+            peerId: 'peer_1',
+            archetype: 'DESKTOP',
+            displayName: 'My Laptop',
+            online: false,
+            freshness: makeFreshnessGql('OFFLINE'),
+            storageUsedBytes: null,
+            storageTotalBytes: null,
+            memoryUsedBytes: null,
+            memoryTotalBytes: null,
+            hostingCount: null,
+            projectingCount: null,
+            beaconAgeMs: null,
+            compute: null,
+          },
+        ],
+      })
+    );
     expect(view.devices[0].archetype).toBe('desktop');
   });
 
   it('sets displayName when non-null', () => {
-    const view = adaptHubResponse(makeHubResponse({
-      devices: [{
-        peerId: 'peer_1',
-        archetype: 'MOBILE',
-        displayName: 'Phone',
-        online: true,
-        freshness: makeFreshnessGql('LIVE'),
-        storageUsedBytes: null,
-        storageTotalBytes: null,
-        memoryUsedBytes: null,
-        memoryTotalBytes: null,
-        hostingCount: null,
-        projectingCount: null,
-        beaconAgeMs: null,
-        compute: null,
-      }],
-    }));
+    const view = adaptHubResponse(
+      makeHubResponse({
+        devices: [
+          {
+            peerId: 'peer_1',
+            archetype: 'MOBILE',
+            displayName: 'Phone',
+            online: true,
+            freshness: makeFreshnessGql('LIVE'),
+            storageUsedBytes: null,
+            storageTotalBytes: null,
+            memoryUsedBytes: null,
+            memoryTotalBytes: null,
+            hostingCount: null,
+            projectingCount: null,
+            beaconAgeMs: null,
+            compute: null,
+          },
+        ],
+      })
+    );
     expect(view.devices[0].displayName).toBe('Phone');
   });
 
   it('omits displayName when null', () => {
-    const view = adaptHubResponse(makeHubResponse({
-      devices: [{
-        peerId: 'peer_1',
-        archetype: 'NODE',
-        displayName: null,
-        online: true,
-        freshness: makeFreshnessGql('LIVE'),
-        storageUsedBytes: null,
-        storageTotalBytes: null,
-        memoryUsedBytes: null,
-        memoryTotalBytes: null,
-        hostingCount: null,
-        projectingCount: null,
-        beaconAgeMs: null,
-        compute: null,
-      }],
-    }));
+    const view = adaptHubResponse(
+      makeHubResponse({
+        devices: [
+          {
+            peerId: 'peer_1',
+            archetype: 'NODE',
+            displayName: null,
+            online: true,
+            freshness: makeFreshnessGql('LIVE'),
+            storageUsedBytes: null,
+            storageTotalBytes: null,
+            memoryUsedBytes: null,
+            memoryTotalBytes: null,
+            hostingCount: null,
+            projectingCount: null,
+            beaconAgeMs: null,
+            compute: null,
+          },
+        ],
+      })
+    );
     expect('displayName' in view.devices[0]).toBe(false);
   });
 
@@ -181,44 +211,52 @@ describe('adaptHubResponse', () => {
     // MyClusterView['devices'][number].compute is `ComputeTriptych` with
     // number-typed bytes. The adapter converts gql string bytes via Number()
     // following the same precision trade-off as the storage/memory counters.
-    const view = adaptHubResponse(makeHubResponse({
-      devices: [{
-        peerId: 'peer_M',
-        archetype: 'DESKTOP',
-        displayName: 'laptop',
-        online: true,
-        freshness: makeFreshnessGql('LIVE'),
-        storageUsedBytes: '500000',
-        storageTotalBytes: '10000000',
-        memoryUsedBytes: null,
-        memoryTotalBytes: null,
-        hostingCount: null,
-        projectingCount: null,
-        beaconAgeMs: null,
-        compute: { free: '9500000', used: '500000', stewarded: '250000' },
-      }],
-    }));
+    const view = adaptHubResponse(
+      makeHubResponse({
+        devices: [
+          {
+            peerId: 'peer_M',
+            archetype: 'DESKTOP',
+            displayName: 'laptop',
+            online: true,
+            freshness: makeFreshnessGql('LIVE'),
+            storageUsedBytes: '500000',
+            storageTotalBytes: '10000000',
+            memoryUsedBytes: null,
+            memoryTotalBytes: null,
+            hostingCount: null,
+            projectingCount: null,
+            beaconAgeMs: null,
+            compute: { free: '9500000', used: '500000', stewarded: '250000' },
+          },
+        ],
+      })
+    );
     expect(view.devices[0].compute).toEqual({ free: 9500000, used: 500000, stewarded: 250000 });
   });
 
   it('omits compute when GraphQL compute is null', () => {
-    const view = adaptHubResponse(makeHubResponse({
-      devices: [{
-        peerId: 'peer_M',
-        archetype: 'NODE',
-        displayName: null,
-        online: true,
-        freshness: makeFreshnessGql('LIVE'),
-        storageUsedBytes: null,
-        storageTotalBytes: null,
-        memoryUsedBytes: null,
-        memoryTotalBytes: null,
-        hostingCount: null,
-        projectingCount: null,
-        beaconAgeMs: null,
-        compute: null,
-      }],
-    }));
+    const view = adaptHubResponse(
+      makeHubResponse({
+        devices: [
+          {
+            peerId: 'peer_M',
+            archetype: 'NODE',
+            displayName: null,
+            online: true,
+            freshness: makeFreshnessGql('LIVE'),
+            storageUsedBytes: null,
+            storageTotalBytes: null,
+            memoryUsedBytes: null,
+            memoryTotalBytes: null,
+            hostingCount: null,
+            projectingCount: null,
+            beaconAgeMs: null,
+            compute: null,
+          },
+        ],
+      })
+    );
     expect('compute' in view.devices[0]).toBe(false);
   });
 
@@ -228,7 +266,9 @@ describe('adaptHubResponse', () => {
   });
 
   it('returns staleSinceMs as number when present', () => {
-    const view = adaptHubResponse(makeHubResponse({ freshness: makeFreshnessGql('STALE', '9999') }));
+    const view = adaptHubResponse(
+      makeHubResponse({ freshness: makeFreshnessGql('STALE', '9999') })
+    );
     expect(view.freshness.staleSinceMs).toBe(9999);
   });
 });
@@ -244,7 +284,9 @@ describe('adaptPeersResponse', () => {
   });
 
   it('lowercases freshness state', () => {
-    const view = adaptPeersResponse(makePeersResponse({ freshness: makeFreshnessGql('ALL_OFFLINE') }));
+    const view = adaptPeersResponse(
+      makePeersResponse({ freshness: makeFreshnessGql('ALL_OFFLINE') })
+    );
     expect(view.freshness.state).toBe('all_offline');
   });
 
@@ -254,26 +296,32 @@ describe('adaptPeersResponse', () => {
   });
 
   it('maps resilienceCliffs correctly', () => {
-    const view = adaptPeersResponse(makePeersResponse({
-      resilienceCliffs: [{ householdId: 'hh_adam', soleReplicaCidCount: 12 }],
-    }));
+    const view = adaptPeersResponse(
+      makePeersResponse({
+        resilienceCliffs: [{ householdId: 'hh_adam', soleReplicaCidCount: 12 }],
+      })
+    );
     expect(view.resilienceCliffs).toEqual([{ householdId: 'hh_adam', soleReplicaCidCount: 12 }]);
   });
 
   it('converts edge lastSyncSec from nullable string to optional number', () => {
-    const view = adaptPeersResponse(makePeersResponse({
-      edges: [{
-        householdId: 'hh_1',
-        displayName: null,
-        online: true,
-        lastSyncSec: '42',
-        myCidsHostedByThem: 7,
-        theirCidsHostedByMe: 3,
-        netDiff: '-4',
-        isCriticalForMe: false,
-        iAmCriticalForThem: null,
-      }],
-    }));
+    const view = adaptPeersResponse(
+      makePeersResponse({
+        edges: [
+          {
+            householdId: 'hh_1',
+            displayName: null,
+            online: true,
+            lastSyncSec: '42',
+            myCidsHostedByThem: 7,
+            theirCidsHostedByMe: 3,
+            netDiff: '-4',
+            isCriticalForMe: false,
+            iAmCriticalForThem: null,
+          },
+        ],
+      })
+    );
     const edge = view.edges[0];
     expect(edge.lastSyncSec).toBe(42);
     expect(edge.netDiff).toBe(-4);
@@ -282,37 +330,45 @@ describe('adaptPeersResponse', () => {
   });
 
   it('omits edge lastSyncSec when null', () => {
-    const view = adaptPeersResponse(makePeersResponse({
-      edges: [{
-        householdId: 'hh_1',
-        displayName: null,
-        online: false,
-        lastSyncSec: null,
-        myCidsHostedByThem: 0,
-        theirCidsHostedByMe: 0,
-        netDiff: null,
-        isCriticalForMe: null,
-        iAmCriticalForThem: null,
-      }],
-    }));
+    const view = adaptPeersResponse(
+      makePeersResponse({
+        edges: [
+          {
+            householdId: 'hh_1',
+            displayName: null,
+            online: false,
+            lastSyncSec: null,
+            myCidsHostedByThem: 0,
+            theirCidsHostedByMe: 0,
+            netDiff: null,
+            isCriticalForMe: null,
+            iAmCriticalForThem: null,
+          },
+        ],
+      })
+    );
     expect('lastSyncSec' in view.edges[0]).toBe(false);
     expect('netDiff' in view.edges[0]).toBe(false);
   });
 
   it('sets edge displayName when non-null', () => {
-    const view = adaptPeersResponse(makePeersResponse({
-      edges: [{
-        householdId: 'hh_1',
-        displayName: 'Adam household',
-        online: true,
-        lastSyncSec: null,
-        myCidsHostedByThem: 1,
-        theirCidsHostedByMe: 1,
-        netDiff: null,
-        isCriticalForMe: null,
-        iAmCriticalForThem: null,
-      }],
-    }));
+    const view = adaptPeersResponse(
+      makePeersResponse({
+        edges: [
+          {
+            householdId: 'hh_1',
+            displayName: 'Adam household',
+            online: true,
+            lastSyncSec: null,
+            myCidsHostedByThem: 1,
+            theirCidsHostedByMe: 1,
+            netDiff: null,
+            isCriticalForMe: null,
+            iAmCriticalForThem: null,
+          },
+        ],
+      })
+    );
     expect(view.edges[0].displayName).toBe('Adam household');
   });
 });

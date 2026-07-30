@@ -154,8 +154,11 @@ describe('LoginComponent (Lit wrapper)', () => {
   it('advances to login step and stores identifier on resolved event', () => {
     component.onResolved(
       new CustomEvent('resolved', {
-        detail: { identifier: 'matthew@alpha.elohim.host', doorwayUrl: 'https://alpha.elohim.host' },
-      }),
+        detail: {
+          identifier: 'matthew@alpha.elohim.host',
+          doorwayUrl: 'https://alpha.elohim.host',
+        },
+      })
     );
 
     expect(component.step).toBe('login');
@@ -165,12 +168,15 @@ describe('LoginComponent (Lit wrapper)', () => {
   it('calls selectDoorwayByUrl with the resolved doorway URL', () => {
     component.onResolved(
       new CustomEvent('resolved', {
-        detail: { identifier: 'matthew@alpha.elohim.host', doorwayUrl: 'https://alpha.elohim.host' },
-      }),
+        detail: {
+          identifier: 'matthew@alpha.elohim.host',
+          doorwayUrl: 'https://alpha.elohim.host',
+        },
+      })
     );
 
     expect(mockDoorwayRegistry.selectDoorwayByUrl).toHaveBeenCalledWith(
-      'https://alpha.elohim.host',
+      'https://alpha.elohim.host'
     );
   });
 
@@ -179,8 +185,11 @@ describe('LoginComponent (Lit wrapper)', () => {
 
     component.onResolved(
       new CustomEvent('resolved', {
-        detail: { identifier: 'matthew@alpha.elohim.host', doorwayUrl: 'https://alpha.elohim.host' },
-      }),
+        detail: {
+          identifier: 'matthew@alpha.elohim.host',
+          doorwayUrl: 'https://alpha.elohim.host',
+        },
+      })
     );
 
     expect(component.errorMessage).toBe('');
@@ -192,16 +201,14 @@ describe('LoginComponent (Lit wrapper)', () => {
 
   it('sets errorMessage on resolve-error event', () => {
     component.onResolveError(
-      new CustomEvent('resolve-error', { detail: { reason: 'unknown-host' } }),
+      new CustomEvent('resolve-error', { detail: { reason: 'unknown-host' } })
     );
 
     expect(component.errorMessage).toContain('unknown-host');
   });
 
   it('does not advance step on resolve error', () => {
-    component.onResolveError(
-      new CustomEvent('resolve-error', { detail: { reason: 'timeout' } }),
-    );
+    component.onResolveError(new CustomEvent('resolve-error', { detail: { reason: 'timeout' } }));
 
     expect(component.step).toBe('resolve');
   });
@@ -216,7 +223,7 @@ describe('LoginComponent (Lit wrapper)', () => {
     await component.onPasswordSubmit(
       new CustomEvent('password-submit', {
         detail: { identifier: 'matthew@alpha.elohim.host', password: 'hunter2', remember: false },
-      }),
+      })
     );
 
     expect(mockAuthService.login).toHaveBeenCalledWith('password', {
@@ -235,7 +242,7 @@ describe('LoginComponent (Lit wrapper)', () => {
     await newFixture.componentInstance.onPasswordSubmit(
       new CustomEvent('password-submit', {
         detail: { identifier: 'matthew@alpha.elohim.host', password: 'pw', remember: false },
-      }),
+      })
     );
 
     expect(router.navigate).toHaveBeenCalledWith(['/dashboard']);
@@ -248,7 +255,7 @@ describe('LoginComponent (Lit wrapper)', () => {
     await component.onPasswordSubmit(
       new CustomEvent('password-submit', {
         detail: { identifier: 'matthew@alpha.elohim.host', password: 'pw', remember: true },
-      }),
+      })
     );
 
     expect(setItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY, 'matthew@alpha.elohim.host');
@@ -261,7 +268,7 @@ describe('LoginComponent (Lit wrapper)', () => {
     await component.onPasswordSubmit(
       new CustomEvent('password-submit', {
         detail: { identifier: 'matthew@alpha.elohim.host', password: 'pw', remember: false },
-      }),
+      })
     );
 
     expect(removeItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY);
@@ -274,7 +281,7 @@ describe('LoginComponent (Lit wrapper)', () => {
     await component.onPasswordSubmit(
       new CustomEvent('password-submit', {
         detail: { identifier: 'matthew@alpha.elohim.host', password: 'wrong', remember: false },
-      }),
+      })
     );
 
     expect(component.errorMessage).toContain('bad credentials');
@@ -287,7 +294,7 @@ describe('LoginComponent (Lit wrapper)', () => {
     await component.onPasswordSubmit(
       new CustomEvent('password-submit', {
         detail: { identifier: 'matthew@alpha.elohim.host', password: 'pw', remember: false },
-      }),
+      })
     );
 
     expect(component.errorMessage).toContain('network error');
@@ -301,13 +308,13 @@ describe('LoginComponent (Lit wrapper)', () => {
     component.identifier = 'matthew@alpha.elohim.host';
     // Provide doorwayUrl via the registry so the handler can resolve it
     (mockDoorwayRegistry.selectedUrl as ReturnType<typeof signal<string | null>>) = signal(
-      'https://alpha.elohim.host',
+      'https://alpha.elohim.host'
     );
 
     await component.onOAuthStart(
       new CustomEvent('oauth-start', {
         detail: { providerId: 'github', doorwayUrl: 'https://alpha.elohim.host' },
-      }),
+      })
     );
 
     expect(mockOAuthProvider.initiateLogin).toHaveBeenCalled();
@@ -317,7 +324,7 @@ describe('LoginComponent (Lit wrapper)', () => {
     await component.onOAuthStart(
       new CustomEvent('oauth-start', {
         detail: { providerId: 'github', doorwayUrl: 'https://alpha.elohim.host' },
-      }),
+      })
     );
 
     expect(mockOAuthProvider.storeReturnUrl).toHaveBeenCalled();
@@ -328,7 +335,7 @@ describe('LoginComponent (Lit wrapper)', () => {
     (mockDoorwayRegistry.selectedUrl as ReturnType<typeof signal<string | null>>) = signal(null);
 
     await component.onOAuthStart(
-      new CustomEvent('oauth-start', { detail: { providerId: 'github' } }),
+      new CustomEvent('oauth-start', { detail: { providerId: 'github' } })
     );
 
     expect(component.errorMessage).toBeTruthy();

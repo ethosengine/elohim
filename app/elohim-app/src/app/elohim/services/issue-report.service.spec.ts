@@ -76,7 +76,7 @@ describe('IssueReportService', () => {
         contentType: 'issue-report',
         title: expect.stringContaining('Something broke'),
         description: 'Something broke',
-      }),
+      })
     );
   });
 
@@ -128,7 +128,7 @@ describe('IssueReportService', () => {
     service.listReports().subscribe();
 
     expect(storageApiSpy.getContents).toHaveBeenCalledWith(
-      expect.objectContaining({ contentType: 'issue-report' }),
+      expect.objectContaining({ contentType: 'issue-report' })
     );
   });
 

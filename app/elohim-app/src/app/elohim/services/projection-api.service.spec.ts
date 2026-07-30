@@ -93,13 +93,17 @@ describe('ProjectionAPIService', () => {
         authorId: data['authorId'] ?? data['author'],
         reach: data['reach'] ?? 'commons',
         trustScore: data['trustScore'],
-        thumbnailUrl: data['thumbnailUrl'] ? `https://blob.example.com/${data['thumbnailUrl']}` : undefined,
+        thumbnailUrl: data['thumbnailUrl']
+          ? `https://blob.example.com/${data['thumbnailUrl']}`
+          : undefined,
         createdAt: data['createdAt'],
         updatedAt: data['updatedAt'],
       })),
-      resolveBlobReference: vi.fn().mockImplementation(
-        (value: string | null | undefined) => value ? `https://blob.example.com/${value}` : undefined
-      ),
+      resolveBlobReference: vi
+        .fn()
+        .mockImplementation((value: string | null | undefined) =>
+          value ? `https://blob.example.com/${value}` : undefined
+        ),
     };
 
     TestBed.configureTestingModule({

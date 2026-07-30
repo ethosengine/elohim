@@ -11,7 +11,11 @@ describe('parseWorkStoryMeta', () => {
   });
 
   it('preserves cadence when present', () => {
-    const cadence = { interval: 'weekly' as const, resetToStatus: 'todo' as const, nextOccurrence: '2026-03-22' };
+    const cadence = {
+      interval: 'weekly' as const,
+      resetToStatus: 'todo' as const,
+      nextOccurrence: '2026-03-22',
+    };
     const result = parseWorkStoryMeta({ cadence });
     expect(result.cadence?.interval).toBe('weekly');
   });
@@ -39,7 +43,10 @@ describe('parseWorkProjectMeta', () => {
   });
 
   it('overrides columns when provided', () => {
-    const custom = [{ id: 'open', name: 'Open' }, { id: 'closed', name: 'Closed', isTerminal: true }];
+    const custom = [
+      { id: 'open', name: 'Open' },
+      { id: 'closed', name: 'Closed', isTerminal: true },
+    ];
     const result = parseWorkProjectMeta({ columns: custom });
     expect(result.columns).toHaveLength(2);
     expect(result.columns[1].isTerminal).toBe(true);

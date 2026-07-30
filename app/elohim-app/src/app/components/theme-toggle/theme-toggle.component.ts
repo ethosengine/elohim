@@ -1,11 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  Component,
-  Input,
-  OnDestroy,
-  OnInit,
-  inject,
-} from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
 
 // @coverage: 84.2% (2026-02-24)
 

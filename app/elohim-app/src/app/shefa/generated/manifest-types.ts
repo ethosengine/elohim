@@ -49,9 +49,9 @@ export const SHEFA_OBSERVATION_KINDS: ObservationKindDeclaration[] = [
     kind: 'shefa:appreciation-emitted',
     namespace: 'elohim/observations/shefa',
     schema: {
-    recipient_cid: 'Cid',
-    magnitude: 'f32',
-    context_cid: 'Cid',
+      recipient_cid: 'Cid',
+      magnitude: 'f32',
+      context_cid: 'Cid',
     },
     retention_class: 'archival',
     reach: 'community',

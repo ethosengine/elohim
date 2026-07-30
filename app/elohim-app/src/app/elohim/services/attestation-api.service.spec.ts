@@ -71,7 +71,7 @@ describe('AttestationApiService', () => {
       const promise = service.issue(input);
 
       const req = httpMock.expectOne(
-        (r) => r.url === '/api/v1/attestations/unified' && r.method === 'POST',
+        r => r.url === '/api/v1/attestations/unified' && r.method === 'POST'
       );
       expect(req.request.body).toEqual(input);
       req.flush(mockAttestation);
@@ -87,12 +87,16 @@ describe('AttestationApiService', () => {
       const promise = service.revoke('bafkrei-test-attestation-cid', 'superseded');
 
       const req = httpMock.expectOne(
-        (r) =>
+        r =>
           r.url === '/api/v1/attestations/unified/bafkrei-test-attestation-cid/revoke' &&
-          r.method === 'POST',
+          r.method === 'POST'
       );
       expect(req.request.body).toEqual({ reason: 'superseded' });
-      req.flush({ ...mockAttestation, revocationReason: 'superseded', revokedAt: '2026-05-11T01:00:00Z' });
+      req.flush({
+        ...mockAttestation,
+        revocationReason: 'superseded',
+        revokedAt: '2026-05-11T01:00:00Z',
+      });
 
       const result = await promise;
       expect(result.revocationReason).toBe('superseded');
@@ -104,9 +108,9 @@ describe('AttestationApiService', () => {
       const promise = service.getById('bafkrei-test-attestation-cid');
 
       const req = httpMock.expectOne(
-        (r) =>
+        r =>
           r.url === '/api/v1/attestations/unified/bafkrei-test-attestation-cid' &&
-          r.method === 'GET',
+          r.method === 'GET'
       );
       req.flush(mockAttestation);
 
@@ -118,9 +122,7 @@ describe('AttestationApiService', () => {
     it('should return null on 404', async () => {
       const promise = service.getById('bafkrei-missing');
 
-      const req = httpMock.expectOne(
-        (r) => r.url === '/api/v1/attestations/unified/bafkrei-missing',
-      );
+      const req = httpMock.expectOne(r => r.url === '/api/v1/attestations/unified/bafkrei-missing');
       req.flush('Not found', { status: 404, statusText: 'Not Found' });
 
       const result = await promise;
@@ -133,10 +135,10 @@ describe('AttestationApiService', () => {
       const promise = service.listBySubject('bafkrei-subject-cid');
 
       const req = httpMock.expectOne(
-        (r) =>
+        r =>
           r.url === '/api/v1/attestations/unified' &&
           r.method === 'GET' &&
-          r.params.get('subjectCid') === 'bafkrei-subject-cid',
+          r.params.get('subjectCid') === 'bafkrei-subject-cid'
       );
       req.flush([mockAttestation]);
 
@@ -149,9 +151,9 @@ describe('AttestationApiService', () => {
       const promise = service.listBySubject('bafkrei-subject-cid', 'attestation:humanness');
 
       const req = httpMock.expectOne(
-        (r) =>
+        r =>
           r.url === '/api/v1/attestations/unified' &&
-          r.params.get('kind') === 'attestation%3Ahumanness',
+          r.params.get('kind') === 'attestation%3Ahumanness'
       );
       req.flush([mockAttestation]);
 
@@ -162,7 +164,7 @@ describe('AttestationApiService', () => {
     it('should return empty array on error', async () => {
       const promise = service.listBySubject('bafkrei-bad-cid');
 
-      const req = httpMock.expectOne((r) => r.url === '/api/v1/attestations/unified');
+      const req = httpMock.expectOne(r => r.url === '/api/v1/attestations/unified');
       req.flush('Server error', { status: 500, statusText: 'Internal Server Error' });
 
       const result = await promise;

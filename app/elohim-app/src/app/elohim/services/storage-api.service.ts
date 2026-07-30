@@ -706,12 +706,10 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
     metadata?: Record<string, unknown> | null;
     note?: string | null;
   }): Observable<EconomicEventView> {
-    return this.http
-      .post<EconomicEventView>(`${this.baseUrl}/api/v1/lamad/events`, intent)
-      .pipe(
-        timeout(this.defaultTimeoutMs),
-        catchError(error => this.handleError('emitLamadIntent', error))
-      );
+    return this.http.post<EconomicEventView>(`${this.baseUrl}/api/v1/lamad/events`, intent).pipe(
+      timeout(this.defaultTimeoutMs),
+      catchError(error => this.handleError('emitLamadIntent', error))
+    );
   }
 
   // ==========================================================================

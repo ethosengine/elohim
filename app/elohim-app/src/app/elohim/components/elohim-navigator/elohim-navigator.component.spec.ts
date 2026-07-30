@@ -200,7 +200,14 @@ describe('ElohimNavigatorComponent', () => {
 
   describe('EPR-aware navigation (cross-bundle rail)', () => {
     it('switchContext rides eprNav', () => {
-      component.switchContext({ id: 'lamad', name: 'Lamad', icon: '📚', route: '/lamad', tagline: '', available: true } as never);
+      component.switchContext({
+        id: 'lamad',
+        name: 'Lamad',
+        icon: '📚',
+        route: '/lamad',
+        tagline: '',
+        available: true,
+      } as never);
       expect(mockEprNav.navigate).toHaveBeenCalledWith('/lamad');
     });
 
@@ -211,7 +218,9 @@ describe('ElohimNavigatorComponent', () => {
 
     it('goToLogin carries the returnUrl', () => {
       component.goToLogin();
-      expect(mockEprNav.navigate).toHaveBeenCalledWith(expect.stringMatching(/^\/identity\/login\?returnUrl=/));
+      expect(mockEprNav.navigate).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/identity\/login\?returnUrl=/)
+      );
     });
 
     it('onLogout returns home via eprNav', async () => {

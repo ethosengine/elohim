@@ -7,9 +7,7 @@ import type { GateEvaluationView, TrustContextView } from '@elohim/storage-clien
 
 import { GateArtifactCardComponent } from './gate-artifact-card.component';
 
-function makeTrustContext(
-  overrides: Partial<TrustContextView> = {},
-): TrustContextView {
+function makeTrustContext(overrides: Partial<TrustContextView> = {}): TrustContextView {
   return {
     compositeTrust: 0.5,
     masteryDepth: 0.5,
@@ -23,9 +21,7 @@ function makeTrustContext(
   };
 }
 
-function makeEvaluation(
-  overrides: Partial<GateEvaluationView> = {},
-): GateEvaluationView {
+function makeEvaluation(overrides: Partial<GateEvaluationView> = {}): GateEvaluationView {
   return {
     tier: 'standard',
     trustContext: makeTrustContext(),
@@ -58,24 +54,20 @@ describe('GateArtifactCardComponent', () => {
   // --- DRAFT state ---
 
   it('should render textarea in draft state', () => {
-    const textarea = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-textarea"]',
-    );
+    const textarea = fixture.nativeElement.querySelector('[data-testid="artifact-textarea"]');
     expect(textarea).toBeTruthy();
     expect(textarea.tagName).toBe('TEXTAREA');
   });
 
   it('should render submit button in draft state', () => {
-    const btn = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-submit"]',
-    );
+    const btn = fixture.nativeElement.querySelector('[data-testid="artifact-submit"]');
     expect(btn).toBeTruthy();
     expect(btn.textContent.trim()).toContain('Submit');
   });
 
   it('should disable submit when textarea is empty', () => {
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-submit"]',
+      '[data-testid="artifact-submit"]'
     );
     expect(btn.disabled).toBe(true);
   });
@@ -96,9 +88,7 @@ describe('GateArtifactCardComponent', () => {
     component.onSubmit();
     fixture.detectChanges();
 
-    const preview = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-preview"]',
-    );
+    const preview = fixture.nativeElement.querySelector('[data-testid="artifact-preview"]');
     expect(preview).toBeTruthy();
     expect(preview.textContent.trim()).toBe('my artifact');
   });
@@ -111,9 +101,7 @@ describe('GateArtifactCardComponent', () => {
     component.interaction.handleGateEvaluation(makeEvaluation());
     fixture.detectChanges();
 
-    const badge = fixture.nativeElement.querySelector(
-      '[data-testid="reach-badge"]',
-    );
+    const badge = fixture.nativeElement.querySelector('[data-testid="reach-badge"]');
     expect(badge).toBeTruthy();
     expect(badge.textContent).toContain('Community');
   });
@@ -124,9 +112,7 @@ describe('GateArtifactCardComponent', () => {
     component.interaction.handleGateEvaluation(makeEvaluation());
     fixture.detectChanges();
 
-    const btn = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-affirm"]',
-    );
+    const btn = fixture.nativeElement.querySelector('[data-testid="artifact-affirm"]');
     expect(btn).toBeTruthy();
     expect(btn.textContent.trim()).toContain('Affirm');
   });
@@ -137,13 +123,11 @@ describe('GateArtifactCardComponent', () => {
     component.localText.set('text');
     component.onSubmit();
     component.interaction.handleGateEvaluation(
-      makeEvaluation({ pausePrompt: 'Consider your words', confirmToken: 'tok' }),
+      makeEvaluation({ pausePrompt: 'Consider your words', confirmToken: 'tok' })
     );
     fixture.detectChanges();
 
-    const prompt = fixture.nativeElement.querySelector(
-      '[data-testid="dialogue-prompt"]',
-    );
+    const prompt = fixture.nativeElement.querySelector('[data-testid="dialogue-prompt"]');
     expect(prompt).toBeTruthy();
     expect(prompt.textContent.trim()).toBe('Consider your words');
   });
@@ -152,13 +136,11 @@ describe('GateArtifactCardComponent', () => {
     component.localText.set('text');
     component.onSubmit();
     component.interaction.handleGateEvaluation(
-      makeEvaluation({ pausePrompt: 'Think again', confirmToken: 'tok' }),
+      makeEvaluation({ pausePrompt: 'Think again', confirmToken: 'tok' })
     );
     fixture.detectChanges();
 
-    const textarea = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-textarea"]',
-    );
+    const textarea = fixture.nativeElement.querySelector('[data-testid="artifact-textarea"]');
     expect(textarea).toBeTruthy();
     expect(textarea.tagName).toBe('TEXTAREA');
   });
@@ -172,13 +154,11 @@ describe('GateArtifactCardComponent', () => {
       makeEvaluation({
         settlementBoundary: 'constitutional-limit',
         appealPath: '/appeal/1',
-      }),
+      })
     );
     fixture.detectChanges();
 
-    const info = fixture.nativeElement.querySelector(
-      '[data-testid="settlement-info"]',
-    );
+    const info = fixture.nativeElement.querySelector('[data-testid="settlement-info"]');
     expect(info).toBeTruthy();
     expect(info.textContent).toContain('constitutional-limit');
   });
@@ -190,12 +170,12 @@ describe('GateArtifactCardComponent', () => {
       makeEvaluation({
         settlementBoundary: 'constitutional-limit',
         appealPath: '/appeal/1',
-      }),
+      })
     );
     fixture.detectChanges();
 
     const link: HTMLAnchorElement = fixture.nativeElement.querySelector(
-      '[data-testid="settlement-link"]',
+      '[data-testid="settlement-link"]'
     );
     expect(link).toBeTruthy();
     expect(link.getAttribute('href')).toBe('/appeal/1');
@@ -213,7 +193,7 @@ describe('GateArtifactCardComponent', () => {
     fixture.detectChanges();
 
     const affirmBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-affirm"]',
+      '[data-testid="artifact-affirm"]'
     );
     affirmBtn.click();
     fixture.detectChanges();
@@ -233,7 +213,7 @@ describe('GateArtifactCardComponent', () => {
       makeEvaluation({
         settlementBoundary: 'constitutional-limit',
         appealPath: '/appeal/1',
-      }),
+      })
     );
     fixture.detectChanges();
 
@@ -252,26 +232,20 @@ describe('GateArtifactCardComponent', () => {
     component.interaction.handleGateEvaluation(
       makeEvaluation({
         trustContext: makeTrustContext({ compositeTrust: 0.75 }),
-      }),
+      })
     );
     fixture.detectChanges();
 
     // Click affirm
     httpMock.post.mockReturnValue(of({}));
-    const affirmBtn = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-affirm"]',
-    );
+    const affirmBtn = fixture.nativeElement.querySelector('[data-testid="artifact-affirm"]');
     affirmBtn.click();
     fixture.detectChanges();
 
     // Verify posted state
-    const preview = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-preview"]',
-    );
+    const preview = fixture.nativeElement.querySelector('[data-testid="artifact-preview"]');
     expect(preview?.textContent).toContain('Posted text');
-    const badge = fixture.nativeElement.querySelector(
-      '[data-testid="reach-badge"]',
-    );
+    const badge = fixture.nativeElement.querySelector('[data-testid="reach-badge"]');
     expect(badge?.textContent).toContain('Network');
   });
 
@@ -291,7 +265,7 @@ describe('GateArtifactCardComponent', () => {
       'api text',
       'comment',
       { contentId: 'c-1' },
-      apiCall,
+      apiCall
     );
   });
 
@@ -304,11 +278,7 @@ describe('GateArtifactCardComponent', () => {
     component.localText.set('manual text');
     component.onSubmit();
 
-    expect(submitSpy).toHaveBeenCalledWith(
-      'manual text',
-      'comment',
-      { contentId: 'c-2' },
-    );
+    expect(submitSpy).toHaveBeenCalledWith('manual text', 'comment', { contentId: 'c-2' });
   });
 
   it('should not submit when text is empty', () => {

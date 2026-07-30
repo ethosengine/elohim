@@ -27,11 +27,7 @@ export class HttpErrorMapper {
   static mapError(error: HttpErrorResponse, operation: string): DoorwayError {
     // Timeout errors
     if (error.name === 'TimeoutError' || error.status === 408) {
-      return new TimeoutError(
-        `Operation '${operation}' timed out`,
-        30000,
-        error.error
-      );
+      return new TimeoutError(`Operation '${operation}' timed out`, 30000, error.error);
     }
 
     // Authentication/Authorization errors
@@ -57,21 +53,13 @@ export class HttpErrorMapper {
     // Validation errors
     if (error.status === 400 || error.status === 422) {
       const field = this.extractValidationField(error);
-      return new ValidationError(
-        error.error?.error ?? error.message,
-        field,
-        error.error
-      );
+      return new ValidationError(error.error?.error ?? error.message, field, error.error);
     }
 
     // Rate limiting
     if (error.status === 429) {
       const retryAfter = this.extractRetryAfter(error);
-      return new RateLimitError(
-        `Rate limit exceeded for '${operation}'`,
-        retryAfter,
-        error.error
-      );
+      return new RateLimitError(`Rate limit exceeded for '${operation}'`, retryAfter, error.error);
     }
 
     // Service unavailable (orchestrator disabled, etc.)
@@ -102,10 +90,7 @@ export class HttpErrorMapper {
     }
 
     // Unknown errors
-    return new UnknownError(
-      `Unexpected error in '${operation}': ${error.message}`,
-      error.error
-    );
+    return new UnknownError(`Unexpected error in '${operation}': ${error.message}`, error.error);
   }
 
   /**

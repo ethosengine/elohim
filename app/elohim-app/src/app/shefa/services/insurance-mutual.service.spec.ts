@@ -23,7 +23,10 @@ describe('InsuranceMutualService', () => {
     mockEconomic.getEventsByProvider.mockReturnValue(Promise.resolve([]));
 
     TestBed.configureTestingModule({
-      providers: [InsuranceMutualService, { provide: ECONOMIC_EVENT_FACTORY, useValue: mockEconomic }],
+      providers: [
+        InsuranceMutualService,
+        { provide: ECONOMIC_EVENT_FACTORY, useValue: mockEconomic },
+      ],
     });
     service = TestBed.inject(InsuranceMutualService);
   });

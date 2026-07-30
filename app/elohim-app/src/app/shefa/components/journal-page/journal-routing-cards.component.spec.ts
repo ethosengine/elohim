@@ -42,7 +42,10 @@ describe('JournalRoutingCardsComponent', () => {
     fixture = TestBed.createComponent(JournalRoutingCardsComponent);
     component = fixture.componentInstance;
     fixture.componentRef.setInput('suggestions', MOCK_SUGGESTIONS);
-    fixture.componentRef.setInput('journalText', 'First line title\nSecond line\nThird line\nFourth line hidden');
+    fixture.componentRef.setInput(
+      'journalText',
+      'First line title\nSecond line\nThird line\nFourth line hidden'
+    );
     fixture.detectChanges();
   });
 

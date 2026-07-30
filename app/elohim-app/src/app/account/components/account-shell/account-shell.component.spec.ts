@@ -15,10 +15,7 @@ describe('AccountShellComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [AccountShellComponent],
-      providers: [
-        provideRouter([]),
-        { provide: AccountService, useValue: mockAccountService },
-      ],
+      providers: [provideRouter([]), { provide: AccountService, useValue: mockAccountService }],
     }).compileComponents();
   });
 
@@ -30,7 +27,9 @@ describe('AccountShellComponent', () => {
   it('should render the pane nav with data-testid', () => {
     const fixture = TestBed.createComponent(AccountShellComponent);
     fixture.detectChanges();
-    const nav = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="account-pane-nav"]');
+    const nav = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="account-pane-nav"]'
+    );
     expect(nav).toBeTruthy();
   });
 

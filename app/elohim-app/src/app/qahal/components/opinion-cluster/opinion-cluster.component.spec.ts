@@ -56,7 +56,9 @@ describe('OpinionClusterComponent', () => {
       getSignals: vi.fn().mockResolvedValue([]),
       getStatements: vi.fn().mockResolvedValue([]),
       getStatementVotes: vi.fn().mockResolvedValue([]),
-      getClusters: vi.fn().mockResolvedValue({ clusters: [], totalParticipants: 0, bridgingStatements: [] }),
+      getClusters: vi
+        .fn()
+        .mockResolvedValue({ clusters: [], totalParticipants: 0, bridgingStatements: [] }),
     };
 
     await TestBed.configureTestingModule({

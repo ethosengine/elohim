@@ -94,7 +94,12 @@ import type { EprHead } from '../../models/epr-head.model';
       <a *ngIf="route" [routerLink]="route" class="epr-popover-link" data-testid="epr-popover-link">
         Open resource
       </a>
-      <a *ngIf="!route && href" [href]="href" class="epr-popover-link" data-testid="epr-popover-link">
+      <a
+        *ngIf="!route && href"
+        [href]="href"
+        class="epr-popover-link"
+        data-testid="epr-popover-link"
+      >
         Open resource
       </a>
     </div>

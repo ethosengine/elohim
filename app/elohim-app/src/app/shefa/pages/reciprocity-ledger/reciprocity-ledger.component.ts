@@ -21,21 +21,17 @@ import { ReciprocityService } from '../../services/reciprocity.service';
         <ul class="rows">
           @for (row of v.inflow; track row.counterpartyHouseholdId) {
             <li data-testid="reciprocity-inflow-row">
-              <strong data-testid="reciprocity-counterparty">{{
-                row.displayName ?? row.counterpartyHouseholdId
-              }}</strong>
+              <strong data-testid="reciprocity-counterparty">
+                {{ row.displayName ?? row.counterpartyHouseholdId }}
+              </strong>
               —
-              <span
-                data-testid="reciprocity-committed"
-                [attr.data-bytes]="row.committedBytes"
-                >{{ formatBytes(row.committedBytes) }}</span
-              >
+              <span data-testid="reciprocity-committed" [attr.data-bytes]="row.committedBytes">
+                {{ formatBytes(row.committedBytes) }}
+              </span>
               committed,
-              <span
-                data-testid="reciprocity-delivered"
-                [attr.data-bytes]="row.deliveredBytes"
-                >{{ formatBytes(row.deliveredBytes) }}</span
-              >
+              <span data-testid="reciprocity-delivered" [attr.data-bytes]="row.deliveredBytes">
+                {{ formatBytes(row.deliveredBytes) }}
+              </span>
               delivered
               <app-commitment-bar
                 [committedBytes]="row.committedBytes"
@@ -52,21 +48,17 @@ import { ReciprocityService } from '../../services/reciprocity.service';
         <ul class="rows">
           @for (row of v.outflow; track row.counterpartyHouseholdId) {
             <li data-testid="reciprocity-outflow-row">
-              <strong data-testid="reciprocity-counterparty">{{
-                row.displayName ?? row.counterpartyHouseholdId
-              }}</strong>
+              <strong data-testid="reciprocity-counterparty">
+                {{ row.displayName ?? row.counterpartyHouseholdId }}
+              </strong>
               —
-              <span
-                data-testid="reciprocity-committed"
-                [attr.data-bytes]="row.committedBytes"
-                >{{ formatBytes(row.committedBytes) }}</span
-              >
+              <span data-testid="reciprocity-committed" [attr.data-bytes]="row.committedBytes">
+                {{ formatBytes(row.committedBytes) }}
+              </span>
               committed,
-              <span
-                data-testid="reciprocity-delivered"
-                [attr.data-bytes]="row.deliveredBytes"
-                >{{ formatBytes(row.deliveredBytes) }}</span
-              >
+              <span data-testid="reciprocity-delivered" [attr.data-bytes]="row.deliveredBytes">
+                {{ formatBytes(row.deliveredBytes) }}
+              </span>
               hosting
               <app-commitment-bar
                 [committedBytes]="row.committedBytes"

@@ -175,7 +175,9 @@ input:focus {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-state p {
@@ -284,7 +286,9 @@ input:focus {
   padding: 0.625rem 1rem;
   border: 1px solid var(--dw-accent-border);
   border-radius: 0.5rem;
-  transition: background 0.2s, border-color 0.2s;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
 }
 
 .federated-link:hover {

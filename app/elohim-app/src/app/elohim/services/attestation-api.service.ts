@@ -65,9 +65,7 @@ export class AttestationApiService {
    * Issue a new attestation of any kind.
    */
   async issue(input: IssueAttestationInput): Promise<AttestationView> {
-    return firstValueFrom(
-      this.http.post<AttestationView>('/api/v1/attestations/unified', input)
-    );
+    return firstValueFrom(this.http.post<AttestationView>('/api/v1/attestations/unified', input));
   }
 
   /**

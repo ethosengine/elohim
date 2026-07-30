@@ -25,14 +25,14 @@ class MockEventSource {
 
   removeEventListener(type: string, listener: (event: MessageEvent) => void): void {
     if (this.listeners[type]) {
-      this.listeners[type] = this.listeners[type].filter((l) => l !== listener);
+      this.listeners[type] = this.listeners[type].filter(l => l !== listener);
     }
   }
 
   // Test helper: simulate an event
   emit(type: string, data: string): void {
     const event = new MessageEvent(type, { data });
-    this.listeners[type]?.forEach((l) => l(event));
+    this.listeners[type]?.forEach(l => l(event));
   }
 }
 
@@ -72,7 +72,7 @@ describe('EventStreamService', () => {
   it('should emit matching events via on()', () => {
     service.connect('/api/v1/events');
     const values: unknown[] = [];
-    service.on<{ id: string }>('content.created').subscribe((v) => values.push(v));
+    service.on<{ id: string }>('content.created').subscribe(v => values.push(v));
 
     MockEventSource.instances[0].emit('content.created', '{"id":"abc"}');
 
@@ -83,7 +83,7 @@ describe('EventStreamService', () => {
   it('should not emit events after disconnect', () => {
     service.connect('/api/v1/events');
     const values: unknown[] = [];
-    service.on('content.created').subscribe((v) => values.push(v));
+    service.on('content.created').subscribe(v => values.push(v));
     service.disconnect();
 
     // The subscription should complete on disconnect
@@ -95,8 +95,8 @@ describe('EventStreamService', () => {
     const created: unknown[] = [];
     const updated: unknown[] = [];
 
-    service.on('content.created').subscribe((v) => created.push(v));
-    service.on('content.updated').subscribe((v) => updated.push(v));
+    service.on('content.created').subscribe(v => created.push(v));
+    service.on('content.updated').subscribe(v => updated.push(v));
 
     MockEventSource.instances[0].emit('content.created', '{"id":"1"}');
     MockEventSource.instances[0].emit('content.updated', '{"id":"2"}');

@@ -7,14 +7,7 @@
  * recompute the profile from voting history.
  */
 
-import {
-  Component,
-  inject,
-  input,
-  OnInit,
-  signal,
-  computed,
-} from '@angular/core';
+import { Component, inject, input, OnInit, signal, computed } from '@angular/core';
 
 import { GovernanceApiService } from '@elohim/service';
 

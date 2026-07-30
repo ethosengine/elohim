@@ -16,9 +16,14 @@ describe('JournalConfirmComponent', () => {
     component = fixture.componentInstance;
   });
 
-  function setInputs(overrides: { text?: string; intentSummary?: string; analyzing?: boolean } = {}) {
+  function setInputs(
+    overrides: { text?: string; intentSummary?: string; analyzing?: boolean } = {}
+  ) {
     fixture.componentRef.setInput('text', overrides.text ?? 'My journal entry');
-    fixture.componentRef.setInput('intentSummary', overrides.intentSummary ?? 'You want to offer help');
+    fixture.componentRef.setInput(
+      'intentSummary',
+      overrides.intentSummary ?? 'You want to offer help'
+    );
     fixture.componentRef.setInput('analyzing', overrides.analyzing ?? false);
     fixture.detectChanges();
   }
@@ -54,7 +59,9 @@ describe('JournalConfirmComponent', () => {
     component.confirmed.subscribe(spy);
     setInputs();
 
-    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="confirm-btn"]');
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="confirm-btn"]'
+    );
     btn.click();
 
     expect(spy).toHaveBeenCalledOnce();
@@ -74,7 +81,9 @@ describe('JournalConfirmComponent', () => {
   it('should disable "Looks good" button when analyzing', () => {
     setInputs({ analyzing: true });
 
-    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="confirm-btn"]');
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="confirm-btn"]'
+    );
     expect(btn.disabled).toBe(true);
   });
 });

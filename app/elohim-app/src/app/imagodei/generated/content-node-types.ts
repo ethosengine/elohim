@@ -9,10 +9,14 @@ export type TypedIdentityNode =
   | (ContentView & { contentType: 'contributor'; metadata: PresenceMetadata })
   | (ContentView & { contentType: string; metadata: Record<string, unknown> });
 
-export function isHumanNode<T extends { contentType: string }>(node: T): node is T & { contentType: 'human'; metadata: HumanMetadata } {
+export function isHumanNode<T extends { contentType: string }>(
+  node: T
+): node is T & { contentType: 'human'; metadata: HumanMetadata } {
   return node.contentType === 'human';
 }
 
-export function isContributorNode<T extends { contentType: string }>(node: T): node is T & { contentType: 'contributor'; metadata: PresenceMetadata } {
+export function isContributorNode<T extends { contentType: string }>(
+  node: T
+): node is T & { contentType: 'contributor'; metadata: PresenceMetadata } {
   return node.contentType === 'contributor';
 }

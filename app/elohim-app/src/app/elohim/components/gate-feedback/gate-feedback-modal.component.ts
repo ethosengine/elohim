@@ -55,10 +55,7 @@ const PLACEHOLDER_MAP: Record<string, string> = {
       (click)="onDialogClick($event)"
       (close)="onDialogClose()"
     >
-      <div
-        class="modal-panel"
-        data-testid="feedback-modal-panel"
-      >
+      <div class="modal-panel" data-testid="feedback-modal-panel">
         <div class="modal-header">
           <h3 id="feedback-modal-heading" data-testid="feedback-modal-title">{{ title() }}</h3>
           <button

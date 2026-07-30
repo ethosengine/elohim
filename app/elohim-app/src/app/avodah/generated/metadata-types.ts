@@ -12,7 +12,12 @@ export interface WorkStoryMeta {
   attestationGates?: string[];
   /** Shefa ServiceRequest ID — set when published to exchange */
   exchangeRequestId?: string;
-  cadence?: { interval?: 'daily' | 'weekly' | 'monthly' | 'custom'; customIntervalDays?: number; resetToStatus?: 'backlog' | 'todo'; nextOccurrence?: string };
+  cadence?: {
+    interval?: 'daily' | 'weekly' | 'monthly' | 'custom';
+    customIntervalDays?: number;
+    resetToStatus?: 'backlog' | 'todo';
+    nextOccurrence?: string;
+  };
   [key: string]: unknown;
 }
 

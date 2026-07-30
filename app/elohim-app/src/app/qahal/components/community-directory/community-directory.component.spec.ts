@@ -165,9 +165,7 @@ describe('CommunityDirectoryComponent', () => {
       count: MOCK_PARTICIPANTS_HOUSEHOLD.length,
     });
 
-    const groupParticipantsReq = httpMock.expectOne(
-      '/api/v1/collectives/group-study/participants'
-    );
+    const groupParticipantsReq = httpMock.expectOne('/api/v1/collectives/group-study/participants');
     groupParticipantsReq.flush({
       items: MOCK_PARTICIPANTS_GROUP,
       count: MOCK_PARTICIPANTS_GROUP.length,

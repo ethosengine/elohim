@@ -111,7 +111,7 @@ describe('GovernanceActionApiService', () => {
       const promise = service.propose(input);
 
       const req = httpMock.expectOne(
-        (r) => r.url === '/api/v1/governance-actions' && r.method === 'POST',
+        r => r.url === '/api/v1/governance-actions' && r.method === 'POST'
       );
       expect(req.request.body).toEqual(input);
       req.flush(mockAction);
@@ -128,8 +128,7 @@ describe('GovernanceActionApiService', () => {
       const promise = service.getById('bafkrei-test-action-cid');
 
       const req = httpMock.expectOne(
-        (r) =>
-          r.url === '/api/v1/governance-actions/bafkrei-test-action-cid' && r.method === 'GET',
+        r => r.url === '/api/v1/governance-actions/bafkrei-test-action-cid' && r.method === 'GET'
       );
       req.flush(withChildren);
 
@@ -142,9 +141,7 @@ describe('GovernanceActionApiService', () => {
     it('should return null on 404', async () => {
       const promise = service.getById('bafkrei-missing');
 
-      const req = httpMock.expectOne(
-        (r) => r.url === '/api/v1/governance-actions/bafkrei-missing',
-      );
+      const req = httpMock.expectOne(r => r.url === '/api/v1/governance-actions/bafkrei-missing');
       req.flush('Not found', { status: 404, statusText: 'Not Found' });
 
       const result = await promise;
@@ -157,9 +154,8 @@ describe('GovernanceActionApiService', () => {
       const promise = service.getTally('bafkrei-test-action-cid');
 
       const req = httpMock.expectOne(
-        (r) =>
-          r.url === '/api/v1/governance-actions/bafkrei-test-action-cid/tally' &&
-          r.method === 'GET',
+        r =>
+          r.url === '/api/v1/governance-actions/bafkrei-test-action-cid/tally' && r.method === 'GET'
       );
       req.flush(mockTally);
 
@@ -174,7 +170,7 @@ describe('GovernanceActionApiService', () => {
       const promise = service.getTally('bafkrei-missing');
 
       const req = httpMock.expectOne(
-        (r) => r.url === '/api/v1/governance-actions/bafkrei-missing/tally',
+        r => r.url === '/api/v1/governance-actions/bafkrei-missing/tally'
       );
       req.flush('Not found', { status: 404, statusText: 'Not Found' });
 
@@ -190,9 +186,8 @@ describe('GovernanceActionApiService', () => {
       const promise = service.vote('bafkrei-test-action-cid', input);
 
       const req = httpMock.expectOne(
-        (r) =>
-          r.url === '/api/v1/governance-actions/bafkrei-test-action-cid/vote' &&
-          r.method === 'POST',
+        r =>
+          r.url === '/api/v1/governance-actions/bafkrei-test-action-cid/vote' && r.method === 'POST'
       );
       expect(req.request.body).toEqual(input);
       req.flush(mockVoteAttestation);

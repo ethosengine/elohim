@@ -1,8 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 
 import { FlowPlanningApiService } from './flow-planning-api.service';
@@ -62,7 +59,7 @@ describe('FlowPlanningApiService', () => {
     it('getPlansForSteward GETs with stewardId param', async () => {
       const p = service.getPlansForSteward('s1');
       const req = httpMock.expectOne(
-        (r) => r.url === '/api/v1/flow-planning/plans' && r.params.get('stewardId') === 's1'
+        r => r.url === '/api/v1/flow-planning/plans' && r.params.get('stewardId') === 's1'
       );
       expect(req.request.method).toBe('GET');
       req.flush([]);
@@ -183,7 +180,7 @@ describe('FlowPlanningApiService', () => {
     it('getGoalsForPlan GETs with planId param', async () => {
       const p = service.getGoalsForPlan('plan-1');
       const req = httpMock.expectOne(
-        (r) => r.url === '/api/v1/flow-planning/goals' && r.params.get('planId') === 'plan-1'
+        r => r.url === '/api/v1/flow-planning/goals' && r.params.get('planId') === 'plan-1'
       );
       req.flush([]);
       expect(await p).toEqual([]);
@@ -209,7 +206,7 @@ describe('FlowPlanningApiService', () => {
       const stub = { id: 'proj-1' };
       const p = service.projectFinancialHealth('s1', 12);
       const req = httpMock.expectOne(
-        (r) =>
+        r =>
           r.url === '/api/v1/flow-planning/projections/financial-health' &&
           r.params.get('stewardId') === 's1'
       );
@@ -221,7 +218,7 @@ describe('FlowPlanningApiService', () => {
       const stub = { id: 'proj-1' };
       const p = service.projectResourceUtilization('r-1', 6);
       const req = httpMock.expectOne(
-        (r) =>
+        r =>
           r.url === '/api/v1/flow-planning/projections/resource-utilization' &&
           r.params.get('resourceId') === 'r-1'
       );
@@ -233,7 +230,7 @@ describe('FlowPlanningApiService', () => {
       const stub = { estimatedDate: '2025-06-01' };
       const p = service.projectGoalCompletion('g-1');
       const req = httpMock.expectOne(
-        (r) =>
+        r =>
           r.url === '/api/v1/flow-planning/projections/goal-completion' &&
           r.params.get('goalId') === 'g-1'
       );
@@ -244,7 +241,7 @@ describe('FlowPlanningApiService', () => {
     it('identifyBreakpoints GETs breakpoints for projection', async () => {
       const p = service.identifyBreakpoints('proj-1', 'balance', 0);
       const req = httpMock.expectOne(
-        (r) =>
+        r =>
           r.url === '/api/v1/flow-planning/projections/proj-1/breakpoints' &&
           r.params.get('metric') === 'balance'
       );
@@ -256,7 +253,7 @@ describe('FlowPlanningApiService', () => {
       const stub = { id: 'proj-1' };
       const p = service.extendTrendForward('r-1', 12, 6);
       const req = httpMock.expectOne(
-        (r) =>
+        r =>
           r.url === '/api/v1/flow-planning/projections/trend' &&
           r.params.get('resourceId') === 'r-1'
       );
@@ -325,7 +322,7 @@ describe('FlowPlanningApiService', () => {
     it('generateRecurringEvents GETs pattern events', async () => {
       const p = service.generateRecurringEvents('pat-1', 12);
       const req = httpMock.expectOne(
-        (r) =>
+        r =>
           r.url === '/api/v1/flow-planning/patterns/pat-1/events' &&
           r.params.get('durationMonths') === '12'
       );
@@ -344,9 +341,7 @@ describe('FlowPlanningApiService', () => {
     it('identifyPatternsFromHistory GETs detected patterns', async () => {
       const p = service.identifyPatternsFromHistory('s1', 'financial-asset', 12);
       const req = httpMock.expectOne(
-        (r) =>
-          r.url === '/api/v1/flow-planning/patterns/detect' &&
-          r.params.get('stewardId') === 's1'
+        r => r.url === '/api/v1/flow-planning/patterns/detect' && r.params.get('stewardId') === 's1'
       );
       req.flush([]);
       expect(await p).toEqual([]);
@@ -372,8 +367,7 @@ describe('FlowPlanningApiService', () => {
       const stub = { activePlans: [] };
       const p = service.buildFlowDashboard('s1');
       const req = httpMock.expectOne(
-        (r) =>
-          r.url === '/api/v1/flow-planning/dashboard' && r.params.get('stewardId') === 's1'
+        r => r.url === '/api/v1/flow-planning/dashboard' && r.params.get('stewardId') === 's1'
       );
       req.flush(stub);
       expect(await p).toEqual(stub);
@@ -390,7 +384,7 @@ describe('FlowPlanningApiService', () => {
     it('generatePlanningInsights GETs insights', async () => {
       const p = service.generatePlanningInsights('s1', 6);
       const req = httpMock.expectOne(
-        (r) =>
+        r =>
           r.url === '/api/v1/flow-planning/insights' &&
           r.params.get('stewardId') === 's1' &&
           r.params.get('lookbackMonths') === '6'
@@ -402,7 +396,7 @@ describe('FlowPlanningApiService', () => {
     it('detectAnomalies GETs anomalies', async () => {
       const p = service.detectAnomalies('r-1', 'high');
       const req = httpMock.expectOne(
-        (r) =>
+        r =>
           r.url === '/api/v1/flow-planning/anomalies' &&
           r.params.get('resourceId') === 'r-1' &&
           r.params.get('sensitivity') === 'high'

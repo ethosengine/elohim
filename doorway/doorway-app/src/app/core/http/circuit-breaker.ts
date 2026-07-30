@@ -55,10 +55,7 @@ export class CircuitBreaker {
         this.lastStateChange = Date.now();
       } else {
         const resetIn = this.config.resetTimeoutMs - timeSinceOpen;
-        throw new CircuitBreakerOpenError(
-          `Circuit breaker '${this.name}' is OPEN`,
-          resetIn
-        );
+        throw new CircuitBreakerOpenError(`Circuit breaker '${this.name}' is OPEN`, resetIn);
       }
     }
 
@@ -102,10 +99,7 @@ export class CircuitBreaker {
     this.consecutiveSuccesses = 0;
 
     // Check if we should open the circuit
-    if (
-      this.state !== CircuitState.OPEN &&
-      this.failures.length >= this.config.failureThreshold
-    ) {
+    if (this.state !== CircuitState.OPEN && this.failures.length >= this.config.failureThreshold) {
       this.state = CircuitState.OPEN;
       this.lastStateChange = Date.now();
       console.error(
@@ -119,7 +113,7 @@ export class CircuitBreaker {
    */
   private cleanupFailures(): void {
     const cutoff = Date.now() - this.config.rollingWindowMs;
-    this.failures = this.failures.filter((f) => f.timestamp >= cutoff);
+    this.failures = this.failures.filter(f => f.timestamp >= cutoff);
   }
 
   /**

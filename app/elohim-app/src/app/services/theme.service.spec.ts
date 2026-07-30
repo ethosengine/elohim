@@ -87,9 +87,7 @@ describe('ThemeService', () => {
       events += 1;
     };
     window.addEventListener('elohim-theme-changed', onEvent);
-    window.dispatchEvent(
-      new StorageEvent('storage', { key: 'elohim-theme', newValue: 'dark' }),
-    );
+    window.dispatchEvent(new StorageEvent('storage', { key: 'elohim-theme', newValue: 'dark' }));
     window.removeEventListener('elohim-theme-changed', onEvent);
     expect(service.getCurrentTheme()).toBe('dark');
     expect(events).toBe(0); // adoptExternal never re-dispatches

@@ -1,8 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 
 import { EconomicEventsApiService } from './economic-events-api.service';
@@ -45,11 +42,7 @@ describe('EconomicEventsApiService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        EconomicEventsApiService,
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [EconomicEventsApiService, provideHttpClient(), provideHttpClientTesting()],
     });
     service = TestBed.inject(EconomicEventsApiService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -60,7 +53,7 @@ describe('EconomicEventsApiService', () => {
   it('getEventsByProvider calls GET with provider param', async () => {
     const promise = service.getEventsByProvider('agent-a');
     const req = httpMock.expectOne(
-      (r) => r.url === '/api/v1/economic-events' && r.params.get('provider') === 'agent-a'
+      r => r.url === '/api/v1/economic-events' && r.params.get('provider') === 'agent-a'
     );
     expect(req.request.method).toBe('GET');
     req.flush([stubEvent]);
@@ -70,7 +63,7 @@ describe('EconomicEventsApiService', () => {
   it('getEventsByReceiver calls GET with receiver param', async () => {
     const promise = service.getEventsByReceiver('agent-b');
     const req = httpMock.expectOne(
-      (r) => r.url === '/api/v1/economic-events' && r.params.get('receiver') === 'agent-b'
+      r => r.url === '/api/v1/economic-events' && r.params.get('receiver') === 'agent-b'
     );
     expect(req.request.method).toBe('GET');
     req.flush([stubEvent]);
@@ -80,7 +73,7 @@ describe('EconomicEventsApiService', () => {
   it('getEventsByAction calls GET with action param', async () => {
     const promise = service.getEventsByAction('transfer');
     const req = httpMock.expectOne(
-      (r) => r.url === '/api/v1/economic-events' && r.params.get('action') === 'transfer'
+      r => r.url === '/api/v1/economic-events' && r.params.get('action') === 'transfer'
     );
     expect(req.request.method).toBe('GET');
     req.flush([stubEvent]);
@@ -90,7 +83,7 @@ describe('EconomicEventsApiService', () => {
   it('getEventsByLamadType calls GET with lamadType param', async () => {
     const promise = service.getEventsByLamadType('mastery');
     const req = httpMock.expectOne(
-      (r) => r.url === '/api/v1/economic-events' && r.params.get('lamadType') === 'mastery'
+      r => r.url === '/api/v1/economic-events' && r.params.get('lamadType') === 'mastery'
     );
     expect(req.request.method).toBe('GET');
     req.flush([stubEvent]);
@@ -116,8 +109,7 @@ describe('EconomicEventsApiService', () => {
   it('getAppreciationsFor calls GET with for param', async () => {
     const promise = service.getAppreciationsFor('evt-1');
     const req = httpMock.expectOne(
-      (r) =>
-        r.url === '/api/v1/economic-events/appreciations' && r.params.get('for') === 'evt-1'
+      r => r.url === '/api/v1/economic-events/appreciations' && r.params.get('for') === 'evt-1'
     );
     expect(req.request.method).toBe('GET');
     req.flush([stubAppreciation]);
@@ -127,8 +119,7 @@ describe('EconomicEventsApiService', () => {
   it('getAppreciationsBy calls GET with by param', async () => {
     const promise = service.getAppreciationsBy('agent-a');
     const req = httpMock.expectOne(
-      (r) =>
-        r.url === '/api/v1/economic-events/appreciations' && r.params.get('by') === 'agent-a'
+      r => r.url === '/api/v1/economic-events/appreciations' && r.params.get('by') === 'agent-a'
     );
     expect(req.request.method).toBe('GET');
     req.flush([stubAppreciation]);

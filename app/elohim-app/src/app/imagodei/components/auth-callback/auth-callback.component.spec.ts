@@ -63,7 +63,9 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
     expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
   };
 
-  async function setup(queryParams: Record<string, string> = { code: 'abc', state: 'xyz', provider: 'github' }) {
+  async function setup(
+    queryParams: Record<string, string> = { code: 'abc', state: 'xyz', provider: 'github' }
+  ) {
     mockOAuth = {
       handleCallback: vi.fn().mockResolvedValue(successResult),
       clearCallbackParams: vi.fn(),
@@ -161,8 +163,9 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
 
   it('wires exchangeCode to OAuthAuthProvider.handleCallback', async () => {
     await setup();
-    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
-      HTMLElement & Record<string, unknown>;
+    const el = fixture.nativeElement.querySelector(
+      'elohim-imagodei-oauth-callback'
+    ) as HTMLElement & Record<string, unknown>;
     const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<unknown>;
 
     await exchangeCode('abc', 'xyz');
@@ -172,8 +175,9 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
 
   it('calls AuthService.setAuthFromResult on successful exchange', async () => {
     await setup();
-    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
-      HTMLElement & Record<string, unknown>;
+    const el = fixture.nativeElement.querySelector(
+      'elohim-imagodei-oauth-callback'
+    ) as HTMLElement & Record<string, unknown>;
     const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<unknown>;
 
     await exchangeCode('abc', 'xyz');
@@ -183,8 +187,9 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
 
   it('clears URL params after a successful exchange', async () => {
     await setup();
-    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
-      HTMLElement & Record<string, unknown>;
+    const el = fixture.nativeElement.querySelector(
+      'elohim-imagodei-oauth-callback'
+    ) as HTMLElement & Record<string, unknown>;
     const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<unknown>;
 
     await exchangeCode('abc', 'xyz');
@@ -194,9 +199,13 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
 
   it('resolves with { session: result } on success', async () => {
     await setup();
-    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
-      HTMLElement & Record<string, unknown>;
-    const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<{ session: unknown }>;
+    const el = fixture.nativeElement.querySelector(
+      'elohim-imagodei-oauth-callback'
+    ) as HTMLElement & Record<string, unknown>;
+    const exchangeCode = el['exchangeCode'] as (
+      c: string,
+      s: string
+    ) => Promise<{ session: unknown }>;
 
     const outcome = await exchangeCode('abc', 'xyz');
 
@@ -209,10 +218,15 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
 
   it('throws when OAuthAuthProvider.handleCallback returns success:false', async () => {
     await setup();
-    mockOAuth.handleCallback.mockResolvedValue({ success: false, error: 'invalid_grant', code: 'INVALID_CREDENTIALS' });
+    mockOAuth.handleCallback.mockResolvedValue({
+      success: false,
+      error: 'invalid_grant',
+      code: 'INVALID_CREDENTIALS',
+    });
 
-    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
-      HTMLElement & Record<string, unknown>;
+    const el = fixture.nativeElement.querySelector(
+      'elohim-imagodei-oauth-callback'
+    ) as HTMLElement & Record<string, unknown>;
     const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<unknown>;
 
     await expect(exchangeCode('abc', 'xyz')).rejects.toThrow('invalid_grant');
@@ -220,10 +234,15 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
 
   it('clears URL params even on a failed exchange', async () => {
     await setup();
-    mockOAuth.handleCallback.mockResolvedValue({ success: false, error: 'expired', code: 'TOKEN_EXPIRED' });
+    mockOAuth.handleCallback.mockResolvedValue({
+      success: false,
+      error: 'expired',
+      code: 'TOKEN_EXPIRED',
+    });
 
-    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
-      HTMLElement & Record<string, unknown>;
+    const el = fixture.nativeElement.querySelector(
+      'elohim-imagodei-oauth-callback'
+    ) as HTMLElement & Record<string, unknown>;
     const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<unknown>;
 
     await exchangeCode('abc', 'xyz').catch(() => {});
@@ -233,10 +252,15 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
 
   it('does NOT call setAuthFromResult on a failed exchange', async () => {
     await setup();
-    mockOAuth.handleCallback.mockResolvedValue({ success: false, error: 'denied', code: 'INVALID_CREDENTIALS' });
+    mockOAuth.handleCallback.mockResolvedValue({
+      success: false,
+      error: 'denied',
+      code: 'INVALID_CREDENTIALS',
+    });
 
-    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
-      HTMLElement & Record<string, unknown>;
+    const el = fixture.nativeElement.querySelector(
+      'elohim-imagodei-oauth-callback'
+    ) as HTMLElement & Record<string, unknown>;
     const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<unknown>;
 
     await exchangeCode('abc', 'xyz').catch(() => {});
@@ -283,7 +307,7 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     component.onError(
-      new CustomEvent('error', { detail: { reason: 'invalid_grant', recoverable: true } }),
+      new CustomEvent('error', { detail: { reason: 'invalid_grant', recoverable: true } })
     );
 
     expect(consoleSpy).toHaveBeenCalledWith('OAuth callback error:', 'invalid_grant');
@@ -296,7 +320,7 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
 
     expect(() => {
       component.onError(
-        new CustomEvent('error', { detail: { reason: 'network_error', recoverable: true } }),
+        new CustomEvent('error', { detail: { reason: 'network_error', recoverable: true } })
       );
     }).not.toThrow();
   });
@@ -306,7 +330,7 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     component.onError(
-      new CustomEvent('error', { detail: { reason: 'access_denied', recoverable: false } }),
+      new CustomEvent('error', { detail: { reason: 'access_denied', recoverable: false } })
     );
 
     expect(router.navigate).not.toHaveBeenCalled();

@@ -1,8 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 
 import { DataProtectionApiService } from './data-protection-api.service';
@@ -81,19 +78,13 @@ describe('DataProtectionApiService', () => {
     data: FamilyCommunityProtectionStatus = stubStatus
   ): Promise<FamilyCommunityProtectionStatus> {
     const promise = service.fetchProtectionStatus(operatorId);
-    httpMock
-      .expectOne(`/api/v1/custodians/protection/${operatorId}/summary`)
-      .flush(data);
+    httpMock.expectOne(`/api/v1/custodians/protection/${operatorId}/summary`).flush(data);
     return promise;
   }
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        DataProtectionApiService,
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [DataProtectionApiService, provideHttpClient(), provideHttpClientTesting()],
     });
     service = TestBed.inject(DataProtectionApiService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -120,7 +111,7 @@ describe('DataProtectionApiService', () => {
 
   it('getProtectionStatus$ emits null then status after fetch', async () => {
     const emissions: (FamilyCommunityProtectionStatus | null)[] = [];
-    const sub = service.getProtectionStatus$().subscribe((s) => emissions.push(s));
+    const sub = service.getProtectionStatus$().subscribe(s => emissions.push(s));
 
     expect(emissions).toEqual([null]);
 
@@ -155,8 +146,8 @@ describe('DataProtectionApiService', () => {
     const risky = service.getHighRiskRegions();
     // Both regions have custodianCount <= 1
     expect(risky.length).toBe(2);
-    expect(risky.some((r) => r.region === 'EU')).toBe(true);
-    expect(risky.some((r) => r.region === 'NA')).toBe(true);
+    expect(risky.some(r => r.region === 'EU')).toBe(true);
+    expect(risky.some(r => r.region === 'NA')).toBe(true);
   });
 
   it('isCustodianHealthy checks uptime >= 95%', async () => {
@@ -183,8 +174,8 @@ describe('DataProtectionApiService', () => {
     // Unhealthy custodian (cust-2 at 80%) + both regions have custodianCount <= 1
     expect(alerts.length).toBe(3);
     expect(alerts[0]).toContain('Community Node');
-    expect(alerts.some((a) => a.includes('NA'))).toBe(true);
-    expect(alerts.some((a) => a.includes('EU'))).toBe(true);
+    expect(alerts.some(a => a.includes('NA'))).toBe(true);
+    expect(alerts.some(a => a.includes('EU'))).toBe(true);
   });
 
   it('getProtectionAlerts includes vulnerability alert', async () => {

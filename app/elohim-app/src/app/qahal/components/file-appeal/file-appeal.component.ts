@@ -6,14 +6,7 @@
  * then calls GovernanceApiService.fileAppeal().
  */
 
-import {
-  Component,
-  computed,
-  inject,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { GovernanceApiService } from '@elohim/service';

@@ -31,9 +31,7 @@ describe('ContentAnalyticsComponent', () => {
     );
 
     TestBed.configureTestingModule({
-      providers: [
-        { provide: StorageClientService, useValue: { getContentEngagement } },
-      ],
+      providers: [{ provide: StorageClientService, useValue: { getContentEngagement } }],
     });
 
     component = TestBed.runInInjectionContext(() => new ContentAnalyticsComponent());

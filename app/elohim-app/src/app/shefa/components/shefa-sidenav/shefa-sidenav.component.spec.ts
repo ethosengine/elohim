@@ -80,13 +80,7 @@ describe('ShefaSidenavComponent', () => {
     it('should render group titles', () => {
       const titles: HTMLElement[] = fixture.nativeElement.querySelectorAll('.nav-group-title');
       const titleTexts = Array.from(titles).map(t => t.textContent?.trim());
-      expect(titleTexts).toEqual([
-        'Primary',
-        'Resources',
-        'Community',
-        'Topology',
-        'Management',
-      ]);
+      expect(titleTexts).toEqual(['Primary', 'Resources', 'Community', 'Topology', 'Management']);
     });
 
     it('should render 17 nav items total', () => {
@@ -149,9 +143,7 @@ describe('ShefaSidenavComponent', () => {
     });
 
     it('should expose data-testid on collapse button', () => {
-      const btn = fixture.nativeElement.querySelector(
-        '[data-testid="shefa-sidenav-collapse"]'
-      );
+      const btn = fixture.nativeElement.querySelector('[data-testid="shefa-sidenav-collapse"]');
       expect(btn).toBeTruthy();
     });
   });

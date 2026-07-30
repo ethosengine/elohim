@@ -9,7 +9,7 @@ import { AuthStateService } from '../../services/auth-state.service';
 import { ThresholdLoginComponent } from './threshold-login.component';
 
 /** Let pending zone promises settle so the next HttpClient request is issued. */
-const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+const settle = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
 /**
  * Steward portal-handoff contract (GAP-2c).

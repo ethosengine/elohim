@@ -13,7 +13,13 @@
 /**
  * Health status of a node
  */
-export type NodeStatus = 'discovered' | 'registering' | 'online' | 'degraded' | 'offline' | 'failed';
+export type NodeStatus =
+  | 'discovered'
+  | 'registering'
+  | 'online'
+  | 'degraded'
+  | 'offline'
+  | 'failed';
 
 /**
  * Steward tier levels
@@ -268,8 +274,23 @@ export interface ClusterSnapshot {
  */
 export type DashboardMessage =
   | { type: 'initial_state'; timestamp: string; nodes: NodeSnapshot[]; cluster: ClusterSnapshot }
-  | { type: 'node_update'; timestamp: string; nodeId: string; status: string; combinedScore: number; changes: string[] }
-  | { type: 'cluster_update'; timestamp: string; onlineNodes: number; totalNodes: number; healthRatio: number; avgTrustScore: number; avgImpactScore: number }
+  | {
+      type: 'node_update';
+      timestamp: string;
+      nodeId: string;
+      status: string;
+      combinedScore: number;
+      changes: string[];
+    }
+  | {
+      type: 'cluster_update';
+      timestamp: string;
+      onlineNodes: number;
+      totalNodes: number;
+      healthRatio: number;
+      avgTrustScore: number;
+      avgImpactScore: number;
+    }
   | { type: 'heartbeat'; timestamp: string; intervalSecs: number }
   | { type: 'pong'; timestamp: string }
   | { type: 'error'; message: string };
@@ -290,7 +311,16 @@ export type ClientMessage =
  * Get display name for reach level
  */
 export function reachLevelName(level: number): string {
-  const names = ['Private', 'Invited', 'Local', 'Neighborhood', 'Municipal', 'Bioregional', 'Regional', 'Commons'];
+  const names = [
+    'Private',
+    'Invited',
+    'Local',
+    'Neighborhood',
+    'Municipal',
+    'Bioregional',
+    'Regional',
+    'Commons',
+  ];
   return names[level] ?? `Level ${level}`;
 }
 
@@ -299,13 +329,20 @@ export function reachLevelName(level: number): string {
  */
 export function statusColor(status: NodeStatus): string {
   switch (status) {
-    case 'online': return 'text-green-600';
-    case 'degraded': return 'text-yellow-600';
-    case 'offline': return 'text-gray-500';
-    case 'failed': return 'text-red-600';
-    case 'discovered': return 'text-blue-400';
-    case 'registering': return 'text-blue-600';
-    default: return 'text-gray-400';
+    case 'online':
+      return 'text-green-600';
+    case 'degraded':
+      return 'text-yellow-600';
+    case 'offline':
+      return 'text-gray-500';
+    case 'failed':
+      return 'text-red-600';
+    case 'discovered':
+      return 'text-blue-400';
+    case 'registering':
+      return 'text-blue-600';
+    default:
+      return 'text-gray-400';
   }
 }
 
@@ -314,11 +351,16 @@ export function statusColor(status: NodeStatus): string {
  */
 export function tierColor(tier: StewardTier | null): string {
   switch (tier) {
-    case 'pioneer': return 'text-purple-600';
-    case 'steward': return 'text-indigo-600';
-    case 'guardian': return 'text-blue-600';
-    case 'caretaker': return 'text-green-600';
-    default: return 'text-gray-500';
+    case 'pioneer':
+      return 'text-purple-600';
+    case 'steward':
+      return 'text-indigo-600';
+    case 'guardian':
+      return 'text-blue-600';
+    case 'caretaker':
+      return 'text-green-600';
+    default:
+      return 'text-gray-500';
   }
 }
 
@@ -627,10 +669,14 @@ export interface UserMutationResponse {
  */
 export function permissionLevelColor(level: UserPermissionLevel): string {
   switch (level) {
-    case 'ADMIN': return 'text-purple-600';
-    case 'AUTHENTICATED': return 'text-blue-600';
-    case 'PUBLIC': return 'text-gray-500';
-    default: return 'text-gray-400';
+    case 'ADMIN':
+      return 'text-purple-600';
+    case 'AUTHENTICATED':
+      return 'text-blue-600';
+    case 'PUBLIC':
+      return 'text-gray-500';
+    default:
+      return 'text-gray-400';
   }
 }
 
@@ -639,10 +685,14 @@ export function permissionLevelColor(level: UserPermissionLevel): string {
  */
 export function permissionLevelName(level: UserPermissionLevel): string {
   switch (level) {
-    case 'ADMIN': return 'Admin';
-    case 'AUTHENTICATED': return 'Authenticated';
-    case 'PUBLIC': return 'Public';
-    default: return level;
+    case 'ADMIN':
+      return 'Admin';
+    case 'AUTHENTICATED':
+      return 'Authenticated';
+    case 'PUBLIC':
+      return 'Public';
+    default:
+      return level;
   }
 }
 
@@ -672,11 +722,16 @@ export function formatBytes(bytes: number): string {
  */
 export function pipelineStageColor(stage: PipelineStage): string {
   switch (stage) {
-    case 'registered': return '#6b7280';
-    case 'hosted': return '#3b82f6';
-    case 'graduating': return '#f59e0b';
-    case 'steward': return '#10b981';
-    default: return '#9ca3af';
+    case 'registered':
+      return '#6b7280';
+    case 'hosted':
+      return '#3b82f6';
+    case 'graduating':
+      return '#f59e0b';
+    case 'steward':
+      return '#10b981';
+    default:
+      return '#9ca3af';
   }
 }
 
@@ -685,11 +740,16 @@ export function pipelineStageColor(stage: PipelineStage): string {
  */
 export function pipelineStageName(stage: PipelineStage): string {
   switch (stage) {
-    case 'registered': return 'Registered';
-    case 'hosted': return 'Hosted';
-    case 'graduating': return 'Graduating';
-    case 'steward': return 'Steward';
-    default: return stage;
+    case 'registered':
+      return 'Registered';
+    case 'hosted':
+      return 'Hosted';
+    case 'graduating':
+      return 'Graduating';
+    case 'steward':
+      return 'Steward';
+    default:
+      return stage;
   }
 }
 
@@ -698,10 +758,14 @@ export function pipelineStageName(stage: PipelineStage): string {
  */
 export function connectionStateColor(state: string): string {
   switch (state) {
-    case 'connected': return 'text-green-600';
-    case 'connecting': return 'text-yellow-600';
-    case 'disconnected': return 'text-gray-500';
-    default: return 'text-gray-400';
+    case 'connected':
+      return 'text-green-600';
+    case 'connecting':
+      return 'text-yellow-600';
+    case 'disconnected':
+      return 'text-gray-500';
+    default:
+      return 'text-gray-400';
   }
 }
 

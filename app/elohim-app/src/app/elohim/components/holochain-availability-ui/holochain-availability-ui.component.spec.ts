@@ -20,9 +20,7 @@ describe('HolochainAvailabilityUiComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [HolochainAvailabilityUiComponent],
-      providers: [
-        { provide: HolochainClientService, useValue: mockHolochainClient },
-      ],
+      providers: [{ provide: HolochainClientService, useValue: mockHolochainClient }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(HolochainAvailabilityUiComponent);

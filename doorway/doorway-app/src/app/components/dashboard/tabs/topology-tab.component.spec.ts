@@ -1,14 +1,11 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { TopologyTabComponent } from './topology-tab.component';
 
-const flushAsync = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+const flushAsync = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
 describe('TopologyTabComponent', () => {
   let fixture: ComponentFixture<TopologyTabComponent>;
@@ -49,10 +46,10 @@ describe('TopologyTabComponent', () => {
     await flushAsync();
     fixture.detectChanges();
     expect(
-      fixture.nativeElement.querySelector('[data-testid="topology-hostname"]')?.textContent,
+      fixture.nativeElement.querySelector('[data-testid="topology-hostname"]')?.textContent
     ).toContain('matthew.elohim.host');
     expect(
-      fixture.nativeElement.querySelector('[data-testid="projection-coverage"]')?.textContent,
+      fixture.nativeElement.querySelector('[data-testid="projection-coverage"]')?.textContent
     ).toMatch(/87/);
   });
 

@@ -1,8 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 
 import { ComputeDashboardApiService } from './compute-dashboard-api.service';
@@ -71,7 +68,12 @@ describe('ComputeDashboardApiService', () => {
         community: { cpuPercent: 25, memoryPercent: 25, storagePercent: 25, bandwidthPercent: 25 },
         network: { cpuPercent: 25, memoryPercent: 25, storagePercent: 25, bandwidthPercent: 25 },
       },
-      totalAllocated: { cpuPercent: 100, memoryPercent: 100, storagePercent: 100, bandwidthPercent: 100 },
+      totalAllocated: {
+        cpuPercent: 100,
+        memoryPercent: 100,
+        storagePercent: 100,
+        bandwidthPercent: 100,
+      },
       allocationBlocks: [],
     },
     familyCommunityProtection: {
@@ -132,11 +134,7 @@ describe('ComputeDashboardApiService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        ComputeDashboardApiService,
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [ComputeDashboardApiService, provideHttpClient(), provideHttpClientTesting()],
     });
     service = TestBed.inject(ComputeDashboardApiService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -155,7 +153,7 @@ describe('ComputeDashboardApiService', () => {
   it('getDashboardForGovernanceLevel calls GET with level param', async () => {
     const promise = service.getDashboardForGovernanceLevel('household');
     const req = httpMock.expectOne(
-      (r) => r.url === '/api/v1/compute/dashboard' && r.params.get('level') === 'household'
+      r => r.url === '/api/v1/compute/dashboard' && r.params.get('level') === 'household'
     );
     expect(req.request.method).toBe('GET');
     req.flush(stubDashboard);

@@ -1,11 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  Component,
-  OnInit,
-  signal,
-  computed,
-  inject,
-} from '@angular/core';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 // @coverage: 98.6% (2026-02-24)

@@ -28,39 +28,29 @@ describe('ElohimSidebarComponent', () => {
   it('is collapsed by default', () => {
     expect(component.expanded()).toBe(false);
 
-    const panel = fixture.nativeElement.querySelector(
-      '[data-testid="sidebar-panel"]',
-    );
+    const panel = fixture.nativeElement.querySelector('[data-testid="sidebar-panel"]');
     expect(panel).toBeNull();
 
-    const toggle = fixture.nativeElement.querySelector(
-      '[data-testid="sidebar-toggle"]',
-    );
+    const toggle = fixture.nativeElement.querySelector('[data-testid="sidebar-toggle"]');
     expect(toggle).toBeTruthy();
   });
 
   it('expands when toggle is clicked', () => {
     const toggle: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="sidebar-toggle"]',
+      '[data-testid="sidebar-toggle"]'
     );
     toggle.click();
     fixture.detectChanges();
 
     expect(component.expanded()).toBe(true);
 
-    const panel = fixture.nativeElement.querySelector(
-      '[data-testid="sidebar-panel"]',
-    );
+    const panel = fixture.nativeElement.querySelector('[data-testid="sidebar-panel"]');
     expect(panel).toBeTruthy();
 
-    const messageList = fixture.nativeElement.querySelector(
-      'app-elohim-message-list',
-    );
+    const messageList = fixture.nativeElement.querySelector('app-elohim-message-list');
     expect(messageList).toBeTruthy();
 
-    const card = fixture.nativeElement.querySelector(
-      'app-gate-artifact-card',
-    );
+    const card = fixture.nativeElement.querySelector('app-gate-artifact-card');
     expect(card).toBeTruthy();
   });
 
@@ -69,16 +59,14 @@ describe('ElohimSidebarComponent', () => {
     fixture.detectChanges();
 
     const close: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="sidebar-close"]',
+      '[data-testid="sidebar-close"]'
     );
     close.click();
     fixture.detectChanges();
 
     expect(component.expanded()).toBe(false);
 
-    const panel = fixture.nativeElement.querySelector(
-      '[data-testid="sidebar-panel"]',
-    );
+    const panel = fixture.nativeElement.querySelector('[data-testid="sidebar-panel"]');
     expect(panel).toBeNull();
   });
 
@@ -87,17 +75,16 @@ describe('ElohimSidebarComponent', () => {
     fixture.detectChanges();
 
     // Type into the textarea
-    const textarea: HTMLTextAreaElement =
-      fixture.nativeElement.querySelector(
-        '[data-testid="artifact-textarea"]',
-      );
+    const textarea: HTMLTextAreaElement = fixture.nativeElement.querySelector(
+      '[data-testid="artifact-textarea"]'
+    );
     textarea.value = 'I need help with this';
     textarea.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
     // Click submit
     const submit: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-submit"]',
+      '[data-testid="artifact-submit"]'
     );
     submit.click();
     fixture.detectChanges();
@@ -117,18 +104,16 @@ describe('ElohimSidebarComponent', () => {
     fixture.detectChanges();
 
     const postMessage = (text: string) => {
-      const textarea: HTMLTextAreaElement =
-        fixture.nativeElement.querySelector(
-          '[data-testid="artifact-textarea"]',
-        );
+      const textarea: HTMLTextAreaElement = fixture.nativeElement.querySelector(
+        '[data-testid="artifact-textarea"]'
+      );
       textarea.value = text;
       textarea.dispatchEvent(new Event('input'));
       fixture.detectChanges();
 
-      const submit: HTMLButtonElement =
-        fixture.nativeElement.querySelector(
-          '[data-testid="artifact-submit"]',
-        );
+      const submit: HTMLButtonElement = fixture.nativeElement.querySelector(
+        '[data-testid="artifact-submit"]'
+      );
       submit.click();
       fixture.detectChanges();
     };

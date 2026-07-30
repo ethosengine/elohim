@@ -16,10 +16,7 @@ describe('AttentionTrackerService', () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [
-        AttentionTrackerService,
-        { provide: HttpClient, useValue: httpSpy },
-      ],
+      providers: [AttentionTrackerService, { provide: HttpClient, useValue: httpSpy }],
     });
     service = TestBed.inject(AttentionTrackerService);
   });

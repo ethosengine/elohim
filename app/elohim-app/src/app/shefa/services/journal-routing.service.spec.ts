@@ -57,10 +57,7 @@ describe('JournalRoutingService', () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [
-        JournalRoutingService,
-        { provide: HttpClient, useValue: mockHttp },
-      ],
+      providers: [JournalRoutingService, { provide: HttpClient, useValue: mockHttp }],
     });
 
     service = TestBed.inject(JournalRoutingService);
@@ -170,7 +167,7 @@ describe('JournalRoutingService', () => {
 
       const cards = service.suggestions();
       const derivative = cards.find(
-        c => c.kind === 'derivative' && c.destinationType === 'exchange-request',
+        c => c.kind === 'derivative' && c.destinationType === 'exchange-request'
       );
       expect(derivative).toBeDefined();
     });
@@ -197,8 +194,8 @@ describe('JournalRoutingService', () => {
       service.setContentId('journal-200');
       service.confirm();
 
-      const suggestCall = mockHttp.post.mock.calls.find(
-        (call: unknown[]) => (call[0] as string).includes('/journal/suggest'),
+      const suggestCall = mockHttp.post.mock.calls.find((call: unknown[]) =>
+        (call[0] as string).includes('/journal/suggest')
       );
       expect(suggestCall).toBeDefined();
       expect(suggestCall![1]).toEqual(
@@ -209,7 +206,7 @@ describe('JournalRoutingService', () => {
             summary: 'This sounds like a need or request.',
             detectedTypes: ['exchange-request'],
           }),
-        }),
+        })
       );
     });
   });
@@ -236,7 +233,7 @@ describe('JournalRoutingService', () => {
       expect(body).toEqual(
         expect.objectContaining({
           metadata: expect.objectContaining({ journalFolder: expect.any(String) }),
-        }),
+        })
       );
     });
 
@@ -245,8 +242,8 @@ describe('JournalRoutingService', () => {
       service.postCard(derivativeCard.id);
 
       // Find the createContent POST (not the journal/analyze or journal/suggest calls)
-      const createCall = mockHttp.post.mock.calls.find(
-        (call: unknown[]) => (call[0] as string).includes('/db/content'),
+      const createCall = mockHttp.post.mock.calls.find((call: unknown[]) =>
+        (call[0] as string).includes('/db/content')
       );
       expect(createCall).toBeDefined();
       const body = createCall![1] as Record<string, unknown>;

@@ -130,10 +130,10 @@ export class WebSocketManager<TMessage = unknown> {
 
     // Subscribe to messages
     this.ws$.subscribe({
-      next: (msg) => {
+      next: msg => {
         this.handleMessage(msg);
       },
-      error: (err) => {
+      error: err => {
         console.error('[WebSocketManager] Error:', err);
         const wsError = new WebSocketError('WebSocket error occurred', undefined, err);
         this.errorSubject.next(wsError);
@@ -196,10 +196,7 @@ export class WebSocketManager<TMessage = unknown> {
     // Calculate delay with exponential backoff
     const delay = Math.min(
       this.config.reconnection.initialDelayMs *
-        Math.pow(
-          this.config.reconnection.backoffMultiplier,
-          this.reconnectAttempts
-        ),
+        Math.pow(this.config.reconnection.backoffMultiplier, this.reconnectAttempts),
       this.config.reconnection.maxDelayMs
     );
 
@@ -237,17 +234,13 @@ export class WebSocketManager<TMessage = unknown> {
       this.send(pingMessage);
 
       // Set timeout for pong response
-      this.heartbeatTimeoutTimer = timer(this.config.heartbeat.timeoutMs).subscribe(
-        () => {
-          const timeSincePong = Date.now() - this.lastPongReceived;
-          if (timeSincePong > this.config.heartbeat.timeoutMs) {
-            console.warn(
-              '[WebSocketManager] Heartbeat timeout - no pong received'
-            );
-            this.handleDisconnect();
-          }
+      this.heartbeatTimeoutTimer = timer(this.config.heartbeat.timeoutMs).subscribe(() => {
+        const timeSincePong = Date.now() - this.lastPongReceived;
+        if (timeSincePong > this.config.heartbeat.timeoutMs) {
+          console.warn('[WebSocketManager] Heartbeat timeout - no pong received');
+          this.handleDisconnect();
         }
-      );
+      });
     } catch (error) {
       console.error('[WebSocketManager] Failed to send ping:', error);
     }

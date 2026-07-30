@@ -17,7 +17,9 @@ describe('PersonalInfoPaneComponent', () => {
   it('should render pane title with data-testid', () => {
     const fixture = TestBed.createComponent(PersonalInfoPaneComponent);
     fixture.detectChanges();
-    const title = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="pane-title-personal-info"]');
+    const title = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="pane-title-personal-info"]'
+    );
     expect(title).toBeTruthy();
     expect(title?.textContent?.trim()).toBe('Personal info');
   });

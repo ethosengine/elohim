@@ -6,13 +6,7 @@
  * and graduation CTA. Adapts based on JWT claims (steward vs hosted).
  */
 
-import {
-  Component,
-  OnInit,
-  inject,
-  signal,
-  computed,
-} from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { DoorwayAdminService } from '../../services/doorway-admin.service';

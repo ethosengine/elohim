@@ -17,7 +17,9 @@ describe('ThirdPartyAppsPaneComponent', () => {
   it('should render pane title with data-testid', () => {
     const fixture = TestBed.createComponent(ThirdPartyAppsPaneComponent);
     fixture.detectChanges();
-    const title = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="pane-title-third-party-apps"]');
+    const title = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="pane-title-third-party-apps"]'
+    );
     expect(title).toBeTruthy();
     expect(title?.textContent?.trim()).toBe('Third-party apps');
   });

@@ -77,7 +77,7 @@ describe('SelfRevokeComponent', () => {
     const fixture = TestBed.createComponent(SelfRevokeComponent);
     fixture.detectChanges();
     const start = fixture.nativeElement.querySelector(
-      '[data-testid="self-revoke-start"]',
+      '[data-testid="self-revoke-start"]'
     ) as HTMLButtonElement;
     start.click();
     fixture.detectChanges();
@@ -97,7 +97,9 @@ describe('SelfRevokeComponent', () => {
     fixture.detectChanges();
 
     // Open confirm step
-    (fixture.nativeElement.querySelector('[data-testid="self-revoke-start"]') as HTMLElement).click();
+    (
+      fixture.nativeElement.querySelector('[data-testid="self-revoke-start"]') as HTMLElement
+    ).click();
     fixture.detectChanges();
 
     // Trigger confirm
@@ -105,7 +107,7 @@ describe('SelfRevokeComponent', () => {
     fixture.detectChanges();
 
     const errorEl = (fixture.nativeElement as HTMLElement).querySelector(
-      '[data-testid="self-revoke-error"]',
+      '[data-testid="self-revoke-error"]'
     );
     expect(errorEl).toBeTruthy();
     expect(errorEl?.textContent).toContain('Phase 11');

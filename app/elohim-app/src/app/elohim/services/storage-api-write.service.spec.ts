@@ -44,7 +44,7 @@ describe('StorageApiService write methods', () => {
     });
 
     const req = httpTesting.expectOne(
-      r => r.url.includes('/db/content/story-123') && r.method === 'PATCH',
+      r => r.url.includes('/db/content/story-123') && r.method === 'PATCH'
     );
     expect(req.request.body).toEqual(patch);
     req.flush(mockResponse);

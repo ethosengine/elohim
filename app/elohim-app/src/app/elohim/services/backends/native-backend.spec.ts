@@ -34,7 +34,10 @@ describe('NativeBackend', () => {
     } as Response);
 
     const response = await firstValueFrom(
-      backend.invoke({ requestId: 'req-1', capability: 'test', params: {} } as any, { id: 'e-1' } as any),
+      backend.invoke(
+        { requestId: 'req-1', capability: 'test', params: {} } as any,
+        { id: 'e-1' } as any
+      )
     );
 
     expect(response.status).toBe('fulfilled');
@@ -61,7 +64,10 @@ describe('NativeBackend', () => {
     } as Response);
 
     const response = await firstValueFrom(
-      backend.invoke({ requestId: 'req-1', capability: 'path-recommendation', params: {} } as any, { id: 'e-1' } as any),
+      backend.invoke(
+        { requestId: 'req-1', capability: 'path-recommendation', params: {} } as any,
+        { id: 'e-1' } as any
+      )
     );
 
     expect(response.status).toBe('deferred');
@@ -88,7 +94,10 @@ describe('NativeBackend', () => {
     } as Response);
 
     await firstValueFrom(
-      backend.invoke({ requestId: 'req-1', capability: 'test', params: {} } as any, { id: 'e-1' } as any),
+      backend.invoke(
+        { requestId: 'req-1', capability: 'test', params: {} } as any,
+        { id: 'e-1' } as any
+      )
     );
 
     const [, options] = fetchSpy.mock.calls[0];
@@ -115,7 +124,10 @@ describe('NativeBackend', () => {
     } as Response);
 
     await firstValueFrom(
-      noAuthBackend.invoke({ requestId: 'req-1', capability: 'test', params: {} } as any, { id: 'e-1' } as any),
+      noAuthBackend.invoke(
+        { requestId: 'req-1', capability: 'test', params: {} } as any,
+        { id: 'e-1' } as any
+      )
     );
 
     const [, options] = fetchSpy.mock.calls[0];
@@ -130,7 +142,10 @@ describe('NativeBackend', () => {
     } as Response);
 
     const response = await firstValueFrom(
-      backend.invoke({ requestId: 'req-1', capability: 'test', params: {} } as any, { id: 'e-1' } as any),
+      backend.invoke(
+        { requestId: 'req-1', capability: 'test', params: {} } as any,
+        { id: 'e-1' } as any
+      )
     );
 
     expect(response.status).toBe('declined');
@@ -141,7 +156,10 @@ describe('NativeBackend', () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'));
 
     const response = await firstValueFrom(
-      backend.invoke({ requestId: 'req-1', capability: 'test', params: {} } as any, { id: 'e-1' } as any),
+      backend.invoke(
+        { requestId: 'req-1', capability: 'test', params: {} } as any,
+        { id: 'e-1' } as any
+      )
     );
 
     expect(response.status).toBe('declined');
@@ -158,7 +176,7 @@ describe('NativeBackend', () => {
     expect(available).toBe(true);
     expect(fetchSpy).toHaveBeenCalledWith(
       '/api/v1/elohim/invoke/health',
-      expect.objectContaining({ method: 'GET' }),
+      expect.objectContaining({ method: 'GET' })
     );
   });
 

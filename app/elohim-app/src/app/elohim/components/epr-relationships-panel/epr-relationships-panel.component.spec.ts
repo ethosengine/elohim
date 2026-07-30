@@ -17,11 +17,17 @@ import type { EprRelationship } from '../../models/epr-head.model';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function queryAll(fixture: ComponentFixture<EprRelationshipsPanelComponent>, testId: string): NodeListOf<Element> {
+function queryAll(
+  fixture: ComponentFixture<EprRelationshipsPanelComponent>,
+  testId: string
+): NodeListOf<Element> {
   return fixture.nativeElement.querySelectorAll(`[data-testid="${testId}"]`);
 }
 
-function query(fixture: ComponentFixture<EprRelationshipsPanelComponent>, testId: string): Element | null {
+function query(
+  fixture: ComponentFixture<EprRelationshipsPanelComponent>,
+  testId: string
+): Element | null {
   return fixture.nativeElement.querySelector(`[data-testid="${testId}"]`);
 }
 
@@ -77,7 +83,7 @@ describe('EprRelationshipsPanelComponent', () => {
 
     // PREREQUISITE group is first; it should contain 2 cards
     const prerequisiteGroup = Array.from(groups).find(
-      (g) => g.getAttribute('data-type') === 'PREREQUISITE',
+      g => g.getAttribute('data-type') === 'PREREQUISITE'
     );
     expect(prerequisiteGroup).toBeTruthy();
     const cards = prerequisiteGroup!.querySelectorAll('[data-testid="epr-relationship-card"]');
@@ -98,7 +104,7 @@ describe('EprRelationshipsPanelComponent', () => {
     fixture.detectChanges();
 
     const groups = queryAll(fixture, 'epr-rel-group');
-    const types = Array.from(groups).map((g) => g.getAttribute('data-type'));
+    const types = Array.from(groups).map(g => g.getAttribute('data-type'));
     expect(types).toEqual(['PREREQUISITE', 'TEACHES', 'CONTAINS', 'REFERENCES']);
   });
 
@@ -124,7 +130,7 @@ describe('EprRelationshipsPanelComponent', () => {
     fixture.detectChanges();
 
     const groups = queryAll(fixture, 'epr-rel-group');
-    const types = Array.from(groups).map((g) => g.getAttribute('data-type'));
+    const types = Array.from(groups).map(g => g.getAttribute('data-type'));
     expect(types).toEqual(['REFERENCES', 'DERIVED_FROM']);
   });
 
@@ -139,7 +145,7 @@ describe('EprRelationshipsPanelComponent', () => {
     fixture.detectChanges();
 
     const groups = queryAll(fixture, 'epr-rel-group');
-    const types = Array.from(groups).map((g) => g.getAttribute('data-type'));
+    const types = Array.from(groups).map(g => g.getAttribute('data-type'));
     expect(types).toEqual(['TEACHES', 'CITES']);
   });
 });

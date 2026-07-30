@@ -5,13 +5,7 @@
  * Registered -> Hosted -> Graduating -> Steward
  */
 
-import {
-  Component,
-  OnInit,
-  inject,
-  signal,
-  computed,
-} from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DoorwayAdminService } from '../../../services/doorway-admin.service';
 import {

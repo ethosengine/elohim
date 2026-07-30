@@ -354,7 +354,7 @@ describe('EventService', () => {
           receiver: contentId,
           lamadEventType: 'content-view',
           contentId,
-        }),
+        })
       );
     });
 
@@ -368,7 +368,7 @@ describe('EventService', () => {
         expect.objectContaining({
           action: 'produce',
           lamadEventType: 'content-complete',
-        }),
+        })
       );
     });
   });

@@ -265,11 +265,21 @@
   gap: 1px;
 }
 
-.risk-segment { min-width: 2px; }
-.risk-segment.low { background: #4CAF50; }
-.risk-segment.moderate { background: #FFC107; }
-.risk-segment.elevated { background: #FF9800; }
-.risk-segment.critical { background: #F44336; }
+.risk-segment {
+  min-width: 2px;
+}
+.risk-segment.low {
+  background: #4caf50;
+}
+.risk-segment.moderate {
+  background: #ffc107;
+}
+.risk-segment.elevated {
+  background: #ff9800;
+}
+.risk-segment.critical {
+  background: #f44336;
+}
 
 .risk-legend {
   display: flex;
@@ -291,10 +301,18 @@
   display: inline-block;
 }
 
-.dot.low { background: #4CAF50; }
-.dot.moderate { background: #FFC107; }
-.dot.elevated { background: #FF9800; }
-.dot.critical { background: #F44336; }
+.dot.low {
+  background: #4caf50;
+}
+.dot.moderate {
+  background: #ffc107;
+}
+.dot.elevated {
+  background: #ff9800;
+}
+.dot.critical {
+  background: #f44336;
+}
 
 .place-list {
   flex: 1;
@@ -345,13 +363,25 @@
   text-transform: uppercase;
 }
 
-.risk-badge[data-tier="low"] { background: #E8F5E9; color: #2E7D32; }
-.risk-badge[data-tier="moderate"] { background: #FFF8E1; color: #F57F17; }
-.risk-badge[data-tier="elevated"] { background: #FFF3E0; color: #E65100; }
-.risk-badge[data-tier="critical"] { background: #FFEBEE; color: #C62828; }
+.risk-badge[data-tier='low'] {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.risk-badge[data-tier='moderate'] {
+  background: #fff8e1;
+  color: #f57f17;
+}
+.risk-badge[data-tier='elevated'] {
+  background: #fff3e0;
+  color: #e65100;
+}
+.risk-badge[data-tier='critical'] {
+  background: #ffebee;
+  color: #c62828;
+}
 
 .hazard-count {
-  background: #FF9800;
+  background: #ff9800;
   color: #fff;
   border-radius: 50%;
   width: 18px;
@@ -364,7 +394,7 @@
 }
 
 .alert-count {
-  background: #F44336;
+  background: #f44336;
   color: #fff;
   border-radius: 50%;
   width: 18px;

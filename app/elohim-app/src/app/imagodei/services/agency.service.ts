@@ -180,11 +180,9 @@ export class AgencyService {
     if (this.hostingAccountService.isLoading()) return;
 
     this.hostingAccountFetchInFlight = true;
-    void this.hostingAccountService
-      .loadAccount()
-      .finally(() => {
-        this.hostingAccountFetchInFlight = false;
-      });
+    void this.hostingAccountService.loadAccount().finally(() => {
+      this.hostingAccountFetchInFlight = false;
+    });
   }
 
   /**

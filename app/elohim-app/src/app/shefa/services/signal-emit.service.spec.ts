@@ -1,8 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 
 import { SignalEmitService, type SignalIntent } from './signal-emit.service';
@@ -73,10 +70,7 @@ describe('SignalEmitService', () => {
   it('returns error on HTTP 500', async () => {
     const promise = service.tryEmit(stubIntent);
     const req = httpMock.expectOne('/api/v1/signal/emit');
-    req.flush(
-      { error: 'ingest failed' },
-      { status: 500, statusText: 'Internal Server Error' }
-    );
+    req.flush({ error: 'ingest failed' }, { status: 500, statusText: 'Internal Server Error' });
 
     const result = await promise;
     expect(result.status).toBe('error');

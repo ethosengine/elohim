@@ -158,5 +158,4 @@ describe('HomeComponent', () => {
     expect(compiled.querySelector('app-call-to-action')).toBeTruthy();
     expect(compiled.querySelector('app-footer')).toBeTruthy();
   });
-
 });

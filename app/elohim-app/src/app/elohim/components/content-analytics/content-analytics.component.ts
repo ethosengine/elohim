@@ -57,7 +57,7 @@ export class ContentAnalyticsComponent implements OnChanges {
     // GET /api/v1/lamad/content/{contentId}/engagement.
     // completionRate is pre-computed by the projection writer (0.0 when views == 0).
     this.storageClient.getContentEngagement(this.contentId).subscribe({
-      next: (stats) => {
+      next: stats => {
         this.viewCount = Number(stats.views);
         this.completionCount = Number(stats.completions);
         this.completionRate = Math.round(stats.completionRate * 100);

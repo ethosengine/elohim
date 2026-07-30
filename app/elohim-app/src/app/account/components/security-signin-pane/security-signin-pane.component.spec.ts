@@ -131,7 +131,7 @@ describe('SecuritySigninPaneComponent', () => {
     const fixture = TestBed.createComponent(SecuritySigninPaneComponent);
     fixture.detectChanges();
     const title = (fixture.nativeElement as HTMLElement).querySelector(
-      '[data-testid="pane-title-security"]',
+      '[data-testid="pane-title-security"]'
     );
     expect(title).toBeTruthy();
     expect(title?.textContent?.trim()).toBe('Security & sign-in');
@@ -158,7 +158,7 @@ describe('SecuritySigninPaneComponent', () => {
         makeAccount({
           isSteward: true,
           portalHosts: [makePortalHost({ lastReachableAt: '2026-06-04T00:00:00Z' })],
-        }),
+        })
       );
       const fixture = TestBed.createComponent(SecuritySigninPaneComponent);
       fixture.detectChanges();
@@ -173,7 +173,7 @@ describe('SecuritySigninPaneComponent', () => {
         makeAccount({
           isSteward: false,
           portalHosts: [makePortalHost({ lastReachableAt: '2026-06-04T00:00:00Z' })],
-        }),
+        })
       );
       const fixture = TestBed.createComponent(SecuritySigninPaneComponent);
       fixture.detectChanges();
@@ -188,7 +188,7 @@ describe('SecuritySigninPaneComponent', () => {
           isSteward: true,
           // Host present but never reachable (probe failed / fall-through scenario).
           portalHosts: [makePortalHost({ lastReachableAt: null })],
-        }),
+        })
       );
       const fixture = TestBed.createComponent(SecuritySigninPaneComponent);
       fixture.detectChanges();
@@ -205,9 +205,7 @@ describe('SecuritySigninPaneComponent', () => {
       const fixture = TestBed.createComponent(SecuritySigninPaneComponent);
       fixture.detectChanges();
 
-      expect(
-        (fixture.nativeElement as HTMLElement).querySelector(REDIRECT_TESTID),
-      ).toBeNull();
+      expect((fixture.nativeElement as HTMLElement).querySelector(REDIRECT_TESTID)).toBeNull();
     });
 
     it('carries accessible labeling (aria-label) on the redirect button', () => {
@@ -215,7 +213,7 @@ describe('SecuritySigninPaneComponent', () => {
         makeAccount({
           isSteward: true,
           portalHosts: [makePortalHost()],
-        }),
+        })
       );
       const fixture = TestBed.createComponent(SecuritySigninPaneComponent);
       fixture.detectChanges();
@@ -236,24 +234,22 @@ describe('SecuritySigninPaneComponent', () => {
               lastReachableAt: '2026-06-04T00:00:00Z',
             }),
           ],
-        }),
+        })
       );
       const fixture = TestBed.createComponent(SecuritySigninPaneComponent);
       fixture.detectChanges();
       const btn = (fixture.nativeElement as HTMLElement).querySelector(
-        REDIRECT_TESTID,
+        REDIRECT_TESTID
       ) as HTMLButtonElement;
       btn.click();
       // Let the async mint-then-redirect handler settle.
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 0));
     }
 
     it('redirects to the portal host URL with a MINTED single-use code, never the JWT', async () => {
       await clickRedirect();
       const target = new URL(hrefSink.href);
-      expect(`${target.origin}${target.pathname}`).toBe(
-        'https://matthew.steward.example/account',
-      );
+      expect(`${target.origin}${target.pathname}`).toBe('https://matthew.steward.example/account');
       expect(mintCalls).toBe(1);
       expect(target.searchParams.get('session_token')).toBe('minted-single-use-code');
       // The redeeming portal needs the issuer origin for the back-channel call.

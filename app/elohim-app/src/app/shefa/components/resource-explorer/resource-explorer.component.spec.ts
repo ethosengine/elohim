@@ -23,7 +23,7 @@ import { ResourceExplorerComponent } from './resource-explorer.component';
 // =============================================================================
 
 const MOCK_ALLOCATION = (
-  overrides: Partial<StewardshipAllocationView> = {},
+  overrides: Partial<StewardshipAllocationView> = {}
 ): StewardshipAllocationView => ({
   id: 'alloc-1',
   hAppId: 'elohim',
@@ -55,7 +55,7 @@ const MOCK_ALLOCATION = (
 });
 
 const MOCK_RESILIENCE = (
-  overrides: Partial<HouseholdResilienceView> = {},
+  overrides: Partial<HouseholdResilienceView> = {}
 ): HouseholdResilienceView => ({
   contentId: 'content-abc',
   householdsStewarding: 3,
@@ -153,7 +153,13 @@ describe('ResourceExplorerComponent — category:content lens', () => {
     const alloc = MOCK_ALLOCATION({ contentId: 'content-abc', allocationRatio: 0.8 });
     mockStewardshipAllocation.listForHousehold.mockReturnValue(of([alloc]));
     mockHouseholdResilience.get.mockReturnValue(
-      of(MOCK_RESILIENCE({ contentId: 'content-abc', protectionStatus: 'protected', householdsStewarding: 3 })),
+      of(
+        MOCK_RESILIENCE({
+          contentId: 'content-abc',
+          protectionStatus: 'protected',
+          householdsStewarding: 3,
+        })
+      )
     );
 
     await setup('category:content');
@@ -175,7 +181,13 @@ describe('ResourceExplorerComponent — category:content lens', () => {
     const alloc = MOCK_ALLOCATION({ contentId: 'content-abc', allocationRatio: 1.0 });
     mockStewardshipAllocation.listForHousehold.mockReturnValue(of([alloc]));
     mockHouseholdResilience.get.mockReturnValue(
-      of(MOCK_RESILIENCE({ contentId: 'content-abc', protectionStatus: 'partial', householdsStewarding: 2 })),
+      of(
+        MOCK_RESILIENCE({
+          contentId: 'content-abc',
+          protectionStatus: 'partial',
+          householdsStewarding: 2,
+        })
+      )
     );
 
     await setup('category:content');

@@ -43,10 +43,7 @@ describe('GateInteractionService', () => {
     httpMock = { post: vi.fn().mockReturnValue(of({})) };
 
     TestBed.configureTestingModule({
-      providers: [
-        GateInteractionService,
-        { provide: HttpClient, useValue: httpMock },
-      ],
+      providers: [GateInteractionService, { provide: HttpClient, useValue: httpMock }],
     });
     service = TestBed.inject(GateInteractionService);
     gateService = TestBed.inject(GateService);
@@ -69,36 +66,34 @@ describe('GateInteractionService', () => {
   // --- Reach tier computation ---
 
   it('should return private when settlementBoundary is present', () => {
-    service.handleGateEvaluation(
-      makeEvaluation({ settlementBoundary: 'constitutional-limit' }),
-    );
+    service.handleGateEvaluation(makeEvaluation({ settlementBoundary: 'constitutional-limit' }));
     expect(service.reachTier()).toBe('private');
   });
 
   it('should return close for low trust (0.2)', () => {
     service.handleGateEvaluation(
-      makeEvaluation({ trustContext: makeTrustContext({ compositeTrust: 0.2 }) }),
+      makeEvaluation({ trustContext: makeTrustContext({ compositeTrust: 0.2 }) })
     );
     expect(service.reachTier()).toBe('close');
   });
 
   it('should return community for mid trust (0.45)', () => {
     service.handleGateEvaluation(
-      makeEvaluation({ trustContext: makeTrustContext({ compositeTrust: 0.45 }) }),
+      makeEvaluation({ trustContext: makeTrustContext({ compositeTrust: 0.45 }) })
     );
     expect(service.reachTier()).toBe('community');
   });
 
   it('should return network for high trust (0.75)', () => {
     service.handleGateEvaluation(
-      makeEvaluation({ trustContext: makeTrustContext({ compositeTrust: 0.75 }) }),
+      makeEvaluation({ trustContext: makeTrustContext({ compositeTrust: 0.75 }) })
     );
     expect(service.reachTier()).toBe('network');
   });
 
   it('should return constitutional for very high trust (0.9)', () => {
     service.handleGateEvaluation(
-      makeEvaluation({ trustContext: makeTrustContext({ compositeTrust: 0.9 }) }),
+      makeEvaluation({ trustContext: makeTrustContext({ compositeTrust: 0.9 }) })
     );
     expect(service.reachTier()).toBe('constitutional');
   });
@@ -123,7 +118,7 @@ describe('GateInteractionService', () => {
       makeEvaluation({
         pausePrompt: 'Are you sure?',
         confirmToken: 'tok-123',
-      }),
+      })
     );
     expect(service.state()).toBe('dialogue');
   });
@@ -134,7 +129,7 @@ describe('GateInteractionService', () => {
       makeEvaluation({
         settlementBoundary: 'constitutional-limit',
         appealPath: '/appeal/1',
-      }),
+      })
     );
     expect(service.state()).toBe('settled');
   });
@@ -154,9 +149,7 @@ describe('GateInteractionService', () => {
 
   it('should transition back to draft with new text on revise', () => {
     service.submit('original', 'create', {});
-    service.handleGateEvaluation(
-      makeEvaluation({ pausePrompt: 'Pause', confirmToken: 'tok' }),
-    );
+    service.handleGateEvaluation(makeEvaluation({ pausePrompt: 'Pause', confirmToken: 'tok' }));
     expect(service.state()).toBe('dialogue');
 
     service.revise('revised text');
@@ -168,9 +161,7 @@ describe('GateInteractionService', () => {
 
   it('should transition from draft to evaluating on resubmit', () => {
     service.submit('text', 'create', {});
-    service.handleGateEvaluation(
-      makeEvaluation({ pausePrompt: 'Pause', confirmToken: 'tok' }),
-    );
+    service.handleGateEvaluation(makeEvaluation({ pausePrompt: 'Pause', confirmToken: 'tok' }));
     service.revise('new text');
     expect(service.state()).toBe('draft');
 
@@ -253,9 +244,7 @@ describe('GateInteractionService', () => {
       pausePrompt: 'Are you sure?',
       confirmToken: 'tok-123',
     });
-    const apiCall = vi
-      .fn()
-      .mockReturnValue(throwError(() => ({ status: 409, error: { gate } })));
+    const apiCall = vi.fn().mockReturnValue(throwError(() => ({ status: 409, error: { gate } })));
 
     service.submitWithApi('hello', 'create', {}, apiCall);
 
@@ -268,9 +257,7 @@ describe('GateInteractionService', () => {
       settlementBoundary: 'constitutional-limit',
       appealPath: '/appeal/1',
     });
-    const apiCall = vi
-      .fn()
-      .mockReturnValue(throwError(() => ({ status: 403, error: { gate } })));
+    const apiCall = vi.fn().mockReturnValue(throwError(() => ({ status: 403, error: { gate } })));
 
     service.submitWithApi('hello', 'create', {}, apiCall);
 
@@ -279,9 +266,7 @@ describe('GateInteractionService', () => {
   });
 
   it('submitWithApi reverts to draft on network error', () => {
-    const apiCall = vi
-      .fn()
-      .mockReturnValue(throwError(() => ({ status: 0, error: null })));
+    const apiCall = vi.fn().mockReturnValue(throwError(() => ({ status: 0, error: null })));
 
     service.submitWithApi('hello', 'create', {}, apiCall);
 

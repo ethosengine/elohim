@@ -367,7 +367,7 @@ describe('StorageApiService', () => {
       const req = httpMock.expectOne(
         request =>
           request.url.includes('/api/v1/presence') &&
-          request.params.get('establishingContent') === 'content-42',
+          request.params.get('establishingContent') === 'content-42'
       );
       req.flush(mockPresences);
       tick();
@@ -658,8 +658,7 @@ describe('StorageApiService', () => {
 
       const req = httpMock.expectOne(
         request =>
-          request.method === 'POST' &&
-          request.url.includes('/api/v1/stewardship/allocations')
+          request.method === 'POST' && request.url.includes('/api/v1/stewardship/allocations')
       );
 
       expect(req.request.body.allocationRatio).toBe(1);

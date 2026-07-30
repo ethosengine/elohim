@@ -1,8 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 
 import { CustodianMetricsApiService } from './custodian-metrics-api.service';
@@ -91,11 +88,7 @@ describe('CustodianMetricsApiService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        CustodianMetricsApiService,
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [CustodianMetricsApiService, provideHttpClient(), provideHttpClientTesting()],
     });
     service = TestBed.inject(CustodianMetricsApiService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -131,7 +124,7 @@ describe('CustodianMetricsApiService', () => {
   it('getRankedByHealth calls GET with rank=health param', async () => {
     const promise = service.getRankedByHealth();
     const req = httpMock.expectOne(
-      (r) => r.url === '/api/v1/custodians/metrics' && r.params.get('rank') === 'health'
+      r => r.url === '/api/v1/custodians/metrics' && r.params.get('rank') === 'health'
     );
     expect(req.request.method).toBe('GET');
     req.flush([stubMetrics]);
@@ -141,7 +134,7 @@ describe('CustodianMetricsApiService', () => {
   it('getRankedByHealth passes limit param', async () => {
     const promise = service.getRankedByHealth(5);
     const req = httpMock.expectOne(
-      (r) =>
+      r =>
         r.url === '/api/v1/custodians/metrics' &&
         r.params.get('rank') === 'health' &&
         r.params.get('limit') === '5'
@@ -154,7 +147,7 @@ describe('CustodianMetricsApiService', () => {
   it('getRankedBySpeed calls GET with rank=speed param', async () => {
     const promise = service.getRankedBySpeed();
     const req = httpMock.expectOne(
-      (r) => r.url === '/api/v1/custodians/metrics' && r.params.get('rank') === 'speed'
+      r => r.url === '/api/v1/custodians/metrics' && r.params.get('rank') === 'speed'
     );
     expect(req.request.method).toBe('GET');
     req.flush([stubMetrics]);
@@ -164,8 +157,7 @@ describe('CustodianMetricsApiService', () => {
   it('getRankedByReputation calls GET with rank=reputation param', async () => {
     const promise = service.getRankedByReputation();
     const req = httpMock.expectOne(
-      (r) =>
-        r.url === '/api/v1/custodians/metrics' && r.params.get('rank') === 'reputation'
+      r => r.url === '/api/v1/custodians/metrics' && r.params.get('rank') === 'reputation'
     );
     expect(req.request.method).toBe('GET');
     req.flush([stubMetrics]);
@@ -175,8 +167,7 @@ describe('CustodianMetricsApiService', () => {
   it('getAvailableCustodians calls GET with available=true param', async () => {
     const promise = service.getAvailableCustodians();
     const req = httpMock.expectOne(
-      (r) =>
-        r.url === '/api/v1/custodians/metrics' && r.params.get('available') === 'true'
+      r => r.url === '/api/v1/custodians/metrics' && r.params.get('available') === 'true'
     );
     expect(req.request.method).toBe('GET');
     req.flush([stubMetrics]);

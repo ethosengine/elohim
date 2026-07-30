@@ -14,13 +14,7 @@
 
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import {
-  Component,
-  OnInit,
-  OnDestroy,
-  inject,
-  signal,
-} from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 
 import { catchError, map, switchMap, takeUntil } from 'rxjs/operators';
 

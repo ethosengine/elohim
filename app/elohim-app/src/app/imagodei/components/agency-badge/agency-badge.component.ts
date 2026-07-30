@@ -6,13 +6,7 @@
  */
 
 import { CommonModule } from '@angular/common';
-import {
-  Component,
-  inject,
-  signal,
-  output,
-  computed,
-} from '@angular/core';
+import { Component, inject, signal, output, computed } from '@angular/core';
 import { Router } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)

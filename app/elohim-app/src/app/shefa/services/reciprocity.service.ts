@@ -61,7 +61,7 @@ export class ReciprocityService {
       this.http.post<GraphQLEnvelope<ViewerReciprocityResponse>>('/api/v1/graphql', {
         query: VIEWER_RECIPROCITY_QUERY,
         variables,
-      }),
+      })
     );
     if (envelope.errors?.length) {
       throw new Error(`GraphQL error: ${envelope.errors.map(e => e.message).join('; ')}`);

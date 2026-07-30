@@ -344,7 +344,7 @@ export function parseFederatedIdentifier(identifier: string): {
  */
 export function resolveGatewayToDoorwayUrl(
   gatewayDomain: string,
-  knownDoorways: DoorwayInfo[] = BOOTSTRAP_DOORWAYS,
+  knownDoorways: DoorwayInfo[] = BOOTSTRAP_DOORWAYS
 ): string {
   const outcome = _resolveGateway(gatewayDomain, knownDoorways);
   return outcome.ok ? outcome.doorway.url : `https://${gatewayDomain}`;

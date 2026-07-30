@@ -20,10 +20,13 @@
         <div class="toolbar-skeleton"></div>
       } @else if (authState.isAuthenticated()) {
         <!-- Profile Bubble -->
-        <button class="profile-bubble" (click)="toggleDropdown($event)"
-                [attr.aria-expanded]="dropdownOpen()"
-                aria-haspopup="true"
-                data-testid="toolbar-profile-bubble">
+        <button
+          class="profile-bubble"
+          (click)="toggleDropdown($event)"
+          [attr.aria-expanded]="dropdownOpen()"
+          aria-haspopup="true"
+          data-testid="toolbar-profile-bubble"
+        >
           <span class="profile-initials">{{ authState.initials() }}</span>
         </button>
 
@@ -38,12 +41,29 @@
               </div>
             </div>
             <div class="dropdown-divider"></div>
-            <a routerLink="/account" class="dropdown-item" role="menuitem" (click)="closeDropdown()">My Account</a>
+            <a
+              routerLink="/account"
+              class="dropdown-item"
+              role="menuitem"
+              (click)="closeDropdown()"
+            >
+              My Account
+            </a>
             @if (authState.isSteward()) {
-              <a href="/identity/profile" class="dropdown-item" role="menuitem">Imagodei Profile <span class="external-icon">&#8599;</span></a>
+              <a href="/identity/profile" class="dropdown-item" role="menuitem">
+                Imagodei Profile
+                <span class="external-icon">&#8599;</span>
+              </a>
             } @else {
-              <a routerLink="/account" fragment="graduation" class="dropdown-item cta" role="menuitem"
-                 (click)="closeDropdown()">Become a Steward</a>
+              <a
+                routerLink="/account"
+                fragment="graduation"
+                class="dropdown-item cta"
+                role="menuitem"
+                (click)="closeDropdown()"
+              >
+                Become a Steward
+              </a>
             }
             <div class="dropdown-divider"></div>
             <div class="dropdown-row">
@@ -51,7 +71,14 @@
               <app-theme-toggle [inline]="true" />
             </div>
             <div class="dropdown-divider"></div>
-            <button class="dropdown-item logout" role="menuitem" (click)="onLogout()" data-testid="toolbar-logout">Sign Out</button>
+            <button
+              class="dropdown-item logout"
+              role="menuitem"
+              (click)="onLogout()"
+              data-testid="toolbar-logout"
+            >
+              Sign Out
+            </button>
           </div>
         }
       } @else {
@@ -64,6 +91,10 @@
   </div>
 </header>
 @if (dropdownOpen()) {
-  <button class="dropdown-backdrop" aria-label="Close menu" data-testid="toolbar-backdrop"
-          (click)="closeDropdown()"></button>
+  <button
+    class="dropdown-backdrop"
+    aria-label="Close menu"
+    data-testid="toolbar-backdrop"
+    (click)="closeDropdown()"
+  ></button>
 }

@@ -601,7 +601,9 @@ describe('IdentityService', () => {
     });
 
     it('should call identityApi.createHuman', async () => {
-      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockResolvedValue(createMockHumanSessionResult());
+      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockResolvedValue(
+        createMockHumanSessionResult()
+      );
 
       await service.registerHumanNative(mockRequest);
 
@@ -615,7 +617,9 @@ describe('IdentityService', () => {
     });
 
     it('should return profile on success', async () => {
-      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockResolvedValue(createMockHumanSessionResult());
+      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockResolvedValue(
+        createMockHumanSessionResult()
+      );
 
       const profile = await service.registerHumanNative(mockRequest);
 
@@ -624,7 +628,9 @@ describe('IdentityService', () => {
     });
 
     it('should update state to steward mode on success (local conductor)', async () => {
-      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockResolvedValue(createMockHumanSessionResult());
+      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockResolvedValue(
+        createMockHumanSessionResult()
+      );
 
       // Local conductor has localhost URL
       mockHolochainClient.getDisplayInfo.mockReturnValue({
@@ -638,13 +644,17 @@ describe('IdentityService', () => {
     });
 
     it('should throw if identity API returns failure', async () => {
-      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Zome error'));
+      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('Zome error')
+      );
 
       await expect(service.registerHumanNative(mockRequest)).rejects.toThrow('Zome error');
     });
 
     it('should set error state if registration fails', async () => {
-      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Conductor offline'));
+      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('Conductor offline')
+      );
 
       await expect(service.registerHumanNative(mockRequest)).rejects.toThrow('Conductor offline');
       expect(service.error()).toBe('Conductor offline');
@@ -680,7 +690,9 @@ describe('IdentityService', () => {
       });
 
       it('should call identityApi.getMyHuman', async () => {
-        (mockIdentityApi.getMyHuman as ReturnType<typeof vi.fn>).mockResolvedValue(createMockHumanSessionResult());
+        (mockIdentityApi.getMyHuman as ReturnType<typeof vi.fn>).mockResolvedValue(
+          createMockHumanSessionResult()
+        );
 
         await service.getCurrentHuman();
 
@@ -688,7 +700,9 @@ describe('IdentityService', () => {
       });
 
       it('should return mapped profile on success', async () => {
-        (mockIdentityApi.getMyHuman as ReturnType<typeof vi.fn>).mockResolvedValue(createMockHumanSessionResult());
+        (mockIdentityApi.getMyHuman as ReturnType<typeof vi.fn>).mockResolvedValue(
+          createMockHumanSessionResult()
+        );
 
         const profile = await service.getCurrentHuman();
 
@@ -705,7 +719,9 @@ describe('IdentityService', () => {
       });
 
       it('should return null and not throw on expected errors', async () => {
-        (mockIdentityApi.getMyHuman as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('User not found'));
+        (mockIdentityApi.getMyHuman as ReturnType<typeof vi.fn>).mockRejectedValue(
+          new Error('User not found')
+        );
 
         const result = await service.getCurrentHuman();
         expect(result).toBeNull();
@@ -790,7 +806,9 @@ describe('IdentityService', () => {
           },
         };
 
-        (mockIdentityApi.updateHuman as ReturnType<typeof vi.fn>).mockResolvedValue(mockUpdateResult);
+        (mockIdentityApi.updateHuman as ReturnType<typeof vi.fn>).mockResolvedValue(
+          mockUpdateResult
+        );
 
         await service.updateProfile(mockUpdateRequest);
 
@@ -817,7 +835,9 @@ describe('IdentityService', () => {
           },
         };
 
-        (mockIdentityApi.updateHuman as ReturnType<typeof vi.fn>).mockResolvedValue(mockUpdateResult);
+        (mockIdentityApi.updateHuman as ReturnType<typeof vi.fn>).mockResolvedValue(
+          mockUpdateResult
+        );
 
         const profile = await service.updateProfile(mockUpdateRequest);
 
@@ -826,7 +846,9 @@ describe('IdentityService', () => {
       });
 
       it('should throw if identity API returns failure', async () => {
-        (mockIdentityApi.updateHuman as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Update failed'));
+        (mockIdentityApi.updateHuman as ReturnType<typeof vi.fn>).mockRejectedValue(
+          new Error('Update failed')
+        );
 
         await expect(service.updateProfile(mockUpdateRequest)).rejects.toThrow('Update failed');
       });

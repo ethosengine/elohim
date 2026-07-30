@@ -75,7 +75,7 @@ describe('VoteAsEcComponent', () => {
           hostingDoorwayPubkey: 'doorway-pub',
           proposedAuthorityKind: 'intimateQuorum',
           proposedAuthorityJson: '{}',
-          requestNonce: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          requestNonce: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
           humanId: 'human-2',
           requiredWitnessCount: 2,
           createdAt: '2024-07-01T00:00:00Z',
@@ -106,7 +106,7 @@ describe('VoteAsEcComponent', () => {
           hostingDoorwayPubkey: 'doorway-pub',
           proposedAuthorityKind: 'intimateQuorum',
           proposedAuthorityJson: '{}',
-          requestNonce: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          requestNonce: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
           humanId: 'human-2',
           requiredWitnessCount: 2,
           createdAt: '2024-07-01T00:00:00Z',
@@ -121,7 +121,7 @@ describe('VoteAsEcComponent', () => {
     fixture.detectChanges();
 
     const errorEl = (fixture.nativeElement as HTMLElement).querySelector(
-      '[data-testid="vote-error"]',
+      '[data-testid="vote-error"]'
     );
     expect(errorEl).toBeTruthy();
     expect(errorEl?.textContent).toContain('Phase 11');

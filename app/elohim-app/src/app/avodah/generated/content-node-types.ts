@@ -9,10 +9,14 @@ export type AvodahTypedContentNode =
   | (ContentView & { contentType: 'work-project'; metadata: WorkProjectMeta })
   | (ContentView & { contentType: string; metadata: Record<string, unknown> });
 
-export function isWorkStoryNode<T extends { contentType: string }>(node: T): node is T & { contentType: 'work-story'; metadata: WorkStoryMeta } {
+export function isWorkStoryNode<T extends { contentType: string }>(
+  node: T
+): node is T & { contentType: 'work-story'; metadata: WorkStoryMeta } {
   return node.contentType === 'work-story';
 }
 
-export function isWorkProjectNode<T extends { contentType: string }>(node: T): node is T & { contentType: 'work-project'; metadata: WorkProjectMeta } {
+export function isWorkProjectNode<T extends { contentType: string }>(
+  node: T
+): node is T & { contentType: 'work-project'; metadata: WorkProjectMeta } {
   return node.contentType === 'work-project';
 }

@@ -8,9 +8,7 @@ import type { GateEvaluationView, TrustContextView } from '@elohim/storage-clien
 import { GateArtifactCardComponent } from '../gate-artifact-card/gate-artifact-card.component';
 import { GateFeedbackModalComponent } from './gate-feedback-modal.component';
 
-function makeTrustContext(
-  overrides: Partial<TrustContextView> = {},
-): TrustContextView {
+function makeTrustContext(overrides: Partial<TrustContextView> = {}): TrustContextView {
   return {
     compositeTrust: 0.5,
     masteryDepth: 0.5,
@@ -24,9 +22,7 @@ function makeTrustContext(
   };
 }
 
-function makeEvaluation(
-  overrides: Partial<GateEvaluationView> = {},
-): GateEvaluationView {
+function makeEvaluation(overrides: Partial<GateEvaluationView> = {}): GateEvaluationView {
   return {
     tier: 'standard',
     trustContext: makeTrustContext(),
@@ -60,23 +56,17 @@ describe('GateFeedbackModalComponent', () => {
   // --- Modal structure ---
 
   it('should render modal backdrop', () => {
-    const backdrop = fixture.nativeElement.querySelector(
-      '[data-testid="feedback-modal-backdrop"]',
-    );
+    const backdrop = fixture.nativeElement.querySelector('[data-testid="feedback-modal-backdrop"]');
     expect(backdrop).toBeTruthy();
   });
 
   it('should render modal panel', () => {
-    const panel = fixture.nativeElement.querySelector(
-      '[data-testid="feedback-modal-panel"]',
-    );
+    const panel = fixture.nativeElement.querySelector('[data-testid="feedback-modal-panel"]');
     expect(panel).toBeTruthy();
   });
 
   it('should render close button', () => {
-    const btn = fixture.nativeElement.querySelector(
-      '[data-testid="feedback-modal-close"]',
-    );
+    const btn = fixture.nativeElement.querySelector('[data-testid="feedback-modal-close"]');
     expect(btn).toBeTruthy();
   });
 
@@ -91,9 +81,7 @@ describe('GateFeedbackModalComponent', () => {
     fixture.componentRef.setInput('feedbackType', 'feedback');
     fixture.detectChanges();
 
-    const title = fixture.nativeElement.querySelector(
-      '[data-testid="feedback-modal-panel"]',
-    );
+    const title = fixture.nativeElement.querySelector('[data-testid="feedback-modal-panel"]');
     expect(title.textContent).toContain('Share Feedback');
   });
 
@@ -101,9 +89,7 @@ describe('GateFeedbackModalComponent', () => {
     fixture.componentRef.setInput('feedbackType', 'flag');
     fixture.detectChanges();
 
-    const title = fixture.nativeElement.querySelector(
-      '[data-testid="feedback-modal-panel"]',
-    );
+    const title = fixture.nativeElement.querySelector('[data-testid="feedback-modal-panel"]');
     expect(title.textContent).toContain('Flag Content');
   });
 
@@ -111,9 +97,7 @@ describe('GateFeedbackModalComponent', () => {
     fixture.componentRef.setInput('feedbackType', 'challenge');
     fixture.detectChanges();
 
-    const title = fixture.nativeElement.querySelector(
-      '[data-testid="feedback-modal-panel"]',
-    );
+    const title = fixture.nativeElement.querySelector('[data-testid="feedback-modal-panel"]');
     expect(title.textContent).toContain('Challenge Content');
   });
 
@@ -123,9 +107,7 @@ describe('GateFeedbackModalComponent', () => {
     fixture.componentRef.setInput('feedbackType', 'flag');
     fixture.detectChanges();
 
-    const textarea = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-textarea"]',
-    );
+    const textarea = fixture.nativeElement.querySelector('[data-testid="artifact-textarea"]');
     expect(textarea).toBeTruthy();
     expect(textarea.getAttribute('placeholder')).toBe('Describe the issue...');
   });
@@ -134,9 +116,7 @@ describe('GateFeedbackModalComponent', () => {
     fixture.componentRef.setInput('feedbackType', 'challenge');
     fixture.detectChanges();
 
-    const textarea = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-textarea"]',
-    );
+    const textarea = fixture.nativeElement.querySelector('[data-testid="artifact-textarea"]');
     expect(textarea).toBeTruthy();
     expect(textarea.getAttribute('placeholder')).toBe('State your case...');
   });
@@ -145,30 +125,22 @@ describe('GateFeedbackModalComponent', () => {
     fixture.componentRef.setInput('feedbackType', 'feedback');
     fixture.detectChanges();
 
-    const textarea = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-textarea"]',
-    );
+    const textarea = fixture.nativeElement.querySelector('[data-testid="artifact-textarea"]');
     expect(textarea).toBeTruthy();
-    expect(textarea.getAttribute('placeholder')).toBe(
-      'Share your thoughts...',
-    );
+    expect(textarea.getAttribute('placeholder')).toBe('Share your thoughts...');
   });
 
   it('should render "Report Issue" title for report type', () => {
     fixture.componentRef.setInput('feedbackType', 'report');
     fixture.detectChanges();
-    const title = fixture.nativeElement.querySelector(
-      '[data-testid="feedback-modal-title"]',
-    );
+    const title = fixture.nativeElement.querySelector('[data-testid="feedback-modal-title"]');
     expect(title.textContent.trim()).toBe('Report Issue');
   });
 
   it('should set placeholder to "What happened?" for report type', () => {
     fixture.componentRef.setInput('feedbackType', 'report');
     fixture.detectChanges();
-    const textarea = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-textarea"]',
-    );
+    const textarea = fixture.nativeElement.querySelector('[data-testid="artifact-textarea"]');
     expect(textarea.getAttribute('placeholder')).toBe('What happened?');
   });
 
@@ -179,7 +151,7 @@ describe('GateFeedbackModalComponent', () => {
     component.closed.subscribe(closedSpy);
 
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="feedback-modal-close"]',
+      '[data-testid="feedback-modal-close"]'
     );
     btn.click();
     fixture.detectChanges();
@@ -192,7 +164,7 @@ describe('GateFeedbackModalComponent', () => {
     component.closed.subscribe(closedSpy);
 
     const backdrop: HTMLElement = fixture.nativeElement.querySelector(
-      '[data-testid="feedback-modal-backdrop"]',
+      '[data-testid="feedback-modal-backdrop"]'
     );
     backdrop.click();
     fixture.detectChanges();
@@ -205,7 +177,7 @@ describe('GateFeedbackModalComponent', () => {
     component.closed.subscribe(closedSpy);
 
     const panel: HTMLElement = fixture.nativeElement.querySelector(
-      '[data-testid="feedback-modal-panel"]',
+      '[data-testid="feedback-modal-panel"]'
     );
     panel.click();
     fixture.detectChanges();
@@ -229,7 +201,7 @@ describe('GateFeedbackModalComponent', () => {
     // Click affirm on the inner card
     httpMock.post.mockReturnValue(of({}));
     const affirmBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="artifact-affirm"]',
+      '[data-testid="artifact-affirm"]'
     );
     affirmBtn.click();
     fixture.detectChanges();
@@ -251,7 +223,7 @@ describe('GateFeedbackModalComponent', () => {
       makeEvaluation({
         settlementBoundary: 'constitutional-limit',
         appealPath: '/appeal/1',
-      }),
+      })
     );
     fixture.detectChanges();
 

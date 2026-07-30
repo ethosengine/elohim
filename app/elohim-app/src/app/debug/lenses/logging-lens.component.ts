@@ -1,11 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  Component,
-  OnInit,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { LoggerService, LogLevel } from '../../elohim/services/logger.service';
 import { DebugContextService } from '../../elohim/services/debug-context.service';
 

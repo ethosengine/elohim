@@ -343,15 +343,9 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should set loading to false even on error', async () => {
-      mockEconomicService.getEventsByProvider.mockReturnValue(
-        Promise.reject(new Error('Error'))
-      );
-      mockEconomicService.getEventsByReceiver.mockReturnValue(
-        Promise.reject(new Error('Error'))
-      );
-      mockEconomicService.getAppreciationsFor.mockReturnValue(
-        Promise.reject(new Error('Error'))
-      );
+      mockEconomicService.getEventsByProvider.mockReturnValue(Promise.reject(new Error('Error')));
+      mockEconomicService.getEventsByReceiver.mockReturnValue(Promise.reject(new Error('Error')));
+      mockEconomicService.getAppreciationsFor.mockReturnValue(Promise.reject(new Error('Error')));
 
       fixture.detectChanges();
       await waitForLoadData();

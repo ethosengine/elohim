@@ -25,7 +25,11 @@ export const AVODAH_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
   'work-story': {
     value: {
       onConsume: { action: 'use', resourceConformsTo: 'work-capacity', recognition: 'work-credit' },
-      onComplete: { action: 'produce', resourceConformsTo: 'work-output', recognition: 'work-credit' },
+      onComplete: {
+        action: 'produce',
+        resourceConformsTo: 'work-output',
+        recognition: 'work-credit',
+      },
     },
     governance: {
       defaultReach: 'community',
@@ -36,7 +40,11 @@ export const AVODAH_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
   },
   'work-project': {
     value: {
-      onContribute: { action: 'produce', resourceConformsTo: 'project-milestone', recognition: 'stewardship-standing' },
+      onContribute: {
+        action: 'produce',
+        resourceConformsTo: 'project-milestone',
+        recognition: 'stewardship-standing',
+      },
     },
     governance: {
       defaultReach: 'community',

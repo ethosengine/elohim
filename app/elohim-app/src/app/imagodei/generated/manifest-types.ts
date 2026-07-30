@@ -58,7 +58,7 @@ export const IMAGODEI_OBSERVATION_KINDS: ObservationKindDeclaration[] = [
     kind: 'imagodei:presence-tick',
     namespace: 'elohim/observations/imagodei',
     schema: {
-    device_cid: 'Cid',
+      device_cid: 'Cid',
     },
     retention_class: 'operational',
     reach: 'community',

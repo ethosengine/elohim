@@ -102,7 +102,7 @@ export class AuthStateService {
     try {
       await Promise.race([
         this.sessionClient.logout().catch(() => undefined),
-        new Promise(res => setTimeout(res, 30_000))
+        new Promise(res => setTimeout(res, 30_000)),
       ]);
     } catch {
       // Race never rejects, but catch for safety.

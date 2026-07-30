@@ -502,9 +502,7 @@ describe('ContentBackendService', () => {
               id: 'ch-1',
               title: 'Chapter 1',
               level: 'course',
-              items: [
-                { ref: 'epr:concept-1', role: 'step', title: 'Step 1' },
-              ],
+              items: [{ ref: 'epr:concept-1', role: 'step', title: 'Step 1' }],
             },
           ],
         },
@@ -542,8 +540,16 @@ describe('ContentBackendService', () => {
 
     it('should filter by difficulty locally', fakeAsync(() => {
       const items = [
-        { ...mockPathData, id: '1', metadata: { ...mockPathData.metadata, difficulty: 'beginner' } },
-        { ...mockPathData, id: '2', metadata: { ...mockPathData.metadata, difficulty: 'advanced' } },
+        {
+          ...mockPathData,
+          id: '1',
+          metadata: { ...mockPathData.metadata, difficulty: 'beginner' },
+        },
+        {
+          ...mockPathData,
+          id: '2',
+          metadata: { ...mockPathData.metadata, difficulty: 'advanced' },
+        },
       ];
       mockClient.query.mockReturnValue(Promise.resolve(items));
 

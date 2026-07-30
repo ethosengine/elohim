@@ -12,15 +12,7 @@
  */
 
 import { CommonModule } from '@angular/common';
-import {
-  Component,
-  OnInit,
-  inject,
-  signal,
-  computed,
-  input,
-  output,
-} from '@angular/core';
+import { Component, OnInit, inject, signal, computed, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 

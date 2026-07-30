@@ -11,13 +11,7 @@
  * signals indicate the entity is ready for sensemaking.
  */
 
-import {
-  Component,
-  computed,
-  inject,
-  OnInit,
-  signal,
-} from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { GovernanceApiService } from '@elohim/service';

@@ -18,7 +18,7 @@ describe('CollectiveDetailComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            paramMap: of({ get: (key: string) => key === 'id' ? 'household-dowell' : null }),
+            paramMap: of({ get: (key: string) => (key === 'id' ? 'household-dowell' : null) }),
           },
         },
       ],

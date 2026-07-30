@@ -18,7 +18,7 @@ describe('JournalPageComponent', () => {
           title: 'Test',
           contentBody: 'Body text',
           contentType: 'journal',
-        }),
+        })
       ),
       patch: vi.fn().mockReturnValue(of({})),
       post: vi.fn().mockReturnValue(of({})),

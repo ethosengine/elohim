@@ -1,9 +1,4 @@
-import {
-  Component,
-  OnInit,
-  ElementRef,
-  ViewEncapsulation,
-} from '@angular/core';
+import { Component, OnInit, ElementRef, ViewEncapsulation } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 

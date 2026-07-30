@@ -33,8 +33,7 @@ describe('StorageApiService — Comments', () => {
       service.createComment('content-1', 'Great article!').subscribe();
 
       const req = httpMock.expectOne(
-        request =>
-          request.method === 'POST' && request.url.includes('/api/v1/comments')
+        request => request.method === 'POST' && request.url.includes('/api/v1/comments')
       );
 
       expect(req.request.body).toEqual({
@@ -90,10 +89,7 @@ describe('StorageApiService — Comments', () => {
       });
 
       const req = httpMock.expectOne(request => request.url.includes('/api/v1/comments'));
-      req.flush(
-        { data: null, gate: mockGate },
-        { status: 409, statusText: 'Conflict' }
-      );
+      req.flush({ data: null, gate: mockGate }, { status: 409, statusText: 'Conflict' });
       tick();
 
       expect(errorReceived).toBe(true);

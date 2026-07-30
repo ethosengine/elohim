@@ -33,10 +33,9 @@ const POSTED: RoutingSuggestion[] = [
 @Component({
   standalone: true,
   imports: [JournalRoutedComponent],
-  template: `<app-journal-routed
-    [suggestions]="suggestions"
-    (writeAnother)="onWriteAnother()"
-  />`,
+  template: `
+    <app-journal-routed [suggestions]="suggestions" (writeAnother)="onWriteAnother()" />
+  `,
 })
 class TestHostComponent {
   suggestions: RoutingSuggestion[] = POSTED;
@@ -65,24 +64,20 @@ describe('JournalRoutedComponent', () => {
 
   it('shows posted cards with reach badges', () => {
     fixture.detectChanges();
-    const badges = fixture.nativeElement.querySelectorAll(
-      '[data-testid="routed-reach"]',
-    );
+    const badges = fixture.nativeElement.querySelectorAll('[data-testid="routed-reach"]');
     expect(badges.length).toBe(2);
   });
 
   it('shows completion message', () => {
     fixture.detectChanges();
-    const message = fixture.nativeElement.querySelector(
-      '[data-testid="routed-message"]',
-    );
+    const message = fixture.nativeElement.querySelector('[data-testid="routed-message"]');
     expect(message).toBeTruthy();
   });
 
   it('emits writeAnother on button click', () => {
     fixture.detectChanges();
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="write-another-btn"]',
+      '[data-testid="write-another-btn"]'
     );
     btn.click();
 
@@ -90,15 +85,10 @@ describe('JournalRoutedComponent', () => {
   });
 
   it('does not show dismissed cards', () => {
-    host.suggestions = [
-      POSTED[0],
-      { ...POSTED[1], status: 'dismissed' },
-    ];
+    host.suggestions = [POSTED[0], { ...POSTED[1], status: 'dismissed' }];
     fixture.detectChanges();
 
-    const badges = fixture.nativeElement.querySelectorAll(
-      '[data-testid="routed-reach"]',
-    );
+    const badges = fixture.nativeElement.querySelectorAll('[data-testid="routed-reach"]');
     expect(badges.length).toBe(1);
   });
 });

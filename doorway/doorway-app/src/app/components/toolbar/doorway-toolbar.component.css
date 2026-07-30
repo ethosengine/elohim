@@ -63,7 +63,9 @@
   color: var(--dw-text-secondary);
   font-size: 0.875rem;
   font-weight: 500;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .nav-link:hover {
@@ -97,8 +99,13 @@
 }
 
 @keyframes skeleton-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.8; }
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
 
 /* Profile bubble */
@@ -258,7 +265,9 @@
   font-weight: 500;
   text-decoration: none;
   color: var(--dw-text-secondary);
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .btn-ghost:hover {

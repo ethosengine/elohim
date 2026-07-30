@@ -16,15 +16,7 @@
  * pillar-projection Manifest.
  */
 
-import {
-  Component,
-  ElementRef,
-  effect,
-  inject,
-  input,
-  signal,
-  viewChild,
-} from '@angular/core';
+import { Component, ElementRef, effect, inject, input, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { GovernanceApiService } from '@elohim/service';

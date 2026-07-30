@@ -18,10 +18,7 @@ describe('ScheduleService', () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [
-        ScheduleService,
-        { provide: HttpClient, useValue: httpMock },
-      ],
+      providers: [ScheduleService, { provide: HttpClient, useValue: httpMock }],
     });
     service = TestBed.inject(ScheduleService);
   });
@@ -30,7 +27,7 @@ describe('ScheduleService', () => {
     service.getSchedule('content', 'cid-123').subscribe();
     expect(httpMock.get).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/schedules'),
-      expect.objectContaining({ params: expect.anything() }),
+      expect.objectContaining({ params: expect.anything() })
     );
   });
 
@@ -43,17 +40,14 @@ describe('ScheduleService', () => {
       rrule: null,
     };
     service.createSchedule(input).subscribe();
-    expect(httpMock.post).toHaveBeenCalledWith(
-      expect.stringContaining('/api/v1/schedules'),
-      input,
-    );
+    expect(httpMock.post).toHaveBeenCalledWith(expect.stringContaining('/api/v1/schedules'), input);
   });
 
   it('should PATCH to update schedule', () => {
     service.updateSchedule('sched-1', { expiresAt: '2026-04-20T00:00:00Z' }).subscribe();
     expect(httpMock.patch).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/schedules/sched-1'),
-      { expiresAt: '2026-04-20T00:00:00Z' },
+      { expiresAt: '2026-04-20T00:00:00Z' }
     );
   });
 
@@ -61,7 +55,7 @@ describe('ScheduleService', () => {
     service.getDueSchedules('2026-03-20T00:00:00Z').subscribe();
     expect(httpMock.get).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/schedules'),
-      expect.objectContaining({ params: expect.anything() }),
+      expect.objectContaining({ params: expect.anything() })
     );
   });
 
@@ -69,7 +63,7 @@ describe('ScheduleService', () => {
     service.advanceOccurrence('sched-1').subscribe();
     expect(httpMock.post).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/schedules/sched-1/advance'),
-      {},
+      {}
     );
   });
 });

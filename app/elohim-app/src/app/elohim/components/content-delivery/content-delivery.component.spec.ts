@@ -22,9 +22,7 @@ describe('ContentDeliveryComponent', () => {
     contentFormat: 'markdown',
     content: '# The Manifesto',
     reach: 'commons',
-    stewardedBy: [
-      { humanId: 'genesis', role: 'steward', affinity: 0.8 },
-    ],
+    stewardedBy: [{ humanId: 'genesis', role: 'steward', affinity: 0.8 }],
     tags: [],
     relatedNodeIds: [],
     metadata: {},

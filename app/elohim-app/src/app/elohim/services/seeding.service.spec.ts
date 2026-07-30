@@ -16,7 +16,6 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { SeedingService, SeedingMode, BatchResult, SeedingProgress } from './seeding.service';
 import { ContentNode } from '@app/lamad/models/content-node.model';
 
-
 describe('SeedingService', () => {
   let service: SeedingService;
 

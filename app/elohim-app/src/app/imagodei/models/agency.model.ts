@@ -43,12 +43,7 @@
  * and project_m5_reframe_auth_portal_convergence in memory.
  */
 
-export type AgencyStage =
-  | 'visitor'
-  | 'hosted'
-  | 'hosted-steward'
-  | 'app-steward'
-  | 'node-steward';
+export type AgencyStage = 'visitor' | 'hosted' | 'hosted-steward' | 'app-steward' | 'node-steward';
 
 /**
  * Detailed information about each agency stage.

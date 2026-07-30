@@ -38,9 +38,7 @@ describe('EprResolveRedirectComponent', () => {
       ],
     }).compileComponents();
 
-    routerNavSpy = vi
-      .spyOn(TestBed.inject(Router), 'navigate')
-      .mockResolvedValue(true as any);
+    routerNavSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true as any);
 
     fixture = TestBed.createComponent(EprResolveRedirectComponent);
     fixture.detectChanges(); // triggers ngOnInit
