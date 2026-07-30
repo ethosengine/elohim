@@ -12,6 +12,8 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use super::lossy_text::LossyTextOpt;
+
 use super::diesel_schema::{
     access_grants, acquisition_pins, agreements, appeals, apps, challenges,
     collective_participations, collectives, comments, concentration_snapshots, content,
@@ -391,7 +393,15 @@ pub struct EconomicEvent {
     pub path_id: Option<String>,
     pub triggered_by: Option<String>,
     pub state: String,
+    /// Free-form human note. Decoded through [`LossyTextOpt`] so a row holding
+    /// non-UTF-8 bytes degrades to U+FFFD instead of failing the whole
+    /// `.load()` batch — see `db::lossy_text` for the diesel 2.3.11 strict-decode
+    /// background and the per-row-degradation rule this upholds.
+    #[diesel(deserialize_as = LossyTextOpt)]
     pub note: Option<String>,
+    /// Opaque JSON payload projected from peers; same lossy-decode rationale as
+    /// `note`.
+    #[diesel(deserialize_as = LossyTextOpt)]
     pub metadata_json: Option<String>,
     pub dht_anchor_hash: Option<String>,
     pub created_at: String,

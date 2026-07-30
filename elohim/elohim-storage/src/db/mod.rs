@@ -21,6 +21,7 @@ pub mod cache_queries;
 pub mod content_diesel;
 pub mod context;
 pub mod diesel_schema;
+pub mod lossy_text;
 pub mod models;
 
 // Diesel modules for graph relationships and domain models
