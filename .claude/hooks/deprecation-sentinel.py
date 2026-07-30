@@ -142,7 +142,9 @@ ECHO_HISTORY_PATH_RE = re.compile(
     r"|genesis/data/timeline/(?:backlog|chronicle)/"
     r"|genesis/docs/superpowers/"
     r"|\.superpowers/"
-    r"|(?:^|/)CLAUDE\.md\b",
+    r"|(?:^|/)CLAUDE\.md\b"
+    r"|(?:^|/)VULNERABILITY_CLUSTER[A-Z0-9_]*\.md\b"  # Guard H1 (see below)
+    r"|genesis/research/repos/",  # Guard I (see below)
     re.IGNORECASE,
 )
 
@@ -260,6 +262,70 @@ ECHO_SRC_DEPRECATED_COMMENT_RE = re.compile(
     r"^(?:[^\s:]+:)?\d*[:-]?\s*//[/!]?.*\bDEPRECATED\b", re.IGNORECASE
 )
 
+# Guard H — REMEDIATION-ANNOTATION self-capture (the security-class analog of
+#   Guards B/G). A vulnerability fix does not just change a version — it
+#   ANNOTATES why, naming the advisory it closes. Those annotations then read
+#   back as fresh "security findings" every time anyone greps or diffs the
+#   remediation surface, which is exactly what the fix work does constantly.
+#   Two shapes, both ZERO true-positive risk:
+#     H1) The repo-root `VULNERABILITY_CLUSTER_*.md` remediation ledgers — the
+#         per-workspace decision records for the Dependabot alert lanes. They
+#         are structurally identical to the Guard-B surfaces (backlog /
+#         chronicle / superpowers prose) and were simply not in that path list:
+#         every "Resolved alerts" table row narrates an advisory by design
+#         (`| #482 | protobuf | Upgraded prometheus 0.13.4 → 0.14.0 … RUSTSEC-2024-0437 …`).
+#     H2) A COMMENT line whose security signal is an ADVISORY IDENTIFIER
+#         (CVE-/GHSA-/RUSTSEC-). A manifest/source comment explaining a pin or
+#         a fix — `# 0.14 carries protobuf >=3.7.2, fixing RUSTSEC-2024-0437.`,
+#         `// origin isolation (GHSA-824h-7x5x-wfmf).` — is the remediation's
+#         own paper trail. Unlike Guards C/G, diff hunks are NOT exempt here: a
+#         comment is annotation whether it is being ADDED or merely re-read, and
+#         a `+`-prefixed comment-add is the single most common shape (a
+#         `git diff Cargo.toml` during in-flight fix work). The attribute form
+#         `#[deprecated…]` is explicitly NOT a comment and stays capturable
+#         (the `#(?!\[)` clause), and the live security channel is never
+#         comment-shaped: cargo-audit emits `ID:      RUSTSEC-…` / `Crate: …`,
+#         npm/pnpm audit emit table+prose, GitHub push banners emit `remote:
+#         GitHub found N vulnerabilities …` — none of which open with `#`/`//`.
+#   fp-dedupe cannot collapse either class: each new cluster-doc row, each
+#   `grep -n` prefix, and each re-worded annotation mints a fresh fingerprint
+#   (same defeat as Guards B/D/F/G). Both classes cost a triage dispatch on
+#   2026-07-29 while the Rust vulnerability-cluster lanes were mid-remediation:
+#   929b7f99229f (H2 — a `git diff Cargo.toml` of cluster 09's own
+#   prometheus-0.14 remediation comment) and 5a3e9e45a634 (H1 — a grep hit on
+#   cluster 09's resolved-alerts table). A third, 0e0f81127d39 on 2026-07-27,
+#   was H2 in `//` form. None named a live concern the fix lanes did not
+#   already own.
+# Guard I — VENDORED THIRD-PARTY RESEARCH CLONE self-capture:
+#   `genesis/research/repos/**` holds read-only upstream clones (freenet-core,
+#   hypercore, polis, civic-ai, … — enumerated in
+#   genesis/research/research-manifest.json) kept for the cross-pollination
+#   surveys. The tree is GITIGNORED (.gitignore:92) and is never built, tested,
+#   or shipped by this repo. Every deprecation and every advisory annotation in
+#   it belongs to ANOTHER project: it can never be a live in-flight finding
+#   here, and it is not our surface to fix. A survey pass that greps a vendored
+#   repo for patterns would otherwise mint one triage dispatch per upstream
+#   annotation it happens to scroll past — fp-dedupe cannot collapse that (each
+#   upstream file/line mints a fresh fingerprint). Zero true-positive risk:
+#   nothing under this path is in any workspace, Dockerfile COPY, or gate.
+#   (One dispatch on 2026-07-27 — 0e0f81127d39 — was this class: freenet-core's
+#   own `// origin isolation (GHSA-824h-7x5x-wfmf).` mitigation comment, read
+#   during a survey. It was H2-shaped too, but the vendored-path guard is the
+#   root-cause collapse for the whole tree.)
+ECHO_VULN_CLUSTER_PATH_RE = re.compile(r"VULNERABILITY_CLUSTER[A-Z0-9_]*\.md", re.IGNORECASE)
+ADVISORY_ID_RE = re.compile(
+    r"\b(?:CVE-\d{4}-\d+"
+    r"|GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}"
+    r"|RUSTSEC-\d{4}-\d+)\b",
+    re.IGNORECASE,
+)
+ECHO_COMMENT_OPENER_RE = re.compile(
+    r"^[+-]?\s*"  # optional diff marker
+    r"(?:[^\s:]+:\d+[:-])?\s*"  # optional grep `path:line:` prefix
+    r"(?:\d+[:-])?\s*"  # optional bare `-n` line-number prefix
+    r"(?://[/!]?|\#(?!\[))"  # comment opener: // /// //! or # (NOT #[attr])
+)
+
 # Command-level gates for echo classes B and C: if the command itself is a pure
 # git history read (git log / git show without a -p / --patch flag) or reads
 # directly from the history / planning / SDD prose trees, ALL lines from that
@@ -275,12 +341,19 @@ _CMD_HISTORY_TREE_RE = re.compile(
     r"|genesis/data/timeline/(?:backlog|chronicle)/"
     r"|genesis/docs/superpowers/"
     r"|\.superpowers/"
-    r"|(?:^|/|\s)CLAUDE\.md\b",
+    r"|(?:^|/|\s)CLAUDE\.md\b"
+    r"|VULNERABILITY_CLUSTER[A-Z0-9_]*\.md\b"  # Guard H1 (see below)
+    r"|genesis/research/repos/",  # Guard I (see below)
     re.IGNORECASE,
 )
 
 
-def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool) -> bool:
+def _is_echo_line(
+    line: str,
+    cmd_is_git_history: bool,
+    cmd_is_history_tree: bool,
+    cls: str | None = None,
+) -> bool:
     """Return True if *line* is a known echo false-positive and must be skipped.
 
     Called after classify() returns non-None to prevent false echo entries
@@ -308,6 +381,17 @@ def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool
          migration-retained), not a live warning; `grep -n` prefixes defeat
          fp-dedupe. Diff hunks (+/-) are exempt so a real added annotation
          still captures.
+      H) Remediation-annotation echo (security class only) — the repo-root
+         `VULNERABILITY_CLUSTER_*.md` alert-lane decision records (H1, folded
+         into Guard B's path/command gates), or a COMMENT line whose security
+         signal is an advisory identifier (H2: `# … fixing RUSTSEC-2024-0437.`,
+         `// origin isolation (GHSA-…)`). The fix's own paper trail, not a live
+         finding. Diff hunks are NOT exempt for H2 — a `+`-prefixed
+         comment-add during in-flight fix work is the dominant shape — but
+         `#[deprecated…]` is not a comment and still captures.
+      I) Vendored third-party research clone (`genesis/research/repos/**`,
+         gitignored, never built) — another project's deprecations/advisories,
+         folded into Guard B's path/command gates.
     """
     # Guard A — ledger self-capture
     if ECHO_LEDGER_PATH.search(line):
@@ -338,8 +422,20 @@ def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool
     ):
         return True
 
-    # Guard B — history prose (grep output carries file path in the line;
-    # if the command itself reads from the tree, every line is echo output)
+    # Guard H2 — remediation annotation: a COMMENT line whose security signal
+    # is an advisory identifier (CVE-/GHSA-/RUSTSEC-). Security class only, and
+    # deliberately NOT diff-exempt: `+# … fixing RUSTSEC-2024-0437.` from a
+    # `git diff Cargo.toml` mid-remediation is the dominant capture shape.
+    if (
+        cls == "security"
+        and ADVISORY_ID_RE.search(line)
+        and ECHO_COMMENT_OPENER_RE.match(line)
+    ):
+        return True
+
+    # Guard B (+ H1) — history / remediation-ledger prose (grep output carries
+    # the file path in the line; if the command itself reads from the tree,
+    # every line is echo output)
     if ECHO_HISTORY_PATH_RE.search(line) or cmd_is_history_tree:
         return True
 
@@ -457,7 +553,7 @@ def main() -> None:
                 continue
             # Anti-echo guards: skip deterministic false-positive line shapes
             # before fingerprinting so they never enter the ledger.
-            if _is_echo_line(line, cmd_is_git_history, cmd_is_history_tree):
+            if _is_echo_line(line, cmd_is_git_history, cmd_is_history_tree, cls):
                 continue
             fp = fingerprint(line, cls)
             if fp in matched_this_call:
