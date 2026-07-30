@@ -283,13 +283,19 @@ describe('MarkdownRendererComponent', () => {
 
   describe('embedded mode', () => {
     it('should apply embedded class when embedded is true', async () => {
+      // renderMarkdown() (triggered by ngOnChanges) is async and populates
+      // tocEntries from the parsed markdown — a *ngIf="tocEntries.length > 0"
+      // binding that starts false. Rendering BEFORE that promise resolves
+      // commits 'false' as the checked value; a later detectChanges() that
+      // then sees tocEntries populated trips NG0100 under
+      // ChangeDetectionStrategy.Eager (Angular 22). Awaiting whenStable()
+      // before the (single) detectChanges() call lets the async update land
+      // first, so the binding is only ever checked in its final state.
       component.embedded = true;
       component.node = createContentNode('# Test');
-      fixture.detectChanges();
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
 

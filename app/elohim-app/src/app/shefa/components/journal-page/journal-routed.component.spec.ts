@@ -54,10 +54,17 @@ describe('JournalRoutedComponent', () => {
 
     fixture = TestBed.createComponent(TestHostComponent);
     host = fixture.componentInstance;
-    fixture.detectChanges();
+    // No detectChanges() here: "does not show dismissed cards" mutates
+    // host.suggestions before its first render. Under ChangeDetectionStrategy
+    // OnPush (Angular 22's implicit default, which JournalRoutedComponent also
+    // sets explicitly), an initial render here — followed by a second
+    // detectChanges() after the signal input's bound value changes — leaves the
+    // child's `postedCards()` computed stale, a CD-timing artifact of the double
+    // pass. Each test renders exactly once, from its own desired starting state.
   });
 
   it('shows posted cards with reach badges', () => {
+    fixture.detectChanges();
     const badges = fixture.nativeElement.querySelectorAll(
       '[data-testid="routed-reach"]',
     );
@@ -65,6 +72,7 @@ describe('JournalRoutedComponent', () => {
   });
 
   it('shows completion message', () => {
+    fixture.detectChanges();
     const message = fixture.nativeElement.querySelector(
       '[data-testid="routed-message"]',
     );
@@ -72,11 +80,11 @@ describe('JournalRoutedComponent', () => {
   });
 
   it('emits writeAnother on button click', () => {
+    fixture.detectChanges();
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector(
       '[data-testid="write-another-btn"]',
     );
     btn.click();
-    fixture.detectChanges();
 
     expect(host.onWriteAnother).toHaveBeenCalled();
   });

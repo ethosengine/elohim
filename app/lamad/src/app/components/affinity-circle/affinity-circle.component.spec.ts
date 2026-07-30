@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { ChangeDetectorRef } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AffinityCircleComponent } from './affinity-circle.component';
 
@@ -297,9 +298,19 @@ describe('AffinityCircleComponent', () => {
 
     it('should handle rapid affinity changes', () => {
       const affinities = [0, 0.25, 0.5, 0.75, 1.0];
+      // AffinityCircleComponent has no explicit changeDetection strategy, so
+      // it takes Angular 22's implicit OnPush default. Each iteration mutates
+      // `affinity` as a raw field write (bypassing the normal @Input()
+      // producer/consumer notification a parent template binding would give
+      // it), which leaves the OnPush view un-dirtied — a REPEATED
+      // fixture.detectChanges() call on the SAME instance then renders stale
+      // (one iteration behind) instead of throwing NG0100. markForCheck()
+      // restores the dirty signal a real binding update would have sent.
+      const cdr = fixture.debugElement.injector.get(ChangeDetectorRef);
 
       affinities.forEach(affinity => {
         component.affinity = affinity;
+        cdr.markForCheck();
         fixture.detectChanges();
 
         const percentageText = fixture.nativeElement.querySelector('.percentage-text');

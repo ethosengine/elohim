@@ -15,7 +15,12 @@ describe('UpgradeModalComponent', () => {
 
     fixture = TestBed.createComponent(UpgradeModalComponent);
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    // No detectChanges() here: several tests set @Input()s (open, session) before
+    // their own single detectChanges() call. Under ChangeDetectionStrategy.Eager
+    // (Angular 22), an initial render here establishes a checked baseline that a
+    // later detectChanges() call — after the input value has changed — trips as
+    // NG0100 ExpressionChangedAfterItHasBeenChecked. Each test renders exactly
+    // once, from its own desired starting state.
   });
 
   it('should create', () => {

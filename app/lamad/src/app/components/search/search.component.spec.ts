@@ -201,16 +201,21 @@ describe('SearchComponent', () => {
   });
 
   describe('template', () => {
-    beforeEach(fakeAsync(() => {
-      fixture.detectChanges();
-    }));
+    // No shared beforeEach detectChanges() here: the results-bearing tests set
+    // component.query and call performSearch() (both plain synchronous calls,
+    // no ngOnInit dependency) BEFORE their own single detectChanges() call.
+    // Rendering the '' baseline first (via a shared beforeEach) and THEN
+    // mutating query trips NG0100 under ChangeDetectionStrategy.Eager
+    // (Angular 22) once the two-way-bound query value actually changes.
 
     it('should display search input', () => {
+      fixture.detectChanges();
       const input = fixture.nativeElement.querySelector('.search-input');
       expect(input).toBeTruthy();
     });
 
     it('should display search button', () => {
+      fixture.detectChanges();
       const button = fixture.nativeElement.querySelector('.search-btn');
       expect(button).toBeTruthy();
     });
@@ -218,8 +223,8 @@ describe('SearchComponent', () => {
     it('should show results count after search', fakeAsync(() => {
       component.query = 'test';
       component.performSearch();
-      tick();
       fixture.detectChanges();
+      tick();
 
       const resultsSection = fixture.nativeElement.querySelector('.results-section');
       expect(resultsSection).toBeTruthy();
@@ -230,8 +235,8 @@ describe('SearchComponent', () => {
       searchServiceSpy.search.mockReturnValue(of({ results: [] } as any));
       component.query = 'nonexistent';
       component.performSearch();
-      tick();
       fixture.detectChanges();
+      tick();
 
       const noResults = fixture.nativeElement.querySelector('.no-results');
       expect(noResults).toBeTruthy();
@@ -241,8 +246,8 @@ describe('SearchComponent', () => {
     it('should display result cards', fakeAsync(() => {
       component.query = 'test';
       component.performSearch();
-      tick();
       fixture.detectChanges();
+      tick();
 
       const resultCards = fixture.nativeElement.querySelectorAll('.result-card');
       expect(resultCards.length).toBe(2);
@@ -251,8 +256,8 @@ describe('SearchComponent', () => {
     it('should display tags on result cards', fakeAsync(() => {
       component.query = 'test';
       component.performSearch();
-      tick();
       fixture.detectChanges();
+      tick();
 
       const tags = fixture.nativeElement.querySelectorAll('.tag');
       expect(tags.length).toBeGreaterThan(0);

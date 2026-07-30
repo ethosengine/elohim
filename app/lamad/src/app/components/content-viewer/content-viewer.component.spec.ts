@@ -25,6 +25,7 @@ import { ContentNode } from '../../models/content-node.model';
 import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
 import { SignalHarnessService } from '../../services/signal-harness.service';
 import { HouseholdResilienceService } from '../../services/household-resilience.service';
+import { ResilienceService } from '../../services/resilience.service';
 import { ResilienceService as LibResilienceService } from '@elohim/service/public-api';
 import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
 import { vi, Mock } from 'vitest';
@@ -244,6 +245,39 @@ describe('ContentViewerComponent', () => {
       }),
     };
 
+    // Local ResilienceService (src/app/services/resilience.service.ts) is
+    // DISTINCT from LibResilienceService (@elohim/service) below — the
+    // component injects both. Left unmocked, loadResilience() (called from
+    // every content load) fires a REAL, unmocked HttpClient GET against the
+    // storageClient mock's fake 'https://test' base URL: a genuine network
+    // leak, not a CD-timing artifact — it surfaced as an intermittent
+    // `fastNowTimeout?.unref is not a function` failure on whichever test
+    // happened to be running when the leaked DNS lookup rejected.
+    const resilienceSpyObj = {
+      getContentResilience: vi.fn().mockReturnValue(of({
+        contentId: 'test-content-1',
+        encoding: { strategy: 'none', dataShards: 0, parityShards: 0, totalSizeBytes: 0, shardSizeBytes: 0 },
+        distribution: { totalShards: 0, shardsWithLocations: 0, distinctPeers: 0, shards: [] },
+        stewardship: { stewardCount: 0, allocations: [] },
+        commitments: { activePeers: 0, totalCommittedBytes: 0, totalUsedBytes: 0 },
+        health: { score: 1, canSurviveFailures: 0, status: 'healthy' },
+      })),
+      verifyResilience: vi.fn().mockReturnValue(of({
+        contentId: 'test-content-1',
+        verified: true,
+        encoding: 'none',
+        shardsAvailable: 0,
+        shardsNeeded: 0,
+        shardsLocated: 0,
+        shardsMissing: 0,
+        reconstructionTimeMs: 0,
+        originalHash: '',
+        reconstructedHash: '',
+        hashMatch: true,
+        error: null,
+      })),
+    };
+
     const libResilienceSpyObj = {
       getSnapshot: vi.fn().mockReturnValue(of({
         contentId: 'test-content-1',
@@ -291,6 +325,7 @@ describe('ContentViewerComponent', () => {
         { provide: LAMAD_GOVERNANCE_SIGNAL, useValue: governanceSignalSpyObj },
         { provide: StewardshipAllocationService, useValue: stewardshipSpyObj },
         { provide: HouseholdResilienceService, useValue: householdResilienceSpyObj },
+        { provide: ResilienceService, useValue: resilienceSpyObj },
         { provide: LibResilienceService, useValue: libResilienceSpyObj },
         { provide: SignalHarnessService, useValue: { onRendererComplete: vi.fn().mockResolvedValue(undefined) } },
         { provide: AttentionTrackerService, useValue: { trackContentView: vi.fn(), trackContentLeave: vi.fn(), getSessionViewedIds: vi.fn().mockReturnValue(new Set()) } },
@@ -547,10 +582,14 @@ describe('ContentViewerComponent', () => {
     }));
 
     it('does NOT render a duplicate mini-graph in the Network tab', fakeAsync(() => {
-      fixture.detectChanges();
-      tick();
+      // setActiveTab() before the (single) detectChanges() call — not between two —
+      // so the 'network' tab is the FIRST rendered state. Under
+      // ChangeDetectionStrategy.Eager (Angular 22), mutating activeTab between two
+      // detectChanges() calls trips NG0100 on the tab's classProp binding, since
+      // setActiveTab() has no ngOnInit dependency (plain field assignment).
       component.setActiveTab('network');
       fixture.detectChanges();
+      tick();
 
       const miniGraph = fixture.nativeElement.querySelector('app-mini-graph');
       expect(miniGraph).toBeFalsy();
@@ -1358,32 +1397,39 @@ describe('ContentViewerComponent', () => {
 
   describe('Header — distribution + resilience side-by-side', () => {
     it('renders <elohim-distribution-badge> when node.distribution is hydrated', fakeAsync(() => {
+      // The distribution-hydrated node is supplied via the getContent() mock
+      // (consumed through the component's own async subscription — same path
+      // as every other content-loading test) rather than a raw post-load
+      // `component.node = {...}` mutation. A manual field mutation between two
+      // detectChanges() calls trips NG0100 under ChangeDetectionStrategy.Eager
+      // (Angular 22) once the rendered value actually changes; routing the
+      // new state through the mocked observable lets ngOnInit's own subscribe
+      // callback (which also flips isLoading) drive the render exactly once.
+      dataLoaderSpy.getContent.mockReturnValue(
+        of({
+          ...mockContentNode,
+          blobs: [
+            {
+              hash: 'sha256-content-viewer-test',
+              mimeType: 'application/json',
+              sizeBytes: 0,
+              fallbackUrls: [],
+            },
+          ],
+          distribution: {
+            replicaCount: 3,
+            replicaTarget: 4,
+            replicaHealth: 'at_risk',
+            projectorCount: 1,
+            reachClass: 'public',
+            diversityHint: { kind: 'region_metro', value: ['us-central'] },
+            thisFetchSource: 'projected_via_doorway',
+            lastVerifiedSeconds: 30,
+          },
+        }),
+      );
       fixture.detectChanges();
       tick();
-      fixture.detectChanges();
-
-      component.node = {
-        ...(component.node as ContentNode),
-        blobs: [
-          {
-            hash: 'sha256-content-viewer-test',
-            mimeType: 'application/json',
-            sizeBytes: 0,
-            fallbackUrls: [],
-          },
-        ],
-        distribution: {
-          replicaCount: 3,
-          replicaTarget: 4,
-          replicaHealth: 'at_risk',
-          projectorCount: 1,
-          reachClass: 'public',
-          diversityHint: { kind: 'region_metro', value: ['us-central'] },
-          thisFetchSource: 'projected_via_doorway',
-          lastVerifiedSeconds: 30,
-        },
-      };
-      component.isLoading = false;
       fixture.detectChanges();
 
       expect(
@@ -1435,16 +1481,19 @@ describe('ContentViewerComponent', () => {
     const PILLAR_AFFORDANCE = '[data-testid="epr-open-in-pillar"]';
 
     it('renders a cross-bundle "Open in Lamad" link for a lamad-claimed type (path)', fakeAsync(() => {
+      // The lamad-claimed node is supplied via the getContent() mock — see
+      // the 'renders <elohim-distribution-badge>' comment above for why a raw
+      // post-load `component.node = {...}` mutation (concept -> path) trips
+      // NG0100 under ChangeDetectionStrategy.Eager (Angular 22).
+      dataLoaderSpy.getContent.mockReturnValue(
+        of({
+          ...mockContentNode,
+          id: 'foundations-christian-technology',
+          contentType: 'path',
+        }),
+      );
       fixture.detectChanges();
       tick();
-      fixture.detectChanges();
-
-      component.node = {
-        ...(component.node as ContentNode),
-        id: 'foundations-christian-technology',
-        contentType: 'path',
-      };
-      component.isLoading = false;
       fixture.detectChanges();
 
       const link = fixture.nativeElement.querySelector(PILLAR_AFFORDANCE) as HTMLAnchorElement;
@@ -1467,15 +1516,18 @@ describe('ContentViewerComponent', () => {
     }));
 
     it('omits the affordance for another unclaimed type (unit)', fakeAsync(() => {
+      // Same NG0100-avoidance discipline as the sibling test above: the
+      // 'unit' node comes from the getContent() mock, not a raw post-load
+      // mutation (the 'concept' -> 'unit' text change still trips the check
+      // via a manual field mutation even though both are unclaimed types).
+      dataLoaderSpy.getContent.mockReturnValue(
+        of({
+          ...mockContentNode,
+          contentType: 'unit',
+        }),
+      );
       fixture.detectChanges();
       tick();
-      fixture.detectChanges();
-
-      component.node = {
-        ...(component.node as ContentNode),
-        contentType: 'unit',
-      };
-      component.isLoading = false;
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector(PILLAR_AFFORDANCE)).toBeFalsy();
