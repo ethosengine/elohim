@@ -6,7 +6,6 @@ import {
   computed,
   inject,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { Subscription, timer } from 'rxjs';
 import { map, switchMap, takeWhile } from 'rxjs/operators';
@@ -25,7 +24,6 @@ import type { SyncProgress } from '../../services/sync-status.service';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './sync-progress.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './sync-progress.component.css',
 })
 export class SyncProgressComponent implements OnInit, OnDestroy {

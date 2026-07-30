@@ -12,7 +12,6 @@ import {
   ViewContainerRef,
   OnDestroy,
   inject,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Router } from '@angular/router';
@@ -119,7 +118,6 @@ const EPR_ANCHOR_SELECTOR = 'a[data-epr]';
       </button>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./markdown-renderer.component.css'],
 })
 export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDestroy {

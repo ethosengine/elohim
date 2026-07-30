@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnChanges, SimpleChanges, ChangeDetectionStrategy } from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 
 // @coverage: 97.5% (2026-02-24)
 
@@ -161,7 +161,6 @@ interface GherkinFeature {
       <pre><code>{{ content }}</code></pre>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./gherkin-renderer.component.css'],
 })
 export class GherkinRendererComponent implements OnChanges {

@@ -5,7 +5,6 @@ import {
   Inject,
   OnInit,
   OnDestroy,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
@@ -47,7 +46,6 @@ interface ContentNodeWithAffinity extends ContentNode {
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './meaning-map.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./meaning-map.component.css'],
 })
 export class MeaningMapComponent implements OnInit, OnDestroy {

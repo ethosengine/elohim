@@ -8,7 +8,6 @@ import {
   OnDestroy,
   ViewChild,
   ElementRef,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -51,7 +50,6 @@ import { ContentIOExportInput } from '../../interfaces/content-io-plugin.interfa
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './default-code-editor.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./default-code-editor.component.css'],
 })
 export class DefaultCodeEditorComponent implements ContentEditorComponent, OnInit, OnDestroy {

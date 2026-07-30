@@ -5,7 +5,6 @@ import {
   OnChanges,
   SimpleChanges,
   inject,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
@@ -73,7 +72,6 @@ export interface Html5AppContent {
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./iframe-renderer.component.css'],
 })
 export class IframeRendererComponent implements OnChanges {

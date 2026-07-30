@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, Inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
 // @coverage: 86.3% (2026-02-24)
@@ -41,7 +41,6 @@ import { PathService } from '../../services/path.service';
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './lamad-home.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./lamad-home.component.css'],
 })
 export class LamadHomeComponent implements OnInit, OnDestroy {

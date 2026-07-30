@@ -5,7 +5,6 @@ import {
   OnDestroy,
   inject,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -143,7 +142,6 @@ interface ChapterDisplay {
   standalone: true,
   imports: [CommonModule, RecommendationListComponent],
   templateUrl: './path-overview.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./path-overview.component.css'],
 })
 export class PathOverviewComponent implements OnInit, OnDestroy {

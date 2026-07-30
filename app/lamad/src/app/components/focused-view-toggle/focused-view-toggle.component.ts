@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -26,7 +26,6 @@ import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from 
       <span class="label">{{ isActive ? 'Exit' : 'Focus' }}</span>
     </button>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .focused-view-btn {

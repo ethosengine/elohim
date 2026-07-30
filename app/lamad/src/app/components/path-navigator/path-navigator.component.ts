@@ -7,7 +7,6 @@ import {
   inject,
   HostListener,
   Inject,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
@@ -104,7 +103,6 @@ const NAV_FAILED_MSG = 'Navigation failed:';
   standalone: true,
   imports: [CommonModule, RouterModule, LessonViewComponent, FocusedViewToggleComponent],
   templateUrl: './path-navigator.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./path-navigator.component.css'],
 })
 export class PathNavigatorComponent implements OnInit, OnDestroy {

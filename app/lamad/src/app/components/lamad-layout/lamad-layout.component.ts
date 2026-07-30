@@ -4,7 +4,6 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   OnInit,
   OnDestroy,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
@@ -30,7 +29,6 @@ import { SyncProgressComponent } from '../sync-progress/sync-progress.component'
   imports: [CommonModule, RouterOutlet, FormsModule, SyncProgressComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './lamad-layout.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./lamad-layout.component.css'],
 })
 export class LamadLayoutComponent implements OnInit, OnDestroy {

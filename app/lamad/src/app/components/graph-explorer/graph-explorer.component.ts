@@ -8,7 +8,6 @@ import {
   ElementRef,
   ViewChild,
   AfterViewInit,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
@@ -67,7 +66,6 @@ const EDGE_TYPE_NEXT: ClusterEdge['type'] = 'NEXT';
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './graph-explorer.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./graph-explorer.component.css'],
 })
 export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit {

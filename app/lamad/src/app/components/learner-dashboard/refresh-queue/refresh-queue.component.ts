@@ -1,5 +1,5 @@
 import { AsyncPipe } from '@angular/common';
-import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 
 // @coverage: 38.5% (2026-03-03)
 
@@ -63,7 +63,6 @@ import type { ContentMastery } from '../../../models';
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .refresh-queue {

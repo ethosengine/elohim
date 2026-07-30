@@ -6,7 +6,6 @@ import {
   inject,
   computed,
   Inject,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
@@ -58,7 +57,6 @@ import type { LearnerMasteryProfile } from '../../models/learner-mastery-profile
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './profile-page.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./profile-page.component.css'],
 })
 export class ProfilePageComponent implements OnInit, OnDestroy {
