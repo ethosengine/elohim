@@ -251,6 +251,7 @@ export class ElohimClient {
    *
    * Returns null if Holochain is not configured.
    */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
   getHolochainUrl(): string | null {
     if (!this.holochain?.enabled) return null;
 
@@ -269,6 +270,7 @@ export class ElohimClient {
   }
 
   /** Get the Holochain app ID */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
   getHolochainAppId(): string | null {
     return this.holochain?.hAppId ?? null;
   }

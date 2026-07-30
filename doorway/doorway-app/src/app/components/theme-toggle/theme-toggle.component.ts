@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, Input, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  Input,
+  ChangeDetectionStrategy,
+  inject,
+} from '@angular/core';
 
 import { Subscription } from 'rxjs';
 
@@ -10,16 +17,15 @@ import { ThemeService, Theme } from '../../services/theme.service';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './theme-toggle.component.html',
-  // OnPush-unsafe: cross-tab theme sync subscribe mutation — see backlog-onpush-eager-debt-inventory
+  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection -- subscribe-mutation pattern, OnPush-unsafe until signals conversion (see backlog-onpush-eager-debt-inventory)
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './theme-toggle.component.css',
 })
 export class ThemeToggleComponent implements OnInit, OnDestroy {
   @Input() inline = false;
   currentTheme: Theme = 'device';
+  private readonly themeService = inject(ThemeService);
   private themeSubscription?: Subscription;
-
-  constructor(private readonly themeService: ThemeService) {}
 
   ngOnInit(): void {
     this.themeSubscription = this.themeService.getTheme().subscribe(theme => {

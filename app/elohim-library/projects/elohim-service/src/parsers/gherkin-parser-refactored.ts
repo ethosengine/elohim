@@ -166,6 +166,7 @@ function parseFeature(lines: string[], filePath: string): ParsedFeature {
 /**
  * Parse a scenario starting at lineIndex
  */
+// eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
 function parseScenario(
   lines: string[],
   startIndex: number
@@ -255,6 +256,7 @@ function parseScenario(
 /**
  * Parse a step line
  */
+// eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
 function parseStep(line: string): ParsedStep | null {
   const stepMatch = matchLine(line, /^\s*(Given|When|Then|And|But)\s+(.+)$/);
   if (!stepMatch) {

@@ -521,6 +521,7 @@ export class TsContentResolver implements IContentResolver {
     return this.appRegistry.has(slug);
   }
 
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
   getAppBlobHash(slug: string): string | null {
     return this.appRegistry.get(slug)?.blobHash ?? null;
   }
@@ -679,6 +680,7 @@ class WasmContentResolverWrapper implements IContentResolver {
     return this.wasm.has_app(slug);
   }
 
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
   getAppBlobHash(slug: string): string | null {
     return this.wasm.get_app_blob_hash(slug);
   }

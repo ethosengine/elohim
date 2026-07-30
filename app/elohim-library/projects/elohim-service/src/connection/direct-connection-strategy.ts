@@ -350,6 +350,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
     return this.connected && this.appWs !== null;
   }
 
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
   getSigningCredentials(): SigningCredentials | null {
     return this.credentials;
   }

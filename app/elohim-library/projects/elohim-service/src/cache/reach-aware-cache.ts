@@ -253,6 +253,7 @@ class TsBlobCache implements IBlobCache {
     });
   }
 
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
   getMetadata(hash: string): CacheEntryMetadata | null {
     const json = this.getJson(hash);
     if (!json) return null;
@@ -587,6 +588,7 @@ class WasmBlobCacheWrapper implements IBlobCache {
     return this.wasm.get_json(hash);
   }
 
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
   getMetadata(hash: string): CacheEntryMetadata | null {
     const json = this.getJson(hash);
     if (!json) return null;

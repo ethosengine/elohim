@@ -788,6 +788,7 @@ function treeLayout(
 }
 
 /** Try all directions from a parent hex position to find an empty neighbor. */
+// eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
 function tryPlaceFromParent(
   parentPos: [number, number],
   primaryDirs: [number, number][],

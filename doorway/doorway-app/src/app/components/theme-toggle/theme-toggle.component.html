@@ -9,6 +9,8 @@
 >
   <span class="theme-icon">
     {{ getIcon() }}
-    <span *ngIf="isAutoMode()" class="auto-indicator" title="Auto (System) Theme">A</span>
+    @if (isAutoMode()) {
+      <span class="auto-indicator" title="Auto (System) Theme">A</span>
+    }
   </span>
 </button>

@@ -132,6 +132,7 @@ export class LocalSourceChainService {
   /**
    * Get a single entry by hash.
    */
+  /* eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain (verified even non-divergent `T | null` returns trigger it). */
   getEntry<T>(entryHash: string): SourceChainEntry<T> | null {
     const entry = this.entriesSubject.value.find(e => e.entryHash === entryHash);
     return (entry as SourceChainEntry<T>) ?? null;
@@ -150,6 +151,7 @@ export class LocalSourceChainService {
    * Get the latest entry of a specific type.
    * Useful for getting current state (e.g., latest mastery for content).
    */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API (see getEntry above)
   getLatestEntryByType<T>(entryType: LamadEntryType): SourceChainEntry<T> | null {
     const entries = this.getEntriesByType<T>(entryType);
     return entries.length > 0 ? entries.at(-1)! : null;
@@ -197,6 +199,7 @@ export class LocalSourceChainService {
   /**
    * Get the head (latest) entry in the chain.
    */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API (see getEntry above)
   getHeadEntry(): SourceChainEntry | null {
     const entries = this.entriesSubject.value;
     return entries.length > 0 ? entries.at(-1)! : null;
@@ -342,6 +345,7 @@ export class LocalSourceChainService {
   /**
    * Get the entry that a link points to.
    */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API (see getEntry above)
   getLinkedEntry<T>(link: EntryLink): SourceChainEntry<T> | null {
     return this.getEntry<T>(link.targetHash);
   }
@@ -374,6 +378,7 @@ export class LocalSourceChainService {
    * Get the latest entry matching a content property.
    * Useful for getting current mastery for a contentId, etc.
    */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API (see getEntry above)
   getLatestEntryByContentProperty<T>(
     entryType: LamadEntryType,
     propertyName: keyof T,
@@ -390,6 +395,7 @@ export class LocalSourceChainService {
   /**
    * Get chain metadata.
    */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API (see getEntry above)
   getMetadata(): ChainMetadata | null {
     if (!this.agentId) return null;
 
@@ -442,6 +448,7 @@ export class LocalSourceChainService {
   /**
    * Prepare migration package for Holochain.
    */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API (see getEntry above)
   prepareMigration(): ChainMigrationPackage | null {
     if (!this.agentId) return null;
 

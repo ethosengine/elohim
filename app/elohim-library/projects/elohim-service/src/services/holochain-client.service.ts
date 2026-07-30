@@ -228,6 +228,7 @@ export class HolochainClientService {
   /**
    * Get the current agent public key
    */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
   get agent(): AgentPubKey | null {
     return this.agentPubKey;
   }
@@ -235,6 +236,7 @@ export class HolochainClientService {
   /**
    * Get the current cell ID
    */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
   get cell(): CellId | null {
     return this.cellId;
   }
@@ -261,6 +263,7 @@ export class HolochainClientService {
    * Extract cell ID from app info
    * Looks for the first provisioned cell in the app
    */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
   private extractCellId(appInfo: AppInfo): CellId | null {
     const cellInfoEntries = Object.entries(appInfo.cell_info);
     for (const [, cells] of cellInfoEntries) {

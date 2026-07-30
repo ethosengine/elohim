@@ -51,6 +51,7 @@ export function splitLines(content: string): string[] {
 /**
  * Check if line matches a pattern
  */
+// eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API (RegExp.exec's own return type); rule misfires on nullable unions in this toolchain
 export function matchLine(line: string, pattern: RegExp): RegExpExecArray | null {
   return pattern.exec(line.trim());
 }

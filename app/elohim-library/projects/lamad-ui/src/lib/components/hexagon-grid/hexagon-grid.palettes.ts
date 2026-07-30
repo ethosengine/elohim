@@ -301,6 +301,7 @@ function applyFreshness(color: string, freshness: number): string {
 }
 
 /** Naive color parser for rgba() and hex strings. */
+// eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
 function parseColor(color: string): { r: number; g: number; b: number; a: number } | null {
   // rgba(r, g, b, a)
   const rgbaMatch = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(color);

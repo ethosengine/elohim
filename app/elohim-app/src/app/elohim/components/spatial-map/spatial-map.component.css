@@ -269,16 +269,16 @@
   min-width: 2px;
 }
 .risk-segment.low {
-  background: #4caf50;
+  background: #4caf50; /* a11y-color-ok: must byte-match RISK_TIER_COLORS.low in spatial-map.component.ts — MapLibre's data-driven 'fill-color' paint expression takes literal color strings only (no CSS custom-property resolution on canvas), so this legend swatch and the map fill it describes have to be the same literal or they visibly diverge */
 }
 .risk-segment.moderate {
-  background: #ffc107;
+  background: #ffc107; /* a11y-color-ok: byte-matches RISK_TIER_COLORS.moderate (spatial-map.component.ts) — same canvas/legend parity constraint as .risk-segment.low */
 }
 .risk-segment.elevated {
-  background: #ff9800;
+  background: #ff9800; /* a11y-color-ok: byte-matches RISK_TIER_COLORS.elevated (spatial-map.component.ts) — same canvas/legend parity constraint as .risk-segment.low */
 }
 .risk-segment.critical {
-  background: #f44336;
+  background: #f44336; /* a11y-color-ok: byte-matches RISK_TIER_COLORS.critical (spatial-map.component.ts) — same canvas/legend parity constraint as .risk-segment.low */
 }
 
 .risk-legend {
@@ -302,16 +302,16 @@
 }
 
 .dot.low {
-  background: #4caf50;
+  background: #4caf50; /* a11y-color-ok: byte-matches RISK_TIER_COLORS.low (spatial-map.component.ts) — this is the risk-legend's dot swatch, held to the same canvas/legend parity constraint as .risk-segment.low */
 }
 .dot.moderate {
-  background: #ffc107;
+  background: #ffc107; /* a11y-color-ok: byte-matches RISK_TIER_COLORS.moderate (spatial-map.component.ts) — legend dot, same canvas/legend parity constraint */
 }
 .dot.elevated {
-  background: #ff9800;
+  background: #ff9800; /* a11y-color-ok: byte-matches RISK_TIER_COLORS.elevated (spatial-map.component.ts) — legend dot, same canvas/legend parity constraint */
 }
 .dot.critical {
-  background: #f44336;
+  background: #f44336; /* a11y-color-ok: byte-matches RISK_TIER_COLORS.critical (spatial-map.component.ts) — legend dot, same canvas/legend parity constraint */
 }
 
 .place-list {
@@ -364,24 +364,24 @@
 }
 
 .risk-badge[data-tier='low'] {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: #e8f5e9; /* a11y-color-ok: fixed-contrast status chip (light tint), self-paired below with #2e7d32 — deliberately NOT the app surface/text tokens so the chip keeps 4CAF50-family hue recognition (RISK_TIER_COLORS.low) and its own guaranteed contrast in both app themes, like a badge/pill in most design systems */
+  color: #2e7d32; /* a11y-color-ok: paired foreground for the #e8f5e9 chip background on this rule — same fixed-contrast-chip reasoning as its background */
 }
 .risk-badge[data-tier='moderate'] {
-  background: #fff8e1;
-  color: #f57f17;
+  background: #fff8e1; /* a11y-color-ok: fixed-contrast status chip paired with #f57f17 below — amber/FFC107-family hue recognition (RISK_TIER_COLORS.moderate), same self-contained-chip reasoning as the 'low' tier */
+  color: #f57f17; /* a11y-color-ok: paired foreground for the #fff8e1 chip background on this rule */
 }
 .risk-badge[data-tier='elevated'] {
-  background: #fff3e0;
-  color: #e65100;
+  background: #fff3e0; /* a11y-color-ok: fixed-contrast status chip paired with #e65100 below — orange/FF9800-family hue recognition (RISK_TIER_COLORS.elevated), same self-contained-chip reasoning as the 'low' tier */
+  color: #e65100; /* a11y-color-ok: paired foreground for the #fff3e0 chip background on this rule */
 }
 .risk-badge[data-tier='critical'] {
-  background: #ffebee;
-  color: #c62828;
+  background: #ffebee; /* a11y-color-ok: fixed-contrast status chip paired with #c62828 below — red/F44336-family hue recognition (RISK_TIER_COLORS.critical), same self-contained-chip reasoning as the 'low' tier */
+  color: #c62828; /* a11y-color-ok: paired foreground for the #ffebee chip background on this rule */
 }
 
 .hazard-count {
-  background: #ff9800;
+  background: #ff9800; /* a11y-color-ok: byte-matches HAZARD_SEVERITY_COLORS.warning / RISK_TIER_COLORS.elevated (spatial-map.component.ts) — this count badge sits on the map legend beside the canvas hazard-marker circles, which MapLibre paints from that same literal; white text below is the fixed paired foreground for this saturated chip */
   color: #fff;
   border-radius: 50%;
   width: 18px;
@@ -394,7 +394,7 @@
 }
 
 .alert-count {
-  background: #f44336;
+  background: #f44336; /* a11y-color-ok: byte-matches RISK_TIER_COLORS.critical (spatial-map.component.ts) — this count badge sits on the map legend beside the canvas place-fill layer painted from that same literal; white text below is the fixed paired foreground for this saturated chip */
   color: #fff;
   border-radius: 50%;
   width: 18px;

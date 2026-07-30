@@ -1,4 +1,4 @@
-import { Injectable, Renderer2, RendererFactory2 } from '@angular/core';
+import { inject, Injectable, Renderer2, RendererFactory2 } from '@angular/core';
 
 import { BehaviorSubject, Observable } from 'rxjs';
 
@@ -8,11 +8,11 @@ export type Theme = 'light' | 'dark' | 'device';
   providedIn: 'root',
 })
 export class ThemeService {
-  private readonly renderer: Renderer2;
+  private readonly rendererFactory = inject(RendererFactory2);
+  private readonly renderer: Renderer2 = this.rendererFactory.createRenderer(null, null);
   private readonly currentTheme$ = new BehaviorSubject<Theme>('device');
 
-  constructor(rendererFactory: RendererFactory2) {
-    this.renderer = rendererFactory.createRenderer(null, null);
+  constructor() {
     this.loadTheme();
   }
 

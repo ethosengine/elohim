@@ -283,7 +283,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
 
     const allPrereqsMet = Array.from(prereqs).every(pid => {
       const pNode = nodeById.get(pid);
-      return pNode?.masteryLevel && BLOOM_ORDER[pNode.masteryLevel] >= BLOOM_ORDER['apply'];
+      return !!(pNode?.masteryLevel && BLOOM_ORDER[pNode.masteryLevel] >= BLOOM_ORDER['apply']);
     });
     return allPrereqsMet ? 'available' : 'locked';
   }

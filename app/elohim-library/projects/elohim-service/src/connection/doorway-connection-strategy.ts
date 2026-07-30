@@ -155,6 +155,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
    * Get the dev proxy base URL in Che environment.
    * Converts angular-dev endpoint to hc-dev endpoint.
    */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
   private getCheDevProxyUrl(): string | null {
     if (!this.isCheEnvironment()) return null;
 
@@ -709,6 +710,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     return this.connected && this.appWs !== null;
   }
 
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
   getSigningCredentials(): SigningCredentials | null {
     return this.credentials;
   }

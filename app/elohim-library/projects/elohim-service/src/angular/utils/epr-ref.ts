@@ -237,6 +237,7 @@ export function eprToUniversalHref(ref: EprRef): string {
  * inference: a `step` fragment implies contentType 'path'.
  * Returns null for blob tier (no page address).
  */
+// eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API (null = blob tier, no page address); rule misfires on nullable unions in this toolchain
 export function eprToRoute(
   ref: EprRef,
   ctx: BundleRouteContext,
@@ -270,6 +271,7 @@ export function eprToDid(id: string, host = 'hosted.elohim.host', namespace = 'c
 
 // ── Internal ────────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line sonarjs/function-return-type -- intentional `T | undefined` API (no match); rule misfires on nullable/undefined unions in this toolchain
 function parseFragment(raw: string): EprFragment | undefined {
   if (raw.startsWith('step/')) {
     return { type: 'step', value: raw.slice(5) };
