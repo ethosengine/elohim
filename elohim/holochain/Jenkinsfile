@@ -1046,6 +1046,37 @@ def shouldRunStep(String stepName) {
     return steps.contains('all') || steps.contains(stepName)
 }
 
+// VALIDATE_ONLY trigger surface (params coalesced — MultiBranch params are
+// null pre-first-run) OR an [edge:validate-only] HEAD commit-message tag,
+// mirroring the orchestrator's [build:*]/[skip ci] commit-message idiom.
+// Called once from Checkout (needs the checked-out repo for `git log`);
+// stashes the result in env.EDGE_VALIDATE_ONLY for every later `when` to read
+// via isValidateOnly() below — kept as top-level defs so the per-stage cost
+// added to the CPS stages-model is just a function call, not inline logic.
+def computeValidateOnly() {
+    def commitMsg = sh(script: 'git log -1 --format=%B', returnStdout: true).trim()
+    env.EDGE_VALIDATE_ONLY = ((params.VALIDATE_ONLY ?: false) ||
+        commitMsg.contains('[edge:validate-only]')) ? 'true' : 'false'
+    if (env.EDGE_VALIDATE_ONLY == 'true') {
+        echo "VALIDATE_ONLY — skipping build/deploy stages; running Dataplane Validation only"
+    }
+}
+
+def isValidateOnly() {
+    env.EDGE_VALIDATE_ONLY == 'true'
+}
+
+// Every build-only stage already gates on `params.DEPLOY_ONLY != true`
+// (DEPLOY_ONLY skips exactly this stage set). VALIDATE_ONLY needs the same
+// stages skipped, so fold both into one call — replaces the DEPLOY_ONLY
+// expression at each site instead of adding a second one (CPS stage-model
+// budget on this file has near-zero headroom; see jenkinsfile-method-size
+// hook). Deploy stages are gated separately via isValidateOnly() directly,
+// since DEPLOY_ONLY must NOT skip those.
+def skipBuildStage() {
+    (params.DEPLOY_ONLY == true) || isValidateOnly()
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -1195,6 +1226,11 @@ spec:
             defaultValue: false,
             description: 'Skip all build stages and run only Deploy Edge Node - <Env>. Tags are read from genesis/orchestrator/environments/{env}.env. Use after manifest/RBAC-only changes when Harbor tags are already valid.'
         )
+        booleanParam(
+            name: 'VALIDATE_ONLY',
+            defaultValue: false,
+            description: 'Skip build/deploy; run only Dataplane Validation against the deployed alpha cluster. Decouples validation timing from deploy-restart windows. Also settable via [edge:validate-only] commit tag.'
+        )
     }
 
     options {
@@ -1277,6 +1313,8 @@ spec:
                         sh 'git clean -fdx'
                         sh 'git reset --hard HEAD'
 
+                        computeValidateOnly()
+
                         echo "Building Holochain infrastructure for branch: ${env.BRANCH_NAME}"
                     }
                 }
@@ -1284,7 +1322,11 @@ spec:
         }
 
         stage('Setup Version') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            // build.env is unused by Dataplane Validation — skippable here.
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { !isValidateOnly() }
+            }}
             steps {
                 container('builder') {
                     script {
@@ -1342,7 +1384,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Setup Nix Cache') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { !isValidateOnly() }
+            }}
             steps {
                 container('builder') {
                     script {
@@ -1368,7 +1413,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Quality Gate: Doorway') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.DEPLOY_ONLY != true }
+                expression { !skipBuildStage() }
             }}
             steps {
                 container('builder') {
@@ -1397,7 +1442,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Doorway') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.DEPLOY_ONLY != true }
+                expression { !skipBuildStage() }
                 expression { shouldRunStep('cargo-build-doorway') }
             }}
             steps {
@@ -1433,7 +1478,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Quality Gate: Doorway App') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.DEPLOY_ONLY != true }
+                expression { !skipBuildStage() }
             }}
             steps {
                 container('builder') {
@@ -1454,7 +1499,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Doorway App') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.DEPLOY_ONLY != true }
+                expression { !skipBuildStage() }
             }}
             steps {
                 container('builder') {
@@ -1495,7 +1540,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Agent SDK') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.DEPLOY_ONLY != true }
+                expression { !skipBuildStage() }
             }}
             steps {
                 container('builder') {
@@ -1533,7 +1578,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Storage') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.DEPLOY_ONLY != true }
+                expression { !skipBuildStage() }
                 expression { shouldRunStep('cargo-build-storage') }
             }}
             // Gate rides INSIDE this stage (not its own stage): adding a stage
@@ -1548,11 +1593,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
-                    expression { params.DEPLOY_ONLY != true }
+                    expression { !skipBuildStage() }
                     anyOf {
                         changeset "elohim/elohim-storage/src/p2p/**"
                         changeset "steward/node/simulation/**"
-                        expression { return params.FORCE_BUILD == true }
+                        expression { params.FORCE_BUILD }
                     }
                 }
             }
@@ -1570,9 +1615,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Edge Node Image') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.DEPLOY_ONLY != true }
+                expression { !skipBuildStage() }
                 expression { shouldRunStep('build-edge-image') }
-                expression { !(params.SKIP_LEGACY_IMAGES ?: false) }
+                expression { params.SKIP_LEGACY_IMAGES != true }
             }}
             steps {
                 container('builder') {
@@ -1628,8 +1673,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build hApp Installer') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.DEPLOY_ONLY != true }
-                expression { !(params.SKIP_LEGACY_IMAGES ?: false) }
+                expression { !skipBuildStage() }
+                expression { params.SKIP_LEGACY_IMAGES != true }
             }}
             steps {
                 container('builder') {
@@ -1681,7 +1726,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Push to Harbor') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { params.DEPLOY_ONLY != true }
+                expression { !skipBuildStage() }
             }}
             steps {
                 container('builder') {
@@ -1837,6 +1882,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { !isValidateOnly() }
                     anyOf {
                         branch 'dev'
                         allOf {
@@ -1846,12 +1892,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 changeset "elohim/holochain/edgenode/**"
                             }
                             anyOf {
-                                expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                                expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                                expression { env.BRANCH_NAME ==~ /feat-.+/ }
+                                expression { env.BRANCH_NAME ==~ /claude\/.+/ }
                             }
                         }
-                        expression { return params.FORCE_DEPLOY == true }
-                        expression { return params.FORCE_BUILD == true }
+                        expression { params.FORCE_DEPLOY }
+                        expression { params.FORCE_BUILD }
                     }
                 }
             }
@@ -1863,9 +1909,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         withBuildVars(props) {
                             // Check if we have a reason to deploy
                             def shouldDeploy = (env.IMAGES_PUSHED == 'true') ||
-                                               (params.FORCE_DEPLOY == true) ||
-                                               (params.FORCE_BUILD == true) ||
-                                               (params.DEPLOY_ONLY == true)
+                                               params.FORCE_DEPLOY || params.FORCE_BUILD || params.DEPLOY_ONLY
 
                             if (!shouldDeploy) {
                                 echo "No new images pushed and no force flags - checking edge node health..."
@@ -2042,12 +2086,13 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                                 changeset 'elohim/holochain/edgenode/**'
                             }
                             anyOf {
-                                expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                                expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                                expression { env.BRANCH_NAME ==~ /feat-.+/ }
+                                expression { env.BRANCH_NAME ==~ /claude\/.+/ }
                             }
                         }
-                        expression { return params.FORCE_DEPLOY == true }
-                        expression { return params.FORCE_BUILD == true }
+                        expression { params.FORCE_DEPLOY }
+                        expression { params.FORCE_BUILD }
+                        expression { isValidateOnly() }
                     }
                 }
             }
@@ -2079,9 +2124,10 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { !isValidateOnly() }
                     anyOf {
                         branch 'staging'
-                        expression { return env.BRANCH_NAME ==~ /staging-.+/ }
+                        expression { env.BRANCH_NAME ==~ /staging-.+/ }
                     }
                 }
             }
@@ -2141,10 +2187,11 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { !isValidateOnly() }
                     anyOf {
                         branch 'main'
                         allOf {
-                            expression { return params.FORCE_DEPLOY == true }
+                            expression { params.FORCE_DEPLOY }
                             branch 'main'
                         }
                     }
@@ -2157,9 +2204,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
 
                         withBuildVars(props) {
                             def shouldDeploy = (env.IMAGES_PUSHED == 'true') ||
-                                               (params.FORCE_DEPLOY == true) ||
-                                               (params.FORCE_BUILD == true) ||
-                                               (params.DEPLOY_ONLY == true)
+                                               params.FORCE_DEPLOY || params.FORCE_BUILD || params.DEPLOY_ONLY
 
                             if (!shouldDeploy) {
                                 if (checkEdgeNodeHealth('https://doorway.elohim.host')) {
