@@ -11,7 +11,7 @@ status: "backlog"
 priority: "medium"
 deprecation_status: blocked
 severity: low
-fingerprints: ["c8e23effd89f", "9d796424bd3a"]
+fingerprints: ["c8e23effd89f", "9d796424bd3a", "ce0de21b8053"]
 relatedNodeIds:
   - "backlog-deprecation-uuid-support-window-upgrade-unit"
   - "backlog-dependabot-triage"
@@ -241,3 +241,63 @@ read-only; no workspace file was modified):
 - Lockfile reverse-dep trace for all three glob resolutions, and confirmation that
   every resolved `minimatch` (`3.1.5`, `9.0.9`, `10.2.3`, `10.2.4`) is at or above
   its fix floor — the reason this entry is `severity: low`.
+
+## 2026-07-30 — sophia's glob carriers, resolved from aggregate banner `ce0de21b8053`
+
+This entry already recorded that `sophia/pnpm-lock.yaml` carries `glob@10.5.0`,
+`8.1.0`, and `7.2.3` with **zero direct declarations** in any
+`sophia/packages/*/package.json`. Triage of sophia's aggregate install banner
+("25 deprecated subdependencies found") completed that finding by naming **which**
+carriers pull them, so this entry no longer holds an unresolved "transitive, source
+unknown" gap. Three banner lines are owned here:
+
+```
+glob@7.2.3      Glob versions prior to v9 are no longer supported
+glob@8.1.0      Glob versions prior to v9 are no longer supported
+inflight@1.0.6  This module is not supported, and leaks memory. Do not use it. …
+```
+
+Parent-edge index over `sophia/pnpm-lock.yaml` `snapshots:` (peer-suffix
+normalised):
+
+| Package | Parents in sophia | Root importer |
+|---|---|---|
+| `glob@7.2.3` | `@jest/reporters@29.7.0`, `jest-config@29.7.0`, `jest-runtime@29.7.0`, `test-exclude@6.0.0` | `jest@29.7.0` / `jest-environment-jsdom@29.7.0` |
+| | `nyc@15.1.0`, `rimraf@3.0.2` | `nyc@15.1.0` (coverage; live via `utils/test-with-coverage.sh`) |
+| | `node-gyp@9.4.1` | `rollup-plugin-filesize@10.0.0` → `pacote@15` |
+| | `globby@7.1.1` | `eslint-plugin-monorepo@0.3.2` (eslint-8 unit) |
+| | `stylus@0.62.0` | `typescript-plugin-css-modules@5.2.0` |
+| `glob@8.1.0` | `cacache@16.1.3` | `rollup-plugin-filesize@10.0.0` → `pacote@15` |
+| | `@rollup/plugin-commonjs@25.0.8` | `packages/sophia-element` + `packages/psephos-element` (both pin `^25.0.7`) |
+| `inflight@1.0.6` | `glob@7.2.3`, `glob@8.1.0` — its **only** parents tree-wide | (rides both) |
+
+Two facts worth carrying forward:
+
+1. **`inflight` is purely derivative.** It has no parent except the two old globs,
+   so it needs no plan of its own — it leaves exactly when they do. Do not triage
+   it separately.
+2. **The cheapest independent lever in sophia is not a `glob` bump at all.** Two
+   of the carriers retire on work already specified elsewhere:
+   `rollup-plugin-filesize` (see
+   `genesis/data/timeline/backlog/deprecation-sophia-rollup-filesize-npm-internals-subtree.md`,
+   which removes the `pacote`/`node-gyp`/`cacache` stack entirely) and
+   `@rollup/plugin-commonjs@25 → 28` (the two element packages pin `^25.0.7` while
+   the sophia root already declares `^28.0.3` — aligning them is a two-line
+   version bump that drops a `glob@8` edge). Neither clears the lines on its own,
+   because `jest@29` and `nyc@15` also carry `glob@7`, but both shrink the carrier
+   set at near-zero cost.
+
+**Correction to this entry's recorded blocker.** The verification section above
+cites 404s against `https://nexus.ethosengine.com/repository/npm/`. That
+constraint no longer applies: the repo **stopped using Nexus for public packages**
+in commit `ecc65384f` *"fix(registry): reserve Nexus for first-party components;
+consume crates.io + npmjs direct"* (2026-07-30 03:18Z, in HEAD), which sets
+`/projects/elohim/.npmrc` to `registry=https://registry.npmjs.org/` and scopes
+Nexus to `@elohim:` publishing only. Nexus was not repaired — it was taken out of
+the path. Probed this pass against the effective registry: uncached
+`rollup-plugin-filesize-10.0.0.tgz` → **200**, control `left-pad-1.2.0.tgz` →
+**200**. Any part of this entry blocked *solely* on artifact availability should
+be re-tested rather than left blocked.
+
+Add to this entry's closure check: `glob@7.2.3`, `glob@8.1.0`, and `inflight@1.0.6`
+absent from `sophia/pnpm-lock.yaml` as well as the root lockfile.

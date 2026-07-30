@@ -11,7 +11,7 @@ status: "backlog"
 priority: "medium"
 deprecation_status: blocked
 severity: medium
-fingerprints: ["819aa7c6f6bd", "bba59aabdf63", "b1561f3d429d"]
+fingerprints: ["819aa7c6f6bd", "bba59aabdf63", "b1561f3d429d", "ce0de21b8053"]
 relatedNodeIds: []
 tags: [deprecation, eslint, sophia, flat-config, toolchain, eol, submodule]
 cites:
@@ -204,3 +204,44 @@ What this pass proved (no fix landed — scoping evidence, not fix verification)
 Closure requires: `eslint` at `^10`, flat config replacing all 13 `.eslintrc.js`
 files, sophia `pnpm lint` + `pnpm typecheck` green, and a `--print-config`
 rule-coverage diff showing no silent rule loss.
+
+## 2026-07-30 — the eslint-8 subtree, from aggregate banner `ce0de21b8053`
+
+Triage of sophia's aggregate install banner ("25 deprecated subdependencies
+found") assigned **two further deprecated packages to this concern**. They are
+not new work — they clear automatically when this entry's migration lands — but
+they are recorded here so the banner is fully accounted for and nobody re-triages
+them as a separate concern.
+
+```
+@humanwhocodes/config-array@0.13.0   Use @eslint/config-array instead
+@humanwhocodes/object-schema@2.0.3   Use @eslint/object-schema instead
+```
+
+Reverse-dep trace over `sophia/pnpm-lock.yaml` `snapshots:` — a two-hop chain
+under the pinned runner, sole parent at each hop:
+
+```
+eslint@8.57.1                          (the pin this entry retires)
+└── @humanwhocodes/config-array@0.13.0 ← DEPRECATED (sole parent: eslint@8.57.1)
+    └── @humanwhocodes/object-schema@2.0.3 ← DEPRECATED (sole parent: config-array)
+```
+
+These two are the clearest possible signal that the pin is the problem:
+`@humanwhocodes/config-array` **is** the eslintrc-era config loader, renamed to
+`@eslint/config-array` when flat config became the default. They exist in the tree
+only because eslint 8 still loads `.eslintrc.js`. Migrating to flat config removes
+the loader, and both packages leave with it — no separate action, no override.
+
+The same banner also traces a `glob@7.2.3` carrier edge into this unit via
+`eslint-plugin-monorepo@0.3.2` → `globby@7.1.1` → `glob@7.2.3`. That plugin is
+**live** (`.eslintrc.js:67` registers it; line 313 enables
+`monorepo/no-internal-import`), so it must be re-declared for flat config rather
+than dropped — worth flagging as a migration task, since `eslint-plugin-monorepo`
+is an eslintrc-era plugin whose flat-config support needs checking before the bump
+is scheduled. The `glob@7.2.3` line itself is owned by
+`deprecation-glob-support-window-upgrade-unit.md`, not here.
+
+Add to this entry's closure check: after the migration, confirm
+`@humanwhocodes/config-array` and `@humanwhocodes/object-schema` are absent from
+`sophia/pnpm-lock.yaml`.

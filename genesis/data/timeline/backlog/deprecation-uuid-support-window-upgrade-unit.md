@@ -11,7 +11,7 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["9b2c18a09eb7", "a200f917e702", "72a88a3bbff4", "e83cd3f2d7e3"]
+fingerprints: ["9b2c18a09eb7", "a200f917e702", "72a88a3bbff4", "e83cd3f2d7e3", "ce0de21b8053"]
 relatedNodeIds:
   - "backlog-dependabot-triage"
   - "backlog-deprecation-storybook-test-runner-jest-island-retire"
@@ -273,3 +273,65 @@ No fix was applied this run, so nothing is claimed fixed. What *was* verified:
 - **Files touched this run**: this entry and three `.claude/data/deprecations.jsonl`
   status transitions. No lockfile, no `pnpm-workspace.yaml`, no `package.json`, no
   submodule content.
+
+## 2026-07-30 — sophia's transitive `uuid@8.3.2`, from aggregate banner `ce0de21b8053`
+
+Triage of sophia's aggregate install banner ("25 deprecated subdependencies
+found") confirms one banner line belongs to this entry:
+
+```
+uuid@8.3.2  uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.
+            For CommonJS codebases, use uuid@11 (but be aware this version …)
+```
+
+This entry already anticipated it ("Transitive too, all pre-window: `uuid@8.3.2`
+via `@cypress/request@3.0.10` and `istanbul-lib-processinfo@2.0.3`"). A
+parent-edge index over `sophia/pnpm-lock.yaml` `snapshots:` **confirms exactly
+those two parents and no others** in sophia:
+
+| Parent of `uuid@8.3.2` | Root importer | Status |
+|---|---|---|
+| `@cypress/request@3.0.10` | `cypress@13.6.5` (`sophia/package.json`; also `onlyBuiltDependencies`) | live — component test runner |
+| `istanbul-lib-processinfo@2.0.3` | `nyc@15.1.0` | live — the coverage merge in `utils/test-with-coverage.sh` |
+
+So the transitive half of the sophia surface is **fully bounded by two dev-tool
+majors**, neither of which is the first-party `packages/sophia` declaration this
+entry's fix targets:
+
+- **`nyc@15.1.0 → 18.x`.** Latest is **18.0.0** (probed this pass). This is the
+  more attractive of the two: `nyc` also carries `glob@7.2.3` and `rimraf@3.0.2`
+  edges (see the glob entry), so one bump retires three deprecated lines at once.
+  Caveat established this pass: `nyc` is **live** despite `knip --dependencies`
+  listing it as an unused devDependency — knip's config excludes `!utils/**`, and
+  `nyc` is driven by `utils/test-with-coverage.sh` plus the `nyc` key in
+  `package.json`. Do not let a knip report talk anyone into deleting it.
+- **`cypress@13.6.5 → 15.x`.** Carries a pinned `onlyBuiltDependencies` entry
+  (`cypress@13.6.5` in `pnpm-workspace.yaml`) that must move with the bump, plus
+  the usual Cypress-major test churn.
+
+**Correction to this entry's recorded blocker.** Blocker #1 in *Current decision*
+is `mirror-blocked`; blocker #3 states the sophia worktree "this environment
+cannot even `git status`". Both are now stale:
+
+1. **Mirror.** The repo stopped using Nexus for public packages in commit
+   `ecc65384f` *"fix(registry): reserve Nexus for first-party components; consume
+   crates.io + npmjs direct"* (2026-07-30 03:18Z, in HEAD) — `/projects/elohim/.npmrc`
+   now sets `registry=https://registry.npmjs.org/`, with Nexus scoped to
+   `@elohim:` publishing. Nexus was not repaired; it was removed from the path.
+   Uncached tarballs probed **200** this pass. Artifact availability is no longer
+   a blocker for the sophia surface.
+2. **Submodule boundary.** `git -C sophia status` works fine from this
+   environment; it was exercised repeatedly this pass. What *is* real is a
+   narrower, transient contention: sophia is currently on branch `feat/jquery-3`
+   with an in-flight jQuery 2→3 migration holding uncommitted edits to
+   `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and one source file. That sprint owns
+   the lockfile right now (its `pnpm install` is what emitted this banner —
+   lockfile mtime `14:58:03Z` matches the fingerprint timestamp), so no
+   dependency work should regenerate it until that lands.
+
+Net effect: the sophia half of this entry is blocked on **worktree timing plus
+dev-tool major bumps**, not on artifact availability or repo access. Re-test
+before inheriting the old blockers.
+
+Add to this entry's closure check: `uuid@8.3.2` absent from
+`sophia/pnpm-lock.yaml` in addition to the root lockfile surfaces already listed.

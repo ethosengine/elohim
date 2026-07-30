@@ -22,7 +22,7 @@ cites:
   - .claude/skills/deprecation-stasis
   - genesis/data/timeline/backlog/deprecation-sophia-eslint-8-eol-flat-config-migration.md
   - genesis/data/timeline/backlog/security-jquery-2-1-1-shipped-in-sophia-umd-bundle.md
-  - genesis/data/timeline/backlog/deprecation-sophia-intersection-observer-dead-declaration.md
+  - genesis/data/timeline/backlog/deprecation-sophia-dead-devdependency-declarations.md
 ---
 
 ## What is deprecated
