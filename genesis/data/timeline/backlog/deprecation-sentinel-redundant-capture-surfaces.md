@@ -134,6 +134,40 @@ likely *digit-collapse for deprecation summaries too* plus a routing rule that
 treats the aggregate as a pointer to the per-package entries rather than a
 concern. Live ledger entry: `ce0de21b8053`, status `open`.
 
+**Class 5 (observed live 2026-07-30 15:01–15:02, the sharpest instance) — the
+Node `(node:PID)` prefix makes every process a new fingerprint.** Node prefixes
+its deprecation warnings with the emitting process id:
+
+```
+(node:810849) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(node:811654) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(node:812228) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+```
+
+Three ledger entries — `534a561884b4`, `e0db70ae40c7`, `9f2941b72728` — all
+`status: open`, all the **same** warning, minted inside ninety seconds by one
+concurrent session running three `jest` invocations. Normalizing `(node:\d+)`
+collapses all three to a single concern (verified against the live ledger).
+
+This is Class 3's disease at its worst. Class 3 re-mints when a lockfile line
+*moves*; Class 5 re-mints **once per process**, so a single test suite can
+mint dispatches faster than triage can retire them, forever, for one long-known
+upstream warning (`punycode` is deprecated in Node ≥21 and reaches this repo
+through transitive deps). Any run that shells out to node repeatedly pays it.
+
+The fix is one normalization beside Fix N in `fingerprint()`:
+
+```python
+norm = re.sub(r"\(node:\d+\)", "(node:#)", norm)
+```
+
+**Not landed here, deliberately, and the reason is a hazard rather than a
+doubt:** the ledger was being actively appended to by another session while
+this was diagnosed. Rewriting the file to migrate the three fingerprints would
+have raced those writes and could have dropped their captures. Fix N and Class
+5 share one ledger migration, so they should land together, in a quiet tree —
+which is also the cheaper sequencing. Bundle them.
+
 ## Usage inventory
 
 Single file — `.claude/hooks/deprecation-sentinel.py`:
