@@ -54,7 +54,7 @@ INDEXEOF
     for file in "$GENERATED_DIR"/*.ts; do
         basename=$(basename "$file" .ts)
         if [ "$basename" != "index" ]; then
-            echo "export * from './$basename';" >> "$GENERATED_DIR/index.ts"
+            echo "export * from './$basename.js';" >> "$GENERATED_DIR/index.ts"
         fi
     done
 

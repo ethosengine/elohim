@@ -6,4 +6,4 @@
  * intentionally ships no client library.
  */
 
-export * from './queries';
+export * from './queries.js';

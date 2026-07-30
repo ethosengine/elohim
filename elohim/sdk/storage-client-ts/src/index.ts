@@ -46,14 +46,14 @@ export { StorageClient } from './client';
 export { AutomergeSync, SyncResult, createSync } from './sync';
 
 // Generated types from Rust via ts-rs
-export * from './generated';
+export * from './generated/index.js';
 
 // GraphQL query documents + response types (viewer.hub, viewer.peers)
-export * from './graphql';
+export * from './graphql/index.js';
 
 // Protocol wire-format types (Slice 2.5 — migrated from elohim-app pillar)
-export * from './protocol-core.model';
-export * from './zome-wire-types';
-export * from './epr-head.model';
-export * from './source-chain.model';
+export * from './protocol-core.model.js';
+export * from './zome-wire-types.js';
+export * from './epr-head.model.js';
+export * from './source-chain.model.js';
 export type { IIntegrityAnchor } from './integrity-anchor.interface';
