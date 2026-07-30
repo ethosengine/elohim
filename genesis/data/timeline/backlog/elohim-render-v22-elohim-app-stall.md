@@ -158,3 +158,64 @@ signature. lamad SSR is fully restored and byte-matches Node. The cost is (a) no
 elohim-app's landing page, and (b) each `/` render occupies the single sequential isolate for the
 full wall-time budget, so a burst of landing-page requests sheds with `RenderError::Busy`. Lowering
 `RenderLimits::wall_time_ms` for this surface would bound that independently of the root cause.
+
+## Second investigation pass (2026-07-30, overnight — commit f2306603a)
+
+Root cause still OPEN, but the search space is materially narrower and two prior readings are
+now **disproven by direct evidence rather than argument**. Read this before re-probing.
+
+### Ruled OUT (do not re-run these)
+
+- **`customElements.whenDefined` is NOT the blocker.** A live trap on `globalThis.customElements`
+  (`ELOHIM_RENDER_DEBUG_HOOKS=1`) shows the Lit SSR registry installs and `define()`s **all 19
+  `<elohim-*>` elements within ~10ms of isolate start** — before the stall, before the single
+  fetch. `whenDefined` is **never called** during the render. This retires suggested-probe #2's
+  lead above.
+- **The `elohim-cache-core` wasm resolve/load pattern is NOT `/`-specific.** Re-running
+  `ELOHIM_RENDER_TRACE_MODULES=1` against the *healthy* `/identity/login` (380ms) shows the
+  **identical** 4×resolve / 1×load signature. The trace above reads as if it localized the stall;
+  it does not. It is a universal, harmless cache probe.
+- **No swallowed rejection**: unhandled-rejection suppression was made loud (log-then-suppress) —
+  nothing ever fires.
+- **No dangling timer**: `setTimeout`/`setInterval` wrapped with caller stacks — every scheduled
+  timer is legitimate (known background timers + AppComponent's 3s abort timer).
+- **Not a module-graph top-level-await deadlock**: a raw `import()` of HomeComponent's own lazy
+  chunk resolves fast (clean `TypeError`, not a hang).
+
+### Established this pass
+
+- Node ground truth for `/` (harness matching elohim-render's fetch-reject semantics exactly):
+  **~524ms, 30 fetches, 60740B** — config.json, version.json, then 14× `epr-head`+`resilience`
+  pairs from the `EprRelationshipCardComponent` instances under Vision / DesignPrinciples /
+  LearningSuccess / PathForward. HomeComponent's **entire** subtree constructs fine in Node.
+- The isolate never gets past AppComponent's own health-check fetch (1 fetch total), so the block
+  **precedes every HomeComponent descendant** — it is not one flaky child component.
+
+### The load-bearing next probe
+
+`app/elohim-app/src/app/app.config.server.ts`'s own comments record that under
+`provideZonelessChangeDetection()`, **both router navigation and HTTP requests** are explicit
+`PendingTasks` contributors. Since zero HttpClient requests are ever issued, the prime suspect is
+now the **Router's per-navigation PendingTask for the `''` route never completing** — which would
+stall `whenStable()` independently of any component constructor running (consistent with
+HomeComponent never being constructed). Instrument `PendingTasks` directly and dump what is
+outstanding at T+5s.
+
+### Mitigation LANDED (independent of root cause)
+
+`AngularRenderer::render()` now clamps caller-requested wall time to
+`DEFAULT_MAX_WALL_TIME_MS = 10_000` (override: `ELOHIM_RENDER_MAX_WALL_TIME_MS`). The doorway's
+hardcoded `wall_time_ms: 60_000` is bounded without editing that surface. A stalling route now
+occupies the single sequential isolate for 10s rather than 60s, cutting the `RenderError::Busy`
+burst hazard 6×. Healthy routes verified unchanged (`/identity/login` 538ms, `/zzz-nonexistent`
+548ms, lamad `/lamad` 464ms / 2 fetches / 4208B); `cargo test --lib --bins` 110/110.
+
+Diagnostics are now permanent and opt-in (off by default, zero behavior change when unset):
+`ELOHIM_RENDER_DEBUG_HOOKS`, `ELOHIM_RENDER_TRACE_MODULES`, `ELOHIM_RENDER_WALL_MS`, plus a wired
+`tracing_subscriber` so `console.*` from the bundle is visible in the harness. The probe recipe
+above no longer needs hand-rebuilding.
+
+### Adjacent bug found, not fixed (deserves its own entry)
+
+`/epr/elohim-host-landing` renders real content fetches and then panics on `localStorage is not
+defined` in mastery-tracking code — pre-existing, unrelated to v22, out of scope here.
