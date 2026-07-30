@@ -38,6 +38,16 @@ impl DataFetcher for FailFetcher {
 
 #[tokio::main]
 async fn main() {
+    // Surface console.* (routed through tracing at target elohim_render::js_console)
+    // and any Rust-side tracing::debug! diagnostics. Defaults to the console
+    // target only; override with RUST_LOG for more.
+    let filter = std::env::var("RUST_LOG")
+        .unwrap_or_else(|_| "elohim_render::js_console=info,elohim_render=info".to_string());
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::new(filter))
+        .with_target(false)
+        .init();
+
     let mut args = std::env::args().skip(1);
     let bundle = args
         .next()
@@ -56,7 +66,10 @@ async fn main() {
         url: url.clone(),
         data_fetcher: fetcher,
         limits: RenderLimits {
-            wall_time_ms: 60_000,
+            wall_time_ms: std::env::var("ELOHIM_RENDER_WALL_MS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(60_000),
             ..Default::default()
         },
     };

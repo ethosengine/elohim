@@ -146,10 +146,26 @@ impl ModuleLoader for NodeShimLoader {
         referrer: &str,
         kind: ResolutionKind,
     ) -> Result<ModuleSpecifier, ModuleLoaderError> {
-        match builtin_name(specifier) {
+        let result = match builtin_name(specifier) {
             Some(name) => builtin_specifier(name),
             None => self.fs.resolve(specifier, referrer, kind),
+        };
+        // Diagnostic-only, gated by ELOHIM_RENDER_TRACE_MODULES — see the
+        // module-trace probe in the '/' stall investigation
+        // (genesis/data/timeline/backlog/2026-07-30-*stall*.md).
+        if std::env::var("ELOHIM_RENDER_TRACE_MODULES").is_ok() {
+            match &result {
+                Ok(spec) => tracing::info!(
+                    target: "elohim_render::module_trace",
+                    "[resolve OK] {specifier} (from {referrer}) -> {spec}"
+                ),
+                Err(e) => tracing::info!(
+                    target: "elohim_render::module_trace",
+                    "[resolve ERR] {specifier} (from {referrer}) -> {e}"
+                ),
+            }
         }
+        result
     }
 
     fn load(
@@ -159,6 +175,12 @@ impl ModuleLoader for NodeShimLoader {
         is_dyn_import: bool,
         requested_module_type: RequestedModuleType,
     ) -> ModuleLoadResponse {
+        if std::env::var("ELOHIM_RENDER_TRACE_MODULES").is_ok() {
+            tracing::info!(
+                target: "elohim_render::module_trace",
+                "[load] dyn={is_dyn_import} {module_specifier}"
+            );
+        }
         if module_specifier.scheme() == BUILTIN_SCHEME {
             // `elohim-builtin:crypto` -> the crypto shim; any other builtin -> a
             // module that throws a clear, named error at evaluation. Path() is the

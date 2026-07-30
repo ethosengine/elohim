@@ -28,6 +28,30 @@ use crate::traced_fetcher::TracingFetcher;
 use crate::types::{FetchEvent, RenderTrace};
 use crate::{RenderContext, RenderError, RenderOutput, Renderer, Result};
 
+/// Safety ceiling on `ctx.limits.wall_time_ms`, independent of whatever the
+/// caller requests (doorway currently asks for 60_000ms to cover a cold-start
+/// worst case). The isolate is a SINGLE sequential worker (capacity-1 channel,
+/// see `render()` below) — a route that genuinely stalls (idle-waiting on a
+/// promise that never settles, not a slow-but-finishing render) occupies that
+/// one isolate for the FULL requested wall time, shedding every other request
+/// with `RenderError::Busy` for the duration. Measured healthy renders
+/// (`examples/render_url.rs`, cold isolate, no JIT warmup) complete in
+/// 300–550ms; this ceiling leaves ~20x headroom over that while cutting a
+/// stalling route's worst-case isolate-occupancy from 60s to this value.
+/// Override with `ELOHIM_RENDER_MAX_WALL_TIME_MS` (e.g. for a slower host or a
+/// deliberately content-heavy cold-start scenario that needs more headroom).
+/// This bounds impact; it does NOT fix a genuine root-cause stall — see the
+/// investigation notes in `genesis/data/timeline/backlog/` for the '/' route
+/// class this was introduced for.
+const DEFAULT_MAX_WALL_TIME_MS: u64 = 10_000;
+
+fn max_wall_time_ms() -> u64 {
+    std::env::var("ELOHIM_RENDER_MAX_WALL_TIME_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_MAX_WALL_TIME_MS)
+}
+
 /// A single unit of work sent to the background render thread.
 struct StringWorkItem {
     /// The JS expression/IIFE driver to evaluate via `eval_string`.
@@ -202,6 +226,80 @@ impl Renderer for AngularRenderer {
         let bundle_lit = serde_json::to_string(bundle_url.as_str()).map_err(RenderError::Serde)?;
         let url_lit = serde_json::to_string(&ctx.url).map_err(RenderError::Serde)?;
 
+        // Diagnostic-only instrumentation, OFF by default and never shipped in a
+        // production driver: ELOHIM_RENDER_DEBUG_HOOKS=1 installs (a) a
+        // console.log heartbeat via Deno.core's own timer facility so a genuine
+        // V8 spin vs. an idle-wait can be told apart from wall-clock alone, and
+        // (b) a trap on the FIRST assignment to `globalThis.customElements`
+        // (Lit's own SSR CustomElementRegistry shim self-installs via
+        // `globalThis.customElements ??= new Registry()` the first time a Lit
+        // chunk evaluates) that wraps `.define()` / `.whenDefined()` to log
+        // ENTER/RESOLVE with a caller stack — the direct test for "some
+        // component awaits customElements.whenDefined(tag) for a tag that is
+        // never defined server-side, and hangs forever." See the root-cause
+        // investigation in genesis/data/timeline/backlog/2026-07-30-*stall*.md.
+        let debug_hooks = std::env::var("ELOHIM_RENDER_DEBUG_HOOKS").is_ok();
+        let debug_js = if debug_hooks {
+            r#"
+                (() => {
+                    if (typeof Deno === 'undefined' || !Deno.core) return;
+                    const core = Deno.core;
+                    const tick = () => {
+                        console.log(`[heartbeat] t=${Date.now()}`);
+                        core.queueUserTimer(1, false, 500, tick);
+                    };
+                    core.queueUserTimer(1, false, 500, tick);
+
+                    // Wrap setTimeout/setInterval to log EVERY scheduled timer
+                    // (delay + caller stack) — names the concrete callback still
+                    // outstanding when the render stalls (e.g. a long/huge-delay
+                    // timer, a retry backoff, an rxjs `timeout()` operator).
+                    const origSetTimeout = globalThis.setTimeout;
+                    const origSetInterval = globalThis.setInterval;
+                    globalThis.setTimeout = function (cb, delay, ...args) {
+                        console.log(`[setTimeout SCHEDULE] delay=${delay}\n${new Error().stack}`);
+                        return origSetTimeout(function (...a) {
+                            console.log(`[setTimeout FIRE] delay=${delay}`);
+                            return cb.apply(this, a);
+                        }, delay, ...args);
+                    };
+                    globalThis.setInterval = function (cb, delay, ...args) {
+                        console.log(`[setInterval SCHEDULE] delay=${delay}\n${new Error().stack}`);
+                        return origSetInterval(cb, delay, ...args);
+                    };
+
+                    let backing = undefined;
+                    Object.defineProperty(globalThis, 'customElements', {
+                        configurable: true,
+                        get() { return backing; },
+                        set(registry) {
+                            console.log('[customElements] registry installed');
+                            try {
+                                const origWhenDefined = registry.whenDefined.bind(registry);
+                                registry.whenDefined = function (name) {
+                                    console.log(`[whenDefined ENTER] ${name}\n${new Error().stack}`);
+                                    return origWhenDefined(name).then(
+                                        (r) => { console.log(`[whenDefined RESOLVE] ${name}`); return r; },
+                                        (e) => { console.log(`[whenDefined REJECT] ${name} ${e}`); throw e; }
+                                    );
+                                };
+                                const origDefine = registry.define.bind(registry);
+                                registry.define = function (name, ctor) {
+                                    console.log(`[customElements.define] ${name}`);
+                                    return origDefine(name, ctor);
+                                };
+                            } catch (e) {
+                                console.log(`[customElements trap install FAILED] ${e}`);
+                            }
+                            backing = registry;
+                        },
+                    });
+                })();
+            "#
+        } else {
+            ""
+        };
+
         // JS driver: dynamic import the bundle, then call Angular's SSR API.
         // The `await import(...)` is required because eval_string executes in a
         // *script* context (not a module context). Dynamic import() is the bridge
@@ -215,6 +313,20 @@ impl Renderer for AngularRenderer {
         // needed because Angular services make HTTP calls during SSR (ConfigService,
         // etc.) which hit our stub fetch and produce rejected Promises that propagate
         // up the RxJS chain without a subscriber-level error handler.
+        // Diagnostic-only: under ELOHIM_RENDER_DEBUG_HOOKS, LOG every unhandled
+        // rejection (reason + a best-effort stack) before still suppressing it —
+        // behavior is unchanged (still returns true/handled), but a rejection
+        // that today vanishes silently (and may be leaving Angular-internal
+        // bookkeeping, e.g. a PendingTask, forever unresolved) becomes visible.
+        let rejection_handler_js = if debug_hooks {
+            r#"Deno.core.setUnhandledPromiseRejectionHandler((promise, reason) => {
+                console.log(`[unhandled rejection] ${reason && reason.stack ? reason.stack : reason}`);
+                return true;
+            });"#
+        } else {
+            "Deno.core.setUnhandledPromiseRejectionHandler(() => true);"
+        };
+
         let driver = format!(
             r#"(async () => {{
                 // Suppress unhandled promise rejections — SSR fetch failures are
@@ -222,8 +334,9 @@ impl Renderer for AngularRenderer {
                 // Without this, op_dispatch_exception is called on each unhandled
                 // rejection, which causes RenderError::Panic instead of rendering.
                 if (typeof Deno !== 'undefined' && Deno.core && Deno.core.setUnhandledPromiseRejectionHandler) {{
-                    Deno.core.setUnhandledPromiseRejectionHandler(() => true);
+                    {rejection_handler_js}
                 }}
+                {debug_js}
                 // Eagerly evaluate the crypto shim BEFORE the bundle graph. The
                 // bundle bundles `ws` (CommonJS), which reaches for a synchronous
                 // `require("crypto")` at module-init; the module shim's require
@@ -270,14 +383,28 @@ impl Renderer for AngularRenderer {
         // A hard-timeout here is the backstop for a true hang (e.g. an infinite
         // loop in JS); the per-fetch soft-deadline already converts a stalled
         // fetch into a fast-completing render below this limit.
+        //
+        // The effective limit is the caller's request CLAMPED to a safety
+        // ceiling (see `max_wall_time_ms` above) — the isolate is a shared,
+        // sequential resource, so no single caller gets to hold it hostage
+        // for longer than the ceiling regardless of what it asks for.
+        let effective_wall_time_ms = ctx.limits.wall_time_ms.min(max_wall_time_ms());
+        if effective_wall_time_ms < ctx.limits.wall_time_ms {
+            tracing::debug!(
+                target: "elohim_render::angular",
+                requested_ms = ctx.limits.wall_time_ms,
+                effective_ms = effective_wall_time_ms,
+                "clamped RenderLimits::wall_time_ms to the elohim-render safety ceiling"
+            );
+        }
         let started = std::time::Instant::now();
         let (render_result, fetch_events) = tokio::time::timeout(
-            std::time::Duration::from_millis(ctx.limits.wall_time_ms),
+            std::time::Duration::from_millis(effective_wall_time_ms),
             reply_rx,
         )
         .await
         .map_err(|_| RenderError::Timeout {
-            limit_ms: ctx.limits.wall_time_ms,
+            limit_ms: effective_wall_time_ms,
         })?
         .map_err(|_| RenderError::Panic("angular render worker: reply channel dropped".into()))?;
 
