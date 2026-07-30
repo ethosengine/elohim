@@ -19,7 +19,7 @@ http-body-util = "0.1"
 
 # HTTP client for health probing
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream", "blocking"] }
-bytes = "1.10"
+bytes = "1.11.1"
 tokio-tungstenite = "0.24"
 futures-util = "0.3"
 
@@ -87,7 +87,7 @@ base64 = "0.22"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 bs58 = "0.5"
 dashmap = "6.1"
-rand = "0.8"
+rand = "0.8.6"
 hex = "0.4"
 
 # OAuth / URL encoding
@@ -100,15 +100,15 @@ serde_urlencoded = "0.7"
 # same version avoids a second resolution and keeps ed25519-dalek
 # at 2.1.1 across the workspace.
 pkarr = { version = "3.10", default-features = false, features = ["signed_packet"] }
-lru = "0.13"
+lru = "0.16.3"
 
 # Caching
 sha2 = "0.10"
 elohim-cache-core = { path = "../../elohim/elohim-cache-core" }
 
 # Prometheus app-metrics surface (the design-decision toolkit P2 doorway leg).
-# Mirror elohim-storage exactly: prometheus 0.13 (NOT 0.14+) + lazy_static.
-prometheus = "0.13"
+# 0.14 carries protobuf >=3.7.2, fixing RUSTSEC-2024-0437.
+prometheus = "0.14"
 lazy_static = "1"
 
 # Wire-shape View types — boundary is now explicit; view imports must use elohim-views, not elohim-storage
