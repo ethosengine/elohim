@@ -7,7 +7,7 @@
     "start": "ng serve",
     "test": "vitest run --config vite.config.ts",
     "lint": "node ../scripts/lint-route-literals.mjs src && node ../scripts/lint-ssr-entry.mjs .",
-    "start:alpha": "ng serve --proxy-config proxy.conf.alpha.mjs --disable-host-check"
+    "start:alpha": "ng serve --proxy-config proxy.conf.alpha.mjs"
   },
   "dependencies": {
     "@angular/animations": "^22.1.0",

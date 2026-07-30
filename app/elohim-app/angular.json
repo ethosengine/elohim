@@ -11,7 +11,7 @@
       "prefix": "app",
       "architect": {
         "build": {
-          "builder": "@angular-devkit/build-angular:application",
+          "builder": "@angular/build:application",
           "options": {
             "outputPath": "dist/elohim-app",
             "index": "src/index.html",
@@ -136,13 +136,11 @@
           "defaultConfiguration": "production"
         },
         "serve": {
-          "builder": "@angular-devkit/build-angular:dev-server",
+          "builder": "@angular/build:dev-server",
           "options": {
             "host": "0.0.0.0",
             "port": 4200,
-            "allowedHosts": [
-              "*.code.ethosengine.com"
-            ],
+            "allowedHosts": true,
             "proxyConfig": "proxy.conf.mjs"
           },
           "configurations": {
@@ -162,7 +160,7 @@
           "defaultConfiguration": "development"
         },
         "extract-i18n": {
-          "builder": "@angular-devkit/build-angular:extract-i18n"
+          "builder": "@angular/build:extract-i18n"
         },
         "test": {
           "builder": "@analogjs/vitest-angular:test"
