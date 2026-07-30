@@ -14,7 +14,14 @@
 
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  inject,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { catchError, map, switchMap, takeUntil } from 'rxjs/operators';
 
@@ -69,6 +76,7 @@ interface CommitmentsListResponse {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './network-health-tab.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './network-health-tab.component.scss',
 })
 export class NetworkHealthTabComponent implements OnInit, OnDestroy {

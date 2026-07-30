@@ -6,7 +6,15 @@
  * then calls GovernanceApiService.respondToChallenge().
  */
 
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { GovernanceApiService } from '@elohim/service';
@@ -114,6 +122,7 @@ const OUTCOME_OPTIONS = [
       </button>
     </form>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     :host {
       display: block;

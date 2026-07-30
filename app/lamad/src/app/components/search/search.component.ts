@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -45,11 +45,25 @@ import { SearchService } from '../../services/search.service';
             </div>
           </ng-template>
           <ng-container *ngFor="let result of results">
-            <a *ngIf="getNodeCommands(result) as commands" [routerLink]="commands" class="result-card" data-testid="result-card">
-              <ng-container *ngTemplateOutlet="cardBody; context: { result: result }"></ng-container>
+            <a
+              *ngIf="getNodeCommands(result) as commands"
+              [routerLink]="commands"
+              class="result-card"
+              data-testid="result-card"
+            >
+              <ng-container
+                *ngTemplateOutlet="cardBody; context: { result: result }"
+              ></ng-container>
             </a>
-            <a *ngIf="!getNodeCommands(result)" [attr.href]="getNodeHref(result)" class="result-card" data-testid="result-card">
-              <ng-container *ngTemplateOutlet="cardBody; context: { result: result }"></ng-container>
+            <a
+              *ngIf="!getNodeCommands(result)"
+              [attr.href]="getNodeHref(result)"
+              class="result-card"
+              data-testid="result-card"
+            >
+              <ng-container
+                *ngTemplateOutlet="cardBody; context: { result: result }"
+              ></ng-container>
             </a>
           </ng-container>
         </div>
@@ -59,6 +73,7 @@ import { SearchService } from '../../services/search.service';
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .search-page {

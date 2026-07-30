@@ -15,7 +15,15 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  inject,
+  signal,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 // @coverage: 96.6% (2026-02-24)
@@ -46,6 +54,7 @@ interface RestrictionItem {
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './capabilities-dashboard.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./capabilities-dashboard.component.css'],
 })
 export class CapabilitiesDashboardComponent implements OnInit, OnDestroy {

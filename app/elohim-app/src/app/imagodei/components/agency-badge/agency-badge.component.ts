@@ -6,7 +6,14 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal, output, computed } from '@angular/core';
+import {
+  Component,
+  inject,
+  signal,
+  output,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { Router } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)
@@ -19,6 +26,7 @@ import { AgencyService } from '@app/imagodei/services/agency.service';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './agency-badge.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './agency-badge.component.css',
 })
 export class AgencyBadgeComponent {

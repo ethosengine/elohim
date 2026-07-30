@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { LoggerService, LogLevel } from '../../elohim/services/logger.service';
 import { DebugContextService } from '../../elohim/services/debug-context.service';
 
@@ -14,6 +21,7 @@ const RUST_LEVELS = ['off', 'error', 'warn', 'info', 'debug', 'trace'];
   standalone: true,
   imports: [CommonModule],
   templateUrl: './logging-lens.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './logging-lens.component.scss',
 })
 export class LoggingLensComponent implements OnInit {

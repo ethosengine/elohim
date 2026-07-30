@@ -5,7 +5,7 @@
  * and completed graduates. Includes force-graduate action per user.
  */
 
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NotificationService } from '../../../core/notifications/notification.service';
 import { DoorwayAdminService } from '../../../services/doorway-admin.service';
@@ -51,12 +51,13 @@ import { GraduationUser } from '../../../models/doorway.model';
                         {{ user.hasLocalConductor ? 'Yes' : 'No' }}
                       </span>
                     </td>
-                    <td class="date">{{ user.keyExportedAt | date:'short' }}</td>
+                    <td class="date">{{ user.keyExportedAt | date: 'short' }}</td>
                     <td>
                       <button
                         class="btn-graduate"
                         (click)="forceGraduate(user)"
-                        [disabled]="graduating().has(user.id)">
+                        [disabled]="graduating().has(user.id)"
+                      >
                         @if (graduating().has(user.id)) {
                           Graduating...
                         } @else {
@@ -89,8 +90,8 @@ import { GraduationUser } from '../../../models/doorway.model';
                 @for (user of completed(); track user.id) {
                   <tr>
                     <td class="identifier">{{ user.identifier }}</td>
-                    <td class="date">{{ user.graduatedAt | date:'short' }}</td>
-                    <td class="date">{{ user.createdAt | date:'short' }}</td>
+                    <td class="date">{{ user.graduatedAt | date: 'short' }}</td>
+                    <td class="date">{{ user.createdAt | date: 'short' }}</td>
                   </tr>
                 }
               </tbody>
@@ -102,6 +103,7 @@ import { GraduationUser } from '../../../models/doorway.model';
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './graduation-tab.component.css',
 })
 export class GraduationTabComponent implements OnInit {

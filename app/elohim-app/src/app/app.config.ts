@@ -1,4 +1,4 @@
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
 import { ApplicationConfig, provideZoneChangeDetection, importProvidersFrom } from '@angular/core';
 import { provideRouter } from '@angular/router';
 
@@ -89,7 +89,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([apiBaseUrlInterceptor])),
+    provideHttpClient(withXhr(), withInterceptors([apiBaseUrlInterceptor])),
     // ElohimClient - mode-aware content client (browser via doorway, tauri via local storage)
     // doorwayUrl resolves to window.location.origin when served from a projected bundle,
     // keeping API calls co-origin with the serving doorway (alpha or prod).

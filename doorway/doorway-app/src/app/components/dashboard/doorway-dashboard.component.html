@@ -6,7 +6,11 @@
       <p class="subtitle">Compute Resources & Network Health</p>
     </div>
     <div class="header-actions">
-      <div class="capabilities-badge" data-testid="dashboard-capabilities-badge" aria-label="Doorway capabilities">
+      <div
+        class="capabilities-badge"
+        data-testid="dashboard-capabilities-badge"
+        aria-label="Doorway capabilities"
+      >
         @for (cap of capabilityEntries(); track cap.key) {
           <span
             class="capability-chip"
@@ -14,7 +18,8 @@
             [class.disabled]="!cap.enabled"
             [attr.data-testid]="'dashboard-capability-' + cap.key"
             [attr.data-enabled]="cap.enabled"
-            [title]="cap.label + ': ' + (cap.enabled ? 'enabled' : 'disabled')">
+            [title]="cap.label + ': ' + (cap.enabled ? 'enabled' : 'disabled')"
+          >
             <span class="capability-dot" aria-hidden="true"></span>
             <span class="capability-label">{{ cap.label }}</span>
           </span>
@@ -24,7 +29,13 @@
         <span class="status-dot"></span>
         {{ connectionState() | titlecase }}
       </span>
-      <button class="refresh-btn" (click)="refresh()" [disabled]="loading()" data-testid="dashboard-refresh" aria-label="Refresh dashboard data">
+      <button
+        class="refresh-btn"
+        (click)="refresh()"
+        [disabled]="loading()"
+        data-testid="dashboard-refresh"
+        aria-label="Refresh dashboard data"
+      >
         <span class="icon" aria-hidden="true">&#8635;</span>
         Refresh
       </button>
@@ -56,7 +67,10 @@
           <div class="stat-value">{{ cluster()?.onlineNodes }}/{{ cluster()?.totalNodes }}</div>
           <div class="stat-label">Nodes Online</div>
           <div class="stat-bar">
-            <div class="stat-bar-fill health" [style.width.%]="(cluster()?.healthRatio ?? 0) * 100"></div>
+            <div
+              class="stat-bar-fill health"
+              [style.width.%]="(cluster()?.healthRatio ?? 0) * 100"
+            ></div>
           </div>
         </div>
 
@@ -64,7 +78,10 @@
           <div class="stat-value">{{ formatPercent(cluster()?.avgTrustScore ?? null) }}</div>
           <div class="stat-label">Avg Trust Score</div>
           <div class="stat-bar">
-            <div class="stat-bar-fill trust" [style.width.%]="(cluster()?.avgTrustScore ?? 0) * 100"></div>
+            <div
+              class="stat-bar-fill trust"
+              [style.width.%]="(cluster()?.avgTrustScore ?? 0) * 100"
+            ></div>
           </div>
         </div>
 
@@ -72,15 +89,23 @@
           <div class="stat-value">{{ formatPercent(cluster()?.avgImpactScore ?? null) }}</div>
           <div class="stat-label">Avg Impact Score</div>
           <div class="stat-bar">
-            <div class="stat-bar-fill impact" [style.width.%]="(cluster()?.avgImpactScore ?? 0) * 100"></div>
+            <div
+              class="stat-bar-fill impact"
+              [style.width.%]="(cluster()?.avgImpactScore ?? 0) * 100"
+            ></div>
           </div>
         </div>
 
         <div class="stat-card">
-          <div class="stat-value">{{ formatPercent(cluster()?.clusterDeliverySuccessRate ?? null) }}</div>
+          <div class="stat-value">
+            {{ formatPercent(cluster()?.clusterDeliverySuccessRate ?? null) }}
+          </div>
           <div class="stat-label">Delivery Success</div>
           <div class="stat-bar">
-            <div class="stat-bar-fill success" [style.width.%]="(cluster()?.clusterDeliverySuccessRate ?? 0) * 100"></div>
+            <div
+              class="stat-bar-fill success"
+              [style.width.%]="(cluster()?.clusterDeliverySuccessRate ?? 0) * 100"
+            ></div>
           </div>
         </div>
       </section>
@@ -100,7 +125,8 @@
         [attr.aria-selected]="activeTab() === 'overview'"
         [class.active]="activeTab() === 'overview'"
         (click)="setTab('overview')"
-        data-testid="dashboard-tab-overview">
+        data-testid="dashboard-tab-overview"
+      >
         Overview
       </button>
       <button
@@ -109,7 +135,8 @@
         [attr.aria-selected]="activeTab() === 'nodes'"
         [class.active]="activeTab() === 'nodes'"
         (click)="setTab('nodes')"
-        data-testid="dashboard-tab-nodes">
+        data-testid="dashboard-tab-nodes"
+      >
         Nodes ({{ nodes().length }})
       </button>
       <button
@@ -118,7 +145,8 @@
         [attr.aria-selected]="activeTab() === 'resources'"
         [class.active]="activeTab() === 'resources'"
         (click)="setTab('resources')"
-        data-testid="dashboard-tab-resources">
+        data-testid="dashboard-tab-resources"
+      >
         Resources
       </button>
       <button
@@ -127,7 +155,8 @@
         [attr.aria-selected]="activeTab() === 'users'"
         [class.active]="activeTab() === 'users'"
         (click)="setTab('users')"
-        data-testid="dashboard-tab-users">
+        data-testid="dashboard-tab-users"
+      >
         Users ({{ usersTotal() }})
       </button>
       <button
@@ -136,7 +165,8 @@
         [attr.aria-selected]="activeTab() === 'pipeline'"
         [class.active]="activeTab() === 'pipeline'"
         (click)="setTab('pipeline')"
-        data-testid="dashboard-tab-pipeline">
+        data-testid="dashboard-tab-pipeline"
+      >
         Pipeline
       </button>
       <button
@@ -145,7 +175,8 @@
         [attr.aria-selected]="activeTab() === 'federation'"
         [class.active]="activeTab() === 'federation'"
         (click)="setTab('federation')"
-        data-testid="dashboard-tab-federation">
+        data-testid="dashboard-tab-federation"
+      >
         Federation
       </button>
       <button
@@ -154,7 +185,8 @@
         [attr.aria-selected]="activeTab() === 'graduation'"
         [class.active]="activeTab() === 'graduation'"
         (click)="setTab('graduation')"
-        data-testid="dashboard-tab-graduation">
+        data-testid="dashboard-tab-graduation"
+      >
         Graduation
       </button>
       <button
@@ -163,7 +195,8 @@
         [attr.aria-selected]="activeTab() === 'topology'"
         [class.active]="activeTab() === 'topology'"
         (click)="setTab('topology')"
-        data-testid="dashboard-tab-topology">
+        data-testid="dashboard-tab-topology"
+      >
         Topology
       </button>
     </nav>
@@ -179,87 +212,102 @@
         }
         <div class="overview-grid">
           @if (orchestratorAvailable()) {
-          <!-- Capacity Card -->
-          <div class="card">
-            <h3>Cluster Capacity</h3>
-            @if (totalCapacity()) {
-              <div class="capacity-grid">
-                <div class="capacity-item">
-                  <span class="capacity-value">{{ totalCapacity()?.cpu }}</span>
-                  <span class="capacity-label">CPU Cores</span>
-                </div>
-                <div class="capacity-item">
-                  <span class="capacity-value">{{ totalCapacity()?.memory }} GB</span>
-                  <span class="capacity-label">Memory</span>
-                </div>
-                <div class="capacity-item">
-                  <span class="capacity-value">{{ totalCapacity()?.storage | number:'1.1-1' }} TB</span>
-                  <span class="capacity-label">Storage</span>
-                </div>
-                <div class="capacity-item">
-                  <span class="capacity-value">{{ totalCapacity()?.bandwidth | number }} Mbps</span>
-                  <span class="capacity-label">Bandwidth</span>
-                </div>
-              </div>
-            }
-          </div>
-
-          <!-- Steward Distribution Card -->
-          <div class="card">
-            <h3>Steward Distribution</h3>
-            <div class="steward-distribution">
-              @for (tier of stewardDistribution(); track tier.tier) {
-                <div class="tier-row">
-                  <span class="tier-name">{{ tier.tier }}</span>
-                  <div class="tier-bar">
-                    <div class="tier-bar-fill" [class]="tier.tier.toLowerCase()" [style.width.%]="tier.pct * 100"></div>
+            <!-- Capacity Card -->
+            <div class="card">
+              <h3>Cluster Capacity</h3>
+              @if (totalCapacity()) {
+                <div class="capacity-grid">
+                  <div class="capacity-item">
+                    <span class="capacity-value">{{ totalCapacity()?.cpu }}</span>
+                    <span class="capacity-label">CPU Cores</span>
                   </div>
-                  <span class="tier-count">{{ tier.count }}</span>
+                  <div class="capacity-item">
+                    <span class="capacity-value">{{ totalCapacity()?.memory }} GB</span>
+                    <span class="capacity-label">Memory</span>
+                  </div>
+                  <div class="capacity-item">
+                    <span class="capacity-value">
+                      {{ $safeNavigationMigration(totalCapacity()?.storage) | number: '1.1-1' }} TB
+                    </span>
+                    <span class="capacity-label">Storage</span>
+                  </div>
+                  <div class="capacity-item">
+                    <span class="capacity-value">
+                      {{ $safeNavigationMigration(totalCapacity()?.bandwidth) | number }} Mbps
+                    </span>
+                    <span class="capacity-label">Bandwidth</span>
+                  </div>
                 </div>
               }
             </div>
-          </div>
 
-          <!-- Reach Coverage Card -->
-          <div class="card">
-            <h3>Reach Coverage</h3>
-            @if (cluster()?.reachCoverage) {
-              <div class="reach-grid">
-                @for (level of [0,1,2,3,4,5,6,7]; track level) {
-                  <div class="reach-item" [class.active]="getReachCount(level) > 0">
-                    <span class="reach-count">{{ getReachCount(level) }}</span>
-                    <span class="reach-name">{{ reachLevelName(level) }}</span>
+            <!-- Steward Distribution Card -->
+            <div class="card">
+              <h3>Steward Distribution</h3>
+              <div class="steward-distribution">
+                @for (tier of stewardDistribution(); track tier.tier) {
+                  <div class="tier-row">
+                    <span class="tier-name">{{ tier.tier }}</span>
+                    <div class="tier-bar">
+                      <div
+                        class="tier-bar-fill"
+                        [class]="tier.tier.toLowerCase()"
+                        [style.width.%]="tier.pct * 100"
+                      ></div>
+                    </div>
+                    <span class="tier-count">{{ tier.count }}</span>
                   </div>
                 }
               </div>
-            }
-          </div>
+            </div>
 
-          <!-- Cache Performance Card -->
-          <div class="card">
-            <h3>Cache Performance</h3>
-            @if (resources()?.cache) {
-              <div class="cache-stats">
-                <div class="cache-stat">
-                  <span class="cache-value">{{ resources()?.cache?.entries | number }}</span>
-                  <span class="cache-label">Entries</span>
+            <!-- Reach Coverage Card -->
+            <div class="card">
+              <h3>Reach Coverage</h3>
+              @if (cluster()?.reachCoverage) {
+                <div class="reach-grid">
+                  @for (level of [0, 1, 2, 3, 4, 5, 6, 7]; track level) {
+                    <div class="reach-item" [class.active]="getReachCount(level) > 0">
+                      <span class="reach-count">{{ getReachCount(level) }}</span>
+                      <span class="reach-name">{{ reachLevelName(level) }}</span>
+                    </div>
+                  }
                 </div>
-                <div class="cache-stat">
-                  <span class="cache-value">{{ formatPercent(resources()?.cache?.hitRate ?? null) }}</span>
-                  <span class="cache-label">Hit Rate</span>
-                </div>
-                <div class="cache-stat">
-                  <span class="cache-value">{{ resources()?.cache?.hits | number }}</span>
-                  <span class="cache-label">Hits</span>
-                </div>
-                <div class="cache-stat">
-                  <span class="cache-value">{{ resources()?.cache?.misses | number }}</span>
-                  <span class="cache-label">Misses</span>
-                </div>
-              </div>
-            }
-          </div>
+              }
+            </div>
 
+            <!-- Cache Performance Card -->
+            <div class="card">
+              <h3>Cache Performance</h3>
+              @if (resources()?.cache) {
+                <div class="cache-stats">
+                  <div class="cache-stat">
+                    <span class="cache-value">
+                      {{ $safeNavigationMigration(resources()?.cache?.entries) | number }}
+                    </span>
+                    <span class="cache-label">Entries</span>
+                  </div>
+                  <div class="cache-stat">
+                    <span class="cache-value">
+                      {{ formatPercent(resources()?.cache?.hitRate ?? null) }}
+                    </span>
+                    <span class="cache-label">Hit Rate</span>
+                  </div>
+                  <div class="cache-stat">
+                    <span class="cache-value">
+                      {{ $safeNavigationMigration(resources()?.cache?.hits) | number }}
+                    </span>
+                    <span class="cache-label">Hits</span>
+                  </div>
+                  <div class="cache-stat">
+                    <span class="cache-value">
+                      {{ $safeNavigationMigration(resources()?.cache?.misses) | number }}
+                    </span>
+                    <span class="cache-label">Misses</span>
+                  </div>
+                </div>
+              }
+            </div>
           }
 
           <!-- Custodian Network Card -->
@@ -276,11 +324,15 @@
                   <span class="label">Healthy</span>
                 </div>
                 <div class="custodian-stat">
-                  <span class="value">{{ custodians()?.trackedBlobs | number }}</span>
+                  <span class="value">
+                    {{ $safeNavigationMigration(custodians()?.trackedBlobs) | number }}
+                  </span>
                   <span class="label">Blobs Tracked</span>
                 </div>
                 <div class="custodian-stat">
-                  <span class="value">{{ formatPercent(custodians()?.probeSuccessRate ?? null) }}</span>
+                  <span class="value">
+                    {{ formatPercent(custodians()?.probeSuccessRate ?? null) }}
+                  </span>
                   <span class="label">Probe Success</span>
                 </div>
               </div>
@@ -296,19 +348,26 @@
                 <span class="label">Total Routes</span>
               </div>
               <div class="custodian-stat">
-                <span class="value" [class.text-green-600]="stewardRegistered()" [class.text-gray-400]="!stewardRegistered()">
+                <span
+                  class="value"
+                  [class.text-green-600]="stewardRegistered()"
+                  [class.text-gray-400]="!stewardRegistered()"
+                >
                   {{ stewardRegistered() ? 'Yes' : 'No' }}
                 </span>
                 <span class="label">Storage Registered</span>
               </div>
             </div>
             @if (routeRegistry()?.stewardUrl) {
-              <div class="info-row" style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--dw-text-muted, #6b7280);">
+              <div
+                class="info-row"
+                style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--dw-text-muted, #6b7280)"
+              >
                 <span>{{ routeRegistry()?.stewardUrl }}</span>
               </div>
             }
             @if ((routeRegistry()?.routeSources?.length ?? 0) > 0) {
-              <div style="margin-top: 0.75rem;">
+              <div style="margin-top: 0.75rem">
                 @for (source of routeRegistry()?.routeSources; track source.sourceType) {
                   <div class="tier-row">
                     <span class="tier-name">{{ source.sourceType }}</span>
@@ -321,19 +380,23 @@
 
           <!-- Human Scale Card -->
           @if (orchestratorAvailable()) {
-          <div class="card human-scale">
-            <h3>Human Scale Metrics</h3>
-            <div class="human-stats">
-              <div class="human-stat">
-                <span class="value">{{ cluster()?.totalHumansServed | number }}</span>
-                <span class="label">Humans Served</span>
-              </div>
-              <div class="human-stat">
-                <span class="value">{{ cluster()?.totalContentCustodied | number }}</span>
-                <span class="label">Content Pieces</span>
+            <div class="card human-scale">
+              <h3>Human Scale Metrics</h3>
+              <div class="human-stats">
+                <div class="human-stat">
+                  <span class="value">
+                    {{ $safeNavigationMigration(cluster()?.totalHumansServed) | number }}
+                  </span>
+                  <span class="label">Humans Served</span>
+                </div>
+                <div class="human-stat">
+                  <span class="value">
+                    {{ $safeNavigationMigration(cluster()?.totalContentCustodied) | number }}
+                  </span>
+                  <span class="label">Content Pieces</span>
+                </div>
               </div>
             </div>
-          </div>
           }
         </div>
       }
@@ -345,88 +408,116 @@
             <p>No orchestrator configured for this doorway</p>
           </div>
         } @else {
-        <div class="nodes-panel">
-          <!-- Filters -->
-          <div class="filters">
-            <select [value]="statusFilter()" (change)="setStatusFilter($any($event.target).value)" data-testid="nodes-status-filter">
-              <option value="all">All Status</option>
-              <option value="online">Online</option>
-              <option value="degraded">Degraded</option>
-              <option value="offline">Offline</option>
-              <option value="failed">Failed</option>
-            </select>
-          </div>
+          <div class="nodes-panel">
+            <!-- Filters -->
+            <div class="filters">
+              <select
+                [value]="statusFilter()"
+                (change)="setStatusFilter($any($event.target).value)"
+                data-testid="nodes-status-filter"
+              >
+                <option value="all">All Status</option>
+                <option value="online">Online</option>
+                <option value="degraded">Degraded</option>
+                <option value="offline">Offline</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
 
-          <!-- Nodes Table -->
-          <table class="nodes-table">
-            <thead>
-              <tr>
-                <th (click)="setSort('nodeId')" class="sortable" data-testid="nodes-sort-id">
-                  Node ID
-                  @if (sortField() === 'nodeId') {
-                    <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
-                  }
-                </th>
-                <th (click)="setSort('status')" class="sortable" data-testid="nodes-sort-status">
-                  Status
-                  @if (sortField() === 'status') {
-                    <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
-                  }
-                </th>
-                <th (click)="setSort('stewardTier')" class="sortable" data-testid="nodes-sort-tier">
-                  Tier
-                  @if (sortField() === 'stewardTier') {
-                    <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
-                  }
-                </th>
-                <th (click)="setSort('trustScore')" class="sortable" data-testid="nodes-sort-trust">
-                  Trust
-                  @if (sortField() === 'trustScore') {
-                    <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
-                  }
-                </th>
-                <th (click)="setSort('combinedScore')" class="sortable" data-testid="nodes-sort-score">
-                  Score
-                  @if (sortField() === 'combinedScore') {
-                    <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
-                  }
-                </th>
-                <th>Last Heartbeat</th>
-                <th>Region</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (node of sortedNodes(); track node.nodeId) {
-                <tr [class]="node.status">
-                  <td class="node-id">{{ node.nodeId | slice:0:12 }}...</td>
-                  <td>
-                    <span class="status-badge" [class]="node.status">
-                      {{ node.status | titlecase }}
-                    </span>
-                  </td>
-                  <td>
-                    <span class="tier-badge" [class]="node.stewardTier ?? 'unknown'">
-                      {{ node.stewardTier ?? '-' | titlecase }}
-                    </span>
-                  </td>
-                  <td>{{ formatPercent(node.trustScore) }}</td>
-                  <td>
-                    <div class="score-bar">
-                      <div class="score-fill" [style.width.%]="node.combinedScore * 100"></div>
-                      <span class="score-text">{{ (node.combinedScore * 100) | number:'1.0-0' }}%</span>
-                    </div>
-                  </td>
-                  <td>{{ formatTime(node.lastHeartbeatSecsAgo) }}</td>
-                  <td>{{ node.region ?? '-' }}</td>
-                </tr>
-              } @empty {
+            <!-- Nodes Table -->
+            <table class="nodes-table">
+              <thead>
                 <tr>
-                  <td colspan="7" class="empty-state">No nodes found</td>
+                  <th (click)="setSort('nodeId')" class="sortable" data-testid="nodes-sort-id">
+                    Node ID
+                    @if (sortField() === 'nodeId') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </th>
+                  <th (click)="setSort('status')" class="sortable" data-testid="nodes-sort-status">
+                    Status
+                    @if (sortField() === 'status') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </th>
+                  <th
+                    (click)="setSort('stewardTier')"
+                    class="sortable"
+                    data-testid="nodes-sort-tier"
+                  >
+                    Tier
+                    @if (sortField() === 'stewardTier') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </th>
+                  <th
+                    (click)="setSort('trustScore')"
+                    class="sortable"
+                    data-testid="nodes-sort-trust"
+                  >
+                    Trust
+                    @if (sortField() === 'trustScore') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </th>
+                  <th
+                    (click)="setSort('combinedScore')"
+                    class="sortable"
+                    data-testid="nodes-sort-score"
+                  >
+                    Score
+                    @if (sortField() === 'combinedScore') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </th>
+                  <th>Last Heartbeat</th>
+                  <th>Region</th>
                 </tr>
-              }
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                @for (node of sortedNodes(); track node.nodeId) {
+                  <tr [class]="node.status">
+                    <td class="node-id">{{ node.nodeId | slice: 0 : 12 }}...</td>
+                    <td>
+                      <span class="status-badge" [class]="node.status">
+                        {{ node.status | titlecase }}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="tier-badge" [class]="node.stewardTier ?? 'unknown'">
+                        {{ node.stewardTier ?? '-' | titlecase }}
+                      </span>
+                    </td>
+                    <td>{{ formatPercent(node.trustScore) }}</td>
+                    <td>
+                      <div class="score-bar">
+                        <div class="score-fill" [style.width.%]="node.combinedScore * 100"></div>
+                        <span class="score-text">
+                          {{ node.combinedScore * 100 | number: '1.0-0' }}%
+                        </span>
+                      </div>
+                    </td>
+                    <td>{{ formatTime(node.lastHeartbeatSecsAgo) }}</td>
+                    <td>{{ node.region ?? '-' }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="7" class="empty-state">No nodes found</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         }
       }
 
@@ -437,100 +528,159 @@
             <p>Orchestrator not enabled on this doorway</p>
           </div>
         } @else {
-        <div class="resources-panel">
-          @if (resources()) {
-            <div class="resource-grid">
-              <!-- CPU -->
-              <div class="resource-card">
-                <h4>CPU</h4>
-                <div class="resource-gauge">
-                  <div class="gauge-fill" [style.width.%]="resources()?.cpu?.utilizationPercent ?? 0"></div>
+          <div class="resources-panel">
+            @if (resources()) {
+              <div class="resource-grid">
+                <!-- CPU -->
+                <div class="resource-card">
+                  <h4>CPU</h4>
+                  <div class="resource-gauge">
+                    <div
+                      class="gauge-fill"
+                      [style.width.%]="resources()?.cpu?.utilizationPercent ?? 0"
+                    ></div>
+                  </div>
+                  <div class="resource-details">
+                    <div class="detail">
+                      <span class="label">Total</span>
+                      <span class="value">
+                        {{ $safeNavigationMigration(resources()?.cpu?.total) | number }} cores
+                      </span>
+                    </div>
+                    <div class="detail">
+                      <span class="label">Available</span>
+                      <span class="value">
+                        {{ $safeNavigationMigration(resources()?.cpu?.available) | number }} cores
+                      </span>
+                    </div>
+                    <div class="detail">
+                      <span class="label">Utilization</span>
+                      <span class="value">
+                        {{
+                          $safeNavigationMigration(resources()?.cpu?.utilizationPercent)
+                            | number: '1.1-1'
+                        }}%
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div class="resource-details">
-                  <div class="detail">
-                    <span class="label">Total</span>
-                    <span class="value">{{ resources()?.cpu?.total | number }} cores</span>
-                  </div>
-                  <div class="detail">
-                    <span class="label">Available</span>
-                    <span class="value">{{ resources()?.cpu?.available | number }} cores</span>
-                  </div>
-                  <div class="detail">
-                    <span class="label">Utilization</span>
-                    <span class="value">{{ resources()?.cpu?.utilizationPercent | number:'1.1-1' }}%</span>
-                  </div>
-                </div>
-              </div>
 
-              <!-- Memory -->
-              <div class="resource-card">
-                <h4>Memory</h4>
-                <div class="resource-gauge">
-                  <div class="gauge-fill" [style.width.%]="resources()?.memory?.utilizationPercent ?? 0"></div>
+                <!-- Memory -->
+                <div class="resource-card">
+                  <h4>Memory</h4>
+                  <div class="resource-gauge">
+                    <div
+                      class="gauge-fill"
+                      [style.width.%]="resources()?.memory?.utilizationPercent ?? 0"
+                    ></div>
+                  </div>
+                  <div class="resource-details">
+                    <div class="detail">
+                      <span class="label">Total</span>
+                      <span class="value">
+                        {{ $safeNavigationMigration(resources()?.memory?.total) | number }} GB
+                      </span>
+                    </div>
+                    <div class="detail">
+                      <span class="label">Available</span>
+                      <span class="value">
+                        {{ $safeNavigationMigration(resources()?.memory?.available) | number }} GB
+                      </span>
+                    </div>
+                    <div class="detail">
+                      <span class="label">Utilization</span>
+                      <span class="value">
+                        {{
+                          $safeNavigationMigration(resources()?.memory?.utilizationPercent)
+                            | number: '1.1-1'
+                        }}%
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div class="resource-details">
-                  <div class="detail">
-                    <span class="label">Total</span>
-                    <span class="value">{{ resources()?.memory?.total | number }} GB</span>
-                  </div>
-                  <div class="detail">
-                    <span class="label">Available</span>
-                    <span class="value">{{ resources()?.memory?.available | number }} GB</span>
-                  </div>
-                  <div class="detail">
-                    <span class="label">Utilization</span>
-                    <span class="value">{{ resources()?.memory?.utilizationPercent | number:'1.1-1' }}%</span>
-                  </div>
-                </div>
-              </div>
 
-              <!-- Storage -->
-              <div class="resource-card">
-                <h4>Storage</h4>
-                <div class="resource-gauge">
-                  <div class="gauge-fill" [style.width.%]="resources()?.storage?.utilizationPercent ?? 0"></div>
+                <!-- Storage -->
+                <div class="resource-card">
+                  <h4>Storage</h4>
+                  <div class="resource-gauge">
+                    <div
+                      class="gauge-fill"
+                      [style.width.%]="resources()?.storage?.utilizationPercent ?? 0"
+                    ></div>
+                  </div>
+                  <div class="resource-details">
+                    <div class="detail">
+                      <span class="label">Total</span>
+                      <span class="value">
+                        {{
+                          $safeNavigationMigration(resources()?.storage?.totalTb) | number: '1.1-1'
+                        }}
+                        TB
+                      </span>
+                    </div>
+                    <div class="detail">
+                      <span class="label">Available</span>
+                      <span class="value">
+                        {{
+                          $safeNavigationMigration(resources()?.storage?.availableTb)
+                            | number: '1.1-1'
+                        }}
+                        TB
+                      </span>
+                    </div>
+                    <div class="detail">
+                      <span class="label">Custodied Content</span>
+                      <span class="value">
+                        {{
+                          $safeNavigationMigration(resources()?.storage?.custodiedContentGb)
+                            | number
+                        }}
+                        GB
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div class="resource-details">
-                  <div class="detail">
-                    <span class="label">Total</span>
-                    <span class="value">{{ resources()?.storage?.totalTb | number:'1.1-1' }} TB</span>
-                  </div>
-                  <div class="detail">
-                    <span class="label">Available</span>
-                    <span class="value">{{ resources()?.storage?.availableTb | number:'1.1-1' }} TB</span>
-                  </div>
-                  <div class="detail">
-                    <span class="label">Custodied Content</span>
-                    <span class="value">{{ resources()?.storage?.custodiedContentGb | number }} GB</span>
-                  </div>
-                </div>
-              </div>
 
-              <!-- Bandwidth -->
-              <div class="resource-card">
-                <h4>Bandwidth</h4>
-                <div class="resource-details">
-                  <div class="detail">
-                    <span class="label">Total Capacity</span>
-                    <span class="value">{{ resources()?.bandwidth?.totalMbps | number }} Mbps</span>
-                  </div>
-                  <div class="detail">
-                    <span class="label">Active Connections</span>
-                    <span class="value">{{ resources()?.bandwidth?.activeConnections | number }}</span>
-                  </div>
-                  <div class="detail">
-                    <span class="label">Avg per Connection</span>
-                    <span class="value">{{ resources()?.bandwidth?.avgBandwidthPerConnectionMbps | number:'1.1-1' }} Mbps</span>
+                <!-- Bandwidth -->
+                <div class="resource-card">
+                  <h4>Bandwidth</h4>
+                  <div class="resource-details">
+                    <div class="detail">
+                      <span class="label">Total Capacity</span>
+                      <span class="value">
+                        {{ $safeNavigationMigration(resources()?.bandwidth?.totalMbps) | number }}
+                        Mbps
+                      </span>
+                    </div>
+                    <div class="detail">
+                      <span class="label">Active Connections</span>
+                      <span class="value">
+                        {{
+                          $safeNavigationMigration(resources()?.bandwidth?.activeConnections)
+                            | number
+                        }}
+                      </span>
+                    </div>
+                    <div class="detail">
+                      <span class="label">Avg per Connection</span>
+                      <span class="value">
+                        {{
+                          $safeNavigationMigration(
+                            resources()?.bandwidth?.avgBandwidthPerConnectionMbps
+                          ) | number: '1.1-1'
+                        }}
+                        Mbps
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          } @else {
-            <div class="empty-state">
-              <p>Resource data unavailable</p>
-            </div>
-          }
-        </div>
+            } @else {
+              <div class="empty-state">
+                <p>Resource data unavailable</p>
+              </div>
+            }
+          </div>
         }
       }
 
@@ -567,18 +717,38 @@
               (input)="searchUsers($any($event.target).value)"
               data-testid="users-search"
             />
-            <select [value]="usersPermFilter()" (change)="filterByPermission($any($event.target).value)" data-testid="users-permission-filter">
+            <select
+              [value]="usersPermFilter()"
+              (change)="filterByPermission($any($event.target).value)"
+              data-testid="users-permission-filter"
+            >
               <option value="all">All Permissions</option>
               <option value="ADMIN">Admin</option>
               <option value="AUTHENTICATED">Authenticated</option>
               <option value="PUBLIC">Public</option>
             </select>
-            <select [value]="usersActiveFilter()" (change)="filterByActive($any($event.target).value === 'all' ? 'all' : $any($event.target).value === 'true')" data-testid="users-active-filter">
+            <select
+              [value]="usersActiveFilter()"
+              (change)="
+                filterByActive(
+                  $any($event.target).value === 'all' ? 'all' : $any($event.target).value === 'true'
+                )
+              "
+              data-testid="users-active-filter"
+            >
               <option value="all">All Status</option>
               <option value="true">Active</option>
               <option value="false">Inactive</option>
             </select>
-            <select [value]="usersQuotaFilter()" (change)="filterByQuota($any($event.target).value === 'all' ? 'all' : $any($event.target).value === 'true')" data-testid="users-quota-filter">
+            <select
+              [value]="usersQuotaFilter()"
+              (change)="
+                filterByQuota(
+                  $any($event.target).value === 'all' ? 'all' : $any($event.target).value === 'true'
+                )
+              "
+              data-testid="users-quota-filter"
+            >
               <option value="all">All Quota</option>
               <option value="true">Over Quota</option>
               <option value="false">Within Quota</option>
@@ -596,34 +766,64 @@
             <table class="users-table">
               <thead>
                 <tr>
-                  <th (click)="setUserSort('identifier')" class="sortable" data-testid="users-sort-identifier">
+                  <th
+                    (click)="setUserSort('identifier')"
+                    class="sortable"
+                    data-testid="users-sort-identifier"
+                  >
                     Identifier
                     @if (userSortField() === 'identifier') {
-                      <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                      <span class="sort-icon">
+                        {{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
                     }
                   </th>
-                  <th (click)="setUserSort('permissionLevel')" class="sortable" data-testid="users-sort-permission">
+                  <th
+                    (click)="setUserSort('permissionLevel')"
+                    class="sortable"
+                    data-testid="users-sort-permission"
+                  >
                     Permission
                     @if (userSortField() === 'permissionLevel') {
-                      <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                      <span class="sort-icon">
+                        {{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
                     }
                   </th>
-                  <th (click)="setUserSort('isActive')" class="sortable" data-testid="users-sort-status">
+                  <th
+                    (click)="setUserSort('isActive')"
+                    class="sortable"
+                    data-testid="users-sort-status"
+                  >
                     Status
                     @if (userSortField() === 'isActive') {
-                      <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                      <span class="sort-icon">
+                        {{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
                     }
                   </th>
-                  <th (click)="setUserSort('storagePercent')" class="sortable" data-testid="users-sort-storage">
+                  <th
+                    (click)="setUserSort('storagePercent')"
+                    class="sortable"
+                    data-testid="users-sort-storage"
+                  >
                     Storage
                     @if (userSortField() === 'storagePercent') {
-                      <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                      <span class="sort-icon">
+                        {{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
                     }
                   </th>
-                  <th (click)="setUserSort('createdAt')" class="sortable" data-testid="users-sort-created">
+                  <th
+                    (click)="setUserSort('createdAt')"
+                    class="sortable"
+                    data-testid="users-sort-created"
+                  >
                     Created
                     @if (userSortField() === 'createdAt') {
-                      <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                      <span class="sort-icon">
+                        {{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
                     }
                   </th>
                   <th>Actions</th>
@@ -639,7 +839,11 @@
                       </span>
                     </td>
                     <td>
-                      <span class="status-badge" [class.active]="user.isActive" [class.inactive]="!user.isActive">
+                      <span
+                        class="status-badge"
+                        [class.active]="user.isActive"
+                        [class.inactive]="!user.isActive"
+                      >
                         {{ user.isActive ? 'Active' : 'Inactive' }}
                       </span>
                     </td>
@@ -648,24 +852,36 @@
                         <div
                           class="storage-fill"
                           [class]="quotaStatusColor(user.storagePercent)"
-                          [style.width.%]="Math.min(user.storagePercent, 100)">
-                        </div>
-                        <span class="storage-text">{{ user.storageUsedMb | number:'1.1-1' }} / {{ user.storageLimitMb | number:'1.0-0' }} MB</span>
+                          [style.width.%]="Math.min(user.storagePercent, 100)"
+                        ></div>
+                        <span class="storage-text">
+                          {{ user.storageUsedMb | number: '1.1-1' }} /
+                          {{ user.storageLimitMb | number: '1.0-0' }} MB
+                        </span>
                       </div>
                       @if (user.isOverQuota) {
                         <span class="over-quota-badge">Over Quota</span>
                       }
                     </td>
-                    <td class="date">{{ user.createdAt | date:'short' }}</td>
+                    <td class="date">{{ user.createdAt | date: 'short' }}</td>
                     <td class="actions">
-                      <button class="btn-icon" title="View Details" (click)="viewUser(user.id)">👁</button>
+                      <button class="btn-icon" title="View Details" (click)="viewUser(user.id)">
+                        👁
+                      </button>
                       <button
                         class="btn-icon"
                         [title]="user.isActive ? 'Deactivate' : 'Activate'"
-                        (click)="toggleUserStatus(user.id, user.isActive)">
+                        (click)="toggleUserStatus(user.id, user.isActive)"
+                      >
                         {{ user.isActive ? '🔒' : '🔓' }}
                       </button>
-                      <button class="btn-icon" title="Force Logout" (click)="forceUserLogout(user.id)">🚪</button>
+                      <button
+                        class="btn-icon"
+                        title="Force Logout"
+                        (click)="forceUserLogout(user.id)"
+                      >
+                        🚪
+                      </button>
                     </td>
                   </tr>
                 } @empty {
@@ -682,14 +898,16 @@
                 <button
                   [disabled]="usersPage() <= 1"
                   (click)="setUsersPage(usersPage() - 1)"
-                  data-testid="users-page-prev">
+                  data-testid="users-page-prev"
+                >
                   Previous
                 </button>
                 <span>Page {{ usersPage() }} of {{ usersTotalPages() }}</span>
                 <button
                   [disabled]="usersPage() >= usersTotalPages()"
                   (click)="setUsersPage(usersPage() + 1)"
-                  data-testid="users-page-next">
+                  data-testid="users-page-next"
+                >
                   Next
                 </button>
               </div>
@@ -702,11 +920,26 @@
 
   <!-- User Detail Modal -->
   @if (showUserDetail() && selectedUser()) {
-    <div class="modal-overlay" (click)="closeUserDetail()" (keydown.enter)="closeUserDetail()" tabindex="0" role="button" data-testid="user-detail-overlay">
-      <div class="modal-content user-detail-modal" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" tabindex="0" role="button">
+    <div
+      class="modal-overlay"
+      (click)="closeUserDetail()"
+      (keydown.enter)="closeUserDetail()"
+      tabindex="0"
+      role="button"
+      data-testid="user-detail-overlay"
+    >
+      <div
+        class="modal-content user-detail-modal"
+        (click)="$event.stopPropagation()"
+        (keydown.enter)="$event.stopPropagation()"
+        tabindex="0"
+        role="button"
+      >
         <header class="modal-header">
           <h2>User Details</h2>
-          <button class="close-btn" (click)="closeUserDetail()" data-testid="user-detail-close">&times;</button>
+          <button class="close-btn" (click)="closeUserDetail()" data-testid="user-detail-close">
+            &times;
+          </button>
         </header>
 
         <div class="modal-body">
@@ -722,17 +955,27 @@
             </div>
             <div class="info-row">
               <span class="label">Human ID:</span>
-              <span class="value monospace">{{ selectedUser()?.humanId | slice:0:20 }}...</span>
+              <span class="value monospace">
+                {{ $safeNavigationMigration(selectedUser()?.humanId) | slice: 0 : 20 }}...
+              </span>
             </div>
             <div class="info-row">
               <span class="label">Status:</span>
-              <span class="status-badge" [class.active]="selectedUser()?.isActive" [class.inactive]="!selectedUser()?.isActive">
+              <span
+                class="status-badge"
+                [class.active]="selectedUser()?.isActive"
+                [class.inactive]="!selectedUser()?.isActive"
+              >
                 {{ selectedUser()?.isActive ? 'Active' : 'Inactive' }}
               </span>
             </div>
             <div class="info-row">
               <span class="label">Permission:</span>
-              <select [value]="selectedUser()?.permissionLevel" (change)="updateUserPermission(selectedUser()!.id, $any($event.target).value)" data-testid="user-detail-permission">
+              <select
+                [value]="$safeNavigationMigration(selectedUser()?.permissionLevel)"
+                (change)="updateUserPermission(selectedUser()!.id, $any($event.target).value)"
+                data-testid="user-detail-permission"
+              >
                 <option value="PUBLIC">Public</option>
                 <option value="AUTHENTICATED">Authenticated</option>
                 <option value="ADMIN">Admin</option>
@@ -740,11 +983,15 @@
             </div>
             <div class="info-row">
               <span class="label">Created:</span>
-              <span class="value">{{ selectedUser()?.createdAt | date:'medium' }}</span>
+              <span class="value">
+                {{ $safeNavigationMigration(selectedUser()?.createdAt) | date: 'medium' }}
+              </span>
             </div>
             <div class="info-row">
               <span class="label">Last Login:</span>
-              <span class="value">{{ selectedUser()?.lastLoginAt | date:'medium' }}</span>
+              <span class="value">
+                {{ $safeNavigationMigration(selectedUser()?.lastLoginAt) | date: 'medium' }}
+              </span>
             </div>
           </section>
 
@@ -757,30 +1004,53 @@
                 <div class="usage-bar">
                   <div
                     class="usage-fill"
-                    [style.width.%]="Math.min(selectedUser()?.quota?.storagePercentUsed ?? 0, 100)">
-                  </div>
+                    [style.width.%]="Math.min(selectedUser()?.quota?.storagePercentUsed ?? 0, 100)"
+                  ></div>
                 </div>
-                <span class="usage-value">{{ selectedUser()?.usage?.storageMb | number:'1.1-1' }} / {{ selectedUser()?.quota?.storageLimitMb | number:'1.0-0' }} MB</span>
+                <span class="usage-value">
+                  {{ $safeNavigationMigration(selectedUser()?.usage?.storageMb) | number: '1.1-1' }}
+                  /
+                  {{
+                    $safeNavigationMigration(selectedUser()?.quota?.storageLimitMb)
+                      | number: '1.0-0'
+                  }}
+                  MB
+                </span>
               </div>
               <div class="usage-item">
                 <span class="usage-label">Queries</span>
                 <div class="usage-bar">
                   <div
                     class="usage-fill"
-                    [style.width.%]="Math.min(selectedUser()?.quota?.queriesPercentUsed ?? 0, 100)">
-                  </div>
+                    [style.width.%]="Math.min(selectedUser()?.quota?.queriesPercentUsed ?? 0, 100)"
+                  ></div>
                 </div>
-                <span class="usage-value">{{ selectedUser()?.usage?.projectionQueries | number }} / {{ selectedUser()?.quota?.dailyQueryLimit | number }}</span>
+                <span class="usage-value">
+                  {{ $safeNavigationMigration(selectedUser()?.usage?.projectionQueries) | number }}
+                  / {{ $safeNavigationMigration(selectedUser()?.quota?.dailyQueryLimit) | number }}
+                </span>
               </div>
               <div class="usage-item">
                 <span class="usage-label">Bandwidth</span>
                 <div class="usage-bar">
                   <div
                     class="usage-fill"
-                    [style.width.%]="Math.min(selectedUser()?.quota?.bandwidthPercentUsed ?? 0, 100)">
-                  </div>
+                    [style.width.%]="
+                      Math.min(selectedUser()?.quota?.bandwidthPercentUsed ?? 0, 100)
+                    "
+                  ></div>
                 </div>
-                <span class="usage-value">{{ selectedUser()?.usage?.bandwidthMb | number:'1.1-1' }} / {{ selectedUser()?.quota?.dailyBandwidthLimitMb | number:'1.0-0' }} MB</span>
+                <span class="usage-value">
+                  {{
+                    $safeNavigationMigration(selectedUser()?.usage?.bandwidthMb) | number: '1.1-1'
+                  }}
+                  /
+                  {{
+                    $safeNavigationMigration(selectedUser()?.quota?.dailyBandwidthLimitMb)
+                      | number: '1.0-0'
+                  }}
+                  MB
+                </span>
               </div>
             </div>
             @if (selectedUser()?.quota?.isOverQuota) {
@@ -797,12 +1067,34 @@
           <section class="actions-section">
             <h3>Actions</h3>
             <div class="action-buttons">
-              <button class="btn" (click)="toggleUserStatus(selectedUser()!.id, selectedUser()!.isActive)" data-testid="user-detail-toggle-status">
+              <button
+                class="btn"
+                (click)="toggleUserStatus(selectedUser()!.id, selectedUser()!.isActive)"
+                data-testid="user-detail-toggle-status"
+              >
                 {{ selectedUser()?.isActive ? '🔒 Deactivate' : '🔓 Activate' }}
               </button>
-              <button class="btn" (click)="forceUserLogout(selectedUser()!.id)" data-testid="user-detail-logout">🚪 Force Logout</button>
-              <button class="btn" (click)="resetUserUsage(selectedUser()!.id)" data-testid="user-detail-reset-usage">🔄 Reset Usage</button>
-              <button class="btn btn-danger" (click)="deleteUser(selectedUser()!.id)" data-testid="user-detail-delete">🗑 Delete User</button>
+              <button
+                class="btn"
+                (click)="forceUserLogout(selectedUser()!.id)"
+                data-testid="user-detail-logout"
+              >
+                🚪 Force Logout
+              </button>
+              <button
+                class="btn"
+                (click)="resetUserUsage(selectedUser()!.id)"
+                data-testid="user-detail-reset-usage"
+              >
+                🔄 Reset Usage
+              </button>
+              <button
+                class="btn btn-danger"
+                (click)="deleteUser(selectedUser()!.id)"
+                data-testid="user-detail-delete"
+              >
+                🗑 Delete User
+              </button>
             </div>
           </section>
         </div>

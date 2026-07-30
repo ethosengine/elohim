@@ -4,7 +4,7 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 
 interface GovernanceLayer {
   id: number;
@@ -18,6 +18,7 @@ interface GovernanceLayer {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './governance-diagram.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./governance-diagram.component.css'],
 })
 export class GovernanceDiagramComponent {

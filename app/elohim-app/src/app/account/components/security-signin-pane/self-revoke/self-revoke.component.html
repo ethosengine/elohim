@@ -1,4 +1,4 @@
-@let active = account.account()?.activeKeyRotation;
+@let active = $safeNavigationMigration(account.account()?.activeKeyRotation);
 @if (active) {
   <p>You are about to revoke the key currently in use. This is irreversible.</p>
   @if (!confirming()) {

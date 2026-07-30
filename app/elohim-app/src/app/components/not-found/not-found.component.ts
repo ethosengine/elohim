@@ -1,5 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import 'elohim-core/register';
 
@@ -23,6 +29,7 @@ import { SeoService } from '../../services/seo.service';
   imports: [CommonModule, RouterModule],
   templateUrl: './not-found.component.html',
   styleUrl: './not-found.component.css',
+  changeDetection: ChangeDetectionStrategy.Eager,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class NotFoundComponent implements OnInit {

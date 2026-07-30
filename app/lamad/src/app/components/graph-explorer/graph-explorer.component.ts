@@ -1,5 +1,15 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, Inject, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import {
+  Component,
+  inject,
+  Inject,
+  OnInit,
+  OnDestroy,
+  ElementRef,
+  ViewChild,
+  AfterViewInit,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 // @coverage: 84.6% (2026-03-03)
@@ -57,10 +67,12 @@ const EDGE_TYPE_NEXT: ClusterEdge['type'] = 'NEXT';
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './graph-explorer.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./graph-explorer.component.css'],
 })
 export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit {
-  @ViewChild('graphContainer', { static: true }) graphContainer!: ElementRef<HTMLDivElement>;
+  @ViewChild('graphContainer', { static: true })
+  graphContainer!: ElementRef<HTMLDivElement>;
 
   // View mode
   viewMode: ViewMode = 'path-hierarchy';
@@ -99,7 +111,8 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
     private readonly route: ActivatedRoute,
     private readonly dataLoader: DataLoaderService,
     private readonly router: Router,
-    @Inject(LAMAD_AFFINITY_TRACKING) private readonly affinityService: ILamadAffinityTracking,
+    @Inject(LAMAD_AFFINITY_TRACKING)
+    private readonly affinityService: ILamadAffinityTracking,
     private readonly hierarchicalGraph: HierarchicalGraphService
   ) {}
 

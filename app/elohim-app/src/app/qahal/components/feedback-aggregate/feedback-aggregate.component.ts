@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { Component, OnInit, inject, input, signal, ChangeDetectionStrategy } from '@angular/core';
 
 import { GovernanceApiService } from '@elohim/service';
 
@@ -57,6 +57,7 @@ import type { SignalAggregateView } from '@elohim/storage-client/generated';
       </div>
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .feedback-aggregate {

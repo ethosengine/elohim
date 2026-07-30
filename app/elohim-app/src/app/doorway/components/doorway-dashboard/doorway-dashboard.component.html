@@ -132,12 +132,14 @@
                 </div>
                 <div class="capacity-item">
                   <span class="capacity-value">
-                    {{ totalCapacity()?.storage | number: '1.1-1' }} TB
+                    {{ $safeNavigationMigration(totalCapacity()?.storage) | number: '1.1-1' }} TB
                   </span>
                   <span class="capacity-label">Storage</span>
                 </div>
                 <div class="capacity-item">
-                  <span class="capacity-value">{{ totalCapacity()?.bandwidth | number }} Mbps</span>
+                  <span class="capacity-value">
+                    {{ $safeNavigationMigration(totalCapacity()?.bandwidth) | number }} Mbps
+                  </span>
                   <span class="capacity-label">Bandwidth</span>
                 </div>
               </div>
@@ -184,7 +186,9 @@
             @if (resources()?.cache) {
               <div class="cache-stats">
                 <div class="cache-stat">
-                  <span class="cache-value">{{ resources()?.cache?.entries | number }}</span>
+                  <span class="cache-value">
+                    {{ $safeNavigationMigration(resources()?.cache?.entries) | number }}
+                  </span>
                   <span class="cache-label">Entries</span>
                 </div>
                 <div class="cache-stat">
@@ -194,11 +198,15 @@
                   <span class="cache-label">Hit Rate</span>
                 </div>
                 <div class="cache-stat">
-                  <span class="cache-value">{{ resources()?.cache?.hits | number }}</span>
+                  <span class="cache-value">
+                    {{ $safeNavigationMigration(resources()?.cache?.hits) | number }}
+                  </span>
                   <span class="cache-label">Hits</span>
                 </div>
                 <div class="cache-stat">
-                  <span class="cache-value">{{ resources()?.cache?.misses | number }}</span>
+                  <span class="cache-value">
+                    {{ $safeNavigationMigration(resources()?.cache?.misses) | number }}
+                  </span>
                   <span class="cache-label">Misses</span>
                 </div>
               </div>
@@ -219,7 +227,9 @@
                   <span class="label">Healthy</span>
                 </div>
                 <div class="custodian-stat">
-                  <span class="value">{{ custodians()?.trackedBlobs | number }}</span>
+                  <span class="value">
+                    {{ $safeNavigationMigration(custodians()?.trackedBlobs) | number }}
+                  </span>
                   <span class="label">Blobs Tracked</span>
                 </div>
                 <div class="custodian-stat">
@@ -237,11 +247,15 @@
             <h3>Human Scale Metrics</h3>
             <div class="human-stats">
               <div class="human-stat">
-                <span class="value">{{ cluster()?.totalHumansServed | number }}</span>
+                <span class="value">
+                  {{ $safeNavigationMigration(cluster()?.totalHumansServed) | number }}
+                </span>
                 <span class="label">Humans Served</span>
               </div>
               <div class="human-stat">
-                <span class="value">{{ cluster()?.totalContentCustodied | number }}</span>
+                <span class="value">
+                  {{ $safeNavigationMigration(cluster()?.totalContentCustodied) | number }}
+                </span>
                 <span class="label">Content Pieces</span>
               </div>
             </div>
@@ -374,16 +388,23 @@
                 <div class="resource-details">
                   <div class="detail">
                     <span class="label">Total</span>
-                    <span class="value">{{ resources()?.cpu?.total | number }} cores</span>
+                    <span class="value">
+                      {{ $safeNavigationMigration(resources()?.cpu?.total) | number }} cores
+                    </span>
                   </div>
                   <div class="detail">
                     <span class="label">Available</span>
-                    <span class="value">{{ resources()?.cpu?.available | number }} cores</span>
+                    <span class="value">
+                      {{ $safeNavigationMigration(resources()?.cpu?.available) | number }} cores
+                    </span>
                   </div>
                   <div class="detail">
                     <span class="label">Utilization</span>
                     <span class="value">
-                      {{ resources()?.cpu?.utilizationPercent | number: '1.1-1' }}%
+                      {{
+                        $safeNavigationMigration(resources()?.cpu?.utilizationPercent)
+                          | number: '1.1-1'
+                      }}%
                     </span>
                   </div>
                 </div>
@@ -401,16 +422,23 @@
                 <div class="resource-details">
                   <div class="detail">
                     <span class="label">Total</span>
-                    <span class="value">{{ resources()?.memory?.total | number }} GB</span>
+                    <span class="value">
+                      {{ $safeNavigationMigration(resources()?.memory?.total) | number }} GB
+                    </span>
                   </div>
                   <div class="detail">
                     <span class="label">Available</span>
-                    <span class="value">{{ resources()?.memory?.available | number }} GB</span>
+                    <span class="value">
+                      {{ $safeNavigationMigration(resources()?.memory?.available) | number }} GB
+                    </span>
                   </div>
                   <div class="detail">
                     <span class="label">Utilization</span>
                     <span class="value">
-                      {{ resources()?.memory?.utilizationPercent | number: '1.1-1' }}%
+                      {{
+                        $safeNavigationMigration(resources()?.memory?.utilizationPercent)
+                          | number: '1.1-1'
+                      }}%
                     </span>
                   </div>
                 </div>
@@ -429,19 +457,29 @@
                   <div class="detail">
                     <span class="label">Total</span>
                     <span class="value">
-                      {{ resources()?.storage?.totalTb | number: '1.1-1' }} TB
+                      {{
+                        $safeNavigationMigration(resources()?.storage?.totalTb) | number: '1.1-1'
+                      }}
+                      TB
                     </span>
                   </div>
                   <div class="detail">
                     <span class="label">Available</span>
                     <span class="value">
-                      {{ resources()?.storage?.availableTb | number: '1.1-1' }} TB
+                      {{
+                        $safeNavigationMigration(resources()?.storage?.availableTb)
+                          | number: '1.1-1'
+                      }}
+                      TB
                     </span>
                   </div>
                   <div class="detail">
                     <span class="label">Custodied Content</span>
                     <span class="value">
-                      {{ resources()?.storage?.custodiedContentGb | number }} GB
+                      {{
+                        $safeNavigationMigration(resources()?.storage?.custodiedContentGb) | number
+                      }}
+                      GB
                     </span>
                   </div>
                 </div>
@@ -453,18 +491,27 @@
                 <div class="resource-details">
                   <div class="detail">
                     <span class="label">Total Capacity</span>
-                    <span class="value">{{ resources()?.bandwidth?.totalMbps | number }} Mbps</span>
+                    <span class="value">
+                      {{ $safeNavigationMigration(resources()?.bandwidth?.totalMbps) | number }}
+                      Mbps
+                    </span>
                   </div>
                   <div class="detail">
                     <span class="label">Active Connections</span>
                     <span class="value">
-                      {{ resources()?.bandwidth?.activeConnections | number }}
+                      {{
+                        $safeNavigationMigration(resources()?.bandwidth?.activeConnections) | number
+                      }}
                     </span>
                   </div>
                   <div class="detail">
                     <span class="label">Avg per Connection</span>
                     <span class="value">
-                      {{ resources()?.bandwidth?.avgBandwidthPerConnectionMbps | number: '1.1-1' }}
+                      {{
+                        $safeNavigationMigration(
+                          resources()?.bandwidth?.avgBandwidthPerConnectionMbps
+                        ) | number: '1.1-1'
+                      }}
                       Mbps
                     </span>
                   </div>

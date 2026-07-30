@@ -19,6 +19,7 @@ import {
   input,
   output,
   signal,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 
 import { GovernanceApiService } from '@elohim/service';
@@ -100,6 +101,7 @@ interface BallotRecognition {
       </div>
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     :host {
       display: block;

@@ -1,5 +1,5 @@
 import { CommonModule, DatePipe, SlicePipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 
 import { AccountService } from '../../../services/account.service';
 import { RevocationService } from '../../../services/revocation.service';
@@ -8,6 +8,7 @@ import { RevocationService } from '../../../services/revocation.service';
   selector: 'app-vote-as-ec',
   standalone: true,
   imports: [CommonModule, DatePipe, SlicePipe],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './vote-as-ec.component.html',
 })
 export class VoteAsEcComponent {

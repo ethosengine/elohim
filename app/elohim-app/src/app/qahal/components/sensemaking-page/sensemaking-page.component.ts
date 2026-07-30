@@ -11,7 +11,14 @@
  * signals indicate the entity is ready for sensemaking.
  */
 
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { GovernanceApiService } from '@elohim/service';
@@ -85,6 +92,7 @@ import type { SensemakingResultView, StatementView } from '@elohim/storage-clien
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .sensemaking-page {
       max-width: 800px;

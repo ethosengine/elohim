@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 // @coverage: 88.0% (2026-04-19)
@@ -263,8 +270,10 @@ import type { LamadPointTrigger } from '@app/lamad/models/learning-points.model'
                   </div>
                   <span
                     class="status-indicator"
-                    [style.background]="getPeerStatusColor(entry.peer?.status)"
-                    [title]="getPeerStatusLabel(entry.peer?.status)"
+                    [style.background]="
+                      getPeerStatusColor($safeNavigationMigration(entry.peer?.status))
+                    "
+                    [title]="getPeerStatusLabel($safeNavigationMigration(entry.peer?.status))"
                   ></span>
                 </div>
 
@@ -296,9 +305,11 @@ import type { LamadPointTrigger } from '@app/lamad/models/learning-points.model'
                     <span class="detail-label">Status</span>
                     <span
                       class="detail-value"
-                      [style.color]="getPeerStatusColor(entry.peer?.status)"
+                      [style.color]="
+                        getPeerStatusColor($safeNavigationMigration(entry.peer?.status))
+                      "
                     >
-                      {{ getPeerStatusLabel(entry.peer?.status) }}
+                      {{ getPeerStatusLabel($safeNavigationMigration(entry.peer?.status)) }}
                     </span>
                   </div>
                   <div class="detail-row">
@@ -350,6 +361,7 @@ import type { LamadPointTrigger } from '@app/lamad/models/learning-points.model'
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .device-stewardship {

@@ -1,5 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, OnDestroy } from '@angular/core';
+import {
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  OnInit,
+  OnDestroy,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 
@@ -24,6 +30,7 @@ import { SyncProgressComponent } from '../sync-progress/sync-progress.component'
   imports: [CommonModule, RouterOutlet, FormsModule, SyncProgressComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './lamad-layout.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./lamad-layout.component.css'],
 })
 export class LamadLayoutComponent implements OnInit, OnDestroy {
@@ -32,11 +39,46 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
 
   /** Host-supplied navigator config (§12.3: routing lives in the host, not the primitive). */
   readonly navigatorApps: ElohimContextAppConfig[] = [
-    { id: 'lamad', name: 'Lamad', icon: '📚', route: '/lamad', tagline: 'Learning & Content', available: true }, // route-literal-ok: navigator app-config route declaration (host routing config, not a minted content link)
-    { id: 'community', name: 'Qahal', icon: '👥', route: '/community', tagline: 'Community & Governance', available: true },
-    { id: 'shefa', name: 'Shefa', icon: '✨', route: '/shefa', tagline: 'Economics of Flourishing', available: true },
-    { id: 'avodah', name: 'Avodah', icon: '🔨', route: '/avodah', tagline: 'Work & Stewardship', available: true },
-    { id: 'map', name: 'Map', icon: '🌍', route: '/map', tagline: 'Living Places', available: true },
+    {
+      id: 'lamad',
+      name: 'Lamad',
+      icon: '📚',
+      route: '/lamad', // route-literal-ok: navigator app-config route declaration (host routing config, not a minted content link)
+      tagline: 'Learning & Content',
+      available: true,
+    },
+    {
+      id: 'community',
+      name: 'Qahal',
+      icon: '👥',
+      route: '/community',
+      tagline: 'Community & Governance',
+      available: true,
+    },
+    {
+      id: 'shefa',
+      name: 'Shefa',
+      icon: '✨',
+      route: '/shefa',
+      tagline: 'Economics of Flourishing',
+      available: true,
+    },
+    {
+      id: 'avodah',
+      name: 'Avodah',
+      icon: '🔨',
+      route: '/avodah',
+      tagline: 'Work & Stewardship',
+      available: true,
+    },
+    {
+      id: 'map',
+      name: 'Map',
+      icon: '🌍',
+      route: '/map',
+      tagline: 'Living Places',
+      available: true,
+    },
   ];
 
   readonly navigatorIdentityRoutes = {
@@ -103,6 +145,9 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
   onNavigatorNavigate(event: Event): void {
     const route = (event as CustomEvent<{ route?: string }>).detail?.route;
     if (!route) return;
+    // lint-route-literals requires its annotation on the same line as the literal,
+    // and the line is over the print width — keep prettier off it.
+    // prettier-ignore
     if (route === '/lamad' || route.startsWith('/lamad/')) { // route-literal-ok: own-bundle prefix detection (base-href handoff), not a minted link
       void this.router.navigateByUrl(route.slice('/lamad'.length) || '/'); // route-literal-ok: base-href strip length, not a minted link
     } else {

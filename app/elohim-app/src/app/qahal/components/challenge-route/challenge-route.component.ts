@@ -8,7 +8,7 @@
  * On successful filing, navigates to the challenge detail page.
  */
 
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, ChangeDetectionStrategy } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -39,6 +39,7 @@ import type { ChallengeView } from '@elohim/storage-client/generated';
       </div>
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .challenge-route-container {
       max-width: 640px;

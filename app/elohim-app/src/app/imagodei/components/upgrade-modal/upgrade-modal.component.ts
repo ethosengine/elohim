@@ -6,7 +6,7 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -17,6 +17,7 @@ import { SessionHuman } from '../../models/session-human.model';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './upgrade-modal.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./upgrade-modal.component.css'],
 })
 export class UpgradeModalComponent {

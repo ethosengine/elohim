@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  Input,
+  OnDestroy,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 // @coverage: 84.2% (2026-02-24)
 
@@ -11,6 +18,7 @@ import { ThemeService, Theme } from '../../services/theme.service';
   selector: 'app-theme-toggle',
   imports: [CommonModule],
   templateUrl: './theme-toggle.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './theme-toggle.component.css',
 })
 export class ThemeToggleComponent implements OnInit, OnDestroy {

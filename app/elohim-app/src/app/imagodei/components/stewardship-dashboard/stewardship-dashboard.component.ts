@@ -13,7 +13,14 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  signal,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 // @coverage: 98.0% (2026-02-24)
@@ -41,6 +48,7 @@ interface AllocationDisplay {
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './stewardship-dashboard.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./stewardship-dashboard.component.css'],
 })
 export class StewardshipDashboardComponent implements OnInit {

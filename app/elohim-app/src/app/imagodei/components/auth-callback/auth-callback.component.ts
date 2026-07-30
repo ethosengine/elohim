@@ -26,6 +26,7 @@ import {
   ViewChild,
   inject,
   signal,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -40,6 +41,7 @@ import { type AuthResult } from '../../models/auth.model';
   standalone: true,
   imports: [CommonModule, RouterModule],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <elohim-imagodei-oauth-callback
       #cb

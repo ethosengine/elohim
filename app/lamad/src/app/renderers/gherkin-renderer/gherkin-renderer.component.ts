@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges, ChangeDetectionStrategy } from '@angular/core';
 
 // @coverage: 97.5% (2026-02-24)
 
@@ -161,6 +161,7 @@ interface GherkinFeature {
       <pre><code>{{ content }}</code></pre>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./gherkin-renderer.component.css'],
 })
 export class GherkinRendererComponent implements OnChanges {
@@ -376,7 +377,10 @@ export class GherkinRendererComponent implements OnChanges {
     // Use atomic grouping pattern to avoid backtracking
     const stepMatch = /^(Given|When|Then|And|But|\*)\s+(\S.*)$/.exec(trimmed);
     if (!stepMatch || !ctx.currentScenario) return false;
-    ctx.currentScenario.steps.push({ keyword: stepMatch[1] + ' ', text: stepMatch[2] });
+    ctx.currentScenario.steps.push({
+      keyword: stepMatch[1] + ' ',
+      text: stepMatch[2],
+    });
     return true;
   }
 

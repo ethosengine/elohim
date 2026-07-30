@@ -6,6 +6,7 @@ import {
   OnInit,
   ViewChild,
   signal,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { StandaloneResolver, type ConsentContext } from './services/standalone-resolver';
@@ -34,7 +35,6 @@ type StewardPhase = 'connecting' | 'failed' | 'unreachable';
     <main>
       <h1 class="visually-hidden">Elohim Portal</h1>
       <elohim-imagodei-portal-shell #shell [attr.step]="step()" [authority]="authority()">
-
         <ng-container *ngIf="mode() === 'login' && step() === 'resolve'">
           <elohim-imagodei-federated-resolver
             #resolver
@@ -43,7 +43,9 @@ type StewardPhase = 'connecting' | 'failed' | 'unreachable';
             (resolved)="onResolved($event)"
             (resolve-error)="onResolveError($event)"
           >
-            <span slot="help-text">Sign in with your federated identifier — for example, matthew&#64;alpha.elohim.host.</span>
+            <span slot="help-text">
+              Sign in with your federated identifier — for example, matthew&#64;alpha.elohim.host.
+            </span>
           </elohim-imagodei-federated-resolver>
         </ng-container>
 
@@ -74,7 +76,9 @@ type StewardPhase = 'connecting' | 'failed' | 'unreachable';
                 class="steward-login__return"
                 [href]="stewardReturnUrl()"
                 rel="noopener"
-              >Return to your doorway</a>
+              >
+                Return to your doorway
+              </a>
             </ng-container>
           </div>
         </ng-container>
@@ -94,46 +98,48 @@ type StewardPhase = 'connecting' | 'failed' | 'unreachable';
         <div slot="error-region" *ngIf="errorMessage()" role="alert">
           {{ errorMessage() }}
         </div>
-
       </elohim-imagodei-portal-shell>
     </main>
   `,
-  styles: [`
-    .visually-hidden {
-      position: absolute;
-      inline-size: 1px;
-      block-size: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
+  changeDetection: ChangeDetectionStrategy.Eager,
+  styles: [
+    `
+      .visually-hidden {
+        position: absolute;
+        inline-size: 1px;
+        block-size: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
 
-    .steward-login {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      text-align: center;
-    }
+      .steward-login {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        text-align: center;
+      }
 
-    .steward-login__lead {
-      margin: 0;
-      font-weight: 600;
-    }
+      .steward-login__lead {
+        margin: 0;
+        font-weight: 600;
+      }
 
-    .steward-login__detail {
-      margin: 0;
-      opacity: 0.75;
-      font-size: 0.875rem;
-    }
+      .steward-login__detail {
+        margin: 0;
+        opacity: 0.75;
+        font-size: 0.875rem;
+      }
 
-    .steward-login__return {
-      align-self: center;
-      color: LinkText;
-    }
-  `],
+      .steward-login__return {
+        align-self: center;
+        color: LinkText;
+      }
+    `,
+  ],
 })
 export class AppComponent implements OnInit, AfterViewInit {
   private readonly resolverService = new StandaloneResolver();
@@ -176,7 +182,7 @@ export class AppComponent implements OnInit, AfterViewInit {
         this.resolverService,
         handoff,
         search,
-        this._stewardEffects(),
+        this._stewardEffects()
       );
       if (outcome.status === 'authenticated') {
         // The session landed; refreshAuthority + consent re-check already ran in
@@ -273,7 +279,13 @@ export class AppComponent implements OnInit, AfterViewInit {
   }
 
   async onPasswordSubmit(e: Event): Promise<void> {
-    const detail = (e as CustomEvent<{ identifier: string; password: string; remember: boolean }>).detail;
+    const detail = (
+      e as CustomEvent<{
+        identifier: string;
+        password: string;
+        remember: boolean;
+      }>
+    ).detail;
     const ident = detail.identifier || this.identifier();
     this.errorMessage.set('');
 
@@ -287,7 +299,9 @@ export class AppComponent implements OnInit, AfterViewInit {
       this.errorMessage.set(out.error);
       // Surface the error directly into the login-card via its setError method,
       // so the card can display it inline without relying on the slot region.
-      const card = this.loginCardRef?.nativeElement as unknown as Record<string, unknown> | undefined;
+      const card = this.loginCardRef?.nativeElement as unknown as
+        | Record<string, unknown>
+        | undefined;
       if (typeof card?.['setError'] === 'function') {
         (card['setError'] as (msg: string) => void)(out.error);
       }
@@ -314,7 +328,7 @@ export class AppComponent implements OnInit, AfterViewInit {
         body: JSON.stringify({ grantedClaims: detail.grantedClaims, state }),
       });
       if (!resp.ok) throw new Error(`grant failed: ${resp.status}`);
-      const result = await resp.json() as { redirect: string };
+      const result = (await resp.json()) as { redirect: string };
       window.location.href = result.redirect;
     } catch (err) {
       this.errorMessage.set(err instanceof Error ? err.message : 'consent grant failed');
@@ -333,7 +347,7 @@ export class AppComponent implements OnInit, AfterViewInit {
         body: JSON.stringify({ state, reason: detail.reason }),
       });
       if (!resp.ok) throw new Error(`decline failed: ${resp.status}`);
-      const result = await resp.json() as { redirect: string };
+      const result = (await resp.json()) as { redirect: string };
       window.location.href = result.redirect;
     } catch (err) {
       this.errorMessage.set(err instanceof Error ? err.message : 'consent decline failed');

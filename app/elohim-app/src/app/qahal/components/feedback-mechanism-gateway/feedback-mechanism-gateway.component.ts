@@ -24,12 +24,11 @@ import {
   input,
   signal,
   viewChild,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { Router } from '@angular/router';
 
-import {
-  GovernanceApiService,
-} from '@elohim/service';
+import { GovernanceApiService } from '@elohim/service';
 import type { AccumulationStatusView, MechanismSelectionView } from '@elohim/storage-client';
 import {
   ContextMenuOnlyComponent,
@@ -138,6 +137,7 @@ import type { ChallengeView, ProposalView } from '@elohim/storage-client';
       <div class="gateway-loading">Loading governance...</div>
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     :host {
       display: block;

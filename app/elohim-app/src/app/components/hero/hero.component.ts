@@ -1,4 +1,10 @@
-import { Component, OnInit, ElementRef, ViewEncapsulation } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  ElementRef,
+  ViewEncapsulation,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -11,6 +17,7 @@ import { DomInteractionService } from '../../services/dom-interaction.service';
   imports: [],
   templateUrl: './hero.component.html',
   styleUrl: './hero.component.css',
+  changeDetection: ChangeDetectionStrategy.Eager,
   encapsulation: ViewEncapsulation.None,
 })
 export class HeroComponent implements OnInit {

@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 /**
  * FaceCardComponent - Identity card with initials-based avatar
@@ -34,6 +42,7 @@ import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from
       }
     </button>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .face-card {

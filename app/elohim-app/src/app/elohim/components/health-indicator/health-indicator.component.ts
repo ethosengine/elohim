@@ -6,7 +6,7 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, inject, computed } from '@angular/core';
+import { Component, inject, computed, ChangeDetectionStrategy } from '@angular/core';
 
 // @coverage: 38.1% (2026-02-24)
 
@@ -17,6 +17,7 @@ import { HealthCheckService, HealthState } from '../../services/health-check.ser
   standalone: true,
   imports: [CommonModule],
   templateUrl: './health-indicator.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./health-indicator.component.css'],
 })
 export class HealthIndicatorComponent {

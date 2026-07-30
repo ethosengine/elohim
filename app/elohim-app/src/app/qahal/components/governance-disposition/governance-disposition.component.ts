@@ -7,7 +7,15 @@
  * recompute the profile from voting history.
  */
 
-import { Component, inject, input, OnInit, signal, computed } from '@angular/core';
+import {
+  Component,
+  inject,
+  input,
+  OnInit,
+  signal,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { GovernanceApiService } from '@elohim/service';
 
@@ -158,6 +166,7 @@ import type {
       <div class="empty">No governance profile found.</div>
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .disposition-card {
       max-width: 600px;

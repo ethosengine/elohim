@@ -1,5 +1,10 @@
-import { ApplicationConfig, mergeApplicationConfig, NgZone, ɵNoopNgZone as NoopNgZone } from '@angular/core';
-import { provideClientHydration } from '@angular/platform-browser';
+import {
+  ApplicationConfig,
+  mergeApplicationConfig,
+  NgZone,
+  ɵNoopNgZone as NoopNgZone,
+} from '@angular/core';
+import { provideClientHydration, withNoIncrementalHydration } from '@angular/platform-browser';
 import {
   FetchBackend,
   HttpBackend,
@@ -12,7 +17,7 @@ import { appConfig } from './app.config';
 const serverConfig: ApplicationConfig = {
   providers: [
     provideServerRendering(),
-    provideClientHydration(),
+    provideClientHydration(withNoIncrementalHydration()),
     // In the deno_core SSR runtime, Zone.js tracks setInterval/setTimeout tasks
     // that never complete (e.g. health-check polling intervals, performance uptime
     // timers). These keep ZoneStablePendingTask from removing its entry from

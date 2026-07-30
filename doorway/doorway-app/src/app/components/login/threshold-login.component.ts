@@ -11,7 +11,14 @@
  * can be an identity provider for elohim-app.
  */
 
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  signal,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -76,7 +83,9 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
               aria-label="Dismiss error"
               (click)="clearError()"
               data-testid="threshold-error-dismiss"
-            >×</button>
+            >
+              ×
+            </button>
           </div>
         }
 
@@ -100,15 +109,17 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
                   inputmode="text"
                   class="identifier-input"
                 />
-                <span class="domain-suffix" data-testid="threshold-domain-suffix"
-                  >&#64;{{ gatewayDomain() }}</span
-                >
+                <span class="domain-suffix" data-testid="threshold-domain-suffix">
+                  &#64;{{ gatewayDomain() }}
+                </span>
               </div>
               <p class="input-hint">
-                Logging in at <strong>{{ gatewayDomain() }}</strong>.
-                <a [href]="federatedLoginUrl()" data-testid="threshold-different-doorway-hint"
-                  >Use a different doorway</a
-                >
+                Logging in at
+                <strong>{{ gatewayDomain() }}</strong>
+                .
+                <a [href]="federatedLoginUrl()" data-testid="threshold-different-doorway-hint">
+                  Use a different doorway
+                </a>
               </p>
             </div>
 
@@ -126,14 +137,23 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
               />
             </div>
 
-            <button type="submit" class="btn-primary" data-testid="threshold-submit" [disabled]="!loginForm.valid">
+            <button
+              type="submit"
+              class="btn-primary"
+              data-testid="threshold-submit"
+              [disabled]="!loginForm.valid"
+            >
               Sign In
             </button>
 
             @if (oauthParams()) {
               <div class="federated-section">
                 <div class="divider"><span>or</span></div>
-                <a [href]="federatedLoginUrl()" class="federated-link" data-testid="threshold-federated-login">
+                <a
+                  [href]="federatedLoginUrl()"
+                  class="federated-link"
+                  data-testid="threshold-federated-login"
+                >
                   Login with a different doorway
                 </a>
               </div>
@@ -171,12 +191,16 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
 
         <!-- Footer -->
         <div class="footer">
-          <p>Don't have an account? <a [href]="registerUrl()" data-testid="threshold-register-link">Register here</a></p>
+          <p>
+            Don't have an account?
+            <a [href]="registerUrl()" data-testid="threshold-register-link">Register here</a>
+          </p>
         </div>
       </div>
     </div>
   `,
-  styleUrl: './threshold-login.component.css'
+  changeDetection: ChangeDetectionStrategy.Eager,
+  styleUrl: './threshold-login.component.css',
 })
 export class ThresholdLoginComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
@@ -413,7 +437,7 @@ export class ThresholdLoginComponent implements OnInit {
     const response = await fetch(authorizeUrl.toString(), {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 

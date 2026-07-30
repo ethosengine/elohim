@@ -7,6 +7,7 @@ import {
   PLATFORM_ID,
   Renderer2,
   inject,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 
 // @coverage: 88.0% (2026-02-24)
@@ -39,6 +40,7 @@ import { VisionComponent } from '../vision/vision.component';
     FooterComponent,
   ],
   templateUrl: './home.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './home.component.css',
 })
 export class HomeComponent implements OnInit, OnDestroy {

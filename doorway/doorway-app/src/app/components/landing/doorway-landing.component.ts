@@ -6,7 +6,14 @@
  * and action links (sign in, register, operator dashboard).
  */
 
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  signal,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
@@ -119,10 +126,14 @@ type LoadingState = 'loading' | 'ready' | 'error';
         </section>
         @if (humansUnmeasured() || contentUnmeasured()) {
           <p class="dataplane-note">
-            <strong>Content available</strong> is the substrate content this doorway has
-            projected through its conductor. <strong>Humans served</strong> aggregates
-            self-reported counts across federated nodes. A <strong>—</strong> means that
-            figure isn't available yet — <em>unknown, not zero</em>.
+            <strong>Content available</strong>
+            is the substrate content this doorway has projected through its conductor.
+            <strong>Humans served</strong>
+            aggregates self-reported counts across federated nodes. A
+            <strong>—</strong>
+            means that figure isn't available yet —
+            <em>unknown, not zero</em>
+            .
           </p>
         }
 
@@ -147,9 +158,7 @@ type LoadingState = 'loading' | 'ready' | 'error';
               }
             </div>
             @if (peers().length > 6) {
-              <p class="peer-overflow">
-                and {{ peers().length - 6 }} more doorways
-              </p>
+              <p class="peer-overflow">and {{ peers().length - 6 }} more doorways</p>
             }
           </section>
         }
@@ -157,8 +166,12 @@ type LoadingState = 'loading' | 'ready' | 'error';
         <!-- Actions -->
         <section class="actions">
           <a routerLink="/login" class="btn-primary" data-testid="landing-sign-in">Sign In</a>
-          <a routerLink="/register" class="btn-secondary" data-testid="landing-create-account">Create Account</a>
-          <a routerLink="/dashboard" class="btn-link" data-testid="landing-dashboard">Operator Dashboard</a>
+          <a routerLink="/register" class="btn-secondary" data-testid="landing-create-account">
+            Create Account
+          </a>
+          <a routerLink="/dashboard" class="btn-link" data-testid="landing-dashboard">
+            Operator Dashboard
+          </a>
         </section>
       }
 
@@ -171,6 +184,7 @@ type LoadingState = 'loading' | 'ready' | 'error';
       </footer>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './doorway-landing.component.css',
 })
 export class DoorwayLandingComponent implements OnInit {
@@ -229,7 +243,9 @@ export class DoorwayLandingComponent implements OnInit {
       const [healthRes, statusRes, federationRes] = await Promise.allSettled([
         firstValueFrom(this.http.get<HealthResponse>(`${this.baseUrl}/health`)),
         firstValueFrom(this.http.get<StatusResponse>(`${this.baseUrl}/status.json`)),
-        firstValueFrom(this.http.get<FederationResponse>(`${this.baseUrl}/api/v1/federation/doorways`)),
+        firstValueFrom(
+          this.http.get<FederationResponse>(`${this.baseUrl}/api/v1/federation/doorways`)
+        ),
       ]);
 
       if (healthRes.status === 'fulfilled') {

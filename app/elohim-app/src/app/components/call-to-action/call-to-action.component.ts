@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 
 import { EprLinkComponent } from '@app/elohim/components/epr-link/epr-link.component';
 
@@ -8,6 +8,7 @@ import { EprLinkComponent } from '@app/elohim/components/epr-link/epr-link.compo
   selector: 'app-call-to-action',
   imports: [EprLinkComponent],
   templateUrl: './call-to-action.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './call-to-action.component.css',
 })
 export class CallToActionComponent {}

@@ -9,7 +9,14 @@
  * Route: /threshold/doorways?client_id=...&redirect_uri=...&state=...
  */
 
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  signal,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -24,6 +31,7 @@ import {
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './doorway-browser.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './doorway-browser.component.css',
 })
 export class DoorwayBrowserComponent implements OnInit {
@@ -43,7 +51,9 @@ export class DoorwayBrowserComponent implements OnInit {
 
   // Computed
   readonly regions = computed(() => {
-    const all = this.doorways().map(d => d.region).filter(Boolean) as string[];
+    const all = this.doorways()
+      .map(d => d.region)
+      .filter(Boolean) as string[];
     return [...new Set(all)].sort();
   });
 
@@ -126,14 +136,19 @@ export class DoorwayBrowserComponent implements OnInit {
       this.runHealthChecks(response.doorways);
     } catch (err) {
       this.loading.set(false);
-      this.error.set(
-        err instanceof Error ? err.message : 'Failed to load doorways'
-      );
+      this.error.set(err instanceof Error ? err.message : 'Failed to load doorways');
     }
   }
 
   private async runHealthChecks(
-    doorways: { id: string; url: string; region?: string; tier: string; capabilities: string[]; status: string }[]
+    doorways: {
+      id: string;
+      url: string;
+      region?: string;
+      tier: string;
+      capabilities: string[];
+      status: string;
+    }[]
   ): Promise<void> {
     const checks = doorways.map(d => this.federation.checkHealth(d));
     const results = await Promise.allSettled(checks);

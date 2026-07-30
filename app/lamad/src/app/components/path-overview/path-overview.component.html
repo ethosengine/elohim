@@ -139,7 +139,9 @@
               <!-- Chapter Body -->
               <div class="chapter-body">
                 @if (item.chapter.description) {
-                  <p class="chapter-description">{{ item.chapter.description }}</p>
+                  <p class="chapter-description">
+                    {{ item.chapter.description }}
+                  </p>
                 }
 
                 <!-- Modules -->
@@ -177,7 +179,9 @@
                       <!-- Module Body -->
                       <div class="module-body">
                         @if (mod.module.description) {
-                          <p class="module-description">{{ mod.module.description }}</p>
+                          <p class="module-description">
+                            {{ mod.module.description }}
+                          </p>
                         }
 
                         <!-- Learning Objectives -->
@@ -202,10 +206,16 @@
                               <button
                                 type="button"
                                 class="section-header section-link"
-                                (click)="goToSection(sec.concepts.at(0)?.conceptId)"
+                                (click)="
+                                  goToSection(
+                                    $safeNavigationMigration(sec.concepts.at(0)?.conceptId)
+                                  )
+                                "
                               >
                                 <div class="section-header-left">
-                                  <h5 class="section-title">{{ sec.section.title }}</h5>
+                                  <h5 class="section-title">
+                                    {{ sec.section.title }}
+                                  </h5>
                                   @if (sec.section.optional) {
                                     <span class="optional-badge tiny">Optional</span>
                                   }
@@ -233,7 +243,9 @@
                               <!-- Section Body - concept list -->
                               <div class="section-body">
                                 @if (sec.section.description) {
-                                  <p class="section-description">{{ sec.section.description }}</p>
+                                  <p class="section-description">
+                                    {{ sec.section.description }}
+                                  </p>
                                 }
 
                                 <!-- Concepts -->
@@ -294,7 +306,8 @@
                     class="btn btn-sm btn-secondary"
                     (click)="startChapter(item.chapter.id)"
                   >
-                    {{ item.completedConcepts > 0 ? 'Continue' : 'Start' }} Chapter
+                    {{ item.completedConcepts > 0 ? 'Continue' : 'Start' }}
+                    Chapter
                   </button>
                 </div>
               </div>

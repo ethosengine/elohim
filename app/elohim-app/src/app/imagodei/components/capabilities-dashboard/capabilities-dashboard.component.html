@@ -38,7 +38,7 @@
   @if (!isLoading()) {
     <!-- Time Status Card -->
     @if (timeStatus()) {
-      <section class="time-status-card" [ngClass]="timeStatus()?.status">
+      <section class="time-status-card" [ngClass]="$safeNavigationMigration(timeStatus()?.status)">
         <div class="status-icon">
           @if (timeStatus()?.status === 'ok') {
             <span class="icon-check">✓</span>

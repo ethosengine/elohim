@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 /**
@@ -15,6 +15,7 @@ import { RouterLink } from '@angular/router';
       <a routerLink="projects">View Projects</a>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .avodah-home {

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
 
 import { eprToUniversalHref } from '@elohim/service';
 import type { EconomicEventView } from '@elohim/storage-client/generated';
@@ -18,6 +18,7 @@ import { EventService } from '@elohim/rea-runtime';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './attention-flow.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./attention-flow.component.css'],
 })
 export class AttentionFlowComponent implements OnInit {

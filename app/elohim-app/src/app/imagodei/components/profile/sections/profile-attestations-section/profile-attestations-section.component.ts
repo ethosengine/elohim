@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { Component, input, ChangeDetectionStrategy } from '@angular/core';
 
 // @coverage: 50.0% (2026-02-24)
 
@@ -6,6 +6,7 @@ import { Component, input } from '@angular/core';
   selector: 'app-profile-attestations-section',
   standalone: true,
   templateUrl: './profile-attestations-section.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./profile-attestations-section.component.css'],
 })
 export class ProfileAttestationsSectionComponent {

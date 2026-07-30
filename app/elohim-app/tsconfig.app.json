@@ -6,14 +6,15 @@
     "outDir": "./out-tsc/app",
     "types": []
   },
-  "files": [
-    "src/main.ts",
-    "src/main.server.ts"
-  ],
-  "include": [
-    "src/**/*.d.ts"
-  ],
-  "exclude": [
-    "src/**/plugins/perseus/perseus-element.tsx"
-  ]
+  "files": ["src/main.ts", "src/main.server.ts"],
+  "include": ["src/**/*.d.ts"],
+  "exclude": ["src/**/plugins/perseus/perseus-element.tsx"],
+  "angularCompilerOptions": {
+    "extendedDiagnostics": {
+      "checks": {
+        "nullishCoalescingNotNullable": "suppress",
+        "optionalChainNotNullable": "suppress"
+      }
+    }
+  }
 }

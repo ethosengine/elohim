@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 /**
@@ -11,6 +11,9 @@ import { RouterOutlet } from '@angular/router';
   selector: 'app-root',
   standalone: true,
   imports: [RouterOutlet],
-  template: `<router-outlet />`,
+  changeDetection: ChangeDetectionStrategy.Eager,
+  template: `
+    <router-outlet />
+  `,
 })
 export class AppComponent {}

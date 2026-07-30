@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
 
 // @coverage: 6.2% (2026-02-24)
 
@@ -14,6 +14,7 @@ import {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './profile-data-section.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./profile-data-section.component.css'],
 })
 export class ProfileDataSectionComponent {

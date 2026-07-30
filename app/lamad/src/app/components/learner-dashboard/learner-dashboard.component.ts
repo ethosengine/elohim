@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 // @coverage: 94.9% (2026-02-24)
@@ -54,6 +54,7 @@ import type {
     RefreshQueueComponent,
   ],
   templateUrl: './learner-dashboard.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./learner-dashboard.component.css'],
 })
 export class LearnerDashboardComponent implements OnInit, OnDestroy {
@@ -109,7 +110,12 @@ export class LearnerDashboardComponent implements OnInit, OnDestroy {
     this.subscription.add(
       this.contentMastery.getAllMastery().subscribe(all => {
         if (all.length === 0) {
-          this.freshnessStats = { healthPercent: 100, fresh: 0, stale: 0, critical: 0 };
+          this.freshnessStats = {
+            healthPercent: 100,
+            fresh: 0,
+            stale: 0,
+            critical: 0,
+          };
           return;
         }
         let fresh = 0,

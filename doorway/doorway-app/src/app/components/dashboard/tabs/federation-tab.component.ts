@@ -7,7 +7,7 @@
  * 3. P2P Peers — table of libp2p peer connections
  */
 
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NotificationService } from '../../../core/notifications/notification.service';
@@ -35,7 +35,12 @@ import {
         <section class="peers-config-section">
           <div class="section-header">
             <h3>Configured Peers ({{ peerConfig().length }})</h3>
-            <button class="btn btn-sm btn-secondary" (click)="refreshPeers()" [disabled]="refreshing()" data-testid="federation-refresh">
+            <button
+              class="btn btn-sm btn-secondary"
+              (click)="refreshPeers()"
+              [disabled]="refreshing()"
+              data-testid="federation-refresh"
+            >
               {{ refreshing() ? 'Refreshing...' : 'Refresh' }}
             </button>
           </div>
@@ -51,7 +56,12 @@ import {
               [disabled]="addingPeer()"
               data-testid="federation-peer-url"
             />
-            <button class="btn btn-sm btn-primary" (click)="addPeer()" [disabled]="addingPeer() || !newPeerUrl" data-testid="federation-add-peer">
+            <button
+              class="btn btn-sm btn-primary"
+              (click)="addPeer()"
+              [disabled]="addingPeer() || !newPeerUrl"
+              data-testid="federation-add-peer"
+            >
               {{ addingPeer() ? 'Adding...' : 'Add Peer' }}
             </button>
           </div>
@@ -73,7 +83,11 @@ import {
                   <tr>
                     <td class="url-cell">{{ peer.url }}</td>
                     <td>
-                      <span class="status-dot" [class.reachable]="peer.reachable" [class.unreachable]="!peer.reachable"></span>
+                      <span
+                        class="status-dot"
+                        [class.reachable]="peer.reachable"
+                        [class.unreachable]="!peer.reachable"
+                      ></span>
                       {{ peer.reachable ? 'Reachable' : 'Unreachable' }}
                     </td>
                     <td>{{ peer.doorwayId ?? '-' }}</td>
@@ -100,7 +114,9 @@ import {
               </tbody>
             </table>
           } @else {
-            <div class="empty-state">No federation peers configured. Add a peer URL above to start federating.</div>
+            <div class="empty-state">
+              No federation peers configured. Add a peer URL above to start federating.
+            </div>
           }
         </section>
 
@@ -130,7 +146,9 @@ import {
                   }
                   <div class="dw-detail">
                     <span class="label">Status</span>
-                    <span class="value status-text" [class]="dw.status">{{ dw.status | titlecase }}</span>
+                    <span class="value status-text" [class]="dw.status">
+                      {{ dw.status | titlecase }}
+                    </span>
                   </div>
                   @if (dw.latencyMs !== null) {
                     <div class="dw-detail">
@@ -179,14 +197,14 @@ import {
               <tbody>
                 @for (peer of peers(); track peer.peerId) {
                   <tr>
-                    <td class="peer-id">{{ peer.peerId | slice:0:16 }}...</td>
+                    <td class="peer-id">{{ peer.peerId | slice: 0 : 16 }}...</td>
                     <td>
                       <span class="conn-badge" [class]="peer.connectionState">
                         {{ peer.connectionState | titlecase }}
                       </span>
                     </td>
                     <td>{{ peer.latencyMs !== null ? peer.latencyMs + 'ms' : '-' }}</td>
-                    <td>{{ peer.connectedSince | date:'short' }}</td>
+                    <td>{{ peer.connectedSince | date: 'short' }}</td>
                     <td>{{ formatBytesHelper(peer.bytesSent) }}</td>
                     <td>{{ formatBytesHelper(peer.bytesReceived) }}</td>
                   </tr>
@@ -200,6 +218,7 @@ import {
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './federation-tab.component.css',
 })
 export class FederationTabComponent implements OnInit {

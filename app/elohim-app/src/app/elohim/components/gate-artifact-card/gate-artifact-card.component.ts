@@ -112,7 +112,7 @@ const REACH_LABELS: Record<ReachTier, string> = {
             @if (interaction.gateResult()?.appealPath) {
               <a
                 class="settlement-link"
-                [href]="interaction.gateResult()?.appealPath"
+                [href]="$safeNavigationMigration(interaction.gateResult()?.appealPath)"
                 data-testid="settlement-link"
               >
                 View appeal story

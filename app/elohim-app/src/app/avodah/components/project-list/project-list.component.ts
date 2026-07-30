@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
@@ -71,6 +71,7 @@ import { AvodahApiService } from '../../services/avodah-api.service';
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .projects-shell {

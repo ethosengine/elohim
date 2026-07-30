@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, ChangeDetectionStrategy } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 // @coverage: 60.0% (2026-02-24)
@@ -54,6 +54,7 @@ import { ShefaSidenavComponent } from '../shefa-sidenav/shefa-sidenav.component'
       </app-elohim-navigator>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .shefa-container {

@@ -29,6 +29,7 @@ import {
   Output,
   inject,
   signal,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { type NavigationExtras, Router } from '@angular/router';
 
@@ -67,6 +68,7 @@ export type { EprLinkDisplay } from 'elohim-core';
       ></app-pin-progress>
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       :host {

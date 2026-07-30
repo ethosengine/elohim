@@ -1,4 +1,4 @@
-import { Component, inject, input, output } from '@angular/core';
+import { Component, inject, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 
 // @coverage: 100.0% (2026-03-03)
@@ -14,6 +14,7 @@ import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/dis
   selector: 'app-profile-discovery-section',
   standalone: true,
   templateUrl: './profile-discovery-section.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./profile-discovery-section.component.css'],
 })
 export class ProfileDiscoverySectionComponent {

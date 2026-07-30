@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  inject,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 // @coverage: 45.1% (2026-03-03)
@@ -9,12 +16,13 @@ import { takeUntil } from 'rxjs/operators';
 import { Subject, forkJoin } from 'rxjs';
 
 import { eprToUniversalHref } from '@elohim/service';
-import { AgentProgress, MasteryLevel, MasteryTier } from '@elohim/service/angular/models/agent.model';
-import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 import {
-  LAMAD_EPR_NAV,
-  type ILamadEprNav,
-} from '../../interfaces/cross-pillar.interface';
+  AgentProgress,
+  MasteryLevel,
+  MasteryTier,
+} from '@elohim/service/angular/models/agent.model';
+import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
+import { LAMAD_EPR_NAV, type ILamadEprNav } from '../../interfaces/cross-pillar.interface';
 
 import { SeoService } from '../../shared/services/seo.service';
 import { LearningPath, PathStep, PathChapter, PathModule, PathSection } from '../../models';
@@ -135,6 +143,7 @@ interface ChapterDisplay {
   standalone: true,
   imports: [CommonModule, RecommendationListComponent],
   templateUrl: './path-overview.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./path-overview.component.css'],
 })
 export class PathOverviewComponent implements OnInit, OnDestroy {

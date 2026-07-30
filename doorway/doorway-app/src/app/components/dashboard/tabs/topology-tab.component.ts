@@ -12,7 +12,7 @@
 
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 // Generated types — single source of truth at
@@ -46,17 +46,23 @@ export type { DoorwayDashboardView, DashboardSteward, DashboardFederationPeer };
         <header class="topology-header">
           <h2 data-testid="topology-hostname">{{ v.doorwayHostname }}</h2>
           <div class="counts">
-            <span data-testid="topology-stewards-count">{{ v.storageStewards.length }} storage stewards</span>
+            <span data-testid="topology-stewards-count">
+              {{ v.storageStewards.length }} storage stewards
+            </span>
             ·
-            <span data-testid="topology-federation-count">{{ v.federationPeers.length }} federation peers</span>
+            <span data-testid="topology-federation-count">
+              {{ v.federationPeers.length }} federation peers
+            </span>
           </div>
         </header>
 
         <section class="projection-coverage">
           <h3>Projection coverage</h3>
           <div data-testid="projection-coverage">
-            {{ v.projectionCoverage.projectedCidCount }} / {{ v.projectionCoverage.knownCidCount }} CIDs
-            ({{ (v.projectionCoverage.cacheHitRate24h * 100) | number: '1.0-0' }}% hit rate over 24h)
+            {{ v.projectionCoverage.projectedCidCount }} /
+            {{ v.projectionCoverage.knownCidCount }} CIDs ({{
+              v.projectionCoverage.cacheHitRate24h * 100 | number: '1.0-0'
+            }}% hit rate over 24h)
           </div>
           <div class="lag" data-testid="projection-lag">
             avg projection lag: {{ v.projectionCoverage.projectionLagMsAvg }}ms
@@ -74,21 +80,23 @@ export type { DoorwayDashboardView, DashboardSteward, DashboardFederationPeer };
             </li>
             <li data-testid="surface-tls">
               TLS: {{ v.publicSurface.tlsValid ? '✓ valid' : '✗ invalid' }}
-              @if (v.publicSurface.tlsExpiresInDays !== undefined && v.publicSurface.tlsExpiresInDays !== null) {
+              @if (
+                v.publicSurface.tlsExpiresInDays !== undefined &&
+                v.publicSurface.tlsExpiresInDays !== null
+              ) {
                 — expires in {{ v.publicSurface.tlsExpiresInDays }} days
               }
             </li>
             <li data-testid="surface-reachable">
-              Reachability: {{ v.publicSurface.publicReachable ? '✓ reachable from public probe' : '✗ unreachable' }}
+              Reachability:
+              {{
+                v.publicSurface.publicReachable ? '✓ reachable from public probe' : '✗ unreachable'
+              }}
             </li>
           </ul>
         </section>
 
-        <button
-          type="button"
-          (click)="toggleDetails()"
-          data-testid="topology-details-toggle"
-        >
+        <button type="button" (click)="toggleDetails()" data-testid="topology-details-toggle">
           [{{ showDetails() ? 'hide' : 'show' }} details]
         </button>
 
@@ -98,6 +106,7 @@ export type { DoorwayDashboardView, DashboardSteward, DashboardFederationPeer };
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .topology-tab {
@@ -147,7 +156,7 @@ export class TopologyTabComponent implements OnInit {
   }
 
   toggleDetails(): void {
-    this.showDetails.update((b) => !b);
+    this.showDetails.update(b => !b);
   }
 
   async refresh(): Promise<void> {
@@ -155,7 +164,7 @@ export class TopologyTabComponent implements OnInit {
     this.error.set(null);
     try {
       const v = await firstValueFrom(
-        this.http.get<DoorwayDashboardView>('/admin/dashboard/topology'),
+        this.http.get<DoorwayDashboardView>('/admin/dashboard/topology')
       );
       this.view.set(v);
     } catch (e: unknown) {

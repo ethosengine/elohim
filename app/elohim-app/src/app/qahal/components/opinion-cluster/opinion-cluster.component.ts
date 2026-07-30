@@ -11,6 +11,7 @@ import {
   SimpleChanges,
   ViewChild,
   inject,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 
 import { from } from 'rxjs';
@@ -54,6 +55,7 @@ import type {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './opinion-cluster.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./opinion-cluster.component.css'],
 })
 export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit {

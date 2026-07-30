@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -17,6 +17,7 @@ export interface BuildInfo {
   selector: 'app-footer',
   imports: [],
   templateUrl: './footer.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './footer.component.css',
 })
 export class FooterComponent {

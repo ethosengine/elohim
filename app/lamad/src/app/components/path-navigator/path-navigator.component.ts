@@ -7,6 +7,7 @@ import {
   inject,
   HostListener,
   Inject,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
@@ -103,6 +104,7 @@ const NAV_FAILED_MSG = 'Navigation failed:';
   standalone: true,
   imports: [CommonModule, RouterModule, LessonViewComponent, FocusedViewToggleComponent],
   templateUrl: './path-navigator.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./path-navigator.component.css'],
 })
 export class PathNavigatorComponent implements OnInit, OnDestroy {
@@ -163,7 +165,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     private readonly router: Router,
     private readonly pathService: PathService,
     @Inject(LAMAD_AGENT) private readonly agentService: ILamadAgent,
-    @Inject(LAMAD_GOVERNANCE_SIGNAL) private readonly governanceSignalService: ILamadGovernanceSignal,
+    @Inject(LAMAD_GOVERNANCE_SIGNAL)
+    private readonly governanceSignalService: ILamadGovernanceSignal,
     private readonly pathContextService: PathContextService,
     @Inject(DOCUMENT) private readonly document: Document
   ) {}
@@ -756,7 +759,10 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
 
     // Update stepView completion state
     if (this.stepView) {
-      this.stepView = { ...this.stepView, isCompleted: this.currentBloomLevel !== 'not_started' };
+      this.stepView = {
+        ...this.stepView,
+        isCompleted: this.currentBloomLevel !== 'not_started',
+      };
     }
 
     // Persist step completion to AgentService at 'remember' or 'apply' threshold

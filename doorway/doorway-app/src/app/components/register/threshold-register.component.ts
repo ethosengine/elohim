@@ -13,7 +13,14 @@
  * can be an identity provider for elohim-app.
  */
 
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  signal,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -44,12 +51,7 @@ interface RegisterForm {
 }
 
 /** State machine for registration flow */
-type RegisterState =
-  | 'form'
-  | 'creating_identity'
-  | 'registering'
-  | 'authorizing'
-  | 'error';
+type RegisterState = 'form' | 'creating_identity' | 'registering' | 'authorizing' | 'error';
 
 @Component({
   selector: 'app-threshold-register',
@@ -77,7 +79,13 @@ type RegisterState =
         @if (error()) {
           <div class="error-banner">
             <span>{{ error() }}</span>
-            <button class="dismiss" (click)="clearError()" data-testid="threshold-register-error-dismiss">×</button>
+            <button
+              class="dismiss"
+              (click)="clearError()"
+              data-testid="threshold-register-error-dismiss"
+            >
+              ×
+            </button>
           </div>
         }
 
@@ -144,7 +152,9 @@ type RegisterState =
                 placeholder="Re-enter your password"
                 data-testid="threshold-register-confirm-password"
               />
-              @if (form.password && form.confirmPassword && form.password !== form.confirmPassword) {
+              @if (
+                form.password && form.confirmPassword && form.password !== form.confirmPassword
+              ) {
                 <span class="field-error">Passwords do not match</span>
               }
             </div>
@@ -161,7 +171,11 @@ type RegisterState =
             @if (oauthParams()) {
               <div class="federated-section">
                 <div class="divider"><span>or</span></div>
-                <a [href]="federatedRegisterUrl()" class="federated-link" data-testid="threshold-register-federated">
+                <a
+                  [href]="federatedRegisterUrl()"
+                  class="federated-link"
+                  data-testid="threshold-register-federated"
+                >
                   Register with a different doorway
                 </a>
               </div>
@@ -193,17 +207,23 @@ type RegisterState =
 
         @if (state() === 'error') {
           <div class="error-state">
-            <button class="btn-secondary" (click)="retry()" data-testid="threshold-register-retry">Try Again</button>
+            <button class="btn-secondary" (click)="retry()" data-testid="threshold-register-retry">
+              Try Again
+            </button>
           </div>
         }
 
         <!-- Footer -->
         <div class="footer">
-          <p>Already have an account? <a [href]="loginUrl()" data-testid="threshold-register-login-link">Sign in</a></p>
+          <p>
+            Already have an account?
+            <a [href]="loginUrl()" data-testid="threshold-register-login-link">Sign in</a>
+          </p>
         </div>
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './threshold-register.component.css',
 })
 export class ThresholdRegisterComponent implements OnInit {
@@ -415,10 +435,7 @@ export class ThresholdRegisterComponent implements OnInit {
    * Complete OAuth authorization flow.
    * Redirects user back to elohim-app with authorization code.
    */
-  private async authorizeOAuth(
-    token: string,
-    params: OAuthParams
-  ): Promise<void> {
+  private async authorizeOAuth(token: string, params: OAuthParams): Promise<void> {
     // Call /auth/authorize with the token to get the authorization code
     // The backend will redirect us to the client's redirect_uri
     const authorizeUrl = new URL('/auth/authorize', window.location.origin);

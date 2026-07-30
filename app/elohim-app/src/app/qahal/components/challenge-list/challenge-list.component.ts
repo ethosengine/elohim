@@ -5,7 +5,7 @@
  * Displays all challenges, with future sprint work for filtering and sorting.
  */
 
-import { Component, inject, signal, type OnInit } from '@angular/core';
+import { Component, inject, signal, type OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { GovernanceApiService } from '@elohim/service';
@@ -40,6 +40,7 @@ import type { ChallengeView } from '@elohim/storage-client/generated';
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .challenge-list {
       padding: 1.5rem;

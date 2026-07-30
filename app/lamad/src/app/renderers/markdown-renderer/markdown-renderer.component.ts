@@ -12,6 +12,7 @@ import {
   ViewContainerRef,
   OnDestroy,
   inject,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Router } from '@angular/router';
@@ -118,6 +119,7 @@ const EPR_ANCHOR_SELECTOR = 'a[data-epr]';
       </button>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./markdown-renderer.component.css'],
 })
 export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDestroy {
@@ -338,7 +340,10 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
     );
   }
 
-  private processHeadings(html: string): { processedHtml: string; toc: TocEntry[] } {
+  private processHeadings(html: string): {
+    processedHtml: string;
+    toc: TocEntry[];
+  } {
     const toc: TocEntry[] = [];
     const usedIds = new Set<string>();
 

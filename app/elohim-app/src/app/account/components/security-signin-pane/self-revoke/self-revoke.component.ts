@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 
 import { AccountService } from '../../../services/account.service';
 import { RevocationService } from '../../../services/revocation.service';
@@ -8,6 +8,7 @@ import { RevocationService } from '../../../services/revocation.service';
   selector: 'app-self-revoke',
   standalone: true,
   imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './self-revoke.component.html',
 })
 export class SelfRevokeComponent {

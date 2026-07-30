@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideAnimations } from '@angular/platform-browser/animations';
@@ -104,7 +104,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideHttpClient(),
+    provideHttpClient(withXhr()),
     provideAnimations(),
     // ELOHIM_ENV — maps lamad-local environment to the @elohim/service token contract.
     // doorwayUrl uses the same origin-aware resolution as the ElohimClient below.
@@ -177,13 +177,18 @@ export const appConfig: ApplicationConfig = {
     // context) + the narrow lamad token the markdown renderer consumes for its
     // popover route minting. resolveInContext (HyperCard) stays on the resolver.
     provideEprResolution(),
-    { provide: LAMAD_EPR_RESOLUTION_PROVIDER, useExisting: EPR_RESOLUTION_PROVIDER },
+    {
+      provide: LAMAD_EPR_RESOLUTION_PROVIDER,
+      useExisting: EPR_RESOLUTION_PROVIDER,
+    },
     // §12.3 / Slice 3 (§8.3): lamad's claims derive from its DECLARATION —
     // one authoring home; the executable commands come from the shared
     // interpreter. Everything not declared stays cross-bundle.
     {
       provide: BUNDLE_ROUTE_CONTEXT,
-      useValue: { claims: claimsFromDeclaration(LAMAD_ROUTE_CLAIMS) } satisfies BundleRouteContext,
+      useValue: {
+        claims: claimsFromDeclaration(LAMAD_ROUTE_CLAIMS),
+      } satisfies BundleRouteContext,
     },
     { provide: LAMAD_GOVERNANCE_SIGNAL, useExisting: GovernanceSignalService },
     { provide: LAMAD_ELOHIM_PRESENCE, useExisting: ElohimPresenceService },

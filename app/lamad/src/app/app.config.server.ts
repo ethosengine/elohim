@@ -1,5 +1,10 @@
-import { ApplicationConfig, mergeApplicationConfig, NgZone, ɵNoopNgZone as NoopNgZone } from '@angular/core';
-import { provideClientHydration } from '@angular/platform-browser';
+import {
+  ApplicationConfig,
+  mergeApplicationConfig,
+  NgZone,
+  ɵNoopNgZone as NoopNgZone,
+} from '@angular/core';
+import { provideClientHydration, withNoIncrementalHydration } from '@angular/platform-browser';
 import {
   FetchBackend,
   HttpBackend,
@@ -28,7 +33,7 @@ import { appConfig } from './app.config';
 const serverConfig: ApplicationConfig = {
   providers: [
     provideServerRendering(),
-    provideClientHydration(),
+    provideClientHydration(withNoIncrementalHydration()),
     { provide: NgZone, useClass: NoopNgZone },
     { provide: REQUESTS_CONTRIBUTE_TO_STABILITY, useValue: false },
     { provide: HttpBackend, useClass: FetchBackend },

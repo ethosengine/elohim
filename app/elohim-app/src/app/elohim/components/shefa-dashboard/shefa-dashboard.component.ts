@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  inject,
+  signal,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 // @coverage: 26.7% (2026-02-24)
 
@@ -44,6 +52,7 @@ interface ShefaRecommendation {
   standalone: true,
   imports: [CommonModule, NetworkHealthTabComponent, SignalsCardComponent],
   templateUrl: './shefa-dashboard.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './shefa-dashboard.component.css',
 })
 export class ShefaDashboardComponent implements OnInit, OnDestroy {

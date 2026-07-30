@@ -6,7 +6,14 @@
  * and graduation CTA. Adapts based on JWT claims (steward vs hosted).
  */
 
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  signal,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { DoorwayAdminService } from '../../services/doorway-admin.service';
@@ -55,7 +62,9 @@ const AGENCY_STEPS: PipelineStep[] = [
       @if (error()) {
         <div class="error-state">
           <p>{{ error() }}</p>
-          <button class="btn-secondary" (click)="loadAccount()" data-testid="account-retry">Retry</button>
+          <button class="btn-secondary" (click)="loadAccount()" data-testid="account-retry">
+            Retry
+          </button>
         </div>
       }
 
@@ -77,11 +86,15 @@ const AGENCY_STEPS: PipelineStep[] = [
             </div>
             <div class="info-item">
               <span class="info-label">Member Since</span>
-              <span class="info-value">{{ account()?.createdAt | date:'mediumDate' }}</span>
+              <span class="info-value">
+                {{ $safeNavigationMigration(account()?.createdAt) | date: 'mediumDate' }}
+              </span>
             </div>
             <div class="info-item">
               <span class="info-label">Last Login</span>
-              <span class="info-value">{{ account()?.lastLoginAt | date:'medium' }}</span>
+              <span class="info-value">
+                {{ $safeNavigationMigration(account()?.lastLoginAt) | date: 'medium' }}
+              </span>
             </div>
           </div>
         </section>
@@ -92,7 +105,10 @@ const AGENCY_STEPS: PipelineStep[] = [
             <span class="banner-icon">&#9432;</span>
             <div class="banner-text">
               <strong>Accessing through this doorway</strong>
-              <p>Your local conductor is not connected. You can download your key bundle or re-provision below.</p>
+              <p>
+                Your local conductor is not connected. You can download your key bundle or
+                re-provision below.
+              </p>
             </div>
           </div>
         }
@@ -106,15 +122,15 @@ const AGENCY_STEPS: PipelineStep[] = [
               <div class="gauge-header">
                 <span class="gauge-label">Storage</span>
                 <span class="gauge-value" [style.color]="storageColor()">
-                  {{ storagePercent() | number:'1.0-0' }}%
+                  {{ storagePercent() | number: '1.0-0' }}%
                 </span>
               </div>
               <div class="gauge-bar">
                 <div
                   class="gauge-fill"
                   [style.width.%]="Math.min(storagePercent(), 100)"
-                  [style.background]="storageColor()">
-                </div>
+                  [style.background]="storageColor()"
+                ></div>
               </div>
               <span class="gauge-detail">
                 {{ formatBytesHelper(account()?.storageBytes ?? 0) }} /
@@ -127,19 +143,19 @@ const AGENCY_STEPS: PipelineStep[] = [
               <div class="gauge-header">
                 <span class="gauge-label">Daily Queries</span>
                 <span class="gauge-value" [style.color]="queriesColor()">
-                  {{ queriesPercent() | number:'1.0-0' }}%
+                  {{ queriesPercent() | number: '1.0-0' }}%
                 </span>
               </div>
               <div class="gauge-bar">
                 <div
                   class="gauge-fill"
                   [style.width.%]="Math.min(queriesPercent(), 100)"
-                  [style.background]="queriesColor()">
-                </div>
+                  [style.background]="queriesColor()"
+                ></div>
               </div>
               <span class="gauge-detail">
-                {{ account()?.projectionQueries | number }} /
-                {{ account()?.dailyQueryLimit | number }} queries
+                {{ $safeNavigationMigration(account()?.projectionQueries) | number }} /
+                {{ $safeNavigationMigration(account()?.dailyQueryLimit) | number }} queries
               </span>
             </div>
 
@@ -148,15 +164,15 @@ const AGENCY_STEPS: PipelineStep[] = [
               <div class="gauge-header">
                 <span class="gauge-label">Daily Bandwidth</span>
                 <span class="gauge-value" [style.color]="bandwidthColor()">
-                  {{ bandwidthPercent() | number:'1.0-0' }}%
+                  {{ bandwidthPercent() | number: '1.0-0' }}%
                 </span>
               </div>
               <div class="gauge-bar">
                 <div
                   class="gauge-fill"
                   [style.width.%]="Math.min(bandwidthPercent(), 100)"
-                  [style.background]="bandwidthColor()">
-                </div>
+                  [style.background]="bandwidthColor()"
+                ></div>
               </div>
               <span class="gauge-detail">
                 {{ formatBytesHelper(account()?.bandwidthBytes ?? 0) }} /
@@ -172,7 +188,11 @@ const AGENCY_STEPS: PipelineStep[] = [
           <p class="pipeline-subtitle">Your journey from hosted human to steward</p>
           <div class="pipeline-stepper">
             @for (step of agencySteps; track step.key; let i = $index) {
-              <div class="step" [class.completed]="isStepCompleted(step.key)" [class.current]="isCurrentStep(step.key)">
+              <div
+                class="step"
+                [class.completed]="isStepCompleted(step.key)"
+                [class.current]="isCurrentStep(step.key)"
+              >
                 <div class="step-marker">
                   @if (isStepCompleted(step.key)) {
                     <span class="check">&#10003;</span>
@@ -205,7 +225,9 @@ const AGENCY_STEPS: PipelineStep[] = [
                   Active hosted account
                 </li>
                 <li [class.met]="account()?.keyExported">
-                  <span class="req-check">{{ account()?.keyExported ? '&#10003;' : '&#10007;' }}</span>
+                  <span class="req-check">
+                    {{ account()?.keyExported ? '&#10003;' : '&#10007;' }}
+                  </span>
                   Export cryptographic keys
                 </li>
                 <li [class.met]="runsOwnConductor()">
@@ -235,6 +257,7 @@ const AGENCY_STEPS: PipelineStep[] = [
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './doorway-account.component.css',
 })
 export class DoorwayAccountComponent implements OnInit {
@@ -318,11 +341,16 @@ export class DoorwayAccountComponent implements OnInit {
     const acct = this.account();
     if (!acct) return false;
     switch (step) {
-      case 'hosted': return true;
-      case 'key_export': return acct.keyExported;
-      case 'install_app': return this.runsOwnConductor();
-      case 'steward': return acct.isSteward;
-      default: return false;
+      case 'hosted':
+        return true;
+      case 'key_export':
+        return acct.keyExported;
+      case 'install_app':
+        return this.runsOwnConductor();
+      case 'steward':
+        return acct.isSteward;
+      default:
+        return false;
     }
   }
 

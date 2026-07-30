@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 
 import { EprRelationshipCardComponent } from '@app/elohim/components/epr-relationship-card/epr-relationship-card.component';
 
@@ -16,6 +16,7 @@ interface WayIn {
   selector: 'app-learning-success',
   imports: [EprRelationshipCardComponent],
   templateUrl: './learning-success.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './learning-success.component.css',
 })
 export class LearningSuccessComponent {

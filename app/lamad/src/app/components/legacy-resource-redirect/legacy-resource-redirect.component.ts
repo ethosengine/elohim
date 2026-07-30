@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
 import { ILamadEprNav, LAMAD_EPR_NAV } from '../../interfaces/cross-pillar.interface';
@@ -13,6 +13,7 @@ import { ILamadEprNav, LAMAD_EPR_NAV } from '../../interfaces/cross-pillar.inter
 @Component({
   selector: 'app-legacy-resource-redirect',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: '',
 })
 export class LegacyResourceRedirectComponent implements OnInit {

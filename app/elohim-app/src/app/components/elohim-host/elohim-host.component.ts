@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -6,6 +6,7 @@ import { Component } from '@angular/core';
   selector: 'app-elohim-host',
   imports: [],
   templateUrl: './elohim-host.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './elohim-host.component.css',
 })
 export class ElohimHostComponent {}

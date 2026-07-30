@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
 
 /**
  * ContextMenuOnlyComponent - Level 0 Governance Surface
@@ -46,6 +46,7 @@ import { Component, input, output } from '@angular/core';
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .context-menu-wrapper {
       position: relative;

@@ -5,7 +5,14 @@
  * Registered -> Hosted -> Graduating -> Steward
  */
 
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  signal,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DoorwayAdminService } from '../../../services/doorway-admin.service';
 import {
@@ -54,7 +61,8 @@ interface FunnelStage {
                 <div
                   class="funnel-bar"
                   [style.width.%]="stage.widthPercent"
-                  [style.background]="stage.color">
+                  [style.background]="stage.color"
+                >
                   <span class="funnel-count">{{ stage.count }}</span>
                 </div>
               </div>
@@ -70,7 +78,7 @@ interface FunnelStage {
             <div class="conversion-grid">
               @for (conv of conversions(); track conv.label) {
                 <div class="conversion-item">
-                  <span class="conv-value">{{ conv.rate | number:'1.1-1' }}%</span>
+                  <span class="conv-value">{{ conv.rate | number: '1.1-1' }}%</span>
                   <span class="conv-label">{{ conv.label }}</span>
                 </div>
               }
@@ -80,6 +88,7 @@ interface FunnelStage {
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './pipeline-tab.component.css',
 })
 export class PipelineTabComponent implements OnInit {
@@ -112,7 +121,7 @@ export class PipelineTabComponent implements OnInit {
   readonly conversions = computed(() => {
     const p = this.pipeline();
     if (!p) return [];
-    const safe = (a: number, b: number) => b > 0 ? (a / b) * 100 : 0;
+    const safe = (a: number, b: number) => (b > 0 ? (a / b) * 100 : 0);
     return [
       { label: 'Registered to Hosted', rate: safe(p.hosted, p.registered) },
       { label: 'Hosted to Graduating', rate: safe(p.graduating, p.hosted) },

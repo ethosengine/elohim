@@ -1,5 +1,5 @@
 import { CommonModule, DatePipe, SlicePipe } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 
 import { AccountService } from '../../../services/account.service';
 
@@ -7,6 +7,7 @@ import { AccountService } from '../../../services/account.service';
   selector: 'app-key-list',
   standalone: true,
   imports: [CommonModule, DatePipe, SlicePipe],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './key-list.component.html',
 })
 export class KeyListComponent {

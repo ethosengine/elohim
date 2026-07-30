@@ -13,7 +13,15 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal, computed, input } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  signal,
+  computed,
+  input,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 
@@ -48,6 +56,7 @@ type PolicyTab = 'content' | 'time' | 'features' | 'monitoring';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './policy-console.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./policy-console.component.css'],
 })
 export class PolicyConsoleComponent implements OnInit {

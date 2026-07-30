@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, Inject, OnInit, OnDestroy } from '@angular/core';
+import {
+  Component,
+  inject,
+  Inject,
+  OnInit,
+  OnDestroy,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)
@@ -40,6 +47,7 @@ interface ContentNodeWithAffinity extends ContentNode {
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './meaning-map.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./meaning-map.component.css'],
 })
 export class MeaningMapComponent implements OnInit, OnDestroy {
@@ -56,7 +64,8 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly dataLoader: DataLoaderService,
-    @Inject(LAMAD_AFFINITY_TRACKING) private readonly affinityService: ILamadAffinityTracking,
+    @Inject(LAMAD_AFFINITY_TRACKING)
+    private readonly affinityService: ILamadAffinityTracking
   ) {}
 
   ngOnInit(): void {

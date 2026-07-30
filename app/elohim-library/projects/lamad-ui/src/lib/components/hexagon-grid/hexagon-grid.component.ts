@@ -11,6 +11,7 @@ import {
   AfterViewInit,
   OnDestroy,
   NgZone,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 
 import { HexAnimationLoop } from './hexagon-grid.animation';
@@ -34,6 +35,7 @@ export type { HexNode } from './hexagon-grid.model';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './hexagon-grid.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./hexagon-grid.component.css'],
 })
 export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy {

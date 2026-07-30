@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)
@@ -20,6 +20,7 @@ import { SeoService } from '../../shared/services/seo.service';
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './lamad-not-found.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './lamad-not-found.component.css',
 })
 export class LamadNotFoundComponent implements OnInit {

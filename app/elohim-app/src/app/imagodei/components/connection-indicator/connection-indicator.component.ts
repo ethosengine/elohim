@@ -10,7 +10,15 @@
 
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  OnInit,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { catchError, of, switchMap, timer } from 'rxjs';
@@ -45,6 +53,7 @@ export interface ConnectionStatus {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './connection-indicator.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./connection-indicator.component.css'],
 })
 export class ConnectionIndicatorComponent implements OnInit {

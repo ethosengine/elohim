@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
 
 import type { LensDefinition } from '@app/shefa/models';
 
@@ -23,6 +23,7 @@ import type { LensDefinition } from '@app/shefa/models';
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .lens-switcher {
       display: flex;

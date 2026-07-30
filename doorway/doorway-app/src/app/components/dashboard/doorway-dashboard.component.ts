@@ -1,4 +1,12 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  inject,
+  signal,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { ConfirmDialogService } from '../../core/notifications/confirm-dialog.service';
@@ -49,6 +57,7 @@ type UserSortField = 'identifier' | 'permissionLevel' | 'isActive' | 'storagePer
     TopologyTabComponent,
   ],
   templateUrl: './doorway-dashboard.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './doorway-dashboard.component.scss',
 })
 export class DoorwayDashboardComponent implements OnInit, OnDestroy {
@@ -156,9 +165,7 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
     });
   });
 
-  readonly healthyCount = computed(() =>
-    this.nodes().filter(n => n.status === 'online').length
-  );
+  readonly healthyCount = computed(() => this.nodes().filter(n => n.status === 'online').length);
 
   readonly totalCapacity = computed(() => {
     const c = this.cluster();
@@ -225,7 +232,7 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
       | 'pipeline'
       | 'federation'
       | 'graduation'
-      | 'topology',
+      | 'topology'
   ): void {
     this.activeTab.set(tab);
     // Load users when switching to users tab
@@ -236,7 +243,7 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
 
   setSort(field: SortField): void {
     if (this.sortField() === field) {
-      this.sortDirection.update(d => d === 'asc' ? 'desc' : 'asc');
+      this.sortDirection.update(d => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       this.sortField.set(field);
       this.sortDirection.set('desc');
@@ -295,7 +302,7 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
 
   setUserSort(field: UserSortField): void {
     if (this.userSortField() === field) {
-      this.userSortDir.update(d => d === 'asc' ? 'desc' : 'asc');
+      this.userSortDir.update(d => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       this.userSortField.set(field);
       this.userSortDir.set('desc');
@@ -359,7 +366,11 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
   }
 
   async forceUserLogout(userId: string): Promise<void> {
-    if (await this.confirmDialog.confirm('This will invalidate all active sessions for this user. Continue?')) {
+    if (
+      await this.confirmDialog.confirm(
+        'This will invalidate all active sessions for this user. Continue?'
+      )
+    ) {
       const result = await this.adminService.forceLogout(userId).toPromise();
       if (result?.success) {
         this.notify.success('User has been logged out from all sessions.');
@@ -373,7 +384,11 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
   }
 
   async deleteUser(userId: string): Promise<void> {
-    if (await this.confirmDialog.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+    if (
+      await this.confirmDialog.confirm(
+        'Are you sure you want to delete this user? This action cannot be undone.'
+      )
+    ) {
       const result = await this.adminService.deleteUser(userId).toPromise();
       if (result?.success) {
         this.notify.success('User deleted');

@@ -27,6 +27,7 @@ import {
   OnInit,
   ViewChild,
   inject,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import type { AuthorityResolution } from 'elohim-imagodei';
@@ -48,6 +49,7 @@ type Step = 'resolve' | 'login';
   imports: [CommonModule, RouterModule],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './login.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./login.component.css'],
 })
 export class LoginComponent implements OnInit, AfterViewInit {
@@ -132,7 +134,8 @@ export class LoginComponent implements OnInit, AfterViewInit {
       const data = (await resp.json()) as Record<string, unknown>;
       const authorityData = (data['authority'] as Record<string, string> | undefined) ?? {};
       this.authority = {
-        trustMode: (data['trustMode'] as AuthorityResolution['trustMode'] | undefined) ?? 'doorway-host',
+        trustMode:
+          (data['trustMode'] as AuthorityResolution['trustMode'] | undefined) ?? 'doorway-host',
         authority: {
           label: (authorityData['label'] as string | undefined) ?? '',
           id: authorityData['id'] as string | undefined,

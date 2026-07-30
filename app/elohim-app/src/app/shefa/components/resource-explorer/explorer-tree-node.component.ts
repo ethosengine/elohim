@@ -1,4 +1,12 @@
-import { Component, forwardRef, input, output, signal, inject } from '@angular/core';
+import {
+  Component,
+  forwardRef,
+  input,
+  output,
+  signal,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { LensRegistryService } from '@app/elohim/services/lens-registry.service';
 
@@ -43,6 +51,7 @@ import type { ExplorerNode } from '@app/shefa/models';
       }
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     :host {
       display: block;

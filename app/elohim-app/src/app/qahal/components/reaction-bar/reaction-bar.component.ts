@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject, input } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  inject,
+  input,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { Subject, takeUntil } from 'rxjs';
 
@@ -118,6 +125,7 @@ import type { RecordSignalInputView, GovernanceSignalView } from '@elohim/storag
       </div>
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .reaction-bar {
