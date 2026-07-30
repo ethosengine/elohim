@@ -1629,7 +1629,7 @@ async fn handle_login(
         return generate_auth_response(
             &jwt,
             &state,
-            &format!("human-{}", &body.identifier),
+            &format!("human-{}", body.identifier),
             "uhCAk-dev-mode-agent-key",
             &body.identifier,
             Some(dev_session_id),

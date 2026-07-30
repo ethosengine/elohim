@@ -19,7 +19,44 @@
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use tracing::{info, warn};
+
+/// Count DISTINCT hosted installs per conductor from `(conductor_id, app_id)` pairs.
+///
+/// # Why `app_id` and not the agent key
+///
+/// The registry deliberately holds **two keys per discovered agent** — the same
+/// `AgentPubKey` under base64-STANDARD (the provisioner's format) and under
+/// base64-URL-SAFE-NO-PAD (Holochain's display format), so a JWT in either
+/// encoding routes. Counting agent keys therefore double-counts every discovered
+/// agent. Both encodings of one agent share a single `installed_app_id`, and the
+/// provisioner mints a deterministic per-user app id
+/// (`generate_app_id(app_id, conductor_id, user_identifier)`), so `app_id` is the
+/// per-install unique proxy for "one hosted human."
+///
+/// # Known undercount
+///
+/// `load_from_db` coerces a legacy Mongo row with no `app_id` field to the bare
+/// `"elohim"` default, so several such rows on one conductor collapse to a single
+/// count. The seeded count is therefore a floor, never an overcount — it can only
+/// make the cap more permissive, never spuriously refuse provisioning.
+pub fn count_distinct_installs_by_conductor<I>(pairs: I) -> HashMap<String, usize>
+where
+    I: IntoIterator<Item = (String, String)>,
+{
+    let mut seen: HashSet<(String, String)> = HashSet::new();
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for (conductor_id, app_id) in pairs {
+        if conductor_id.is_empty() {
+            continue;
+        }
+        if seen.insert((conductor_id.clone(), app_id)) {
+            *counts.entry(conductor_id).or_insert(0) += 1;
+        }
+    }
+    counts
+}
 
 /// Registry of conductors and agent→conductor mappings
 pub struct ConductorRegistry {
@@ -130,6 +167,48 @@ impl ConductorRegistry {
             "Registered conductor in pool"
         );
         self.conductors.insert(info.conductor_id.clone(), info);
+    }
+
+    /// Re-seed every registered conductor's `capacity_used` from the persisted
+    /// agent mappings. Returns the seeded `(conductor_id, count)` pairs, sorted.
+    ///
+    /// # Why this is required for the cap to bite
+    ///
+    /// `register_conductor` hard-sets `capacity_used: 0`, and `load_from_db`
+    /// restores agent→conductor mappings WITHOUT touching capacity. Without this
+    /// seed, `capacity_used` counts only agents newly registered during the
+    /// current process lifetime — a doorway that restarts several times a day
+    /// would never observe its true hosted population, and
+    /// `DOORWAY_MAX_AGENTS_PER_CONDUCTOR` would degrade into "N new
+    /// registrations per process lifetime" rather than a population ceiling.
+    ///
+    /// # Call ordering
+    ///
+    /// Call ONCE at startup, AFTER the `register_conductor` loop (which would
+    /// otherwise reset the seeded value to 0) and BEFORE
+    /// `discover_existing_agents` (whose `register_agent` calls increment on top
+    /// of the seed). Conductors with no persisted agents are explicitly seeded to
+    /// 0 so a stale in-memory value can never survive a re-seed.
+    ///
+    /// Deduplicates via [`count_distinct_installs_by_conductor`] — see its docs
+    /// for why raw agent-key counts double-count.
+    pub fn seed_capacity_from_agents(&self) -> Vec<(String, usize)> {
+        let pairs: Vec<(String, String)> = self
+            .agents
+            .iter()
+            .map(|e| (e.value().conductor_id.clone(), e.value().app_id.clone()))
+            .collect();
+        let counts = count_distinct_installs_by_conductor(pairs);
+
+        let mut seeded: Vec<(String, usize)> = Vec::new();
+        for mut entry in self.conductors.iter_mut() {
+            let count = counts.get(entry.key()).copied().unwrap_or(0);
+            let conductor_id = entry.key().clone();
+            entry.value_mut().capacity_used = count;
+            seeded.push((conductor_id, count));
+        }
+        seeded.sort();
+        seeded
     }
 
     /// Register an agent→conductor mapping
@@ -448,5 +527,162 @@ mod tests {
         // Capacity should reflect all registrations
         let info = registry.get_conductor_info("conductor-0").unwrap();
         assert_eq!(info.capacity_used, 20);
+    }
+
+    // ---- capacity seeding (DOORWAY_MAX_AGENTS_PER_CONDUCTOR support) ----
+
+    fn pair(conductor: &str, app: &str) -> (String, String) {
+        (conductor.to_string(), app.to_string())
+    }
+
+    #[test]
+    fn distinct_installs_dedupes_dual_encoded_agent_keys() {
+        // The shape `discover_existing_agents` produces: ONE agent registered
+        // twice (base64-std + base64-url keys) sharing one installed_app_id.
+        let counts = count_distinct_installs_by_conductor(vec![
+            pair("conductor-0", "elohim-conductor-0-adam"),
+            pair("conductor-0", "elohim-conductor-0-adam"),
+            pair("conductor-0", "elohim-conductor-0-eve"),
+            pair("conductor-0", "elohim-conductor-0-eve"),
+        ]);
+        assert_eq!(
+            counts.get("conductor-0").copied(),
+            Some(2),
+            "two humans registered under two encodings each must count as 2, not 4"
+        );
+    }
+
+    #[test]
+    fn distinct_installs_partitions_by_conductor() {
+        let counts = count_distinct_installs_by_conductor(vec![
+            pair("conductor-0", "app-a"),
+            pair("conductor-0", "app-b"),
+            pair("conductor-1", "app-c"),
+            // Same app_id on a different conductor is a distinct install.
+            pair("conductor-1", "app-a"),
+        ]);
+        assert_eq!(counts.get("conductor-0").copied(), Some(2));
+        assert_eq!(counts.get("conductor-1").copied(), Some(2));
+        assert_eq!(counts.get("conductor-2").copied(), None);
+    }
+
+    #[test]
+    fn distinct_installs_handles_empty_and_legacy_rows() {
+        assert!(count_distinct_installs_by_conductor(vec![]).is_empty());
+
+        // Rows with no conductor_id are skipped entirely.
+        let counts = count_distinct_installs_by_conductor(vec![
+            pair("", "app-a"),
+            pair("conductor-0", "app-a"),
+        ]);
+        assert_eq!(counts.get("conductor-0").copied(), Some(1));
+        assert_eq!(counts.get("").copied(), None);
+
+        // Documented undercount: legacy rows coerced to the bare "elohim"
+        // app_id collapse to 1. Asserted so the floor-not-overcount property
+        // is a contract, not an accident.
+        let legacy = count_distinct_installs_by_conductor(vec![
+            pair("conductor-0", "elohim"),
+            pair("conductor-0", "elohim"),
+            pair("conductor-0", "elohim"),
+        ]);
+        assert_eq!(legacy.get("conductor-0").copied(), Some(1));
+    }
+
+    #[tokio::test]
+    async fn seed_capacity_counts_persisted_agents_not_process_lifetime() {
+        let registry = ConductorRegistry::new(None).await;
+
+        // Simulate load_from_db: agent mappings exist BEFORE any conductor is
+        // registered, and two encodings of one agent share one app_id.
+        for (key, app) in [
+            ("uhCAk_adam_std", "elohim-conductor-0-adam"),
+            ("uhCAk_adam_url", "elohim-conductor-0-adam"),
+            ("uhCAk_eve_std", "elohim-conductor-0-eve"),
+        ] {
+            registry
+                .register_agent(key, "conductor-0", app)
+                .await
+                .unwrap();
+        }
+
+        // register_conductor resets capacity_used to 0 — the bug the seed fixes.
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-0".to_string(),
+            conductor_url: "ws://c0:4445".to_string(),
+            admin_url: "ws://c0:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 32,
+        });
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-1".to_string(),
+            conductor_url: "ws://c1:4445".to_string(),
+            admin_url: "ws://c1:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 32,
+        });
+        assert_eq!(
+            registry
+                .get_conductor_info("conductor-0")
+                .unwrap()
+                .capacity_used,
+            0,
+            "precondition: register_conductor zeroes capacity_used"
+        );
+
+        let seeded = registry.seed_capacity_from_agents();
+        assert_eq!(
+            seeded,
+            vec![
+                ("conductor-0".to_string(), 2),
+                ("conductor-1".to_string(), 0)
+            ],
+            "2 distinct installs on conductor-0 (not 3 agent keys); conductor-1 seeded to 0"
+        );
+        assert_eq!(
+            registry
+                .get_conductor_info("conductor-0")
+                .unwrap()
+                .capacity_used,
+            2
+        );
+        assert_eq!(
+            registry
+                .get_conductor_info("conductor-1")
+                .unwrap()
+                .capacity_used,
+            0
+        );
+    }
+
+    #[tokio::test]
+    async fn seeded_capacity_at_or_over_cap_refuses_further_growth() {
+        let registry = ConductorRegistry::new(None).await;
+        for i in 0..3u32 {
+            registry
+                .register_agent(
+                    &format!("uhCAk_h{i}"),
+                    "conductor-0",
+                    &format!("elohim-conductor-0-h{i}"),
+                )
+                .await
+                .unwrap();
+        }
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-0".to_string(),
+            conductor_url: "ws://c0:4445".to_string(),
+            admin_url: "ws://c0:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 3,
+        });
+        registry.seed_capacity_from_agents();
+
+        // This is the condition AgentProvisioner::provision_agent checks before
+        // installing a NEW app; at the seeded population it must be true.
+        let info = registry.find_least_loaded().unwrap();
+        assert!(
+            info.capacity_used >= info.capacity_max,
+            "a cap at the seeded population must gate further provisioning"
+        );
     }
 }

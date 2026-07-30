@@ -139,12 +139,8 @@ fn parse_requester_identity(
         let validator = if state.args.dev_mode {
             JwtValidator::new_dev()
         } else {
-            match &state.args.jwt_secret {
-                Some(secret) => {
-                    JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).ok()?
-                }
-                None => return None,
-            }
+            let secret = state.args.jwt_secret.as_ref()?;
+            JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).ok()?
         };
 
         let result = validator.verify_token(token);

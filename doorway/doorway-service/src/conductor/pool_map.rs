@@ -10,6 +10,7 @@
 use dashmap::DashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use tracing::warn;
 
 use crate::worker::{PoolMetrics, WorkerPool};
 
@@ -40,11 +41,77 @@ pub struct ConductorPoolStatus {
     pub pool_metrics: PoolMetrics,
 }
 
-/// Default maximum agents per conductor
-const DEFAULT_MAX_AGENTS_PER_CONDUCTOR: usize = 50;
+/// Default maximum agents per conductor (used when the env lever is unset or unparseable).
+pub const DEFAULT_MAX_AGENTS_PER_CONDUCTOR: usize = 50;
+
+/// Env lever overriding [`DEFAULT_MAX_AGENTS_PER_CONDUCTOR`] at startup.
+///
+/// # Why this lever exists
+///
+/// Kitsune2 budgets gossip **per space**, not per agent: a space runs one
+/// outbound initiate round at a time, and a single local agent still below its
+/// target storage arc holds the whole space in the slow initiate path. Every
+/// cell's storage arc resets to `Empty` on conductor start, so arc-convergence
+/// cost scales with the hosted-agent count while the convergence budget does
+/// not. Past roughly 30 hosted agents on one conductor, arc convergence stalls
+/// and the storage projection never reports `caught_up` (measured on the alpha
+/// apex doorway: 1 of ~35 agents converged in 14.5h). Capping provisioning is
+/// the operator's ceiling for that; see
+/// `genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md`.
+///
+/// # Semantics
+///
+/// - unset → [`DEFAULT_MAX_AGENTS_PER_CONDUCTOR`]
+/// - unparseable (non-numeric, negative) → [`DEFAULT_MAX_AGENTS_PER_CONDUCTOR`], logged at `warn!`
+/// - `0` → honored as a deliberate provisioning freeze (see [`parse_max_agents_per_conductor`])
+///
+/// Read ONCE at startup (`main.rs`) and threaded into both capacity gates —
+/// never read on a request path.
+pub const MAX_AGENTS_PER_CONDUCTOR_ENV: &str = "DOORWAY_MAX_AGENTS_PER_CONDUCTOR";
+
+/// Pure parse of the [`MAX_AGENTS_PER_CONDUCTOR_ENV`] value.
+///
+/// Split from the env read so it is testable without mutating process env
+/// (`set_var` in one test leaks into every other test in the binary).
+///
+/// A value of `0` is honored, not clamped: it is the operator's explicit
+/// "provision no new hosted agents on any conductor" freeze. Existing hosted
+/// agents are unaffected — `AgentProvisioner::provision_agent` short-circuits
+/// on `find_existing_app` BEFORE the capacity check, so a cap at or below the
+/// current population stops growth without evicting or locking out anyone.
+pub fn parse_max_agents_per_conductor(raw: Option<&str>) -> usize {
+    match raw.map(str::trim) {
+        None | Some("") => DEFAULT_MAX_AGENTS_PER_CONDUCTOR,
+        Some(v) => match v.parse::<usize>() {
+            Ok(n) => n,
+            Err(e) => {
+                warn!(
+                    env = MAX_AGENTS_PER_CONDUCTOR_ENV,
+                    value = %v,
+                    error = %e,
+                    default = DEFAULT_MAX_AGENTS_PER_CONDUCTOR,
+                    "Unparseable agent cap; falling back to default"
+                );
+                DEFAULT_MAX_AGENTS_PER_CONDUCTOR
+            }
+        },
+    }
+}
+
+/// Read the per-conductor agent cap from the environment.
+///
+/// Call this ONCE at startup and thread the result; do not call it per request.
+pub fn max_agents_per_conductor_from_env() -> usize {
+    parse_max_agents_per_conductor(std::env::var(MAX_AGENTS_PER_CONDUCTOR_ENV).ok().as_deref())
+}
 
 impl ConductorPoolMap {
-    /// Create a new pool map with a default fallback pool
+    /// Create a new pool map at the compiled-in default capacity.
+    ///
+    /// This ctor does NOT read the environment. Startup code that wants the
+    /// `DOORWAY_MAX_AGENTS_PER_CONDUCTOR` lever must use
+    /// [`ConductorPoolMap::with_capacity`] with
+    /// [`max_agents_per_conductor_from_env`].
     pub fn new(default_pool: Arc<WorkerPool>) -> Self {
         Self {
             pools: DashMap::new(),
@@ -118,7 +185,27 @@ impl ConductorPoolMap {
         counter.value().store(count, Ordering::Relaxed);
     }
 
-    /// Check if a conductor has capacity for more agents
+    /// Check if a conductor has capacity for more agents.
+    ///
+    /// # Behavior at the cap
+    ///
+    /// This gate governs **request routing**, not provisioning. When it returns
+    /// `false`, `ConductorRouter::route` logs a `warn!` and overflows the request
+    /// to the healthiest conductor with remaining capacity; if none has capacity
+    /// it keeps using the agent's assigned conductor (degrade, never drop). No
+    /// request is ever refused or panicked on by this gate.
+    ///
+    /// The **provisioning** gate is separate and lives in
+    /// `AgentProvisioner::provision_agent`, which compares
+    /// `ConductorInfo::capacity_used` against `ConductorInfo::capacity_max`
+    /// (seeded from the same env lever in `main.rs`). At the cap it returns a
+    /// clean `Err("Conductor {id} at capacity ({used}/{max})")` — never a panic —
+    /// which surfaces as `503 SERVICE_UNAVAILABLE` on the registration path
+    /// (`auth_routes`) and `500` with the same message on
+    /// `POST /admin/hosted-users`. Already-hosted agents are unaffected:
+    /// `provision_agent` returns early from `find_existing_app` before the
+    /// capacity check, so lowering the cap to the current population stops
+    /// growth without evicting or locking out an existing hosted human.
     pub fn has_capacity(&self, conductor_id: &str) -> bool {
         self.agent_count(conductor_id) < self.max_agents_per_conductor
     }
@@ -238,5 +325,62 @@ mod tests {
             .map(|c| c.value().load(Ordering::Relaxed) < max)
             .unwrap_or(false);
         assert!(!cond1_has_cap);
+    }
+
+    #[test]
+    fn max_agents_unset_uses_default() {
+        assert_eq!(
+            parse_max_agents_per_conductor(None),
+            DEFAULT_MAX_AGENTS_PER_CONDUCTOR
+        );
+        assert_eq!(
+            parse_max_agents_per_conductor(Some("")),
+            DEFAULT_MAX_AGENTS_PER_CONDUCTOR,
+            "empty string is treated as unset"
+        );
+        assert_eq!(
+            parse_max_agents_per_conductor(Some("   ")),
+            DEFAULT_MAX_AGENTS_PER_CONDUCTOR,
+            "whitespace-only is treated as unset"
+        );
+    }
+
+    #[test]
+    fn max_agents_valid_override_is_honored() {
+        assert_eq!(parse_max_agents_per_conductor(Some("32")), 32);
+        assert_eq!(
+            parse_max_agents_per_conductor(Some(" 32 ")),
+            32,
+            "surrounding whitespace (k8s env YAML) is tolerated"
+        );
+        assert_eq!(parse_max_agents_per_conductor(Some("200")), 200);
+        assert_eq!(
+            parse_max_agents_per_conductor(Some("0")),
+            0,
+            "0 is a deliberate provisioning freeze, not a parse failure"
+        );
+    }
+
+    #[test]
+    fn max_agents_invalid_falls_back_to_default() {
+        for bad in ["abc", "-1", "32.5", "1_000", "50 agents"] {
+            assert_eq!(
+                parse_max_agents_per_conductor(Some(bad)),
+                DEFAULT_MAX_AGENTS_PER_CONDUCTOR,
+                "{bad:?} should fall back to the default"
+            );
+        }
+    }
+
+    #[test]
+    fn max_agents_from_env_defaults_when_unset() {
+        // The lever is not set in the test environment; the env reader must
+        // agree with the pure parser's unset case.
+        if std::env::var(MAX_AGENTS_PER_CONDUCTOR_ENV).is_err() {
+            assert_eq!(
+                max_agents_per_conductor_from_env(),
+                DEFAULT_MAX_AGENTS_PER_CONDUCTOR
+            );
+        }
     }
 }

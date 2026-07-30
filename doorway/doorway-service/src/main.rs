@@ -9,7 +9,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use doorway::{
     conductor::{
-        ConductorInfo, ConductorPoolMap, ConductorRegistry, ConductorRouter, TypedAdminClient,
+        max_agents_per_conductor_from_env, ConductorInfo, ConductorPoolMap, ConductorRegistry,
+        ConductorRouter, TypedAdminClient, MAX_AGENTS_PER_CONDUCTOR_ENV,
     },
     config::Args,
     db::MongoClient,
@@ -365,6 +366,20 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     });
     let registry = ConductorRegistry::new(registry_collection).await;
 
+    // Hosted-agent ceiling, read ONCE at startup and threaded into BOTH capacity
+    // gates below (registry `capacity_max` = the provisioning gate; ConductorPoolMap
+    // = the request-routing/overflow gate). Kitsune2 budgets gossip per SPACE, so
+    // arc-convergence cost scales with the hosted-agent count while the convergence
+    // budget does not — past ~30 agents on one conductor, storage-arc convergence
+    // stalls and the projection never reports caught_up. This is the operator's
+    // ceiling on that; see genesis/data/timeline/backlog/
+    // self-heal-adam-projection-catchup-exhaustion-full-arc.md ("The real ceiling").
+    let max_agents_per_conductor = max_agents_per_conductor_from_env();
+    info!(
+        env = MAX_AGENTS_PER_CONDUCTOR_ENV,
+        max_agents_per_conductor, "Hosted-agent ceiling per conductor"
+    );
+
     // Register all conductors from config
     for (i, url) in conductor_urls.iter().enumerate() {
         let conductor_id = format!("conductor-{i}");
@@ -375,8 +390,29 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             conductor_url: url.clone(),
             admin_url,
             capacity_used: 0,
-            capacity_max: 50,
+            capacity_max: max_agents_per_conductor,
         });
+    }
+
+    // Seed capacity_used from the PERSISTED agent mappings (loaded from Mongo by
+    // ConductorRegistry::new above). Must run AFTER the register_conductor loop —
+    // which hard-sets capacity_used: 0 — and BEFORE discover_existing_agents,
+    // whose register_agent calls increment on top of this seed.
+    //
+    // Without this, capacity_used only ever counts agents registered during the
+    // CURRENT process lifetime, so the cap above would mean "N new registrations
+    // per boot" rather than a population ceiling — on a doorway that restarts
+    // several times a day that is effectively no cap at all. Counts DISTINCT
+    // app_ids, not agent keys: discover_existing_agents registers each agent
+    // under two base64 encodings, so raw key counts double.
+    for (conductor_id, seeded) in registry.seed_capacity_from_agents() {
+        info!(
+            conductor = %conductor_id,
+            capacity_used = seeded,
+            capacity_max = max_agents_per_conductor,
+            at_capacity = seeded >= max_agents_per_conductor,
+            "Seeded conductor capacity from persisted agent mappings"
+        );
     }
 
     // Discover existing agents on each conductor (populate registry for affinity routing)
@@ -398,7 +434,10 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     // Each conductor in CONDUCTOR_URLS gets its own pool of workers
     // Requires a default pool (always exists in production; absent only in dev mode without conductor)
     if let Some(ref default_pool) = state.pool {
-        let pool_map = ConductorPoolMap::new(Arc::clone(default_pool));
+        // Same ceiling as the registry above (DOORWAY_MAX_AGENTS_PER_CONDUCTOR),
+        // so the routing/overflow gate and the provisioning gate agree.
+        let pool_map =
+            ConductorPoolMap::with_capacity(Arc::clone(default_pool), max_agents_per_conductor);
 
         let mut pools_created = 0usize;
         for (i, url) in conductor_urls.iter().enumerate() {

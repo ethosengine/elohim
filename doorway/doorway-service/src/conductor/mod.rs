@@ -12,7 +12,10 @@ pub mod router;
 pub mod typed_admin;
 pub mod typed_app;
 
-pub use pool_map::{ConductorPoolMap, ConductorPoolStatus};
+pub use pool_map::{
+    max_agents_per_conductor_from_env, ConductorPoolMap, ConductorPoolStatus,
+    DEFAULT_MAX_AGENTS_PER_CONDUCTOR, MAX_AGENTS_PER_CONDUCTOR_ENV,
+};
 pub use provisioner::{AgentProvisioner, ProvisionedAgent};
 pub use registry::{ConductorEntry, ConductorInfo, ConductorRegistry};
 pub use router::ConductorRouter;

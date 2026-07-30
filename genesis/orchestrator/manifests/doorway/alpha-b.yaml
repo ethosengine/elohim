@@ -274,6 +274,25 @@ spec:
             # in-binary is 10000 if unset.
             - name: DOORWAY_ZOME_CALL_TIMEOUT_MS
               value: "10000"
+            # Hosted-agent ceiling per conductor. Kitsune2 budgets gossip per SPACE,
+            # not per agent: one outbound initiate round at a time, and a single local
+            # agent still below its target storage arc holds the whole space in the slow
+            # initiate path. Every cell's arc resets to Empty on conductor start, so
+            # arc-convergence cost scales with the hosted-agent count while the
+            # convergence budget does NOT. adam (this doorway's apex conductor) sat at
+            # ~35 hosted agents and converged exactly ONE agent's arc in 14.5h — the
+            # storage projection never reaches caught_up, and elohim.host serves 503
+            # {"status":"catching-up"} behind it. 32 ≈ the current population: it stops
+            # further growth WITHOUT evicting anyone (provision_agent short-circuits on
+            # find_existing_app before the capacity check, so already-hosted humans keep
+            # logging in; only NEW hosted-agent provisioning is refused, cleanly, with
+            # 503 on the registration path). Doorway-A (alpha.yaml) and the household
+            # edgenode template intentionally do NOT set this — they carry 1-2 agents
+            # and the in-binary default of 50 is correct there.
+            # See genesis/data/timeline/backlog/
+            #   self-heal-adam-projection-catchup-exhaustion-full-arc.md
+            - name: DOORWAY_MAX_AGENTS_PER_CONDUCTOR
+              value: "32"
             # DOORWAY_HEALTH_PORT (dedicated probe listener) intentionally LEFT
             # UNSET: that listener shares the main tokio runtime, so a killer probe
             # pointed at it would stay green during a PARTIAL wedge — defeating
