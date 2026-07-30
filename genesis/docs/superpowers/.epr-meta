@@ -11,6 +11,16 @@ rules:
     when: { write: "*.md", new: true }
     require-frontmatter: [id, status, cites]
     why: "No doc born without id + status + cites (the .epr-meta law)."
+  - id: ssr-doorway-boundary
+    class: ask
+    when: { write: "*ssr*.md", contains-any: ["doorway"], new: true }
+    dedupe-of: genesis/docs/superpowers/specs/2026-07-30-render-delivery-manifest-adapter-design.md
+    why: "Doorway is a projector, never a render dependency — the renderer is an optional feature of the peer runtime (storage `ssr` feature), and a zero-doorway mesh must retain full SSR delivery. The boundary is settled in the render-delivery adapter spec §3e; frame the serving side as 'serving peer' and cite that spec rather than re-deriving doorway-as-SSR-dependency."
+  - id: render-doorway-boundary
+    class: ask
+    when: { write: "*render*.md", contains-any: ["doorway"], new: true }
+    dedupe-of: genesis/docs/superpowers/specs/2026-07-30-render-delivery-manifest-adapter-design.md
+    why: "Doorway is a projector, never a render dependency — the renderer is an optional feature of the peer runtime (storage `ssr` feature), and a zero-doorway mesh must retain full SSR delivery. The boundary is settled in the render-delivery adapter spec §3e; frame the serving side as 'serving peer' and cite that spec rather than re-deriving doorway-as-SSR-dependency."
 validators: []
 max-cascade-depth: 8
 cites:
