@@ -132,9 +132,28 @@
     }
 
     const bodyBytes = new Uint8Array(response.body);
+
+    // Build the response Headers leniently: a real fetch() never throws
+    // because an upstream server sent a header name/value the strict
+    // Headers class (web_api.js's normalizeName/normalizeValue) would
+    // reject -- skip-with-best-effort per entry instead of failing the
+    // whole response. App-constructed `new Headers(...)` / `new Response(...,
+    // {headers})` stays fully strict; only this wire-ingestion loop is
+    // tolerant.
+    const responseHeaders = new Headers();
+    const rawHeaders = response.headers || {};
+    for (const name of Object.keys(rawHeaders)) {
+      try {
+        responseHeaders.append(name, rawHeaders[name]);
+      } catch (_ignored) {
+        // Drop the one header the wire sent that strict validation rejects
+        // rather than fail the whole response over it.
+      }
+    }
+
     return new Response(streamOfBytes(bodyBytes), {
       status: response.status,
-      headers: response.headers || {},
+      headers: responseHeaders,
       // The fetcher follows redirects opaquely and reports the requested URL,
       // so `redirected` is unknowable here -- absence over a fabricated value.
       url: url,

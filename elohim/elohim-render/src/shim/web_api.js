@@ -34,8 +34,13 @@
 //     no gain, since nothing in the render path does
 //     `signal instanceof EventTarget`.
 //   - `Headers` stores one combined value per lowercased name (comma-joined on
-//     append), which is what `HttpHeaders` re-splits anyway. `getSetCookie()`
-//     returns the split list; there is no separate set-cookie value list.
+//     append), which is what `HttpHeaders` re-splits anyway -- `get()` returns
+//     that joined form for every header, Set-Cookie included (compat). Set-
+//     Cookie is the one exception underneath: it also keeps a dedicated,
+//     never-joined value list (a Set-Cookie value can itself contain ", ",
+//     e.g. an Expires attribute, so comma-joining it is lossy), and
+//     `getSetCookie()` returns that list rather than re-splitting `get()`'s
+//     joined form.
 //   - `Response`'s constructor accepts non-spec `url` / `redirected` / `type`
 //     init keys so the fetch shim can report the fields FetchBackend reads.
 //     The spec builds those via `Response.error()` / internal fetch state,
@@ -56,7 +61,8 @@
   // and `new DOMException('Request timed out', 'TimeoutError')`; the fetch shim
   // constructs an 'AbortError'. The legacy numeric `code` is table-driven --
   // names outside the legacy table read 0, exactly as in a browser.
-  const LEGACY_CODES = {
+  const LEGACY_CODES = Object.create(null);
+  Object.assign(LEGACY_CODES, {
     IndexSizeError: 1,
     HierarchyRequestError: 3,
     WrongDocumentError: 4,
@@ -79,7 +85,7 @@
     TimeoutError: 23,
     InvalidNodeTypeError: 24,
     DataCloneError: 25,
-  };
+  });
 
   class DOMException extends Error {
     constructor(message, name) {
@@ -180,6 +186,13 @@
       if (handle && typeof handle.unref === "function") {
         handle.unref();
       }
+      // Defensive: if the signal ever settles through some other path before
+      // the timer fires, cancel the pending timer rather than leave it to
+      // fire uselessly later -- an isolate reused across renders (see
+      // src/shim/mod.rs) should not carry a stale pending timer forward.
+      signal.addEventListener("abort", () => {
+        globalThis.clearTimeout(handle);
+      });
       return signal;
     }
   }
@@ -204,17 +217,15 @@
         reportListenerError(e);
       }
     }
+    // `[SIGNAL_LISTENERS]` was already reset to `[]` above (abort is
+    // terminal -- there is no second abort to re-register a listener for),
+    // so every listener in `list` fires exactly once here regardless of its
+    // `once` flag; there is no re-registration branch to take.
     for (let i = 0; i < list.length; i++) {
       try {
         list[i].listener.call(signal, event);
       } catch (e) {
         reportListenerError(e);
-      }
-      if (!list[i].once) {
-        // Non-once listeners stay registered for a hypothetical second abort,
-        // which cannot happen (abort is terminal) -- kept for symmetry with
-        // removeEventListener semantics rather than re-added to the live list.
-        continue;
       }
     }
   }
@@ -266,22 +277,44 @@
     return n.toLowerCase();
   }
 
+  const FORBIDDEN_VALUE = /[\r\n\0]/;
+
   function normalizeValue(value) {
     // Strip leading/trailing HTTP whitespace, as the spec's normalize does.
-    return String(value === undefined || value === null ? "" : value).replace(
+    const trimmed = String(value === undefined || value === null ? "" : value).replace(
       /^[\t\n\r ]+|[\t\n\r ]+$/g,
       ""
     );
+    // Mirror normalizeName's strictness: a header value carrying a raw CR,
+    // LF, or NUL cannot be represented on the wire (CRLF is header-injection
+    // territory) and a real Headers.set()/append() rejects it.
+    if (FORBIDDEN_VALUE.test(trimmed)) {
+      throw new TypeError("Invalid header value: " + trimmed);
+    }
+    return trimmed;
   }
 
   class Headers {
     constructor(init) {
       this._map = new Map();
+      // Dedicated Set-Cookie list: unlike every other header, Set-Cookie
+      // values must never be comma-joined (an Expires attribute legitimately
+      // contains a comma, e.g. "Expires=Wed, 21 Oct ... GMT"), and a
+      // response can legitimately carry more than one. `_map` still carries
+      // a joined value under "set-cookie" for `get()` compat (see the header
+      // note); this list is the source of truth for `getSetCookie()`.
+      this._setCookies = [];
       if (init === undefined || init === null) {
         return;
       }
       if (init instanceof Headers) {
-        init.forEach((value, name) => this.append(name, value));
+        // Clone internal state directly rather than forEach+append: forEach
+        // yields one already-joined value per name, which would silently
+        // collapse a multi-value Set-Cookie list (and any other repeated
+        // header) down to a single re-split entry.
+        this._map = new Map(init._map);
+        this._setCookies = init._setCookies.slice();
+        return;
       } else if (Array.isArray(init)) {
         for (const pair of init) {
           if (!pair || pair.length !== 2) {
@@ -303,12 +336,20 @@
     append(name, value) {
       const key = normalizeName(name);
       const val = normalizeValue(value);
+      if (key === "set-cookie") {
+        this._setCookies.push(val);
+      }
       const existing = this._map.get(key);
       this._map.set(key, existing === undefined ? val : existing + ", " + val);
     }
 
     set(name, value) {
-      this._map.set(normalizeName(name), normalizeValue(value));
+      const key = normalizeName(name);
+      const val = normalizeValue(value);
+      if (key === "set-cookie") {
+        this._setCookies = [val];
+      }
+      this._map.set(key, val);
     }
 
     get(name) {
@@ -321,12 +362,18 @@
     }
 
     delete(name) {
-      this._map.delete(normalizeName(name));
+      const key = normalizeName(name);
+      if (key === "set-cookie") {
+        this._setCookies = [];
+      }
+      this._map.delete(key);
     }
 
     getSetCookie() {
-      const val = this._map.get("set-cookie");
-      return val === undefined ? [] : val.split(", ");
+      // The dedicated list (see the constructor note), never the comma-joined
+      // `_map` entry -- a Set-Cookie value can itself contain ", " (an
+      // Expires attribute), so re-splitting the joined form is lossy/wrong.
+      return this._setCookies.slice();
     }
 
     forEach(callback, thisArg) {
@@ -529,8 +576,19 @@
     }
     releaseLock() {
       const s = this._stream;
-      if (s._reader === this) {
-        s._reader = null;
+      if (s._reader !== this) {
+        return;
+      }
+      s._reader = null;
+      // Spec: releasing the lock while reads are outstanding rejects them
+      // with a TypeError rather than leaving them pending forever (nothing
+      // else can ever settle a read whose reader is no longer attached).
+      if (s._pendingReads.length > 0) {
+        const pending = s._pendingReads;
+        s._pendingReads = [];
+        for (const { reject } of pending) {
+          reject(new TypeError("The reader was released"));
+        }
       }
     }
   }
@@ -756,6 +814,17 @@
     };
   }
 
+  // A body that has been lazily materialized into a stream (see the `body`
+  // getter in defineBodyMixin: `_bodyBytes` cleared, `_bodyStream` set) has
+  // no buffered bytes left to hand a clone -- cloning it would need tee(),
+  // which this subset does not implement (see the file header). Silently
+  // building a copy with an empty body is worse than refusing outright.
+  function assertBodyCloneable(target) {
+    if (target._bodyBytes === null && target._bodyStream) {
+      throw new TypeError("cannot clone a stream-backed body");
+    }
+  }
+
   // --- Request ------------------------------------------------------------
   // The render path calls `fetch(urlString, init)`, so Request exists for
   // bundle code that constructs one (and for `fetch(request)`), not because
@@ -792,6 +861,7 @@
       return this._url;
     }
     clone() {
+      assertBodyCloneable(this);
       return new Request(this, { body: this._bodyBytes });
     }
   }
@@ -819,6 +889,11 @@
     504: "Gateway Timeout",
   };
 
+  // Statuses the spec forbids a body on: 101/103 are informational
+  // (Switching Protocols / Early Hints, no body by definition), 204/205 are
+  // No Content / Reset Content, 304 is Not Modified.
+  const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
+
   class Response {
     constructor(body, init) {
       const opts = init || {};
@@ -834,7 +909,7 @@
       this._redirected = !!opts.redirected;
       this._type = opts.type === undefined ? "default" : String(opts.type);
       this._bodyUsed = false;
-      bodyInit(this, this._status === 204 || this._status === 304 ? null : body);
+      bodyInit(this, NULL_BODY_STATUSES.has(this._status) ? null : body);
       if (this._bodyContentType && !this.headers.has("content-type")) {
         this.headers.set("content-type", this._bodyContentType);
       }
@@ -862,7 +937,9 @@
         throw new TypeError("Cannot clone a Response with a used body");
       }
       // Only a fully-buffered body can be cloned here; a stream-backed body
-      // would need tee(), which this subset does not implement.
+      // would need tee(), which this subset does not implement (see
+      // assertBodyCloneable).
+      assertBodyCloneable(this);
       const copy = new Response(this._bodyBytes, {
         status: this._status,
         statusText: this._statusText,
