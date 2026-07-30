@@ -5,7 +5,7 @@
  * Reads the challenge ID from the route and displays challenge details.
  */
 
-import { Component, inject, signal, type OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, type OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { GovernanceApiService } from '@elohim/service';
@@ -56,7 +56,6 @@ import type { ChallengeView } from '@elohim/storage-client/generated';
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .challenge-detail {
       padding: 1.5rem;

@@ -6,7 +6,6 @@ import {
   inject,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 
 // @coverage: 93.7% (2026-02-24)
@@ -39,7 +38,6 @@ type SortDirection = 'asc' | 'desc';
   standalone: true,
   imports: [CommonModule, DecimalPipe],
   templateUrl: './doorway-dashboard.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './doorway-dashboard.component.scss',
 })
 export class DoorwayDashboardComponent implements OnInit, OnDestroy {

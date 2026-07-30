@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 // @coverage: 4.3% (2026-02-24)
@@ -16,7 +16,6 @@ import {
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './profile-agency-section.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./profile-agency-section.component.css'],
 })
 export class ProfileAgencySectionComponent {

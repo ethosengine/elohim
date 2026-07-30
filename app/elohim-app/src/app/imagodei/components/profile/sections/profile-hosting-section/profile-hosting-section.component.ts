@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, input, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 
 // @coverage: 4.2% (2026-02-24)
 
@@ -20,7 +20,6 @@ export interface AgencyStep {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './profile-hosting-section.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./profile-hosting-section.component.css'],
 })
 export class ProfileHostingSectionComponent {

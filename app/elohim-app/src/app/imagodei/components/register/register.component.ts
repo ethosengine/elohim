@@ -15,7 +15,6 @@ import {
   inject,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
@@ -43,7 +42,6 @@ import { SessionMigrationService } from '../../services/session-migration.servic
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './register.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./register.component.css'],
 })
 export class RegisterComponent implements OnInit {

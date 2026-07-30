@@ -5,7 +5,6 @@ import {
   signal,
   computed,
   inject,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
@@ -196,7 +195,6 @@ const RECOGNITION_POINTS_UNIT = 'recognition-points';
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .shefa-dashboard {

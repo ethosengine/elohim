@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, input, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, inject, input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { GovernanceApiService } from '@elohim/service';
@@ -116,7 +116,6 @@ import type { StatementView, CreateStatementInputView } from '@elohim/storage-cl
       </div>
     </ng-template>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .contribute-loading,

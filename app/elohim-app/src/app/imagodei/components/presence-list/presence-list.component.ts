@@ -15,7 +15,6 @@ import {
   inject,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -38,7 +37,6 @@ type FilterState = 'all' | PresenceState;
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './presence-list.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./presence-list.component.css'],
 })
 export class PresenceListComponent implements OnInit {

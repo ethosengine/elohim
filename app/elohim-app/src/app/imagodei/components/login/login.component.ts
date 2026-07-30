@@ -27,7 +27,6 @@ import {
   OnInit,
   ViewChild,
   inject,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import type { AuthorityResolution } from 'elohim-imagodei';
@@ -49,7 +48,6 @@ type Step = 'resolve' | 'login';
   imports: [CommonModule, RouterModule],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './login.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./login.component.css'],
 })
 export class LoginComponent implements OnInit, AfterViewInit {

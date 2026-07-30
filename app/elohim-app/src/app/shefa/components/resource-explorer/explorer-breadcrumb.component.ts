@@ -1,4 +1,4 @@
-import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 
 import type { ExplorerBreadcrumb } from '@app/shefa/models';
 
@@ -19,7 +19,6 @@ import type { ExplorerBreadcrumb } from '@app/shefa/models';
       }
     </nav>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .breadcrumb-trail {
       display: flex;

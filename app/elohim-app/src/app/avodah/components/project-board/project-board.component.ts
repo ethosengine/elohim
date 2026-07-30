@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink, ActivatedRoute, Router } from '@angular/router';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
@@ -82,7 +82,6 @@ import { StoryCardComponent } from '../story-card/story-card.component';
       </main>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .board-shell {

@@ -16,7 +16,6 @@ import {
   inject,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
@@ -80,7 +79,6 @@ export type ProfileTab = 'identity' | 'network' | 'data';
     ProfileDataSectionComponent,
   ],
   templateUrl: './profile.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./profile.component.css'],
 })
 export class ProfileComponent implements OnInit, OnDestroy {

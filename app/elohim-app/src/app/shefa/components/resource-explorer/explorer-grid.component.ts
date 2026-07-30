@@ -1,4 +1,4 @@
-import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 
 import type { ExplorerNode } from '@app/shefa/models';
 
@@ -47,7 +47,6 @@ import type { ExplorerNode } from '@app/shefa/models';
       </section>
     }
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .empty-state {
       display: flex;

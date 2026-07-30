@@ -5,7 +5,6 @@ import {
   computed,
   inject,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -44,7 +43,6 @@ const PENDING = 'pending wire-up (sibling follow-on)';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './stability-lens.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './stability-lens.component.scss',
 })
 export class StabilityLensComponent implements OnInit {

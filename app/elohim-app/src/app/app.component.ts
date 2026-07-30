@@ -6,7 +6,6 @@ import {
   OnDestroy,
   inject,
   effect,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 
@@ -39,7 +38,6 @@ interface RetryConfig {
   selector: 'app-root',
   imports: [RouterOutlet, ThemeToggleComponent, CommonModule],
   templateUrl: './app.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './app.component.css',
 })
 export class AppComponent implements OnInit, OnDestroy {

@@ -24,7 +24,6 @@ import {
   input,
   signal,
   viewChild,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { Router } from '@angular/router';
 
@@ -137,7 +136,6 @@ import type { ChallengeView, ProposalView } from '@elohim/storage-client';
       <div class="gateway-loading">Loading governance...</div>
     }
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     :host {
       display: block;

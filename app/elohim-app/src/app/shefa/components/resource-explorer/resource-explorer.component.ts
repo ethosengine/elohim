@@ -5,7 +5,6 @@ import {
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -143,7 +142,6 @@ const ROOT_BREADCRUMB: ExplorerBreadcrumb = { id: null, title: 'My Resources' };
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './resource-explorer.component.css',
 })
 export class ResourceExplorerComponent implements OnInit {

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { DebugModeService } from '../services/debug-mode.service';
 import { DebugLens } from './debug.types';
 import { ConnectionLensComponent } from './lenses/connection-lens.component';
@@ -19,7 +19,6 @@ import { FlagsLensComponent } from './lenses/flags-lens.component';
   // CommonModule (for ngComponentOutlet/ngFor/ngIf) belongs here.
   imports: [CommonModule],
   templateUrl: './debug-shell.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './debug-shell.component.scss',
 })
 export class DebugShellComponent {

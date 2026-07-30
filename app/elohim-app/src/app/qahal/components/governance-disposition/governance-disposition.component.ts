@@ -14,7 +14,6 @@ import {
   OnInit,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 
 import { GovernanceApiService } from '@elohim/service';
@@ -166,7 +165,6 @@ import type {
       <div class="empty">No governance profile found.</div>
     }
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .disposition-card {
       max-width: 600px;

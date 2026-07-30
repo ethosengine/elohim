@@ -7,7 +7,7 @@
  * handles navigation to the override flow.
  */
 
-import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 
 import type { RankedVoteView } from '@elohim/storage-client/generated';
 
@@ -36,7 +36,6 @@ import type { RankedVoteView } from '@elohim/storage-client/generated';
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .proxy-notification-card {
       padding: 1rem 1.25rem;

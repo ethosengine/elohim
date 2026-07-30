@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { DebugContextService } from '../../elohim/services/debug-context.service';
 import { environment } from '../../../environments/environment';
 
@@ -28,7 +28,6 @@ import { environment } from '../../../environments/environment';
       <dd>{{ gitHash }}</dd>
     </dl>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .debug-kv {

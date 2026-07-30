@@ -20,7 +20,6 @@ import {
   computed,
   input,
   output,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
@@ -73,7 +72,6 @@ const APPEAL_GROUNDS: Record<AppealType, string[]> = {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './appeal-wizard.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./appeal-wizard.component.css'],
 })
 export class AppealWizardComponent implements OnInit {

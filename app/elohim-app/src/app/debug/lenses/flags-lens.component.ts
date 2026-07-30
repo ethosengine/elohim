@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component } from '@angular/core';
 
 import { environment } from '../../../environments/environment';
 
@@ -24,7 +24,6 @@ import { environment } from '../../../environments/environment';
       in every environment build.
     </p>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .debug-kv {

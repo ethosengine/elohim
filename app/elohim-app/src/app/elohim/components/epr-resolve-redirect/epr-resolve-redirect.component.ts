@@ -9,7 +9,7 @@
  * Everything else (context-aware resolution, popover inspection) is our polyfill.
  */
 
-import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { parseEpr, eprToRoute, BUNDLE_ROUTE_CONTEXT } from '@elohim/service';
@@ -17,7 +17,6 @@ import { parseEpr, eprToRoute, BUNDLE_ROUTE_CONTEXT } from '@elohim/service';
 @Component({
   selector: 'app-epr-resolve-redirect',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
   template: '<p>Resolving...</p>',
 })
 export class EprResolveRedirectComponent implements OnInit {

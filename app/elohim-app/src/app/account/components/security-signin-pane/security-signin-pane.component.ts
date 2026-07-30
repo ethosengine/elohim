@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject } from '@angular/core';
 
 import { AccountService } from '../../services/account.service';
 import { HandoffService } from '../../services/handoff.service';
@@ -24,7 +24,6 @@ const OAUTH_PASSTHROUGH_PARAMS = ['client_id', 'redirect_uri', 'response_type', 
     LostKeyEntryComponent,
   ],
   templateUrl: './security-signin-pane.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './security-signin-pane.component.css',
 })
 export class SecuritySigninPaneComponent {

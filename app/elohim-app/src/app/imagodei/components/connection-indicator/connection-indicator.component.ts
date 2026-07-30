@@ -17,7 +17,6 @@ import {
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -53,7 +52,6 @@ export interface ConnectionStatus {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './connection-indicator.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./connection-indicator.component.css'],
 })
 export class ConnectionIndicatorComponent implements OnInit {

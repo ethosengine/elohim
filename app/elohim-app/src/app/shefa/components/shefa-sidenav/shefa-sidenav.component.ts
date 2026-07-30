@@ -1,4 +1,4 @@
-import { Component, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, output } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
 // @coverage: 100.0% (2026-03-03)
@@ -103,7 +103,6 @@ export const SHEFA_NAV_GROUPS: NavGroup[] = [
       </button>
     </aside>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .shefa-sidenav {

@@ -19,7 +19,6 @@ import {
   inject,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
@@ -48,7 +47,6 @@ interface AllocationDisplay {
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './stewardship-dashboard.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./stewardship-dashboard.component.css'],
 })
 export class StewardshipDashboardComponent implements OnInit {

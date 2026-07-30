@@ -17,7 +17,6 @@ import {
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -92,7 +91,6 @@ import type { SensemakingResultView, StatementView } from '@elohim/storage-clien
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .sensemaking-page {
       max-width: 800px;

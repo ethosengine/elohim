@@ -22,7 +22,6 @@ import {
   inject,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
@@ -54,7 +53,6 @@ interface RestrictionItem {
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './capabilities-dashboard.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./capabilities-dashboard.component.css'],
 })
 export class CapabilitiesDashboardComponent implements OnInit, OnDestroy {

@@ -5,7 +5,6 @@ import {
   computed,
   inject,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
@@ -361,7 +360,6 @@ import type { LamadPointTrigger } from '@app/lamad/models/learning-points.model'
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .device-stewardship {

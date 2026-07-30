@@ -8,7 +8,6 @@ import {
   ViewChild,
   ViewContainerRef,
   inject,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 
@@ -53,7 +52,6 @@ interface OmnibarSteward {
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './content-delivery.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./content-delivery.component.css'],
 })
 export class ContentDeliveryComponent implements OnInit, OnDestroy, AfterViewChecked {

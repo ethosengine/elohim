@@ -13,7 +13,6 @@ import {
   input,
   output,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -82,7 +81,6 @@ const APPEAL_GROUNDS_OPTIONS = [
       </button>
     </form>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     :host {
       display: block;

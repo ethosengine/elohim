@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component } from '@angular/core';
 
 import { HealthIndicatorComponent } from '../../elohim/components/health-indicator/health-indicator.component';
 
@@ -8,7 +8,6 @@ import { HealthIndicatorComponent } from '../../elohim/components/health-indicat
   selector: 'app-health-lens',
   standalone: true,
   imports: [HealthIndicatorComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <app-health-indicator />
   `,

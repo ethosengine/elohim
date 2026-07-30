@@ -7,7 +7,7 @@
  * UI so the human can cast their own vote.
  */
 
-import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { GovernanceApiService } from '@elohim/service';
@@ -48,7 +48,6 @@ interface ProxyVoteEntry {
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .proxy-vote-list {
       max-width: 600px;

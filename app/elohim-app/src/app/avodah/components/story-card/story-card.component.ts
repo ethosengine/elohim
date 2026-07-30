@@ -1,4 +1,4 @@
-import { Component, computed, input, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
 
@@ -70,7 +70,6 @@ import { parseWorkStoryMeta, type WorkStoryMeta } from '../../models/work-story.
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .story-card {

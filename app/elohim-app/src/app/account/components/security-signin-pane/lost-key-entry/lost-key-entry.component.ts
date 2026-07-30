@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { AccountService } from '../../../services/account.service';
@@ -8,7 +8,6 @@ import { AccountService } from '../../../services/account.service';
   selector: 'app-lost-key-entry',
   standalone: true,
   imports: [CommonModule],
-  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './lost-key-entry.component.html',
 })
 export class LostKeyEntryComponent {

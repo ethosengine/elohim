@@ -6,7 +6,6 @@ import {
   OnChanges,
   Output,
   SimpleChanges,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 
 /**
@@ -42,7 +41,6 @@ import {
       }
     </button>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .face-card {

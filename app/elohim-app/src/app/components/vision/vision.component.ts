@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component } from '@angular/core';
 
 import { EprRelationshipCardComponent } from '@app/elohim/components/epr-relationship-card/epr-relationship-card.component';
 
@@ -8,7 +8,6 @@ import type { EprRelationship } from '@app/elohim/models/epr-head.model';
   selector: 'app-vision',
   imports: [EprRelationshipCardComponent],
   templateUrl: './vision.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './vision.component.css',
 })
 export class VisionComponent {

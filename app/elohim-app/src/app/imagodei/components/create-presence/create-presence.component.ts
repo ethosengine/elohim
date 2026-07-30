@@ -19,7 +19,6 @@ import {
   signal,
   computed,
   output,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -50,7 +49,6 @@ interface IdentifierEntry {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './create-presence.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./create-presence.component.css'],
 })
 export class CreatePresenceComponent {

@@ -25,7 +25,6 @@ import {
   EventEmitter,
   TemplateRef,
   OnInit,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 
 // @coverage: 38.8% (2026-02-24)
@@ -75,7 +74,6 @@ export interface AlertData {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './alert-banner.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./alert-banner.component.scss'],
 })
 export class AlertBannerComponent implements OnInit {

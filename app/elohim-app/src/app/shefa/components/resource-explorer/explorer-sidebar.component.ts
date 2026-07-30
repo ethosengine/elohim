@@ -1,4 +1,4 @@
-import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 
 import { ExplorerTreeNodeComponent } from './explorer-tree-node.component';
 
@@ -44,7 +44,6 @@ import type { ExplorerNode, LensDefinition } from '@app/shefa/models';
       </button>
     </aside>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
     .explorer-sidebar {
       width: 260px;

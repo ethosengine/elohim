@@ -7,7 +7,6 @@ import {
   Output,
   inject,
   input,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -153,7 +152,6 @@ import type { RecordSignalInputView, GovernanceSignalView } from '@elohim/storag
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .graduated-feedback {

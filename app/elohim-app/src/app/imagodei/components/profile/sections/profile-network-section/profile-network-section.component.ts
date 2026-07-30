@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 
 // @coverage: 7.7% (2026-02-24)
 
@@ -12,7 +12,6 @@ import { type AgencyState, type ConnectionStatus } from '../../../../models/agen
   standalone: true,
   imports: [CommonModule],
   templateUrl: './profile-network-section.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./profile-network-section.component.css'],
 })
 export class ProfileNetworkSectionComponent {

@@ -6,7 +6,6 @@ import {
   computed,
   inject,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { Router } from '@angular/router';
 
@@ -159,7 +158,6 @@ interface ListResponse<T> {
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .directory {

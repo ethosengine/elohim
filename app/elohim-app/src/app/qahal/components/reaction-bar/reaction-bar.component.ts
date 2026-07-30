@@ -5,7 +5,6 @@ import {
   OnInit,
   inject,
   input,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 
 import { Subject, takeUntil } from 'rxjs';
@@ -125,7 +124,6 @@ import type { RecordSignalInputView, GovernanceSignalView } from '@elohim/storag
       </div>
     }
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .reaction-bar {
