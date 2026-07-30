@@ -136,7 +136,11 @@ url = "2"  # Query string parsing for HTTP sync API
 
 # CID (Content Identifiers) - IPFS-compatible content addressing
 cid = "0.11"
-multihash-codetable = { version = "0.1", features = ["sha2"] }
+# multihash-codetable 0.2 (not 0.1): every published `core2` version — 0.0.0
+# through 0.4.0 — is YANKED, and codetable 0.1.x hard-depends on `core2 ^0.4.0`.
+# 0.2.x replaced it with `no_std_io2`. This also unifies with elohim-epr, which
+# already declares 0.2, and drops the duplicate digest/sha2/sha3/keccak 0.10 tree.
+multihash-codetable = { version = "0.2", features = ["sha2"] }
 
 # IPLD codecs for EPR Head serialization (versions match rust-ipfs workspace)
 serde_ipld_dagcbor = "0.6.3"
@@ -181,9 +185,12 @@ libc = "0.2"
 
 # Prometheus app-metrics surface — durable /metrics exposition for the
 # design-decision toolkit (memory-attribution gauges, identity-namespace
-# violation counter, RCA instruments). Composes elohim-bitswap's prometheus 0.13
+# violation counter, RCA instruments). Matches elohim-bitswap's prometheus 0.14
 # + lazy_static idiom; src/metrics.rs registers everything into one Registry.
-prometheus = "0.13"
+# 0.14 (not 0.13): prometheus 0.13 pins `protobuf ^2.0`, which resolves the
+# unmaintained protobuf 2.28.0; 0.14 requires `protobuf ^3.7.2` (the advisory
+# fix line). elohim-bitswap is already on 0.14, so this converges the two.
+prometheus = "0.14"
 lazy_static = "1"
 
 # Error handling
