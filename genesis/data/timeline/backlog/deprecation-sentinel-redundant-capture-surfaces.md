@@ -12,7 +12,7 @@ priority: "high"
 deprecation_status: blocked
 severity: medium
 fingerprints: []
-evidence_fingerprints: ["bba59aabdf63", "b1561f3d429d", "9d31ba938515", "010ff5a7bfb5"]
+evidence_fingerprints: ["bba59aabdf63", "b1561f3d429d", "9d31ba938515", "010ff5a7bfb5", "fb31d99a0ba8"]
 relatedNodeIds: []
 tags: [deprecation, tooling, deprecation-sentinel, pnpm, fingerprint-stability, automation-cost]
 cites:
@@ -65,6 +65,46 @@ fingerprints (`b1561f3d429d`, `9d31ba938515`, `010ff5a7bfb5`) were minted this
 way during *this* triage run, for the eslint / jquery / intersection-observer
 warnings already held under `819aa7c6f6bd` / `011f5406331d` / `50aa3734f6b0`.
 
+**Class 3 — `grep -n` line-number prefix makes fingerprints file-edit-volatile.**
+Observed 2026-07-30 at 14:27, and it is the class that *dispatched the run which
+found it*. `fingerprint()` (hook line 484) normalizes only whitespace and case:
+
+```python
+def fingerprint(line: str, cls: str) -> str:
+    norm = re.sub(r"\s+", " ", line).strip().lower()
+    if cls == "security" and SECURITY_SUMMARY.search(line):
+        norm = re.sub(r"\d+", "#", norm)      # digit-collapse: security summaries ONLY
+    return hashlib.sha256(norm.encode()).hexdigest()[:12]
+```
+
+The leading `<lineno>:` that `grep -n` prepends is therefore **part of the
+hashed string** for every non-`security`-summary class. When any edit shifts a
+lockfile, the identical warning re-mints under a new fingerprint. Exactly that
+happened to sophia's jQuery notice: the `feat/node24` security commit
+`f0157adbb` moved `pnpm-lock.yaml`'s deprecation line from **6618 → 6620**, and
+one unchanged warning became two live ledger entries and two Opus dispatches.
+
+Reproduced exactly against the real `fingerprint()` normalization — the message
+text is byte-identical in both, only the prefix differs:
+
+| Captured line | Fingerprint |
+|---|---|
+| `6618:    deprecated: This version is deprecated. …herodevs.com/support/jquery-nes.` | `313c6eac27c1` |
+| `6620:    deprecated: This version is deprecated. …herodevs.com/support/jquery-nes.` | `fb31d99a0ba8` |
+| *(same text, no `grep -n` prefix)* | `fe896c58f14e` |
+
+Note the third row: the same warning captured **without** `-n` is a *third*
+distinct fingerprint. So the prefix does not merely churn — it also splits
+`grep -n` captures from `grep` captures of the same line.
+
+This class is strictly worse than Classes 1 and 2, because those are bounded
+(one twin per install; only on `cat -A` re-reads) whereas Class 3 re-mints
+**every time an unrelated dependency edit shifts the lockfile** — unboundedly,
+on a file whose line numbers move constantly, for a concern already documented
+as `blocked`. Note the digit-collapse guard on line 3 of `fingerprint()` already
+solves precisely this churn shape for security summaries; it is simply not
+reached by any other class.
+
 ## Usage inventory
 
 Single file — `.claude/hooks/deprecation-sentinel.py`:
@@ -77,6 +117,10 @@ Single file — `.claude/hooks/deprecation-sentinel.py`:
 - The diff-hunk exemptions in Guards C and G (`not line.startswith(("+","-"))`)
   do **not** cover Class 1: pnpm's summary marker *is* `+`/`-`, so the shape
   must be matched precisely rather than exempted.
+- `fingerprint()` (line 484) — Class 3 lives here, **not** in `_is_echo_line()`.
+  A `grep -n` capture is a perfectly legitimate warning surface that must still
+  be *captured*; the defect is that it is *hashed unstably*. Suppression would
+  be the wrong instrument.
 
 Ledger evidence (`.claude/data/deprecations.jsonl`): 4 redundant live entries
 against 3 genuine concerns.
@@ -130,6 +174,36 @@ no command-flag dependency. Both are the same species as Guard F's
 registry-metadata collapse: a structural collapse of a surface that carries no
 information the primary surface lacks.
 
+**Fix N (Class 3) — strip the `grep -n` prefix before hashing.** A different
+instrument in a different function: normalization in `fingerprint()`, not
+suppression in `_is_echo_line()`. The line stays captured; it just hashes
+stably.
+
+```python
+GREP_LINENO_PREFIX_RE = re.compile(r"^\s*(?:[^\s:]+:)?\d+[:-]\s*")
+
+def fingerprint(line: str, cls: str) -> str:
+    norm = re.sub(r"\s+", " ", line).strip().lower()
+    norm = GREP_LINENO_PREFIX_RE.sub("", norm)   # Fix N: line numbers churn; content does not
+    if cls == "security" and SECURITY_SUMMARY.search(line):
+        norm = re.sub(r"\d+", "#", norm)
+    return hashlib.sha256(norm.encode()).hexdigest()[:12]
+```
+
+Two properties worth stating before anyone lands it:
+
+- **It is a one-way merge, and it is deliberately narrow.** The regex requires a
+  digit run followed by `:` or `-`, at line start, optionally after a
+  colon-terminated path — `grep -n` / `grep -Hn` shape. A real warning rarely
+  opens that way; `2.1.1: deprecated` cannot match (the digits are broken by
+  dots before the colon).
+- **It changes existing fingerprints.** Any live ledger entry whose captured
+  `line` carries a `grep -n` prefix re-hashes and reads as NEW once. Landing Fix
+  N therefore needs a one-time ledger migration (recompute `fp` for affected
+  live lines) or it will fire a dispatch per affected entry — the exact cost it
+  removes. This makes Fix N *cheaper to land early*, before more prefixed
+  captures accumulate.
+
 Worth folding in while there: `\bDEPRECATED\b` + `re.IGNORECASE` makes the
 bare word `deprecated` a catch-all and renders lines 62–66 dead. Guard G's own
 comment states the intent — "real deprecations are lowercase prose … Vitest
@@ -158,6 +232,7 @@ run that owned the primary surfaces:
 | `b1561f3d429d` | `819aa7c6f6bd` eslint@8.57.1 EOL | `deprecation-sophia-eslint-8-eol-flat-config-migration.md` |
 | `9d31ba938515` | `011f5406331d` jquery@2.1.1 XSS family | `security-jquery-2-1-1-shipped-in-sophia-umd-bundle.md` |
 | `010ff5a7bfb5` | `50aa3734f6b0` intersection-observer@0.12.2 | `deprecation-sophia-intersection-observer-dead-declaration.md` |
+| `fb31d99a0ba8` | `313c6eac27c1` jquery@2.1.1 lockfile notice (Class 3, line 6618→6620) | `security-jquery-2-1-1-shipped-in-sophia-umd-bundle.md` |
 
 That routing is deliberate: a redundant surface carries no independent concern,
 so on re-encounter the sentinel should cite what the line is *about* (eslint 8
@@ -175,14 +250,29 @@ Not fixed — no verification to record. The regexes are verified in isolation
 against real captured bytes (see Migration path); the guards themselves are
 unlanded, so the sentinel's live behavior is unchanged.
 
-Re-check trigger for the stasis sweep: once Guards J/K land in
+Class 3 is verified by exact reproduction rather than by regex reasoning: both
+`313c6eac27c1` and `fb31d99a0ba8` were **recomputed from the same warning text**
+through the hook's own `fingerprint()` normalization, differing only in the
+`grep -n` prefix (`6618:` vs `6620:`), and both matched the ledger byte-for-byte.
+The bare-text variant hashes to `fe896c58f14e`. Fix N's regex is *not* yet
+verified against adversarial negatives — that is owed before it lands.
+
+Re-check trigger for the stasis sweep: once Guards J/K **and Fix N** land in
 `.claude/hooks/deprecation-sentinel.py`, confirm a fresh `pnpm install` in a
 changed pnpm workspace mints exactly ONE fingerprint per deprecated package
-(not two), then delete the four `evidence_fingerprints` lines from the ledger
-(their owner entries keep the primary fps) and delete this entry.
+(not two), and confirm that re-grepping a shifted lockfile does **not** mint a
+new fingerprint. Then delete the five `evidence_fingerprints` lines from the
+ledger (their owner entries keep the primary fps) and delete this entry.
 
 Self-demonstrating footnote: `b1561f3d429d`, `9d31ba938515`, and
 `010ff5a7bfb5` were minted *by this triage run*, when a `cat -A` inspection of
 the already-captured install log re-emitted three warnings the ledger was
 already holding. The defect cost three dispatch directives inside the very run
 that diagnosed it.
+
+Second footnote, 2026-07-30 — the cost is now measured, not projected. Class 3
+**spent a full background Opus dispatch**: `fb31d99a0ba8` was triaged as a new
+finding, and the entire finding was that a lockfile line had moved two rows
+under a jQuery concern already canonicalized and already `blocked`. That is the
+steady-state price of leaving this unlanded — not a one-time diagnosis cost but
+one dispatch per lockfile shift, per workspace, indefinitely.

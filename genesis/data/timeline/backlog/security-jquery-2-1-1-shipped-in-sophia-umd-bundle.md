@@ -11,7 +11,7 @@ status: "backlog"
 priority: "high"
 deprecation_status: blocked
 severity: security
-fingerprints: ["011f5406331d", "313c6eac27c1", "93e83acd4b96", "d5f606fc5fa4", "4ee2a842e119", "01b4b9157783", "9d31ba938515"]
+fingerprints: ["011f5406331d", "313c6eac27c1", "93e83acd4b96", "d5f606fc5fa4", "4ee2a842e119", "01b4b9157783", "9d31ba938515", "fb31d99a0ba8"]
 relatedNodeIds: []
 tags: [deprecation, security, jquery, sophia, perseus, umd-bundle, xss, prototype-pollution, submodule]
 cites:
@@ -180,8 +180,9 @@ advisories and CVE-2015-9251 live. Not worth a release.
 
 ## Current decision
 
-**Blocked — exceeds the bounded-fix envelope on two independent counts, and the
-target tree is frozen by concurrent work.**
+**Blocked — exceeds the bounded-fix envelope on scale.** Originally blocked on
+*two* independent counts; the second (worktree contention) **cleared on
+2026-07-30** — see "Contention resolved" below. Scale alone now holds it.
 
 1. **Scale.** This is a **major version bump (2.x → 3.x)** across **22 import
    sites in 22 files**, including a vendored jQuery-2-era event shim and the
@@ -190,32 +191,48 @@ target tree is frozen by concurrent work.**
    deprecation-triage envelope are tripped. This needs an operator-initiated
    sprint against the jQuery 3 upgrade guide with eyes-on widget verification,
    not a background agent.
-2. **Worktree contention (transient).** Every file needing edit lives inside the
-   `sophia` git submodule, which at triage time had **uncommitted changes on
-   branch `feat/node24`** (`package.json`, `packages/sophia/package.json`,
-   `pnpm-workspace.yaml` — a concurrent Node 24 + dependency-security upgrade,
-   itself mid-flight editing the very catalog file this fix must touch). Editing
-   sophia now risks clobbering unlanded work. **No sophia file was modified by
-   this triage pass.**
+2. ~~**Worktree contention (transient).**~~ **RESOLVED 2026-07-30.** At first
+   triage every file needing edit lived inside the `sophia` submodule, which had
+   uncommitted changes on branch `feat/node24` mid-flight in the very catalog
+   file this fix must touch. **That work has landed and the tree is clean** —
+   see "Contention resolved". No sophia file has been modified by any triage
+   pass; the catalog is untouched at 2.1.1.
 
 The ledger fingerprints stay present with `status: blocked` so the sentinel
 cites this decision deterministically and never re-dispatches; the
 deprecation-stasis sweep owns the re-check.
 
-**Live trajectory — ordered, and the first step is cheap.** The concurrent
-`feat/node24` agent is *already editing the catalog file* and is *already doing
-dependency-security remediation* (its uncommitted diff adds an `overrides:`
-block for `qs`/`flatted`/`picomatch`/`minimatch` and bumps `vite` 5.4.11→5.4.21).
-The catalog one-liner in step 1 is a natural, near-zero-cost addition to that
-work — **but only if paired with the step-2/4/5 verification**, because an
-unverified catalog bump would silently swap the jQuery major under 22 call sites.
-So:
+### Contention resolved — and the cheap-fold window has closed
 
-- **Next step (small):** once `feat/node24` lands, re-check whether that agent's
-  `overrides:` work already moved jQuery. If not, decide explicitly whether to
-  fold the catalog bump into a follow-up commit *with* the suite + UMD-marker +
-  eyes verification, or to schedule the sprint.
-- **Then (sprint-sized):** the 22-site jQuery 3 migration per Migration path.
+The "wait for `feat/node24`" step this entry owed is **answered**. As of
+2026-07-30 the sophia submodule is **clean** (`git status --porcelain` → empty)
+on `feat/node24` at `f0157adbb` *"security(deps): postcss/qs/picomatch/minimatch/
+flatted/vite-5.4.x/uuid — clear the mirror-blocked remediation set"*.
+
+**That remediation did NOT move jQuery.** `sophia/pnpm-workspace.yaml` still
+reads `jquery: ^2.1.1` (line 75, devDeps) and `jquery: 2.1.1` (line 114,
+peerDeps) — byte-identical to first triage. The lockfile still resolves
+`jquery@2.1.1` for 5 importers.
+
+Two consequences:
+
+- The **near-zero-cost fold no longer exists.** The catalog one-liner can no
+  longer ride along on someone else's in-flight dependency commit; it now needs
+  its own change, which means it needs its own verification, which is the
+  sprint. The cheap path was real and it expired unused — worth naming so it is
+  not re-proposed as though still available.
+- The **blocker count drops from two to one.** Nothing transient guards this any
+  more. Scale is the sole remaining obstacle, and scale does not clear itself by
+  waiting — this will not become unblocked by a later stasis sweep. It needs to
+  be *scheduled*.
+
+**Live trajectory:**
+
+- **Next (sprint-sized, and now the only step):** the 22-site jQuery 3 migration
+  per Migration path. Operator-initiated; the tree is clean and ready for it.
+- **Newly known cost:** the sprint must also **republish** `@ethosengine/
+  sophia-element` to Nexus — a local rebuild alone does not fix deployed
+  browsers (see Verification).
 - **Escape hatch if the sprint cannot be scheduled:** because the vulnerable
   copy arrives *only* via the bundler, the exposure could in principle be cut by
   externalising jQuery in `sophia-element`'s rollup config and having the host
@@ -252,10 +269,22 @@ the security framing above):
   in `renderer.tsx` / `widgets/passage` / `widgets/iframe`? A proven trace
   raises priority to urgent; a proven refutation makes this a hygiene upgrade
   that can wait for the sprint.
-- **Published-package check:** `check-sophia.sh` can source the UMD from Nexus
-  (`npm pack @ethosengine/sophia-element`) or a GitHub Release instead of the
-  local build. Confirm the published artifacts also carry 2.1.1, so the fix is
-  known to require a republish and not just a local rebuild.
+- ~~**Published-package check.**~~ **RESOLVED 2026-07-30 — the published
+  artifact is vulnerable too.** `npm pack @ethosengine/sophia-element
+  --registry=https://nexus.ethosengine.com/repository/npm/` fetched
+  `ethosengine-sophia-element-1.0.0.tgz` (3,746,107 B, sha256 `fbffc9d9efc216f3…`)
+  and its `package/dist/sophia-element.umd.js` carries the same jQuery marker as
+  the local asset — `p="2.1.1"` with `jquery:p`, and `grep -c '3\.7\.1'` → **0**.
+  The local copy at `app/elohim-app/src/assets/sophia-plugin/sophia-element.umd.js`
+  shows `p="2.1.1"` identically.
+
+  This closes a real scoping gap: `check-sophia.sh` Source 3 pulls the UMD from
+  Nexus when no local `dist/` exists (script lines 31–41), so a developer or CI
+  run that never builds sophia still gets jQuery 2.1.1. **The fix therefore
+  requires a republish, not merely a local rebuild** — that step is now named in
+  Migration path's closure criteria and in the trajectory above.
 
 Closure requires: catalog at `^3.7.1`, sophia `pnpm test` green, rebuilt UMD
-showing the 3.7.1 marker, and eyes-verified Sophia widget rendering.
+showing the 3.7.1 marker, eyes-verified Sophia widget rendering, **and a
+republished `@ethosengine/sophia-element` on Nexus whose tarball shows the
+3.7.1 marker** (the local rebuild alone leaves the registry path vulnerable).
