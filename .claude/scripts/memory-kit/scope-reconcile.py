@@ -130,8 +130,11 @@ def _feature_requires(doc: Path) -> list:
     (above the first `Feature:` keyword), NOT frontmatter."""
     caps = []
     for ln in doc.read_text(encoding="utf-8", errors="replace").splitlines():
-        if ln.lstrip().startswith("Feature:"):
+        stripped = ln.lstrip()
+        if stripped.startswith("Feature:"):
             break
+        if stripped.startswith("#"):  # gherkin comment — prose mentioning a tag is not a tag
+            continue
         caps += _REQUIRES_TAG.findall(ln)
     return caps
 
