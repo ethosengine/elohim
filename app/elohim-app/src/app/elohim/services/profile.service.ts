@@ -31,7 +31,7 @@ import { AffinityTrackingService } from './affinity-tracking.service';
 
 // Models
 
-import type { LearningPath } from '@app/lamad/models/learning-path.model';
+import type { PathView } from '@app/lamad/models/learning-path.model';
 
 /**
  * ProfileService - Human-Centered Identity View
@@ -484,7 +484,7 @@ export class ProfileService {
    * Convert path and progress to PathWithProgress.
    */
   private pathToPathWithProgress(
-    path: LearningPath | null,
+    path: PathView | null,
     progress: SessionPathProgress | null
   ): PathWithProgress | null {
     if (!path) return null;

@@ -5,7 +5,7 @@ import { ContentBackendService } from './content.service';
 import { ProjectionAPIService } from './projection-api.service';
 import { StorageClientService } from './storage-client.service';
 import { ContentNode, ContentType } from '@app/lamad/models/content-node.model';
-import { LearningPath } from '@app/lamad/models/learning-path.model';
+import { PathView } from '@app/lamad/models/learning-path.model';
 import { vi, Mock } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';
 
@@ -536,7 +536,7 @@ describe('ProjectionAPIService', () => {
 
   describe('getPath', () => {
     it('should fetch path by ID', fakeAsync(() => {
-      let result: LearningPath | null = null;
+      let result: PathView | null = null;
       service.getPathNode('path-1').subscribe(data => {
         result = data;
       });
@@ -554,7 +554,7 @@ describe('ProjectionAPIService', () => {
     }));
 
     it('should transform path data correctly', fakeAsync(() => {
-      let result: LearningPath | null = null;
+      let result: PathView | null = null;
       service.getPathNode('path-1').subscribe(data => {
         result = data;
       });
@@ -572,7 +572,7 @@ describe('ProjectionAPIService', () => {
     }));
 
     it('should handle path 404 errors gracefully', fakeAsync(() => {
-      let result: LearningPath | null = null;
+      let result: PathView | null = null;
       service.getPathNode('not-found').subscribe(data => {
         result = data;
       });
@@ -587,7 +587,7 @@ describe('ProjectionAPIService', () => {
 
   describe('queryPaths', () => {
     it('should query paths with limit and skip', fakeAsync(() => {
-      let result: LearningPath[] = [];
+      let result: PathView[] = [];
       service.queryPaths({ limit: 20, skip: 10 }).subscribe(data => {
         result = data;
       });
@@ -609,7 +609,7 @@ describe('ProjectionAPIService', () => {
       const beginner = { ...mockPathData, difficulty: 'beginner' };
       const advanced = { ...mockPathData, id: 'path-2', difficulty: 'advanced' };
 
-      let result: LearningPath[] = [];
+      let result: PathView[] = [];
       service.queryPaths({ difficulty: 'beginner' }).subscribe(data => {
         result = data;
       });
@@ -626,7 +626,7 @@ describe('ProjectionAPIService', () => {
       const publicPath = { ...mockPathData, visibility: 'public' };
       const privatePath = { ...mockPathData, id: 'path-2', visibility: 'private' };
 
-      let result: LearningPath[] = [];
+      let result: PathView[] = [];
       service.queryPaths({ visibility: 'public' }).subscribe(data => {
         result = data;
       });
@@ -643,7 +643,7 @@ describe('ProjectionAPIService', () => {
       const publicPath = { ...mockPathData, visibility: 'public' };
       const privatePath = { ...mockPathData, id: 'path-2', visibility: 'private' };
 
-      let result: LearningPath[] = [];
+      let result: PathView[] = [];
       service.queryPaths({ publicOnly: true }).subscribe(data => {
         result = data;
       });
@@ -659,7 +659,7 @@ describe('ProjectionAPIService', () => {
       const path1 = { ...mockPathData, tags: ['learning', 'beginner'] };
       const path2 = { ...mockPathData, id: 'path-2', tags: ['advanced', 'expert'] };
 
-      let result: LearningPath[] = [];
+      let result: PathView[] = [];
       service.queryPaths({ tags: ['learning'] }).subscribe(data => {
         result = data;
       });
@@ -673,7 +673,7 @@ describe('ProjectionAPIService', () => {
     }));
 
     it('should handle path query errors gracefully', fakeAsync(() => {
-      let result: LearningPath[] | null = null;
+      let result: PathView[] | null = null;
       service.queryPaths({}).subscribe(data => {
         result = data;
       });
@@ -688,7 +688,7 @@ describe('ProjectionAPIService', () => {
 
   describe('getAllPaths', () => {
     it('should get all public paths with default limit', fakeAsync(() => {
-      let result: LearningPath[] = [];
+      let result: PathView[] = [];
       service.getAllPaths().subscribe(data => {
         result = data;
       });
@@ -716,7 +716,7 @@ describe('ProjectionAPIService', () => {
       const path1 = { ...mockPathData, id: 'path-1' };
       const path2 = { ...mockPathData, id: 'path-2' };
 
-      let result: Map<string, LearningPath> = new Map();
+      let result: Map<string, PathView> = new Map();
       service.batchGetPaths(['path-1', 'path-2']).subscribe(data => {
         result = data;
       });
@@ -730,7 +730,7 @@ describe('ProjectionAPIService', () => {
     }));
 
     it('should return empty map for empty IDs', fakeAsync(() => {
-      let result: Map<string, LearningPath> | null = null;
+      let result: Map<string, PathView> | null = null;
       service.batchGetPaths([]).subscribe(data => {
         result = data;
       });

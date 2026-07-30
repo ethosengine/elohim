@@ -19,7 +19,7 @@ import { Observable, of } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { ContentNode, ContentType, ContentReach } from '@app/lamad/models/content-node.model';
-import { LearningPath, parsePathView } from '@app/lamad/models/learning-path.model';
+import { PathView, parsePathView } from '@app/lamad/models/learning-path.model';
 
 import { ContentBackendService } from './content.service';
 import { StorageClientService } from './storage-client.service';
@@ -351,9 +351,9 @@ export class ProjectionAPIService implements IStorageApi {
   // =========================================================================
 
   /**
-   * Get a single learning path by ID (returns domain LearningPath type)
+   * Get a single learning path by ID (returns domain PathView type)
    */
-  getPathNode(id: string): Observable<LearningPath | null> {
+  getPathNode(id: string): Observable<PathView | null> {
     if (!this.enabled) {
       return of(null);
     }
@@ -379,7 +379,7 @@ export class ProjectionAPIService implements IStorageApi {
    * Get path overview (minimal data for listing)
    * Note: Uses same endpoint as getPathNode since cache API is generic
    */
-  getPathOverview(id: string): Observable<Partial<LearningPath> | null> {
+  getPathOverview(id: string): Observable<Partial<PathView> | null> {
     return this.getPathNode(id);
   }
 
@@ -389,7 +389,7 @@ export class ProjectionAPIService implements IStorageApi {
    * Note: The generic cache API only supports limit/skip.
    * Client-side filtering is applied for other filters.
    */
-  queryPaths(filters: PathQueryFilters): Observable<LearningPath[]> {
+  queryPaths(filters: PathQueryFilters): Observable<PathView[]> {
     if (!this.enabled) {
       return of([]);
     }
@@ -416,7 +416,7 @@ export class ProjectionAPIService implements IStorageApi {
   /**
    * Apply client-side path filters
    */
-  private applyPathFilters(paths: LearningPath[], filters: PathQueryFilters): LearningPath[] {
+  private applyPathFilters(paths: PathView[], filters: PathQueryFilters): PathView[] {
     let result = paths;
 
     if (filters.id) {
@@ -445,21 +445,21 @@ export class ProjectionAPIService implements IStorageApi {
   /**
    * Get all public paths (path index)
    */
-  getAllPaths(limit = 100): Observable<LearningPath[]> {
+  getAllPaths(limit = 100): Observable<PathView[]> {
     return this.queryPaths({ publicOnly: true, limit });
   }
 
   /**
    * Batch get multiple paths by IDs
    */
-  batchGetPaths(ids: string[]): Observable<Map<string, LearningPath>> {
+  batchGetPaths(ids: string[]): Observable<Map<string, PathView>> {
     if (!this.enabled || ids.length === 0) {
       return of(new Map());
     }
 
     return this.queryPaths({ ids }).pipe(
       map(paths => {
-        const map = new Map<string, LearningPath>();
+        const map = new Map<string, PathView>();
         paths.forEach(p => map.set(p.id, p));
         return map;
       })
@@ -526,10 +526,10 @@ export class ProjectionAPIService implements IStorageApi {
   // =========================================================================
 
   /**
-   * Transform projected path to LearningPath (PathView) model.
+   * Transform projected path to PathView model.
    * Constructs a synthetic ContentNode from projected data, then parses via parsePathView.
    */
-  private transformPath(data: unknown): LearningPath {
+  private transformPath(data: unknown): PathView {
     const d = data as Record<string, unknown>;
     const id = (d['id'] ?? d['docId'] ?? '') as string;
 
@@ -586,14 +586,14 @@ export class ProjectionAPIService implements IStorageApi {
   private handlePathError(
     _error: HttpErrorResponse,
     _context: string
-  ): Observable<LearningPath | null> {
+  ): Observable<PathView | null> {
     return of(null);
   }
 
   private handlePathArrayError(
     _error: HttpErrorResponse,
     _context: string
-  ): Observable<LearningPath[]> {
+  ): Observable<PathView[]> {
     return of([]);
   }
 

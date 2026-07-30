@@ -19,7 +19,7 @@ import { Injectable } from '@angular/core';
 // @coverage: 80.5% (2026-02-24)
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
-import { LearningPath } from '@app/lamad/models/learning-path.model';
+import { PathView } from '@app/lamad/models/learning-path.model';
 
 // =============================================================================
 // Cache Entry Types
@@ -208,13 +208,13 @@ export class IndexedDBCacheService {
    * Get a learning path from cache.
    *
    * @param id Path ID
-   * @returns LearningPath if found and not expired, null otherwise
+   * @returns PathView if found and not expired, null otherwise
    */
-  async getPath(id: string): Promise<LearningPath | null> {
+  async getPath(id: string): Promise<PathView | null> {
     if (!this.db) return null;
 
     try {
-      const entry = await this.get<LearningPath>(STORES.PATHS, id);
+      const entry = await this.get<PathView>(STORES.PATHS, id);
       if (entry && !this.isExpired(entry) && entry.version === SCHEMA_VERSION) {
         return entry.data;
       }
@@ -227,13 +227,13 @@ export class IndexedDBCacheService {
   /**
    * Store a learning path in cache.
    *
-   * @param path LearningPath to cache
+   * @param path PathView to cache
    */
-  async setPath(path: LearningPath): Promise<void> {
+  async setPath(path: PathView): Promise<void> {
     if (!this.db) return;
 
     try {
-      const entry: CacheEntry<LearningPath> = {
+      const entry: CacheEntry<PathView> = {
         data: path,
         cachedAt: Date.now(),
         expiresAt: Date.now() + CACHE_TTL.PATHS,

@@ -7,7 +7,7 @@ import { StorageClientService } from './storage-client.service';
 import { BLOB_FETCHER } from '../interfaces/blob-fetcher.interface';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 import { ContentNode } from '@app/lamad/models/content-node.model';
-import { LearningPath } from '@app/lamad/models/learning-path.model';
+import { PathView } from '@app/lamad/models/learning-path.model';
 import { vi } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';
 
@@ -455,7 +455,7 @@ describe('ContentBackendService', () => {
     it('should fetch path by ID', fakeAsync(() => {
       mockClient.get.mockReturnValue(Promise.resolve(mockPathData));
 
-      let result: LearningPath | null = null;
+      let result: PathView | null = null;
       service.getPath('test-path-1').subscribe(path => {
         result = path;
       });
@@ -469,7 +469,7 @@ describe('ContentBackendService', () => {
     it('should return null for missing path', fakeAsync(() => {
       mockClient.get.mockReturnValue(Promise.resolve(null));
 
-      let result: LearningPath | null = undefined as unknown as LearningPath | null;
+      let result: PathView | null = undefined as unknown as PathView | null;
       service.getPath('non-existent').subscribe(path => {
         result = path;
       });
@@ -509,7 +509,7 @@ describe('ContentBackendService', () => {
       };
       mockClient.get.mockReturnValue(Promise.resolve(pathWithSections as any));
 
-      let result: LearningPath | null = null;
+      let result: PathView | null = null;
       service.getPath('nested-path').subscribe(path => {
         result = path;
       });
@@ -529,7 +529,7 @@ describe('ContentBackendService', () => {
       // which passes through to storage for server-side filtering
       mockClient.query.mockReturnValue(Promise.resolve([mockPathData]));
 
-      let result: LearningPath[] = [];
+      let result: PathView[] = [];
       service.queryPaths({ visibility: 'public', limit: 10 }).subscribe(paths => {
         result = paths;
       });
@@ -553,7 +553,7 @@ describe('ContentBackendService', () => {
       ];
       mockClient.query.mockReturnValue(Promise.resolve(items));
 
-      let result: LearningPath[] = [];
+      let result: PathView[] = [];
       service.queryPaths({ difficulty: 'beginner' }).subscribe(paths => {
         result = paths;
       });
@@ -568,7 +568,7 @@ describe('ContentBackendService', () => {
     it('should get all public paths', fakeAsync(() => {
       mockClient.query.mockReturnValue(Promise.resolve([mockPathData]));
 
-      let result: LearningPath[] = [];
+      let result: PathView[] = [];
       service.getAllPaths().subscribe(paths => {
         result = paths;
       });

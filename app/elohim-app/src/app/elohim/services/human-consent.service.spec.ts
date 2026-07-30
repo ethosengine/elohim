@@ -5,7 +5,7 @@ import { HumanConsentService } from './human-consent.service';
 import { LocalSourceChainService } from '@elohim/service';
 import { SessionHumanService } from '@elohim/identity';
 import { HumanConsent } from '@app/elohim/models/human-consent.model';
-import { LearningPath } from '@app/lamad/models/learning-path.model';
+import { PathView } from '@app/lamad/models/learning-path.model';
 import { vi, Mock } from 'vitest';
 
 /**
@@ -785,7 +785,7 @@ describe('HumanConsentService', () => {
   // ===========================================================================
 
   describe('canViewPath', () => {
-    const mockPath: LearningPath = {
+    const mockPath: PathView = {
       id: 'path-1',
       version: '1.0.0',
       title: 'Test Path',

@@ -3,7 +3,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
-import { LearningPath } from '@app/lamad/models/learning-path.model';
+import { PathView } from '@app/lamad/models/learning-path.model';
 import { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import { DataLoaderService } from './data-loader.service';
 import { GOVERNANCE } from '@elohim/service';
@@ -235,7 +235,7 @@ describe('DataLoaderService', () => {
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
       visibility: 'public',
-    } as unknown as LearningPath;
+    } as unknown as PathView;
 
     beforeEach(() => {
       // Enable IDB for these tests
@@ -307,7 +307,7 @@ describe('DataLoaderService', () => {
         );
         idbMock.getPath.mockReturnValue(Promise.resolve(mockPath));
 
-        let result: LearningPath | undefined;
+        let result: PathView | undefined;
         service.getPath('test-path-1').subscribe(path => {
           result = path;
         });

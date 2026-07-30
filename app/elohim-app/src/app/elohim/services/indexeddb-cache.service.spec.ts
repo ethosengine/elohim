@@ -10,7 +10,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ContentNode } from '@app/lamad/models/content-node.model';
-import { LearningPath } from '@app/lamad/models/learning-path.model';
+import { PathView } from '@app/lamad/models/learning-path.model';
 
 // =============================================================================
 // In-memory IDB Mock
@@ -243,7 +243,7 @@ const mockContent2: ContentNode = {
   metadata: {},
 };
 
-const mockPath: LearningPath = {
+const mockPath: PathView = {
   id: 'test-path-1',
   version: '1.0.0',
   title: 'Test Path',

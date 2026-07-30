@@ -24,7 +24,7 @@ import {
   KnowledgeNode,
 } from '@app/lamad/models/knowledge-map.model';
 import {
-  LearningPath,
+  PathView,
   PathIndex,
   PathIndexEntry,
   parsePathView,
@@ -225,7 +225,7 @@ export interface ClusterConnectionSummary {
 @Injectable({ providedIn: 'root' })
 export class DataLoaderService {
   // Caches to prevent redundant calls (shareReplay pattern)
-  private readonly pathCache = new Map<string, Observable<LearningPath>>();
+  private readonly pathCache = new Map<string, Observable<PathView>>();
   private readonly contentCache = new Map<string, Observable<ContentNode>>();
   private graphCache$: Observable<ContentGraph> | null = null;
   private pathIndexCache$: Observable<PathIndex> | null = null;
@@ -297,13 +297,13 @@ export class DataLoaderService {
   // NOTE: PATH_TIMEOUT_MS removed - ContentService handles timeouts
 
   /**
-   * Load a LearningPath (PathView) by ID.
+   * Load a PathView by ID.
    * Delegates to getContent() and parses via parsePathView().
    * Does NOT load the content for each step (lazy loading).
    *
    * Read path: getContent() (projection → ContentService fallback) → parsePathView.
    */
-  getPath(pathId: string): Observable<LearningPath> {
+  getPath(pathId: string): Observable<PathView> {
     const cached = this.pathCache.get(pathId);
     if (cached) {
       return cached;
@@ -384,15 +384,15 @@ export class DataLoaderService {
    * 2. Holochain REST API (15 minute TTL cache)
    *
    * @param pathId The path ID to load
-   * @returns Observable of lightweight LearningPath (steps array will be empty)
+   * @returns Observable of lightweight PathView (steps array will be empty)
    */
-  getPathOverview(pathId: string): Observable<LearningPath> {
+  getPathOverview(pathId: string): Observable<PathView> {
     // Paths are now ContentNodes — delegate to getPath() which uses getContent() + parsePathView
     return this.getPath(pathId);
   }
 
   /**
-   * Transform path overview to LearningPath model.
+   * Transform path overview to PathView model.
    * Returns path with empty steps array - use getPath() for full steps.
    */
   /**
@@ -565,7 +565,7 @@ export class DataLoaderService {
    *
    * Enhanced version of getPath that also prefetches the first few steps.
    */
-  getPathWithPrefetch(pathId: string, prefetchSteps = 3): Observable<LearningPath> {
+  getPathWithPrefetch(pathId: string, prefetchSteps = 3): Observable<PathView> {
     return this.getPath(pathId).pipe(
       tap(path => {
         // Prefetch first N step content in background
@@ -1963,13 +1963,13 @@ export class DataLoaderService {
    * Get path hierarchy for cluster graph visualization.
    *
    * This is a convenience method that uses existing getPath() which loads
-   * chapters from Holochain's metadata_json field. The LearningPath returned
+   * chapters from Holochain's metadata_json field. The PathView returned
    * contains the full hierarchy: chapters → modules → sections → conceptIds.
    *
    * @param pathId - Learning path ID (e.g., 'elohim-protocol')
-   * @returns Observable of LearningPath with chapters hierarchy
+   * @returns Observable of PathView with chapters hierarchy
    */
-  getPathHierarchy(pathId: string): Observable<LearningPath> {
+  getPathHierarchy(pathId: string): Observable<PathView> {
     return this.getPath(pathId);
   }
 

@@ -22,7 +22,7 @@ import { SessionHumanService } from '@elohim/identity';
 
 // Models
 
-import type { LearningPath, PathVisibility } from '@app/lamad/models/learning-path.model';
+import type { PathView, PathVisibility } from '@app/lamad/models/learning-path.model';
 
 /**
  * HumanConsentService - Manages consent-based relationships between humans.
@@ -353,7 +353,7 @@ export class HumanConsentService {
   /**
    * Check if path is visible to current human.
    */
-  canViewPath(path: LearningPath): Observable<boolean> {
+  canViewPath(path: PathView): Observable<boolean> {
     // Public paths are always visible
     if (path.visibility === 'public') {
       return of(true);

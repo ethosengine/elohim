@@ -19,7 +19,7 @@ import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 import { Observable, from, of } from 'rxjs';
 
 import { ContentNode, ContentType, ContentReach } from '@app/lamad/models/content-node.model';
-import { LearningPath, PathStep, parsePathView } from '@app/lamad/models/learning-path.model';
+import { PathView, PathStep, parsePathView } from '@app/lamad/models/learning-path.model';
 import { BLOB_FETCHER, type IBlobFetcher } from '../interfaces/blob-fetcher.interface';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 
@@ -298,7 +298,7 @@ export class ContentBackendService {
 
   // In-memory cache for hot paths
   private readonly contentCache = new Map<string, Observable<ContentNode | null>>();
-  private readonly pathCache = new Map<string, Observable<LearningPath | null>>();
+  private readonly pathCache = new Map<string, Observable<PathView | null>>();
   private readonly blobCache = new Map<string, Observable<string>>();
 
   // =========================================================================
@@ -440,7 +440,7 @@ export class ContentBackendService {
    * Get a single learning path by ID.
    * Fetches as ContentNode, then parses via parsePathView().
    */
-  getPath(id: string): Observable<LearningPath | null> {
+  getPath(id: string): Observable<PathView | null> {
     // Check cache first
     const cached = this.pathCache.get(id);
     if (cached) return cached;
@@ -461,7 +461,7 @@ export class ContentBackendService {
    * Query paths with filters.
    * Queries content by type 'path', then parses each via parsePathView().
    */
-  queryPaths(filters: PathFilters): Observable<LearningPath[]> {
+  queryPaths(filters: PathFilters): Observable<PathView[]> {
     return this.queryContent({
       contentType: 'path',
       tags: filters.tags,
@@ -480,7 +480,7 @@ export class ContentBackendService {
   /**
    * Get all public paths
    */
-  getAllPaths(limit = 100): Observable<LearningPath[]> {
+  getAllPaths(limit = 100): Observable<PathView[]> {
     return this.queryPaths({ visibility: 'public', limit });
   }
 
@@ -787,7 +787,7 @@ export class ContentBackendService {
   /**
    * Apply local path filters
    */
-  private applyPathFilters(items: LearningPath[], filters: PathFilters): LearningPath[] {
+  private applyPathFilters(items: PathView[], filters: PathFilters): PathView[] {
     let result = items;
 
     if (filters.difficulty) {

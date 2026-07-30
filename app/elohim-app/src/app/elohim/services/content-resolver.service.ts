@@ -44,7 +44,7 @@ import {
 } from '@elohim/service/cache/content-resolver';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
-import { LearningPath } from '@app/lamad/models/learning-path.model';
+import { PathView } from '@app/lamad/models/learning-path.model';
 
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
@@ -677,7 +677,7 @@ export class ContentResolverService implements OnDestroy {
    * @param pathId - Path identifier
    * @returns Resolution with data, or null if not found
    */
-  async resolvePath(pathId: string): Promise<ContentResolution<LearningPath> | null> {
+  async resolvePath(pathId: string): Promise<ContentResolution<PathView> | null> {
     this.ensureReady();
     const startTime = performance.now();
 
@@ -719,7 +719,7 @@ export class ContentResolverService implements OnDestroy {
   private async offlineFallbackPath(
     pathId: string,
     startTime: number
-  ): Promise<ContentResolution<LearningPath> | null> {
+  ): Promise<ContentResolution<PathView> | null> {
     if (!this.idbCache.isAvailable()) return null;
     try {
       const cached = await this.idbCache.getPath(pathId);
@@ -740,10 +740,7 @@ export class ContentResolverService implements OnDestroy {
   /**
    * Fetch path from a specific source.
    */
-  private async fetchPathFromSource(
-    pathId: string,
-    sourceId: string
-  ): Promise<LearningPath | null> {
+  private async fetchPathFromSource(pathId: string, sourceId: string): Promise<PathView | null> {
     switch (sourceId) {
       case 'indexeddb':
         return await this.idbCache.getPath(pathId);
@@ -840,7 +837,7 @@ export class ContentResolverService implements OnDestroy {
   /**
    * Cache path locally for future resolution.
    */
-  async cachePath(path: LearningPath): Promise<void> {
+  async cachePath(path: PathView): Promise<void> {
     try {
       await this.idbCache.setPath(path);
       this.resolver?.recordContentLocation(path.id, 'indexeddb');
