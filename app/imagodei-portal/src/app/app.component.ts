@@ -6,7 +6,6 @@ import {
   OnInit,
   ViewChild,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { StandaloneResolver, type ConsentContext } from './services/standalone-resolver';
@@ -101,7 +100,6 @@ type StewardPhase = 'connecting' | 'failed' | 'unreachable';
       </elohim-imagodei-portal-shell>
     </main>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .visually-hidden {
