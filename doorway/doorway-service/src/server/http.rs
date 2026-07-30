@@ -3589,12 +3589,36 @@ async fn serve_ssr_route(
                 .unwrap_or_default()
         );
 
-        // MVP cache key: (url, spec_version). TTL invalidation (5-minute default).
+        // Build the originating user's credential for the V8 fetch shim
+        // (anonymous → None). Forwards the session header to outbound storage
+        // fetches so reach-aware content renders for logged-in users instead of
+        // falling back to public — the SSR-audit anonymous-render failure mode.
+        //
+        // Constructed BEFORE the cache lookup because the fetcher's declared
+        // trust scope decides whether this request may touch the shared render
+        // cache at all (see below).
+        let user_credential = build_ssr_user_credential(&req);
+        let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(
+            crate::ssr::ResolverFetcher::new(Arc::clone(&state.ssr_http_client), endpoint.clone())
+                .maybe_with_user_credential(user_credential),
+        );
+        // The trust scope of THIS request's fetcher. `Principal` (a credentialed
+        // render) is excluded from the render cache in BOTH directions: the
+        // cache key carries no principal, so a credentialed render stored under
+        // it would be served to every other requester for the TTL, and a
+        // credentialed requester served from it would get someone else's
+        // reach-gated view. See `crate::ssr::render_is_cache_shareable`.
+        let render_trust = fetcher.trust_scope();
+
+        // MVP cache key: (url, spec_version) — deliberately principal-free; the
+        // trust gate above, not the key, is what scopes this cache.
         // `fetched_inputs` is captured in the audit trail (RenderOutput) but not
         // in the lookup key. Hash-aware invalidation lands with a DHT signal
         // subscriber driving evictions (Task 14+).
         let cache_key = crate::ssr::render_cache_key(&url, &[], "v1");
-        if let Some(cached_html) = state.cache.get_rendered(&cache_key) {
+        if let Some(cached_html) =
+            crate::ssr::cached_render_for_trust(&state.cache, &cache_key, render_trust)
+        {
             tracing::debug!(target: "doorway::ssr", path = %path, "SSR cache HIT");
             // The cache holds the UN-composed render (the shell's bundle hashes
             // vary per deploy and must never be baked into the render-TTL entry).
@@ -3630,17 +3654,11 @@ async fn serve_ssr_route(
             };
         }
 
-        // Build the originating user's credential for the V8 fetch shim
-        // (anonymous → None). Forwards the session header to outbound storage
-        // fetches so reach-aware content renders for logged-in users instead of
-        // falling back to public — the SSR-audit anonymous-render failure mode.
-        let user_credential = build_ssr_user_credential(&req);
-        let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(
-            crate::ssr::ResolverFetcher::new(Arc::clone(&state.ssr_http_client), endpoint.clone())
-                .maybe_with_user_credential(user_credential),
-        );
         // Test-only stall fault injection (env-gated, off by default), applied to
-        // the per-request fetcher (renders run against ctx.data_fetcher).
+        // the per-request fetcher (renders run against ctx.data_fetcher). Applied
+        // after the cache lookup so the fault-injection warning marks an actual
+        // render, not a cache hit. The decorator delegates `trust_scope`, so
+        // `render_trust` computed above still describes this fetcher.
         let fetcher = crate::ssr::maybe_inject_stall_fault(fetcher);
         // 60s wall: cold-start parses a ~51MB bundle (171 .mjs files) + walks
         // Angular bootstrap (which fetches); warm renders settle to tens of ms
@@ -3723,10 +3741,15 @@ async fn serve_ssr_route(
                 // (slug/auth) AND the bundle-carrying shell (per-deploy bundle
                 // hashes) are both request/deploy-specific and spliced at serve
                 // time on both MISS and a later HIT — never baked into the entry.
-                state.cache.put_rendered(
+                // Trust-scoped: a credentialed (`Principal`) render is NOT
+                // written — the key carries no principal, so caching it would
+                // serve one user's reach-gated view to everyone for the TTL.
+                crate::ssr::cache_render_for_trust(
+                    &state.cache,
                     &cache_key,
                     html.clone(),
                     std::time::Duration::from_secs(5 * 60),
+                    render_trust,
                 );
                 // Compose the render into the bundle-carrying shell so it can
                 // hydrate; on failure shed to the hydratable bundle fallback.

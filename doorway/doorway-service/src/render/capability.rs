@@ -25,7 +25,29 @@ pub enum CapabilityDeriverError {
 /// operator-as-pod model from
 /// `project_storage_as_pod_operator_sets_virtual_limits`.
 const DEFAULT_MAX_CONCURRENT: u32 = 8;
-const DEFAULT_AUTH_MODES: &[&str] = &["anonymous", "doorway-hosted"];
+/// Secure-by-default: SSR is offered to ANONYMOUS requests only unless an
+/// operator explicitly opts in via `[render] auth_modes` in the override file.
+///
+/// `doorway-hosted` was in this default until 2026-07-30. It was removed because
+/// a credentialed render runs in a **reused V8 isolate** whose JS heap is never
+/// reset between renders (`elohim_render::runtime::JsRuntime` — only the
+/// `DataFetcher` is swapped), so one principal's residue is live in the next
+/// principal's render. Until per-principal isolates are affordable (the
+/// deno_core startup-snapshot spike; deno_core 0.339 exposes no realm API),
+/// authenticated SSR in a shared isolate is unsafe by construction.
+///
+/// This costs nothing user-facing: an authenticated request whose posture is not
+/// in the claim falls back to CSR with `x-ssr-skipped: auth-mode-not-supported`,
+/// which is a graceful, already-modelled degradation — the app hydrates and
+/// fetches with the user's credential client-side. Operators who accept the
+/// trade-off re-enable it explicitly.
+///
+/// `anonymous` is required to be present regardless (see the override merge
+/// below) — this default does not change that invariant, it only stops
+/// `doorway-hosted` from being granted implicitly.
+///
+/// See `genesis/data/timeline/backlog/elohim-render-isolate-reuse-trust-boundary.md`.
+const DEFAULT_AUTH_MODES: &[&str] = &["anonymous"];
 
 /// Per-node compute budget extracted from elohim-storage's
 /// `/api/v1/compute/dashboard`. Each field is `0` when unknown / not
@@ -174,8 +196,11 @@ pub async fn derive_capability(
             .collect()
     };
 
-    // Auth modes: override-restricted or default (anonymous + doorway-hosted).
-    // Per spec, anonymous must always be present.
+    // Auth modes: operator override, else the secure default (anonymous ONLY —
+    // see DEFAULT_AUTH_MODES for why doorway-hosted is not granted implicitly).
+    // Per spec, anonymous must always be present: an override that forgets it
+    // gets it back. Note this merge only ADDS anonymous — it never expands an
+    // override in any other direction (reduce-never-inflate).
     let auth_modes: Vec<String> = match override_cfg.auth_modes {
         Some(modes) => {
             let mut m = modes;
@@ -422,8 +447,15 @@ mod derive_tests {
         assert_eq!(profile.bundles.len(), 1);
         assert_eq!(profile.bundles[0].name, "lamad-app");
         assert_eq!(profile.renderers, vec![RendererKind::AngularSsr]);
-        assert!(profile.auth_modes.contains(&"anonymous".to_string()));
-        assert!(profile.auth_modes.contains(&"doorway-hosted".to_string()));
+        // Secure-by-default: the DERIVED claim (no operator override) offers SSR
+        // to anonymous requests only. `doorway-hosted` must NOT appear here —
+        // credentialed renders share a never-reset V8 isolate, so authenticated
+        // SSR is opt-in, never implicit. See DEFAULT_AUTH_MODES.
+        assert_eq!(
+            profile.auth_modes,
+            vec!["anonymous".to_string()],
+            "the default render claim must not implicitly grant doorway-hosted SSR"
+        );
         assert_eq!(profile.max_concurrent_renders, DEFAULT_MAX_CONCURRENT);
         assert!(profile.memory_budget_mib.is_none());
     }

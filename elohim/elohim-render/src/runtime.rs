@@ -26,9 +26,41 @@ use crate::{RenderError, Result};
 /// `JsRuntime::new()` boots the isolate with no module loader — suitable for
 /// `eval_string` only. `JsRuntime::with_fs_loader()` adds `FsModuleLoader`
 /// so that `render_via_module` can load ESM files from the filesystem.
+///
+/// # Trust contract: this isolate is reused across renders
+///
+/// One `JsRuntime` serves many sequential renders (see
+/// [`crate::angular::AngularRenderer`], which owns exactly one for the life of
+/// its worker thread). Only the [`DataFetcher`](crate::DataFetcher) is swapped
+/// between renders — via [`set_fetcher`](Self::set_fetcher). **Nothing resets
+/// the JS heap.** `globalThis`, the ESM module map, Angular's DI singletons and
+/// every module-scope cache in the server bundle survive from one render into
+/// the next, by design: re-evaluating a ~51 MB bundle graph per render is the
+/// cold start this reuse exists to avoid.
+///
+/// That is safe exactly while every render shares one trust level, and unsafe
+/// the moment two renders run under different principals. `set_fetcher` tracks
+/// which of those two worlds this isolate is in; see its docs and
+/// [`isolate_hosted_principal_fetcher`](Self::isolate_hosted_principal_fetcher).
+///
+/// deno_core 0.339 offers no way to make this cheap and safe: multi-realm
+/// support is gone from the public API (`JsRealm` is `pub(crate)`,
+/// `JsRuntime::create_realm` does not exist, and the exported
+/// `CreateRealmOptions` is a vestige with no consumer), so "fresh `globalThis`
+/// per render at near-zero cost" is not purchasable here. The verdict and its
+/// evidence live in
+/// `genesis/data/timeline/backlog/elohim-render-isolate-reuse-trust-boundary.md`.
 pub struct JsRuntime {
     inner: DenoJsRuntime,
     has_fs_loader: bool,
+    /// Sticky: set once any [`FetcherTrust::Principal`] fetcher has served a
+    /// render on this isolate. Never cleared — nothing resets the JS heap, so
+    /// once a principal's render has run here, its residue is present for
+    /// every subsequent render.
+    hosted_principal_fetcher: bool,
+    /// Warn-once latch so a busy authenticated doorway emits one line per
+    /// isolate rather than one per render.
+    reported_principal_reuse: bool,
 }
 
 impl JsRuntime {
@@ -41,9 +73,17 @@ impl JsRuntime {
         let inner = DenoJsRuntime::new(RuntimeOptions {
             ..Default::default()
         });
+        Self::wrap(inner, false)
+    }
+
+    /// Common tail of every constructor: a freshly booted isolate has hosted no
+    /// fetcher at all, so its trust bookkeeping starts clean.
+    fn wrap(inner: DenoJsRuntime, has_fs_loader: bool) -> Self {
         Self {
             inner,
-            has_fs_loader: false,
+            has_fs_loader,
+            hosted_principal_fetcher: false,
+            reported_principal_reuse: false,
         }
     }
 
@@ -57,10 +97,7 @@ impl JsRuntime {
             module_loader: Some(Rc::new(FsModuleLoader)),
             ..Default::default()
         });
-        Self {
-            inner,
-            has_fs_loader: true,
-        }
+        Self::wrap(inner, true)
     }
 
     /// Boot a new V8 isolate with console, URL, and TextEncoder/TextDecoder shims.
@@ -98,10 +135,7 @@ impl JsRuntime {
             ],
             ..Default::default()
         });
-        Self {
-            inner,
-            has_fs_loader: true,
-        }
+        Self::wrap(inner, true)
     }
 
     /// Boot a new V8 isolate with all shims plus a `fetch` global backed by
@@ -140,10 +174,7 @@ impl JsRuntime {
             ],
             ..Default::default()
         });
-        Self {
-            inner,
-            has_fs_loader: true,
-        }
+        Self::wrap(inner, true)
     }
 
     /// Replace the `fetch` global's backing [`DataFetcher`](crate::DataFetcher)
@@ -155,12 +186,75 @@ impl JsRuntime {
     /// each request against that request's own fetcher (carrying, e.g., the
     /// originating user's session credential) rather than a fixed construction-
     /// time fetcher. No-op if the runtime was built without the fetch shim.
+    ///
+    /// # This swap does NOT reset the isolate — read before relying on it
+    ///
+    /// **The fetcher is the only thing that changes.** Swapping in a different
+    /// principal's fetcher does not clear `globalThis`, the ESM module map,
+    /// Angular's DI singletons, or any module-scope cache in the server bundle;
+    /// all of it carries over from the previous render. A per-user credentialed
+    /// fetcher therefore does not make a render *isolated* — it only makes it
+    /// *authorized*. Those are different properties and this method provides
+    /// only the second.
+    ///
+    /// Consequently: whenever a [`FetcherTrust::Principal`] fetcher renders
+    /// here, every render that follows on this isolate is running on top of
+    /// that principal's residue. This method records that as a sticky fact
+    /// ([`isolate_hosted_principal_fetcher`](Self::isolate_hosted_principal_fetcher))
+    /// and emits one `WARN` on `elohim_render::trust` the first time a render
+    /// follows a principal render, so the crossing is visible in logs rather
+    /// than assumed away in a comment.
+    ///
+    /// A caller that must guarantee isolation between principals cannot get it
+    /// from this method; it has to drop the whole `JsRuntime` and pay a cold
+    /// start. See the type-level docs on [`JsRuntime`] and the backlog record
+    /// `genesis/data/timeline/backlog/elohim-render-isolate-reuse-trust-boundary.md`.
+    ///
+    /// [`FetcherTrust::Principal`]: crate::FetcherTrust::Principal
     pub fn set_fetcher(&mut self, fetcher: std::sync::Arc<dyn crate::DataFetcher>) {
         use crate::shim::fetch::FetcherHandle;
+        self.note_isolate_trust_transition(fetcher.trust_scope());
         self.inner
             .op_state()
             .borrow_mut()
             .put(FetcherHandle(fetcher));
+    }
+
+    /// Whether a [`FetcherTrust::Principal`](crate::FetcherTrust::Principal)
+    /// fetcher has ever served a render on this isolate.
+    ///
+    /// Sticky and deliberately conservative: it never returns to `false`,
+    /// because nothing in this runtime resets the JS heap. Once true, treat the
+    /// isolate as carrying that principal's residue for the rest of its life.
+    pub fn isolate_hosted_principal_fetcher(&self) -> bool {
+        self.hosted_principal_fetcher
+    }
+
+    /// Record the trust scope of the fetcher about to serve the next render,
+    /// and surface a trust-boundary crossing the first time one occurs.
+    ///
+    /// The rule is intentionally conservative: any render that *follows* a
+    /// principal render on this isolate is a crossing, whatever its own trust
+    /// scope — an ambient render after a principal render can still observe
+    /// that principal's data through leftover JS state, and a second principal
+    /// render obviously can.
+    fn note_isolate_trust_transition(&mut self, incoming: crate::FetcherTrust) {
+        if self.hosted_principal_fetcher && !self.reported_principal_reuse {
+            self.reported_principal_reuse = true;
+            tracing::warn!(
+                target: "elohim_render::trust",
+                incoming_trust = ?incoming,
+                "V8 isolate reuse crossed a trust boundary: a render is starting on an \
+                 isolate that has already served a credentialed (FetcherTrust::Principal) \
+                 render. Swapping the fetcher does not reset globalThis, the module map, \
+                 or Angular DI singletons, so the previous principal's residue is live in \
+                 this render. Isolating principals requires dropping the JsRuntime (cold \
+                 start); deno_core 0.339 exposes no realm API to do it cheaply."
+            );
+        }
+        if incoming == crate::FetcherTrust::Principal {
+            self.hosted_principal_fetcher = true;
+        }
     }
 
     /// Evaluate a JS expression and return its `toString()`.

@@ -266,6 +266,20 @@ impl AngularRenderer {
     /// so an authenticated render fetches with the originating user's credential
     /// rather than as anonymous (the SSR reach-aware contract).
     ///
+    /// # The swap authorizes; it does not isolate
+    ///
+    /// **One isolate serves every render for the life of this renderer.** The
+    /// fetcher is the only thing swapped between them — `globalThis`, the ESM
+    /// module map, and the Angular bundle's DI singletons and module-scope
+    /// caches all persist. So a per-user credentialed fetcher makes render N+1
+    /// *authorized* as user B, but does not stop it from observing whatever
+    /// user A's render left in the JS heap. `JsRuntime::set_fetcher` records
+    /// that crossing (see its docs and
+    /// [`JsRuntime`](crate::runtime::JsRuntime)); closing it requires a cold
+    /// start per principal, which this reuse exists precisely to avoid. Verdict
+    /// and evidence:
+    /// `genesis/data/timeline/backlog/elohim-render-isolate-reuse-trust-boundary.md`.
+    ///
     /// # Errors
     ///
     /// Returns `RenderError::ModuleLoad` if the bundle path does not exist or the

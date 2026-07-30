@@ -27,7 +27,7 @@ pub use chrome::{
     ENHANCE_JS, STABLE_ELEMENT_PATH,
 };
 pub use compose::{compose_ssr_with_shell, ComposeError};
-pub use data_fetcher::{DataFetcher, FetchRequest, FetchResponse};
+pub use data_fetcher::{DataFetcher, FetchRequest, FetchResponse, FetcherTrust};
 pub use error::{RenderError, Result};
 pub use renderer::{EchoRenderer, Renderer};
 pub use stats::{RenderTraceSnapshot, RenderTraceStats};

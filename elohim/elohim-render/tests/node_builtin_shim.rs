@@ -192,8 +192,8 @@ async fn node_module_createrequire_links_and_resolves_cjs_builtins() {
 async fn renders_deployed_bundle_without_node_builtin_wall() {
     use async_trait::async_trait;
     use elohim_render::{
-        AngularRenderer, DataFetcher, FetchRequest, FetchResponse, RenderContext, RenderLimits,
-        RenderSpec, Renderer,
+        AngularRenderer, DataFetcher, FetchRequest, FetchResponse, FetcherTrust, RenderContext,
+        RenderLimits, RenderSpec, Renderer,
     };
     use std::collections::HashMap;
     use std::path::PathBuf;
@@ -204,6 +204,10 @@ async fn renders_deployed_bundle_without_node_builtin_wall() {
     struct StubFetcher;
     #[async_trait]
     impl DataFetcher for StubFetcher {
+        fn trust_scope(&self) -> FetcherTrust {
+            FetcherTrust::Ambient
+        }
+
         async fn fetch(&self, _req: FetchRequest) -> elohim_render::Result<FetchResponse> {
             Ok(FetchResponse {
                 status: 200,

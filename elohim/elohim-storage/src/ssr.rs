@@ -22,7 +22,7 @@
 
 use async_trait::async_trait;
 use elohim_render::{materialize_server_bundle, AngularRenderer, BundleSource, DataFetcher};
-use elohim_render::{FetchRequest, FetchResponse, RenderContext};
+use elohim_render::{FetchRequest, FetchResponse, FetcherTrust, RenderContext};
 use elohim_render::{RenderError, RenderSpec, Renderer};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -131,6 +131,22 @@ pub struct LocalFetcher;
 
 #[async_trait]
 impl DataFetcher for LocalFetcher {
+    /// The peer renders its own content under its OWN authority — there is no
+    /// end-user credential on this path (`render_url` constructs `LocalFetcher`
+    /// unconditionally, with no request context). So every render on a storage
+    /// peer's isolate reaches exactly the same data, and isolate reuse across
+    /// them leaks nothing that was not already shared.
+    ///
+    /// **This must be revisited if the TODO above is taken.** Wiring the local
+    /// content service in so fetches resolve against the DHT projection is
+    /// fine; threading a *requesting user's* identity through it is not — that
+    /// would make this `Principal`, and the reused isolate would then carry one
+    /// user's residue into the next user's render. See
+    /// `genesis/data/timeline/backlog/elohim-render-isolate-reuse-trust-boundary.md`.
+    fn trust_scope(&self) -> FetcherTrust {
+        FetcherTrust::Ambient
+    }
+
     async fn fetch(&self, _request: FetchRequest) -> elohim_render::Result<FetchResponse> {
         Ok(FetchResponse {
             status: 404,

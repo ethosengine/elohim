@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::data_fetcher::{DataFetcher, FetchRequest, FetchResponse};
+use crate::data_fetcher::{DataFetcher, FetchRequest, FetchResponse, FetcherTrust};
 use crate::types::{FetchEvent, FetchOutcome};
 use crate::Result;
 
@@ -86,6 +86,16 @@ pub(crate) fn is_empty_payload(status: u16, body: &[u8]) -> bool {
 
 #[async_trait]
 impl DataFetcher for TracingFetcher {
+    /// Delegates to the wrapped fetcher — a decorator must never answer for
+    /// itself here. `TracingFetcher` sits between the render worker and the
+    /// real fetcher on EVERY render (see [`crate::angular::AngularRenderer`]),
+    /// so returning [`FetcherTrust::Ambient`] from this impl would launder
+    /// every credentialed fetcher in the system into an ambient one and render
+    /// the isolate trust bookkeeping permanently blind.
+    fn trust_scope(&self) -> FetcherTrust {
+        self.inner.trust_scope()
+    }
+
     async fn fetch(&self, request: FetchRequest) -> Result<FetchResponse> {
         let offset_ms = self
             .start
@@ -162,6 +172,10 @@ mod tests {
 
     #[async_trait]
     impl DataFetcher for StubFetcher {
+        fn trust_scope(&self) -> FetcherTrust {
+            FetcherTrust::Ambient
+        }
+
         async fn fetch(&self, _request: FetchRequest) -> Result<FetchResponse> {
             match &self.response {
                 Some(r) => Ok(r.clone()),
@@ -267,6 +281,10 @@ mod tests {
 
     #[async_trait]
     impl DataFetcher for SlowFetcher {
+        fn trust_scope(&self) -> FetcherTrust {
+            FetcherTrust::Ambient
+        }
+
         async fn fetch(&self, _request: FetchRequest) -> Result<FetchResponse> {
             tokio::time::sleep(Duration::from_millis(self.delay_ms)).await;
             Ok(resp(200, "finally"))

@@ -18,8 +18,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use elohim_render::{
-    AngularRenderer, DataFetcher, FetchRequest, FetchResponse, RenderContext, RenderLimits,
-    RenderSpec, Renderer,
+    AngularRenderer, DataFetcher, FetchRequest, FetchResponse, FetcherTrust, RenderContext,
+    RenderLimits, RenderSpec, Renderer,
 };
 
 /// Fetcher that fails fast — reproduces a render with no reachable peer.
@@ -27,6 +27,10 @@ struct FailFetcher;
 
 #[async_trait]
 impl DataFetcher for FailFetcher {
+    fn trust_scope(&self) -> FetcherTrust {
+        FetcherTrust::Ambient
+    }
+
     async fn fetch(&self, req: FetchRequest) -> elohim_render::Result<FetchResponse> {
         eprintln!("[fetch → FAIL] {} {}", req.method, req.url);
         Err(elohim_render::RenderError::DataFetch(format!(

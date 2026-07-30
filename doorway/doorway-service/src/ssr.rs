@@ -26,7 +26,9 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use elohim_render::{DataFetcher, FetchRequest, FetchResponse, RenderError, Result};
+use elohim_render::{DataFetcher, FetchRequest, FetchResponse, FetcherTrust, RenderError, Result};
+
+use crate::cache::ContentCache;
 
 // =============================================================================
 // Cache key
@@ -125,6 +127,25 @@ impl ResolverFetcher {
 
 #[async_trait]
 impl DataFetcher for ResolverFetcher {
+    /// A `ResolverFetcher` carrying a user credential fetches under THAT user's
+    /// authority — reach-aware storage reads answer differently for it than for
+    /// the doorway's own identity — so it is `Principal`. Without a credential
+    /// it fetches as the doorway itself: `Ambient`.
+    ///
+    /// This is the declaration the render isolate's trust bookkeeping reads.
+    /// `elohim_render::JsRuntime` reuses one V8 isolate across sequential
+    /// renders and does NOT reset the JS heap between them, so declaring
+    /// `Principal` here is what makes the resulting cross-render residue
+    /// visible instead of silent. See the type-level docs on
+    /// `elohim_render::runtime::JsRuntime` and
+    /// `genesis/data/timeline/backlog/elohim-render-isolate-reuse-trust-boundary.md`.
+    fn trust_scope(&self) -> FetcherTrust {
+        match self.user_credential {
+            Some(_) => FetcherTrust::Principal,
+            None => FetcherTrust::Ambient,
+        }
+    }
+
     async fn fetch(&self, request: FetchRequest) -> Result<FetchResponse> {
         let path = strip_to_path(&request.url);
         let url = format!("{}{}", self.storage_base, path);
@@ -216,6 +237,57 @@ pub fn maybe_inject_stall_fault(inner: Arc<dyn DataFetcher>) -> Arc<dyn DataFetc
     }
 }
 
+// =============================================================================
+// Trust-scoped SSR render cache
+// =============================================================================
+
+// The shareability RULE is not defined here: it lives in the shared render
+// layer as `FetcherTrust::is_cache_shareable`, because every render host must
+// make the same decision (doorway is one optional web2 projection of a peer
+// runtime capability, never a required component of the render path). These two
+// functions are only the doorway-local cache ADAPTER — they bind that shared
+// predicate to `ContentCache`. When render serving consolidates into the shared
+// render-host layer (see the isolate-reuse backlog record's consolidation note),
+// these move; the predicate does not.
+
+/// Trust-scoped read of the SSR render cache.
+///
+/// Returns `None` for a `Principal` render even on a populated key, so an
+/// authenticated visitor is never served another principal's (or a stale
+/// anonymous) render of reach-gated content.
+pub fn cached_render_for_trust(
+    cache: &ContentCache,
+    key: &str,
+    trust: FetcherTrust,
+) -> Option<String> {
+    if !trust.is_cache_shareable() {
+        return None;
+    }
+    cache.get_rendered(key)
+}
+
+/// Trust-scoped write to the SSR render cache.
+///
+/// A `Principal` render is silently not cached — this is the guard that closes
+/// the credential-blind-key disclosure: `render_cache_key` carries no principal,
+/// so storing a credentialed render would serve it to everyone for the TTL.
+pub fn cache_render_for_trust(
+    cache: &ContentCache,
+    key: &str,
+    html: String,
+    ttl: std::time::Duration,
+    trust: FetcherTrust,
+) {
+    if !trust.is_cache_shareable() {
+        tracing::debug!(
+            target: "doorway::ssr",
+            "credentialed render not cached (trust-scoped SSR cache)"
+        );
+        return;
+    }
+    cache.put_rendered(key, html, ttl);
+}
+
 /// Decorator that stalls fetches whose URL contains `fault_substr`, delegating
 /// everything else to `inner`. See [`maybe_inject_stall_fault`].
 struct StallFaultFetcher {
@@ -225,6 +297,13 @@ struct StallFaultFetcher {
 
 #[async_trait]
 impl DataFetcher for StallFaultFetcher {
+    /// Delegates — a decorator must never answer for itself. This one wraps the
+    /// real `ResolverFetcher`, so reporting its own scope would launder a
+    /// credentialed fetcher into an ambient one.
+    fn trust_scope(&self) -> FetcherTrust {
+        self.inner.trust_scope()
+    }
+
     async fn fetch(&self, request: FetchRequest) -> Result<FetchResponse> {
         if request.url.contains(self.fault_substr.as_str()) {
             // Never settle — the TracingFetcher's per-fetch soft-deadline converts
@@ -410,6 +489,136 @@ mod tests {
             strip_to_path("https://example.com/api/v1/foo?bar=1"),
             "/api/v1/foo?bar=1"
         );
+    }
+
+    // ── ResolverFetcher trust-scope declaration ─────────────────────────────
+    //
+    // These pin the input to `elohim_render::JsRuntime`'s isolate trust
+    // bookkeeping. The render isolate is reused across sequential renders and
+    // its JS heap is never reset, so a mis-declared `Ambient` here would make a
+    // real cross-principal residue channel invisible. See
+    // `genesis/data/timeline/backlog/elohim-render-isolate-reuse-trust-boundary.md`.
+
+    #[test]
+    fn anonymous_resolver_fetcher_declares_ambient_trust() {
+        let f = ResolverFetcher::new(Arc::new(reqwest::Client::new()), "http://x".into());
+        assert_eq!(f.trust_scope(), FetcherTrust::Ambient);
+    }
+
+    #[test]
+    fn credentialed_resolver_fetcher_declares_principal_trust() {
+        let f = ResolverFetcher::new(Arc::new(reqwest::Client::new()), "http://x".into())
+            .with_user_credential(UserCredential {
+                header_name: "Cookie".into(),
+                header_value: "doorway_session=abc".into(),
+            });
+        assert_eq!(
+            f.trust_scope(),
+            FetcherTrust::Principal,
+            "a fetcher carrying an end-user credential reaches reach-gated data \
+             on that user's behalf and MUST declare Principal, so isolate reuse \
+             after it is reported as a trust crossing"
+        );
+    }
+
+    #[test]
+    fn stall_fault_decorator_delegates_trust_instead_of_laundering_it() {
+        let inner: Arc<dyn DataFetcher> = Arc::new(
+            ResolverFetcher::new(Arc::new(reqwest::Client::new()), "http://x".into())
+                .with_user_credential(UserCredential {
+                    header_name: "Authorization".into(),
+                    header_value: "Bearer t".into(),
+                }),
+        );
+        let decorated = StallFaultFetcher {
+            inner,
+            fault_substr: "nope".into(),
+        };
+        assert_eq!(decorated.trust_scope(), FetcherTrust::Principal);
+    }
+
+    // ── Trust-scoped render cache ───────────────────────────────────────────
+    //
+    // The disclosure this closes: `render_cache_key` carries NO principal, so a
+    // credentialed render written into the cache is served to every other
+    // requester for the TTL. The gate is the fetcher's declared trust scope.
+
+    fn test_cache() -> ContentCache {
+        ContentCache::new(crate::cache::CacheConfig::default())
+    }
+
+    const TTL: std::time::Duration = std::time::Duration::from_secs(300);
+
+    #[test]
+    fn ambient_render_round_trips_through_the_cache() {
+        let cache = test_cache();
+        cache_render_for_trust(
+            &cache,
+            "k-ambient",
+            "<p>public</p>".into(),
+            TTL,
+            FetcherTrust::Ambient,
+        );
+        assert_eq!(
+            cached_render_for_trust(&cache, "k-ambient", FetcherTrust::Ambient),
+            Some("<p>public</p>".to_string()),
+            "anonymous renders must still be cached and served — the whole point \
+             of the SSR cache is preserved for the shareable path"
+        );
+    }
+
+    #[test]
+    fn principal_render_is_never_written_to_the_cache() {
+        let cache = test_cache();
+        cache_render_for_trust(
+            &cache,
+            "k-principal",
+            "<p>alice-private</p>".into(),
+            TTL,
+            FetcherTrust::Principal,
+        );
+        // Read back on the ANONYMOUS path — this is the disclosure direction.
+        assert_eq!(
+            cached_render_for_trust(&cache, "k-principal", FetcherTrust::Ambient),
+            None,
+            "a credentialed render must never land in the cache: the key carries \
+             no principal, so an anonymous request for the same URL would be \
+             served another user's reach-gated HTML"
+        );
+        assert_eq!(
+            cache.get_rendered("k-principal"),
+            None,
+            "nothing may reach the underlying store either"
+        );
+    }
+
+    #[test]
+    fn principal_render_is_never_served_from_the_cache() {
+        let cache = test_cache();
+        // A legitimately-cached anonymous render...
+        cache_render_for_trust(
+            &cache,
+            "k-shared",
+            "<p>public</p>".into(),
+            TTL,
+            FetcherTrust::Ambient,
+        );
+        // ...must not be handed to a credentialed request, which is entitled to
+        // a reach-aware render, not a stale anonymous one.
+        assert_eq!(
+            cached_render_for_trust(&cache, "k-shared", FetcherTrust::Principal),
+            None,
+            "a credentialed request must render fresh, never inherit the \
+             anonymous cache entry"
+        );
+    }
+
+    #[test]
+    fn only_ambient_is_cache_shareable() {
+        // The rule itself lives in elohim-render (FetcherTrust::is_cache_shareable);
+        // this pins doorway's adapter to it so a local re-derivation would fail.
+        assert!(FetcherTrust::Ambient.is_cache_shareable());
+        assert!(!FetcherTrust::Principal.is_cache_shareable());
     }
 
     // ── ResolverFetcher user_credential threading ───────────────────────────

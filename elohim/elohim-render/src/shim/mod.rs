@@ -16,6 +16,30 @@
 //! [`web_api`] for the mechanism and `web_api.js`'s header for the deliberate
 //! spec divergences.
 //!
+//! # Isolate lifecycle and the shims' trust contract
+//!
+//! Every shim installed here lives on `globalThis` of an isolate that is
+//! **reused across sequential renders** (see [`crate::runtime::JsRuntime`]).
+//! `web_api.js` installs its globals under a
+//! `if (typeof globalThis[name] === "undefined")` guard, which correctly stops
+//! re-installation from clobbering live state — and is precisely why nothing
+//! resets `Headers` / `Response` / `ReadableStream` (or the app bundle's own
+//! module-scope state) between renders. That is deliberate: the shims are
+//! installed once per isolate, not once per render.
+//!
+//! The resulting contract, stated plainly so it is not re-derived by guesswork:
+//! **isolate reuse is safe exactly while every render on that isolate runs
+//! under the same authority.** It is NOT made safe by swapping the
+//! [`DataFetcher`](crate::DataFetcher) per request — that changes what the next
+//! render is *allowed* to fetch, not what the previous render *left behind*.
+//! A fetcher declaring [`FetcherTrust::Principal`](crate::FetcherTrust::Principal)
+//! therefore contaminates the isolate for every render that follows; the
+//! runtime records and warns on that crossing rather than assuming it away.
+//!
+//! Anyone adding a shim that caches per-request data on `globalThis` is adding
+//! a new lane to that same channel. Keep request-scoped state in `OpState`
+//! (swapped per render) rather than on the JS global object.
+//!
 //! NOTE on URL: the hand-rolled `url.js` covers the WHATWG surface that
 //! Angular HttpClient and Universal SSR exercise (constructor, accessors,
 //! URLSearchParams, IPv6, default-port elision). If Angular pushes

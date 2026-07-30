@@ -1,0 +1,61 @@
+---
+epr-meta-version: 1
+id: elohim-render-shim-governance
+covers: subtree
+purpose: >
+  The deno_core extension shims that hand-roll the JS runtime surface the Angular server
+  bundle expects but a bare V8 isolate does not ship — console, URL/URLSearchParams,
+  TextEncoder/TextDecoder, the Node globals (process/timers/performance/Buffer), the web
+  platform globals (Headers/Request/Response/ReadableStream/AbortController/Blob), crypto,
+  and fetch. This manifest CLAIMS full responsibility for the subtree (covers: subtree). It
+  carries NO author-time rule, by the considered decision recorded below, not by omission.
+---
+
+# elohim-render/src/shim — the V8 runtime shims
+
+Every `.js` file here is compiled INTO the binary by deno_core's `js = [dir "...", "..."]`
+extension macro and installed onto one long-lived isolate's `globalThis`. The module-level
+orientation (what each shim covers, install ordering, the deliberate spec divergences) lives
+co-located in `mod.rs`; this manifest records the two governance facts an editor needs and
+why neither becomes an edit-time gate.
+
+## Considered, no enforcing rule (the deliberate opt-in, not a nag)
+
+**1. ASCII purity is an INVARIANT — and it is already caught by the strongest possible gate.**
+Every `.js` file here must be pure ASCII. The macro uses `ascii_str_include!`, which panics at
+**const-eval time** on any non-ASCII byte with a cryptic
+`error[E0080]: evaluation panicked: assertion failed: buffer.is_ascii() && ...` naming no file
+and no line. The offenders are always prose habits — em-dash, en-dash, curly quotes, ellipsis,
+arrows, non-breaking space — in *comments*. The fix is the HTML entity escape (`&#x2014;` for
+em-dash, `&#x2018;`/`&#x2019;` for curly quotes), documented at the top of `mod.rs`.
+
+This is not gated here because the compile itself is an exhaustive, unbypassable structural
+backstop — strictly stronger than any edit-time advisory, which could only enumerate the
+*common* offending characters via `contains-any` and would miss the rest. What the compiler
+gives poorly is the *message*, not the *catch*; a `contains-any` rule would need a registered
+validator-EPR to be actionable at all (schema: an enforcing rule requires one of
+`require-frontmatter`/`route-to`/`validator`/…), and an unregistered one degrades to an inert
+advisory — the footgun `validate_meta` exists to prevent. Sibling precedent for this outcome
+on a code tree: `doorway/doorway-service/.epr-meta`.
+
+Scar tissue: this trap fired on 2026-07-30 from an in-flight `url.js` edit (three em-dashes in
+new comments), turning the whole crate red mid-verification for an unrelated session.
+
+**2. Request-scoped state must not be cached on `globalThis`.** These shims live on an isolate
+that is **reused across sequential renders** — only the `DataFetcher` is swapped between them
+(`runtime.rs::set_fetcher`), and nothing resets the JS heap. `web_api.js`'s install guard
+(`if (typeof globalThis[name] === "undefined")`) correctly prevents re-installation from
+clobbering live state, and is exactly why nothing is reset between renders: shims install once
+per isolate, not once per render.
+
+So a shim that memoizes per-request data on the global object adds a lane to a live
+cross-principal residue channel — doorway already renders authenticated requests with a
+per-user credentialed fetcher (`FetcherTrust::Principal`). Keep request-scoped state in
+`OpState`, which IS swapped per render. This is a design judgment about what a new shim
+*means*, not a mechanizable predicate over file content — there is no textual signature that
+distinguishes legitimate one-time install state from illegitimate per-request caching — so it
+is held by the `mod.rs` doc contract and review, and by the trust bookkeeping and tests in
+`elohim/elohim-render/tests/isolate_trust.rs`.
+
+Full context and the deno_core-realm verdict:
+`genesis/data/timeline/backlog/elohim-render-isolate-reuse-trust-boundary.md`.

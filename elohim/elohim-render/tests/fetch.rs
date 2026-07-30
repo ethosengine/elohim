@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use elohim_render::runtime::JsRuntime;
-use elohim_render::{DataFetcher, FetchRequest, FetchResponse, Result};
+use elohim_render::{DataFetcher, FetchRequest, FetchResponse, FetcherTrust, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -8,6 +8,10 @@ struct FixedFetcher;
 
 #[async_trait]
 impl DataFetcher for FixedFetcher {
+    fn trust_scope(&self) -> FetcherTrust {
+        FetcherTrust::Ambient
+    }
+
     async fn fetch(&self, request: FetchRequest) -> Result<FetchResponse> {
         Ok(FetchResponse {
             status: 200,

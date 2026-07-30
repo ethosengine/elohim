@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use elohim_render::{
-    AngularRenderer, DataFetcher, FetchRequest, FetchResponse, RenderContext, RenderLimits,
-    RenderSpec, RenderTerminal, Renderer, Result,
+    AngularRenderer, DataFetcher, FetchRequest, FetchResponse, FetcherTrust, RenderContext,
+    RenderLimits, RenderSpec, RenderTerminal, Renderer, Result,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -11,6 +11,10 @@ struct EmptyFetcher;
 
 #[async_trait]
 impl DataFetcher for EmptyFetcher {
+    fn trust_scope(&self) -> FetcherTrust {
+        FetcherTrust::Ambient
+    }
+
     async fn fetch(&self, _request: FetchRequest) -> Result<FetchResponse> {
         Ok(FetchResponse {
             status: 200,
@@ -26,6 +30,10 @@ struct ContentFetcher;
 
 #[async_trait]
 impl DataFetcher for ContentFetcher {
+    fn trust_scope(&self) -> FetcherTrust {
+        FetcherTrust::Ambient
+    }
+
     async fn fetch(&self, _request: FetchRequest) -> Result<FetchResponse> {
         Ok(FetchResponse {
             status: 200,
@@ -41,6 +49,10 @@ struct EmptyArrayFetcher;
 
 #[async_trait]
 impl DataFetcher for EmptyArrayFetcher {
+    fn trust_scope(&self) -> FetcherTrust {
+        FetcherTrust::Ambient
+    }
+
     async fn fetch(&self, _request: FetchRequest) -> Result<FetchResponse> {
         Ok(FetchResponse {
             status: 200,
@@ -58,6 +70,10 @@ struct SlowFetcher {
 
 #[async_trait]
 impl DataFetcher for SlowFetcher {
+    fn trust_scope(&self) -> FetcherTrust {
+        FetcherTrust::Ambient
+    }
+
     async fn fetch(&self, _request: FetchRequest) -> Result<FetchResponse> {
         tokio::time::sleep(std::time::Duration::from_millis(self.delay_ms)).await;
         Ok(FetchResponse {
@@ -78,6 +94,10 @@ struct MarkerFetcher {
 
 #[async_trait]
 impl DataFetcher for MarkerFetcher {
+    fn trust_scope(&self) -> FetcherTrust {
+        FetcherTrust::Ambient
+    }
+
     async fn fetch(&self, _request: FetchRequest) -> Result<FetchResponse> {
         self.calls.lock().unwrap().push(self.marker.to_string());
         Ok(FetchResponse {

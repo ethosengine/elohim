@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use elohim_render::{
-    DataFetcher, EchoRenderer, FetchRequest, FetchResponse, RenderContext, RenderLimits,
-    RenderSpec, Renderer, Result,
+    DataFetcher, EchoRenderer, FetchRequest, FetchResponse, FetcherTrust, RenderContext,
+    RenderLimits, RenderSpec, Renderer, Result,
 };
 use std::sync::Arc;
 
@@ -9,6 +9,10 @@ struct NoopFetcher;
 
 #[async_trait]
 impl DataFetcher for NoopFetcher {
+    fn trust_scope(&self) -> FetcherTrust {
+        FetcherTrust::Ambient
+    }
+
     async fn fetch(&self, _request: FetchRequest) -> Result<FetchResponse> {
         unreachable!("EchoRenderer should not call fetch");
     }
