@@ -3,7 +3,19 @@
 /**
  * Economic event row from SELECT query
  */
-export type EconomicEvent = { id: string, h_app_id: string, action: string, provider: string, receiver: string, resource_conforms_to: string | null, resource_inventoried_as: string | null, resource_classified_as_json: string | null, resource_quantity_value: number | null, resource_quantity_unit: string | null, effort_quantity_value: number | null, effort_quantity_unit: string | null, has_point_in_time: string, has_duration: string | null, input_of: string | null, output_of: string | null, lamad_event_type: string | null, content_id: string | null, contributor_presence_id: string | null, path_id: string | null, triggered_by: string | null, state: string, note: string | null, metadata_json: string | null, dht_anchor_hash: string | null, created_at: string, 
+export type EconomicEvent = { id: string, h_app_id: string, action: string, provider: string, receiver: string, resource_conforms_to: string | null, resource_inventoried_as: string | null, resource_classified_as_json: string | null, resource_quantity_value: number | null, resource_quantity_unit: string | null, effort_quantity_value: number | null, effort_quantity_unit: string | null, has_point_in_time: string, has_duration: string | null, input_of: string | null, output_of: string | null, lamad_event_type: string | null, content_id: string | null, contributor_presence_id: string | null, path_id: string | null, triggered_by: string | null, state: string, 
+/**
+ * Free-form human note. Decoded through [`LossyTextOpt`] so a row holding
+ * non-UTF-8 bytes degrades to U+FFFD instead of failing the whole
+ * `.load()` batch — see `db::lossy_text` for the diesel 2.3.11 strict-decode
+ * background and the per-row-degradation rule this upholds.
+ */
+note: string | null, 
+/**
+ * Opaque JSON payload projected from peers; same lossy-decode rationale as
+ * `note`.
+ */
+metadata_json: string | null, dht_anchor_hash: string | null, created_at: string, 
 /**
  * Place ID where this event occurred (spatial grounding for carrying capacity)
  */

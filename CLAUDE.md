@@ -23,14 +23,21 @@ pnpm run hc:start[:seed]           # Start Holochain + doorway + storage [with s
 
 ### Rust services (RUSTFLAGS override required — see Gotchas)
 ```bash
-# doorway (doorway/doorway-service/) + steward/node — native builds
+# doorway (doorway/doorway-service/) — native build; has a lib + bins
 RUSTFLAGS="" cargo build --release && cargo test --lib --bins && cargo clippy -- -D warnings && cargo fmt --check
+
+# steward/node — native build. BIN-ONLY (one [[bin]] elohim-node, no src/lib.rs):
+# `cargo test --lib` exits 101 with "no library targets found". Its canonical gate
+# is steward/node/justfile's `gate: fmt-check clippy test` — plain `cargo test`.
+RUSTFLAGS="" cargo build --release && cargo test && cargo clippy -- -D warnings && cargo fmt --check
 
 # elohim/elohim-storage/ — Holochain WASM build
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
 cargo test export_bindings         # Regenerate TypeScript types
 ```
-Prefer `cargo nextest run` over `cargo test` for unit/integration runs (installed at `/opt/rust/cargo/bin/cargo-nextest`; parallel, faster on warm caches; same `--lib`/`--test <name>`/filter syntax). It does NOT replace `cargo test export_bindings` (separate ts-rs harness) and skips `#[ignore]` by default like `cargo test`.
+`cargo nextest` is **NOT installed in the dev container** (verified 2026-07-30 twice: `/opt/rust/cargo/bin` holds only rustup shims). Use plain `cargo test`. Where nextest IS available it is preferred for unit/integration runs (parallel, faster on warm caches; same `--lib`/`--test <name>`/filter syntax), but it never replaces `cargo test export_bindings` (separate ts-rs harness) and it skips `#[ignore]` by default like `cargo test`.
+
+**A dependency bump is not verified by `cargo check`.** `cargo check --locked --all-targets` *compiles* tests without running them, so a bump that changes runtime behaviour passes clean — that is exactly how a `diesel 2.3.5→2.3.11` strict-UTF-8 decode change reached `dev` and broke a committed resilience test. Dependency work needs `cargo test`. Two corollaries: never judge a cargo run from piped/tailed output (`| tee` and the background harness have each reported exit 0 while cargo returned 101 — echo `EXIT=$?` on its own line), and a warm target slot can make a gate read green for a build that no longer compiles from cold.
 
 ### Other Angular surfaces
 - `doorway/doorway-app/`: `pnpm start | build`; lint via `pnpm exec eslint src --ext .ts,.html`
