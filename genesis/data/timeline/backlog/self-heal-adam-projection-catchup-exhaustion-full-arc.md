@@ -6,7 +6,7 @@ contentFormat: "markdown"
 title: "adam (B / elohim.host) projection catch-up stalls after a deploy restart — cells are NOT authorities until their storage arc reconverges, so every heal get_links leaves the box and dies on the 60s conductor request timeout"
 slug: "self-heal-adam-projection-catchup-exhaustion-full-arc"
 written: "2026-07-27"
-updated: "2026-07-29"
+updated: "2026-07-30"
 author: "claude (resiliency-saga sprint-3 delivery — ch06 runtime blocker RCA); mechanism corrected 2026-07-29 (rust-architect, probe-confirmed)"
 status: "wip"
 priority: "high"
@@ -193,6 +193,31 @@ tuned away.
 Also still true: adam re-opens this window on **every deploy restart** (step 1
 above), so the trust contract's ~20min restart-churn does not hold for this node
 until the hosted-agent count comes down.
+
+## Post-cure measurement (2026-07-30, Loki 05:00Z→19:30Z — the escalation evidence bundle)
+
+The cures are deployed and behaving as designed, and the ceiling still holds:
+
+- **Cure code live on adam** (build `5290e3f`, running since 17:24Z): the content-leg
+  `HealCircuit` OPENED/shed 28 times across the window (first 11 min after a boot, most
+  recently 19:16Z) — the storm is *contained*, not gone; `resolve_content_head_local`
+  observed as a called extern. The `get_links response channel dropped` storm: 4 lines
+  total, all 06:55–07:33Z, **zero** after the 07:33Z redeploy.
+- **Arc convergence stalled at the population level**: exactly ONE `Updating storage arc
+  to full` agent (`uhCAk_hiBZ…`, the same one every boot) in 14.5h across ~35 hosted
+  agents; `caught_up=false` on every sweep all day; `content_local_anchored` 4226→4231
+  (+5) over the window; `content_divergent_anchor` oscillates 691–2919 (windowed-scan
+  noise, no trend).
+- **Restart churn compounds it**: four process boots in one day (05:04, 05:12, 07:33,
+  17:24Z — rolling redeploys), each resetting every cell's arc to Empty per
+  `core_space.rs:419`.
+
+Verdict: with the amplification cured, what remains is exactly the structural ceiling
+above — per-space gossip budget × hosted-agent count. No further storage/DNA-side code
+change moves this; the next state change is the operator's provisioning decision
+(cap/shard doorway-B's agents onto adam), or a long deploy-quiet stretch getting lucky.
+saga ch04 (elohim.host `GET /` 200) and ch06 (declared-head equality) both wait behind
+B's `caught_up`, plus ch06's separate head-direction decision.
 
 ## What would land ch06
 
