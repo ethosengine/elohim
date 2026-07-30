@@ -32,10 +32,11 @@ const bootstrap = (ctx: BootstrapContext) => bootstrapApplication(AppComponent, 
 // renderApplication wrapper exported for elohim-render's AngularRenderer driver:
 //   `mod.renderApplication(mod.default, { url })`
 // Injects a default document if the caller omits it — the driver only supplies { url }.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// Parameters are derived from @angular/platform-server's own signature, so this stays
+// correct across upgrades without the `any` casts the pre-22 version needed.
 export async function renderApplication(
-  bootstrapFn: any,
-  options: Record<string, any>
+  bootstrapFn: Parameters<typeof _platformRenderApplication>[0],
+  options: Parameters<typeof _platformRenderApplication>[1]
 ): Promise<string> {
   return _platformRenderApplication(bootstrapFn, {
     document: SSR_DOCUMENT,

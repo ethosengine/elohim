@@ -3,7 +3,6 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "@elohim/identity": ["../../app/elohim-library/projects/elohim-identity/src/public-api.ts"],
       "@elohim/identity/*": ["../../app/elohim-library/projects/elohim-identity/src/*"],

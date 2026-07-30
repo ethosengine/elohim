@@ -1,7 +1,6 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
-    "baseUrl": ".",
     "typeRoots": ["node_modules/@types"],
     "paths": {
       "@app/lamad/*": ["./src/app/*"],

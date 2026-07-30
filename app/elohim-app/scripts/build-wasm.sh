@@ -34,14 +34,27 @@ PKG_DIR="$CACHE_CORE_DIR/pkg"
 PKG_JS="$PKG_DIR/elohim_cache_core.js"
 PKG_WASM="$PKG_DIR/elohim_cache_core_bg.wasm"
 
+
+# @angular/build's application builder rejects asset inputs outside the workspace
+# root (app/elohim-app), so angular.json copies the WASM from
+# node_modules/elohim-cache-core rather than ../../elohim/elohim-cache-core/pkg.
+# Mirror pkg/ into that location so a freshly built pkg/ is what ng build ships.
+# (CI does the equivalent copy in the root Jenkinsfile after pnpm install.)
+sync_to_node_modules() {
+  local dest="$APP_DIR/node_modules/elohim-cache-core"
+  mkdir -p "$dest"
+  cp -f "$PKG_DIR"/*.js "$PKG_DIR"/*.wasm "$PKG_DIR"/*.d.ts "$PKG_DIR"/package.json "$dest/" 2>/dev/null || true
+}
+
 if command -v wasm-pack &>/dev/null; then
-  cd "$CACHE_CORE_DIR"
-  RUSTFLAGS='' wasm-pack build --target web --release
+  (cd "$CACHE_CORE_DIR" && RUSTFLAGS='' wasm-pack build --target web --release)
+  sync_to_node_modules
   exit 0
 fi
 
 if [ -f "$PKG_JS" ] && [ -f "$PKG_WASM" ]; then
   echo "wasm-pack not installed — reusing existing elohim-cache-core pkg output"
+  sync_to_node_modules
   exit 0
 fi
 
