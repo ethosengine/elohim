@@ -4,15 +4,18 @@ import {
   activationDecision,
   buildCustodyCommitmentBody,
   defaultCustodyPairs,
+  resolveCustodyBlobDescriptor,
   resolveCustodyPeerIds,
+  seedCustodyCommitments,
   type CommitmentClient,
   type CustodyPair,
   type CustodyPeerIds,
+  type ResolvedCustodyPair,
 } from '../seed-commitments.js';
 import { clearPeerIdCache, deterministicPeerId, resolvePeerId, storageUrlForHuman } from '../peer-id.js';
 
 describe('buildCustodyCommitmentBody', () => {
-  const pair: CustodyPair = {
+  const pair: ResolvedCustodyPair = {
     providerHumanId: 'human-matthew-manager',
     providerArchetype: 'desktop',
     receiverHumanId: 'human-terrance-tutor',
@@ -205,6 +208,116 @@ describe('resolvePeerId (Stage 2)', () => {
 });
 
 // =============================================================================
+// resolveCustodyBlobDescriptor — contentId -> serverBlobHash resolution.
+// Live alpha finding (2026-07-30): the custody-facing fold only resolves
+// `stocked` off the store's SERVER-side hash (shard_manifests.blob_hash),
+// which is `serverBlobHash` on the content row — never the client-declared
+// `blobHash`. This resolver lets a CustodyPair declare `contentId` instead of
+// a static fixture `blobHash` so the seeded pledge always carries the hash
+// the fold actually checks.
+// =============================================================================
+
+describe('resolveCustodyBlobDescriptor', () => {
+  const basePair = {
+    providerHumanId: 'human-matthew-manager',
+    providerArchetype: 'desktop' as const,
+    receiverHumanId: 'human-matthew-manager',
+    receiverArchetype: 'desktop' as const,
+  };
+
+  it('blobHash pair: passes the declared hash/size through unchanged (back-compat, no fetch)', async () => {
+    const fetchImpl = vi.fn();
+    const resolved = await resolveCustodyBlobDescriptor(
+      { ...basePair, blobHash: 'sha256-deadbeef', blobSizeBytes: 42 },
+      { fetchImpl },
+    );
+    expect(resolved).toEqual({ blobHash: 'sha256-deadbeef', blobSizeBytes: 42 });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('contentId pair: fetches the PROVIDER content row and serverBlobHash wins over blobHash', async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      expect(url).toBe(`${storageUrlForHuman('human-matthew-manager')}/db/content/elohim-host-landing`);
+      return new Response(
+        JSON.stringify({
+          serverBlobHash: 'sha256-56adaebb',
+          blobHash: 'sha256-a12218a5',
+          contentSizeBytes: 999,
+        }),
+        { status: 200 },
+      );
+    });
+    const resolved = await resolveCustodyBlobDescriptor(
+      { ...basePair, contentId: 'elohim-host-landing' },
+      { fetchImpl },
+    );
+    expect(resolved.blobHash).toBe('sha256-56adaebb');
+    expect(resolved.blobSizeBytes).toBe(999);
+  });
+
+  it('contentId pair: falls back to blobHash when the row has no serverBlobHash', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ blobHash: 'sha256-a12218a5', contentSizeBytes: 10 }), { status: 200 }),
+    );
+    const resolved = await resolveCustodyBlobDescriptor(
+      { ...basePair, contentId: 'elohim-host-landing' },
+      { fetchImpl },
+    );
+    expect(resolved.blobHash).toBe('sha256-a12218a5');
+  });
+
+  it('contentId pair: an explicitly declared blobSizeBytes wins over the row\'s contentSizeBytes', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb', contentSizeBytes: 999 }), { status: 200 }),
+    );
+    const resolved = await resolveCustodyBlobDescriptor(
+      { ...basePair, contentId: 'elohim-host-landing', blobSizeBytes: 5 },
+      { fetchImpl },
+    );
+    expect(resolved.blobSizeBytes).toBe(5);
+  });
+
+  it('declaring BOTH blobHash and contentId is a fail-fast authoring error', async () => {
+    await expect(
+      resolveCustodyBlobDescriptor({ ...basePair, blobHash: 'sha256-deadbeef', blobSizeBytes: 1, contentId: 'x' }),
+    ).rejects.toThrow(/declares BOTH blobHash and contentId/);
+  });
+
+  it('declaring NEITHER blobHash nor contentId is a fail-fast authoring error', async () => {
+    await expect(resolveCustodyBlobDescriptor({ ...basePair })).rejects.toThrow(
+      /declares NEITHER blobHash nor contentId/,
+    );
+  });
+
+  it('an unresolvable content row (fetch failure) is an honest seed failure, no fallback', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('connect ECONNREFUSED');
+    });
+    await expect(
+      resolveCustodyBlobDescriptor({ ...basePair, contentId: 'elohim-host-landing' }, { fetchImpl }),
+    ).rejects.toThrow('connect ECONNREFUSED');
+  });
+
+  it('a content row with neither serverBlobHash nor blobHash is a fail-fast error', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ contentSizeBytes: 5 }), { status: 200 }));
+    await expect(
+      resolveCustodyBlobDescriptor({ ...basePair, contentId: 'elohim-host-landing' }, { fetchImpl }),
+    ).rejects.toThrow(/neither serverBlobHash nor blobHash/);
+  });
+
+  it('an unresolvable blobSizeBytes (no declared value, no contentSizeBytes on the row) fails fast', async () => {
+    const fetchImpl = vi.fn(
+      async () => new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb' }), { status: 200 }),
+    );
+    await expect(
+      resolveCustodyBlobDescriptor({ ...basePair, contentId: 'elohim-host-landing' }, { fetchImpl }),
+    ).rejects.toThrow(/cannot resolve blobSizeBytes/);
+  });
+});
+
+// =============================================================================
 // Idempotent activation — recognize an already-active commitment as a
 // meaningful success instead of re-submitting it (a PATCH active→active still
 // routes through the conductor/projection write path and gets shed under seed
@@ -233,7 +346,7 @@ describe('activationDecision (idempotent activation rule)', () => {
 
 describe('activateCustodyCommitments (offline, injected client + agent-key probe)', () => {
   const REAL = 'uhCAkmatthewagentkey';
-  const pair: CustodyPair = {
+  const pair: ResolvedCustodyPair = {
     providerHumanId: 'human-matthew-manager',
     providerArchetype: 'desktop',
     receiverHumanId: 'human-jessica-spouse',
@@ -312,6 +425,62 @@ describe('activateCustodyCommitments (offline, injected client + agent-key probe
   });
 });
 
+describe('seedCustodyCommitments (offline) — contentId pair drives create + activate', () => {
+  const REAL = 'uhCAkmatthewagentkey';
+  const contentIdPair: CustodyPair = {
+    providerHumanId: 'human-matthew-manager',
+    providerArchetype: 'desktop',
+    receiverHumanId: 'human-matthew-manager',
+    receiverArchetype: 'desktop',
+    contentId: 'elohim-host-landing',
+  };
+
+  beforeEach(() => clearPeerIdCache());
+  afterEach(() => vi.restoreAllMocks());
+
+  it('resolves serverBlobHash via contentId, creates the commitment, then issues the activation PATCH', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url.endsWith('/db/content/elohim-host-landing')) {
+        return new Response(
+          JSON.stringify({ serverBlobHash: 'sha256-56adaebb', blobHash: 'sha256-a12218a5', contentSizeBytes: 999 }),
+          { status: 200 },
+        );
+      }
+      if (url.endsWith('/auth/me')) {
+        return new Response(JSON.stringify({ agentPubKey: REAL }), { status: 200 });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    const createCommitment = vi.fn(async (_body: { resourceClassifiedAs: string[] }) => new Response('{}', { status: 200 }));
+    const getCommitment = vi.fn(
+      async (id: string) => new Response(JSON.stringify({ id, state: 'proposed' }), { status: 200 }),
+    );
+    const patchCommitmentState = vi.fn(
+      async (_id: string, _state: string) => new Response('{}', { status: 200 }),
+    );
+    const client = {
+      createCommitment,
+      getCommitment,
+      patchCommitmentState,
+    } as unknown as CommitmentClient;
+
+    await seedCustodyCommitments(client, [contentIdPair], { fetchImpl });
+
+    // Created with the RESOLVED serverBlobHash, not the (absent) client blobHash.
+    expect(createCommitment).toHaveBeenCalledTimes(1);
+    const sentBody = createCommitment.mock.calls[0][0] as { resourceClassifiedAs: string[] };
+    expect(sentBody.resourceClassifiedAs).toEqual(['sha256-56adaebb']);
+
+    // The activation step ran and issued the PATCH for the same (proposed) row.
+    expect(getCommitment).toHaveBeenCalledTimes(1);
+    expect(patchCommitmentState).toHaveBeenCalledTimes(1);
+    expect(patchCommitmentState.mock.calls[0][1]).toBe('active');
+  });
+});
+
 describe('defaultCustodyPairs triad fixture', () => {
   let prevHash: string | undefined;
   let prevSize: string | undefined;
@@ -330,15 +499,25 @@ describe('defaultCustodyPairs triad fixture', () => {
 
   it('includes the james fixture pairs with formation-output provenance', () => {
     const pairs = defaultCustodyPairs();
-    // 2 M1 pairs (matthew<->jessica) + 4 fixture pairs (james with each parent, both directions)
-    expect(pairs).toHaveLength(6);
+    // 2 M1 pairs (matthew<->jessica) + 4 fixture pairs (james with each parent,
+    // both directions) + 1 self-custody contentId pair (elohim-host-landing)
+    expect(pairs).toHaveLength(7);
     const jamesPairs = pairs.filter(
       (p) => p.providerHumanId === 'human-james-son' || p.receiverHumanId === 'human-james-son',
     );
     expect(jamesPairs).toHaveLength(4);
     for (const p of jamesPairs) expect(p.fixture).toBe('formation-output');
     const nonFixturePairs = pairs.filter((p) => !p.fixture);
-    expect(nonFixturePairs).toHaveLength(2);
+    expect(nonFixturePairs).toHaveLength(3);
+  });
+
+  it('includes the elohim-host-landing self-custody pair, resolved via contentId not a fixture blobHash', () => {
+    const pairs = defaultCustodyPairs();
+    const selfCustody = pairs.find((p) => p.contentId === 'elohim-host-landing');
+    expect(selfCustody).toBeDefined();
+    expect(selfCustody?.providerHumanId).toBe('human-matthew-manager');
+    expect(selfCustody?.receiverHumanId).toBe('human-matthew-manager');
+    expect(selfCustody?.blobHash).toBeUndefined();
   });
 
   it('stamps fixture provenance into the commitment body metadata', () => {

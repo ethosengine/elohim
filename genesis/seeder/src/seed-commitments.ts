@@ -96,11 +96,47 @@ export interface CustodyPair {
   providerArchetype: Archetype;
   receiverHumanId: string;
   receiverArchetype: Archetype;
-  blobHash: string; // raw hex (no prefix), or full "sha256-<hex>"
-  blobSizeBytes: number;
+  /**
+   * Client-declared blob hash — raw hex (no prefix), or full "sha256-<hex>".
+   * Mutually exclusive with `contentId`: declare exactly one. Prefer
+   * `contentId` for anything backed by a real content row — the
+   * custody-facing fold only resolves `stocked` off the store's SERVER-side
+   * hash (`shard_manifests.blob_hash`), which is `serverBlobHash` on the
+   * content row, not this client-side value (verified live on alpha
+   * 2026-07-30: pledging the client blobHash never flipped
+   * `elohim_custody_class_count{class="stocked"}`; pledging serverBlobHash
+   * did). `blobHash` stays supported for fixture pairs with no backing
+   * content row.
+   */
+  blobHash?: string;
+  /**
+   * Content id to resolve at seed time via
+   * `GET {storageUrl}/db/content/{contentId}` against the PROVIDER's storage
+   * pod — takes `serverBlobHash ?? blobHash` from the row (server hash wins;
+   * see `blobHash` doc above) and falls back to `contentSizeBytes` for
+   * `blobSizeBytes` when the pair doesn't declare it. Mutually exclusive with
+   * `blobHash`.
+   *
+   * DRIFT GUARD: the seeded commitment id is a content-addressed hash of
+   * (provider_peer, receiver_peer, RESOLVED blob hash) — see
+   * `buildCustodyCommitmentBody`. A content re-upload that mints a new
+   * `serverBlobHash` therefore mints a NEW commitment id on the next seed
+   * run; it does not update the old one in place. The old pledge is not
+   * superseded automatically — that reconcile pass (recognize + retire the
+   * stale commitment id for a re-uploaded contentId) is out of scope here.
+   */
+  contentId?: string;
+  /**
+   * Optional when `contentId` is set (resolved from the content row's
+   * `contentSizeBytes`); required when `blobHash` is set.
+   */
+  blobSizeBytes?: number;
   /** Formation provenance marker — present only on interim fixtures. */
   fixture?: string;
 }
+
+/** A `CustodyPair` with `blobHash`/`blobSizeBytes` resolved to concrete values. */
+export type ResolvedCustodyPair = CustodyPair & { blobHash: string; blobSizeBytes: number };
 
 interface CommitmentBody {
   id: string;
@@ -164,6 +200,94 @@ export async function resolveCustodyPeerIds(
 }
 
 /**
+ * Resolve a `CustodyPair`'s `blobHash`/`blobSizeBytes` to concrete values,
+ * following the pair's declared source:
+ *
+ * - `blobHash` declared: pass through unchanged (back-compat fixture path).
+ *   `blobSizeBytes` must already be declared — there is no row to fall back
+ *   to for size.
+ * - `contentId` declared: `GET {storageUrl}/db/content/{contentId}` against
+ *   the PROVIDER's storage pod (the node that must verifiably hold the
+ *   blob), and take `serverBlobHash ?? blobHash` from the row —
+ *   `serverBlobHash` wins because the custody-facing fold only resolves
+ *   `stocked` off the store's server-side hash (`shard_manifests.blob_hash`),
+ *   never the client-declared one (verified live on alpha 2026-07-30:
+ *   pledging `elohim-host-landing`'s `serverBlobHash` flipped
+ *   `elohim_custody_class_count{class="stocked"}` 0→1; pledging its client
+ *   `blobHash` did not). `blobSizeBytes` resolves from the pair's declared
+ *   value, else the row's `contentSizeBytes`.
+ *
+ * Exactly one of `blobHash`/`contentId` must be declared — declaring both or
+ * neither is a fail-fast authoring error, same posture as the no-fallback
+ * rule in `resolveCustodyPeerIds`: an unresolvable content row is an honest
+ * seed failure, not a decision this function papers over.
+ */
+export async function resolveCustodyBlobDescriptor(
+  pair: CustodyPair,
+  opts: ResolvePeerIdOptions = {},
+): Promise<{ blobHash: string; blobSizeBytes: number }> {
+  const label = `${pair.providerHumanId}→${pair.receiverHumanId}`;
+  const hasBlobHash = typeof pair.blobHash === 'string' && pair.blobHash.length > 0;
+  const hasContentId = typeof pair.contentId === 'string' && pair.contentId.length > 0;
+
+  if (hasBlobHash && hasContentId) {
+    throw new Error(`${label}: pair declares BOTH blobHash and contentId — declare exactly one.`);
+  }
+  if (!hasBlobHash && !hasContentId) {
+    throw new Error(`${label}: pair declares NEITHER blobHash nor contentId — declare exactly one.`);
+  }
+
+  if (hasBlobHash) {
+    if (typeof pair.blobSizeBytes !== 'number' || pair.blobSizeBytes <= 0) {
+      throw new Error(`${label}: blobHash pair requires a positive blobSizeBytes.`);
+    }
+    return { blobHash: normalizeBlobHash(pair.blobHash as string), blobSizeBytes: pair.blobSizeBytes };
+  }
+
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const storageUrl = (opts.storageUrl ?? storageUrlForHuman(pair.providerHumanId)).replace(/\/+$/, '');
+  const endpoint = `${storageUrl}/db/content/${pair.contentId}`;
+
+  let response: Response;
+  try {
+    response = await fetchImpl(endpoint, { signal: AbortSignal.timeout(opts.timeoutMs ?? 5000) });
+  } catch (err) {
+    throw new Error(`${label}: GET ${endpoint} failed — ${err instanceof Error ? err.message : String(err)}`);
+  }
+  if (!response.ok) {
+    throw new Error(`${label}: GET ${endpoint} returned HTTP ${response.status} — cannot resolve contentId "${pair.contentId}".`);
+  }
+
+  const row = (await response.json()) as {
+    serverBlobHash?: unknown;
+    blobHash?: unknown;
+    contentSizeBytes?: unknown;
+  };
+
+  const resolvedHash =
+    typeof row.serverBlobHash === 'string' && row.serverBlobHash.length > 0
+      ? row.serverBlobHash
+      : typeof row.blobHash === 'string' && row.blobHash.length > 0
+        ? row.blobHash
+        : undefined;
+  if (!resolvedHash) {
+    throw new Error(
+      `${label}: content row "${pair.contentId}" at ${endpoint} has neither serverBlobHash nor blobHash — cannot resolve a custody blob hash.`,
+    );
+  }
+
+  const blobSizeBytes =
+    pair.blobSizeBytes ?? (typeof row.contentSizeBytes === 'number' ? row.contentSizeBytes : undefined);
+  if (typeof blobSizeBytes !== 'number' || blobSizeBytes <= 0) {
+    throw new Error(
+      `${label}: cannot resolve blobSizeBytes for contentId "${pair.contentId}" — pair didn't declare it and the row's contentSizeBytes is missing/invalid.`,
+    );
+  }
+
+  return { blobHash: normalizeBlobHash(resolvedHash), blobSizeBytes };
+}
+
+/**
  * Build a CreateReaCommitmentInputView body for a single custody-blob pair.
  *
  * `id` is a deterministic content-addressed hash of the (provider_peer,
@@ -176,7 +300,7 @@ export async function resolveCustodyPeerIds(
  * accidentally reviving the transport-peer-ID namespace that cannot join
  * `shard_locations`.
  */
-export function buildCustodyCommitmentBody(pair: CustodyPair, peerIds: CustodyPeerIds): CommitmentBody {
+export function buildCustodyCommitmentBody(pair: ResolvedCustodyPair, peerIds: CustodyPeerIds): CommitmentBody {
   const providerPeerId = peerIds.provider;
   const receiverPeerId = peerIds.receiver;
   const blob = normalizeBlobHash(pair.blobHash);
@@ -272,6 +396,24 @@ export function defaultCustodyPairs(): CustodyPair[] {
       receiverArchetype: 'desktop',
       ...fixture,
     },
+    // Self-custody pledge for the saga ch07 carrier content (2026-07-30):
+    // resolved via contentId, not a fixture blobHash, so every genesis seed
+    // run re-asserts the EXACT pledge whose serverBlobHash the custody-facing
+    // fold checks against shard_manifests.blob_hash (proven live on alpha —
+    // pledging elohim-host-landing's serverBlobHash flipped
+    // elohim_custody_class_count{class="stocked"} 0→1; the client blobHash
+    // did not). The deterministic id derivation from (provider|receiver|
+    // resolved-blob) already makes re-running this idempotent (409 on
+    // re-seed). DRIFT GUARD: a re-upload of elohim-host-landing mints a new
+    // serverBlobHash and therefore a NEW commitment id here — the old pledge
+    // is not superseded automatically; that reconcile pass is out of scope.
+    {
+      providerHumanId: 'human-matthew-manager',
+      providerArchetype: 'desktop',
+      receiverHumanId: 'human-matthew-manager',
+      receiverArchetype: 'desktop',
+      contentId: 'elohim-host-landing',
+    },
   ];
 }
 
@@ -309,22 +451,30 @@ export class CommitmentClient extends DoorwayClient {
 // Seeding (fail-fast on non-409 errors)
 // =============================================================================
 
-export async function seedCustodyCommitments(client: CommitmentClient, pairs: CustodyPair[]): Promise<void> {
+export async function seedCustodyCommitments(
+  client: CommitmentClient,
+  pairs: CustodyPair[],
+  opts: ResolvePeerIdOptions = {},
+): Promise<void> {
   console.log(`[seed-commitments] Seeding ${pairs.length} custody-blob commitments...`);
 
   let created = 0;
   let alreadyExists = 0;
 
   for (const pair of pairs) {
-    // Real peer ids from the live storage pods — per-host cached, so the
+    // Resolve the blob descriptor (blobHash pass-through, or contentId ->
+    // serverBlobHash/contentSizeBytes off the provider's content row) and the
+    // real peer ids from the live storage pods — per-host cached, so the
     // activate phase below recomputes the SAME content-addressed body.id.
-    const body = buildCustodyCommitmentBody(pair, await resolveCustodyPeerIds(pair));
+    const blob = await resolveCustodyBlobDescriptor(pair, opts);
+    const resolvedPair: ResolvedCustodyPair = { ...pair, ...blob };
+    const body = buildCustodyCommitmentBody(resolvedPair, await resolveCustodyPeerIds(pair, opts));
     const label = `${pair.providerHumanId.replace(/^human-/, '')}→${pair.receiverHumanId.replace(/^human-/, '')}`;
 
     const response = await client.createCommitment(body);
 
     if (response.ok) {
-      console.log(`  [+] ${label} ${pair.blobHash.slice(0, 16)}...`);
+      console.log(`  [+] ${label} ${blob.blobHash.slice(0, 16)}...`);
       created += 1;
       continue;
     }
@@ -345,7 +495,7 @@ export async function seedCustodyCommitments(client: CommitmentClient, pairs: Cu
 
   console.log(`[seed-commitments] Done. created=${created} already-exists=${alreadyExists} total=${pairs.length}`);
 
-  await activateCustodyCommitments(client, pairs);
+  await activateCustodyCommitments(client, pairs, opts);
 }
 
 /**
@@ -400,9 +550,12 @@ export async function activateCustodyCommitments(
   let missing = 0;
 
   for (const pair of pairs) {
-    // Same resolver as the seed phase — the per-host cache (peer-id.ts)
-    // guarantees an identical id even if a pod flapped between phases.
-    const body = buildCustodyCommitmentBody(pair, await resolveCustodyPeerIds(pair, opts));
+    // Same resolvers as the seed phase — the per-host peer-id cache
+    // (peer-id.ts) guarantees an identical id even if a pod flapped between
+    // phases; the blob descriptor is re-resolved from the same content row.
+    const blob = await resolveCustodyBlobDescriptor(pair, opts);
+    const resolvedPair: ResolvedCustodyPair = { ...pair, ...blob };
+    const body = buildCustodyCommitmentBody(resolvedPair, await resolveCustodyPeerIds(pair, opts));
     const label = `${pair.providerHumanId.replace(/^human-/, '')}→${pair.receiverHumanId.replace(/^human-/, '')}`;
 
     // Read-first idempotency check: recognize the same commitment already active
