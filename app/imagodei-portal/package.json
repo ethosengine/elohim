@@ -9,24 +9,24 @@
     "typecheck": "tsc -p tsconfig.app.json --noEmit"
   },
   "dependencies": {
-    "@angular/animations": "^19.2.18",
-    "@angular/common": "^19.2.0",
-    "@angular/compiler": "^19.2.0",
-    "@angular/core": "^19.2.0",
-    "@angular/forms": "^19.2.0",
-    "@angular/platform-browser": "^19.2.0",
-    "@angular/platform-browser-dynamic": "^19.2.0",
-    "@angular/router": "^19.2.0",
+    "@angular/animations": "^22.1.0",
+    "@angular/common": "^22.1.0",
+    "@angular/compiler": "^22.1.0",
+    "@angular/core": "^22.1.0",
+    "@angular/forms": "^22.1.0",
+    "@angular/platform-browser": "^22.1.0",
+    "@angular/platform-browser-dynamic": "^22.1.0",
+    "@angular/router": "^22.1.0",
     "elohim-core": "workspace:*",
     "elohim-imagodei": "workspace:*",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
-    "zone.js": "~0.15.0"
+    "zone.js": "~0.16.0"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "^19.2.15",
-    "@angular/cli": "^19.2.15",
-    "@angular/compiler-cli": "^19.2.0",
-    "typescript": "~5.7.2"
+    "@angular/build": "^22.1.0",
+    "@angular/cli": "^22.1.0",
+    "@angular/compiler-cli": "^22.1.0",
+    "typescript": "~6.0.3"
   }
 }

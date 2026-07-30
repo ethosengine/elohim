@@ -62,5 +62,13 @@ onlyBuiltDependencies:
   - sharp
   - unrs-resolver
 
+# Vitest-JIT resource-transformer workaround (re-cut for Angular 22, 2026-07-30).
+# @angular/build's createJitResourceTransformer relies on ts.visitEachChild, which
+# no-ops on the synthetic source files Vitest's JIT pipeline hands it, so component
+# styles/templates never get rewritten to imports. The patch adds a manual
+# statement-iteration fallback. Defect confirmed still present at 22.1.0 (identical
+# visitEachChild logic at the same anchor). Re-cut this patch on every @angular/build
+# bump; verify node_modules/@angular/build/src/tools/angular/transformers/
+# jit-resource-transformer.js carries the fallback after install.
 patchedDependencies:
-  '@angular/build@19.2.22': patches/@angular__build@19.2.22.patch
+  '@angular/build@22.1.0': patches/@angular__build@22.1.0.patch

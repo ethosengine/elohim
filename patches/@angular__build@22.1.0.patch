@@ -1,5 +1,5 @@
 diff --git a/src/tools/angular/transformers/jit-resource-transformer.js b/src/tools/angular/transformers/jit-resource-transformer.js
-index b57a38a6c0b491ed09ce65e8bc7224d7fb5a2b59..f3fe0a419e14ad972497b87b8ce7e80749aecdd9 100755
+index 6df36d7..f9fbb1a 100755
 --- a/src/tools/angular/transformers/jit-resource-transformer.js
 +++ b/src/tools/angular/transformers/jit-resource-transformer.js
 @@ -40,7 +40,19 @@ function createJitResourceTransformer(getTypeChecker) {
