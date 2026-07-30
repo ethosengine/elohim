@@ -241,6 +241,33 @@ Two consequences:
   concern, and sophia's sources would then face jQuery 3 semantics *without* the
   step-2 audit. Recorded as an option, not a plan.
 
+### Sprint executed — fix committed, awaiting integration (2026-07-30)
+
+The operator-initiated sprint ran the same day. The migration is **committed on
+sophia branch `feat/jquery-3`** (branched from `f0157adbb`), lead commit
+`3adf1d493c` *"security(deps): jquery 2.1.1 -> 3.7.1 (catalog) + jQuery 3
+compat fixes"*:
+
+- Catalog moved to `^3.7.1`/`3.7.1`; lockfile resolves `jquery@3.7.1` only
+  (`2.1.1` count 0). The sole hard code break was the vendored
+  `jquery.mobile.vmouse.js` using removed jQuery-2 event internals
+  (`$.event.props`/`mouseHooks`); two further fixes were jsdom-only test shims.
+  No Deferred usage existed; MathQuill needed no global-jQuery change.
+- Rebuilt `sophia-element.umd.js` carries `3.7.1` (and zero `2.1.1` hits);
+  headless-Chromium A/B against the jQuery-2 bundle showed identical DOM
+  metrics. Full suite, lint, and root tsc green — independently re-verified by
+  a non-author agent (485 suites / 6498 passed).
+- The branch also carries a vetted upstream-Perseus a11y harvest (see
+  `sophia-upstream-graph-types-features-sync-epic.md` for what was deliberately
+  deferred).
+
+**Remaining for closure:** integrator merge (submodule pointer bump rides the
+normal integration flow) and the **Nexus republish** of
+`@ethosengine/sophia-element` — the published package still ships 2.1.1 until
+then. Touch/vmouse and plotter drag paths remain unexercised end-to-end;
+eyes-on widget verification on a deployed surface is the last recommended
+check.
+
 ## Verification
 
 What this pass proved (no fix landed, so this is scoping evidence, not
