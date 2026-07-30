@@ -11,7 +11,7 @@ status: "backlog"
 priority: "high"
 deprecation_status: blocked
 severity: security
-fingerprints: ["011f5406331d", "313c6eac27c1", "93e83acd4b96", "d5f606fc5fa4", "4ee2a842e119", "01b4b9157783", "9d31ba938515", "fb31d99a0ba8"]
+fingerprints: ["011f5406331d", "313c6eac27c1", "93e83acd4b96", "d5f606fc5fa4", "4ee2a842e119", "01b4b9157783", "9d31ba938515", "fb31d99a0ba8", "21d129212653"]
 relatedNodeIds: []
 tags: [deprecation, security, jquery, sophia, perseus, umd-bundle, xss, prototype-pollution, submodule]
 cites:
