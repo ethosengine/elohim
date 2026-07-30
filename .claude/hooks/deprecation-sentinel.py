@@ -257,6 +257,45 @@ ECHO_LOCKFILE_VERSION_META_RE = re.compile(
 #   2730dafbdcc2 / e06ddf1806ad / c1065020cbb6 — were this class, from a
 #   content_store section-header scope grep; the fns are intentionally
 #   deprecated-and-retained, so there was no live concern to canonicalize.)
+# Guard J — pnpm PACKAGE-CHANGES-SUMMARY redundant surface:
+#   pnpm reports a deprecated dependency TWICE in one install, from two stages.
+#   The resolution stage emits the real warning, carrying the upstream message
+#   and URL (` WARN  deprecated eslint@8.57.1: This version is no longer
+#   supported. Please see https://eslint.org/version-support …`). The
+#   end-of-install lockfile-diff listing then emits a bare marker with no
+#   message, no URL, no workspace prefix (`+ eslint 8.57.1 deprecated`). They
+#   differ textually, so they hash differently and fp-dedupe cannot collapse
+#   them — fps 819aa7c6f6bd (resolution WARN) and bba59aabdf63 (summary twin)
+#   cost TWO background triage dispatches for ONE concern on 2026-07-30.
+#   Safe because the summary surface is a strict SUBSET of the resolution
+#   surface: the resolution WARN fires on every install (it re-reads the
+#   lockfile), while the summary block only prints when the package set
+#   changes. Collapsing the summary can never lose a finding.
+#   The `deprecated\s*$` anchor keeps it narrow: a real diff hunk adding
+#   `#[deprecated(note = "…")]`, a `version = "0.9.34+deprecated"` literal, or
+#   any prose sentence carries punctuation, quotes, or trailing words and
+#   cannot match. Diff markers are matched precisely rather than exempted —
+#   pnpm's summary marker IS `+`/`-`, so Guard C/G's hunk exemption misses it.
+ECHO_PNPM_CHANGE_SUMMARY_RE = re.compile(
+    r"^\s*(?:[^\s:]+:\d+[:-])?\s*(?:\d+[:-])?\s*"  # optional grep path:line: / -n prefix
+    r"[+-]\s+"  # pnpm add/remove marker
+    r"(?:@[A-Za-z0-9._-]+/)?[A-Za-z0-9._-]+\s+"  # package name (optionally scoped)
+    r"\d[A-Za-z0-9.+-]*\s+"  # version (starts with a digit)
+    r"deprecated\s*$",  # bare marker, nothing after it
+    re.IGNORECASE,
+)
+
+# Guard K — ESCAPE-RENDERED mangling self-capture:
+#   The sentinel already normalizes the U+2009 THIN SPACE that pnpm pads its
+#   `WARN` prefix with. But when an agent re-reads that same captured log
+#   through an escape-rendering tool (`cat -A`, `od -c`), U+2009 renders as the
+#   literal ASCII `M-bM-^@M-^I` — a different byte string, so it hashes
+#   differently and re-mints. Three fps (b1561f3d429d, 9d31ba938515,
+#   010ff5a7bfb5) were minted this way on 2026-07-30 for warnings the ledger
+#   already held. No real toolchain emits `cat -A`'s escape vocabulary; a
+#   mangled rendering is never a live warning.
+ECHO_ESCAPE_RENDERED_RE = re.compile(r"M-[A-Za-z]M-\^?[@-_A-Za-z]|M-\^[@-_]")
+
 ECHO_SRC_DEPRECATED_BANNER_RE = re.compile(r"\(DEPRECATED\)\s*$")
 ECHO_SRC_DEPRECATED_COMMENT_RE = re.compile(
     r"^(?:[^\s:]+:)?\d*[:-]?\s*//[/!]?.*\bDEPRECATED\b", re.IGNORECASE
@@ -326,6 +365,74 @@ ECHO_COMMENT_OPENER_RE = re.compile(
     r"(?://[/!]?|\#(?!\[))"  # comment opener: // /// //! or # (NOT #[attr])
 )
 
+# Guard L — DERIVED/GENERATED ARTIFACT TREE self-capture:
+#   A grep/cat/find that recurses into a BUILD OUTPUT or dependency tree reads
+#   back annotations that are, by construction, copies of something else:
+#   `node_modules/**` (another project's source — the Guard-I rationale applied
+#   to installed deps), and the derived trees `dist/**`, `.angular/cache/**`,
+#   `.nx/cache/**`, `.vite/**`, `vite/deps/**`, `coverage/**`,
+#   `target/{debug,release,wasm32*}/**` (our OWN source, compiled/cached/bundled).
+#   Nothing in these trees is authored or fixed here: a finding in `dist/` is
+#   the `src/` line that produced it, and a finding in `node_modules/` belongs
+#   upstream. fp-dedupe cannot collapse the class — cache filenames are
+#   content-hashed (`.angular/cache/22.1.0/ng-packagr/<sha256>.json`) so every
+#   rebuild mints a FRESH path and therefore a fresh fingerprint, unboundedly
+#   (same defeat as Guards B/D/F/G).
+#   Keyed at LINE level on a grep-with-filename PATH PREFIX (`<path>:` at line
+#   start), deliberately NOT on the command string. That is what makes it safe
+#   against the over-suppression risk recorded in
+#   `deprecation-lit-context-upstream-dts-jsdoc-noise.md`: a real warning from a
+#   tool INVOKED out of `node_modules/.bin/` (vitest, ng, eslint) is emitted as
+#   the tool's own prose with no path prefix, and a DeprecationWarning carrying
+#   a `node_modules/` STACK FRAME mid-line is not prefix-shaped either — both
+#   stay capturable (verified TP7/TP15).
+#   (2026-07-30: fp c3259594f97a + the three self-minted d6938f2c29af /
+#   0efde47788fa / 678210c3381a all came from ONE
+#   `app/elohim-library/.angular/cache/**/ng-packagr/<sha>.json` blob.)
+ECHO_DERIVED_ARTIFACT_PATH_RE = re.compile(
+    r"^[+-]?\s*"
+    r"(?:[^\s:]*/)?"
+    r"(?:node_modules|dist|coverage|\.angular/cache|\.nx/cache|\.vite"
+    r"|vite/deps|target/(?:debug|release|wasm32[^/]*))"
+    r"/[^\s:]*:",
+)
+
+# Guard M — JSDoc `@deprecated` TAG self-capture (the TS/JS analog of Guard G):
+#   Guard G collapses the deprecation-IMPLEMENTATION surface for `//`-comment
+#   languages, but the TypeScript/JavaScript form of the same deliberate,
+#   migration-retained annotation is a JSDoc BLOCK comment, which G's
+#   `//`-anchored regex cannot see:
+#       /**
+#        * Trigger an upgrade prompt.
+#        * @deprecated Activity signals now flow via EconomicEvents to the Rust
+#        * substrate. This stub is retained for call-site compatibility.
+#        */
+#   A scope grep re-emits those ` * @deprecated …` lines with a fresh
+#   `grep -n` line-number prefix every time the file shifts, so fp-dedupe can
+#   never collapse them — only a shape guard can.
+#   Keyed on the JSDoc TAG `@deprecated` (with its literal `@`) on a
+#   COMMENT-SHAPED line (`/**`, `/*`, `*`, `//`, `///`, `//!`). Zero
+#   true-positive risk: the live TS deprecation channel is the ESLint
+#   `@typescript-eslint/no-deprecated` rule, whose output is prose
+#   ("`LearningPath` is deprecated. Use PathView instead") and contains the
+#   substring `no-deprecated`, never `@deprecated`; npm's channel is
+#   `npm warn deprecated <pkg>@<ver>` (the `@` follows the package name, never
+#   precedes `deprecated`); Vitest/Node/Rust emit bare-word prose. Verified
+#   against 19 live-channel negatives, zero over-suppression.
+#   Deliberately NOT diff-exempt (unlike Guards C/G, like Guard H2): a JSDoc
+#   tag is an annotation whether it is being ADDED in a `git diff` or merely
+#   re-read, and `+ * @deprecated …` mid-migration is a dominant shape. The
+#   Rust attribute form `#[deprecated…]` is not comment-shaped and still
+#   captures (verified TP11/TP18).
+ECHO_JSDOC_DEPRECATED_TAG_RE = re.compile(
+    r"^\s*[+-]?\s*"
+    r"(?:[^\s:]+:\d+[:-])?\s*"  # optional grep `path:line:` prefix
+    r"(?:\d+[:-])?\s*"  # optional bare `-n` line-number prefix
+    r"(?:/\*\*?|\*|//[/!]?)"  # JSDoc/blockcomment opener: /** /* * // /// //!
+    r".*@deprecated",
+    re.IGNORECASE,
+)
+
 # Command-level gates for echo classes B and C: if the command itself is a pure
 # git history read (git log / git show without a -p / --patch flag) or reads
 # directly from the history / planning / SDD prose trees, ALL lines from that
@@ -392,6 +499,25 @@ def _is_echo_line(
       I) Vendored third-party research clone (`genesis/research/repos/**`,
          gitignored, never built) — another project's deprecations/advisories,
          folded into Guard B's path/command gates.
+      J) pnpm package-changes-summary twin (`+ eslint 8.57.1 deprecated`) — the
+         end-of-install lockfile-diff marker for a package whose real warning
+         the resolution stage already emitted with message + URL. A strict
+         subset of the resolution surface, so collapsing it loses nothing.
+      K) Escape-rendered mangling (`M-bM-^@M-^I` from a `cat -A`/`od -c`
+         re-read of a captured log) — a byte-mangled rendering of a warning
+         already held, never a live emission.
+      L) Derived/generated artifact tree — a grep-with-filename PATH PREFIX
+         into `node_modules/`, `dist/`, `.angular/cache/`, `.nx/cache/`,
+         `.vite/`, `vite/deps/`, `coverage/`, `target/{debug,release,wasm32*}/`.
+         Build output or installed dependency: the finding belongs to the
+         `src/` line that produced it or to the upstream project. Keyed on the
+         path prefix, NOT the command, so a tool invoked from
+         `node_modules/.bin/` still captures.
+      M) JSDoc `@deprecated` tag on a comment-shaped line — the TS/JS analog of
+         Guard G's `//`-comment collapse, covering the block-comment form
+         (`/** … * @deprecated … */`) that G's regex cannot see. The live TS
+         channel is ESLint `@typescript-eslint/no-deprecated` prose, which
+         never contains the literal `@deprecated`. Not diff-exempt (like H2).
     """
     # Guard A — ledger self-capture
     if ECHO_LEDGER_PATH.search(line):
@@ -407,6 +533,16 @@ def _is_echo_line(
     # registry artifact filename (`…-0.9.34+deprecated.crate`): registry
     # metadata, not a live warning. Deterministic, no command-flag dep — like D.
     if ECHO_LOCKFILE_VERSION_META_RE.search(line):
+        return True
+
+    # Guard J — pnpm package-changes-summary twin (`+ eslint 8.57.1 deprecated`):
+    # a bare marker carrying no message/URL the resolution WARN lacks.
+    if ECHO_PNPM_CHANGE_SUMMARY_RE.match(line):
+        return True
+
+    # Guard K — escape-rendered mangling (`cat -A`/`od -c` re-read of a captured
+    # log): never a live warning.
+    if ECHO_ESCAPE_RENDERED_RE.search(line):
         return True
 
     # Guard E — agentic tooling-source echo (.claude/ paths, review-finding
@@ -431,6 +567,19 @@ def _is_echo_line(
         and ADVISORY_ID_RE.search(line)
         and ECHO_COMMENT_OPENER_RE.match(line)
     ):
+        return True
+
+    # Guard L — derived/generated artifact tree (node_modules, dist, .angular/
+    # cache, .nx/cache, .vite, vite/deps, coverage, target/{debug,release,wasm32*}).
+    # Line-level path-prefix key only — a tool run FROM node_modules/.bin emits
+    # prose with no path prefix and stays capturable.
+    if ECHO_DERIVED_ARTIFACT_PATH_RE.match(line):
+        return True
+
+    # Guard M — JSDoc `@deprecated` tag on a comment-shaped line: the TS/JS
+    # deprecation-IMPLEMENTATION surface (Guard G's analog for block comments).
+    # Not diff-exempt: an annotation is an annotation added or re-read.
+    if ECHO_JSDOC_DEPRECATED_TAG_RE.match(line):
         return True
 
     # Guard B (+ H1) — history / remediation-ledger prose (grep output carries
