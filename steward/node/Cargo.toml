@@ -65,8 +65,17 @@ tokio-tungstenite = "0.21"
 # HTTP middleware
 tower-http = { version = "0.5", features = ["fs"] }
 
-# HTTP client for updates
-reqwest = { version = "0.11", features = ["json", "stream"] }
+# HTTP client for updates.
+# rustls-tls (not the default native-tls) so the tree carries no openssl:
+# openssl reached this lock through exactly one edge, reqwest 0.11 -> native-tls.
+# Every sibling manifest (elohim/Cargo.toml workspace, elohim-storage,
+# elohim-sdk, elohim-storage-client) is already 0.12 + rustls-tls; this was the
+# last 0.11/native-tls holdout.
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "stream",
+    "rustls-tls",
+] }
 futures = "0.3"
 
 # Crypto for update verification
