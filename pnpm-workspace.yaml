@@ -38,6 +38,20 @@ overrides:
   '@vue/compiler-ssr': 3.5.34
   '@vue/reactivity': 3.5.34
   '@vue/shared': 3.5.34
+  # GHSA-3ppc-4f35-3m26 / GHSA-23c5-xmqv-rm74 (Dependabot #551/#553/#552): eslint-plugin-sonarjs
+  # pins an exact vulnerable minimatch@10.1.2; force the dedupe to an already-resolved, already
+  # patched instance (10.2.4) already present in the graph — no new tarball fetch required.
+  'eslint-plugin-sonarjs>minimatch': ^10.2.4
+  # GHSA-c2c7-rcm5-vvqj / GHSA-3v7f-55p6-f55p (Dependabot #578/#579): @angular-devkit/core pins
+  # an exact vulnerable picomatch@4.0.2; force the dedupe to an already-resolved, already patched
+  # instance (4.0.4) already present in the graph — no new tarball fetch required.
+  '@angular-devkit/core>picomatch': ^4.0.4
+  '@angular-devkit/build-angular>picomatch': ^4.0.4
+  '@angular/build>picomatch': ^4.0.4
+  # GHSA-q8mj-m7cp-5q26 (Dependabot #642): qs is resolved at 6.14.2/6.15.0 (dev-only, via
+  # webpack-dev-server's express chain); 6.15.2 is confirmed fetchable on the mirror right now
+  # (unlike almost everything else checked in this pass) and fixes the CVE with no API change.
+  qs: ^6.15.2
 
 onlyBuiltDependencies:
   - '@parcel/watcher'
