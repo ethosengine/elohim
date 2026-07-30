@@ -5,7 +5,7 @@
  * and completed graduates. Includes force-graduate action per user.
  */
 
-import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NotificationService } from '../../../core/notifications/notification.service';
 import { DoorwayAdminService } from '../../../services/doorway-admin.service';
@@ -103,7 +103,6 @@ import { GraduationUser } from '../../../models/doorway.model';
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './graduation-tab.component.css',
 })
 export class GraduationTabComponent implements OnInit {

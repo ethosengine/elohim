@@ -19,7 +19,6 @@ import {
   inject,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -223,7 +222,6 @@ type RegisterState = 'form' | 'creating_identity' | 'registering' | 'authorizing
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './threshold-register.component.css',
 })
 export class ThresholdRegisterComponent implements OnInit {

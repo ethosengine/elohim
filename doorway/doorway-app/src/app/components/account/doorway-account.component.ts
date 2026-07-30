@@ -12,7 +12,6 @@ import {
   inject,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -257,7 +256,6 @@ const AGENCY_STEPS: PipelineStep[] = [
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './doorway-account.component.css',
 })
 export class DoorwayAccountComponent implements OnInit {

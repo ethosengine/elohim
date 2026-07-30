@@ -12,7 +12,6 @@ import {
   inject,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
@@ -184,7 +183,6 @@ type LoadingState = 'loading' | 'ready' | 'error';
       </footer>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './doorway-landing.component.css',
 })
 export class DoorwayLandingComponent implements OnInit {

@@ -1,4 +1,4 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
 import { AuthStateService } from '../../services/auth-state.service';
@@ -9,7 +9,6 @@ import { ThemeToggleComponent } from '../theme-toggle/theme-toggle.component';
   standalone: true,
   imports: [RouterLink, RouterLinkActive, ThemeToggleComponent],
   templateUrl: './doorway-toolbar.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './doorway-toolbar.component.css',
 })
 export class DoorwayToolbarComponent {

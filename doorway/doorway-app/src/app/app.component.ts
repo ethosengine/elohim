@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 import { DoorwayToolbarComponent } from './components/toolbar/doorway-toolbar.component';
@@ -9,7 +9,6 @@ import { AuthStateService } from './services/auth-state.service';
   selector: 'app-root',
   imports: [RouterOutlet, DoorwayToolbarComponent, NotificationToastComponent],
   templateUrl: './app.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './app.component.css',
 })
 export class AppComponent implements OnInit {

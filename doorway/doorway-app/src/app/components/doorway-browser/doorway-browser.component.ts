@@ -15,7 +15,6 @@ import {
   inject,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -31,7 +30,6 @@ import {
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './doorway-browser.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './doorway-browser.component.css',
 })
 export class DoorwayBrowserComponent implements OnInit {

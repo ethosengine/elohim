@@ -17,7 +17,6 @@ import {
   inject,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -199,7 +198,6 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './threshold-login.component.css',
 })
 export class ThresholdLoginComponent implements OnInit {

@@ -11,7 +11,6 @@ import {
   inject,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DoorwayAdminService } from '../../../services/doorway-admin.service';
@@ -88,7 +87,6 @@ interface FunnelStage {
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './pipeline-tab.component.css',
 })
 export class PipelineTabComponent implements OnInit {

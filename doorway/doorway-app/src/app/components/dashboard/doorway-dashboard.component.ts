@@ -5,7 +5,6 @@ import {
   inject,
   signal,
   computed,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { NotificationService } from '../../core/notifications/notification.service';
@@ -57,7 +56,6 @@ type UserSortField = 'identifier' | 'permissionLevel' | 'isActive' | 'storagePer
     TopologyTabComponent,
   ],
   templateUrl: './doorway-dashboard.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './doorway-dashboard.component.scss',
 })
 export class DoorwayDashboardComponent implements OnInit, OnDestroy {

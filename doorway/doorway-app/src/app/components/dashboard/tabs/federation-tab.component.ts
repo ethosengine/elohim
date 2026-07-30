@@ -7,7 +7,7 @@
  * 3. P2P Peers — table of libp2p peer connections
  */
 
-import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NotificationService } from '../../../core/notifications/notification.service';
@@ -218,7 +218,6 @@ import {
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './federation-tab.component.css',
 })
 export class FederationTabComponent implements OnInit {

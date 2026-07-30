@@ -5,7 +5,7 @@
  * Include once in the app root template.
  */
 
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject } from '@angular/core';
 
 import { NotificationService } from './notification.service';
 
@@ -31,7 +31,6 @@ import { NotificationService } from './notification.service';
       </div>
     }
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .toast-container {

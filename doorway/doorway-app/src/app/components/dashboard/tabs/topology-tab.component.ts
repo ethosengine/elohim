@@ -12,7 +12,7 @@
 
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 // Generated types — single source of truth at
@@ -106,7 +106,6 @@ export type { DoorwayDashboardView, DashboardSteward, DashboardFederationPeer };
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .topology-tab {
