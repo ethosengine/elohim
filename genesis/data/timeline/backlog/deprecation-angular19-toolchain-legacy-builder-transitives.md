@@ -167,6 +167,96 @@ upgrade is scheduled, attach steps 1–4 above to it as acceptance criteria, and
 `glob@7.2.3`, `inflight@1.0.6`, `rimraf@3.0.2`, `tar@6.2.1`, and the
 `sockjs`-carried `uuid@8.3.2`.
 
+## 2026-07-30 — operator-requested 19 → 21 attempt: gates cleared, artifact layer blocked
+
+An operator-initiated attempt (target chosen as **21.x**, not 20.x, because v19 is EOL
+and 20's LTS window is short) got as far as a full manifest bump and died at
+`pnpm install` resolution. Every *code and toolchain* gate cleared; the blocker is
+purely artifact availability. Recording the cleared gates so the next attempt is
+one-shot rather than a re-derivation.
+
+**Cleared (probed against real 20.3.x / 21.2.x package contents, not release notes):**
+
+| Gate | Finding |
+|---|---|
+| Node floor | `@angular/core@21` engines `^20.19.0 \|\| ^22.12.0 \|\| >=24.0.0`; local 22.22, root `engines >=20.20`, containers `node:20-alpine` / `node:22-alpine` — all satisfy. No container rebuild needed. |
+| TypeScript | `compiler-cli@21` peer `>=5.9 <6.1`, `@angular/build@21` peer `>=5.9 <6.0` → `~5.9.3`. Note `elohim-service` and `perseus-plugin` separately pin `~5.4.0` and must move too. |
+| Vitest | `@angular/build@21` peers **`vitest ^4.0.8`** — matches the workspace's vitest 4 exactly (the 20.x line wanted `^3.1.1`, so 21 is the *better* target for this repo). |
+| Vite | `@angular/build@21` depends on `vite 7.3.2`; workspace declares `^7.3.1`. This closes the recorded `'@angular/build>vite'` override gap and the `@vitejs/plugin-basic-ssl` unmet-peer warning without an override. |
+| Builders | `@angular-devkit/build-angular@21.2.x` still publishes, so the five `angular.json` files keep resolving unchanged — the `use-application-builder` migration (step 1 above) is decoupled from the version bump and can land after. `@angular/build:ng-packagr` exists at 21, unblocking step 2. |
+| Analog | `@analogjs/vite-plugin-angular@2.3.0` (installed) already declares `^20.0.0 \|\| ^21.0.0` peers — no bump strictly required; `2.3.1` is a patch. |
+| SSR private-API survival | The elohim-app / lamad SSR path leans on three non-public symbols. All three survive at **21.2.14**: `ɵNoopNgZone` (`@angular/core`), `ɵREQUESTS_CONTRIBUTE_TO_STABILITY` (`@angular/common/http`), and `renderApplication` + `provideServerRendering` (`@angular/platform-server`). This was the largest silent-break candidate; it is not one. |
+| Forced source migrations | v21 ships six `ng-update` migrations. Four are no-ops here (no `Router.getCurrentNavigation`, no `Router.lastSuccessfulNavigation`, no `ApplicationConfig` imported from `platform-browser`, no deprecated bootstrap options). `add-bootstrap-context-to-server-main` is already hand-implemented in both `main.server.ts` files — with `BootstrapContext` public at 21, the `any` cast + eslint-disable can be dropped. `control-flow-migration` is opt-in, not forced. |
+| TestBed strictness | `THROW_ON_UNKNOWN_ELEMENTS_DEFAULT = false` at 21 — the Lit `<elohim-*>` custom elements rendered in Angular specs do **not** start erroring. |
+| `@angular/build` patch | The Vitest-JIT resource-transformer defect is **not fixed upstream in 20.x or 21.x** (verified byte-identical `visitEachChild` logic in both). The patch must be re-cut, not dropped. The hunk applies at the identical anchor — replace the single line `const updatedSourceFile = ts.visitEachChild(sourceFile, visitNode, context);` in `src/tools/angular/transformers/jit-resource-transformer.js` with the `let` + manual-statement-iteration fallback from `patches/@angular__build@19.2.22.patch`; `git apply --check` confirmed clean against pristine 21.2.14. |
+
+**The blocker — the Nexus npm mirror serves cached artifacts only.**
+
+`pnpm install` fails at *version resolution*, before any tarball fetch, because the
+mirror's cached metadata lags upstream (`@angular/cli` latest reads `21.2.12`, not
+`21.2.14`; `@angular-eslint/*` reads `21.3.1`, not `21.4.0`). Pinning to the exact
+versions the mirror's metadata *does* know still fails, because no Angular 20/21
+tarball is cached:
+
+```
+authenticated GET https://nexus.ethosengine.com/repository/npm/…
+  @angular/core@21.2.14        404      @angular/core@21.2.12        404
+  @angular/core@20.3.27        404      @angular/build@21.2.12       404
+  @angular/cli@21.2.12         404      @angular/ssr@21.2.12         404
+  @angular-devkit/build-angular@21.2.12 404
+  @angular/core@19.2.19        200   ← control: cached, serves
+```
+
+Anonymous and token-authenticated requests behave identically, so this is not an
+auth gap. Uncached non-Angular probes 404 the same way (`left-pad@1.2.0`,
+`is-odd@3.0.1`), while every artifact that *does* serve turns out to be already in
+the cache — so the proxy's on-demand upstream fetch is broken repo-wide, not
+Angular-specific. `registry.npmjs.org` is directly reachable from the build
+container (`@angular/core@21.2.14` → `200`), so the wall is the mirror, not egress.
+
+**Beware one measurement artifact** that produces false "the mirror has it" reads:
+the Nexus npm endpoint sometimes returns upstream `dist.tarball` URLs
+(`https://registry.npmjs.org/…`) in its metadata and sometimes its own
+(`https://nexus.ethosengine.com/repository/npm/…`). Probing whatever
+`npm view <pkg> dist.tarball` hands back therefore flips between `200` (npmjs
+path, irrelevant to what pnpm will fetch) and `404` (the mirror path, the real
+answer). Always probe the **`repository/npm/` URL explicitly** before concluding
+an artifact is available. Same caution applies to the `vite@6.4.2` /
+`glob@13.0.6` / `qs@6.15.2` "fetchable" reads recorded in
+`VULNERABILITY_CLUSTER_00_RETRY_QUEUE.md`.
+
+**Two unblock paths, both operator/infra decisions:**
+
+1. **Repair the mirror's proxy remote** (root fix). A `repository/npm-proxy/`
+   endpoint exists and returns metadata `200` but tarball `403`, while the
+   configured `repository/npm/` group returns metadata `200` and tarball `404`
+   for anything uncached — consistent with the group's proxy member being
+   unable to reach or unauthorized against upstream. Fixing this unblocks the
+   whole 228-finding dependency campaign, not just Angular.
+2. **Point the install at `registry.npmjs.org`** — works from this container, but
+   `.npmrc` `registry=` is what CI uses too, so CI would fetch through the same
+   broken mirror unless it is repointed as well. The lockfile itself is
+   host-agnostic (integrity hashes only, zero recorded hosts), so a lockfile
+   generated against npmjs is *portable* — it just cannot be **installed**
+   through a mirror that lacks the artifacts.
+
+Until one of those lands, the manifests stay at 19.2.x. The bump was reverted
+rather than left in the tree: `package.json` at 21 with `pnpm-lock.yaml` at 19
+breaks `--frozen-lockfile` for CI, the pre-push gates, and every concurrent
+session sharing this worktree.
+
+**Landed from the attempt (not blocked):** the six test-setup files migrated off
+the deprecated `@angular/platform-browser-dynamic/testing` entry point to
+`platformBrowserTesting` / `BrowserTestingModule` from
+`@angular/platform-browser/testing`. Those symbols already exist at 19.2.19, so
+this is forward-pay for the upgrade that is verifiable *today*, and it closes
+ledger fingerprints `7bddeaf8d471` / `80b6044081e1`. One non-obvious catch:
+`platformBrowserTesting()` does **not** pull in the JIT compiler the way
+`platformBrowserDynamicTesting()` did — every migrated setup needs an explicit
+`import '@angular/compiler';` or specs fail with *"needs to be compiled using the
+JIT compiler"* (doorway-app's 7 spec files failed exactly this way before the
+import was added).
+
 ## Verification
 
 No fix was applied this run; nothing is claimed fixed. Verified:

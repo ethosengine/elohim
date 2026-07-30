@@ -17,9 +17,10 @@ Object.defineProperty(globalThis, 'matchMedia', {
 });
 
 import { getTestBed } from '@angular/core/testing';
-import {
-  BrowserDynamicTestingModule,
-  platformBrowserDynamicTesting,
-} from '@angular/platform-browser-dynamic/testing';
+// platformBrowserTesting() (unlike the deprecated platformBrowserDynamicTesting()) does
+// NOT pull in the JIT compiler implicitly — specs that JIT-compile injectables/components
+// fail with "needs to be compiled using the JIT compiler" without this import.
+import '@angular/compiler';
+import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
 
-getTestBed().initTestEnvironment(BrowserDynamicTestingModule, platformBrowserDynamicTesting());
+getTestBed().initTestEnvironment(BrowserTestingModule, platformBrowserTesting());

@@ -1,13 +1,12 @@
 import '@analogjs/vitest-angular/setup-zone';
 
-import {
-  BrowserDynamicTestingModule,
-  platformBrowserDynamicTesting,
-} from '@angular/platform-browser-dynamic/testing';
+// platformBrowserTesting() (unlike the deprecated platformBrowserDynamicTesting()) does
+// NOT pull in the JIT compiler implicitly — specs that JIT-compile injectables/components
+// fail with "needs to be compiled using the JIT compiler" without this import.
+import '@angular/compiler';
+import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
 import { getTestBed } from '@angular/core/testing';
 
-getTestBed().initTestEnvironment(
-  BrowserDynamicTestingModule,
-  platformBrowserDynamicTesting(),
-  { teardown: { destroyAfterEach: true } }
-);
+getTestBed().initTestEnvironment(BrowserTestingModule, platformBrowserTesting(), {
+  teardown: { destroyAfterEach: true },
+});

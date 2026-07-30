@@ -1,7 +1,7 @@
-import '@analogjs/vitest-angular/setup-zone';
+import "@analogjs/vitest-angular/setup-zone";
 
 // jsdom lacks matchMedia — stub it for component tests that check prefers-color-scheme
-Object.defineProperty(globalThis, 'matchMedia', {
+Object.defineProperty(globalThis, "matchMedia", {
   writable: true,
   value: (query: string) => ({
     matches: false,
@@ -15,10 +15,17 @@ Object.defineProperty(globalThis, 'matchMedia', {
   }),
 });
 
-import { getTestBed } from '@angular/core/testing';
+import { getTestBed } from "@angular/core/testing";
+// platformBrowserTesting() (unlike the deprecated platformBrowserDynamicTesting()) does
+// NOT pull in the JIT compiler implicitly — specs that JIT-compile injectables/components
+// fail with "needs to be compiled using the JIT compiler" without this import.
+import "@angular/compiler";
 import {
-  BrowserDynamicTestingModule,
-  platformBrowserDynamicTesting,
-} from '@angular/platform-browser-dynamic/testing';
+  BrowserTestingModule,
+  platformBrowserTesting,
+} from "@angular/platform-browser/testing";
 
-getTestBed().initTestEnvironment(BrowserDynamicTestingModule, platformBrowserDynamicTesting());
+getTestBed().initTestEnvironment(
+  BrowserTestingModule,
+  platformBrowserTesting(),
+);
