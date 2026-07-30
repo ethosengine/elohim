@@ -16,6 +16,7 @@ use crate::shim::loader::NodeShimLoader;
 use crate::shim::node_buffer::node_buffer_ext;
 use crate::shim::node_crypto::node_crypto_ext;
 use crate::shim::node_globals::node_globals_ext;
+use crate::shim::web_api::web_api_ext;
 use crate::shim::{console::console_ext, text::text_ext, url::url_ext};
 
 use crate::{RenderError, Result};
@@ -92,6 +93,7 @@ impl JsRuntime {
                 text_ext::init_ops_and_esm(),
                 node_globals_ext::init_ops_and_esm(),
                 node_buffer_ext::init_ops_and_esm(),
+                web_api_ext::init_ops_and_esm(),
                 node_crypto_ext::init_ops_and_esm(),
             ],
             ..Default::default()
@@ -130,6 +132,9 @@ impl JsRuntime {
                 text_ext::init_ops_and_esm(),
                 node_globals_ext::init_ops_and_esm(),
                 node_buffer_ext::init_ops_and_esm(),
+                // MUST precede fetch_ext: fetch.js builds a `Response` and reads
+                // `Headers` from the globals web_api.js installs.
+                web_api_ext::init_ops_and_esm(),
                 fetch_ext::init_ops_and_esm(FetcherHandle(fetcher)),
                 node_crypto_ext::init_ops_and_esm(),
             ],
