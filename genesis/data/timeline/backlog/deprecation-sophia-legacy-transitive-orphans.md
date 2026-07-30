@@ -14,7 +14,6 @@ severity: low
 fingerprints: ["ce0de21b8053"]
 relatedNodeIds:
   - "backlog-deprecation-sophia-rollup-filesize-npm-internals-subtree"
-  - "backlog-deprecation-sophia-dead-devdependency-declarations"
 tags: [deprecation, sophia, transitive, orphan, snapdragon, micromatch, cypress-jest-adapter, sloc, svgo, cssnano, rollup-plugin-postcss, abandoned-upstream]
 cites:
   - https://github.com/lydell/urix#deprecated

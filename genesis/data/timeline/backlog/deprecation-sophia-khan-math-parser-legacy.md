@@ -13,7 +13,7 @@ deprecation_status: blocked
 severity: low
 fingerprints: ["ce0de21b8053"]
 relatedNodeIds:
-  - "backlog-deprecation-sophia-dead-devdependency-declarations"
+  - "backlog-deprecation-sophia-rollup-filesize-npm-internals-subtree"
 tags: [deprecation, sophia, mathjax, mathjax-full, khanacademy, nomnom, jison, kas, parser-generator, upstream-pinned, fork-boundary]
 cites:
   - https://www.npmjs.com/package/mathjax-full

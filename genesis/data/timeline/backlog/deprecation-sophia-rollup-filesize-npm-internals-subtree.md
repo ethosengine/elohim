@@ -13,7 +13,6 @@ deprecation_status: open
 severity: low
 fingerprints: ["ce0de21b8053"]
 relatedNodeIds:
-  - "backlog-deprecation-sophia-dead-devdependency-declarations"
   - "backlog-deprecation-glob-support-window-upgrade-unit"
 tags: [deprecation, sophia, rollup, rollup-plugin-filesize, pacote, node-gyp, cacache, npmlog, tar, upstream-stale, bounded-fix]
 cites:
@@ -148,6 +147,30 @@ entries does not apply. Probed this pass: uncached
 This is deliberately **not** marked `blocked`: there is no technical unknown and
 no upstream dependency. It is a queued, specified fix waiting on a named,
 short-lived event.
+
+**Update, same day — the worktree race cleared and the sibling fix landed.** The
+`feat/jquery-3` sprint committed (`3adf1d493c`), and the sibling dead-declaration
+removals were applied and verified in sophia commit `a4d931cca1` (483 test suites
+/ 6453 tests, plus build, typecheck, and lint all green). That entry has been
+decomposed — closure is recorded in the commit, not in the backlog. So the
+lockfile is no longer contended and **this fix is now landable**; it was left for
+a separate pass only because removing a live build plugin needs its own
+byte-identity verification, not because anything blocks it.
+
+### Carried forward from the closed sibling — the knip trap
+
+Both entries lean on `pnpm knip --dependencies` as corroborating evidence. Record
+the caveat here, since the entry that documented it is gone:
+
+`sophia/knip.config.ts` excludes `!utils/**` from its project scan, so any
+dependency used *only* by a helper in `utils/` reads as **unused**. Concretely,
+knip reports `nyc` as an unused devDependency — and `nyc` is **live**, driven by
+`utils/test-with-coverage.sh` and the `nyc` key in `package.json`. Never act on a
+knip "unused dependency" line without a cross-checking grep that includes
+`utils/` and all shell scripts. `rollup-plugin-filesize` is *not* flagged by knip
+at all, which is independent confirmation that it is genuinely in use — the fix
+for this entry is a deliberate removal of a live plugin, not a dead-declaration
+cleanup, and the two must not be conflated.
 
 ### Live trajectory
 

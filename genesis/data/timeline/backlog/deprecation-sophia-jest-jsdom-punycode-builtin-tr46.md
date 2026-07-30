@@ -11,7 +11,7 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["534a561884b4", "e0db70ae40c7", "9f2941b72728", "d4b8d4668bd1", "7b068a5072a3"]
+fingerprints: ["534a561884b4", "e0db70ae40c7", "9f2941b72728", "d4b8d4668bd1", "7b068a5072a3", "f1d828cffd23"]
 relatedNodeIds: []
 tags: [deprecation, node, punycode, DEP0040, jest, jsdom, tr46, whatwg-url, sophia, transitive, test-only]
 cites:

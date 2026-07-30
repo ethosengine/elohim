@@ -22,7 +22,6 @@ cites:
   - .claude/skills/deprecation-stasis
   - genesis/data/timeline/backlog/deprecation-sophia-eslint-8-eol-flat-config-migration.md
   - genesis/data/timeline/backlog/security-jquery-2-1-1-shipped-in-sophia-umd-bundle.md
-  - genesis/data/timeline/backlog/deprecation-sophia-dead-devdependency-declarations.md
 ---
 
 ## What is deprecated
@@ -132,7 +131,15 @@ Recorded here rather than acted on: it is neither an echo (the line is a real
 warning) nor a pure hash-stability bug, so it wants its own decision — most
 likely *digit-collapse for deprecation summaries too* plus a routing rule that
 treats the aggregate as a pointer to the per-package entries rather than a
-concern. Live ledger entry: `ce0de21b8053`, status `open`.
+concern. Live ledger entry: `ce0de21b8053`, status **`triaged`** as of 2026-07-30
+— the aggregate was decomposed by carrier into 8 concerns (5 new sophia entries
+plus 3 folded into existing ones), which is exactly the "pointer to the
+per-package entries" routing this class argues for, done by hand. The fingerprint
+is deliberately **retained**, not deleted: it is the shared banner all 8 entries
+hang off, and it clears only when the banner does. That triage also landed one of
+them — three dead devDependency declarations removed in sophia commit
+`a4d931cca1` — dropping the count from 25 to 23, which will re-mint this
+fingerprint and demonstrate the count-drift defect live.
 
 **Class 5 (observed live 2026-07-30 15:01–15:02, the sharpest instance) — the
 Node `(node:PID)` prefix makes every process a new fingerprint.** Node prefixes
