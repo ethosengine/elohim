@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 // @coverage: 94.9% (2026-02-24)
@@ -54,6 +54,8 @@ import type {
     RefreshQueueComponent,
   ],
   templateUrl: './learner-dashboard.component.html',
+  // OnPush-unsafe: ngOnInit subscribe mutation — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./learner-dashboard.component.css'],
 })
 export class LearnerDashboardComponent implements OnInit, OnDestroy {

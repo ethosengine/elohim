@@ -11,6 +11,7 @@ import {
   SimpleChanges,
   ViewChild,
   inject,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 
 import { from } from 'rxjs';
@@ -54,6 +55,8 @@ import type {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './opinion-cluster.component.html',
+  // OnPush-unsafe: canvas event listeners + subscribe mutation outside change detection — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./opinion-cluster.component.css'],
 })
 export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit {

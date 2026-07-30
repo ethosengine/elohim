@@ -8,6 +8,7 @@ import {
   computed,
   inject,
   isDevMode,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router, NavigationEnd } from '@angular/router';
@@ -82,6 +83,8 @@ export interface ContextAppConfig {
     UpgradeModalComponent,
   ],
   templateUrl: './elohim-navigator.component.html',
+  // OnPush-unsafe: raw subscribes masked by router co-trigger — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./elohim-navigator.component.css'],
 })
 export class ElohimNavigatorComponent implements OnInit, OnDestroy {

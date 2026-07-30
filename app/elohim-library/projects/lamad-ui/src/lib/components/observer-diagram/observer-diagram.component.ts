@@ -4,13 +4,15 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectionStrategy } from '@angular/core';
 
 @Component({
   selector: 'lamad-observer-diagram',
   standalone: true,
   imports: [CommonModule],
   templateUrl: './observer-diagram.component.html',
+  // OnPush-unsafe: setInterval field mutation — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./observer-diagram.component.css'],
 })
 export class ObserverDiagramComponent implements OnInit, OnDestroy {

@@ -8,6 +8,7 @@ import {
   Type,
   ComponentRef,
   inject,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { LAMAD_EPR_NAV, type ILamadEprNav } from '../../interfaces/cross-pillar.interface';
@@ -49,6 +50,8 @@ import { ContentNode } from '../../models/content-node.model';
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './content-editor-page.component.html',
+  // OnPush-unsafe: ngOnInit subscribe mutation — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./content-editor-page.component.css'],
 })
 export class ContentEditorPageComponent implements OnInit, OnDestroy {

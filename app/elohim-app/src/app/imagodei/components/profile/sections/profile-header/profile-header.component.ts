@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, input, output, computed } from '@angular/core';
+import { Component, input, output, computed, ChangeDetectionStrategy } from '@angular/core';
 
 // @coverage: 5.9% (2026-02-24)
 
@@ -14,6 +14,8 @@ import {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './profile-header.component.html',
+  // OnPush-unsafe: clipboard write + setTimeout flag mutation — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./profile-header.component.css'],
 })
 export class ProfileHeaderComponent {

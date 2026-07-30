@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, Input } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, ChangeDetectionStrategy } from '@angular/core';
 
 import { Subscription } from 'rxjs';
 
@@ -10,6 +10,8 @@ import { ThemeService, Theme } from '../../services/theme.service';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './theme-toggle.component.html',
+  // OnPush-unsafe: cross-tab theme sync subscribe mutation — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './theme-toggle.component.css',
 })
 export class ThemeToggleComponent implements OnInit, OnDestroy {

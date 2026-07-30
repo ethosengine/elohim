@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject, computed, Inject } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  inject,
+  computed,
+  Inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 // @coverage: 60.0% (2026-02-24)
@@ -50,6 +58,8 @@ import type { LearnerMasteryProfile } from '../../models/learner-mastery-profile
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './profile-page.component.html',
+  // OnPush-unsafe: ngOnInit subscribe mutation — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./profile-page.component.css'],
 })
 export class ProfilePageComponent implements OnInit, OnDestroy {

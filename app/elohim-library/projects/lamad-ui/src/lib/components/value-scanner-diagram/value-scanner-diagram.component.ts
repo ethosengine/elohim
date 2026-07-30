@@ -4,7 +4,7 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectionStrategy } from '@angular/core';
 
 interface Step {
   title: string;
@@ -17,6 +17,8 @@ interface Step {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './value-scanner-diagram.component.html',
+  // OnPush-unsafe: setInterval field mutation — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./value-scanner-diagram.component.css'],
 })
 export class ValueScannerDiagramComponent implements OnInit, OnDestroy {
