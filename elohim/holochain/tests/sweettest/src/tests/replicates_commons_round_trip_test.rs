@@ -142,7 +142,10 @@ async fn replicates_commons_notarized_and_readable_by_peer() -> Result<()> {
     })?;
 
     assert_eq!(got.action, "replicates-commons");
-    assert_eq!(got.signed_at, "2026-06-10T00:00:00Z", "caller signed_at must round-trip");
+    assert_eq!(
+        got.signed_at, "2026-06-10T00:00:00Z",
+        "caller signed_at must round-trip"
+    );
     assert_eq!(
         got.action_hash, alice_output.action_hash,
         "get_commitment action_hash (== dht_anchor_hash) must be byte-identical across peers"

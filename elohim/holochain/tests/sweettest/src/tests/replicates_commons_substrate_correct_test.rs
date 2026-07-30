@@ -152,7 +152,10 @@ async fn replicates_commons_variants_accepted_and_replicate() -> Result<()> {
     let bootstrap_steward: Option<holo_hash::AgentPubKey> = cb
         .call(&cell_b.zome(MISHPAT_ZOME), "get_bootstrap_steward", ())
         .await;
-    assert!(bootstrap_steward.is_some(), "Bob must be DHT-consistent after await_consistency");
+    assert!(
+        bootstrap_steward.is_some(),
+        "Bob must be DHT-consistent after await_consistency"
+    );
     Ok(())
 }
 

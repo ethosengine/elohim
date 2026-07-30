@@ -165,12 +165,33 @@ path = "src/tests/identity_lineage.rs"
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).
 #
-# `default-features = true` pulls in `datachannel-vendored` which provides a
-# webrtc backend (tx5-connection requires one; turning defaults off produces
-# a transitive compile error in tx5-connection's BackendModule::default).
-# The vendored libdatachannel build adds ~1-2 min to first compile; cached
-# thereafter.
-holochain = { version = "=0.6.0", features = ["sweettest", "test_utils"] }
+# `datachannel-vendored` provides the webrtc backend tx5-connection requires
+# (without one, tx5-connection's `BackendModule::default` is a transitive
+# compile error). The vendored libdatachannel build adds ~1-2 min to first
+# compile; cached thereafter. It is a holochain *default* feature, so it has
+# to be re-listed explicitly below now that we opt out of the default set.
+#
+# SECURITY — why `default-features = false`:
+# holochain's default set includes `metrics_influxive`, which is NOT required
+# by `sweettest`/`test_utils`. It pulls `holochain_metrics/influxive` →
+# `influxive 0.0.5` → { `influxdb 0.7.2` → `reqwest 0.11.27` → `rustls 0.21.12`
+# → `rustls-webpki 0.101.7`, `influxive-downloader` → `tar` }. That
+# `rustls-webpki 0.101.7` copy is affected by RUSTSEC-2026-0098 / -0099 / -0104
+# (all fixed only on the 0.103 line — the 0.101 line has no fix, and
+# `influxdb 0.8` / `reqwest 0.12` are unreachable through the `=0.6.0`
+# holochain pin), so the vulnerable copy cannot be upgraded away — only
+# removed. Dropping the feature removes both chains outright. The test harness
+# never reads InfluxDB metrics.
+# The remaining four entries reproduce holochain's default set verbatim minus
+# `metrics_influxive`; keep them in sync if the holochain pin ever moves.
+holochain = { version = "=0.6.0", default-features = false, features = [
+  "sweettest",
+  "test_utils",
+  "sqlite-encrypted",
+  "schema",
+  "wasmer_sys",
+  "datachannel-vendored",
+] }
 holochain_types = "=0.6.0"
 hdk = "=0.6.0"
 hdi = "=0.7.0"
