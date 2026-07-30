@@ -219,3 +219,114 @@ above no longer needs hand-rebuilding.
 
 `/epr/elohim-host-landing` renders real content fetches and then panics on `localStorage is not
 defined` in mastery-tracking code — pre-existing, unrelated to v22, out of scope here.
+
+## Third pass (2026-07-30, overnight) — ROOT CAUSE NAMED
+
+The stall is **HttpClient PendingTasks that never settle**, not the Router. Two prior readings
+are now disproven with direct evidence.
+
+### Disproven
+
+- **"Zero HttpClient requests are ever issued"** (first pass) — FALSE. Requests ARE issued; they
+  never complete. The earlier fetch-accounting missed them precisely because they never reach
+  `fetch()`.
+- **"Router per-navigation PendingTask never completes"** (second pass's suggested probe) — FALSE.
+  Router's `scheduleNavigation` task is created and REMOVED cleanly. SSR never calls
+  `navigateByUrl` at all (it uses the internal `scheduleNavigation` path) — verified on both the
+  stalling and healthy routes.
+
+### Established mechanism
+
+Patched Angular's real `PendingTasks.add()/remove()` in-place (dynamic-import of the same chunk so
+the ES module cache hands the bundle the identical singleton — no bundle file edited) and raised
+`Error.stackTraceLimit` to 50, because V8's default of 10 was truncating every caller stack before
+it reached application frames.
+
+On `/`: **42 `PendingTasks.add()` calls; 13 removed cleanly (bootstrap + Router); 29 outstanding
+FOREVER**, frozen at t≈317ms — which matches the previously-measured ~0.3s CPU exactly. All 29
+stacks trace to `EprRelationshipCardComponent.resolveRelationship()`'s
+`forkJoin({ head, resilience })` — both the `EprResolverService.resolvePreview()` branch
+(`/epr-head/{id}`, arraybuffer + dag-cbor) and the sibling `ResilienceService.getContentResilience()`
+branch hang identically. Under `provideZonelessChangeDetection()` an outstanding HTTP PendingTask
+directly blocks `ApplicationRef.whenStable()`, which `renderApplication()` awaits — that is
+mechanically why the render hangs in total silence.
+
+`/identity/login` gave no signal either way: its 2 fetches are raw `globalThis.fetch()` calls that
+bypass HttpClient entirely, so it never exercises this path. That is why route-comparison alone
+never localized it.
+
+### The break, localized
+
+Every one of the 29 reaches `HttpInterceptorHandler.handle()` (proven — the patched `add()` fires
+synchronously with a full caller stack) but **none reaches `FetchBackend`'s `fetch()`** (zero
+entries in the render's fetch trace) and none ever settles. So the chain dies **inside the
+interceptor's deferred subscription**, before the backend.
+
+For every doorway-path (`/db/…`, `/api/…`) request that is the app's single custom interceptor,
+`app/elohim-app/src/app/elohim/interceptors/api-base-url.interceptor.ts`. Its SSR bypass guard is
+correct in INTENT — *"with no browser location (SSR/elohim-render context), pass the request
+through untouched"* — but it never fires:
+
+```ts
+const origin = globalThis.location?.origin;   // 'http://ssr-server' under SSR — TRUTHY
+if (!origin) return next(req);                // therefore never taken
+```
+
+because `app/elohim-app/scripts/ssr-globals-preamble.mjs` (~line 272-279, compiled into
+`polyfills.server.mjs`) shims `globalThis.location = { origin: 'http://ssr-server', … }`. So every
+SSR doorway request runs the full browser-only multi-host failover / candidate-resolution /
+`timeout(8000)` path.
+
+Corroborating: despite GETs being wrapped in `.pipe(timeout(8000))`, **no `setTimeout(delay=8000)`
+is ever scheduled** in the entire render — the interceptor's returned observable is never
+subscribed forward.
+
+### The fix (belongs in `app/**` — NOT applied by the diagnosing pass, out of its edit grant)
+
+Make the SSR bypass detect the platform rather than infer it from `location`. Canonical:
+`isPlatformServer(inject(PLATFORM_ID))`, using the same `inject(…, { optional: true })` +
+try/catch idiom the interceptor already uses (direct unit calls run outside an injection context).
+A minimal alternative is to also treat the `http://ssr-server` sentinel origin as non-browser, but
+that couples the interceptor to the preamble's sentinel string.
+
+Note the guard is a *bypass*, so fixing it restores the intended SSR path; it does not explain why
+the failover chain fails to subscribe under zoneless SSR. That deeper question stays open and is
+worth its own probe if the failover path is ever wanted server-side.
+
+### Diagnostics now permanent
+
+`ELOHIM_RENDER_DEBUG_HOOKS=1` additionally installs the PendingTasks/Router probes (chunk located
+by un-mangled method-name signature, since esbuild chunk filenames are content-hashes that change
+every build) and dumps outstanding task IDs every 500ms. Off by default; verified zero behavior
+change (`/identity/login` 344ms/1378B, `/zzz-nonexistent` 317ms/5739B, lamad `/lamad` 308ms /
+2 fetches / **4208B** all unchanged; `cargo test --lib --bins` 110/110; fmt + clippy clean).
+
+### Fix attempt 1 — platform-detect guard: TRIED, DID NOT WORK, REVERTED
+
+Applied the recommended fix (`isPlatformServer(inject(PLATFORM_ID, { optional: true }))` replacing
+the `!globalThis.location?.origin` inference, location check kept as the non-injection-context
+fallback), rebuilt the server bundle with a scratchpad Node 24 (build green, bundle newer than the
+edit — the change WAS compiled in), and re-ran the harness:
+
+```
+[fetch → FAIL] GET https://doorway.elohim.host/health
+RENDER ERROR: render timed out after 10000ms      <- unchanged; still 1 fetch
+```
+
+So either the guard still does not fire (`inject(PLATFORM_ID)` returning null / throwing inside the
+interceptor's execution context, silently caught), or **the custom interceptor is not the blocker at
+all** and the break sits deeper — between `HttpInterceptorHandler.handle()` and `FetchBackend`,
+i.e. in HttpClient's own chain under zoneless SSR. The localization stands; the *attribution to
+this interceptor* does not.
+
+**Reverted, deliberately** — and the attempt surfaced a reason the "obvious" fix may be actively
+wrong: under SSR the app NEEDS an absolute base (relative `/db/…` URLs have no host server-side),
+so the interceptor's rewrite is arguably required on the server path rather than something to
+bypass. The truthy `location.origin = 'http://ssr-server'` shim may therefore be deliberate — it is
+what lets `resolveBaseUrl()` produce an absolute doorway URL at all. Anyone taking this next should
+settle that design question FIRST (should SSR bypass the interceptor, or use it with a
+server-appropriate base?) before touching the guard.
+
+Next probe, unchanged in priority: re-run with `ELOHIM_RENDER_DEBUG_HOOKS=1` after any candidate
+fix and confirm whether the 29 `EprRelationshipCardComponent` PendingTasks still accumulate — that
+distinguishes "guard not firing" from "blocker is downstream of the interceptor" in one run.
