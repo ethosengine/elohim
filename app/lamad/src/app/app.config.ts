@@ -1,7 +1,6 @@
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { provideAnimations } from '@angular/platform-browser/animations';
 
 import { routes } from './app.routes';
 import {
@@ -87,8 +86,8 @@ function resolveDoorwayUrl(configured: string | undefined): string {
 /**
  * Lamad bundle application config.
  *
- * B18d: Provides HTTP client, router (wired to LAMAD_ROUTES via app.routes.ts),
- * and animations. The lamad bundle is served at /lamad/ with <base href="/lamad/">. // route-literal-ok: doc comment describing the base-href, not a minted link
+ * B18d: Provides HTTP client and router (wired to LAMAD_ROUTES via app.routes.ts).
+ * The lamad bundle is served at /lamad/ with <base href="/lamad/">. // route-literal-ok: doc comment describing the base-href, not a minted link
  *
  * B18d omnibar note:
  * When spec Task B6 lands <elohim-page-chrome>, the lamad toolbar becomes a
@@ -105,7 +104,6 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideHttpClient(withXhr()),
-    provideAnimations(),
     // ELOHIM_ENV — maps lamad-local environment to the @elohim/service token contract.
     // doorwayUrl uses the same origin-aware resolution as the ElohimClient below.
     {
