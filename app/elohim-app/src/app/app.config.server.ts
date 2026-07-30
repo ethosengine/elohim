@@ -1,15 +1,10 @@
+import { FetchBackend, HttpBackend } from '@angular/common/http';
 import {
   ApplicationConfig,
   mergeApplicationConfig,
-  NgZone,
-  ɵNoopNgZone as NoopNgZone,
+  provideZonelessChangeDetection,
 } from '@angular/core';
 import { provideClientHydration, withNoIncrementalHydration } from '@angular/platform-browser';
-import {
-  FetchBackend,
-  HttpBackend,
-  ɵREQUESTS_CONTRIBUTE_TO_STABILITY as REQUESTS_CONTRIBUTE_TO_STABILITY,
-} from '@angular/common/http';
 import { provideServerRendering } from '@angular/platform-server';
 
 import { appConfig } from './app.config';
@@ -18,30 +13,44 @@ const serverConfig: ApplicationConfig = {
   providers: [
     provideServerRendering(),
     provideClientHydration(withNoIncrementalHydration()),
-    // In the deno_core SSR runtime, Zone.js tracks setInterval/setTimeout tasks
-    // that never complete (e.g. health-check polling intervals, performance uptime
-    // timers). These keep ZoneStablePendingTask from removing its entry from
-    // PendingTasks, so ApplicationRef.whenStable() never resolves.
+    // Zoneless change detection for the server render — public API (stable since
+    // Angular 20.2), replacing two ɵ-prefixed private symbols this file used to
+    // reach for (`ɵNoopNgZone` via `{provide: NgZone}` and
+    // `ɵREQUESTS_CONTRIBUTE_TO_STABILITY = false`).
     //
-    // Overriding NgZone with NoopNgZone makes ZoneStablePendingTask see
-    // hasPendingMacrotasks=false immediately — its onStable/onUnstable subscriptions
-    // become no-ops, so the PendingTasks bridge task is never added. Combined with
-    // REQUESTS_CONTRIBUTE_TO_STABILITY=false, PendingTasks only tracks router
-    // navigation, which completes normally once the initial route activates.
+    // The problem those hacks worked around: in the deno_core SSR runtime,
+    // Zone.js tracks setInterval/setTimeout macrotasks that never complete
+    // (health-check polling, performance uptime timers). `ZoneStablePendingTask`
+    // bridges `NgZone.onUnstable` into `PendingTasks`, so with a live zone those
+    // never-completing macrotasks keep the bridge task registered and
+    // `ApplicationRef.whenStable()` never resolves — the render hangs.
     //
-    // The browser build retains Zone.js for change detection. The server build uses
-    // a noop zone purely to unblock SSR stability detection via PendingTasks.
+    // Under zoneless, stability is PendingTasks-only: there is no Zone macrotask
+    // bridge at all, so a polling timer cannot register as pending work. Only
+    // explicit contributors count — router navigation (resolves once the initial
+    // route activates) and, unlike the old config, HTTP requests (zoneless keeps
+    // REQUESTS_CONTRIBUTE_TO_STABILITY at its default `true`). That is why the
+    // FetchBackend override below is still load-bearing rather than vestigial:
+    // it makes every SSR request settle immediately instead of pending forever.
+    //
+    // Note `appConfig` still provides `provideZoneChangeDetection()` for the
+    // browser — merging zoneless over it is intentional and wins (ZONELESS_ENABLED
+    // and the NgZone binding both resolve to the later provider; the zone
+    // ENVIRONMENT_INITIALIZERs remain but are inert against a NoopNgZone). The
+    // NG0408 "both provided" notice is ngDevMode-only, so the production server
+    // bundle is silent. The browser build is untouched and stays zone-based.
     //
     // TODO(ssr-runtime): wire the DataFetcher from elohim-render to Angular's
     // HttpClient so real content fetches work during SSR (Task 14+).
-    { provide: NgZone, useClass: NoopNgZone },
-    { provide: REQUESTS_CONTRIBUTE_TO_STABILITY, useValue: false },
+    provideZonelessChangeDetection(),
     // Use FetchBackend instead of HttpXhrBackend for SSR. HttpXhrBackend.handle()
     // calls xhrFactory.ɵloadImpl() which does `await import('xhr2')`. In deno_core's
     // FsModuleLoader, bare specifier imports like 'xhr2' fail and leave pending dynamic
     // module evaluations in the V8 event loop — keeping poll_event_loop() in
     // Poll::Pending indefinitely. FetchBackend uses globalThis.fetch (shimmed to
     // reject immediately), so HTTP requests fail fast without hanging the event loop.
+    // Under zoneless this is doubly load-bearing: HTTP requests DO contribute to
+    // stability, so a request that never settles would now stall whenStable().
     //
     // The browser build is unaffected — this override only applies to the server config
     // merged via mergeApplicationConfig(appConfig, serverConfig).

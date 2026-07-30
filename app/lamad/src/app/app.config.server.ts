@@ -1,15 +1,10 @@
+import { FetchBackend, HttpBackend } from '@angular/common/http';
 import {
   ApplicationConfig,
   mergeApplicationConfig,
-  NgZone,
-  ɵNoopNgZone as NoopNgZone,
+  provideZonelessChangeDetection,
 } from '@angular/core';
 import { provideClientHydration, withNoIncrementalHydration } from '@angular/platform-browser';
-import {
-  FetchBackend,
-  HttpBackend,
-  ɵREQUESTS_CONTRIBUTE_TO_STABILITY as REQUESTS_CONTRIBUTE_TO_STABILITY,
-} from '@angular/common/http';
 import { provideServerRendering } from '@angular/platform-server';
 
 import { appConfig } from './app.config';
@@ -20,22 +15,27 @@ import { appConfig } from './app.config';
 // EPR-app SSR pattern (see that file for the full rationale on each provider).
 // The short form:
 //
-// - NoopNgZone: Zone.js tracks polling timers that never complete in the
-//   deno_core runtime, so ApplicationRef.whenStable() never resolves without it.
-// - REQUESTS_CONTRIBUTE_TO_STABILITY=false: PendingTasks then only tracks
-//   router navigation, which completes once the initial route activates.
+// - provideZonelessChangeDetection(): SSR stability runs on PendingTasks alone.
+//   With a live Zone, `ZoneStablePendingTask` bridges never-completing polling
+//   macrotasks into PendingTasks and `ApplicationRef.whenStable()` never
+//   resolves in the deno_core runtime. Zoneless has no Zone macrotask bridge, so
+//   only explicit contributors count — router navigation and HTTP requests.
+//   (Public API since 20.2; replaces the previous `ɵNoopNgZone` +
+//   `ɵREQUESTS_CONTRIBUTE_TO_STABILITY=false` private-symbol pair.)
 // - FetchBackend: HttpXhrBackend lazy-imports 'xhr2', which strands a pending
 //   dynamic module evaluation in the V8 event loop; globalThis.fetch is shimmed
-//   by the runtime (elohim-render DataFetcher) and fails fast instead.
+//   by the runtime (elohim-render DataFetcher) and fails fast instead. Under
+//   zoneless this also keeps HTTP out of the stability path by settling fast,
+//   since requests DO contribute to stability here.
 //
 // The browser build is unaffected — these overrides exist only in the merged
-// server config.
+// server config, and the browser keeps `provideZoneChangeDetection()` from
+// appConfig (the NG0408 "both provided" notice is ngDevMode-only).
 const serverConfig: ApplicationConfig = {
   providers: [
     provideServerRendering(),
     provideClientHydration(withNoIncrementalHydration()),
-    { provide: NgZone, useClass: NoopNgZone },
-    { provide: REQUESTS_CONTRIBUTE_TO_STABILITY, useValue: false },
+    provideZonelessChangeDetection(),
     { provide: HttpBackend, useClass: FetchBackend },
   ],
 };
