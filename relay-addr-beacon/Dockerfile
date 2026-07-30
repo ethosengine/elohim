@@ -12,14 +12,11 @@ FROM rust:1-slim-bookworm AS builder
 
 WORKDIR /build
 
-# Route crates.io through the Nexus mirror (matches the repo .cargo/config.toml).
-RUN mkdir -p /usr/local/cargo && cat > /usr/local/cargo/config.toml <<'EOF'
-[source.crates-io]
-replace-with = "elohim-mirror"
-
-[source.elohim-mirror]
-registry = "sparse+https://nexus.ethosengine.com/repository/cargo/"
-EOF
+# crates.io is consumed directly — deliberately NOT mirrored through Nexus
+# (matches the repo .cargo/config.toml; decided 2026-07-30). This image builds a
+# full reqwest/rustls dep graph, so mirroring it spent hundreds of Sonatype CE
+# requests per image build against a 100k/day cap whose breach blocks
+# first-party PUBLISHING. Nexus is for first-party components only.
 
 # rustls needs no OpenSSL; reqwest uses rustls-tls. Nothing else to install.
 COPY Cargo.toml Cargo.lock ./

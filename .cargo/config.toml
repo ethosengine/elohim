@@ -6,25 +6,29 @@
 #     AND serves them back to consumers via `registry = "elohim"`. Hosted is the
 #     only endpoint Nexus accepts publishes on; group endpoints are read-only.
 #
-#   - `cargo` (Nexus group) — bundles the crates.io proxy + the hosted repo.
-#     Used as the crates.io replacement so all upstream traffic is cached through
-#     Nexus. Reads of internal crates still flow through this transparently.
+#   - crates.io — consumed DIRECTLY, never mirrored through Nexus. Nexus is
+#     reserved for first-party components. Two reasons (decided 2026-07-30):
+#     (1) our Nexus is Sonatype Community Edition, whose 100k-requests/day cap
+#     is enforced by refusing to add new components — and a cap breach takes
+#     down first-party PUBLISHING, the one thing only Nexus can do. Proxying a
+#     free public registry spent that budget for no gain: a monorepo-wide cold
+#     cargo fetch is thousands of index+crate requests. (2) It decouples every
+#     Rust build from Nexus uptime. `elohim/rakia/.cargo/config.toml` reached
+#     the same conclusion independently and is the precedent this follows.
+#     Cargo source replacement is lock-transparent, so Cargo.lock files record
+#     canonical crates.io sources and dropping the mirror causes zero churn.
+#     If a caching proxy is ever wanted back, it must be one without a
+#     request-count license cap, and it must not sit in the publish path.
 #
 # Authentication: NEVER commit credentials. Use one of:
 #   1. Per-user file: $CARGO_HOME/credentials.toml (chmod 600) — see Task 5.
 #   2. CI env var: CARGO_REGISTRIES_ELOHIM_TOKEN="Bearer NpmToken.<rest>"
 #
-# Anonymous read is enabled on both endpoints, so `cargo build` works without
+# Anonymous read is enabled on cargo-internal, so `cargo build` works without
 # credentials. Credentials are only needed for `cargo publish`.
 
 [registries.elohim]
 index = "sparse+https://nexus.ethosengine.com/repository/cargo-internal/"
-
-[source.crates-io]
-replace-with = "elohim-mirror"
-
-[source.elohim-mirror]
-registry = "sparse+https://nexus.ethosengine.com/repository/cargo/"
 
 # ── Dev-profile debug-info policy (validated 2026-06-04) ─────────────────────
 # Cargo's default dev profile embeds full DWARF (debug=2) in every artifact.
