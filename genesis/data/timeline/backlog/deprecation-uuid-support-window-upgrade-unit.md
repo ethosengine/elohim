@@ -11,9 +11,11 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["9b2c18a09eb7", "a200f917e702", "72a88a3bbff4"]
+fingerprints: ["9b2c18a09eb7", "a200f917e702", "72a88a3bbff4", "e83cd3f2d7e3"]
 relatedNodeIds:
   - "backlog-dependabot-triage"
+  - "backlog-deprecation-storybook-test-runner-jest-island-retire"
+  - "backlog-deprecation-angular19-toolchain-legacy-builder-transitives"
 tags: [deprecation, uuid, cucumber, storybook-test-runner, nyc, jest-junit, sockjs, npm-groovy-lint, sophia, mirror-blocked, transitive]
 cites:
   - https://github.com/uuidjs/uuid/blob/main/CHANGELOG.md
@@ -27,7 +29,7 @@ cites:
 
 ## What is deprecated
 
-Three ledger fingerprints, all the **same upstream banner** emitted while resolving
+Four ledger fingerprints, all the **same upstream banner** emitted while resolving
 the npm tree:
 
 ```
@@ -46,6 +48,16 @@ will likely be deprecated in 2028).
   lines the sentinel will re-mint for *any* future grep of `pnpm-lock.yaml`. This
   is precisely why the three lines must stay present-and-`blocked` rather than be
   deleted (see Current decision).
+- `e83cd3f2d7e3` — **added 2026-07-30.** The root-workspace `pnpm install
+  --lockfile-only` aggregate banner: `WARN 11 deprecated subdependencies found:
+  expect-playwright@0.8.0, glob@7.2.3, inflight@1.0.6, jest-process-manager@0.4.0,
+  node-domexception@1.0.0, prebuild-install@7.1.3, rimraf@3.0.2, tar@6.2.1,
+  uuid@10.0.0, uuid@8.3.2, whatwg-encoding@2.0.0`. It names **both** uuid
+  resolutions this entry owns, so it is co-canonicalized here — but it is a
+  *multi-concern aggregate*, decomposed by upgrade unit across six entries (this
+  one plus the five named under Current decision). Its value to this entry: it
+  re-confirms, independently of any lockfile grep, that `uuid@10.0.0` and
+  `uuid@8.3.2` are still resolved and still emitting.
 
 This is a **support-window notice, not a vulnerability** — the banner says the
 8.x/10.x lines are out of upstream maintenance. A *separate but co-located*
@@ -158,6 +170,25 @@ each sufficient on its own:
    matches cluster 06's probe table (`uuid | 11.1.1 / 13.0.1 | 404 |
    mirror-blocked`, one of 47 mirror-blocked targets out of 49 probed). Clearing it
    is a Nexus proxy/remote-cache operator action, not a repo change.
+
+   **Refinement 2026-07-30 — the mirror is cached-artifact-only, per-artifact, and
+   `uuid@14.0.1` IS fetchable.** Re-probed on two consecutive passes:
+   `uuid-11.1.1.tgz` and `uuid-13.0.1.tgz` → `404` (persistent, not transient),
+   but `uuid-14.0.1.tgz` (`dist-tags.latest`) → **`200`**, and an
+   already-installed control (`@anthropic-ai/sdk-0.39.0.tgz`) → `200` while its
+   `latest` (`sdk-0.80.0.tgz`) → `404`. So the mirror is not uniformly broken: it
+   serves whatever happens to be cached and 404s the rest. That does **not**
+   unblock this entry, because the one fetchable target is not a drop-in:
+   `uuid@14.0.1` is `"type": "module"` and its `exports["."].node` condition has
+   **no `require` branch** (`{"node": {"types": …, "default": "./dist-node/index.js"}}`)
+   — ESM-only under Node. Every carrier here is CommonJS (`@cucumber/messages`,
+   `jest-junit`, `nyc → istanbul-lib-processinfo`, `sockjs`,
+   `@storybook/test-runner`; and on the sophia side, a Jest CJS test path), so an
+   override to `14.0.1` would break them at `require()`. The **dual-published**
+   version that would actually work — `uuid@11.1.1`, whose `exports["."].node`
+   carries both `import` and `require` — is precisely the one that 404s. Blocker
+   stands; it is now sharper, not gone. Re-probe both on every sweep, since
+   availability is per-artifact and can change without any repo action.
 2. **Write-lock**: `pnpm-lock.yaml`, `pnpm-workspace.yaml`, and workspace
    `package.json`s are owned exclusively by the in-flight cluster-06 campaign owner
    (mid-edit). This triage run was explicitly scoped to touch none of them, and did
@@ -167,12 +198,25 @@ each sufficient on its own:
    (`fatal: detected dubious ownership`). That is a deliberate operator-scoped
    surface, not a background-agent one.
 
-The three ledger fingerprints stay **present with `status: blocked`** so the
+The four ledger fingerprints stay **present with `status: blocked`** so the
 sentinel cites this decision deterministically and never re-dispatches. Deleting
-them would be actively harmful: two of the three were minted by nothing more than a
+them would be actively harmful: two of the four were minted by nothing more than a
 `grep` of the lockfile, so the next agent that greps `pnpm-lock.yaml` — or diffs it
 — would re-mint them as NEW and burn another triage dispatch on an unchanged,
 externally-blocked concern. The deprecation-stasis sweep owns the re-check.
+
+`e83cd3f2d7e3` additionally requires care on close-out: it is a **shared aggregate
+banner fingerprint** whose eleven packages are decomposed by upgrade unit across
+six entries in `genesis/data/timeline/backlog/` — this entry plus
+`deprecation-storybook-test-runner-jest-island-retire.md`,
+`deprecation-angular19-toolchain-legacy-builder-transitives.md`,
+`deprecation-helia-webrtc-native-addon-react-native-subtree.md`,
+`deprecation-anthropic-agent-sdk-legacy-http-stack-bump.md`, and
+`deprecation-first-party-glob-v10-declarations-bump.md`. Fixing the uuid unit
+therefore does **not** license deleting `e83cd3f2d7e3` from the ledger; that
+fingerprint retires only when the last of the six closes and the banner is
+actually gone. The other three fingerprints are uuid-only and retire with this
+entry.
 
 ### Live trajectory — what unblocks this, in order
 
@@ -205,6 +249,17 @@ No fix was applied this run, so nothing is claimed fixed. What *was* verified:
 - **Registry probe (the load-bearing blocker), run this session:**
   `curl -o /dev/null -w "%{http_code}" https://nexus.ethosengine.com/repository/npm/uuid/-/uuid-11.1.1.tgz`
   → `404`; same for `uuid-13.0.1.tgz` → `404`; packument `/uuid` → `200`.
+- **Registry re-probe, 2026-07-30** (two consecutive passes, same results):
+  `uuid-11.1.1.tgz` → `404`, `uuid-13.0.1.tgz` → `404`, **`uuid-14.0.1.tgz` →
+  `200`**; `uuid` `dist-tags.latest = 14.0.1`. Module-shape probe from the same
+  packument: `versions["14.0.1"].exports["."] = {"node": {"types":
+  "./dist/index.d.ts", "default": "./dist-node/index.js"}, "default":
+  "./dist/index.js"}` with `"type": "module"` — **no `require` condition**, i.e.
+  ESM-only under Node; whereas `versions["11.1.1"].exports["."].node =
+  {"import": …, "require": …}` — dual. Control probes establishing the mirror's
+  cached-only behaviour: `@anthropic-ai/sdk-0.39.0.tgz` (installed) → `200`,
+  `@anthropic-ai/sdk-0.80.0.tgz` (latest) → `404`, `rimraf-6.1.3.tgz` → `404`,
+  `tar-7.5.13.tgz` → `404`, `glob-13.0.6.tgz` → `200`.
 - **Reverse-dep trace**: lockfile snapshot walk mapping all four root `uuid:`
   resolutions to owning packages (table above) — no first-party importer.
 - **Manifest scan**: the only `uuid` declaration in any tracked `package.json` is
