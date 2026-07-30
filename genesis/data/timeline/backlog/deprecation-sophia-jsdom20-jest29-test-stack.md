@@ -11,9 +11,8 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["ce0de21b8053"]
+fingerprints: ["6bbd169077f5"]
 relatedNodeIds:
-  - "backlog-deprecation-sophia-jest-jsdom-punycode-builtin-tr46"
   - "backlog-deprecation-glob-support-window-upgrade-unit"
   - "backlog-deprecation-sophia-eslint-8-eol-flat-config-migration"
 tags: [deprecation, sophia, jest, jsdom, abab, domexception, whatwg-encoding, test-stack, major-upgrade, transitive]
@@ -27,7 +26,7 @@ cites:
 ## What is deprecated
 
 Three of the 25 packages in the sophia install banner (fingerprint
-`ce0de21b8053`) are internals of **jsdom@20.0.3**, which enters solely through
+`6bbd169077f5`) are internals of **jsdom@20.0.3**, which enters solely through
 `jest-environment-jsdom@29.7.0`. All three are "the platform has this natively
 now" retirements, not vulnerabilities:
 
@@ -92,25 +91,32 @@ upgrade guide:
 4. `nyc`'s coverage merge path (`utils/test-with-coverage.sh`) reads Jest's
    `coverage-final.json`; verify the merged report still produces after the bump.
 
-### Sibling concern — same upgrade unit, different symptom
+### Sibling concern — CLOSED 2026-07-30, and it did not need this sprint
 
-`deprecation-sophia-jest-jsdom-punycode-builtin-tr46.md` (written the same day by
-a concurrent triage pass) covers a **different symptom of this identical carrier**:
-Node's `DEP0040` runtime warning, emitted because `tr46@3.0.0` — reached via
-`whatwg-url@11` under `jsdom@20` — bare-`require`s the builtin `punycode` module.
+A sibling entry (`deprecation-sophia-jest-jsdom-punycode-builtin-tr46.md`) tracked
+a **different symptom of this identical carrier**: Node's `DEP0040` runtime
+warning, emitted because `tr46@3.0.0` — reached via `whatwg-url@11` under
+`jsdom@20` — bare-`require`s the builtin `punycode` module. It was written on the
+assumption that the two concerns shared one fix, namely this jest 29 → 30 bump.
 
-The two entries are deliberately kept separate because they are found by different
-detectors and cite different evidence: this entry tracks packages carrying a
-lockfile `deprecated:` field (visible in the `pnpm install` banner), that one
-tracks a Node process warning (visible in jest stderr). But **they have one fix
-between them.** jest 30's jsdom environment ships jsdom 26+, which pulls
-`whatwg-url@14` / `tr46@5` — clearing `DEP0040` — *and* drops the `abab` /
-`domexception` / `whatwg-encoding` shims tracked here.
+**That assumption was wrong, and the correction is the useful part.** The two
+symptoms have the same *carrier* but not the same *fix*, because they fail for
+different reasons. The banner packages tracked here (`abab`, `domexception`,
+`whatwg-encoding`) are deprecated *as packages* — only a newer jsdom stops
+resolving them. `DEP0040` was never about tr46's version at all: it fired because
+tr46@3 used the **bare specifier** `require("punycode")`, which resolves to the
+builtin no matter what sits in `node_modules`. That made it fixable with a
+one-line override to `tr46@^4.1.1` (the version that switched to
+`require("punycode/")`), landed in sophia `576dd73f88` and verified with the full
+484-suite jest run showing zero `DEP0040`. The sibling entry was deleted on that
+verification.
 
-Whoever schedules the jest 29 → 30 sprint should close **both** entries with it,
-and use both closure checks: the three packages absent from
-`sophia/pnpm-lock.yaml`, and a clean jest run with no `DEP0040` on stderr. Neither
-entry should be deleted on the strength of the other's verification.
+**The lesson for this entry:** a shared carrier is not a shared fix. Do not let a
+"one sprint closes both" framing defer a bounded fix behind a major bump. The
+`DEP0040` closure check no longer belongs to this entry, and this entry's own
+closure check is unchanged and unsatisfied: `abab`, `domexception` and
+`whatwg-encoding` must be absent from `sophia/pnpm-lock.yaml`. The tr46 override
+is orthogonal to that and will simply become redundant when jest 30 lands.
 
 ## Current decision
 

@@ -11,7 +11,7 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["ce0de21b8053"]
+fingerprints: ["6bbd169077f5"]
 relatedNodeIds:
   - "backlog-deprecation-sophia-rollup-filesize-npm-internals-subtree"
 tags: [deprecation, sophia, mathjax, mathjax-full, khanacademy, nomnom, jison, kas, parser-generator, upstream-pinned, fork-boundary]
@@ -29,7 +29,7 @@ cites:
 ## What is deprecated
 
 Two of the 25 packages in the sophia install banner (fingerprint
-`ce0de21b8053`) sit in sophia's **math layer** — the part of the Perseus fork
+`6bbd169077f5`) sit in sophia's **math layer** — the part of the Perseus fork
 that renders equations and parses mathematical expressions. Both are pinned by an
 upstream package rather than by sophia directly.
 

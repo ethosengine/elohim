@@ -11,7 +11,7 @@ status: "backlog"
 priority: "medium"
 deprecation_status: blocked
 severity: medium
-fingerprints: ["819aa7c6f6bd", "bba59aabdf63", "b1561f3d429d", "ce0de21b8053"]
+fingerprints: ["819aa7c6f6bd", "bba59aabdf63", "b1561f3d429d", "6bbd169077f5"]
 relatedNodeIds: []
 tags: [deprecation, eslint, sophia, flat-config, toolchain, eol, submodule]
 cites:
@@ -205,7 +205,7 @@ Closure requires: `eslint` at `^10`, flat config replacing all 13 `.eslintrc.js`
 files, sophia `pnpm lint` + `pnpm typecheck` green, and a `--print-config`
 rule-coverage diff showing no silent rule loss.
 
-## 2026-07-30 — the eslint-8 subtree, from aggregate banner `ce0de21b8053`
+## 2026-07-30 — the eslint-8 subtree, from aggregate banner `6bbd169077f5`
 
 Triage of sophia's aggregate install banner ("25 deprecated subdependencies
 found") assigned **two further deprecated packages to this concern**. They are

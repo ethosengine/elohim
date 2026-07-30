@@ -92,6 +92,16 @@ SECURITY_SUMMARY = re.compile(
     r"\d+ vulnerabilit|\(\d+ (?:critical|high|moderate|low)", re.IGNORECASE
 )
 
+# Node prefixes its own process warnings with the EMITTING PROCESS ID:
+#   (node:810849) [DEP0040] DeprecationWarning: The `punycode` module ...
+# The pid is pure run-identity, never concern-identity, so leaving it in the
+# hashed string mints one fingerprint PER PROCESS — a single test suite can
+# mint triage dispatches faster than triage can retire them, forever, for one
+# long-known upstream warning. Collapsing the pid makes the concern the unit.
+# Deliberately narrow: only the literal `(node:<digits>)` wrapper is touched,
+# so DEP-codes, package versions and message text all stay concern-bearing.
+NODE_PID_PREFIX = re.compile(r"\(node:\d+\)")
+
 # Commands that themselves talk about these signals (greps, ledger edits,
 # this tooling) are not new in-flight findings.
 GUARD_TOKENS = ("deprecat", "vulnerab", "cve-", "ghsa-", "rustsec", "advisor")
@@ -632,6 +642,8 @@ def classify(line: str) -> str | None:
 
 def fingerprint(line: str, cls: str) -> str:
     norm = re.sub(r"\s+", " ", line).strip().lower()
+    # Run-identity stripping: the emitting pid is not part of the concern.
+    norm = NODE_PID_PREFIX.sub("(node:#)", norm)
     if cls == "security" and SECURITY_SUMMARY.search(line):
         # Count-churn stability: digit runs collapse so "191 vulnerabilities
         # (1 critical, 113 high)" and next week's counts share one concern.

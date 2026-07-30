@@ -11,7 +11,7 @@ status: "backlog"
 priority: "medium"
 deprecation_status: open
 severity: low
-fingerprints: ["ce0de21b8053"]
+fingerprints: ["6bbd169077f5"]
 relatedNodeIds:
   - "backlog-deprecation-glob-support-window-upgrade-unit"
 tags: [deprecation, sophia, rollup, rollup-plugin-filesize, pacote, node-gyp, cacache, npmlog, tar, upstream-stale, bounded-fix]
@@ -27,7 +27,21 @@ cites:
 
 ## What is deprecated
 
-Six of the 25 packages in the sophia install banner (fingerprint `ce0de21b8053`)
+> **Banner fingerprint supersession (2026-07-30).** The aggregate install
+> banner is one line whose text carries a drifting package count, so its
+> fingerprint re-mints whenever the count or list moves. It was
+> `ce0de21b8053` when the banner read *25 deprecated subdependencies* and is
+> now **`6bbd169077f5`** at *23* — the drop came from sophia `a4d931cca1`
+> (three dead devDependency declarations removed). The `25` figures in the
+> prose below are left as written: they are accurate as of the decomposition
+> that produced these eight entries, and rewriting them would falsify the
+> record. `ce0de21b8053` was deleted from the ledger because its exact text is
+> now unreachable and can never re-fire; all eight sibling entries were
+> retargeted to the live fingerprint. This drift is the predicted **Class 4**
+> defect in `deprecation-sentinel-redundant-capture-surfaces.md`, and it cost
+> a triage dispatch when it fired.
+
+Six of the 25 packages in the sophia install banner (fingerprint `6bbd169077f5`)
 enter the tree through **one cosmetic build-log plugin**:
 `rollup-plugin-filesize@10.0.0`, which prints bundle sizes after a rollup build.
 It depends on `pacote` — npm's package fetcher — purely to look up the *published*
@@ -194,7 +208,7 @@ Once `git -C sophia status --porcelain` is clean:
    with the dead-declarations entry).
 5. On green, close out with full decomposition — delete this entry, quote the
    byte-identity proof in the commit message. Do not delete fingerprint
-   `ce0de21b8053`; it is the shared aggregate banner.
+   `6bbd169077f5`; it is the shared aggregate banner.
 
 Best landed **in the same commit** as the sibling dead-declarations entry: one
 `pnpm install`, one lockfile regeneration, one verification run.

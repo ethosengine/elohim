@@ -3,7 +3,7 @@ id: "backlog-deprecation-sentinel-redundant-capture-surfaces"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "deprecation-sentinel fingerprint instability — Class 3 (grep -n prefix) remains after Guards J/K landed"
+title: "deprecation-sentinel fingerprint instability — Class 3 (grep -n prefix) and Class 4 (aggregate-banner drift) remain after Guards J/K and the Class-5 pid fix landed"
 slug: "deprecation-sentinel-redundant-capture-surfaces"
 written: "2026-07-30"
 author: "deprecation-triage"
@@ -141,6 +141,27 @@ them — three dead devDependency declarations removed in sophia commit
 `a4d931cca1` — dropping the count from 25 to 23, which will re-mint this
 fingerprint and demonstrate the count-drift defect live.
 
+> **It fired, exactly as predicted, on 2026-07-30 at 15:47.** The next root
+> `pnpm install` emitted the banner at its new count and minted
+> **`6bbd169077f5`**, costing a triage dispatch for a concern already decomposed
+> into eight entries. `ce0de21b8053` was then deleted (its 25-count text is
+> unreachable and can never re-fire) and all eight sibling entries were
+> retargeted to `6bbd169077f5`.
+>
+> The firing also **settles the design question this class was holding open.**
+> The proposed remedy was digit-collapse, as for security summaries. That would
+> not have helped: the count moved 25 → 23 *because packages were removed*, so
+> the package **list** changed too and the line re-mints under digit-collapse
+> anyway. Count-collapse is not merely partial here — it is inert for the
+> dominant shape. So Class 4 needs the *routing* fix this entry already
+> gestured at, not a normalization: the aggregate banner is not a concern, it
+> is a **pointer to per-package concerns**, and the sentinel should either
+> decline to fingerprint it as a finding, or fingerprint it on the invariant
+> stem (`deprecated subdependencies found`) with the count and list excluded
+> from the hash. That is a behavioral change to what counts as a finding, so it
+> keeps its own decision — but it is now a decision with the evidence in hand
+> rather than an open question.
+
 **Class 5 (observed live 2026-07-30 15:01–15:02, the sharpest instance) — the
 Node `(node:PID)` prefix makes every process a new fingerprint.** Node prefixes
 its deprecation warnings with the emitting process id:
@@ -168,12 +189,28 @@ The fix is one normalization beside Fix N in `fingerprint()`:
 norm = re.sub(r"\(node:\d+\)", "(node:#)", norm)
 ```
 
-**Not landed here, deliberately, and the reason is a hazard rather than a
-doubt:** the ledger was being actively appended to by another session while
-this was diagnosed. Rewriting the file to migrate the three fingerprints would
-have raced those writes and could have dropped their captures. Fix N and Class
-5 share one ledger migration, so they should land together, in a quiet tree —
-which is also the cheaper sequencing. Bundle them.
+**Class 5 LANDED 2026-07-30** — and the "bundle it with Fix N" sequencing
+advice recorded here was wrong, which is worth keeping because it is the
+generalizable part. The two fixes were assumed to share one ledger migration.
+They do not: measured against the live ledger, the pid normalization moves
+**exactly 8 rows and Fix N moves 105**, and the 8 are a strict subset of the
+punycode rows. Bundling would have held a zero-cost fix hostage to a 105-row
+one. The lesson: *measure the migration surface per-fix before bundling on the
+assumption of a shared one.*
+
+The pid normalization went in beside `SECURITY_SUMMARY` in
+`.claude/hooks/deprecation-sentinel.py`, applied unconditionally in
+`fingerprint()` before the security digit-collapse:
+
+```python
+NODE_PID_PREFIX = re.compile(r"\(node:\d+\)")
+...
+norm = NODE_PID_PREFIX.sub("(node:#)", norm)
+```
+
+It landed at **zero migration cost**: all 8 affected rows were the punycode
+captures, closed and deleted in the same commit when the underlying warning was
+actually fixed (`tr46@3 → ^4.1.1`, sophia `576dd73f88`). See Verification.
 
 ## Usage inventory
 
@@ -301,22 +338,50 @@ this entry's own stated deletion condition.
 > lesson is narrow and worth keeping: **re-probe a permission blocker before
 > inheriting it**; a denial is an event, not an attribute.
 
-**Class 3 remains BLOCKED, and it is now the entire remaining concern.** Fix N
-(strip the `grep -n` line-number prefix in `fingerprint()`) is *not* landed,
-deliberately, for the reason this entry already documents:
+**Class 5 is CLOSED — the pid normalization landed 2026-07-30** with an
+adversarial harness and zero migration cost (see Verification). Classes 1 and 2
+closed earlier the same day. **Classes 3 and 4 remain BLOCKED**, and they are
+now the entire remaining concern.
 
-- Fix N **changes existing fingerprints**. Every live ledger entry whose
-  captured `line` carries a `grep -n` prefix re-hashes and reads as NEW once,
-  firing one dispatch per affected entry — precisely the cost it removes.
-  Landing it therefore requires a **one-time ledger migration** (recompute `fp`
-  for affected live lines in the same commit), which is a different and riskier
-  operation than an additive `_is_echo_line` guard.
-- Fix N's regex is **not yet verified against adversarial negatives**. Guards
-  J/K/L/M each shipped with a positive/negative harness; Fix N has none. It
-  should not land to a weaker standard than the guards it sits beside.
+**Class 3 (Fix N — strip the `grep -n` prefix in `fingerprint()`) stays blocked
+on migration scale, and that scale is now measured rather than estimated.** The
+earlier text said Fix N "changes existing fingerprints" without saying how many.
+Measured against the live 254-row ledger by recomputing every row under both
+normalizations:
 
-That is a real, bounded, well-specified next step — not an open-ended one — but
-it needs its own run with the ledger migration written and verified together.
+| | rows re-hashed | merge groups | notes |
+|---|---|---|---|
+| Class 5 (pid) | **8** | 1 | all punycode; deleted as fixed → zero cost. **Landed.** |
+| Fix N (`grep -n`) | **105** | **22** | ~41% of the ledger |
+
+The 22 merge groups are the real blocker, and they are not a mechanical rewrite.
+Fix N does not just re-hash rows, it **merges rows that currently carry
+different `status` and different `backlog` values**, so each group needs a
+decision about which status and which owner entry survives. Two worked examples:
+
+- `f47f0600b001` ← `3d8af5658223`(triaged), `cdb5ca58ee6c`(false-positive),
+  `d7af212f42f2`(false-positive), `ea88a05cc69f`(open), `fef5d7190486`(open) —
+  five captures of one `X-Schema-Version` warning at three different statuses.
+- `efdbd32ba5ca` ← **11** rows: the `datetime.utcfromtimestamp()` warning
+  captured from `<string>:N:`, `<stdin>:N:` and `/tmp/parse_jobs.py:N:`.
+
+That merge table is also the clearest existing measure of the defect's cost:
+**105 of 254 live rows are redundant captures of warnings the ledger already
+holds.** The dispatch bill for those was paid one Opus run at a time.
+
+Two things are now discharged that were owed: the migration surface is
+enumerated (exact old→new mapping computed, reproducible from the script in
+Verification), and the *method* for verifying such a fix is proven by the
+Class-5 harness. What remains owed is Fix N's own adversarial-negative harness
+plus the 22 per-group status/backlog decisions — an operator-initiated pass, not
+a background run, because 22 judgment calls on live suppression state is exactly
+the shape that should not be automated silently.
+
+**Class 4 (aggregate banner) stays blocked, now with a decided direction** —
+see the Class-4 section above: it fired live on 2026-07-30 (`ce0de21b8053` →
+`6bbd169077f5`), and that firing ruled out digit-collapse as the remedy. It
+needs the routing change (banner = pointer, not finding), which is a change to
+what the sentinel counts as a finding and so wants an operator decision.
 
 **This entry canonicalizes ZERO ledger fingerprints** (`fingerprints: []`). One
 evidence fingerprint remains:
@@ -330,6 +395,12 @@ so on re-encounter the sentinel should cite what the line is *about* (jQuery
 2.1.1 is a shipped XSS family, blocked) rather than a hook defect. The owner
 entry already lists this fp, so the mapping is N:1 onto concerns with no
 duplicate claim. It stays in the ledger until Fix N lands.
+
+The Class-5 evidence fingerprints are deliberately **not** listed: all eight
+were deleted when the underlying `punycode` warning was fixed at its root, so
+there is nothing left to suppress. If `DEP0040` ever returns from another
+carrier it will mint a single fingerprint (`58fe49f33e62`) regardless of how
+many processes emit it — which is the fix working.
 
 ## Verification
 
@@ -347,6 +418,49 @@ fired the dispatch directive (`+2 new → deprecation-triage dispatch`), which i
 the regression that matters: the guards narrow the echo surface without
 narrowing the warning surface.
 
+**Class 5 (pid normalization) — verified and landed 2026-07-30.** Harness at
+`.claude/hooks/` sibling scratch (reproducible; drives the hook's own
+`fingerprint()` by loading `deprecation-sentinel.py` directly, so it tests the
+shipped code path rather than a copy):
+
+- **Positives — 15 pid-variants collapsed into 4 concerns, 4/4 groups PASS.**
+  The eight real punycode captures (pids 810849…913131) → one fp
+  `58fe49f33e62`; `DEP0044` across pids 1 / 99999 / 4194303 → one fp;
+  an `ExperimentalWarning` pair → one fp; and a mid-line pid
+  (`stderr | (node:500) …`) pair → one fp, confirming the sub is not
+  line-anchored.
+- **Negatives — 10/10 distinct lines stayed 10 distinct fingerprints, zero
+  collisions.** These are the adversarial cases that matter: three *different*
+  DEP codes sharing **one** pid (proves the message, not the pid, carries
+  identity); two real Node **stack frames** (`at Module._compile
+  (node:internal/modules/cjs/loader:1234:14)`) which contain `(node:` but no
+  digit run and must stay untouched; a `(node:worker)` non-numeric variant;
+  and `glob@7.2.3` vs `glob@8.1.0` vs `eslint@8.57.1`, proving package
+  versions remain concern-bearing (the sub is scoped to the literal
+  `(node:<digits>)` wrapper, never a general digit-collapse).
+- **Whole-ledger stability — PASS.** Recomputing all 254 live rows under the
+  previous and new normalization: exactly **8 rows re-hash, and every one is a
+  node-pid line; 0 non-node rows moved.** This is the property that made the
+  fix free to land — the 8 were the punycode rows, deleted in the same commit
+  as fixed.
+
+- **End-to-end through the hook's real entrypoint — PASS.** Three synthetic
+  `PostToolUse` payloads carrying the same `DEP0040` warning from pids
+  `111111` / `222222` / `333333`, against a throwaway project dir, produced
+  **one** ledger row (`58fe49f33e62`, matching the harness prediction). The
+  first emitted `deprecation-sentinel: +1 new → deprecation-triage dispatch`;
+  the second and third emitted `known re-encounter cited` and minted nothing.
+  Before the fix this sequence was three rows and three dispatches. The
+  regression that matters is also covered: the warning is still *captured* and
+  still *fires once* — the fix narrows re-minting, not the warning surface.
+
+Harness exit 0, `RESULT: ALL PASS`.
+
+The Fix N (Class 3) and Class 4 measurements quoted in Current decision come
+from the same script run in comparison mode over the live ledger, recomputing
+each row's fingerprint under the candidate normalization and grouping by the
+resulting hash.
+
 Class 3 is verified by exact reproduction rather than by regex reasoning: both
 `313c6eac27c1` and `fb31d99a0ba8` were **recomputed from the same warning text**
 through the hook's own `fingerprint()` normalization, differing only in the
@@ -354,22 +468,41 @@ through the hook's own `fingerprint()` normalization, differing only in the
 The bare-text variant hashes to `fe896c58f14e`. Fix N's regex is *not* yet
 verified against adversarial negatives — that is owed before it lands.
 
-Re-check trigger for the stasis sweep — **narrowed to Fix N only**: land Fix N
-together with its one-time ledger migration and an adversarial-negative
-harness, then confirm that re-grepping a *shifted* lockfile does **not** mint a
-new fingerprint (the Class-3 proof), and that the migration left no live ledger
-entry re-reading as NEW. Then delete the remaining `fb31d99a0ba8` evidence line
-(its owner entry keeps the primary fp) and delete this entry.
+Re-check trigger for the stasis sweep — **narrowed to Fix N (Class 3) and the
+Class-4 routing change**, both of which need an operator-initiated pass:
 
-The Guards J/K half of that trigger is already discharged: a fresh `pnpm
-install` in a changed workspace now mints exactly ONE fingerprint per
-deprecated package, because the summary twin is collapsed at source.
+1. **Fix N** — land the `grep -n` prefix strip with (a) its own
+   adversarial-negative harness at the Class-5 standard, (b) the 105-row ledger
+   migration, and (c) the 22 per-group status/backlog decisions written down.
+   Confirm afterwards that re-grepping a *shifted* lockfile does **not** mint a
+   new fingerprint, and that the migration left no live entry re-reading as NEW.
+   Then delete the `fb31d99a0ba8` evidence line (its owner entry keeps the
+   primary fp).
+2. **Class 4** — decide the banner-routing change (pointer, not finding).
+   Confirm afterwards that a root `pnpm install` whose package set changed does
+   not mint a new aggregate fingerprint.
+
+Delete this entry when both are discharged.
+
+Two thirds of the original trigger are already discharged. Guards J/K: a fresh
+`pnpm install` in a changed workspace now mints exactly ONE fingerprint per
+deprecated package, because the summary twin is collapsed at source. Class 5:
+repeated node processes emitting the same warning now mint exactly ONE
+fingerprint, verified across 15 pid-variants.
 
 Self-demonstrating footnote: `b1561f3d429d`, `9d31ba938515`, and
 `010ff5a7bfb5` were minted *by this triage run*, when a `cat -A` inspection of
 the already-captured install log re-emitted three warnings the ledger was
 already holding. The defect cost three dispatch directives inside the very run
 that diagnosed it.
+
+Third footnote, 2026-07-30 — this entry has now been *self-demonstrating three
+times over*. The triage run that landed the Class-5 fix was itself dispatched by
+a Class-5 re-mint (`18bf6594df8d`, the eighth pid-variant of one punycode
+warning), and while that run was working, Class 4 fired and requested a *ninth*
+dispatch (`6bbd169077f5`). Two wasted dispatches inside one run, from two
+different classes of the same defect. That is the argument for treating
+fingerprint stability as infrastructure rather than as cleanup.
 
 Second footnote, 2026-07-30 — the cost is now measured, not projected. Class 3
 **spent a full background Opus dispatch**: `fb31d99a0ba8` was triaged as a new

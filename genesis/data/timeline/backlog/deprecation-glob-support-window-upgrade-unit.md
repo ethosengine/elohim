@@ -11,7 +11,7 @@ status: "backlog"
 priority: "medium"
 deprecation_status: blocked
 severity: low
-fingerprints: ["c8e23effd89f", "9d796424bd3a", "ce0de21b8053"]
+fingerprints: ["c8e23effd89f", "9d796424bd3a", "6bbd169077f5"]
 relatedNodeIds:
   - "backlog-deprecation-uuid-support-window-upgrade-unit"
   - "backlog-dependabot-triage"
@@ -242,7 +242,7 @@ read-only; no workspace file was modified):
   every resolved `minimatch` (`3.1.5`, `9.0.9`, `10.2.3`, `10.2.4`) is at or above
   its fix floor — the reason this entry is `severity: low`.
 
-## 2026-07-30 — sophia's glob carriers, resolved from aggregate banner `ce0de21b8053`
+## 2026-07-30 — sophia's glob carriers, resolved from aggregate banner `6bbd169077f5`
 
 This entry already recorded that `sophia/pnpm-lock.yaml` carries `glob@10.5.0`,
 `8.1.0`, and `7.2.3` with **zero direct declarations** in any

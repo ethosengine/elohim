@@ -11,7 +11,7 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["ce0de21b8053"]
+fingerprints: ["6bbd169077f5"]
 relatedNodeIds:
   - "backlog-deprecation-sophia-rollup-filesize-npm-internals-subtree"
 tags: [deprecation, sophia, transitive, orphan, snapdragon, micromatch, cypress-jest-adapter, sloc, svgo, cssnano, rollup-plugin-postcss, abandoned-upstream]
@@ -28,7 +28,7 @@ cites:
 ## What is deprecated
 
 Five of the 25 packages in the sophia install banner (fingerprint
-`ce0de21b8053`) are **deep-transitive orphans**: author-retired micro-packages
+`6bbd169077f5`) are **deep-transitive orphans**: author-retired micro-packages
 buried three to six hops below a first-party declaration, with no direct
 declaration, no first-party import, and no override that would be safe.
 

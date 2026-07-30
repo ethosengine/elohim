@@ -11,7 +11,7 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["9b2c18a09eb7", "a200f917e702", "72a88a3bbff4", "e83cd3f2d7e3", "ce0de21b8053"]
+fingerprints: ["9b2c18a09eb7", "a200f917e702", "72a88a3bbff4", "e83cd3f2d7e3", "6bbd169077f5"]
 relatedNodeIds:
   - "backlog-dependabot-triage"
   - "backlog-deprecation-storybook-test-runner-jest-island-retire"
@@ -274,7 +274,7 @@ No fix was applied this run, so nothing is claimed fixed. What *was* verified:
   status transitions. No lockfile, no `pnpm-workspace.yaml`, no `package.json`, no
   submodule content.
 
-## 2026-07-30 — sophia's transitive `uuid@8.3.2`, from aggregate banner `ce0de21b8053`
+## 2026-07-30 — sophia's transitive `uuid@8.3.2`, from aggregate banner `6bbd169077f5`
 
 Triage of sophia's aggregate install banner ("25 deprecated subdependencies
 found") confirms one banner line belongs to this entry:
