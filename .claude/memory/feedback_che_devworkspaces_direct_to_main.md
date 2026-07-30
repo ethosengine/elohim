@@ -1,6 +1,6 @@
 ---
 name: feedback_che_devworkspaces_direct_to_main
-title: "Push policy: che-devworkspaces main yes, elohim main no"
+title: Push policy: che-devworkspaces main yes, elohim main no
 description: "che-devworkspaces (CI/image infra) pushes straight to main, inert-by-default; elohim monorepo main is reviewed dev→main only — surface classifier blocks."
 metadata: 
   node_type: memory

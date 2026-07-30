@@ -6,6 +6,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: a0632634-fa0a-4b7a-8546-a7e1a5d6f0ab
+  modified: 2026-07-21T14:01:02.280Z
 ---
 
 After the Che op-gate (governed distribution) landed, an 11-agent grounding workflow
@@ -60,6 +61,17 @@ imagodei" guidance above (the flip happened as part of a shared reconciliation, 
 Still INERT in prod, but the cause MOVED: `household_id` stays NULL because (1) `agent_pub_key` is
 unpopulated and (2) the transport-id vs agent_cid namespace mismatch — substrate-identity-coherence
 gates now, not a scope-read bug.
+
+**UPDATE 2026-07-21 — both INERT causes CLOSED on dev (`928bbb5ec..44feb0db0`, identity-coherence
+sprint):** (1) `on_membership_projected` now stamps `humans.agent_pub_key = member_agent_key`
+(NULL-only, HOUSEHOLD-gated, `is_agent_cid`-guarded) — the 2026-06-15 spec's stopgap shipped; (2) the
+salvage/custody path resolves self to agent_cid on WRITE ([session → boot cell-key snapshot], skip+
+observe when unresolvable; reconcile re-resolves the session arm PER PASS — no boot-frozen identity)
+while READS match legacy transport-id rows too. Also: holder-relation dedup (last-write-wins by
+humans.id) prevents duplicate-agent_pub_key diversity inflation; snapshot diversity now the real
+`fault_domain_diversity` fold shared via elohim-facings (`FAULT_DOMAIN_TARGET=7`). Remaining for
+live efficacy: deploy + humans rows actually carrying keys on alpha (membership signals / heal /
+seeder re-author after rekey), and mesh convergence for cross-peer coverage.
 
 **Correctly deferred (live-mesh / shem blocked):** op-gate's own live driving loop; P3-7 cross-peer
 "replica count rises" a2o; stage-2 signed capacity ads / real spare_bytes probe; CoverageRollup

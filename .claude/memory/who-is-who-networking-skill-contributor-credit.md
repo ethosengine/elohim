@@ -1,6 +1,6 @@
 ---
 name: who-is-who-networking-skill-contributor-credit
-title: "Who's-who networking skill + contributor credit"
+title: Who's-who networking skill + contributor credit
 description: "CONTRIBUTORS file already exists as genesis/data/presences (standing gradient, on-grain credit); Waves 1-2 landed; opt-out→commons + who's-who skill remain."
 metadata: 
   node_type: memory

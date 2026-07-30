@@ -2,14 +2,14 @@
   "schema_version": 1,
   "entries": {
     "project_local_stack_dht_anchor_gap": {
-      "hits": 70,
+      "hits": 111,
       "last_changed": "elohim/elohim-storage/src/db/content_diesel.rs",
-      "last_signal_at": "2026-07-11T21:39:36Z"
+      "last_signal_at": "2026-07-28T00:56:05Z"
     },
     "project_resilience_snapshot_humans_junction": {
-      "hits": 43,
-      "last_changed": "elohim/elohim-storage/src/db/humans.rs",
-      "last_signal_at": "2026-06-27T02:09:29Z"
+      "hits": 60,
+      "last_changed": "elohim/elohim-storage/src/services/household_resilience.rs",
+      "last_signal_at": "2026-07-26T02:32:25Z"
     },
     "project_sprint_branch_not_orchestrator_indexed": {
       "hits": 17,
@@ -42,19 +42,19 @@
       "last_signal_at": "2026-06-25T19:01:16Z"
     },
     "project_ci_storage_topology": {
-      "hits": 39,
+      "hits": 61,
       "last_changed": "elohim/holochain/Jenkinsfile",
-      "last_signal_at": "2026-07-16T16:34:54Z"
+      "last_signal_at": "2026-07-30T04:15:15Z"
     },
     "feedback_diesel_migration_timestamp_collision": {
-      "hits": 10,
+      "hits": 12,
       "last_changed": "elohim/elohim-storage/src/db/mod.rs",
-      "last_signal_at": "2026-06-27T21:48:46Z"
+      "last_signal_at": "2026-07-30T02:30:13Z"
     },
     "project_sweettest_native_build_env": {
-      "hits": 14,
-      "last_changed": "elohim/holochain/tests/sweettest/.epr-meta",
-      "last_signal_at": "2026-07-12T02:06:23Z"
+      "hits": 29,
+      "last_changed": "elohim/holochain/tests/sweettest/Cargo.toml",
+      "last_signal_at": "2026-07-30T01:12:17Z"
     },
     "feedback_codegen_prettier_oscillation": {
       "hits": 19,
@@ -72,9 +72,9 @@
       "last_signal_at": "2026-06-10T21:20:44Z"
     },
     "project_reach_enum_drift_reconciliation": {
-      "hits": 1,
-      "last_changed": "elohim/sdk/schemas/v1/enums/reach.schema.json",
-      "last_signal_at": "2026-06-11T00:07:43Z"
+      "hits": 16,
+      "last_changed": "elohim/elohim-storage/src/services/reach_earning.rs",
+      "last_signal_at": "2026-07-24T22:33:40Z"
     },
     "project_container_cargo_environment_quirks": {
       "hits": 9,
@@ -97,14 +97,14 @@
       "last_signal_at": "2026-06-22T09:32:57Z"
     },
     "project_rust_build_footprint_anatomy": {
-      "hits": 34,
-      "last_changed": "genesis/agentic/pool-policy.json",
-      "last_signal_at": "2026-06-22T09:32:57Z"
+      "hits": 35,
+      "last_changed": ".cargo/config.toml",
+      "last_signal_at": "2026-07-30T03:13:47Z"
     },
     "feedback_deterministic_flag_agent_canon_stasis_pattern": {
-      "hits": 9,
+      "hits": 25,
       "last_changed": ".claude/hooks/deprecation-sentinel.py",
-      "last_signal_at": "2026-07-02T16:19:54Z"
+      "last_signal_at": "2026-07-30T00:05:00Z"
     }
   }
 }
