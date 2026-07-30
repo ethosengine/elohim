@@ -52,6 +52,171 @@ fn max_wall_time_ms() -> u64 {
         .unwrap_or(DEFAULT_MAX_WALL_TIME_MS)
 }
 
+/// Scans `dir` (non-recursive — the server bundle's chunks are flat) for a
+/// `.mjs` file whose SOURCE TEXT contains every substring in `signatures`.
+///
+/// This is how the `ELOHIM_RENDER_DEBUG_HOOKS` PendingTasks/Router probes
+/// (see [`render`](AngularRenderer::render)) relocate a specific Angular
+/// framework chunk across rebuilds: esbuild mints a fresh content-hash
+/// filename for every chunk on every build (`chunk-HBGZH5O4.mjs` today, some
+/// other hash tomorrow), so hard-coding a filename would silently break the
+/// probe on the next `ng build`. Public method/getter names invoked via dot
+/// notation elsewhere in the module graph (`hasPendingTasksObservable`,
+/// `navigateByUrl`, `initialNavigation`) are NOT mangled by the minifier
+/// (only local variable/class names are), so grepping for them is a stable
+/// anchor. Returns the matching file's `file://` URL pre-encoded as a JSON
+/// string literal (quotes included) ready to splice directly into generated
+/// JS; `None` if no chunk matches — callers degrade the probe to a no-op
+/// rather than failing the render.
+fn find_module_chunk_by_signatures(dir: &std::path::Path, signatures: &[&str]) -> Option<String> {
+    let entries = std::fs::read_dir(dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("mjs") {
+            continue;
+        }
+        let Ok(contents) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        if signatures.iter().all(|sig| contents.contains(sig)) {
+            if let Ok(url) = url::Url::from_file_path(&path) {
+                if let Ok(lit) = serde_json::to_string(url.as_str()) {
+                    return Some(lit);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Builds the `ELOHIM_RENDER_DEBUG_HOOKS` PendingTasks + Router instrumentation
+/// block (empty string if the relevant chunk isn't found — a no-op, not a
+/// render failure).
+///
+/// # Why PendingTasks and Router
+///
+/// Under `provideZonelessChangeDetection()` (elohim-app's config),
+/// `ApplicationRef.whenStable()` — which `renderApplication` awaits internally
+/// before serializing — resolves only when Angular's `PendingTasks` registry
+/// is empty. The two contributors are HttpClient requests and Router
+/// navigation: `Router`'s navigation path calls `pendingTasks.add()` before
+/// dispatching, and only calls `remove()` once its `events` stream emits
+/// `NavigationEnd` / `NavigationCancel` / `NavigationError` for that
+/// navigation (Angular's real, un-mangled source — verified by reading the
+/// bundle directly). If navigation never reaches one of those terminal
+/// events, `remove()` never fires and `whenStable()` hangs forever with NO
+/// component constructor having to run — this is the prime suspect for the
+/// silent `/` stall recorded in
+/// `genesis/data/timeline/backlog/elohim-render-v22-elohim-app-stall.md`.
+///
+/// # Mechanism
+///
+/// Neither class is reachable from `globalThis` (Angular resolves them via
+/// DI). Instead this dynamically `import()`s the SAME chunk file the main
+/// bundle will later import (by resolved `file://` URL, so the ES module
+/// cache returns the identical, singleton module record) BEFORE the bundle
+/// loads, duck-types the exported class by its distinctive
+/// prototype members, and monkey-patches the prototype in place. When
+/// Angular's DI later instantiates the (now-patched) class, every instance
+/// carries the instrumentation automatically — no bundle file is ever
+/// edited.
+fn pending_tasks_debug_probe_js(bundle_dir: &std::path::Path) -> String {
+    let mut js = String::new();
+
+    if let Some(pt_url) =
+        find_module_chunk_by_signatures(bundle_dir, &["hasPendingTasksObservable"])
+    {
+        js.push_str(&format!(
+            r#"
+            try {{
+                const __ptUrl = {pt_url};
+                const __ptNs = await import(__ptUrl);
+                let __ptFound = false;
+                for (const __ptKey of Object.keys(__ptNs)) {{
+                    const __ptCls = __ptNs[__ptKey];
+                    if (typeof __ptCls === 'function' && __ptCls.prototype &&
+                        Object.getOwnPropertyDescriptor(__ptCls.prototype, 'hasPendingTasks')) {{
+                        const __ptProto = __ptCls.prototype;
+                        const __ptOrigAdd = __ptProto.add;
+                        const __ptOrigRemove = __ptProto.remove;
+                        __ptProto.add = function (...args) {{
+                            const id = __ptOrigAdd.apply(this, args);
+                            globalThis.__eprLastPendingTasks = this;
+                            console.log(`[PendingTasks.add] key=${{__ptKey}} id=${{id}} outstanding=${{this.pendingTasks.size}} t=${{Date.now()}}\n${{new Error().stack}}`);
+                            return id;
+                        }};
+                        __ptProto.remove = function (...args) {{
+                            console.log(`[PendingTasks.remove] key=${{__ptKey}} id=${{args[0]}} outstanding-before=${{this.pendingTasks.size}} t=${{Date.now()}}`);
+                            return __ptOrigRemove.apply(this, args);
+                        }};
+                        console.log(`[PendingTasks probe] installed on export "${{__ptKey}}" from ${{__ptUrl}}`);
+                        __ptFound = true;
+                        break;
+                    }}
+                }}
+                if (!__ptFound) {{
+                    console.log('[PendingTasks probe] chunk imported but no matching class export found');
+                }}
+            }} catch (e) {{
+                console.log(`[PendingTasks probe FAILED] ${{e && e.stack ? e.stack : e}}`);
+            }}
+            "#
+        ));
+    } else {
+        js.push_str(
+            "console.log('[PendingTasks probe] no chunk in bundle dir matched the signature');\n",
+        );
+    }
+
+    if let Some(router_url) =
+        find_module_chunk_by_signatures(bundle_dir, &["navigateByUrl", "initialNavigation"])
+    {
+        js.push_str(&format!(
+            r#"
+            try {{
+                const __rtUrl = {router_url};
+                const __rtNs = await import(__rtUrl);
+                let __rtFound = false;
+                for (const __rtKey of Object.keys(__rtNs)) {{
+                    const __rtCls = __rtNs[__rtKey];
+                    if (typeof __rtCls === 'function' && __rtCls.prototype &&
+                        typeof __rtCls.prototype.navigateByUrl === 'function' &&
+                        typeof __rtCls.prototype.initialNavigation === 'function') {{
+                        const __rtProto = __rtCls.prototype;
+                        const __rtOrigNav = __rtProto.navigateByUrl;
+                        __rtProto.navigateByUrl = function (...args) {{
+                            if (!this.__eprEventsHooked && this.events && typeof this.events.subscribe === 'function') {{
+                                this.__eprEventsHooked = true;
+                                this.events.subscribe({{
+                                    next: (ev) => console.log(`[Router.events] type=${{ev && ev.type}} t=${{Date.now()}} ${{ev && ev.toString ? ev.toString() : ''}}`),
+                                    error: (err) => console.log(`[Router.events ERROR] ${{err}}`),
+                                }});
+                            }}
+                            console.log(`[Router.navigateByUrl] url=${{args[0]}} t=${{Date.now()}}`);
+                            return __rtOrigNav.apply(this, args);
+                        }};
+                        console.log(`[Router probe] installed on export "${{__rtKey}}" from ${{__rtUrl}}`);
+                        __rtFound = true;
+                        break;
+                    }}
+                }}
+                if (!__rtFound) {{
+                    console.log('[Router probe] chunk imported but no matching class export found');
+                }}
+            }} catch (e) {{
+                console.log(`[Router probe FAILED] ${{e && e.stack ? e.stack : e}}`);
+            }}
+            "#
+        ));
+    } else {
+        js.push_str(
+            "console.log('[Router probe] no chunk in bundle dir matched the signature');\n",
+        );
+    }
+
+    js
+}
+
 /// A single unit of work sent to the background render thread.
 struct StringWorkItem {
     /// The JS expression/IIFE driver to evaluate via `eval_string`.
@@ -243,9 +408,25 @@ impl Renderer for AngularRenderer {
             r#"
                 (() => {
                     if (typeof Deno === 'undefined' || !Deno.core) return;
+                    // V8's default Error.stackTraceLimit (10) truncates every
+                    // caller-stack capture below before it reaches the actual
+                    // application-level caller (a component/service several
+                    // RxJS operators + interceptor-chain frames deep) — every
+                    // captured stack in this probe bottoms out at generic
+                    // RxJS Subscriber machinery instead of naming who issued
+                    // the request. Raise it for the duration of the render.
+                    Error.stackTraceLimit = 50;
                     const core = Deno.core;
                     const tick = () => {
-                        console.log(`[heartbeat] t=${Date.now()}`);
+                        // If the PendingTasks probe below installed itself and
+                        // Angular's DI has instantiated the (patched) class, the
+                        // last instance that called add()/remove() is stashed on
+                        // globalThis — dump its outstanding task ids on every
+                        // beat so a stuck-forever task is visible well before
+                        // any fixed T+2s/T+5s checkpoint.
+                        const pt = globalThis.__eprLastPendingTasks;
+                        const ptInfo = pt ? ` pendingTasks=[${[...pt.pendingTasks].join(',')}]` : '';
+                        console.log(`[heartbeat] t=${Date.now()}${ptInfo}`);
                         core.queueUserTimer(1, false, 500, tick);
                     };
                     core.queueUserTimer(1, false, 500, tick);
@@ -327,6 +508,23 @@ impl Renderer for AngularRenderer {
             "Deno.core.setUnhandledPromiseRejectionHandler(() => true);"
         };
 
+        // Diagnostic-only, under ELOHIM_RENDER_DEBUG_HOOKS: reflection-based
+        // PendingTasks + Router instrumentation — see
+        // `pending_tasks_debug_probe_js` for the full rationale. Must run
+        // BEFORE the bundle's own module graph is imported below so the
+        // prototype patches are in place before Angular's DI instantiates
+        // these classes. Empty string (no-op) when disabled or when the
+        // bundle's directory doesn't contain a matching chunk.
+        let pending_tasks_probe_js = if debug_hooks {
+            let bundle_dir = self
+                .bundle
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("."));
+            pending_tasks_debug_probe_js(bundle_dir)
+        } else {
+            String::new()
+        };
+
         let driver = format!(
             r#"(async () => {{
                 // Suppress unhandled promise rejections — SSR fetch failures are
@@ -337,6 +535,7 @@ impl Renderer for AngularRenderer {
                     {rejection_handler_js}
                 }}
                 {debug_js}
+                {pending_tasks_probe_js}
                 // Eagerly evaluate the crypto shim BEFORE the bundle graph. The
                 // bundle bundles `ws` (CommonJS), which reaches for a synchronous
                 // `require("crypto")` at module-init; the module shim's require
