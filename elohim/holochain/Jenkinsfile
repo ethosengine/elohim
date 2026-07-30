@@ -1737,22 +1737,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                                 sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
 
-                                // Push each component with its own tag
+                                // Push each component with its own tag.
+                                // Bash bodies extracted to scripts/ci/ (2026-07-30, Jenkinsfile Size Limit —
+                                // see CLAUDE.md) — see those scripts' headers for the exact preserved
+                                // error-propagation semantics of the tracked (edgenode/doorway, via
+                                // returnStatus) vs untracked (storage/happ-installer/doorway-app/agent-sdk)
+                                // push patterns.
                                 def edgeNodePushed = sh(
-                                    script: """
-                                        if nerdctl -n k8s.io images | grep -q "elohim-edgenode.*${IMAGE_TAG}"; then
-                                            echo "Pushing Edge Node image: ${EDGENODE_TAG}"
-                                            nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${EDGENODE_TAG}
-                                            nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
-
-                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${EDGENODE_TAG}
-                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
-                                            exit 0
-                                        else
-                                            echo "Edge Node image not found, skipping push"
-                                            exit 1
-                                        fi
-                                    """,
+                                    script: "bash '${env.WORKSPACE}/scripts/ci/push-harbor-tracked.sh' elohim-edgenode elohim-edgenode '${EDGENODE_TAG}' 'Edge Node'",
                                     returnStatus: true
                                 ) == 0
 
@@ -1761,20 +1753,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 }
 
                                 def doorwayPushed = sh(
-                                    script: """
-                                        if nerdctl -n k8s.io images | grep -q "elohim-doorway.*${IMAGE_TAG}"; then
-                                            echo "Pushing Doorway image: ${DOORWAY_TAG}"
-                                            nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:${DOORWAY_TAG}
-                                            nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:${GIT_COMMIT_HASH}
-
-                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:${DOORWAY_TAG}
-                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:${GIT_COMMIT_HASH}
-                                            exit 0
-                                        else
-                                            echo "Doorway image not found, skipping push"
-                                            exit 1
-                                        fi
-                                    """,
+                                    script: "bash '${env.WORKSPACE}/scripts/ci/push-harbor-tracked.sh' elohim-doorway elohim-doorway '${DOORWAY_TAG}' 'Doorway'",
                                     returnStatus: true
                                 ) == 0
 
@@ -1782,94 +1761,20 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     env.IMAGES_PUSHED = 'true'
                                 }
 
-                                sh """
-                                    if nerdctl -n k8s.io images | grep -q "elohim-storage.*${IMAGE_TAG}"; then
-                                        echo "Pushing elohim-storage image: ${STORAGE_TAG}"
-                                        nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-storage:${STORAGE_TAG}
-                                        nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-storage:${GIT_COMMIT_HASH}
+                                sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-untracked.sh' elohim-storage elohim-storage '${STORAGE_TAG}' 'elohim-storage'"
 
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-storage:${STORAGE_TAG}
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-storage:${GIT_COMMIT_HASH}
-                                    else
-                                        echo "elohim-storage image not found, skipping push"
-                                    fi
-                                """
+                                sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-untracked.sh' elohim-happ-installer elohim-happ-installer '${HAPP_INSTALLER_TAG}' 'hApp Installer'"
 
-                                sh """
-                                    if nerdctl -n k8s.io images | grep -q "elohim-happ-installer.*${IMAGE_TAG}"; then
-                                        echo "Pushing hApp Installer image: ${HAPP_INSTALLER_TAG}"
-                                        nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:${HAPP_INSTALLER_TAG}
-                                        nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:${GIT_COMMIT_HASH}
+                                sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-untracked.sh' doorway-app doorway-app '${DOORWAY_APP_TAG}' 'Doorway App'"
 
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:${HAPP_INSTALLER_TAG}
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:${GIT_COMMIT_HASH}
-                                    else
-                                        echo "hApp Installer image not found, skipping push"
-                                    fi
-                                """
-
-                                sh """
-                                    if nerdctl -n k8s.io images | grep -q "doorway-app.*${IMAGE_TAG}"; then
-                                        echo "Pushing Doorway App image: ${DOORWAY_APP_TAG}"
-                                        nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/doorway-app:${DOORWAY_APP_TAG}
-                                        nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/doorway-app:${GIT_COMMIT_HASH}
-
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/doorway-app:${DOORWAY_APP_TAG}
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/doorway-app:${GIT_COMMIT_HASH}
-                                    else
-                                        echo "Doorway App image not found, skipping push"
-                                    fi
-                                """
-
-                                sh """
-                                    if nerdctl -n k8s.io images | grep -q "elohim-agent-sdk.*${IMAGE_TAG}"; then
-                                        echo "Pushing Agent SDK image: ${AGENT_SDK_TAG}"
-                                        nerdctl -n k8s.io tag elohim-agent-sdk:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-agent-sdk:${AGENT_SDK_TAG}
-                                        nerdctl -n k8s.io tag elohim-agent-sdk:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-agent-sdk:${GIT_COMMIT_HASH}
-
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-agent-sdk:${AGENT_SDK_TAG}
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-agent-sdk:${GIT_COMMIT_HASH}
-                                    else
-                                        echo "Agent SDK image not found, skipping push"
-                                    fi
-                                """
+                                sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-untracked.sh' elohim-agent-sdk elohim-agent-sdk '${AGENT_SDK_TAG}' 'Agent SDK'"
 
                                 // Relay Addr Beacon push+alias — scripts/ci/push-relay-addr-beacon.sh
                                 sh "bash '${env.WORKSPACE}/scripts/ci/push-relay-addr-beacon.sh'"
 
                                 // Also push dev-latest aliases on dev branch for backward compat
                                 if (env.BRANCH_NAME == 'dev') {
-                                    sh """
-                                        if nerdctl -n k8s.io images | grep -q "elohim-edgenode.*${IMAGE_TAG}"; then
-                                            nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
-                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
-                                        fi
-
-                                        if nerdctl -n k8s.io images | grep -q "elohim-doorway.*${IMAGE_TAG}"; then
-                                            nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:dev-latest
-                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:dev-latest
-                                        fi
-
-                                        if nerdctl -n k8s.io images | grep -q "elohim-storage.*${IMAGE_TAG}"; then
-                                            nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-storage:dev-latest
-                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-storage:dev-latest
-                                        fi
-
-                                        if nerdctl -n k8s.io images | grep -q "elohim-happ-installer.*${IMAGE_TAG}"; then
-                                            nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:dev-latest
-                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:dev-latest
-                                        fi
-
-                                        if nerdctl -n k8s.io images | grep -q "doorway-app.*${IMAGE_TAG}"; then
-                                            nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/doorway-app:dev-latest
-                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/doorway-app:dev-latest
-                                        fi
-
-                                        if nerdctl -n k8s.io images | grep -q "elohim-agent-sdk.*${IMAGE_TAG}"; then
-                                            nerdctl -n k8s.io tag elohim-agent-sdk:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-agent-sdk:dev-latest
-                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-agent-sdk:dev-latest
-                                        fi
-                                    """
+                                    sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-dev-latest-aliases.sh'"
                                 }
                             }
                         }
