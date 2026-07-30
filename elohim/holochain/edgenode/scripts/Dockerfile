@@ -7,7 +7,7 @@
 
 # Use slim instead of alpine for better ESM module compatibility
 # (libsodium-wrappers has ESM resolution issues on Alpine)
-FROM node:20-slim
+FROM node:24-slim
 
 WORKDIR /app
 

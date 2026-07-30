@@ -5,7 +5,7 @@
 # Run:   docker run -p 8095:8095 -e ANTHROPIC_API_KEY=... elohim-agent-sdk
 
 # Stage 1: Install and build
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 
@@ -21,7 +21,7 @@ COPY src ./src
 RUN pnpm build
 
 # Stage 2: Production
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
