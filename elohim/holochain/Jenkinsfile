@@ -1997,7 +1997,8 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
         }
 
         // Advisory @dataplane cucumber suite — bash body in scripts/ci/run-dataplane-validation.sh.
-        // catchError->UNSTABLE: red concerns surface without blocking the orchestrator cascade.
+        // catchError->UNSTABLE: red concerns and zero-scenario measurements surface
+        // without blocking the orchestrator cascade; zero scenarios is never SUCCESS.
         // Flip to FAILURE once all concerns go green on dev.
         stage('Dataplane Validation') {
             when {

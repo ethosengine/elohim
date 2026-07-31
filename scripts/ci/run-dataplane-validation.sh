@@ -36,6 +36,25 @@ DOORWAY="${E2E_DOORWAY_ALPHA:-https://doorway-alpha.elohim.host}"
 STORAGE_URL="${E2E_STORAGE_URL:-http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090}"
 RUN_ID="${BUILD_TAG:-dataplane-$(date +%Y%m%dT%H%M%S)}"
 
+read_scenario_count() {
+  awk '
+    /^[[:space:]]*"scenarios"[[:space:]]*:[[:space:]]*\{/ {
+      in_scenarios = 1
+      next
+    }
+    in_scenarios && /^[[:space:]]*"total"[[:space:]]*:/ {
+      count = $0
+      sub(/^[^:]*:[[:space:]]*/, "", count)
+      sub(/,.*/, "", count)
+      gsub(/[[:space:]]/, "", count)
+      if (count ~ /^[0-9]+$/) {
+        print count
+      }
+      exit
+    }
+  ' "$1"
+}
+
 echo "=== Dataplane Validation ==="
 echo "  Doorway : ${DOORWAY}"
 echo "  Storage : ${STORAGE_URL}"
@@ -104,6 +123,26 @@ for concern, stats in bc.items():
 " "${SPRINT_JSON}"
 fi
 
-# Propagate cucumber exit code — Jenkinsfile catchError(stageResult:'UNSTABLE')
-# converts non-zero to UNSTABLE (advisory) rather than FAILURE.
-exit "${CUCUMBER_EXIT}"
+# A support-load crash or broken tag filter can leave cucumber with zero
+# scenarios. The report builder legitimately renders that empty input, so the
+# cucumber exit alone is not a sufficient measurement invariant: Jenkins may
+# otherwise downgrade the error and display a false-green SUCCESS. Treat an
+# absent/unreadable count and a measured zero as an explicit validation error.
+SCENARIO_COUNT=""
+if [ -r "${SPRINT_JSON}" ]; then
+  SCENARIO_COUNT="$(read_scenario_count "${SPRINT_JSON}" || true)"
+fi
+VALIDATION_EXIT="${CUCUMBER_EXIT}"
+
+if [ -z "${SCENARIO_COUNT}" ]; then
+  echo "ERROR: Dataplane scenario count is missing or unreadable — the report is invalid, this is NOT a pass."
+  VALIDATION_EXIT=3
+elif [ "${SCENARIO_COUNT}" -eq 0 ]; then
+  echo "ERROR: 0 dataplane scenarios ran — support load or tag filter is broken, this is NOT a pass."
+  VALIDATION_EXIT=3
+fi
+
+# Propagate cucumber failures and the measurement invariant above. The
+# Jenkinsfile catchError(stageResult:'UNSTABLE') converts non-zero to UNSTABLE
+# (advisory) rather than FAILURE.
+exit "${VALIDATION_EXIT}"
