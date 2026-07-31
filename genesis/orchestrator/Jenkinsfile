@@ -777,6 +777,8 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
                 if (!graphPipelines.contains(name) && meta.jenkinsPath) {
                     graphPipelines.add(name)
                     echo "🔧 [build:*] force-include applied to graph result: ${name}"
+                } else if (!graphPipelines.contains(name)) {
+                    echo "⚠️  [build:*] force-include DROPPED: ${name} has no jenkinsPath in the registry — not dispatchable"
                 }
             }
         }
@@ -1191,6 +1193,22 @@ def runBuildGraph(List changedFiles) {
     // metadata without re-parsing build-manifest.json files.
     if (result.pipelineRegistry) {
         env.PIPELINE_REGISTRY_JSON = writeJSON(returnText: true, json: result.pipelineRegistry)
+        // elohim-sophia's build-manifest.json lives INSIDE the sophia
+        // submodule, which this orchestrator checkout never initializes — the
+        // walker cannot see it, so [build:sophia] force-includes were silently
+        // dropped as non-dispatchable (no jenkinsPath). Register it statically:
+        // jenkinsPath here is only the dispatchability marker; the elohim-sophia
+        // multibranch job loads sophia/Jenkinsfile from its own
+        // submodule-initialized checkout.
+        def reg = readJSON(text: env.PIPELINE_REGISTRY_JSON)
+        def sophiaMeta = reg['elohim-sophia'] ?: [:]
+        def sjp = sophiaMeta.jenkinsPath
+        if (!(sjp instanceof CharSequence) || !sjp.toString().trim()) {
+            sophiaMeta.jenkinsPath = 'sophia/Jenkinsfile'
+            reg['elohim-sophia'] = sophiaMeta
+            env.PIPELINE_REGISTRY_JSON = writeJSON(returnText: true, json: reg)
+            echo "Registry patch: elohim-sophia marked dispatchable (submodule manifest invisible to the walker)"
+        }
     }
 
     return result
