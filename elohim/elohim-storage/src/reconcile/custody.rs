@@ -544,6 +544,11 @@ pub struct ManifestBackfillOutcome {
     pub manifests_written: usize,
     /// New `shard_locations` self-held rows recorded.
     pub self_held_recorded: usize,
+    /// Self-held rows RE-claimed for blobs that already had a manifest — the
+    /// re-key repair arm (see `manifest_backfill_pass`). Counted separately from
+    /// `self_held_recorded` so "the node re-attributed old custody to its live
+    /// key" is distinguishable in logs from "the node manifested new bytes".
+    pub self_held_reclaimed: usize,
     /// Candidates that turned out to already have a manifest (pre-filter hit,
     /// or a race detected at the write-time re-check).
     pub skipped_existing: usize,
@@ -565,8 +570,16 @@ impl LocalBlobStore for VerifiedShardProbe<'_> {
 }
 
 /// Run one bounded custody-backfill pass. Idempotent — safe to call on every
-/// tick; a blob that gained a manifest (and self-held row) on a prior pass is
-/// no longer a candidate on the next.
+/// tick; a blob that gained a manifest on a prior pass is no longer a *manifest*
+/// candidate on the next.
+///
+/// It IS still a self-held candidate. Manifest-existence does not imply the
+/// self-held claim is current: this node's `agent_cid` changes across a non-prod
+/// DNA reinstall, and a manifest written by the ingest path never recorded a
+/// self-held row at all. The pre-filter therefore carries a RE-CLAIM ARM that
+/// re-asserts custody under the node's live identity for already-manifested
+/// blobs (`self_held_reclaimed`), so the resilience holder join keeps finding
+/// this node after a re-key instead of stranding it behind a fossil key.
 ///
 /// `self_agent_cid` is this node's resolved `agent_cid` (`uhCAk…`), obtained by
 /// the caller EXACTLY the way `distribute_shards` does
@@ -594,6 +607,9 @@ pub async fn manifest_backfill_pass(
     // genuinely missing a manifest become candidates for the (comparatively
     // expensive) read + encode + persist below.
     let mut candidates: Vec<(String, String)> = Vec::new(); // (hash, content_id)
+                                                            // Re-claim work is capped independently of `candidates` so a store full of
+                                                            // already-manifested blobs cannot make one pass unbounded.
+    let mut reclaims: usize = 0;
     for hash in &hashes {
         if candidates.len() >= batch_cap {
             break;
@@ -613,8 +629,82 @@ pub async fn manifest_backfill_pass(
         };
         let content_id = format!("blob:{cid}");
         match crate::db::shard_manifests::get_manifest(conn, h_app_id, &content_id) {
-            Ok(Some(_)) => {
+            Ok(Some(existing)) => {
                 outcome.skipped_existing += 1;
+                // RE-CLAIM ARM — the repair for a node that re-keyed.
+                //
+                // Manifest-existence used to imply "self-held evidence was
+                // already recorded on the pass that created it". That holds only
+                // while this node's `agent_cid` never changes. It does change: a
+                // non-prod DNA reinstall mints a NEW AgentPubKey per pod, and a
+                // manifest written by the INGEST path (`put_blob_bytes`) records
+                // no self-held row at all. Either way the blob is filtered out
+                // here as `skipped_existing` FOREVER, so the node holds bytes it
+                // never claims under its live key: the resilience holder join
+                // (`shard_locations.peer_id == humans.agent_pub_key`) sees only
+                // fossil-keyed rows and the card reads `stewardingCollectives: 0`
+                // while the bytes are demonstrably local. Observed live on both
+                // alpha doorways 2026-07-31 (holder key matched no `humans` row
+                // and no live conductor agent, yet `GET /blob/{hash}` served the
+                // full object).
+                //
+                // So: re-assert the claim under the CURRENT identity every pass.
+                // `upsert_location` is keyed `(shard_hash, peer_id)`, so this is
+                // idempotent — steady state writes nothing, and the fossil row is
+                // left untouched (removing it is `membership_identity_reconcile`'s
+                // rekey cascade, not ours; a stale row is inert, never a lie about
+                // the live key).
+                //
+                // Honesty gate, three ways: only `encoding == "none"` (where the
+                // single shard IS the whole blob), only when the manifest's shard
+                // hash equals the blob hash we are iterating, and only for a hash
+                // the local store just listed — the same listing-based custody
+                // evidence `BlobStoreSnapshot` supplies to the main reconcile
+                // pass. `record_self_held_shard` independently refuses any
+                // identity that is not a well-formed `agent_cid`.
+                if let Some(agent_cid) =
+                    self_agent_cid.filter(|c| crate::identity_namespace::is_agent_cid(c))
+                {
+                    if reclaims < batch_cap && existing.encoding == "none" {
+                        let first_shard: Option<String> =
+                            serde_json::from_str::<Vec<String>>(&existing.shard_hashes_json)
+                                .ok()
+                                .and_then(|v| v.into_iter().next());
+                        // Steady state must be a true no-op: once the claim
+                        // exists under the live key there is nothing to repair,
+                        // so skip the write (and the counter) rather than
+                        // re-asserting an identical row on every tick. Without
+                        // this the pass would log a non-zero `self_held_reclaimed`
+                        // forever and read as perpetual churn.
+                        let already_claimed = first_shard.as_deref() == Some(hash.as_str())
+                            && crate::db::shard_locations::get_locations_for_shard(conn, hash)
+                                .map(|rows| rows.iter().any(|l| l.peer_id == agent_cid))
+                                .unwrap_or(false);
+                        if first_shard.as_deref() == Some(hash.as_str()) && !already_claimed {
+                            reclaims += 1;
+                            let probe = VerifiedShardProbe(hash.as_str());
+                            match crate::services::self_stewardship::record_self_held_shard(
+                                conn, &probe, hash, agent_cid, h_app_id,
+                            ) {
+                                Ok(
+                                    crate::services::self_stewardship::SelfHeldOutcome::Recorded,
+                                ) => {
+                                    outcome.self_held_reclaimed += 1;
+                                }
+                                Ok(_) => {}
+                                Err(e) => {
+                                    tracing::warn!(
+                                        target: "elohim_storage::reconcile",
+                                        hash = %hash,
+                                        error = %e,
+                                        "custody-backfill: self-held re-claim failed"
+                                    );
+                                    outcome.errors += 1;
+                                }
+                            }
+                        }
+                    }
+                }
             }
             Ok(None) => candidates.push((hash.clone(), content_id)),
             Err(e) => {
@@ -756,6 +846,7 @@ pub async fn manifest_backfill_pass(
         blobs_scanned = outcome.blobs_scanned,
         manifests_written = outcome.manifests_written,
         self_held_recorded = outcome.self_held_recorded,
+        self_held_reclaimed = outcome.self_held_reclaimed,
         skipped_existing = outcome.skipped_existing,
         errors = outcome.errors,
         "custody-backfill: pass complete"
@@ -1805,5 +1896,121 @@ mod tests {
             "legacy transport-id provider row counts as already-provider (no duplicate)"
         );
         assert!(author.authored.lock().unwrap().is_empty());
+    }
+
+    /// REGRESSION (alpha 2026-07-31, both doorways): a node that re-keys must
+    /// keep claiming bytes it still holds.
+    ///
+    /// Before the re-claim arm, the second pass filtered the already-manifested
+    /// blob out as `skipped_existing` and recorded nothing, so `shard_locations`
+    /// held ONLY the fossil-keyed row. The resilience holder join
+    /// (`shard_locations.peer_id == humans.agent_pub_key`) then matched no live
+    /// human and the card read `stewardingCollectives: 0` while
+    /// `GET /blob/{hash}` served the object in full — exactly the live symptom.
+    #[tokio::test]
+    async fn reclaims_self_held_custody_under_a_new_agent_key() {
+        const OLD_KEY: &str = "uhCAkFossilAgentKeyFromABeforeTimesReinstall";
+        const NEW_KEY: &str = "uhCAkLiveAgentKeyMintedByTheLatestReinstall";
+
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let store = BlobStore::new_memory();
+
+        // Small payload → `encoding == "none"`, so the single shard IS the blob.
+        let stored = store.store(b"the landing page bytes").await.expect("store");
+        let hash = stored.hash.clone();
+
+        // Pass 1 — under the OLD identity: manifests the blob and claims it.
+        let first = manifest_backfill_pass(&mut conn, &store, Some(OLD_KEY), "lamad", 16)
+            .await
+            .expect("first pass");
+        assert_eq!(first.manifests_written, 1, "blob is manifested once");
+        assert_eq!(first.self_held_recorded, 1, "and claimed under the old key");
+        assert_eq!(first.self_held_reclaimed, 0, "nothing to re-claim yet");
+
+        // Pass 2 — the pod has been re-keyed. The manifest already exists, so the
+        // blob is `skipped_existing`; the re-claim arm must still fire.
+        let second = manifest_backfill_pass(&mut conn, &store, Some(NEW_KEY), "lamad", 16)
+            .await
+            .expect("second pass");
+        assert_eq!(second.manifests_written, 0, "manifest is not rewritten");
+        assert_eq!(second.skipped_existing, 1, "the blob is a pre-filter hit");
+        assert_eq!(
+            second.self_held_reclaimed, 1,
+            "custody must be re-asserted under the live key — this is the fix"
+        );
+
+        let holders: std::collections::HashSet<String> =
+            crate::db::shard_locations::get_locations_for_shard(&mut conn, &hash)
+                .expect("load locations")
+                .into_iter()
+                .map(|l| l.peer_id)
+                .collect();
+        assert!(
+            holders.contains(NEW_KEY),
+            "the live key must be a recorded holder, else the resilience join \
+             stays empty; got {holders:?}"
+        );
+        assert!(
+            holders.contains(OLD_KEY),
+            "the fossil row is left inert, not deleted (rekey cascade is \
+             membership_identity_reconcile's job); got {holders:?}"
+        );
+
+        // Pass 3 — steady state under the same key writes nothing new (upsert is
+        // keyed `(shard_hash, peer_id)`), so the arm cannot grow the table.
+        let third = manifest_backfill_pass(&mut conn, &store, Some(NEW_KEY), "lamad", 16)
+            .await
+            .expect("third pass");
+        assert_eq!(
+            third.self_held_reclaimed, 0,
+            "an already-current claim is not re-recorded"
+        );
+        assert_eq!(
+            crate::db::shard_locations::get_locations_for_shard(&mut conn, &hash)
+                .expect("load locations")
+                .len(),
+            2,
+            "exactly the fossil row + the live row"
+        );
+    }
+
+    /// The re-claim arm inherits `record_self_held_shard`'s namespace refusal: a
+    /// transport id must never reach the `agent_cid` join-key column.
+    #[tokio::test]
+    async fn reclaim_refuses_a_transport_identity() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let store = BlobStore::new_memory();
+        let stored = store
+            .store(b"bytes held by a node with no agent key")
+            .await
+            .expect("store");
+
+        manifest_backfill_pass(&mut conn, &store, Some("uhCAkRealAgentKey"), "lamad", 16)
+            .await
+            .expect("first pass");
+
+        let second = manifest_backfill_pass(
+            &mut conn,
+            &store,
+            Some("12D3KooWTransportIdNotAnAgentCid"),
+            "lamad",
+            16,
+        )
+        .await
+        .expect("second pass");
+        assert_eq!(
+            second.self_held_reclaimed, 0,
+            "a libp2p id can never join humans.agent_pub_key; it must not be written"
+        );
+
+        let holders: Vec<String> =
+            crate::db::shard_locations::get_locations_for_shard(&mut conn, &stored.hash)
+                .expect("load locations")
+                .into_iter()
+                .map(|l| l.peer_id)
+                .collect();
+        assert_eq!(holders, vec!["uhCAkRealAgentKey".to_string()]);
     }
 }

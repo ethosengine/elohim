@@ -92,3 +92,119 @@ until both clear:**
 
 The U1 JSON-list serialization bug is unrelated to this plan (owned by
 `2026-06-13-non-commons-provide-commitments-design` §11).
+
+---
+
+## UPDATE 2026-07-31 — a THIRD cause found and FIXED: the fossil-key custody strand
+
+Live RCA on both alpha doorways (operator report: "resiliency cards aren't converging").
+The headline correction: **`stewardingCollectives: 0` is NOT caused by the NULL
+`agent_pub_key` gate above.** Gate 1 is real but is not what darkens the card.
+
+### Live evidence (2026-07-31, read-only)
+
+| Probe | doorway-alpha (matthew) | elohim.host (adam) |
+|---|---|---|
+| `/api/v1/resilience/elohim-host-landing/household` | `stewardingCollectives: 0`, `distributionState: "measured"` | `stewardingCollectives: 0`, `"measured"` |
+| holder `shard_locations.peer_id` | `uhCAkYi1CWDUW9YgQ…` | `uhCAk_hiBZZedIfYqp…` |
+| that key ∈ any `humans.agent_pub_key`? | **no** | **no** |
+| that key ∈ live conductor agents (`/db/p2p/conductor-diagnostics`)? | **no** | **no** |
+| `GET /blob/{that shard hash}` | **200, 9 994 802 B** | **200, 9 990 975 B** |
+
+So both nodes **demonstrably hold the bytes** and record a holder row — under an
+`agent_cid` that is neither live nor any human's. The one human whose key IS live
+(matthew on A, adam on B — confirmed against conductor-diagnostics) has **no** holder
+row. The join `shard_locations.peer_id == humans.agent_pub_key` therefore matches
+nothing, and the card reports zero stewards for content the node is serving.
+
+The key is a **fossil**: a non-prod DNA reinstall mints a new `AgentPubKey` per pod,
+and `humans` was healed forward (`genesis_self_heal`) while the `shard_locations` row
+was left behind under the dead key.
+
+### Root cause (code-verified) — the repair path was structurally unreachable
+
+`reconcile::custody::manifest_backfill_pass` is the producer of self-held custody
+evidence. Its pre-filter admits a blob as a *candidate* only when the blob has **no**
+manifest; an already-manifested blob is counted `skipped_existing` and `continue`d.
+`record_self_held_shard` was reachable **only** from inside the candidate loop. So:
+
+- once a manifest exists, the node never re-claims that blob again — forever;
+- a manifest written by the ingest path (`put_blob_bytes`) records no self-held row
+  at all, and can never be repaired later;
+- after a re-key the node keeps holding the bytes and keeps *not* claiming them under
+  its live identity.
+
+The pass's own doc comment encoded the stale assumption: *"a blob that gained a
+manifest (and self-held row) on a prior pass is no longer a candidate on the next"* —
+true only if the node's `agent_cid` never changes.
+
+### Fix (landed) — the re-claim arm
+
+`elohim/elohim-storage/src/reconcile/custody.rs`: the pre-filter's existing-manifest
+arm now re-asserts self-held custody under the node's **current** `agent_cid`.
+Honesty-gated three ways — `encoding == "none"` (single shard IS the blob), the
+manifest's shard hash equals the blob hash being iterated, and the hash came from the
+local store listing (the same listing-based evidence `BlobStoreSnapshot` supplies to
+the main reconcile pass). `record_self_held_shard` independently refuses any non-
+`agent_cid` identity, so a transport id can never reach the join-key column. Steady
+state is a true no-op (skips when the live-key claim already exists); the fossil row
+is left inert rather than deleted — moving it is `membership_identity_reconcile`'s
+rekey cascade, not this arm's job. Re-claim work is capped at `batch_cap` per pass.
+
+New counter `ManifestBackfillOutcome.self_held_reclaimed` (internal struct, no wire
+shape changed) separates "re-attributed old custody" from "manifested new bytes" in
+the pass log. Regression tests: `reclaims_self_held_custody_under_a_new_agent_key`
+(the re-key scenario end-to-end, plus idempotence) and
+`reclaim_refuses_a_transport_identity`.
+
+`self_agent_cid` resolves on a live pod — `identity::resolve_agent_pubkey` prefers the
+conductor cell key over the transport id — so the arm fires on the next edge deploy
+without any operator action.
+
+### Verdicts on the other two hypotheses tested in this pass
+
+- **NULL `agent_pub_key` (gate 1 above) — real, but NOT the card-zero cause.** On
+  doorway-alpha 7 of 14 humans have `household_id` set with `agent_pub_key` NULL
+  (caleb, daniel, emma, ezra, nancy, pete, terrance) and 6 more carry fossil keys;
+  only matthew's is live. Fixing all of them would still not have lit the card,
+  because the holder side pointed at a key belonging to nobody. Gate 1 stays open and
+  keeps its owner (per-pod registration / humans-replayer) — it caps *how many*
+  households can ever be counted, not whether the count is zero.
+- **Omnibar endpoint mismatch — REFUTED.** Suspected that the SSR omnibar client calls
+  `/api/v1/resilience/{slug}` without `/household` (a different handler branch
+  returning `ResilienceView`, which has no `stewardingCollectives`). Both the tree and
+  the **deployed** asset (`/chrome/omni-element.<sha>.js`, byte-identical across both
+  doorways) build `var base = '/api/v1/resilience/' + encodeURIComponent(slug)` and
+  then `fetch(base + '/household', opts)`, falling back to base only on failure. The
+  suffix is appended at the call, not the assignment. No fix needed. (The base-shape
+  fallback cannot populate the card — `applyResilience` requires `protectionStatus` /
+  `feltStatus`, which the base shape lacks — so it degrades to the honest `unmatched`
+  marker, never to a wrong number.)
+
+### Residual, deliberately NOT fixed here
+
+The two doorways hold **different bytes** for the same slug (`sha256-30011cff…` vs
+`sha256-de394363…`, 9 994 802 B vs 9 990 975 B) and render pages of different size.
+Once the re-claim arm lands, each doorway will honestly report its own single steward
+— non-zero, but still not the SAME footprint. That divergence is a
+replication/declared-head concern, not a resilience-projection one (see
+`feedback_reach_head_replication_distinct_planes`); it needs its own item.
+
+Also observed: `GET /` on both doorways intermittently sheds `503
+{"status":"catching-up"}` and succeeds on retry — the known projector catch-up flap
+(`alpha-a-projector-chronic-catchup-flap.md`).
+
+### The single probe that proves convergence (post-deploy)
+
+After an edge deploy carrying this fix, on **both** doorways:
+
+```
+curl -s https://doorway-alpha.elohim.host/api/v1/resilience/elohim-host-landing/household | jq '.stewardingCollectives, .details.stewardingCollectives'
+curl -s https://elohim.host/api/v1/resilience/elohim-host-landing/household        | jq '.stewardingCollectives, .details.stewardingCollectives'
+```
+
+Expect `stewardingCollectives >= 1` with a named collective (`household-dowell` on A,
+`household-adam` on B) within one `MANIFEST_BACKFILL_SECONDS` tick (default 300s) of
+pod start. Still `0` after two ticks ⇒ `self_agent_cid` is not resolving on that pod —
+check the pass log line for `self_held_reclaimed` and the resolved cell key, not this
+arm.
