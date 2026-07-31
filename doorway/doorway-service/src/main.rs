@@ -511,8 +511,13 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     // Generate node Ed25519 signing key for federation
     // This key is used in the DID document and JWKS endpoint
     {
-        let (_, verifying_key) = doorway::custodial_keys::crypto::generate_keypair();
+        let (signing_key, verifying_key) = doorway::custodial_keys::crypto::generate_keypair();
         state.node_verifying_key = Some(verifying_key);
+        // T2.2: retain the private half so `federation_jwt_validator()` can mint
+        // and self-verify EdDSA tokens. Minting stays HS256 unless the operator
+        // sets DOORWAY_JWT_SIGN_ALG=eddsa; see the AppState field doc for the
+        // boot-rotation caveat that keeps hs256 the default.
+        state.node_signing_key = Some(signing_key);
         info!("Node signing key generated for federation");
     }
 
@@ -1193,6 +1198,18 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             "Federation peer discovery started: {} peer(s) configured",
             peer_count
         );
+
+        // T2.2 live wiring: refresh the peer JWKS cache off the peer list the
+        // discovery task above already maintains. Same cadence, one tick later
+        // so the first refresh sees a populated peer list. This is the ONLY
+        // place peer keys are fetched — `verify_token` is network-free.
+        services::federation::spawn_peer_jwks_refresh_task(
+            state.peer_cache.clone(),
+            state.peer_jwks_cache.clone(),
+            std::time::Duration::from_secs(15),
+            std::time::Duration::from_secs(60),
+        );
+        info!("Peer JWKS refresh task started (cross-doorway JWT verification)");
     }
 
     // Federation: register in DHT + start heartbeat task

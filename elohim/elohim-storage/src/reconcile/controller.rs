@@ -41,9 +41,22 @@ use crate::reconcile::portal_host_handlers;
 use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
 use crate::reconcile::signal_stream::{
     AgentPeerBindingSignal, CollectiveProjectedSignal, DnaSignal, DnaSignalStream,
-    KeyRevocationSignal, KeyRotationSignal, MembershipProjectedSignal, PortalHostCreatedSignal,
-    PortalHostRemovedSignal, RevocationAttestationSignal,
+    HostedAgentBindingSignal, KeyRevocationSignal, KeyRotationSignal, MembershipProjectedSignal,
+    PortalHostCreatedSignal, PortalHostRemovedSignal, RevocationAttestationSignal,
 };
+
+/// Format a Holochain microsecond timestamp as the ISO-8601 TEXT this crate
+/// stores. Out-of-range values fall back to now rather than panicking — a
+/// malformed timestamp must not drop an otherwise-valid binding.
+fn micros_to_iso(micros: i64) -> String {
+    use chrono::TimeZone;
+    chrono::Utc
+        .timestamp_micros(micros)
+        .single()
+        .unwrap_or_else(chrono::Utc::now)
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string()
+}
 use crate::reconcile::sweep::sweep_on_revocation;
 
 // ---------------------------------------------------------------------------
@@ -313,6 +326,11 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                 debug!(collective_cid = %m.collective_cid, member_cid = %m.member_cid, "dispatching MembershipProjected signal");
                 self.observe_kind("membershipProjected");
                 self.on_membership_projected(m).await
+            }
+            DnaSignal::HostedAgentBinding(h) => {
+                debug!(agent_pub_key = %h.agent_pub_key, doorway_id = %h.doorway_id, "dispatching HostedAgentBinding signal");
+                self.observe_kind("hostedAgentBinding");
+                self.on_hosted_agent_binding(h).await
             }
         }
     }
@@ -802,6 +820,105 @@ impl<S: DnaSignalStream> ReconcileController<S> {
     ///
     /// If no DB pool is wired (test stub constructed via `new()`), logs at
     /// debug level and returns `Ok(())`.
+    /// T2.2: project a hosted-at binding into `hosted_agent_bindings`.
+    ///
+    /// The DHT truth is a Category-A2 link; `signal.action_hash` (the CreateLink
+    /// ActionHash) is the `dht_anchor_hash` AND the idempotency key, so a
+    /// re-delivered signal updates the same row rather than duplicating it.
+    ///
+    /// This table deliberately carries **no `h_app_id`**: a hosted-at binding is
+    /// a property of an agent, not of a pillar partition, so there is no
+    /// write-scope/read-scope pair that can silently disagree (the `h_app_id`
+    /// pillar-namespace mismatch class).
+    ///
+    /// If no DB pool is wired (test stub constructed via `new()`), logs at debug
+    /// level and returns `Ok(())`.
+    async fn on_hosted_agent_binding(
+        &mut self,
+        signal: HostedAgentBindingSignal,
+    ) -> Result<(), ReconcileError> {
+        use crate::db::diesel_schema::hosted_agent_bindings as hab;
+        use diesel::prelude::*;
+
+        let pool = match self.db_pool.as_ref() {
+            Some(p) => p,
+            None => {
+                debug!(
+                    agent_pub_key = %signal.agent_pub_key,
+                    "on_hosted_agent_binding: no db_pool wired — projection write skipped"
+                );
+                return Ok(());
+            }
+        };
+
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(
+                    agent_pub_key = %signal.agent_pub_key,
+                    error = %e,
+                    "on_hosted_agent_binding: db pool checkout failed — projection write skipped"
+                );
+                return Ok(());
+            }
+        };
+
+        let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        let bound_at = micros_to_iso(signal.bound_at_micros);
+
+        let existing: Option<String> = hab::table
+            .filter(hab::dht_anchor_hash.eq(&signal.action_hash))
+            .select(hab::dht_anchor_hash)
+            .first::<String>(&mut conn)
+            .optional()
+            .unwrap_or(None);
+
+        let write = if existing.is_some() {
+            diesel::update(hab::table.filter(hab::dht_anchor_hash.eq(&signal.action_hash)))
+                .set((
+                    hab::agent_pub_key.eq(&signal.agent_pub_key),
+                    hab::doorway_id.eq(&signal.doorway_id),
+                    hab::doorway_url.eq(&signal.doorway_url),
+                    hab::installed_app_id.eq(&signal.installed_app_id),
+                    hab::bound_at.eq(&bound_at),
+                    hab::observed_at.eq(&now_iso),
+                ))
+                .execute(&mut conn)
+        } else {
+            diesel::insert_into(hab::table)
+                .values((
+                    hab::agent_pub_key.eq(&signal.agent_pub_key),
+                    hab::doorway_id.eq(&signal.doorway_id),
+                    hab::doorway_url.eq(&signal.doorway_url),
+                    hab::installed_app_id.eq(&signal.installed_app_id),
+                    hab::dht_anchor_hash.eq(&signal.action_hash),
+                    hab::bound_at.eq(&bound_at),
+                    hab::observed_at.eq(&now_iso),
+                ))
+                .execute(&mut conn)
+        };
+
+        match write {
+            Ok(_) => {
+                info!(
+                    agent_pub_key = %signal.agent_pub_key,
+                    doorway_id = %signal.doorway_id,
+                    dht_anchor_hash = %signal.action_hash,
+                    "Projected hosted-agent binding"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    agent_pub_key = %signal.agent_pub_key,
+                    error = %e,
+                    "on_hosted_agent_binding: projection write failed"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
     async fn on_membership_projected(
         &mut self,
         signal: MembershipProjectedSignal,
@@ -2981,5 +3098,147 @@ mod tests {
             "the household_id stamp must be unaffected by the agent_pub_key skip \
              (it matches via the id-arm independent of the namespace guard)"
         );
+    }
+
+    // =====================================================================
+    // T2.2 — hosted_agent_bindings projection
+    // =====================================================================
+
+    fn hosted_signal(
+        anchor: &str,
+        doorway: &str,
+        bound_at_micros: i64,
+    ) -> HostedAgentBindingSignal {
+        HostedAgentBindingSignal {
+            action_hash: anchor.to_string(),
+            agent_pub_key: "uhCAkHostedAlice0001".to_string(),
+            doorway_id: doorway.to_string(),
+            doorway_url: format!("https://{doorway}.elohim.host"),
+            installed_app_id: "elohim-hosted-alice".to_string(),
+            bound_at_micros,
+        }
+    }
+
+    /// Signal → row: the projector writes the binding keyed by dht_anchor_hash.
+    #[tokio::test]
+    async fn t22_hosted_agent_binding_projects_row() {
+        use crate::db::diesel_schema::hosted_agent_bindings as hab;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::HostedAgentBinding(
+            hosted_signal(
+                "uhCkkHostedLink0001",
+                "doorway-alpha",
+                1_754_000_000_000_000,
+            ),
+        )]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+        controller.run_one_pass().await.expect("hosted pass");
+
+        let mut conn = pool.get().expect("conn");
+        let rows: Vec<(String, String, String, String)> = hab::table
+            .select((
+                hab::agent_pub_key,
+                hab::doorway_id,
+                hab::doorway_url,
+                hab::installed_app_id,
+            ))
+            .load(&mut conn)
+            .expect("load");
+
+        assert_eq!(rows.len(), 1, "exactly one binding row expected");
+        assert_eq!(rows[0].0, "uhCAkHostedAlice0001");
+        assert_eq!(rows[0].1, "doorway-alpha");
+        assert_eq!(rows[0].2, "https://doorway-alpha.elohim.host");
+        assert_eq!(rows[0].3, "elohim-hosted-alice");
+    }
+
+    /// Idempotent: re-delivering the SAME signal must update in place, never
+    /// duplicate — `dht_anchor_hash` is the idempotency key.
+    #[tokio::test]
+    async fn t22_hosted_agent_binding_redelivery_is_idempotent() {
+        use crate::db::diesel_schema::hosted_agent_bindings as hab;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        let sig = hosted_signal(
+            "uhCkkHostedLink0002",
+            "doorway-alpha",
+            1_754_000_000_000_000,
+        );
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::HostedAgentBinding(sig.clone()),
+            DnaSignal::HostedAgentBinding(sig),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+        controller.run_one_pass().await.expect("pass 1");
+        controller.run_one_pass().await.expect("pass 2");
+
+        let mut conn = pool.get().expect("conn");
+        let count: i64 = hab::table.count().get_result(&mut conn).expect("count");
+        assert_eq!(count, 1, "re-delivery must upsert, not duplicate");
+    }
+
+    /// A migrated human accumulates bindings; the reader must return the NEWEST
+    /// as the current home doorway.
+    #[tokio::test]
+    async fn t22_reader_returns_newest_binding_after_migration() {
+        use crate::test_util::test_pool;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::HostedAgentBinding(hosted_signal(
+                "uhCkkHostedLink0003",
+                "doorway-alpha",
+                1_754_000_000_000_000,
+            )),
+            DnaSignal::HostedAgentBinding(hosted_signal(
+                "uhCkkHostedLink0004",
+                "doorway-beta",
+                1_754_900_000_000_000,
+            )),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+        controller.run_one_pass().await.expect("pass 1");
+        controller.run_one_pass().await.expect("pass 2");
+
+        let mut conn = pool.get().expect("conn");
+        let current = crate::db::hosted_agent_bindings::current_binding_for_agent(
+            &mut conn,
+            "uhCAkHostedAlice0001",
+        )
+        .expect("read")
+        .expect("a current binding");
+
+        assert_eq!(current.doorway_id, "doorway-beta");
+        assert_eq!(current.dht_anchor_hash, "uhCkkHostedLink0004");
+    }
+
+    /// Correct-but-dormant: an agent with no binding reads as honest absence,
+    /// not an error — the doorway degrades that to its existing 409.
+    #[tokio::test]
+    async fn t22_reader_is_honestly_empty_for_unknown_agent() {
+        use crate::test_util::test_pool;
+
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let current = crate::db::hosted_agent_bindings::current_binding_for_agent(
+            &mut conn,
+            "uhCAkNeverSeen0000",
+        )
+        .expect("read must not error");
+        assert!(current.is_none());
     }
 }

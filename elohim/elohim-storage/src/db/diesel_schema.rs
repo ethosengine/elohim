@@ -1286,6 +1286,23 @@ diesel::table! {
     }
 }
 
+// doorway-federation-failover T2.2 — hosted_agent_bindings
+// Source of truth: Holochain DHT (imagodei Category-A2 `hosted-at` LINK; no
+// entry type — the payload rides the link tag). Read-optimized projection a
+// SIBLING doorway consults to resolve a hosted user's home doorway.
+// dht_anchor_hash = CreateLink ActionHash (the idempotency key).
+diesel::table! {
+    hosted_agent_bindings (dht_anchor_hash) {
+        agent_pub_key    -> Text,
+        doorway_id       -> Text,
+        doorway_url      -> Text,
+        installed_app_id -> Text,
+        dht_anchor_hash  -> Text,
+        bound_at         -> Text,
+        observed_at      -> Text,
+    }
+}
+
 // EPR Phase 3 — manifests projection (P3.2)
 // Source of truth: Holochain DHT (Manifest entry, content_store_integrity zome).
 // Category C operational projection rebuildable via signal replay.
@@ -1906,6 +1923,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     observation_logs,
     observation_cursors,
     observation_diversity_summary,
+    hosted_agent_bindings,
     peer_blob_inventory,
     peer_identity_bindings,
     peer_inventory_cursor,

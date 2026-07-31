@@ -612,6 +612,99 @@ fn json_error_response(status: StatusCode, message: &str) -> Response<Full<Bytes
         .unwrap()
 }
 
+// =============================================================================
+// Hosted-at binding resolution (doorway-federation-failover T2.2)
+// =============================================================================
+
+/// Handle `GET /api/v1/federation/hosted-binding/{agent_pub_key}`.
+///
+/// Serves this node's `hosted_agent_bindings` projection of the imagodei
+/// Category-A2 `hosted-at` link, so a sibling doorway (or an operator) can ask
+/// "where is this agent hosted?" and get an answer grounded in substrate truth
+/// rather than one doorway's private Mongo.
+///
+/// This is a SINGLE-TARGET read of this node's own storage — it never iterates
+/// peers and never fans out (`doorway/CLAUDE.md` no-fan-out rule). A sibling
+/// that wants a different node's view asks that node.
+///
+/// - 200 — the projected binding (`doorwayId`, `doorwayUrl`, `installedAppId`,
+///   `dhtAnchorHash`, `boundAt`).
+/// - 404 `{"error":"no-hosted-binding"}` — HONEST ABSENCE. The Chaperone
+///   degrades this to its existing 409 `hosted-elsewhere` rather than guessing.
+/// - 502 — storage unreachable. Distinct from 404 on purpose: "we could not
+///   ask" must never read as "there is no binding."
+pub async fn handle_federation_hosted_binding(
+    state: Arc<AppState>,
+    agent_pub_key: &str,
+) -> Response<Full<Bytes>> {
+    if agent_pub_key.trim().is_empty() {
+        return hosted_binding_json(
+            StatusCode::BAD_REQUEST,
+            r#"{"error":"agent_pub_key required"}"#.to_string(),
+        );
+    }
+
+    let storage_url = state
+        .args
+        .storage_url
+        .clone()
+        .unwrap_or_else(|| "http://localhost:8090".to_string());
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
+
+    let url = format!(
+        "{}/api/v1/federation/hosted-binding/{}",
+        storage_url.trim_end_matches('/'),
+        agent_pub_key
+    );
+
+    match client.get(&url).send().await {
+        Ok(resp) if resp.status().is_success() => match resp.text().await {
+            Ok(body) => hosted_binding_json(StatusCode::OK, body),
+            Err(e) => {
+                tracing::debug!(error = %e, "Hosted-binding body read failed");
+                hosted_binding_json(
+                    StatusCode::BAD_GATEWAY,
+                    r#"{"error":"hosted-binding-unreadable"}"#.to_string(),
+                )
+            }
+        },
+        Ok(resp) if resp.status() == reqwest::StatusCode::NOT_FOUND => hosted_binding_json(
+            StatusCode::NOT_FOUND,
+            r#"{"error":"no-hosted-binding"}"#.to_string(),
+        ),
+        Ok(resp) => {
+            tracing::debug!(status = %resp.status(), "Hosted-binding query returned non-success");
+            hosted_binding_json(
+                StatusCode::BAD_GATEWAY,
+                r#"{"error":"hosted-binding-unavailable"}"#.to_string(),
+            )
+        }
+        Err(e) => {
+            tracing::debug!(error = %e, "Hosted-binding query failed to reach storage");
+            hosted_binding_json(
+                StatusCode::BAD_GATEWAY,
+                r#"{"error":"hosted-binding-unavailable"}"#.to_string(),
+            )
+        }
+    }
+}
+
+fn hosted_binding_json(status: StatusCode, body: String) -> Response<Full<Bytes>> {
+    Response::builder()
+        .status(status)
+        .header("Content-Type", "application/json")
+        // Never cache a hosting-location answer: a human's home doorway can
+        // change (migration), and a stale cached redirect target would send
+        // them to a doorway that no longer hosts them.
+        .header("Cache-Control", "no-store")
+        .body(Full::new(Bytes::from(body)))
+        .unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

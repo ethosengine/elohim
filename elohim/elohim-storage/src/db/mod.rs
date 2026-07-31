@@ -119,6 +119,10 @@ pub mod recovery_witnesses;
 // EPR Phase 2B — peer identity bindings projection (AgentPeerBinding DHT signal)
 pub mod peer_identity_bindings;
 
+// doorway-federation-failover T2.2 — hosted-at binding projection (imagodei
+// Category-A2 link signal). Read-only; writes land via ReconcileController.
+pub mod hosted_agent_bindings;
+
 // T12 — peer_blob_inventory projection (libp2p gossipsub inventory, Category C operational)
 pub mod peer_blob_inventory;
 

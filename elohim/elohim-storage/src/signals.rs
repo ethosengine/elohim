@@ -1332,6 +1332,24 @@ pub enum ImagodeiSignal {
         membership: MembershipPayload,
         author: String,
     },
+    /// Emitted by the imagodei coordinator `create_hosted_agent_binding`
+    /// (doorway-federation-failover T2.2).
+    ///
+    /// Consumed by `translate_imagodei` → `DnaSignal::HostedAgentBinding` →
+    /// `ReconcileController::on_hosted_agent_binding` → upsert
+    /// `hosted_agent_bindings` keyed by `dht_anchor_hash = action_hash`
+    /// (the CreateLink ActionHash).
+    ///
+    /// The payload is flat because the binding is a Category-A2 LINK — there is
+    /// no entry struct to mirror; the whole payload rides the link tag.
+    HostedAgentBindingCreated {
+        action_hash: String,
+        agent_pub_key: String,
+        doorway_id: String,
+        doorway_url: String,
+        installed_app_id: String,
+        bound_at_micros: i64,
+    },
 }
 
 // =============================================================================

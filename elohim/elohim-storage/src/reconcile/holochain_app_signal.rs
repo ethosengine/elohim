@@ -79,8 +79,8 @@ use holochain_types::signal::Signal;
 use crate::db::DbPool;
 use crate::reconcile::signal_stream::{
     AgentPeerBindingSignal, AttestationKind, CollectiveProjectedSignal, DeviceArchetype, DnaSignal,
-    DnaSignalStream, KeyRotationSignal, MembershipProjectedSignal, RevocationAttestationSignal,
-    SignalCursor, SignalStreamError,
+    DnaSignalStream, HostedAgentBindingSignal, KeyRotationSignal, MembershipProjectedSignal,
+    RevocationAttestationSignal, SignalCursor, SignalStreamError,
 };
 use crate::signals::{ImagodeiSignal, RecoveryV2Signal};
 
@@ -313,6 +313,28 @@ fn translate_imagodei(signal: ImagodeiSignal) -> Option<DnaSignal> {
                 departed_at,
             }))
         }
+
+        // T2.2: project a hosted-at binding into `hosted_agent_bindings`.
+        //
+        // No conductor round-trip is needed: the binding is a Category-A2 link
+        // and the whole payload rides the signal (as it rides the link tag).
+        // Idempotency key is `dht_anchor_hash = action_hash` (the CreateLink
+        // ActionHash).
+        ImagodeiSignal::HostedAgentBindingCreated {
+            action_hash,
+            agent_pub_key,
+            doorway_id,
+            doorway_url,
+            installed_app_id,
+            bound_at_micros,
+        } => Some(DnaSignal::HostedAgentBinding(HostedAgentBindingSignal {
+            action_hash,
+            agent_pub_key,
+            doorway_id,
+            doorway_url,
+            installed_app_id,
+            bound_at_micros,
+        })),
 
         // Not yet consumed by the reconcile controller.
         ImagodeiSignal::HumanCommitted { .. }

@@ -29,6 +29,12 @@ pub use stewardship::*;
 pub mod agent_peer_binding;
 pub use agent_peer_binding::*;
 
+// HostedAgentBinding coordinator functions (doorway-federation-failover T2.2).
+// Coordinator-only + reuses LinkTypes::PeerToBinding on a disjoint anchor base,
+// so the DNA hash does not move — see the module doc.
+pub mod hosted_binding;
+pub use hosted_binding::*;
+
 // sign_for_agent coordinator function (EPR Phase 2B, Task C.1)
 pub mod sign_for_agent;
 pub use sign_for_agent::*;
@@ -227,6 +233,23 @@ pub enum ImagodeiSignal {
         entry_hash: EntryHash,
         membership: Membership,
         author: AgentPubKey,
+    },
+    /// Emitted by `create_hosted_agent_binding` (doorway-federation-failover T2.2).
+    ///
+    /// Consumed by elohim-storage `translate_imagodei` → `ReconcileController::
+    /// on_hosted_agent_binding`, which projects into `hosted_agent_bindings`.
+    ///
+    /// The payload is flattened (no nested entry struct) because the binding has
+    /// no entry — it is a Category-A2 link whose whole payload rides the link
+    /// tag. `action_hash` is the CreateLink action hash and becomes the
+    /// projection's `dht_anchor_hash`.
+    HostedAgentBindingCreated {
+        action_hash: ActionHash,
+        agent_pub_key: AgentPubKey,
+        doorway_id: String,
+        doorway_url: String,
+        installed_app_id: String,
+        bound_at_micros: i64,
     },
 }
 

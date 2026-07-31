@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
-use crate::auth::{extract_token_from_header, JwtValidator, TokenInput};
+use crate::auth::{extract_token_from_header, TokenInput};
 use crate::conductor::typed_admin::TypedAdminClient;
 use crate::conductor::AgentProvisioner;
 use crate::server::http::AppState;
@@ -85,27 +85,59 @@ pub async fn handle_hc_connect(
         }
     };
 
-    let jwt = if state.args.dev_mode {
-        JwtValidator::new_dev()
-    } else {
-        match state.args.jwt_secret.as_ref() {
-            Some(secret) => {
-                match JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds) {
-                    Ok(v) => v,
-                    Err(_) => {
-                        return json_error(StatusCode::INTERNAL_SERVER_ERROR, "JWT not configured")
-                    }
-                }
-            }
-            None => return json_error(StatusCode::INTERNAL_SERVER_ERROR, "JWT not configured"),
+    // The ORIGINAL request path, captured before `req` is consumed. It is the
+    // only piece of request input that reaches the redirect, and it is appended
+    // as a PATH — never as the host (see `hosted_at_redirect_response`).
+    let original_path = req.uri().path().to_string();
+
+    // T2.2 live wiring: the federation-aware validator. Verification is
+    // dual-algorithm (self HS256/EdDSA + sibling EdDSA via the peer JWKS
+    // cache); an unresolvable foreign `kid` fails closed to `UnknownIssuer`
+    // rather than falling through to the HS256 secret.
+    let jwt = match state.federation_jwt_validator() {
+        Some(v) => v,
+        None => return json_error(StatusCode::INTERNAL_SERVER_ERROR, "JWT not configured"),
+    };
+
+    let claims = match jwt.verify_token_detailed(&token_str) {
+        Ok(c) => c,
+        Err(_) => {
+            // Includes `UnknownIssuer` — an UNVERIFIED foreign token. This is
+            // exactly today's 401, and it must stay one: redirecting on an
+            // unverified issuer claim would be an open redirect driven by an
+            // attacker-supplied token.
+            return json_error(StatusCode::UNAUTHORIZED, "Invalid or expired token");
         }
     };
 
-    let validation = jwt.verify_token(&token_str);
-    let claims = match validation.claims {
-        Some(c) if validation.valid => c,
-        _ => return json_error(StatusCode::UNAUTHORIZED, "Invalid or expired token"),
-    };
+    // --- Step 1b: honest cross-doorway landing (T2.2) ---
+    //
+    // The token VERIFIED and it was minted by a sibling doorway. This human is
+    // hosted elsewhere; this doorway must neither 502 (conductor-pinned) nor
+    // silently provision a fresh empty identity. Send them home.
+    if claims_are_foreign(
+        claims.doorway_id.as_deref(),
+        state.args.doorway_id.as_deref(),
+    ) {
+        return match resolve_home_doorway(&state, &claims).await {
+            Some(home_url) => {
+                info!(
+                    identifier = %claims.identifier,
+                    home = %home_url,
+                    "Chaperone: verified foreign token — redirecting to home doorway"
+                );
+                hosted_at_redirect_response(&home_url, &original_path)
+            }
+            None => {
+                warn!(
+                    identifier = %claims.identifier,
+                    claims_doorway = ?claims.doorway_id,
+                    "Chaperone: verified foreign token but home doorway unresolvable"
+                );
+                hosted_elsewhere_response(&claims)
+            }
+        };
+    }
 
     // --- Read request body ---
     let body_bytes = match req.collect().await {
@@ -557,6 +589,135 @@ fn hosted_elsewhere_response(claims: &crate::auth::jwt::Claims) -> Response<Full
         .unwrap()
 }
 
+// ---------------------------------------------------------------------------
+// T2.2 — honest cross-doorway landing
+// ---------------------------------------------------------------------------
+
+/// The response header naming where a hosted human actually lives. Present on
+/// both the 307 and (for symmetry with future clients) nothing else — the 409
+/// carries `homeDoorway` in its JSON body.
+pub const HOSTED_AT_HEADER: &str = "X-Elohim-Hosted-At";
+
+/// OPEN-REDIRECT GUARD.
+///
+/// Accepts a candidate home-doorway URL ONLY if it is an absolute `http`/`https`
+/// URL with a non-empty host and no embedded credentials. Everything else —
+/// scheme-relative `//evil.example`, a bare path, a `javascript:` URI, an
+/// authority with `@` — is rejected, and the caller degrades to the honest 409.
+///
+/// The candidate itself must come from a *verified* source: the `doorway_url`
+/// claim inside a signature-verified JWT, or a row in the DHT-projected
+/// `hosted_agent_bindings` table. It must NEVER come from request input — no
+/// header, no query parameter, no body field. That provenance rule is enforced
+/// by `resolve_home_doorway`, which has no access to the request.
+fn sanitize_home_doorway_url(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    let rest = trimmed
+        .strip_prefix("https://")
+        .or_else(|| trimmed.strip_prefix("http://"))?;
+
+    // Authority ends at the first '/', '?' or '#'.
+    let authority = rest
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or_default()
+        .to_string();
+
+    if authority.is_empty() {
+        return None;
+    }
+    // Reject userinfo (`user:pass@host`) — the classic look-alike-host trick.
+    if authority.contains('@') {
+        return None;
+    }
+    // Reject whitespace and control characters anywhere in the URL.
+    if trimmed.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return None;
+    }
+
+    Some(trimmed.trim_end_matches('/').to_string())
+}
+
+/// Build the honest `307 Temporary Redirect` to a hosted human's home doorway.
+///
+/// 307 (not 302) so the browser/client REPLAYS the original method and body —
+/// `/hc/connect` is a POST carrying the browser's freshly generated signing key,
+/// and a 302 would silently downgrade it to a GET.
+///
+/// `home_url` is already sanitized; `original_path` contributes ONLY the path,
+/// appended after the verified authority — request input can never influence
+/// which host is redirected to.
+fn hosted_at_redirect_response(home_url: &str, original_path: &str) -> Response<Full<Bytes>> {
+    let path = if original_path.starts_with('/') {
+        original_path
+    } else {
+        "/"
+    };
+    let location = format!("{home_url}{path}");
+    let body = serde_json::json!({
+        "error": "hosted-elsewhere",
+        "homeDoorway": home_url,
+    });
+    Response::builder()
+        .status(StatusCode::TEMPORARY_REDIRECT)
+        .header(hyper::header::LOCATION, &location)
+        .header(HOSTED_AT_HEADER, home_url)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body.to_string())))
+        .unwrap()
+}
+
+/// Resolve a verified-foreign human's home doorway URL.
+///
+/// Two sources, in order:
+/// 1. `claims.doorway_url` — already trusted: it is INSIDE the signature-verified
+///    token, so the issuing doorway asserted it and we verified the signature.
+/// 2. The `hosted_agent_bindings` projection of the imagodei `hosted-at` link,
+///    read from this node's own elohim-storage. Used when the token predates the
+///    `doorway_url` claim (legacy tokens carry only `doorway_id`).
+///
+/// Neither source is request input. Both pass through
+/// [`sanitize_home_doorway_url`]. `None` means "unresolvable" — the caller
+/// answers the existing honest 409 rather than guessing.
+async fn resolve_home_doorway(
+    state: &Arc<AppState>,
+    claims: &crate::auth::jwt::Claims,
+) -> Option<String> {
+    if let Some(ref url) = claims.doorway_url {
+        if let Some(sanitized) = sanitize_home_doorway_url(url) {
+            return Some(sanitized);
+        }
+        warn!(
+            claimed = %url,
+            "Rejected doorway_url claim: not an absolute http(s) URL with a plain host"
+        );
+    }
+
+    let storage_url = state.args.storage_url.as_ref()?;
+    let url = format!(
+        "{}/api/v1/federation/hosted-binding/{}",
+        storage_url.trim_end_matches('/'),
+        claims.agent_pub_key
+    );
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .ok()?;
+    let resp = client.get(&url).send().await.ok()?;
+    if !resp.status().is_success() {
+        debug!(
+            agent = %claims.agent_pub_key,
+            status = %resp.status(),
+            "No hosted binding projected for this agent"
+        );
+        return None;
+    }
+    let body: serde_json::Value = resp.json().await.ok()?;
+    let projected = body.get("doorwayUrl")?.as_str()?;
+    sanitize_home_doorway_url(projected)
+}
+
 /// Decide the response for a JWT-pinned `conductor_id` this doorway has
 /// never heard of. A foreign-doorway claim means the user is hosted
 /// elsewhere — honest 409, not the misleading "not found in registry" 502.
@@ -648,11 +809,93 @@ async fn auto_provision(
             .await;
     }
 
+    // T2.2 Part B: record the hosted-at binding on the DHT so a SIBLING doorway
+    // can resolve this human's home from substrate truth.
+    //
+    // FAIL-SOFT BY DESIGN: the binding is a resolution optimization. Its absence
+    // degrades to today's behavior (the honest 409 from the guard above), so a
+    // write failure logs a warning and never fails a provision that otherwise
+    // succeeded. It is written AFTER the provision, not before.
+    write_hosted_binding_best_effort(
+        state,
+        &info.admin_url,
+        &info.conductor_url,
+        &provisioned.installed_app_id,
+    )
+    .await;
+
     Ok((
         provisioned.conductor_id,
         info.admin_url,
         provisioned.installed_app_id,
     ))
+}
+
+/// Write the imagodei `hosted-at` binding as the user's delegate.
+///
+/// "As the user's delegate" is literal: a `ZomeCaller` scoped to the user's own
+/// `installed_app_id` authorizes signing credentials for the user's cells and
+/// issues the call through them, so `agent_info()` inside the coordinator is the
+/// USER's agent key — never the doorway's. There is no third-party write path;
+/// an agent can only ever bind itself.
+///
+/// Never returns an error: see the fail-soft note at the call site.
+async fn write_hosted_binding_best_effort(
+    state: &Arc<AppState>,
+    admin_url: &str,
+    app_url: &str,
+    installed_app_id: &str,
+) {
+    let (Some(doorway_id), Some(doorway_url)) = (&state.args.doorway_id, &state.args.doorway_url)
+    else {
+        debug!("Hosted-binding write skipped: doorway_id/doorway_url not configured");
+        return;
+    };
+    let Some(sanitized_url) = sanitize_home_doorway_url(doorway_url) else {
+        warn!(
+            configured = %doorway_url,
+            "Hosted-binding write skipped: DOORWAY_URL is not an absolute http(s) URL"
+        );
+        return;
+    };
+
+    let caller = crate::services::ZomeCaller::new(admin_url, app_url, installed_app_id);
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct CreateHostedAgentBindingInput<'a> {
+        doorway_id: &'a str,
+        doorway_url: &'a str,
+        installed_app_id: &'a str,
+    }
+
+    let input = CreateHostedAgentBindingInput {
+        doorway_id,
+        doorway_url: &sanitized_url,
+        installed_app_id,
+    };
+
+    match caller
+        .call::<_, serde_json::Value>(
+            "imagodei",
+            "imagodei",
+            "create_hosted_agent_binding",
+            &input,
+        )
+        .await
+    {
+        Ok(_) => info!(
+            app = %installed_app_id,
+            doorway = %doorway_id,
+            "Recorded hosted-at binding on the DHT"
+        ),
+        Err(e) => warn!(
+            app = %installed_app_id,
+            error = %e,
+            "Hosted-binding write failed (fail-soft — provision stands; sibling \
+             resolution degrades to the honest 409)"
+        ),
+    }
 }
 
 /// Sanitize internal error details for client-facing responses.
@@ -905,5 +1148,302 @@ mod tests {
                 .is_some(),
             "recovered mapping must reach a current conductor"
         );
+    }
+
+    // ================================================================
+    // T2.2 — honest cross-doorway landing (307 / 409 / open-redirect guard)
+    // ================================================================
+
+    // ---- sanitize_home_doorway_url (the open-redirect guard) ----
+
+    #[test]
+    fn sanitize_accepts_plain_absolute_urls() {
+        assert_eq!(
+            sanitize_home_doorway_url("https://elohim.host"),
+            Some("https://elohim.host".to_string())
+        );
+        assert_eq!(
+            sanitize_home_doorway_url("https://doorway-alpha.elohim.host/"),
+            Some("https://doorway-alpha.elohim.host".to_string())
+        );
+        assert_eq!(
+            sanitize_home_doorway_url("  http://localhost:8888  "),
+            Some("http://localhost:8888".to_string())
+        );
+    }
+
+    #[test]
+    fn sanitize_rejects_open_redirect_shapes() {
+        // Scheme-relative — a browser would follow this to evil.example.
+        assert_eq!(sanitize_home_doorway_url("//evil.example"), None);
+        // Bare path / relative.
+        assert_eq!(sanitize_home_doorway_url("/hc/connect"), None);
+        assert_eq!(sanitize_home_doorway_url("elohim.host"), None);
+        // Non-http schemes.
+        assert_eq!(sanitize_home_doorway_url("javascript:alert(1)"), None);
+        assert_eq!(sanitize_home_doorway_url("file:///etc/passwd"), None);
+        // Userinfo look-alike host.
+        assert_eq!(
+            sanitize_home_doorway_url("https://elohim.host@evil.example"),
+            None
+        );
+        // Header-injection / control characters.
+        assert_eq!(
+            sanitize_home_doorway_url("https://elohim.host\r\nX-Evil: 1"),
+            None
+        );
+        // Empty authority.
+        assert_eq!(sanitize_home_doorway_url("https://"), None);
+        assert_eq!(sanitize_home_doorway_url("https:///path"), None);
+        assert_eq!(sanitize_home_doorway_url(""), None);
+    }
+
+    // ---- hosted_at_redirect_response ----
+
+    #[test]
+    fn redirect_is_307_with_location_and_hosted_at_header() {
+        let resp = hosted_at_redirect_response("https://elohim.host", "/hc/connect");
+        assert_eq!(resp.status(), StatusCode::TEMPORARY_REDIRECT);
+        assert_eq!(
+            resp.headers()
+                .get(hyper::header::LOCATION)
+                .and_then(|v| v.to_str().ok()),
+            Some("https://elohim.host/hc/connect"),
+            "307 (not 302) so the POST body + method are replayed at the home doorway"
+        );
+        assert_eq!(
+            resp.headers()
+                .get(HOSTED_AT_HEADER)
+                .and_then(|v| v.to_str().ok()),
+            Some("https://elohim.host")
+        );
+    }
+
+    /// OPEN-REDIRECT GUARD: the Location HOST is always the verified home
+    /// doorway. A path that tries to smuggle an authority contributes only a
+    /// path segment; it can never replace the host.
+    #[test]
+    fn redirect_host_never_comes_from_request_path() {
+        let resp = hosted_at_redirect_response("https://elohim.host", "//evil.example/steal");
+        let location = resp
+            .headers()
+            .get(hyper::header::LOCATION)
+            .and_then(|v| v.to_str().ok())
+            .unwrap()
+            .to_string();
+        assert!(
+            location.starts_with("https://elohim.host/"),
+            "Location must stay anchored to the verified home doorway, got {location}"
+        );
+
+        // A non-absolute path degrades to "/" rather than being concatenated raw.
+        let resp2 = hosted_at_redirect_response("https://elohim.host", "evil.example");
+        assert_eq!(
+            resp2
+                .headers()
+                .get(hyper::header::LOCATION)
+                .and_then(|v| v.to_str().ok()),
+            Some("https://elohim.host/")
+        );
+    }
+
+    // ---- resolve_home_doorway ----
+
+    /// The verified token's own `doorway_url` claim is the primary source —
+    /// it is inside the signature-verified token, so it is already trusted.
+    #[tokio::test]
+    async fn resolve_home_doorway_prefers_the_verified_claim() {
+        let registry = ConductorRegistry::new(None).await;
+        let state = test_state(Some("self-doorway"), registry);
+        let claims = test_claims(Some("sibling-doorway"), Some("https://elohim.host/"));
+
+        assert_eq!(
+            resolve_home_doorway(&state, &claims).await,
+            Some("https://elohim.host".to_string())
+        );
+    }
+
+    /// A malformed `doorway_url` claim must NOT be redirected to. With no
+    /// storage projection configured, this is unresolvable → the caller's 409.
+    #[tokio::test]
+    async fn resolve_home_doorway_rejects_a_malformed_claim() {
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.dev_mode = true;
+        args.doorway_id = Some("self-doorway".into());
+        args.storage_url = None; // no projection fallback available
+        let state = Arc::new(AppState::new(args));
+        let claims = test_claims(Some("sibling-doorway"), Some("//evil.example"));
+
+        assert_eq!(resolve_home_doorway(&state, &claims).await, None);
+    }
+
+    /// Legacy token: `doorway_id` present, no `doorway_url`, and no storage
+    /// URL configured → unresolvable, which the Chaperone answers with the
+    /// existing honest 409 rather than guessing a redirect target.
+    #[tokio::test]
+    async fn resolve_home_doorway_is_none_without_claim_or_projection() {
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.dev_mode = true;
+        args.doorway_id = Some("self-doorway".into());
+        args.storage_url = None;
+        let state = Arc::new(AppState::new(args));
+        let claims = test_claims(Some("sibling-doorway"), None);
+
+        assert_eq!(resolve_home_doorway(&state, &claims).await, None);
+        // …and that unresolvable case is the 409 contract, reusing the SAME
+        // builder the Task 2.3 guard uses (never a duplicate).
+        let resp = hosted_elsewhere_response(&claims);
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+    }
+
+    // ---- T2.1 live-wiring smoke ----
+
+    /// The validator built on the LIVE path (`AppState::federation_jwt_validator`)
+    /// must still verify a self-minted token. This is the wiring smoke test:
+    /// every Task 2.1 builder method is opt-in, so attaching them must not
+    /// change self-token behaviour.
+    #[test]
+    fn federation_validator_verifies_a_self_minted_token() {
+        use crate::auth::TokenInput;
+
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.dev_mode = true;
+        args.doorway_id = Some("self-doorway".into());
+        let state = Arc::new(AppState::new(args));
+
+        let validator = state
+            .federation_jwt_validator()
+            .expect("dev-mode validator must build on the live path");
+
+        let token = validator
+            .generate_token(TokenInput {
+                human_id: "human-1".into(),
+                agent_pub_key: "uhCAk-test".into(),
+                identifier: "test@example.com".into(),
+                permission_level: PermissionLevel::Authenticated,
+                session_id: None,
+                doorway_id: Some("self-doorway".into()),
+                doorway_url: Some("https://self.elohim.host".into()),
+                conductor_id: None,
+                installed_app_id: None,
+                is_steward: false,
+                has_local_conductor: false,
+            })
+            .expect("mint");
+
+        let claims = validator
+            .verify_token_detailed(&token)
+            .expect("self-minted token must verify through the live validator");
+        assert_eq!(claims.doorway_id.as_deref(), Some("self-doorway"));
+        assert!(
+            !claims_are_foreign(claims.doorway_id.as_deref(), Some("self-doorway")),
+            "a self-minted token must never be classified foreign"
+        );
+    }
+
+    // ---- the Chaperone's cross-doorway decision, composed ----
+    //
+    // `handle_hc_connect` takes `Request<hyper::body::Incoming>`, which cannot
+    // be constructed in a unit test (`Incoming` has no public constructor), so
+    // these tests exercise the EXACT composition its step-1b branch performs:
+    //   claims_are_foreign → resolve_home_doorway → 307 | hosted_elsewhere 409.
+    // Every part is independently tested above; this pins how they combine.
+
+    async fn chaperone_foreign_decision(
+        state: &Arc<AppState>,
+        claims: &Claims,
+        original_path: &str,
+    ) -> Response<Full<Bytes>> {
+        assert!(
+            claims_are_foreign(
+                claims.doorway_id.as_deref(),
+                state.args.doorway_id.as_deref()
+            ),
+            "precondition: these claims must classify as foreign"
+        );
+        match resolve_home_doorway(state, claims).await {
+            Some(home) => hosted_at_redirect_response(&home, original_path),
+            None => hosted_elsewhere_response(claims),
+        }
+    }
+
+    /// A VERIFIED foreign token carrying `doorway_url` → 307 to the home
+    /// doorway, `X-Elohim-Hosted-At` set. Never a 502, never a re-provision.
+    #[tokio::test]
+    async fn verified_foreign_token_with_doorway_url_redirects_307() {
+        let registry = ConductorRegistry::new(None).await;
+        let state = test_state(Some("self-doorway"), registry);
+        let claims = test_claims(Some("sibling-doorway"), Some("https://elohim.host"));
+
+        let resp = chaperone_foreign_decision(&state, &claims, "/hc/connect").await;
+
+        assert_eq!(resp.status(), StatusCode::TEMPORARY_REDIRECT);
+        assert_eq!(
+            resp.headers()
+                .get(hyper::header::LOCATION)
+                .and_then(|v| v.to_str().ok()),
+            Some("https://elohim.host/hc/connect")
+        );
+        assert_eq!(
+            resp.headers()
+                .get(HOSTED_AT_HEADER)
+                .and_then(|v| v.to_str().ok()),
+            Some("https://elohim.host")
+        );
+    }
+
+    /// A VERIFIED foreign token whose home is UNRESOLVABLE (no `doorway_url`
+    /// claim, no projection reachable) → the existing honest 409, reusing
+    /// `hosted_elsewhere_response` rather than a duplicate builder.
+    #[tokio::test]
+    async fn verified_foreign_token_unresolvable_falls_back_to_409() {
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.dev_mode = true;
+        args.doorway_id = Some("self-doorway".into());
+        args.storage_url = None;
+        let state = Arc::new(AppState::new(args));
+        let claims = test_claims(Some("sibling-doorway"), None);
+
+        let resp = chaperone_foreign_decision(&state, &claims, "/hc/connect").await;
+
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        assert!(
+            resp.headers().get(hyper::header::LOCATION).is_none(),
+            "an unresolvable home must never carry a Location header"
+        );
+        let body = body_json(resp).await;
+        assert_eq!(body["error"], "hosted-elsewhere");
+    }
+
+    /// OPEN-REDIRECT GUARD, end to end: a foreign token whose `doorway_url`
+    /// claim is an attacker-shaped URL must NOT produce a redirect at all —
+    /// it degrades to the 409. The Location header is never derived from an
+    /// unsanitized value.
+    #[tokio::test]
+    async fn verified_foreign_token_with_hostile_claim_never_redirects() {
+        for hostile in [
+            "//evil.example",
+            "javascript:alert(1)",
+            "https://elohim.host@evil.example",
+            "/relative/path",
+        ] {
+            let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+            args.dev_mode = true;
+            args.doorway_id = Some("self-doorway".into());
+            args.storage_url = None;
+            let state = Arc::new(AppState::new(args));
+            let claims = test_claims(Some("sibling-doorway"), Some(hostile));
+
+            let resp = chaperone_foreign_decision(&state, &claims, "/hc/connect").await;
+            assert_eq!(
+                resp.status(),
+                StatusCode::CONFLICT,
+                "hostile doorway_url {hostile:?} must degrade to 409, not redirect"
+            );
+            assert!(
+                resp.headers().get(hyper::header::LOCATION).is_none(),
+                "hostile doorway_url {hostile:?} produced a Location header"
+            );
+        }
     }
 }

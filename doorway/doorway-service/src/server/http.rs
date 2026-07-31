@@ -168,6 +168,21 @@ pub struct AppState {
     /// Node Ed25519 verifying (public) key for federation signing
     /// Generated at startup, used in DID document and JWKS endpoint
     pub node_verifying_key: Option<ed25519_dalek::VerifyingKey>,
+    /// Private half of the node key above. Retained (T2.2) so the JWT validator
+    /// can MINT EdDSA tokens verifiable by siblings when the operator flips
+    /// `DOORWAY_JWT_SIGN_ALG=eddsa`; unused on the HS256 default.
+    ///
+    /// CAVEAT (honest, not hidden): the pair is generated fresh at boot, so a
+    /// restart rotates it and any EdDSA token minted before the restart becomes
+    /// unverifiable once siblings refresh their JWKS. That is why `hs256`
+    /// remains the default — flipping to `eddsa` should wait on a persisted
+    /// node key (operator menu item 3, the dual-alg migration window).
+    pub node_signing_key: Option<ed25519_dalek::SigningKey>,
+    /// Shared `kid` → Ed25519 public key cache for verifying sibling-minted
+    /// JWTs (Task 2.1's `PeerJwksCache`). Refreshed by
+    /// `spawn_peer_jwks_refresh_task` off the existing peer-discovery cache —
+    /// never fetched on the request path.
+    pub peer_jwks_cache: crate::services::federation::PeerJwksCache,
     /// ZomeCaller for federation and service registration
     /// Shared by federation service, heartbeat task, and federation routes
     pub zome_caller: Option<Arc<crate::services::ZomeCaller>>,
@@ -416,6 +431,54 @@ mod signal_relay_identity_tests {
 }
 
 impl AppState {
+    /// Build a **federation-aware** `JwtValidator` — the live wiring seam for
+    /// Task 2.1's cross-doorway trust core.
+    ///
+    /// Every builder method is opt-in, so this returns exactly today's
+    /// behaviour when nothing federation-related is configured:
+    /// - `with_doorway_id` — enables self-vs-foreign `kid` comparison. Without
+    ///   it every `kid`-bearing token reads as foreign.
+    /// - `with_eddsa_signing_key` / `with_eddsa_verifying_key` — the node key
+    ///   already published at `/.well-known/doorway-keys`; never a fresh key.
+    /// - `with_sign_alg` — `DOORWAY_JWT_SIGN_ALG`, default `hs256`. Verification
+    ///   is dual-algorithm regardless; this only controls MINTING.
+    /// - `with_peer_key_lookup` — the `PeerJwksCache`. Without it, a foreign
+    ///   `kid` fails closed to `UnknownIssuer` rather than falling through to
+    ///   the HS256 secret.
+    ///
+    /// Returns `None` when JWT is not configured at all (no dev mode, no
+    /// secret) so callers keep their existing "JWT not configured" branch.
+    pub fn federation_jwt_validator(&self) -> Option<crate::auth::JwtValidator> {
+        let base = if self.args.dev_mode {
+            crate::auth::JwtValidator::new_dev()
+        } else {
+            let secret = self.args.jwt_secret.as_ref()?;
+            crate::auth::JwtValidator::new(secret.clone(), self.args.jwt_expiry_seconds).ok()?
+        };
+
+        let mut validator = base
+            .with_sign_alg(crate::auth::jwt::JwtSignAlg::from_process_env())
+            .with_peer_key_lookup(std::sync::Arc::new(self.peer_jwks_cache.clone()));
+
+        if let Some(ref id) = self.args.doorway_id {
+            validator = validator.with_doorway_id(id.clone());
+        }
+        match (
+            self.node_signing_key.as_ref(),
+            self.node_verifying_key.as_ref(),
+        ) {
+            (Some(sk), Some(vk)) => {
+                validator = validator.with_eddsa_signing_key(sk.clone(), *vk);
+            }
+            (None, Some(vk)) => {
+                validator = validator.with_eddsa_verifying_key(*vk);
+            }
+            _ => {}
+        }
+
+        Some(validator)
+    }
+
     /// Create AppState without external services (dev mode, direct proxy)
     pub fn new(args: Args) -> Self {
         let bootstrap = if args.bootstrap_enabled {
@@ -479,6 +542,8 @@ impl AppState {
             conductor_registry: None,
             conductor_router: None,
             node_verifying_key: None,
+            node_signing_key: None,
+            peer_jwks_cache: crate::services::federation::new_peer_jwks_cache(),
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
             peer_url_list,
@@ -591,6 +656,8 @@ impl AppState {
             conductor_registry: None,
             conductor_router: None,
             node_verifying_key: None,
+            node_signing_key: None,
+            peer_jwks_cache: crate::services::federation::new_peer_jwks_cache(),
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
             peer_url_list,
@@ -718,6 +785,8 @@ impl AppState {
             conductor_registry: None,
             conductor_router: None,
             node_verifying_key: None,
+            node_signing_key: None,
+            peer_jwks_cache: crate::services::federation::new_peer_jwks_cache(),
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
             peer_url_list,
@@ -848,6 +917,8 @@ impl AppState {
             conductor_registry: None,
             conductor_router: None,
             node_verifying_key: None,
+            node_signing_key: None,
+            peer_jwks_cache: crate::services::federation::new_peer_jwks_cache(),
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
             peer_url_list,
@@ -2191,6 +2262,21 @@ mod shakeout_tests {
         // the SPA bundle instead of the exposition body.
         assert!(is_service_path("/metrics"));
     }
+    /// T2.2 shadow-guard: the hosted-binding route MUST be a service path, or
+    /// the EPR router (GET + !is_service_path) shadows it to the SPA bundle
+    /// whenever a root projection is registered — the /auth/portal incident
+    /// shape. A sibling doorway's JSON parse would then fail on an HTML body
+    /// and every cross-doorway resolution would silently degrade to the 409.
+    #[test]
+    fn is_service_path_covers_hosted_binding() {
+        assert!(is_service_path(
+            "/api/v1/federation/hosted-binding/uhCAkAlice0001"
+        ));
+        // The sibling federation routes stay covered too.
+        assert!(is_service_path("/api/v1/federation/doorways"));
+        assert!(is_service_path("/api/v1/federation/coherence"));
+    }
+
     #[test]
     fn shakeout_service_path_guards_chrome() {
         // /chrome/* (runtime chrome static assets — omni-element.js) MUST be a
@@ -4150,6 +4236,17 @@ async fn handle_request(
         (Method::GET, "/api/v1/federation/coherence") => to_boxed(
             routes::coherence::handle_federation_coherence(Arc::clone(&state)).await,
         ),
+
+        // Hosted-at binding resolution (T2.2). Doorway-specific logic (single
+        // storage read + honest 404/502 split), so it earns an explicit arm
+        // rather than a registry declaration. `/api/` is already covered by
+        // `is_service_path`, which keeps the EPR router from shadowing this to
+        // the SPA bundle — the /auth/portal incident shape. Guarded by
+        // `is_service_path_covers_hosted_binding`.
+        (Method::GET, p) if p.starts_with("/api/v1/federation/hosted-binding/") => {
+            let agent = p.trim_start_matches("/api/v1/federation/hosted-binding/");
+            to_boxed(routes::handle_federation_hosted_binding(Arc::clone(&state), agent).await)
+        }
 
         // ====================================================================
         // Threshold (operator dashboard) - Angular SPA at /threshold/*

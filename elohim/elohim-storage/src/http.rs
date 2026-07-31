@@ -1124,6 +1124,17 @@ impl HttpServer {
             #[cfg(feature = "p2p")]
             (Method::GET, "/api/v1/peers/delivery") => self.handle_delivery_peers().await,
 
+            // Hosted-at binding resolution (doorway-federation-failover T2.2).
+            // Serves the `hosted_agent_bindings` projection of the imagodei
+            // Category-A2 `hosted-at` link so a SIBLING doorway can answer
+            // "where is this agent hosted?" from substrate truth.
+            (Method::GET, p) if p.starts_with("/api/v1/federation/hosted-binding/") => {
+                let agent = p
+                    .trim_start_matches("/api/v1/federation/hosted-binding/")
+                    .to_string();
+                self.handle_hosted_binding(&agent).await
+            }
+
             // Sync API: /sync/v1/{h_app_id}/docs[/{doc_id}[/heads|/changes]]
             (method, p) if p.starts_with("/sync/v1/") => {
                 if let Some(ref sync_manager) = self.sync_manager {
@@ -3516,6 +3527,56 @@ impl HttpServer {
 
     /// Handle delivery peers request — returns discovered peers with capabilities
     #[cfg(feature = "p2p")]
+    /// `GET /api/v1/federation/hosted-binding/{agent_pub_key}` — resolve an
+    /// agent's home doorway from the `hosted_agent_bindings` projection.
+    ///
+    /// 200 with the binding, or 404 `{"error":"no-hosted-binding"}` when the
+    /// agent has none. A 404 here is HONEST ABSENCE, not a failure: the caller
+    /// (a sibling doorway's Chaperone) degrades it to the existing 409
+    /// `hosted-elsewhere` response rather than guessing a redirect target.
+    async fn handle_hosted_binding(
+        &self,
+        agent_pub_key: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // `HoloHashB64` renders base64url (no `+`, `/`, or `=`), so the agent key
+        // is already path-safe — no percent-decoding step to get wrong.
+        let agent = agent_pub_key.to_string();
+        if agent.trim().is_empty() {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(
+                    r#"{"error":"agent_pub_key required"}"#,
+                )))
+                .unwrap());
+        }
+
+        let pool = self.db_pool.as_ref().ok_or_else(|| {
+            StorageError::Internal("hosted-binding lookup requires a database".to_string())
+        })?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Database(e.to_string()))?;
+
+        match crate::db::hosted_agent_bindings::current_binding_for_agent(&mut conn, &agent)? {
+            Some(binding) => {
+                let json = serde_json::to_string(&binding).map_err(|e| {
+                    StorageError::Internal(format!("Failed to serialize hosted binding: {e}"))
+                })?;
+                Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(json)))
+                    .unwrap())
+            }
+            None => Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error":"no-hosted-binding"}"#)))
+                .unwrap()),
+        }
+    }
+
     async fn handle_delivery_peers(&self) -> Result<Response<Full<Bytes>>, StorageError> {
         if let Some(ref handle) = self.p2p_handle {
             let mut peers = handle.delivery_peers();

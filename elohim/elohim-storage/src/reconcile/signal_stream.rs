@@ -313,6 +313,37 @@ pub enum DnaSignal {
     /// Drives `ReconcileController::on_membership_projected` which upserts a
     /// `collective_participations` row keyed by `dht_anchor_hash`.
     MembershipProjected(MembershipProjectedSignal),
+    /// A hosted-at binding (agent → home doorway) has been notarized on the
+    /// imagodei DHT as a Category-A2 link (doorway-federation-failover T2.2).
+    ///
+    /// Drives `ReconcileController::on_hosted_agent_binding`, which upserts a
+    /// `hosted_agent_bindings` row keyed by `dht_anchor_hash`.
+    HostedAgentBinding(HostedAgentBindingSignal),
+}
+
+// ---------------------------------------------------------------------------
+// HostedAgentBindingSignal
+// ---------------------------------------------------------------------------
+
+/// Payload for [`DnaSignal::HostedAgentBinding`].
+///
+/// Carries the whole binding — the DNA side has no entry to fetch, because the
+/// binding is a link whose payload rides the tag. `action_hash` is the
+/// CreateLink ActionHash and becomes the projection's `dht_anchor_hash`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HostedAgentBindingSignal {
+    /// CreateLink ActionHash (base64) — the projection's `dht_anchor_hash`.
+    pub action_hash: String,
+    /// The hosted human's Holochain agent key (`uhCAk…`).
+    pub agent_pub_key: String,
+    /// Stable id of the home doorway.
+    pub doorway_id: String,
+    /// Public base URL of the home doorway.
+    pub doorway_url: String,
+    /// Conductor-side installed app id for this human's hosted install.
+    pub installed_app_id: String,
+    /// When the binding was written, microseconds since epoch.
+    pub bound_at_micros: i64,
 }
 
 // ---------------------------------------------------------------------------

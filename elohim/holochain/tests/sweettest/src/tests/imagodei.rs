@@ -106,3 +106,88 @@ async fn second_agent_is_not_bootstrap_steward() -> Result<()> {
 // pubkey directly.
 //
 // See also: §7 (deferred work) of the authority frame design doc.
+
+// =============================================================================
+// HostedAgentBinding (doorway-federation-failover T2.2)
+// =============================================================================
+//
+// Category A2 — a link on existing integrity surface (`LinkTypes::PeerToBinding`
+// on a disjoint `StringAnchor("hosted_at", …)` base), so the DNA hash does not
+// move. This test proves the coordinator round-trip: an agent binds itself to a
+// home doorway, and the binding resolves back by agent pubkey.
+
+#[tokio::test(flavor = "multi_thread")]
+async fn hosted_agent_binding_round_trips() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("imagodei-hosted-binding", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+
+    // No binding before the write — resolution must be honestly empty, not an error.
+    let before: Option<serde_json::Value> = conductor
+        .call(
+            &cell.zome("imagodei"),
+            "get_hosted_agent_binding",
+            agent.clone(),
+        )
+        .await;
+    assert!(before.is_none(), "expected no binding before create");
+
+    // Typed input mirror (the coordinator crate is WASM-only, so sweettests
+    // mirror its input struct — same convention as imagodei_peer_binding.rs).
+    // `rename_all = "camelCase"` must match the coordinator exactly or serde
+    // silently drops fields over the msgpack zome-call boundary.
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct CreateHostedAgentBindingInput {
+        doorway_id: String,
+        doorway_url: String,
+        installed_app_id: String,
+    }
+
+    let _created: serde_json::Value = conductor
+        .call(
+            &cell.zome("imagodei"),
+            "create_hosted_agent_binding",
+            CreateHostedAgentBindingInput {
+                doorway_id: "alpha-a".to_string(),
+                doorway_url: "https://doorway-alpha.elohim.host".to_string(),
+                installed_app_id: "elohim-hosted-sweettest".to_string(),
+            },
+        )
+        .await;
+
+    let after: Option<serde_json::Value> = conductor
+        .call(
+            &cell.zome("imagodei"),
+            "get_hosted_agent_binding",
+            agent.clone(),
+        )
+        .await;
+    let binding = after.expect("binding resolves after create");
+    assert_eq!(binding["doorwayId"], "alpha-a");
+    assert_eq!(binding["doorwayUrl"], "https://doorway-alpha.elohim.host");
+    assert_eq!(binding["installedAppId"], "elohim-hosted-sweettest");
+    assert!(
+        binding["boundAtMicros"].as_i64().unwrap_or(0) > 0,
+        "boundAtMicros must be stamped"
+    );
+
+    // Anchor-base disjointness: the hosted binding must NOT leak into the
+    // AgentPeerBinding reverse index that shares LinkTypes::PeerToBinding.
+    let peer_bindings: Vec<serde_json::Value> = conductor
+        .call(
+            &cell.zome("imagodei"),
+            "get_bindings_for_peer",
+            "alpha-a".to_string(),
+        )
+        .await;
+    assert!(
+        peer_bindings.is_empty(),
+        "hosted binding leaked into the peer_binding anchor namespace: {peer_bindings:?}"
+    );
+
+    Ok(())
+}
