@@ -429,10 +429,7 @@ fn resolve_projector_source(source_path: &str, atom: &EprAtom) -> Option<String>
 fn resolve_payload_path(dotted_path: &str, payload: &serde_json::Value) -> Option<String> {
     let mut current = payload;
     for key in dotted_path.split('.') {
-        match current.get(key) {
-            Some(next) => current = next,
-            None => return None,
-        }
+        current = current.get(key)?;
     }
     scalar_to_string(current)
 }

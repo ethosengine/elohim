@@ -239,7 +239,7 @@ fn build_governance_action_row(
         )?,
         eligibility_predicate_json: metadata
             .get("eligibility_predicate")
-            .and_then(|v| if v.is_null() { None } else { Some(v) })
+            .filter(|&v| !v.is_null())
             .map(serde_json::to_string)
             .transpose()?,
         ballot_format: metadata["ballot_format"]
@@ -252,7 +252,7 @@ fn build_governance_action_row(
             .to_string(),
         parameters_json: metadata
             .get("parameters")
-            .and_then(|v| if v.is_null() { None } else { Some(v) })
+            .filter(|&v| !v.is_null())
             .map(serde_json::to_string)
             .transpose()?,
         title: signal.title.clone(),
