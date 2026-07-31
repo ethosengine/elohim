@@ -670,7 +670,7 @@ describe('seedCapacityPledge (offline, injected mock client)', () => {
   it('happy path: posts the attestation verbatim from the GET', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const getCapacityRatios = vi.fn(async () => new Response(JSON.stringify(RATIOS), { status: 200 }));
-    const createCapacityPledge = vi.fn(async () => new Response('{}', { status: 200 }));
+    const createCapacityPledge = vi.fn(async (_body: unknown) => new Response('{}', { status: 200 }));
     const client = {
       getCapacityRatios,
       createCapacityPledge,
