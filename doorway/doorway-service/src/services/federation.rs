@@ -31,6 +31,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
 use tracing::{debug, info, warn};
 
@@ -618,6 +619,238 @@ pub type PeerCache = Arc<tokio::sync::RwLock<Vec<PeerDoorway>>>;
 /// Create a new empty peer cache
 pub fn new_peer_cache() -> PeerCache {
     Arc::new(tokio::sync::RwLock::new(Vec::new()))
+}
+
+// =============================================================================
+// Peer JWKS Cache (cross-doorway EdDSA trust — Task 2.1)
+// =============================================================================
+//
+// A sibling doorway's Ed25519 public key, keyed by `kid` (== that doorway's
+// `doorway_id`). Populated out-of-band by `refresh_peer_jwks_cache` /
+// `ensure_peer_key_cached` below — `auth::jwt::JwtValidator::verify_token`
+// itself NEVER touches the network; it only reads this cache synchronously
+// (via the `PeerKeyLookup` trait it implements).
+
+/// TTL for a positively-cached peer public key before it's considered stale
+/// and eligible for re-fetch.
+pub const PEER_JWKS_TTL: Duration = Duration::from_secs(600);
+
+/// Cooldown after a failed on-demand fetch attempt for a given `kid` — keeps
+/// a burst of foreign-`kid` verify calls from becoming a fetch storm. Only
+/// ONE attempt happens per cooldown window per `kid`.
+pub const PEER_JWKS_NEGATIVE_COOLDOWN: Duration = Duration::from_secs(60);
+
+#[derive(Debug, Clone)]
+enum JwksCacheEntry {
+    /// A verified Ed25519 public key, fetched at `fetched_at`.
+    Positive {
+        pubkey: [u8; 32],
+        fetched_at: Instant,
+    },
+    /// The last on-demand fetch attempt for this `kid` failed at this
+    /// instant; no further attempt until `PEER_JWKS_NEGATIVE_COOLDOWN`
+    /// elapses.
+    NegativeCooldown { attempted_at: Instant },
+}
+
+/// Shared `kid` -> Ed25519 public key cache, sourced from peers'
+/// `/.well-known/doorway-keys` JWKS. Cheap to clone (Arc-backed). Implements
+/// `auth::jwt::PeerKeyLookup` so a `JwtValidator` can be handed read access
+/// via `.with_peer_key_lookup(...)`.
+#[derive(Clone)]
+pub struct PeerJwksCache(Arc<dashmap::DashMap<String, JwksCacheEntry>>);
+
+impl PeerJwksCache {
+    /// Synchronous, network-free lookup, TTL-bounded.
+    pub fn get(&self, kid: &str) -> Option<[u8; 32]> {
+        match self.0.get(kid).map(|entry| entry.clone()) {
+            Some(JwksCacheEntry::Positive { pubkey, fetched_at })
+                if fetched_at.elapsed() < PEER_JWKS_TTL =>
+            {
+                Some(pubkey)
+            }
+            _ => None,
+        }
+    }
+
+    fn insert_positive(&self, kid: String, pubkey: [u8; 32]) {
+        self.0.insert(
+            kid,
+            JwksCacheEntry::Positive {
+                pubkey,
+                fetched_at: Instant::now(),
+            },
+        );
+    }
+
+    fn mark_negative(&self, kid: &str) {
+        self.0.insert(
+            kid.to_string(),
+            JwksCacheEntry::NegativeCooldown {
+                attempted_at: Instant::now(),
+            },
+        );
+    }
+
+    /// True when an on-demand fetch attempt for `kid` is warranted right
+    /// now: no live positive entry, and either no prior failed attempt or
+    /// its cooldown has elapsed. Guards `ensure_peer_key_cached` from a
+    /// per-request fetch storm.
+    fn should_attempt_fetch(&self, kid: &str) -> bool {
+        match self.0.get(kid).map(|entry| entry.clone()) {
+            None => true,
+            Some(JwksCacheEntry::Positive { fetched_at, .. }) => {
+                fetched_at.elapsed() >= PEER_JWKS_TTL
+            }
+            Some(JwksCacheEntry::NegativeCooldown { attempted_at }) => {
+                attempted_at.elapsed() >= PEER_JWKS_NEGATIVE_COOLDOWN
+            }
+        }
+    }
+}
+
+/// Create a new empty peer JWKS cache.
+pub fn new_peer_jwks_cache() -> PeerJwksCache {
+    PeerJwksCache(Arc::new(dashmap::DashMap::new()))
+}
+
+impl crate::auth::jwt::PeerKeyLookup for PeerJwksCache {
+    fn lookup_key(&self, kid: &str) -> Option<[u8; 32]> {
+        self.get(kid)
+    }
+}
+
+/// Wire shape of `GET /.well-known/doorway-keys` — mirrors
+/// `routes::federation::JwksResponse` / `JwkKey` (kept independent here so
+/// this module has no route-layer dependency).
+#[derive(Deserialize)]
+struct JwksWire {
+    keys: Vec<JwkWire>,
+}
+
+#[derive(Deserialize)]
+struct JwkWire {
+    kty: String,
+    crv: String,
+    kid: String,
+    x: String,
+}
+
+fn decode_base64url_pubkey(x: &str) -> Option<[u8; 32]> {
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+    let bytes = URL_SAFE_NO_PAD.decode(x).ok()?;
+    bytes.try_into().ok()
+}
+
+/// Fetches a single peer's JWKS document. Never errors outward — a down or
+/// non-conformant peer just yields an empty list (mirrors `fetch_single_peer`
+/// above).
+async fn fetch_peer_jwks(client: &reqwest::Client, peer_url: &str) -> Vec<(String, [u8; 32])> {
+    let url = format!(
+        "{}/.well-known/doorway-keys",
+        peer_url.trim_end_matches('/')
+    );
+    match client.get(&url).send().await {
+        Ok(resp) if resp.status().is_success() => match resp.json::<JwksWire>().await {
+            Ok(parsed) => parsed
+                .keys
+                .into_iter()
+                .filter(|k| k.kty == "OKP" && k.crv == "Ed25519")
+                .filter_map(|k| decode_base64url_pubkey(&k.x).map(|pubkey| (k.kid, pubkey)))
+                .collect(),
+            Err(e) => {
+                warn!(peer = %peer_url, error = %e, "Failed to parse peer JWKS document");
+                Vec::new()
+            }
+        },
+        Ok(resp) => {
+            debug!(peer = %peer_url, status = %resp.status(), "Peer JWKS query returned non-success");
+            Vec::new()
+        }
+        Err(e) => {
+            debug!(peer = %peer_url, error = %e, "Failed to reach peer JWKS endpoint");
+            Vec::new()
+        }
+    }
+}
+
+/// Refreshes the peer JWKS cache by querying every known peer's
+/// `/.well-known/doorway-keys`. Intended to run on the SAME cadence as
+/// `refresh_peer_cache` — piggybacking the peer list the existing discovery
+/// task already maintains — never per-request.
+pub async fn refresh_peer_jwks_cache(
+    peers: &[PeerDoorway],
+    client: &reqwest::Client,
+    cache: &PeerJwksCache,
+) {
+    for peer in peers {
+        if peer.url.trim().is_empty() {
+            continue;
+        }
+        let keys = fetch_peer_jwks(client, &peer.url).await;
+        for (kid, pubkey) in keys {
+            cache.insert_positive(kid, pubkey);
+        }
+    }
+}
+
+/// On-demand, cooldown-guarded single-`kid` fetch for a verify-time cache
+/// miss. `should_attempt_fetch` enforces the negative cooldown BEFORE any
+/// network I/O happens, so a burst of requests for the same unresolvable
+/// `kid` triggers at most one fetch per cooldown window.
+pub async fn ensure_peer_key_cached(
+    cache: &PeerJwksCache,
+    kid: &str,
+    peer_url: &str,
+    client: &reqwest::Client,
+) -> Option<[u8; 32]> {
+    if let Some(key) = cache.get(kid) {
+        return Some(key);
+    }
+    if !cache.should_attempt_fetch(kid) {
+        return None;
+    }
+    let keys = fetch_peer_jwks(client, peer_url).await;
+    let mut found = None;
+    for (fetched_kid, pubkey) in keys {
+        if fetched_kid == kid {
+            found = Some(pubkey);
+        }
+        cache.insert_positive(fetched_kid, pubkey);
+    }
+    if found.is_none() {
+        cache.mark_negative(kid);
+    }
+    found
+}
+
+/// Spawns a background task that periodically refreshes the peer JWKS cache
+/// from the `PeerCache` the existing discovery task already maintains — this
+/// piggybacks that machinery's OUTPUT (the known-peer list) rather than
+/// duplicating peer discovery. `initial_delay`/`interval` mirror
+/// `spawn_peer_discovery_task`'s cadence.
+pub fn spawn_peer_jwks_refresh_task(
+    peer_cache: PeerCache,
+    jwks_cache: PeerJwksCache,
+    initial_delay: Duration,
+    interval: Duration,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        tokio::time::sleep(initial_delay).await;
+
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .unwrap_or_default();
+
+        loop {
+            let peers = get_cached_peers(&peer_cache).await;
+            if !peers.is_empty() {
+                refresh_peer_jwks_cache(&peers, &client, &jwks_cache).await;
+            }
+            tokio::time::sleep(interval).await;
+        }
+    })
 }
 
 // =============================================================================
@@ -1253,6 +1486,121 @@ mod tests {
                 cache.read().await.is_empty(),
                 "empty peer-url list must clear the stale cache"
             );
+        }
+    }
+
+    // ── Peer JWKS cache: fetch, refresh, TTL/cooldown (Task 2.1) ──────────
+    mod peer_jwks {
+        use super::super::{
+            ensure_peer_key_cached, fetch_peer_jwks, new_peer_jwks_cache, refresh_peer_jwks_cache,
+            PeerDoorway,
+        };
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+        use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+        fn jwks_body(kid: &str, pubkey: &[u8; 32]) -> serde_json::Value {
+            serde_json::json!({
+                "keys": [{
+                    "kty": "OKP",
+                    "crv": "Ed25519",
+                    "use": "sig",
+                    "kid": kid,
+                    "x": URL_SAFE_NO_PAD.encode(pubkey),
+                }]
+            })
+        }
+
+        async fn mount_jwks(server: &MockServer, kid: &str, pubkey: &[u8; 32]) {
+            Mock::given(matchers::method("GET"))
+                .and(matchers::path("/.well-known/doorway-keys"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(jwks_body(kid, pubkey)))
+                .mount(server)
+                .await;
+        }
+
+        #[tokio::test]
+        async fn fetch_peer_jwks_parses_okp_ed25519_entries() {
+            let server = MockServer::start().await;
+            let pubkey = [7u8; 32];
+            mount_jwks(&server, "sibling", &pubkey).await;
+
+            let client = reqwest::Client::new();
+            let keys = fetch_peer_jwks(&client, &server.uri()).await;
+
+            assert_eq!(keys.len(), 1);
+            assert_eq!(keys[0].0, "sibling");
+            assert_eq!(keys[0].1, pubkey);
+        }
+
+        #[tokio::test]
+        async fn fetch_peer_jwks_404_is_empty_not_an_error() {
+            let server = MockServer::start().await;
+            // No mock mounted → 404, mirroring an undeployed/older peer.
+            let client = reqwest::Client::new();
+            let keys = fetch_peer_jwks(&client, &server.uri()).await;
+            assert!(keys.is_empty());
+        }
+
+        #[tokio::test]
+        async fn refresh_peer_jwks_cache_populates_from_known_peers() {
+            let server = MockServer::start().await;
+            let pubkey = [9u8; 32];
+            mount_jwks(&server, "sibling", &pubkey).await;
+
+            let cache = new_peer_jwks_cache();
+            let client = reqwest::Client::new();
+            let peers = vec![PeerDoorway {
+                id: "sibling".into(),
+                url: server.uri(),
+                region: None,
+                capabilities: vec![],
+                source_peer: "seed".into(),
+            }];
+
+            refresh_peer_jwks_cache(&peers, &client, &cache).await;
+
+            assert_eq!(cache.get("sibling"), Some(pubkey));
+            assert_eq!(cache.get("unknown-doorway"), None);
+        }
+
+        #[tokio::test]
+        async fn ensure_peer_key_cached_fetches_once_on_miss() {
+            let server = MockServer::start().await;
+            let pubkey = [3u8; 32];
+            mount_jwks(&server, "sibling", &pubkey).await;
+
+            let cache = new_peer_jwks_cache();
+            let client = reqwest::Client::new();
+
+            let found = ensure_peer_key_cached(&cache, "sibling", &server.uri(), &client).await;
+            assert_eq!(found, Some(pubkey));
+            // Now served from cache without another fetch attempt needed.
+            assert_eq!(cache.get("sibling"), Some(pubkey));
+        }
+
+        #[tokio::test]
+        async fn ensure_peer_key_cached_negative_cooldown_guards_against_a_fetch_storm() {
+            let server = MockServer::start().await;
+            // Peer never publishes this kid → every fetch 404s. Expect
+            // EXACTLY ONE outbound request across two on-demand calls.
+            Mock::given(matchers::method("GET"))
+                .and(matchers::path("/.well-known/doorway-keys"))
+                .respond_with(ResponseTemplate::new(404))
+                .expect(1)
+                .mount(&server)
+                .await;
+
+            let cache = new_peer_jwks_cache();
+            let client = reqwest::Client::new();
+
+            let first = ensure_peer_key_cached(&cache, "ghost", &server.uri(), &client).await;
+            assert_eq!(first, None);
+
+            // Immediately retrying must NOT issue a second network call —
+            // the negative cooldown guards it. wiremock's `.expect(1)`
+            // panics on drop if a second request landed.
+            let second = ensure_peer_key_cached(&cache, "ghost", &server.uri(), &client).await;
+            assert_eq!(second, None);
         }
     }
 }

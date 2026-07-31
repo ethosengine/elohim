@@ -164,6 +164,12 @@ pub async fn handle_federation_doorways(state: Arc<AppState>) -> Response<Full<B
 ///
 /// Returns public signing key in JWKS (JSON Web Key Set) format.
 /// Used by other doorways to verify signatures from this doorway.
+///
+/// `kid` is this doorway's own `doorway_id` — cross-doorway JWT verification
+/// (`auth::jwt::JwtValidator`) keys its peer cache by `doorway_id`, so a
+/// mismatch here would make every foreign-issued token unverifiable. Falls
+/// back to the pre-federation placeholder id only when `doorway_id` isn't
+/// configured (dev/standalone mode).
 pub fn handle_doorway_keys(state: Arc<AppState>) -> Response<Full<Bytes>> {
     let mut keys = Vec::new();
 
@@ -171,12 +177,17 @@ pub fn handle_doorway_keys(state: Arc<AppState>) -> Response<Full<Bytes>> {
     if let Some(ref verifying_key) = state.node_verifying_key {
         let pub_bytes = verifying_key.to_bytes();
         let x = base64_url_encode(&pub_bytes);
+        let kid = state
+            .args
+            .doorway_id
+            .clone()
+            .unwrap_or_else(|| "node-key-1".to_string());
 
         keys.push(JwkKey {
             kty: "OKP".to_string(),
             crv: "Ed25519".to_string(),
             key_use: "sig".to_string(),
-            kid: "node-key-1".to_string(),
+            kid,
             x,
         });
     }
