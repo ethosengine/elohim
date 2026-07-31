@@ -54,7 +54,7 @@ use elohim_storage::db::content_diesel::{
 };
 use elohim_storage::db::context::AppContext;
 use elohim_storage::db::models::NewAcquisitionPin;
-use elohim_storage::p2p::acquisition::AcquisitionState;
+use elohim_storage::p2p::acquisition::{retry_budget_for_peers, AcquisitionState};
 use elohim_storage::test_util::test_pool;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,7 +100,12 @@ async fn item_pin_completes_on_byte_arrival() {
     // ── Step 3: reconcile the acquisition state (mirrors run_acquisition_reconcile) ─
     let acq = AcquisitionState::new();
     let pin_wants: Vec<(i32, Vec<String>)> = vec![(pin.id, vec![content_id.to_string()])];
-    let to_dispatch = acq.reconcile(pin_wants, &local_has).await;
+    // Retry budget is peer-count-sized in the live loop (see
+    // `retry_budget_for_peers`); this harness has no swarm, so 0 peers → the
+    // MIN_RETRIES floor, which is the pre-existing behaviour this test asserts.
+    let to_dispatch = acq
+        .reconcile(pin_wants, &local_has, retry_budget_for_peers(0))
+        .await;
     assert_eq!(
         to_dispatch,
         vec![content_id.to_string()],
@@ -202,7 +207,11 @@ async fn failed_fetch_never_increments_fetched_count() {
 
     let acq = AcquisitionState::new();
     let to_dispatch = acq
-        .reconcile(vec![(pin.id, vec![content_id.to_string()])], &local_has)
+        .reconcile(
+            vec![(pin.id, vec![content_id.to_string()])],
+            &local_has,
+            retry_budget_for_peers(0),
+        )
         .await;
     assert_eq!(to_dispatch.len(), 1, "must enqueue the missing item");
 
@@ -274,7 +283,13 @@ async fn zero_item_resolved_set_is_not_caught_up() {
 
     let acq = AcquisitionState::new();
     // Reconcile with an empty desired set for this pin
-    let to_dispatch = acq.reconcile(vec![(pin.id, vec![])], &local_has).await;
+    let to_dispatch = acq
+        .reconcile(
+            vec![(pin.id, vec![])],
+            &local_has,
+            retry_budget_for_peers(0),
+        )
+        .await;
     assert!(
         to_dispatch.is_empty(),
         "zero desired set must dispatch nothing"

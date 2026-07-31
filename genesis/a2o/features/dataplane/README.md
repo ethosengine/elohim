@@ -31,13 +31,14 @@ in the sprint report.
 | `saga-08-capacity-reported` | Resiliency-saga chapter 8 — cluster-aggregate free/stewarded custodian capacity gauges are live and readable. |
 | `saga-09-projectors-carry` | Resiliency-saga chapter 9 — the household-resilience projection's `commitmentBackedReplication.totalPledgedBytes` reflects real pledged bytes. **RED-FIRST** — born red; `household_resilience.rs` hard-codes this field to its zero default (T15 TODO). |
 | `saga-10-card-tells-truth` | Resiliency-saga chapter 10 — two doorways report the SAME non-zero stewarding count for the same content ("two doorways, one truth"). **RED-FIRST** — depends on chapters 5 and 9 landing first. |
+| `saga-11-pull-queue-retires` | Resiliency-saga chapter 11 — the pull queue reaches `caughtUp`, and any pin set aside to get there is counted (`elohim_acquisition_pins_retired`) rather than silently dropped. |
 
 Add new concerns here as they are introduced. Concern names must be lowercase kebab-case (e.g.
 `@concern:my-new-concern`), and must appear in the table above before the feature file is merged.
 
 ### The resiliency-saga (sourced from `features/dataplane/resiliency-saga/`)
 
-Ten ordered chapter features narrating one continuous epic — a device awakens through
+Eleven ordered chapter features narrating one continuous epic — a device awakens through
 to the resilience card telling the truth on every doorway that serves it. Unlike the
 deterministic-floor concerns above, these scenarios live IN this directory (a governed
 subdirectory, `features/dataplane/resiliency-saga/`, with its own `.epr-meta`), not in
@@ -56,6 +57,7 @@ chapter/concern/proof-signal table.
 | `resiliency-saga/08-capacity-reported.feature` | `saga-08-capacity-reported` |
 | `resiliency-saga/09-projectors-carry.feature` | `saga-09-projectors-carry` |
 | `resiliency-saga/10-card-tells-truth.feature` | `saga-10-card-tells-truth` |
+| `resiliency-saga/11-pull-queue-retires.feature` | `saga-11-pull-queue-retires` |
 
 ### Deterministic-floor concerns (sourced from `features/resilience/`)
 

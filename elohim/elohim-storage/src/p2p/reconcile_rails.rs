@@ -49,6 +49,19 @@ impl GapTracker {
         }
     }
 
+    /// Raise (or lower) the retry budget on a LIVE tracker.
+    ///
+    /// The acquisition stream sizes its budget from the CONNECTED PEER COUNT —
+    /// `MAX_RETRIES = 3` on a 6-peer fabric probes at most 3 of 6 possible
+    /// providers before declaring an item unsatisfiable, so "exhausted" meant
+    /// "half the fabric was never asked". Peer count changes between reconcile
+    /// cycles and trackers outlive a cycle, so the budget must be adjustable in
+    /// place. RAISING it re-admits ids whose failed-count is below the new bound
+    /// on the next `reconcile_desired` — which is the point.
+    pub fn set_max_retries(&mut self, max_retries: u32) {
+        self.max_retries = max_retries;
+    }
+
     /// Ids whose retry budget is spent. `enqueue_missing` refuses to re-queue
     /// these, so they leave `pending` permanently — the exact reason
     /// `pending.is_empty()` (i.e. `caught_up`) overstates convergence.
@@ -284,6 +297,33 @@ mod tests {
         assert!(!c.caught_up);
         assert!(!c.converged);
         assert_eq!(c.exhausted, 0, "retryable != exhausted");
+    }
+
+    #[test]
+    fn raising_the_budget_re_admits_an_exhausted_id() {
+        // Peer-breadth: an item asked of 3 peers on a 6-peer fabric has not been
+        // proven unsatisfiable — five of six providers may never have been
+        // probed. Raising the budget to the peer count must let it back in.
+        let mut t = GapTracker::new(3);
+        t.reconcile_desired(vec!["x".into()]);
+        for _ in 0..3 {
+            t.mark_failed("x");
+            t.reconcile_desired(vec!["x".into()]);
+        }
+        assert_eq!(t.counts().exhausted, 1, "spent at the 3-retry budget");
+
+        t.set_max_retries(6);
+        let gaps = t.reconcile_desired(vec!["x".into()]);
+        assert_eq!(
+            gaps,
+            vec!["x".to_string()],
+            "re-admitted under the new bound"
+        );
+        assert_eq!(
+            t.counts().exhausted,
+            0,
+            "not exhausted while unprobed providers remain"
+        );
     }
 
     #[test]

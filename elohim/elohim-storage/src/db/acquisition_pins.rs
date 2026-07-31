@@ -68,6 +68,23 @@ pub fn count_active_pins(conn: &mut SqliteConnection) -> QueryResult<i64> {
         .get_result(conn)
 }
 
+/// List pins carrying an arbitrary status, ordered by id ascending.
+///
+/// The `status` column is free-form TEXT, so this is the general form of
+/// [`list_active_pins`]. It exists for the RETIRED re-admission path: a pin the
+/// substrate held back (no peer could supply its bytes) is re-activated the
+/// moment a peer's inventory names its `head_ref` again — which needs the
+/// retired set in hand at inventory-receipt time, not a full table scan.
+pub fn list_pins_by_status(
+    conn: &mut SqliteConnection,
+    status: &str,
+) -> QueryResult<Vec<AcquisitionPin>> {
+    pins::acquisition_pins
+        .filter(pins::status.eq(status))
+        .order(pins::id.asc())
+        .load(conn)
+}
+
 /// List all pins regardless of status, ordered by id ascending.
 pub fn list_all_pins(conn: &mut SqliteConnection) -> QueryResult<Vec<AcquisitionPin>> {
     pins::acquisition_pins.order(pins::id.asc()).load(conn)
