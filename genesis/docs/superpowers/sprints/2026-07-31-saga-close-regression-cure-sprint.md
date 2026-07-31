@@ -89,6 +89,12 @@ wording and step reorder.
 | `cd7b73472` | apps: Eager stamps on elohim-app/doorway-app/imagodei-portal roots + specs |
 | `0f9b4145b` | CI: zero-scenario Dataplane Validation exits 3 → UNSTABLE, never SUCCESS |
 | `0d0b830af` | storage: migration admitting 'retired' pin status (review-critical fix) |
+| `18b5d4747` | a2o: saga-11 story carries its stake (blind-reader revision, 4 rounds) |
+
+The saga-11 blind-reader loop surfaced one deliberately-unresolved item:
+the reader's recurring ask to move narrative from comments into Gherkin
+bodies is a saga-wide convention decision (all 10 sibling chapters carry
+narrative in comments) — operator call, not a per-file fix.
 
 New a2o coverage: ch06 honesty-guard scenario (divergence measured AND
 converged); `11-pull-queue-retires.feature` (@concern:saga-11) registered
