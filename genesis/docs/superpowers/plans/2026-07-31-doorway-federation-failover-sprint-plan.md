@@ -167,6 +167,21 @@ Scenario 2/3 run against the live pair (organic shed windows are real red eviden
 
 ## WS3 — Read-path anycast + the dead fallback
 
+> **WS3 ground-truth revision (2026-07-31, in-sprint).** (a) Task 3.1 as
+> specced is BLOCKED by encoded policy: `check-ingress-conflicts.sh` aborts any
+> deploy where two differently-named ingresses claim one host in the namespace,
+> and publishing apex multi-A before the operations leg can serve `elohim.host`
+> would 404 half of apex traffic. Apex multi-A therefore needs the operator's
+> ingress-topology decision FIRST (per-leg ingress classes or controller split)
+> — demoted to Operator menu item 2 with this evidence; do not land the beacon
+> diff ahead of it. (b) Task 3.2 is ALREADY SHIPPED: `environment.alpha.ts`
+> carries `doorwayFallbacks: ['https://elohim.host']`, and a browser on the
+> apex primaries its API calls to doorway-A via `resolveBaseUrl()` (origin ≠
+> doorwayUrl → cross-origin primary) with sticky failover — data reads already
+> survive B's shed for users holding the shell. The unclosed apex leg is the
+> ROOT-DOCUMENT serve only. (c) New Task 3.4 (warm-boot shell cache) is the
+> repo-side cure for that leg.
+
 ### Task 3.1: Apex multi-A manifest diff (operator-gated apply) — **tier: Sonnet**
 **Files:** Modify `genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml`, `genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml`.
 **Spec:** Add `--shared-record-name elohim.host --record-owner <shem|operations>` contribution to BOTH beacon legs (exact flag shape copied from the working `doorways.elohim.host` stanzas at `alpha-coturn-shem.yaml:227-234` / `alpha-coturn-operations.yaml:232-239`), REPLACING the shem leg's exclusive `--record-name elohim.host` ownership. Header comment documents rollback (revert to single-owner) and the ingress precondition: doorway-A's ingress must accept the `elohim.host` host (add the host to `alpha.yaml`'s ingress + TLS SAN — include that diff) or A answers 404 for apex traffic. **This lands as a committed, ready-to-apply diff; the operator decides when the pipeline reconciles it** (outward-facing DNS semantics change — §Operator menu item 2).
@@ -182,6 +197,11 @@ Scenario 2/3 run against the live pair (organic shed windows are real red eviden
 **Spec:** Doctrine question first (rust-architect): a single-sibling doorway→doorway HTTP fetch after local-storage 404 is federation-seam behavior, not storage fan-out — confirm against `doorway/CLAUDE.md:32-57`, then wire it as DeliveryRelay's final fallback tier exactly as the function's own doc comment (`federation.rs:364`) claims, with its existing loop-prevention header and a per-request budget of ONE remote attempt. If the doctrine call goes the other way: delete the function and its FEDERATION.md claims in the same commit (dead code with a lying doc comment is the worst state — the current one).
 **Tests (first, if wiring):** local 404 + healthy sibling → bytes served, loop-prevention header set; sibling also 404 → original 404 preserved (no error masking); loop header present on inbound → no recursive fetch.
 **Verify:** doorway gate green; a2o Task 1.1 scenario 3 exercises the path live.
+
+### Task 3.4: Warm-boot shell cache — serve `/` through the catch-up window — **tier: Opus design + Sonnet implementation**
+**Files:** Modify `doorway/doorway-service/src/render/registry.rs` boot path, `doorway/doorway-service/src/cache/app_file_cache.rs` consumers, the `/` serve path that currently sheds.
+**Spec:** The 503 shed on `/` during post-restart catch-up exists because the SSR hot cache is in-memory (dies with the pod) while the declared-head fetch needs the still-catching-up upstream. The Mongo-backed `app_file_cache` (keyed `{slug}:{file_path}:{blob_hash}`) already holds the last reconciled bundle — derivable, content-addressed truth. At boot: hydrate the render registry's served-bundle head from the last reconciled `BundleHead` and serve the shell from cache (browser navigations only) with an explicit staleness marker header (`x-elohim-bundle: last-reconciled`) while catch-up runs; the existing reconcile loop upgrades to the declared head the moment the upstream answers, exactly as today. API/data routes keep the shed contract untouched — this changes ONLY the shell serve, honoring the pinned `x-ssr-fetches: 0` cache-warm invariant (doorway-catching-up-page `@wip` scenario — de-`@wip` it with this task). Serving the last content-addressed bundle is serving true (possibly one-behind, marked) content — not a violation of the honest-shed design, whose target is data reads.
+**Verify:** doorway gate green; the born-red apex scenario (`doorway-failover.feature`) flips green on the next post-deploy catch-up window; the cache-warm scenario de-`@wip`'d and passing.
 
 ## Sequencing
 
