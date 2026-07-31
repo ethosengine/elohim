@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { signal } from '@angular/core';
+import { NgZone, provideZoneChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, NavigationEnd } from '@angular/router';
 
@@ -83,6 +83,9 @@ describe('AppComponent', () => {
     await TestBed.configureTestingModule({
       imports: [AppComponent],
       providers: [
+        // Mirror app.config.ts. TestBed defaults to zoneless, which masks root
+        // propagation failures caused by an implicit-OnPush bundle root.
+        provideZoneChangeDetection(),
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -216,6 +219,26 @@ describe('AppComponent', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('app-theme-toggle')).toBeFalsy();
+  });
+
+  it('renders a post-first-paint route update without a manual change-detection trigger', async () => {
+    mockRouter.url = '/lamad';
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.autoDetectChanges(true);
+    await fixture.whenStable();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('app-theme-toggle')).toBeFalsy();
+
+    // This is the browser sequence: Router emits inside Angular's zone after
+    // first paint. Do not call detectChanges() after the mutation — doing so
+    // would unconditionally check an OnPush root and mask the regression.
+    TestBed.inject(NgZone).run(() => {
+      routerEventsSubject.next(new NavigationEnd(2, '/', '/'));
+    });
+    await fixture.whenStable();
+
+    expect(host.querySelector('app-theme-toggle')).toBeTruthy();
   });
 
   describe('ngOnDestroy', () => {

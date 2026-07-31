@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 import { DoorwayToolbarComponent } from './components/toolbar/doorway-toolbar.component';
@@ -10,6 +10,10 @@ import { AuthStateService } from './services/auth-state.service';
   imports: [RouterOutlet, DoorwayToolbarComponent, NotificationToastComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css',
+  // OnPush-unsafe: ROOT view — an OnPush root is never marked dirty, so a global
+  // ApplicationRef tick skips it and freezes change detection for the whole
+  // non-signal tree. See backlog-onpush-eager-debt-inventory.
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class AppComponent implements OnInit {
   private readonly authState = inject(AuthStateService);

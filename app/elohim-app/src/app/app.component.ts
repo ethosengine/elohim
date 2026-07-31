@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnInit, OnDestroy, inject, effect } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  OnInit,
+  OnDestroy,
+  inject,
+  effect,
+} from '@angular/core';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 
 import { filter } from 'rxjs/operators';
@@ -32,6 +40,10 @@ interface RetryConfig {
   imports: [RouterOutlet, ThemeToggleComponent, CommonModule],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css',
+  // OnPush-unsafe: ROOT view — an OnPush root is never marked dirty, so a global
+  // ApplicationRef tick skips it and freezes change detection for the whole
+  // non-signal tree. See backlog-onpush-eager-debt-inventory.
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class AppComponent implements OnInit, OnDestroy {
   title = 'elohim-app';

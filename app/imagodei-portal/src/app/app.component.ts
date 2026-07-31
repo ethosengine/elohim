@@ -1,5 +1,6 @@
 import {
   AfterViewInit,
+  ChangeDetectionStrategy,
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
   ElementRef,
@@ -30,6 +31,10 @@ type StewardPhase = 'connecting' | 'failed' | 'unreachable';
   standalone: true,
   imports: [CommonModule],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  // OnPush-unsafe: ROOT view — an OnPush root is never marked dirty, so a global
+  // ApplicationRef tick skips it and freezes change detection for the whole
+  // non-signal tree. See backlog-onpush-eager-debt-inventory.
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <main>
       <h1 class="visually-hidden">Elohim Portal</h1>

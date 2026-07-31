@@ -218,20 +218,32 @@ zoneless, which masks this entire class), `fixture.autoDetectChanges(true)`, the
 delivered inside `NgZone.run()`, and the assertion taken after `whenStable()`. Neither calls
 `fixture.detectChanges()` after the mutation.
 
-### OPEN — the other three bundle roots are still implicitly OnPush
+### Resolved (2026-07-31) — the other three bundle roots are stamped Eager
 
-Not changed in this fix (the lamad hang was the reported regression and is the only surface
-verified end-to-end against live alpha data). All three carry the same latent root-view freeze
-and each needs its own eyes-on verification before stamping:
+All three roots now carry the same documented `ChangeDetectionStrategy.Eager` safeguard as
+lamad:
 
 - `app/elohim-app/src/app/app.component.ts`
 - `doorway/doorway-app/src/app/app.component.ts`
 - `app/imagodei-portal/src/app/app.component.ts`
 
-Their first paint is masked by router navigation (activating a routed component marks views
-dirty), so a static route renders fine and only *post-render async updates* freeze — the same
-mask the review noted for `elohim-navigator`. Route each app through `pnpm look` on a surface
-whose content arrives after first paint before deciding.
+Each root has a browser-mirroring regression spec using `provideZoneChangeDetection()`,
+`fixture.autoDetectChanges(true)`, a mutation delivered inside `NgZone.run()`, and no manual
+`detectChanges()` after the mutation:
+
+- `app/elohim-app/src/app/app.component.spec.ts` drives the real post-first-paint router event
+  that toggles root chrome.
+- `doorway/doorway-app/src/app/app.component.spec.ts` drives a subscribe-style mutation in an
+  Eager routed child beneath the real root outlet.
+- `app/imagodei-portal/src/app/app.component.render.spec.ts` carries the production root's
+  compiled strategy into an isolated Eager-child harness (template overrides otherwise default
+  to Eager and would mask the regression).
+
+The negative control was run for every root: removing only its Eager stamp leaves `stale` in the
+DOM and fails the corresponding spec; restoring the stamp makes all three green. Local eyes-on
+renders also completed for the elohim root, doorway at `/threshold/`, and imagodei at its
+configured `/auth/portal/` serve path. Backend-dependent requests fail as expected without the
+local service stack, but the three Angular roots render with no page exceptions.
 
 ## Recheck trigger
 
