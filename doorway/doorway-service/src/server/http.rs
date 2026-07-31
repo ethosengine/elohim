@@ -1101,9 +1101,14 @@ fn build_ssr_user_credential<B>(req: &Request<B>) -> Option<crate::ssr::UserCred
 ///   element cannot determine this client-side, and it gates the account link.
 ///
 /// `theme`/`envTier`/`buildMarker`/`nav` are intentionally LEFT to the element's
-/// own client-side resolution (it fetches `/db/content/{slug}` for the theme and
-/// treats an absent env tier as non-visible) — the doorway SSR path does not yet
-/// plumb env-tier/build-marker, and inventing it here would be speculative. The
+/// own client-side resolution — the doorway SSR path does not yet plumb
+/// env-tier/build-marker, and inventing it here would be speculative. The
+/// element fetches `/db/content/{slug}` for the theme and — on first expand —
+/// resolves its NAV and the EPR's backing claims from the Category-C EPR
+/// projections `GET /api/v1/epr/{slug}/{nav-context,raw}` (proxied by this same
+/// doorway). Nav is SETTLED there, not a gap: the doorway once deferred nav to
+/// the element while the element deferred it back to the doorway, so the links
+/// never rendered; client-side resolution wins. The
 /// element's defaults are sensible for the unspecified fields, so a minimal,
 /// honest island is correct — `ChromeContext`'s `Option` fields stay `None` and
 /// are omitted from the wire JSON (`skip_serializing_if`), keeping the shape

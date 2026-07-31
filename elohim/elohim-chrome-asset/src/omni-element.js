@@ -14,6 +14,13 @@
  * the lazy /api/v1/resilience/{slug} fetch) so any sibling that depended on the
  * enhance behavior still works.
  *
+ * On first expand the element resolves, lazily and best-effort, everything the
+ * inline context island does NOT carry: the resilience snapshot, and the EPR's
+ * BACKING CLAIMS + nav neighbors from the two Category-C EPR projections
+ * (/api/v1/epr/{slug}/nav-context and /api/v1/epr/{slug}/raw). The island's job
+ * is only what the client cannot know (the authoritative slug, authenticated);
+ * everything else is the element's own client-side resolution.
+ *
  * Served content-addressed at /chrome/omni-element.{sha256}.js — immutable.
  * Defensive by construction: every step is guarded; if context cannot be
  * acquired, or the bar is already mounted, the script no-ops. It must never
@@ -174,6 +181,35 @@
     '#elohim-omni .omni-resilience-reassure { color: var(--omni-muted, rgba(20,22,30,0.55)); }\n' +
     '#elohim-omni .omni-resilience-facts { display: block; ' +
     'color: var(--omni-muted, rgba(20,22,30,0.55)); font-size: 11px; }\n' +
+    // Backing-claims group — the EPR's coupling legs + graph neighbors, folded
+    // DOWN from a quiet glyph exactly like the resilience card (same spec §11
+    // tooltip-direction convention, same progressive-disclosure idiom).
+    '#elohim-omni .omni-nav-slot { display: inline-flex; align-items: center; }\n' +
+    '#elohim-omni .omni-claims-wrap { position: relative; display: inline-flex; }\n' +
+    '#elohim-omni .omni-claims { display: inline-flex; align-items: center; ' +
+    'color: var(--omni-fg, rgba(20,22,30,0.96)); padding: 0 0.25rem; ' +
+    'background: transparent; border: none; font: inherit; cursor: pointer; }\n' +
+    '#elohim-omni .omni-claims-glyph { font-size: 12px; line-height: 1; }\n' +
+    '#elohim-omni .omni-claims-card { position: absolute; top: 100%; ' +
+    'inset-inline-start: 0; margin-top: 0.4rem; min-width: 15rem; max-width: 22rem; ' +
+    'padding: 0.6rem 0.75rem; text-align: start; ' +
+    'background: var(--omni-bg, rgba(255,255,255,0.96)); ' +
+    'color: var(--omni-fg, rgba(20,22,30,0.96)); ' +
+    'border: 1px solid var(--omni-border, rgba(20,22,30,0.14)); border-radius: 8px; ' +
+    'box-shadow: var(--omni-shadow, 0 2px 10px rgba(0,0,0,0.12)); ' +
+    'backdrop-filter: blur(10px); }\n' +
+    '#elohim-omni .omni-claims-row { display: flex; align-items: baseline; ' +
+    'gap: 0.5rem; margin-bottom: 0.3rem; }\n' +
+    '#elohim-omni .omni-claims-leg { flex: 0 0 auto; min-width: 5.5rem; ' +
+    'color: var(--omni-muted, rgba(20,22,30,0.55)); font-size: 11px; }\n' +
+    // Card links are compact text, not the toolbar's chip-buttons: this rule
+    // follows `.omni-toolbar a` in source order at equal specificity, so it wins.
+    '#elohim-omni .omni-claims-card a { border: none; border-radius: 0; padding: 0; }\n' +
+    '#elohim-omni .omni-epr-link { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; ' +
+    'color: var(--omni-fg, rgba(20,22,30,0.96)); text-decoration: none; ' +
+    'border-bottom: 1px solid var(--omni-border, rgba(20,22,30,0.14)); }\n' +
+    '#elohim-omni .omni-claims-card a:hover { ' +
+    'border-bottom-color: var(--omni-accent, rgba(20,22,30,0.96)); }\n' +
     '#elohim-omni .omni-collapse { margin-left: auto; }\n';
 
   // ── CSS-value allowlist (port of omnibar.rs::is_safe_token_value) ───────────
@@ -300,7 +336,11 @@
     // === EXPANDED TOOLBAR ===
     html += '<div class="omni-toolbar" role="region" aria-label="Protocol context">';
 
-    // Back nav (server-known target only; plain link, no client router).
+    // Back nav SLOT. The island may supply the target (ctx.navBack); when it
+    // does not, the element resolves it itself from the EPR nav-context API on
+    // first expand (`fillNavSlot`) — the slot is the insertion point, so the
+    // toolbar order is identical either way.
+    html += '<span class="omni-nav-slot" data-omni-nav-slot="back">';
     var navBack = ctx.navBack;
     var navBackHref = navBack ? safeHref(navBack.href, null) : null;
     if (navBackHref) {
@@ -317,6 +357,7 @@
         bl +
         '</a>';
     }
+    html += '</span>';
 
     // EPR group: copy-CID button + (optional) env-context badge.
     html += '<span class="omni-epr-group">';
@@ -361,7 +402,24 @@
     html += '<div class="omni-resilience-card" data-omni-resilience-card hidden></div>';
     html += '</span>';
 
-    // Forward nav (server-known target only).
+    // Backing-claims indicator — starts HIDDEN and stays hidden unless the
+    // EPR actually has claims to show (an EPR with no recorded claims keeps
+    // the omnibar quiet rather than offering an empty flyout — the same
+    // "no empty flyout" discipline as the resilience card).
+    html += '<span class="omni-claims-wrap">';
+    html +=
+      '<button type="button" class="omni-claims" ' +
+      'data-omni-action="claims-toggle" aria-expanded="false" ' +
+      'aria-label="Backing claims" hidden>';
+    html +=
+      '<span class="omni-claims-glyph" data-omni-claims-glyph ' +
+      'title="Backing claims">◈</span>';
+    html += '</button>';
+    html += '<div class="omni-claims-card" data-omni-claims-card hidden></div>';
+    html += '</span>';
+
+    // Forward nav SLOT (island target if supplied, else nav-context-resolved).
+    html += '<span class="omni-nav-slot" data-omni-nav-slot="forward">';
     var navFwd = ctx.navForward;
     var navFwdHref = navFwd ? safeHref(navFwd.href, null) : null;
     if (navFwdHref) {
@@ -378,6 +436,7 @@
         fl +
         ' →</a>';
     }
+    html += '</span>';
 
     // Account link — hidden + data-omni-account hook when unauthenticated.
     var accountHref = htmlEscape(safeHref(ctx.accountHref || '/account', '/account'));
@@ -449,7 +508,10 @@
     var state = omni.getAttribute('data-omni-state');
     var next = state === 'expanded' ? 'pill' : 'expanded';
     omni.setAttribute('data-omni-state', next);
-    if (next === 'expanded') maybeLoadResilience(omni);
+    if (next === 'expanded') {
+      maybeLoadResilience(omni);
+      maybeLoadClaims(omni);
+    }
   }
 
   // ── Copy the EPR address to the clipboard ──────────────────────────────────
@@ -751,6 +813,213 @@
     }
   }
 
+  // ── Backing claims (EPR nav-context + raw coupling legs) ──────────────────
+  // The EPR an omnibar wraps is not a bare page: it is coupled to the claims
+  // that back it — a STORY leg (knowledge), a VALUE leg, a GOVERNANCE leg —
+  // and it sits inside a graph (what it is part of, what it relates to, what
+  // it supersedes / was superseded by). Two read-only Category-C projections
+  // already serve exactly that, and the element resolves BOTH itself on first
+  // expand (same trigger as the resilience snapshot):
+  //   GET /api/v1/epr/{slug|cid}/nav-context → prev · next · partOf[] · related[]
+  //   GET /api/v1/epr/{slug|cid}/raw         → coupling{knowledge,value,governance}
+  // Both accept a schema_key slug as well as a CIDv1, so the omnibar's slug
+  // addresses them directly. They are fetched in PARALLEL with INDEPENDENT
+  // failure handling: either one alone still fills what it knows, and neither
+  // can break the page.
+  //
+  // data-omni-claims-loaded is TRI-STATE (mirrors the resilience marker so the
+  // DOM itself testifies): "loading" (fetches in flight / re-entry guard) →
+  // "applied" (at least one claim link rendered) or "unmatched" (both
+  // projections absent/404/empty — nothing to show, so the group stays hidden
+  // and the omnibar stays quiet).
+  var CLAIM_LEGS = [
+    ['knowledge', 'story'],
+    ['value', 'value'],
+    ['governance', 'governance']
+  ];
+  var CLAIM_REF_CAP = 4;
+
+  // An EPR ref is either an EprNavRef object ({cid,label?,resilienceTier?} —
+  // epr-nav-context-view.schema.json) or a bare CID string (the /raw coupling
+  // legs + reversePartOf). Normalize to the CID.
+  function refCid(ref) {
+    if (!ref) return '';
+    if (typeof ref === 'string') return ref;
+    return typeof ref.cid === 'string' ? ref.cid : '';
+  }
+
+  // The universal EPR address (doorway §12.1): every claim link targets
+  // /epr/{cid}, which serves the lens-complete shell viewer for that atom.
+  function eprHref(cid) {
+    return safeHref('/epr/' + encodeURIComponent(cid), null);
+  }
+
+  // Build a claim link element. textContent only — projection strings never
+  // touch innerHTML — and the href goes through the safeHref allowlist.
+  function eprLinkEl(ref) {
+    var cid = refCid(ref);
+    if (!cid) return null;
+    var href = eprHref(cid);
+    if (!href) return null;
+    var a = document.createElement('a');
+    a.className = 'omni-epr-link';
+    a.setAttribute('href', href);
+    a.setAttribute('data-omni-epr-link', cid);
+    a.setAttribute('title', cid);
+    var label = ref && typeof ref.label === 'string' && ref.label ? ref.label : truncateAddress(cid);
+    a.textContent = label;
+    if (ref && typeof ref.resilienceTier === 'string') {
+      a.setAttribute('data-omni-epr-tier', ref.resilienceTier);
+    }
+    return a;
+  }
+
+  // Fill a nav slot the inline island did NOT supply. A slot with a child is
+  // island-authored and is never overwritten — the island still wins when it
+  // speaks; the element only resolves what was left to it.
+  function fillNavSlot(omni, dir, ref) {
+    var slot = omni.querySelector('[data-omni-nav-slot="' + dir + '"]');
+    if (!slot || slot.firstChild) return false;
+    var cid = refCid(ref);
+    if (!cid) return false;
+    var href = eprHref(cid);
+    if (!href) return false;
+    var label = (ref && typeof ref.label === 'string' && ref.label) || truncateAddress(cid);
+    var a = document.createElement('a');
+    a.className = 'omni-nav omni-nav-' + dir;
+    a.setAttribute('href', href);
+    a.setAttribute('title', label);
+    a.setAttribute('aria-label', label);
+    a.setAttribute('data-omni-nav-resolved', 'nav-context');
+    a.textContent = dir === 'back' ? '← ' + label : label + ' →';
+    slot.appendChild(a);
+    return true;
+  }
+
+  // Render the claims card. Returns the number of links rendered (0 ⇒ nothing
+  // to show; the caller keeps the group hidden).
+  function renderClaimsCard(omni, nav, raw) {
+    var card = omni.querySelector('[data-omni-claims-card]');
+    if (!card) return 0;
+    while (card.firstChild) card.removeChild(card.firstChild);
+    var count = 0;
+
+    function row(legKey, legLabel, ref) {
+      var link = eprLinkEl(ref);
+      if (!link) return;
+      var r = document.createElement('div');
+      r.className = 'omni-claims-row';
+      r.setAttribute('data-omni-claim-leg', legKey);
+      var l = document.createElement('span');
+      l.className = 'omni-claims-leg';
+      l.textContent = legLabel;
+      r.appendChild(l);
+      r.appendChild(link);
+      card.appendChild(r);
+      count += 1;
+    }
+
+    // (1) The three coupling legs — the EPR's backing claims (EprRawView).
+    var coupling = raw && raw.coupling && typeof raw.coupling === 'object' ? raw.coupling : {};
+    for (var i = 0; i < CLAIM_LEGS.length; i++) {
+      row(CLAIM_LEGS[i][0], CLAIM_LEGS[i][1], coupling[CLAIM_LEGS[i][0]]);
+    }
+
+    // (2) part of — nav-context's partOf refs, else /raw's reversePartOf CIDs
+    //     (independent failure handling: whichever projection answered).
+    var partOf = nav && Array.isArray(nav.partOf) && nav.partOf.length ? nav.partOf : null;
+    if (!partOf && raw && Array.isArray(raw.reversePartOf)) partOf = raw.reversePartOf;
+    var j;
+    if (partOf) {
+      for (j = 0; j < partOf.length && j < CLAIM_REF_CAP; j++) {
+        row('part-of', j === 0 ? 'part of' : '', partOf[j]);
+      }
+    }
+
+    // (3) related — outbound coupling targets + claim CIDs (nav-context).
+    if (nav && Array.isArray(nav.related)) {
+      for (j = 0; j < nav.related.length && j < CLAIM_REF_CAP; j++) {
+        row('related', j === 0 ? 'related' : '', nav.related[j]);
+      }
+    }
+
+    return count;
+  }
+
+  function applyClaims(omni, nav, raw) {
+    try {
+      if (nav) {
+        fillNavSlot(omni, 'back', nav.prev);
+        fillNavSlot(omni, 'forward', nav.next);
+      }
+      var count = renderClaimsCard(omni, nav, raw);
+      omni.setAttribute('data-omni-claims-count', String(count));
+      if (!count) {
+        // Nothing recorded (or neither projection answered) — stay quiet: the
+        // group keeps its `hidden` attribute, no empty flyout is offered.
+        omni.setAttribute('data-omni-claims-loaded', 'unmatched');
+        return;
+      }
+      var btn = omni.querySelector('[data-omni-action="claims-toggle"]');
+      if (btn) btn.removeAttribute('hidden');
+      omni.setAttribute('data-omni-claims-loaded', 'applied');
+    } catch (e) {
+      /* never let a projection-shape surprise break the page — and never
+       * strand the marker on "loading". */
+      if (omni.getAttribute('data-omni-claims-loaded') === 'loading') {
+        omni.setAttribute('data-omni-claims-loaded', 'unmatched');
+      }
+    }
+  }
+
+  function maybeLoadClaims(omni) {
+    if (!omni || omni.getAttribute('data-omni-claims-loaded')) return;
+    var slug = omni.getAttribute('data-omni-slug');
+    if (!slug || typeof window.fetch !== 'function') return;
+    omni.setAttribute('data-omni-claims-loaded', 'loading');
+
+    var base = '/api/v1/epr/' + encodeURIComponent(slug);
+    var opts = { headers: { accept: 'application/json' }, credentials: 'same-origin' };
+    // Each leg swallows its own failure (404 on an un-seeded atom is the
+    // COMMON case today) and resolves to null — one absent projection never
+    // denies the other.
+    function get(url) {
+      return window
+        .fetch(url, opts)
+        .then(function (resp) {
+          if (!resp || !resp.ok) return null;
+          return resp.json().catch(function () {
+            return null;
+          });
+        })
+        .catch(function () {
+          return null;
+        });
+    }
+
+    Promise.all([get(base + '/nav-context'), get(base + '/raw')])
+      .then(function (both) {
+        applyClaims(omni, both[0], both[1]);
+      })
+      .catch(function () {
+        omni.setAttribute('data-omni-claims-loaded', 'unmatched');
+      });
+  }
+
+  function toggleClaimsCard(actionEl) {
+    var omni = document.getElementById(OMNI_ID);
+    if (!omni) return;
+    var card = omni.querySelector('[data-omni-claims-card]');
+    if (!card || !card.firstChild) return; // nothing resolved — no empty flyout
+    var open = !card.hasAttribute('hidden');
+    if (open) {
+      card.setAttribute('hidden', '');
+    } else {
+      card.removeAttribute('hidden');
+    }
+    actionEl.setAttribute('aria-expanded', open ? 'false' : 'true');
+  }
+
   function toggleResilienceCard(actionEl) {
     var omni = document.getElementById(OMNI_ID);
     if (!omni) return;
@@ -780,6 +1049,8 @@
       toggleTheme();
     } else if (action === 'resilience-toggle') {
       toggleResilienceCard(actionEl);
+    } else if (action === 'claims-toggle') {
+      toggleClaimsCard(actionEl);
     }
   }
 
@@ -826,13 +1097,19 @@
       title: (node && node.title) || '',
       theme: theme,
       buildMarker: buildMarker,
-      // The element cannot safely infer env tier / auth / nav client-side; the
+      // The element cannot safely infer env tier / auth client-side; the
       // inline-context path (doorway) supplies those. Sensible defaults here.
       envTier: '',
       showEnv: false,
       authenticated: false,
       accountHref: '/account',
       showThemeToggle: true,
+      // Nav is NOT deferred to a producer: neither producer supplies it today,
+      // and the mutual deferral (each side waiting for the other) is exactly
+      // why the nav links never rendered. The element resolves nav ITSELF from
+      // GET /api/v1/epr/{slug}/nav-context on first expand (`fillNavSlot`), for
+      // BOTH acquisition paths. These nulls just mean "no island-supplied
+      // target" — the nav slots stay empty until the projection answers.
       navBack: null,
       navForward: null
     };
@@ -870,6 +1147,9 @@
       container.id = OMNI_ID;
       container.setAttribute('data-omni-state', 'pill');
       container.setAttribute('data-omni-resilience-slug', ctx.slug);
+      // The EPR address every lazy projection fetch is keyed on (resilience
+      // keeps its own historical attribute; claims + nav read this one).
+      container.setAttribute('data-omni-slug', ctx.slug);
       container.innerHTML = buildMarkup(ctx);
       document.body.appendChild(container);
 

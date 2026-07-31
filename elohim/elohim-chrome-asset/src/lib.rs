@@ -291,6 +291,130 @@ mod tests {
     }
 
     #[test]
+    fn claims_mapper_speaks_the_epr_projection_contracts() {
+        // Structural contract gate for the backing-claims section — the client
+        // leg of the two Category-C EPR projections. Sibling of
+        // `resilience_mapper_speaks_the_snapshot_contract`: the element reads a
+        // wire shape it does not compile against, so the field names are pinned
+        // here against their schemas.
+
+        // Both projections are fetched (parallel legs, independent failure).
+        assert!(
+            ELEMENT_JS.contains("/nav-context"),
+            "missing lazy EPR nav-context fetch"
+        );
+        assert!(
+            ELEMENT_JS.contains("/api/v1/epr/"),
+            "claims fetch must target the EPR projection routes"
+        );
+        assert!(
+            ELEMENT_JS.contains("Promise.all"),
+            "the two projections must be fetched in parallel, not chained"
+        );
+
+        // epr-nav-context-view.schema.json properties the mapper reads.
+        for field in ["prev", "next", "partOf", "related", "resilienceTier"] {
+            assert!(
+                ELEMENT_JS.contains(field),
+                "element no longer reads EprNavContextView field `{field}`"
+            );
+        }
+        // epr-raw-view.schema.json properties the mapper reads (the three
+        // coupling legs — story/value/governance — plus reverse part-of).
+        for field in [
+            "coupling",
+            "knowledge",
+            "value",
+            "governance",
+            "reversePartOf",
+        ] {
+            assert!(
+                ELEMENT_JS.contains(field),
+                "element no longer reads EprRawView field `{field}`"
+            );
+        }
+        // Neither projection carries these — a phantom read here is the exact
+        // shape of the resilience-mapper regression.
+        for phantom in ["nav.claims", "raw.legs", "raw.partOf", "nav.coupling"] {
+            assert!(
+                !ELEMENT_JS.contains(phantom),
+                "phantom EPR projection accessor `{phantom}` — not in any schema"
+            );
+        }
+
+        // Links target the universal EPR address (doorway §12.1), routed
+        // through the href allowlist like every other element-built href.
+        assert!(
+            ELEMENT_JS.contains("'/epr/' + encodeURIComponent(cid)"),
+            "claim links must target the universal /epr/{{cid}} address"
+        );
+    }
+
+    #[test]
+    fn claims_section_is_tri_state_and_quiet_when_absent() {
+        // The DOM must testify the section's state the same way the resilience
+        // section does — "loading" → "applied" | "unmatched" — so a probe can
+        // tell "no claims recorded" (the common case while the atom seeder is
+        // manual-only) from "the fetch never ran".
+        assert!(
+            ELEMENT_JS.contains("data-omni-claims-loaded"),
+            "missing the tri-state claims marker attribute"
+        );
+        for state in ["'loading'", "'applied'", "'unmatched'"] {
+            assert!(
+                ELEMENT_JS.contains(state),
+                "claims marker must be able to settle to {state}"
+            );
+        }
+        // Quiet-when-absent: the toggle ships `hidden` and is only revealed
+        // once at least one claim link rendered.
+        assert!(
+            ELEMENT_JS.contains("data-omni-action=\"claims-toggle\""),
+            "missing the claims toggle action hook"
+        );
+        assert!(
+            ELEMENT_JS.contains("removeAttribute('hidden')"),
+            "the claims group must be revealed only after links render"
+        );
+        assert!(
+            ELEMENT_JS.contains("data-omni-claims-count"),
+            "missing the rendered-claims count attestation"
+        );
+        // The card is never offered empty (mirrors toggleResilienceCard).
+        assert!(
+            ELEMENT_JS.contains("no empty flyout"),
+            "the no-empty-flyout discipline must stay documented at the toggle"
+        );
+    }
+
+    #[test]
+    fn nav_slots_are_client_resolved_not_deferred() {
+        // The mutual-deferral bug: the doorway left nav "to the element's own
+        // client-side resolution" while the element hard-nulled navBack /
+        // navForward because "the doorway supplies those" — so nav never
+        // rendered from either side. The element now owns the resolution.
+        assert!(
+            ELEMENT_JS.contains("data-omni-nav-slot"),
+            "missing the nav insertion slots the fetched nav-context fills"
+        );
+        assert!(
+            ELEMENT_JS.contains("fillNavSlot"),
+            "missing the client-side nav resolver"
+        );
+        assert!(
+            !ELEMENT_JS.contains("the doorway supplies those"),
+            "the stale mutual-deferral comment is back — nav is client-resolved"
+        );
+        // An island-supplied nav target still wins (the slot is only filled
+        // when empty) — the element resolves what was LEFT to it, it does not
+        // override a producer that spoke.
+        assert!(
+            ELEMENT_JS.contains("if (!slot || slot.firstChild) return false;"),
+            "an island-authored nav slot must never be overwritten"
+        );
+    }
+
+    #[test]
     fn chrome_context_speaks_the_producer_contract() {
         // Structural contract gate for the inline context island — the third
         // (and last) unchecked producer/consumer edge of the omni element,
