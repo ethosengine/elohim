@@ -7,10 +7,9 @@
  * constraints match the archetype definitions.
  */
 
-import { Given, Then, DataTable } from '@cucumber/cucumber';
-
-// eslint-disable-next-line import/no-extraneous-dependencies
 import { strict as assert } from 'node:assert';
+
+import { Given, Then, DataTable } from '@cucumber/cucumber';
 
 import {
   DeviceArchetype,
@@ -142,7 +141,10 @@ Then(
     const device = requireDevice(this);
     const expectedSurfaces: string[] = table.rows().map((row: string[]) => row[0]);
     for (const surface of expectedSurfaces) {
-      assert.ok(device.healthSurfaces.includes(surface), `Expected ${device.displayName} to report health surface "${surface}"`);
+      assert.ok(
+        device.healthSurfaces.includes(surface),
+        `Expected ${device.displayName} to report health surface "${surface}"`
+      );
     }
   }
 );
@@ -163,7 +165,10 @@ Then('the device should support attestation:', function (this: WorldWithDevice, 
   const device = requireDevice(this);
   const expectedCaps: string[] = table.rows().map((row: string[]) => row[0]);
   for (const cap of expectedCaps) {
-    assert.ok(device.attestationCapabilities.includes(cap), `Expected ${device.displayName} to support attestation capability "${cap}"`);
+    assert.ok(
+      device.attestationCapabilities.includes(cap),
+      `Expected ${device.displayName} to support attestation capability "${cap}"`
+    );
   }
 });
 
