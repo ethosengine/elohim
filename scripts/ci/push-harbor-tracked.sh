@@ -24,7 +24,14 @@
 # directly, never re-passed as argv):
 #   IMAGE_TAG          the just-built local tag suffix, used for the `images | grep` check
 #   GIT_COMMIT_HASH    provenance tag pushed alongside the component tag
-set -uo pipefail
+# set -u only — NO pipefail. The image-exists guard is `nerdctl images | grep -q`,
+# and grep -q exits at first match, SIGPIPE-killing a still-writing nerdctl (141).
+# Under pipefail that read as pipeline failure → "image not found, skipping push"
+# for EVERY tracked push since the 2026-07-30 extraction (edge #1266-#1273:
+# artifacts reached Harbor only via the pipefail-free dev-latest alias script,
+# SHA tags never pushed). The inline original had no pipefail; the siblings
+# (push-harbor-untracked.sh, push-harbor-dev-latest-aliases.sh) don't either.
+set -u
 
 LOCAL_IMAGE="$1"
 REMOTE_IMAGE="$2"

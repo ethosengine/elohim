@@ -16,6 +16,18 @@ cites:
   - genesis/data/timeline/backlog/doorway-apex-only-hosted-provisioning-policy.md
 ---
 
+> **SUPERSEDED DIAGNOSIS (2026-07-31 morning):** retention was EXONERATED by the
+> Harbor artifact list — SHA tags weren't stripped, they were **never pushed**
+> after 2026-07-30T05:10. Root cause: the 07-30 heredoc extraction added
+> `set -uo pipefail` to `scripts/ci/push-harbor-tracked.sh` only; its
+> `nerdctl images | grep -q` guard then read grep's early-exit SIGPIPE (141 on
+> nerdctl) as pipeline failure → "image not found, skipping push" on every
+> tracked push, while the pipefail-free dev-latest alias script kept delivering
+> the artifact bytes (hence exactly one tagged artifact). Fixed by dropping
+> pipefail (same file). The retention-rule triage below is retained as the
+> anti-pattern record: verify tag-history against the artifact list (pushed-
+> then-stripped vs never-pushed) BEFORE accepting a registry-side theory.
+
 # Harbor retention policy deletes doorway commit-SHA tags, stranding deploys
 
 Observed 2026-07-31 (edge #1269 wave, dc73c5d0): the doorway image build and
