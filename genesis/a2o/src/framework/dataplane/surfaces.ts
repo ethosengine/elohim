@@ -20,7 +20,11 @@
  *   /health/startup (→ /health fallback) → ServedHeadProbeResult (T4-1 servedBundleHeads
  *                                     attestation — Track-4 T4-2's "served" side, compared
  *                                     against ContentItemSurface.serverBlobHash, the "declared" side)
+ *   /db/content/{id}/head           → DeclaredHeadResult (notary HEAD: headActionHash + declared)
+ *   / (+ /health, /status.json)     → classifyDoorwayState() DoorwayState ('serving' |
+ *                                     'shedding' | 'dead') — doorway-failover concern
  *
+
  * Peer resolution:
  *   'alpha-A'    → E2E_DOORWAY_ALPHA (default https://doorway-alpha.elohim.host)
  *   'elohim.host' → https://elohim.host
@@ -468,13 +472,22 @@ function encodeDocId(id: string): string {
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
-/** Raw GET — returns status + response body text. Never throws on non-2xx. */
-export async function getRaw(url: string): Promise<{ status: number; text: string }> {
+/**
+ * Raw GET — returns status + response body text. Never throws on non-2xx (a
+ * non-2xx status is still a real answer); DOES throw on connect error/timeout
+ * (there is no status to report). `opts.timeoutMs` overrides the default 15s
+ * remote-peer allowance — callers doing bounded, no-retry classification
+ * (classifyDoorwayState) pass a tighter budget.
+ */
+export async function getRaw(
+  url: string,
+  opts: { timeoutMs?: number } = {}
+): Promise<{ status: number; text: string }> {
+  const timeoutMs = opts.timeoutMs ?? 15_000;
   const { statusCode, body } = await request(url, {
     method: 'GET',
-    // 15 s timeout — remote alpha peers can be slow
-    bodyTimeout: 15_000,
-    headersTimeout: 15_000,
+    bodyTimeout: timeoutMs,
+    headersTimeout: timeoutMs,
   });
   const text = await body.text();
   return { status: statusCode, text };
@@ -522,6 +535,134 @@ async function getJson<T>(url: string): Promise<ProbeResult<T>> {
  */
 export async function probeHealth(peerUrl: string): Promise<ProbeResult<HealthSurface>> {
   return getJson<HealthSurface>(`${peerUrl}/health`);
+}
+
+// ---------------------------------------------------------------------------
+// Doorway live-state classification (doorway-failover concern)
+// ---------------------------------------------------------------------------
+
+export type DoorwayState = 'serving' | 'shedding' | 'dead';
+
+/** Per-request bound for classifyDoorwayState's probes — no retries; callers own polling. */
+export const CLASSIFY_TIMEOUT_MS = 10_000;
+
+/**
+ * GET a URL bounded to `timeoutMs`, collapsing ANY thrown error (connect
+ * refused, DNS failure, timeout) to `null` rather than propagating —
+ * classification needs to tell "answered, badly" apart from "never answered"
+ * without a try/catch at every call site.
+ */
+async function tryGetRaw(
+  url: string,
+  timeoutMs: number
+): Promise<{ status: number; text: string } | null> {
+  try {
+    return await getRaw(url, { timeoutMs });
+  } catch {
+    return null;
+  }
+}
+
+/** Minimal shape of GET /status.json this classifier reads — see doorway-catching-up-page.feature. */
+interface StatusJsonShape {
+  upstreams?: { circuit?: string }[];
+  admission?: { shedTotal?: number };
+}
+
+/** True when a 503's own body on `/` is the legacy non-browser shed JSON. */
+function isCatchingUpBody(text: string): boolean {
+  try {
+    const body = JSON.parse(text) as Record<string, unknown>;
+    return body['status'] === 'catching-up';
+  } catch {
+    return false; // browser path gets a staged HTML page, not JSON
+  }
+}
+
+/** True when GET /status.json names an open upstream circuit or rising shedTotal. */
+async function statusJsonShowsShedding(peerUrl: string): Promise<boolean> {
+  const statusJson = await tryGetRaw(`${peerUrl}/status.json`, CLASSIFY_TIMEOUT_MS);
+  if (statusJson?.status !== 200) return false;
+  try {
+    const body = JSON.parse(statusJson.text) as StatusJsonShape;
+    const openCircuit = (body.upstreams ?? []).some(u => u.circuit && u.circuit !== 'closed');
+    const shedTotal = body.admission?.shedTotal ?? 0;
+    return openCircuit || shedTotal > 0;
+  } catch {
+    return false; // status.json unreachable/unparseable — caller falls back to the tie-break
+  }
+}
+
+/**
+ * Confirm WHY a 503 on / is shedding — checked in order, stopping at the
+ * first confirmation (shape 1, then shape 2, then the /health tie-break).
+ * Every confirmed-503 path IS shedding by definition (see the doc comment on
+ * classifyDoorwayState for why 'dead' can never apply here), so this returns
+ * void rather than DoorwayState: the caller's outcome is always 'shedding'
+ * regardless of which shape confirmed it. Split out of classifyDoorwayState
+ * purely to keep that function's cognitive complexity in budget.
+ */
+async function confirm503Cause(peerUrl: string, rootText: string): Promise<void> {
+  if (isCatchingUpBody(rootText)) return;
+  if (await statusJsonShowsShedding(peerUrl)) return;
+  // Tie-break: neither shed shape confirmed — ask /health anyway. Its result
+  // doesn't change the caller's outcome (still 'shedding' either way); the
+  // request exists to make the alive-but-unconfirmed-cause case observable.
+  await tryGetRaw(`${peerUrl}/health`, CLASSIFY_TIMEOUT_MS);
+}
+
+/**
+ * Classify a doorway's live state from its two public HTTP surfaces. Bounded:
+ * 10s per request (CLASSIFY_TIMEOUT_MS), no retries — callers own polling.
+ *
+ *   serving  — GET / answers 200 (the shell rendered normally).
+ *
+ *   shedding — GET / answers 503 AND the response identifies as the specified
+ *              catching-up contract: either the / body itself is
+ *              `{"status":"catching-up",...}` (the legacy non-browser shed
+ *              JSON — spec 2026-07-19-doorway-catching-up-page-design), or
+ *              GET /status.json succeeds and shows an upstream with
+ *              `circuit !== 'closed'` or `admission.shedTotal > 0` (the
+ *              browser path gets a staged HTML recovery page instead of JSON
+ *              on `/`, so status.json is the only way to read the cause off
+ *              that path).
+ *
+ *              TIE-BREAK: a 503 whose body matches NEITHER shape above (e.g.
+ *              status.json itself unreachable, or reachable but showing no
+ *              open circuit / shedTotal yet — an admission-layer shed with no
+ *              upstream signal recorded) still counts as shedding, never
+ *              dead, as long as GET /health answers 200 — the process is
+ *              alive and intentionally refusing, which is a materially
+ *              different state from an outage even when the exact cause
+ *              can't be pinned. A 503 that fails even the tie-break also
+ *              defaults to shedding rather than dead: GET / produced a real
+ *              HTTP response (not a connect error/timeout), which already
+ *              disqualifies 'dead' by the definition below — a process that
+ *              answers ANYTHING on / is not silently gone.
+ *
+ *   dead     — connect error / timeout on BOTH / and /health — nothing
+ *              answered at all.
+ */
+export async function classifyDoorwayState(peerUrl: string): Promise<DoorwayState> {
+  const root = await tryGetRaw(`${peerUrl}/`, CLASSIFY_TIMEOUT_MS);
+
+  if (root === null) {
+    // GET / itself never answered — confirm total silence via /health before
+    // calling it dead (health is the cheaper, more permissive probe).
+    const health = await tryGetRaw(`${peerUrl}/health`, CLASSIFY_TIMEOUT_MS);
+    return health === null ? 'dead' : 'shedding';
+  }
+
+  if (root.status === 200) return 'serving';
+  if (root.status === 503) {
+    await confirm503Cause(peerUrl, root.text);
+    return 'shedding';
+  }
+
+  // Some other status this contract doesn't specify — / answered (so not
+  // dead), but the answer isn't a clean 200 or the documented 503. Treat as
+  // shedding: the caller's binary "not dead" contract holds either way.
+  return 'shedding';
 }
 
 // ---------------------------------------------------------------------------
@@ -613,6 +754,49 @@ export async function probeContent(
   contentId: string
 ): Promise<ProbeResult<ContentItemSurface>> {
   return getJson<ContentItemSurface>(`${peerUrl}/db/content/${encodeDocId(contentId)}`);
+}
+
+/** Result of GET /db/content/{id}/head — the notary HEAD answer. */
+export interface DeclaredHeadResult {
+  headActionHash: string;
+  declared: boolean;
+}
+
+/**
+ * GET /db/content/{id}/head on a peer and extract the notary HEAD answer.
+ * Shared fetch logic behind two call sites that both need "does this peer
+ * have a canonical declared head, and what is it": the ch10 cross-doorway
+ * comparator (steps/dataplane/resiliency-saga.steps.ts, "peer ... resolves
+ * the declared head for content ... equal to peer ...") and the failover
+ * concern's per-serving-peer check (steps/dataplane/failover.steps.ts,
+ * "every serving doorway ... resolves the same declared head ..."). Throws
+ * if the surface itself is unreachable/non-200/non-JSON, or if
+ * `headActionHash` is missing/empty (the notary has no HEAD answer at all) —
+ * callers decide what an unreachable HEAD means for their assertion.
+ */
+export async function probeDeclaredHead(
+  peerUrl: string,
+  contentId: string
+): Promise<DeclaredHeadResult> {
+  const { status, text } = await getRaw(`${peerUrl}/db/content/${encodeDocId(contentId)}/head`);
+  if (status !== 200) {
+    throw new Error(
+      `GET ${peerUrl}/db/content/${contentId}/head: HTTP ${status} (body: ${text.slice(0, 120)})`
+    );
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new Error(`GET ${peerUrl}/db/content/${contentId}/head: response is not valid JSON`);
+  }
+  const headActionHash = body['headActionHash'];
+  if (typeof headActionHash !== 'string' || headActionHash.length === 0) {
+    throw new Error(
+      `headActionHash missing/empty for "${contentId}" at ${peerUrl} — the notary has no HEAD answer`
+    );
+  }
+  return { headActionHash, declared: body['declared'] === true };
 }
 
 /**

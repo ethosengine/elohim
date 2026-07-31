@@ -1,5 +1,14 @@
 # Doorway Federation: Fediverse Patterns on P2P Infrastructure
 
+> **⚠ SPEC-DRIFT NOTICE (2026-07-31).** The custodian-selection / blob-routing narrative
+> below ("Blob Routing", "Custodian Health Federation", "Content Routing" — doorway
+> selecting and fetching from custodians) is NOT implemented and CONTRADICTS the enforced
+> No-Blob-Fan-Out rule. `doorway/CLAUDE.md` (§"No Blob Fan-Out") is the authority; the
+> storage proxy is single-target with a 503 shed contract (`routes/storage_proxy.rs`).
+> What IS wired: DHT `DoorwayRegistration` + peer discovery + health attestations
+> (`services/federation.rs`), the JWKS/DID endpoints, and an EPR-projection fallback pool
+> (`projection/epr_router.rs`). Read the body below as design history, not behavior.
+
 > **See also**: [P2P-DATAPLANE.md](../P2P-DATAPLANE.md) for the overall P2P architecture
 
 ## The Bridge Problem

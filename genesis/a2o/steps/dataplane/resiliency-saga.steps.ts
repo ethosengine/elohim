@@ -57,6 +57,7 @@ import {
   GAUGE_SWEEP_POLL_TIMEOUT_MS,
   waitForDoorwayReady,
   DOORWAY_READY_POLL_TIMEOUT_MS,
+  probeDeclaredHead,
 } from '../../src/framework/dataplane/surfaces.js';
 import { PROTOCOL_OMNI } from '../../src/framework/pages/selectors.js';
 import { retry } from '../../src/framework/utils/retry.js';
@@ -666,32 +667,20 @@ Then(
 Then(
   'peer {string} resolves the declared head for content {string} equal to peer {string}',
   async function (this: E2EWorld, adopter: string, contentId: string, declarer: string) {
+    // Delegates the fetch to the shared probeDeclaredHead() (surfaces.ts) —
+    // same helper the failover concern's "every serving doorway ... resolves
+    // the same declared head" step uses. Wrap errors with the peer alias for
+    // a readable failure (probeDeclaredHead only knows the resolved URL).
     const readHead = async (
       peerName: string
     ): Promise<{ headActionHash: string; declared: boolean }> => {
       const doorway = this.getDoorway(peerName);
-      const { status, text } = await getRaw(
-        `${doorway.url}/db/content/${encodeURIComponent(contentId)}/head`
-      );
-      assert.strictEqual(
-        status,
-        200,
-        `GET /db/content/${contentId}/head on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})`
-      );
-      let body: Record<string, unknown>;
       try {
-        body = JSON.parse(text) as Record<string, unknown>;
-      } catch {
-        throw new Error(
-          `GET /db/content/${contentId}/head on ${peerName}: response is not valid JSON`
-        );
+        return await probeDeclaredHead(doorway.url, contentId);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`${message} (peer "${peerName}")`);
       }
-      const headActionHash = body['headActionHash'];
-      assert.ok(
-        typeof headActionHash === 'string' && headActionHash.length > 0,
-        `headActionHash on ${peerName} is missing/empty for ${contentId} — the notary has no HEAD answer`
-      );
-      return { headActionHash, declared: body['declared'] === true };
     };
 
     const declared = await readHead(declarer);

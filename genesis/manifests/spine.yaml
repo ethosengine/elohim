@@ -24,7 +24,7 @@
 #   6. Session contract: (a) move reds toward green with proof, (b) file new reds
 #      as runnable checks, (c) one-line delta here. Nothing else is a deliverable.
 version: 1
-updated: 2026-07-04
+updated: 2026-07-31
 vision: >
   A p2p backplane for a socially resilient, reach-gated substrate — a human-scale,
   capture-resistant foundation for communication that can scale to global
@@ -205,6 +205,32 @@ nodes:
     refs:
       - "genesis/docs/superpowers/specs/2026-07-01-crdt-authoritative-content-state-dht-notary-decouple-design.md"
       - "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md"
+
+  - id: doorway-failover
+    invariant: >
+      The apex name serves a person the landing shell through the loss OR
+      catch-up shed of either doorway: siblings are honestly classifiable
+      (serving | shedding | dead), at least one always serves, the name rides
+      through a sibling's shed, and whichever serves resolves the same
+      declared head. Federation failover, not per-host luck.
+    status: red
+    active: false
+    checks:
+      - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-failover.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
+    evidence: >
+      RED WRITTEN 2026-07-31 (doorway-federation-failover sprint session,
+      live-probed in-session): elohim.host / -> 503 catching-up shed (adam
+      post-deploy arc-convergence window) while doorway-alpha / -> 200. The
+      pair floor and honest-classification scenarios hold; the apex-name
+      scenario is the born-red — the name is pinned to doorway-B, so B's
+      hours-long catch-up sheds the apex while a healthy sibling holds the
+      identical converged content. Cure surface named by the sprint plan:
+      apex multi-A + client fallback (WS3), warm-boot shell cache
+      (x-ssr-fetches:0 invariant), and the operator ceiling on adam's
+      hosted-agent provisioning.
+    refs:
+      - "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md"
+      - "genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md"
 
   - id: reach-enforced-everywhere
     invariant: >

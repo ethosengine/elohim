@@ -19,6 +19,9 @@
  *   Then every observable HOUSEHOLD-member human on peer {string} has a non-fossil agentPubKey
  *   Then resolving {string} on peer {string} does NOT return App-not-found
  *   Then metric {string} on peer {string} {word} {float}
+ *   Then the surface response has field {string}
+ *   Then each entry under {string} has field {string}
+ *   Then the surface response field {string} has field {string}
  *
  * Peer URL delegation:
  *   The second arg of "peer {name} at {host}" resolves via resolvePeerUrl():
@@ -1019,12 +1022,14 @@ Then(
 // Then — generic last-capture assertions (for "When I query" step)
 // ---------------------------------------------------------------------------
 
+const NO_SURFACE_CAPTURE_MSG = 'No surface response captured — run "When I query" first';
+
 /**
  * Assert that the last queried surface returned the given HTTP status.
  */
 Then('the surface response status is {int}', function (this: E2EWorld, expectedStatus: number) {
   const capture = lastCapture.get(this);
-  assert.ok(capture, 'No surface response captured — run "When I query" first');
+  assert.ok(capture, NO_SURFACE_CAPTURE_MSG);
   assert.strictEqual(
     capture.status,
     expectedStatus,
@@ -1042,7 +1047,7 @@ Then('the surface response status is {int}', function (this: E2EWorld, expectedS
  */
 Then('the surface response is not the doorway shed body', function (this: E2EWorld) {
   const capture = lastCapture.get(this);
-  assert.ok(capture, 'No surface response captured — run "When I query" first');
+  assert.ok(capture, NO_SURFACE_CAPTURE_MSG);
   const body = capture.body;
   const isShedBody =
     capture.status === 503 &&
@@ -1061,10 +1066,74 @@ Then('the surface response is not the doorway shed body', function (this: E2EWor
  */
 Then('the surface response has field {string}', function (this: E2EWorld, fieldName: string) {
   const capture = lastCapture.get(this);
-  assert.ok(capture, 'No surface response captured — run "When I query" first');
+  assert.ok(capture, NO_SURFACE_CAPTURE_MSG);
   const body = capture.body as Record<string, unknown>;
   assert.ok(
     Object.prototype.hasOwnProperty.call(body, fieldName),
     `Surface "${capture.path}": field "${fieldName}" not present in response`
   );
 });
+
+/**
+ * Assert that EVERY entry of an array field on the last-captured surface
+ * response carries the named field. Used by the catching-up-page concern's
+ * "each upstream ... carries circuit state and error streak" scenario
+ * (status.json's `upstreams[]`) — a per-entry sibling of the whole-body
+ * "the surface response has field" check above, sharing the same lastCapture
+ * store (populated by the "When I query" step in this same file).
+ *
+ * Fails loudly (not pending) on a missing/non-array field or an empty array:
+ * an empty array would vacuously pass a naive "every entry has X", silently
+ * hiding the case status.json reports zero upstreams.
+ */
+Then(
+  'each entry under {string} has field {string}',
+  function (this: E2EWorld, arrayFieldName: string, entryFieldName: string) {
+    const capture = lastCapture.get(this);
+    assert.ok(capture, NO_SURFACE_CAPTURE_MSG);
+    const body = capture.body as Record<string, unknown>;
+    const arr = body[arrayFieldName];
+    assert.ok(
+      Array.isArray(arr),
+      `Surface "${capture.path}": field "${arrayFieldName}" is not an array (got ${typeof arr})`
+    );
+    assert.ok(
+      arr.length > 0,
+      `Surface "${capture.path}": field "${arrayFieldName}" is an empty array — nothing to check "${entryFieldName}" on`
+    );
+    arr.forEach((entry: unknown, i: number) => {
+      assert.ok(
+        entry !== null && typeof entry === 'object',
+        `Surface "${capture.path}": "${arrayFieldName}[${i}]" is not an object (got ${typeof entry})`
+      );
+      assert.ok(
+        Object.prototype.hasOwnProperty.call(entry, entryFieldName),
+        `Surface "${capture.path}": "${arrayFieldName}[${i}]" is missing field "${entryFieldName}"`
+      );
+    });
+  }
+);
+
+/**
+ * Assert that a NESTED object field on the last-captured surface response
+ * itself carries the named field. Used by the catching-up-page concern's
+ * `admission.shedTotal` pin — a one-level-deep sibling of the top-level
+ * "the surface response has field" check above, same lastCapture store.
+ */
+Then(
+  'the surface response field {string} has field {string}',
+  function (this: E2EWorld, outerFieldName: string, innerFieldName: string) {
+    const capture = lastCapture.get(this);
+    assert.ok(capture, NO_SURFACE_CAPTURE_MSG);
+    const body = capture.body as Record<string, unknown>;
+    const outer = body[outerFieldName];
+    assert.ok(
+      outer !== null && typeof outer === 'object' && !Array.isArray(outer),
+      `Surface "${capture.path}": field "${outerFieldName}" is not an object (got ${typeof outer})`
+    );
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(outer, innerFieldName),
+      `Surface "${capture.path}": field "${outerFieldName}.${innerFieldName}" not present in response`
+    );
+  }
+);

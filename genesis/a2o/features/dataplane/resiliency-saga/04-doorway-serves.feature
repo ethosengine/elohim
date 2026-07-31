@@ -17,7 +17,7 @@
 # deploy without masking a genuine outage — see waitForDoorwayReady in
 # src/framework/dataplane/surfaces.ts.
 #
-# Status today: GREEN.
+# Status: see the chapter table in README.md (this directory) — the README, not this header, is the authority (headers here went stale mid-2026-07).
 @e2e @dataplane @concern:saga-04-doorway-serves
 Feature: Chapter 4 — the doorway serves
   Hosting a doorway means a human's browser gets a real page back. This chapter

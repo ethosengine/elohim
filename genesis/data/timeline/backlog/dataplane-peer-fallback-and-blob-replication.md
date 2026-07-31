@@ -9,6 +9,7 @@ written: "2026-06-29"
 author: "p2p-dataplane validation-suite planning (the gap the suite makes CI-visible)"
 status: "backlog"
 priority: "high"
+supersession_note: "2026-07-31: items 2 (heal-on-read via race_fetch in the on-demand path — get_blob_or_heal in elohim/elohim-storage/src/http.rs) and 3 (EPR-head-aware syncing status, not hard 404) have LANDED; remaining scope is item 1 (blobHash pointer propagation via content-sync) and item 4 (retire the per-host stageSpaBlob crutch)."
 jobs: [elohim]
 ---
 

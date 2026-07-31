@@ -46,7 +46,7 @@ Feature: Doorway catching-up page — staged, honest shed progress for people
   # only reason latch was distinguishable from flap was that status.json's upstream
   # carried a circuit state plus a monotonic errorStreak that sat pinned. Pin those
   # fields so the diagnostic that named the second defect can never silently regress.
-  @wip @regression
+  @regression
   Scenario: each upstream in status.json carries circuit state and error streak
     When I query "/status.json" on peer "alpha-A"
     Then the surface response status is 200
