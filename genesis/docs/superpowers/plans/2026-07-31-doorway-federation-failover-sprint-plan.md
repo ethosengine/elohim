@@ -219,7 +219,7 @@ JWKS cache TTL, remote-fetch budget, shed classification thresholds).
 
 1. **Adam hosted-agent provisioning** — the structural ch04 ceiling. Cap is 32; the apex-only hosted-provisioning policy (dc73c5d09) says spillover onto household conductors is a placement smell. Decide: hold at 32 / shard onto a second shem conductor / drain-and-rebalance.
 2. **Apex multi-A flip timing** — apply Task 3.1's committed diff (DNS semantics change; both-doorways-healthy window recommended).
-3. **JWT dual-alg migration window** — Task 2.1 ships dual-verify; decide when HS256 minting stops (token TTL horizon after EdDSA minting starts).
+3. **JWT dual-alg migration window** — Task 2.1 ships dual-verify; decide when HS256 minting stops (token TTL horizon after EdDSA minting starts). **PRECONDITION discovered in Task 2.2: the doorway's Ed25519 node key is generated fresh at every boot** (the signing half was previously discarded entirely) — flipping `DOORWAY_JWT_SIGN_ALG=eddsa` today would invalidate every minted token on each pod restart. A persisted node key (k8s secret or PVC-backed) must land first; until then the lever stays at its `hs256` default.
 4. **Cloudflare LB (§3b)** — adopt-or-not; if adopted it needs its own exit-doctrine ledger row as a new borrowed dependency.
 5. **Demand-autopin retirement semantics** — saga residue; policy on what `active` means once provably unfetchable.
 
