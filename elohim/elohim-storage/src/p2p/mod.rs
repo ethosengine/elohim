@@ -1222,6 +1222,11 @@ pub struct P2PHandle {
     /// [`P2PHandle::distribute_shards`]. `None` on stub/test handles (self
     /// stewardship is then simply not recorded — never fabricated).
     blob_store: Option<Arc<BlobStore>>,
+    /// Lamad/content_store conductor bridge used only for notarized automatic
+    /// self-custody authoring after verified self-placement. `None` on test
+    /// handles and while the bridge is offline; absence skips authoring rather
+    /// than creating an unanchored local promise.
+    hc_lamad: Option<Arc<crate::hc_client::HcClient>>,
 }
 
 impl P2PHandle {
@@ -1390,6 +1395,7 @@ impl P2PHandle {
             // Stub state — NOT shared with any P2PNode; acquisition_per_pin() always empty here.
             acquisition: acquisition::AcquisitionState::new(),
             blob_store: None,
+            hc_lamad: None,
         }
     }
 
@@ -1442,6 +1448,7 @@ impl P2PHandle {
             // Stub state — NOT shared with any P2PNode; acquisition_per_pin() always empty here.
             acquisition: acquisition::AcquisitionState::new(),
             blob_store: None,
+            hc_lamad: None,
         }
     }
 
@@ -1818,6 +1825,7 @@ impl P2PHandle {
         };
 
         let mut distributed = 0usize;
+        let mut self_placement_recorded = false;
         let now = chrono::Utc::now().to_rfc3339();
 
         // Pre-resolve each SELECTED peer's `agent_cid` → dialable libp2p `PeerId`
@@ -1942,6 +1950,7 @@ impl P2PHandle {
                             crate::services::self_stewardship::SELF_HELD_STATUS,
                         )
                         .await;
+                        self_placement_recorded = true;
                         distributed += 1;
                     }
                     Ok(outcome) => {
@@ -2017,6 +2026,61 @@ impl P2PHandle {
                         "Shard push failed"
                     );
                 }
+            }
+        }
+
+        // First-commitment producer: verified self-placement is the consented
+        // self-stewardship seam. Author ONE active custody-blob promise for the
+        // exact generated manifest address. The method already holds the full
+        // `blob_data`, so this node can truthfully pledge the blob even when the
+        // placement selector assigned only a subset of its shards to self.
+        //
+        // Conductor-required: an offline bridge leaves the commitment absent
+        // and a later distribution/backfill retries; it never creates a local
+        // SQLite-only promise. Failure is non-fatal to the evidence plane—the
+        // manifest + shard_locations remain truthful and the gap stays visible.
+        if self_placement_recorded {
+            match (self_agent_cid.as_deref(), self.hc_lamad.as_ref()) {
+                (Some(provider), Some(hc)) => match pool.get() {
+                    Ok(mut conn) => {
+                        let ctx = crate::db::AppContext::new(h_app_id);
+                        match crate::services::rea_commitment_service::ReaCommitmentService::ensure_active_self_custody(
+                            &mut conn,
+                            &ctx,
+                            &manifest.blob_hash,
+                            manifest.total_size,
+                            provider,
+                            Some(content_id),
+                            hc,
+                        )
+                        .await
+                        {
+                            Ok(outcome) => tracing::info!(
+                                content_id,
+                                blob_hash = %manifest.blob_hash,
+                                ?outcome,
+                                "self-stewardship: active custody-blob commitment ensured"
+                            ),
+                            Err(e) => tracing::warn!(
+                                content_id,
+                                blob_hash = %manifest.blob_hash,
+                                error = %e,
+                                "self-stewardship: custody commitment authoring failed; evidence remains and a later pass retries"
+                            ),
+                        }
+                    }
+                    Err(e) => tracing::warn!(
+                        content_id,
+                        error = %e,
+                        "self-stewardship: DB pool unavailable for custody commitment authoring"
+                    ),
+                },
+                (Some(_), None) => tracing::warn!(
+                    content_id,
+                    blob_hash = %manifest.blob_hash,
+                    "self-stewardship: lamad conductor bridge offline; skipping unanchored custody commitment"
+                ),
+                (None, _) => {}
             }
         }
 
@@ -7514,6 +7578,10 @@ impl P2PNode {
             // shard_locations row is only written after the local pantry is
             // confirmed to hold the shard. See `services::self_stewardship`.
             blob_store: Some(Arc::clone(&self.blob_store)),
+            hc_lamad: self
+                .hc_registry
+                .as_ref()
+                .and_then(|registry| registry.lamad_client()),
         }
     }
 

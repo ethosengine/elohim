@@ -7,7 +7,7 @@ title: "custody-blob first-commitment auto-producer — no runtime path authors 
 slug: "custody-blob-first-commitment-auto-producer"
 written: "2026-07-30"
 author: "agentic-developer"
-status: "open"
+status: "done"
 priority: "medium"
 area: "elohim-storage"
 tags: [custody-blob, self-stewardship, distribute-shards, commitment, p2p-design-gate, mishpat]
@@ -102,3 +102,17 @@ implementation, per CLAUDE.md's P2P Design Gate (MANDATORY) section.
 This entry is a design-readiness backlog item, not an implementation ticket. The
 `shift_objective` above is ready to paste into `/shift`, but the first session must
 open with the `p2p-design-gate` skill invocation before any code is proposed.
+
+## Completion (2026-07-31)
+
+The mandatory design gate classified this as an existing Class-A REA
+Commitment, created through `content_store::create_rea_commitment` and projected
+by `ReaCommitmentCommitted`; no new entry type or HTTP route was needed.
+`distribute_shards` now authors one deterministic, active self-custody
+commitment only after verified self-placement, using the exact generated
+manifest address. It requires a live conductor and never degrades to an
+unanchored SQLite promise. Runtime and salvage producers share the deterministic
+identifier helper. Once a re-upload's successor is active, older live runtime
+pledges for the same provider/content identity are cancelled through the
+existing notarized state-transition path. Focused Rust tests cover exact-address
+construction and artifact-address idempotency.

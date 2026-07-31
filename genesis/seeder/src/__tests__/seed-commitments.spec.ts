@@ -75,6 +75,21 @@ describe('buildCustodyCommitmentBody', () => {
     expect(a.id).toBe(b.id);
   });
 
+  it('preserves content identity and artifact role for stale-pledge retirement', () => {
+    const body = buildCustodyCommitmentBody(
+      {
+        ...pair,
+        contentId: 'elohim-host-landing',
+        artifactRole: 'ssr-server',
+      },
+      agentCids,
+    );
+    expect(body.metadata).toMatchObject({
+      contentId: 'elohim-host-landing',
+      artifactRole: 'ssr-server',
+    });
+  });
+
   it('uses resolved Holochain agent keys when provided (and the content-addressed id follows)', () => {
     const resolved = {
       provider: 'uhCAkmatthewagentkey',
@@ -208,13 +223,11 @@ describe('resolvePeerId (Stage 2)', () => {
 });
 
 // =============================================================================
-// resolveCustodyBlobDescriptor — contentId -> serverBlobHash resolution.
-// Live alpha finding (2026-07-30): the custody-facing fold only resolves
-// `stocked` off the store's SERVER-side hash (shard_manifests.blob_hash),
-// which is `serverBlobHash` on the content row — never the client-declared
-// `blobHash`. This resolver lets a CustodyPair declare `contentId` instead of
-// a static fixture `blobHash` so the seeded pledge always carries the hash
-// the fold actually checks.
+// resolveCustodyBlobDescriptor — contentId + explicit artifact role.
+// A content row's blobHash (browser/primary artifact) and serverBlobHash
+// (optional SSR server bundle) intentionally name different bytes. The
+// custody join uses the exact artifact selected by the caller; no fallback
+// can silently switch the pledge to a different artifact.
 // =============================================================================
 
 describe('resolveCustodyBlobDescriptor', () => {
@@ -231,11 +244,14 @@ describe('resolveCustodyBlobDescriptor', () => {
       { ...basePair, blobHash: 'sha256-deadbeef', blobSizeBytes: 42 },
       { fetchImpl },
     );
-    expect(resolved).toEqual({ blobHash: 'sha256-deadbeef', blobSizeBytes: 42 });
+    expect(resolved).toEqual({
+      blobHash: 'sha256-deadbeef',
+      blobSizeBytes: 42,
+    });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('contentId pair: fetches the PROVIDER content row and serverBlobHash wins over blobHash', async () => {
+  it('ssr-server pair: selects serverBlobHash even when blobHash is present', async () => {
     const fetchImpl = vi.fn(async (url: string) => {
       expect(url).toBe(`${storageUrlForHuman('human-matthew-manager')}/db/content/elohim-host-landing`);
       return new Response(
@@ -248,32 +264,86 @@ describe('resolveCustodyBlobDescriptor', () => {
       );
     });
     const resolved = await resolveCustodyBlobDescriptor(
-      { ...basePair, contentId: 'elohim-host-landing' },
+      {
+        ...basePair,
+        contentId: 'elohim-host-landing',
+        artifactRole: 'ssr-server',
+      },
       { fetchImpl },
     );
     expect(resolved.blobHash).toBe('sha256-56adaebb');
     expect(resolved.blobSizeBytes).toBe(999);
   });
 
-  it('contentId pair: falls back to blobHash when the row has no serverBlobHash', async () => {
+  it('content pair: selects blobHash even when serverBlobHash is present', async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ blobHash: 'sha256-a12218a5', contentSizeBytes: 10 }), { status: 200 }),
+        new Response(
+          JSON.stringify({
+            blobHash: 'sha256-a12218a5',
+            serverBlobHash: 'sha256-56adaebb',
+            contentSizeBytes: 10,
+          }),
+          { status: 200 },
+        ),
     );
     const resolved = await resolveCustodyBlobDescriptor(
-      { ...basePair, contentId: 'elohim-host-landing' },
+      {
+        ...basePair,
+        contentId: 'elohim-host-landing',
+        artifactRole: 'content',
+      },
       { fetchImpl },
     );
     expect(resolved.blobHash).toBe('sha256-a12218a5');
   });
 
-  it('contentId pair: an explicitly declared blobSizeBytes wins over the row\'s contentSizeBytes', async () => {
+  it('contentId pair requires an explicit artifact role', async () => {
+    await expect(
+      resolveCustodyBlobDescriptor({
+        ...basePair,
+        contentId: 'elohim-host-landing',
+      }),
+    ).rejects.toThrow(/requires artifactRole/);
+  });
+
+  it('does not fall back from a missing selected artifact to the other field', async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb', contentSizeBytes: 999 }), { status: 200 }),
+        new Response(JSON.stringify({ blobHash: 'sha256-a12218a5', contentSizeBytes: 10 }), {
+          status: 200,
+        }),
+    );
+    await expect(
+      resolveCustodyBlobDescriptor(
+        {
+          ...basePair,
+          contentId: 'elohim-host-landing',
+          artifactRole: 'ssr-server',
+        },
+        { fetchImpl },
+      ),
+    ).rejects.toThrow(/has no serverBlobHash/);
+  });
+
+  it("contentId pair: an explicitly declared blobSizeBytes wins over the row's contentSizeBytes", async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            serverBlobHash: 'sha256-56adaebb',
+            contentSizeBytes: 999,
+          }),
+          { status: 200 },
+        ),
     );
     const resolved = await resolveCustodyBlobDescriptor(
-      { ...basePair, contentId: 'elohim-host-landing', blobSizeBytes: 5 },
+      {
+        ...basePair,
+        contentId: 'elohim-host-landing',
+        artifactRole: 'ssr-server',
+        blobSizeBytes: 5,
+      },
       { fetchImpl },
     );
     expect(resolved.blobSizeBytes).toBe(5);
@@ -281,7 +351,12 @@ describe('resolveCustodyBlobDescriptor', () => {
 
   it('declaring BOTH blobHash and contentId is a fail-fast authoring error', async () => {
     await expect(
-      resolveCustodyBlobDescriptor({ ...basePair, blobHash: 'sha256-deadbeef', blobSizeBytes: 1, contentId: 'x' }),
+      resolveCustodyBlobDescriptor({
+        ...basePair,
+        blobHash: 'sha256-deadbeef',
+        blobSizeBytes: 1,
+        contentId: 'x',
+      }),
     ).rejects.toThrow(/declares BOTH blobHash and contentId/);
   });
 
@@ -296,23 +371,47 @@ describe('resolveCustodyBlobDescriptor', () => {
       throw new Error('connect ECONNREFUSED');
     });
     await expect(
-      resolveCustodyBlobDescriptor({ ...basePair, contentId: 'elohim-host-landing' }, { fetchImpl }),
+      resolveCustodyBlobDescriptor(
+        {
+          ...basePair,
+          contentId: 'elohim-host-landing',
+          artifactRole: 'ssr-server',
+        },
+        { fetchImpl },
+      ),
     ).rejects.toThrow('connect ECONNREFUSED');
   });
 
-  it('a content row with neither serverBlobHash nor blobHash is a fail-fast error', async () => {
+  it('a content row without the selected artifact is a fail-fast error', async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ contentSizeBytes: 5 }), { status: 200 }));
     await expect(
-      resolveCustodyBlobDescriptor({ ...basePair, contentId: 'elohim-host-landing' }, { fetchImpl }),
-    ).rejects.toThrow(/neither serverBlobHash nor blobHash/);
+      resolveCustodyBlobDescriptor(
+        {
+          ...basePair,
+          contentId: 'elohim-host-landing',
+          artifactRole: 'ssr-server',
+        },
+        { fetchImpl },
+      ),
+    ).rejects.toThrow(/has no serverBlobHash/);
   });
 
   it('an unresolvable blobSizeBytes (no declared value, no contentSizeBytes on the row) fails fast', async () => {
     const fetchImpl = vi.fn(
-      async () => new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb' }), { status: 200 }),
+      async () =>
+        new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb' }), {
+          status: 200,
+        }),
     );
     await expect(
-      resolveCustodyBlobDescriptor({ ...basePair, contentId: 'elohim-host-landing' }, { fetchImpl }),
+      resolveCustodyBlobDescriptor(
+        {
+          ...basePair,
+          contentId: 'elohim-host-landing',
+          artifactRole: 'ssr-server',
+        },
+        { fetchImpl },
+      ),
     ).rejects.toThrow(/cannot resolve blobSizeBytes/);
   });
 });
@@ -433,6 +532,7 @@ describe('seedCustodyCommitments (offline) — contentId pair drives create + ac
     receiverHumanId: 'human-matthew-manager',
     receiverArchetype: 'desktop',
     contentId: 'elohim-host-landing',
+    artifactRole: 'ssr-server',
   };
 
   beforeEach(() => clearPeerIdCache());
@@ -444,23 +544,32 @@ describe('seedCustodyCommitments (offline) — contentId pair drives create + ac
     const fetchImpl = vi.fn(async (url: string) => {
       if (url.endsWith('/db/content/elohim-host-landing')) {
         return new Response(
-          JSON.stringify({ serverBlobHash: 'sha256-56adaebb', blobHash: 'sha256-a12218a5', contentSizeBytes: 999 }),
+          JSON.stringify({
+            serverBlobHash: 'sha256-56adaebb',
+            blobHash: 'sha256-a12218a5',
+            contentSizeBytes: 999,
+          }),
           { status: 200 },
         );
       }
       if (url.endsWith('/auth/me')) {
-        return new Response(JSON.stringify({ agentPubKey: REAL }), { status: 200 });
+        return new Response(JSON.stringify({ agentPubKey: REAL }), {
+          status: 200,
+        });
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
 
-    const createCommitment = vi.fn(async (_body: { resourceClassifiedAs: string[] }) => new Response('{}', { status: 200 }));
+    const createCommitment = vi.fn(
+      async (_body: { resourceClassifiedAs: string[] }) => new Response('{}', { status: 200 }),
+    );
     const getCommitment = vi.fn(
-      async (id: string) => new Response(JSON.stringify({ id, state: 'proposed' }), { status: 200 }),
+      async (id: string) =>
+        new Response(JSON.stringify({ id, state: 'proposed' }), {
+          status: 200,
+        }),
     );
-    const patchCommitmentState = vi.fn(
-      async (_id: string, _state: string) => new Response('{}', { status: 200 }),
-    );
+    const patchCommitmentState = vi.fn(async (_id: string, _state: string) => new Response('{}', { status: 200 }));
     const client = {
       createCommitment,
       getCommitment,
@@ -469,9 +578,11 @@ describe('seedCustodyCommitments (offline) — contentId pair drives create + ac
 
     await seedCustodyCommitments(client, [contentIdPair], { fetchImpl });
 
-    // Created with the RESOLVED serverBlobHash, not the (absent) client blobHash.
+    // Created with the explicitly selected SSR-server artifact address.
     expect(createCommitment).toHaveBeenCalledTimes(1);
-    const sentBody = createCommitment.mock.calls[0][0] as { resourceClassifiedAs: string[] };
+    const sentBody = createCommitment.mock.calls[0][0] as {
+      resourceClassifiedAs: string[];
+    };
     expect(sentBody.resourceClassifiedAs).toEqual(['sha256-56adaebb']);
 
     // The activation step ran and issued the PATCH for the same (proposed) row.
@@ -518,6 +629,7 @@ describe('defaultCustodyPairs triad fixture', () => {
     expect(selfCustody?.providerHumanId).toBe('human-matthew-manager');
     expect(selfCustody?.receiverHumanId).toBe('human-matthew-manager');
     expect(selfCustody?.blobHash).toBeUndefined();
+    expect(selfCustody?.artifactRole).toBe('ssr-server');
   });
 
   it('stamps fixture provenance into the commitment body metadata', () => {

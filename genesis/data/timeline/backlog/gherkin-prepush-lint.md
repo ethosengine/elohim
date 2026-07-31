@@ -7,7 +7,7 @@ title: "Pre-push gherkin/cucumber grammar linter — catch empty-alternation and
 slug: "gherkin-prepush-lint"
 written: "2026-06-02"
 author: "cartographer"
-status: "proposed"
+status: "done"
 priority: "high"
 area: "genesis/a2o"
 recurrence: 2
@@ -62,3 +62,11 @@ blank report = parse abort, not feature failure" rule alongside it.
 
 A feature file with an empty-alternation or bare-continuation fails a committed pre-push lint
 rather than aborting the E2E run.
+
+## Completion (2026-07-31)
+
+Already landed in commit `b0150a4cc`:
+`genesis/a2o/scripts/gherkin-prepush-lint.mjs`, its committed `node:test`
+regressions, the `lint:gherkin` package script, and `.husky/pre-push.bash`
+integration. Reverified here: both malformed-fixture tests pass and the linter
+parses all 160 current feature files.

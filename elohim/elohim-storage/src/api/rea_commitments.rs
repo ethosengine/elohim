@@ -44,6 +44,13 @@ pub async fn handle(
         // POST /api/v1/commitments
         (&Method::POST, "") => handle_create(req, pool, ctx, services, hc_lamad.as_ref()).await,
 
+        // POST /api/v1/commitments/capacity — explicit steward consent to
+        // notarize a commons byte-budget pledge. Matched before the bare-id
+        // arms so the capacity primitive stays a named protocol operation.
+        (&Method::POST, "capacity") => {
+            handle_create_capacity_pledge(req, pool, ctx, hc_lamad.as_ref()).await
+        }
+
         // GET /api/v1/commitments/agent/{agent_id}
         (&Method::GET, agent_path) if agent_path.starts_with("agent/") => {
             let agent_id = agent_path.trim_start_matches("agent/");
@@ -71,6 +78,28 @@ pub async fn handle(
             method, path
         ))),
     }
+}
+
+async fn handle_create_capacity_pledge(
+    req: Request<Incoming>,
+    pool: &DbPool,
+    ctx: &AppContext,
+    hc_lamad: Option<&Arc<HcClient>>,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let payload: elohim_views::replicates_commons::ReplicatesContentPayload =
+        parse_body(req).await?;
+    let hc = hc_lamad.ok_or_else(|| {
+        StorageError::Conductor(
+            "lamad/mishpat bridge unavailable — capacity pledges require notarization".to_string(),
+        )
+    })?;
+    let mut conn = get_conn(pool)?;
+    Ok(from_create_result(
+        crate::services::capacity_pledge_author::author_capacity_pledge(
+            &mut conn, ctx, payload, hc,
+        )
+        .await,
+    ))
 }
 
 // ---------------------------------------------------------------------------

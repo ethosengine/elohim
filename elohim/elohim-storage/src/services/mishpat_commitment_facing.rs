@@ -37,7 +37,7 @@ use crate::db::models::MishpatCommitment;
 /// guard keeps a malformed row from breaking the wire contract.)
 /// `dht_anchor_hash` carries through as `Option<String>` — a NULL anchor (the
 /// un-notarized / local-stack-gap row) omits the field rather than sending `null`.
-fn to_view(row: MishpatCommitment) -> MishpatCommitmentView {
+pub(crate) fn to_view(row: MishpatCommitment) -> MishpatCommitmentView {
     let bounds = parse_json_opt(&Some(row.bounds_json)).filter(|v| v.0.is_object());
     MishpatCommitmentView {
         cid: row.cid,

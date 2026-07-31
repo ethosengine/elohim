@@ -97,25 +97,17 @@ export interface CustodyPair {
   receiverHumanId: string;
   receiverArchetype: Archetype;
   /**
-   * Client-declared blob hash — raw hex (no prefix), or full "sha256-<hex>".
-   * Mutually exclusive with `contentId`: declare exactly one. Prefer
-   * `contentId` for anything backed by a real content row — the
-   * custody-facing fold only resolves `stocked` off the store's SERVER-side
-   * hash (`shard_manifests.blob_hash`), which is `serverBlobHash` on the
-   * content row, not this client-side value (verified live on alpha
-   * 2026-07-30: pledging the client blobHash never flipped
-   * `elohim_custody_class_count{class="stocked"}`; pledging serverBlobHash
-   * did). `blobHash` stays supported for fixture pairs with no backing
-   * content row.
+   * Exact blob-store address — raw hex (no prefix), or full "sha256-<hex>".
+   * Mutually exclusive with `contentId`: declare exactly one. This is the
+   * canonical custody join key when the caller already knows the artifact.
    */
   blobHash?: string;
   /**
-   * Content id to resolve at seed time via
-   * `GET {storageUrl}/db/content/{contentId}` against the PROVIDER's storage
-   * pod — takes `serverBlobHash ?? blobHash` from the row (server hash wins;
-   * see `blobHash` doc above) and falls back to `contentSizeBytes` for
-   * `blobSizeBytes` when the pair doesn't declare it. Mutually exclusive with
-   * `blobHash`.
+   * Content id to resolve at seed time against the PROVIDER's storage pod.
+   * `artifactRole` is mandatory with this field because a content row may
+   * intentionally name two DIFFERENT artifacts: `blobHash` is the browser /
+   * primary content blob; `serverBlobHash` is the optional Angular SSR server
+   * bundle. Neither is an alias for the other.
    *
    * DRIFT GUARD: the seeded commitment id is a content-addressed hash of
    * (provider_peer, receiver_peer, RESOLVED blob hash) — see
@@ -126,6 +118,7 @@ export interface CustodyPair {
    * stale commitment id for a re-uploaded contentId) is out of scope here.
    */
   contentId?: string;
+  artifactRole?: 'content' | 'ssr-server';
   /**
    * Optional when `contentId` is set (resolved from the content row's
    * `contentSizeBytes`); required when `blobHash` is set.
@@ -136,7 +129,10 @@ export interface CustodyPair {
 }
 
 /** A `CustodyPair` with `blobHash`/`blobSizeBytes` resolved to concrete values. */
-export type ResolvedCustodyPair = CustodyPair & { blobHash: string; blobSizeBytes: number };
+export type ResolvedCustodyPair = CustodyPair & {
+  blobHash: string;
+  blobSizeBytes: number;
+};
 
 interface CommitmentBody {
   id: string;
@@ -206,16 +202,14 @@ export async function resolveCustodyPeerIds(
  * - `blobHash` declared: pass through unchanged (back-compat fixture path).
  *   `blobSizeBytes` must already be declared — there is no row to fall back
  *   to for size.
- * - `contentId` declared: `GET {storageUrl}/db/content/{contentId}` against
- *   the PROVIDER's storage pod (the node that must verifiably hold the
- *   blob), and take `serverBlobHash ?? blobHash` from the row —
- *   `serverBlobHash` wins because the custody-facing fold only resolves
- *   `stocked` off the store's server-side hash (`shard_manifests.blob_hash`),
- *   never the client-declared one (verified live on alpha 2026-07-30:
- *   pledging `elohim-host-landing`'s `serverBlobHash` flipped
- *   `elohim_custody_class_count{class="stocked"}` 0→1; pledging its client
- *   `blobHash` did not). `blobSizeBytes` resolves from the pair's declared
- *   value, else the row's `contentSizeBytes`.
+ * - `contentId` declared: `artifactRole` MUST select the exact row field:
+ *   `content` → `blobHash`; `ssr-server` → `serverBlobHash`. There is no
+ *   fallback between them because they address different bytes. The
+ *   custody-facing join key is whichever exact artifact the manifest and
+ *   `shard_locations` describe, not a preferred content-row column.
+ *   `blobSizeBytes` resolves from the pair's declared value, else the row's
+ *   `contentSizeBytes` (callers pledging an SSR server bundle should declare
+ *   its exact size when it differs from the content row's primary artifact).
  *
  * Exactly one of `blobHash`/`contentId` must be declared — declaring both or
  * neither is a fail-fast authoring error, same posture as the no-fallback
@@ -236,12 +230,22 @@ export async function resolveCustodyBlobDescriptor(
   if (!hasBlobHash && !hasContentId) {
     throw new Error(`${label}: pair declares NEITHER blobHash nor contentId — declare exactly one.`);
   }
+  if (hasBlobHash && pair.artifactRole) {
+    throw new Error(`${label}: artifactRole is only valid with contentId.`);
+  }
 
   if (hasBlobHash) {
     if (typeof pair.blobSizeBytes !== 'number' || pair.blobSizeBytes <= 0) {
       throw new Error(`${label}: blobHash pair requires a positive blobSizeBytes.`);
     }
-    return { blobHash: normalizeBlobHash(pair.blobHash as string), blobSizeBytes: pair.blobSizeBytes };
+    return {
+      blobHash: normalizeBlobHash(pair.blobHash as string),
+      blobSizeBytes: pair.blobSizeBytes,
+    };
+  }
+
+  if (!pair.artifactRole) {
+    throw new Error(`${label}: contentId pair requires artifactRole ('content' or 'ssr-server').`);
   }
 
   const fetchImpl = opts.fetchImpl ?? fetch;
@@ -250,12 +254,16 @@ export async function resolveCustodyBlobDescriptor(
 
   let response: Response;
   try {
-    response = await fetchImpl(endpoint, { signal: AbortSignal.timeout(opts.timeoutMs ?? 5000) });
+    response = await fetchImpl(endpoint, {
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 5000),
+    });
   } catch (err) {
     throw new Error(`${label}: GET ${endpoint} failed — ${err instanceof Error ? err.message : String(err)}`);
   }
   if (!response.ok) {
-    throw new Error(`${label}: GET ${endpoint} returned HTTP ${response.status} — cannot resolve contentId "${pair.contentId}".`);
+    throw new Error(
+      `${label}: GET ${endpoint} returned HTTP ${response.status} — cannot resolve contentId "${pair.contentId}".`,
+    );
   }
 
   const row = (await response.json()) as {
@@ -264,15 +272,12 @@ export async function resolveCustodyBlobDescriptor(
     contentSizeBytes?: unknown;
   };
 
-  const resolvedHash =
-    typeof row.serverBlobHash === 'string' && row.serverBlobHash.length > 0
-      ? row.serverBlobHash
-      : typeof row.blobHash === 'string' && row.blobHash.length > 0
-        ? row.blobHash
-        : undefined;
+  const field = pair.artifactRole === 'ssr-server' ? 'serverBlobHash' : 'blobHash';
+  const candidate = row[field];
+  const resolvedHash = typeof candidate === 'string' && candidate.length > 0 ? candidate : undefined;
   if (!resolvedHash) {
     throw new Error(
-      `${label}: content row "${pair.contentId}" at ${endpoint} has neither serverBlobHash nor blobHash — cannot resolve a custody blob hash.`,
+      `${label}: content row "${pair.contentId}" at ${endpoint} has no ${field} for artifactRole "${pair.artifactRole}".`,
     );
   }
 
@@ -324,6 +329,7 @@ export function buildCustodyCommitmentBody(pair: ResolvedCustodyPair, peerIds: C
       blobHash: blob,
       providerHumanId: pair.providerHumanId,
       receiverHumanId: pair.receiverHumanId,
+      ...(pair.contentId ? { contentId: pair.contentId, artifactRole: pair.artifactRole } : {}),
       ...(pair.fixture ? { fixture: pair.fixture, retireAt: 'ceremony-landing' } : {}),
     },
   };
@@ -397,22 +403,23 @@ export function defaultCustodyPairs(): CustodyPair[] {
       ...fixture,
     },
     // Self-custody pledge for the saga ch07 carrier content (2026-07-30):
-    // resolved via contentId, not a fixture blobHash, so every genesis seed
-    // run re-asserts the EXACT pledge whose serverBlobHash the custody-facing
-    // fold checks against shard_manifests.blob_hash (proven live on alpha —
-    // pledging elohim-host-landing's serverBlobHash flipped
-    // elohim_custody_class_count{class="stocked"} 0→1; the client blobHash
-    // did not). The deterministic id derivation from (provider|receiver|
-    // resolved-blob) already makes re-running this idempotent (409 on
-    // re-seed). DRIFT GUARD: a re-upload of elohim-host-landing mints a new
-    // serverBlobHash and therefore a NEW commitment id here — the old pledge
-    // is not superseded automatically; that reconcile pass is out of scope.
+    // resolved via contentId + the explicit `ssr-server` artifact role, not a
+    // fixture blobHash. The live custody evidence for this saga carrier names
+    // the SSR server-bundle manifest; the browser bundle is a different
+    // artifact and must never be selected by fallback. The deterministic id
+    // derivation from (provider|receiver|resolved-blob) keeps re-runs
+    // idempotent. DRIFT GUARD: a server-bundle re-upload mints a new
+    // serverBlobHash and therefore a NEW commitment id; the old pledge is not
+    // superseded automatically (that reconcile pass remains out of scope).
     {
       providerHumanId: 'human-matthew-manager',
       providerArchetype: 'desktop',
       receiverHumanId: 'human-matthew-manager',
       receiverArchetype: 'desktop',
       contentId: 'elohim-host-landing',
+      artifactRole: 'ssr-server',
+      // The SSR deployment artifact is distinct from the browser bundle;
+      // keep its measured byte count explicit when production supplies it.
     },
   ];
 }
@@ -462,10 +469,10 @@ export async function seedCustodyCommitments(
   let alreadyExists = 0;
 
   for (const pair of pairs) {
-    // Resolve the blob descriptor (blobHash pass-through, or contentId ->
-    // serverBlobHash/contentSizeBytes off the provider's content row) and the
-    // real peer ids from the live storage pods — per-host cached, so the
-    // activate phase below recomputes the SAME content-addressed body.id.
+    // Resolve the blob descriptor (blobHash pass-through, or contentId +
+    // explicit artifactRole → exact row field) and the real peer ids from the
+    // live storage pods — per-host cached, so the activate phase below
+    // recomputes the SAME content-addressed body.id.
     const blob = await resolveCustodyBlobDescriptor(pair, opts);
     const resolvedPair: ResolvedCustodyPair = { ...pair, ...blob };
     const body = buildCustodyCommitmentBody(resolvedPair, await resolveCustodyPeerIds(pair, opts));

@@ -25,8 +25,6 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use sha2::{Digest, Sha256};
-
 use crate::error::StorageError;
 use crate::hc_client::HcClient;
 use crate::reconcile::custody::CommitmentAuthor;
@@ -125,10 +123,11 @@ fn record_self_unresolved_skip(self_cid: &str) -> u64 {
 /// (provider, receiver, blob) tuple yields the same id → idempotent at the
 /// conductor (a duplicate is a no-op / 409, never a corrupt second row).
 fn deterministic_custody_id(provider: &str, receiver: &str, blob_marker: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(format!("{provider}|{receiver}|{blob_marker}").as_bytes());
-    let digest = hex::encode(hasher.finalize());
-    format!("custody-blob-{}", &digest[..16])
+    crate::services::rea_commitment_service::deterministic_custody_id(
+        provider,
+        receiver,
+        blob_marker,
+    )
 }
 
 impl CommitmentAuthor for SalvageCommitmentAuthor {

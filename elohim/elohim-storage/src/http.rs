@@ -12774,6 +12774,12 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         .route(
+            Route::post("/api/v1/commitments/capacity")
+                .handler("create_capacity_pledge")
+                .auth_required()
+                .build(),
+        )
+        .route(
             Route::get("/api/v1/commitments/agent/{agent_id}")
                 .handler("commitments_by_agent")
                 .cache_ttl(300)
@@ -14037,6 +14043,10 @@ mod tests {
         assert!(
             paths.contains(&"/api/v1/commitments/facing/rea"),
             "missing /api/v1/commitments/facing/rea (REA economic facing Wave 4.2)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/commitments/capacity"),
+            "missing /api/v1/commitments/capacity (capacity pledge consent lever)"
         );
         // Plural-Mishpat lens market (lens-market S7). Same route-shadow guard
         // discipline as /api/v1/weave: the GET arm is dispatched through

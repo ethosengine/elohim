@@ -19,6 +19,7 @@
 use std::sync::Arc;
 
 use diesel::SqliteConnection;
+use sha2::{Digest, Sha256};
 
 use crate::db::context::AppContext;
 use crate::db::rea_commitments::{
@@ -35,7 +36,164 @@ use elohim_views::projection::ProjectionMode;
 
 pub struct ReaCommitmentService;
 
+/// Serialize automatic first-custody authoring inside one process. The
+/// persistent id check below is the restart-safe guard; this lock closes the
+/// smaller same-process race where two distribution tasks observe no projected
+/// row before either conductor result has been eagerly projected.
+static CUSTODY_AUTHOR_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnsureCustodyOutcome {
+    CreatedAndActivated,
+    ActivatedExisting,
+    AlreadyActive,
+}
+
+/// Logical id shared by genesis, salvage, and runtime first-custody producers.
+///
+/// The DHT entry hash remains the notarized identity; this deterministic
+/// logical id makes retries of one `(provider, receiver, exact blob address)`
+/// tuple converge on the same projection row.
+pub fn deterministic_custody_id(provider: &str, receiver: &str, blob_marker: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(format!("{provider}|{receiver}|{blob_marker}").as_bytes());
+    let digest = hex::encode(hasher.finalize());
+    format!("custody-blob-{}", &digest[..16])
+}
+
+/// Build the canonical storage-layer custody input from an exact manifest
+/// address. Runtime callers must pass `ShardManifest.blob_hash` directly; this
+/// function never resolves or prefers a content-row hash field.
+pub fn build_custody_blob_input(
+    blob_marker: &str,
+    blob_size_bytes: u64,
+    provider: &str,
+    receiver: &str,
+    content_id: Option<&str>,
+    origin: &str,
+) -> CreateReaCommitmentInput {
+    CreateReaCommitmentInput {
+        id: Some(deterministic_custody_id(provider, receiver, blob_marker)),
+        action: "custody-blob".to_string(),
+        provider: provider.to_string(),
+        receiver: receiver.to_string(),
+        resource_conforms_to: Some("blob".to_string()),
+        resource_classified_as: Some(blob_marker.to_string()),
+        resource_quantity_value: Some(blob_size_bytes.min(f32::MAX as u64) as f32),
+        resource_quantity_unit: Some("B".to_string()),
+        note: Some(format!("{provider} commits self-custody of {blob_marker}")),
+        metadata_json: Some(
+            serde_json::json!({
+                "origin": origin,
+                "blobHash": blob_marker,
+                "contentId": content_id,
+                "consentBasis": "node-self-stewardship-placement",
+            })
+            .to_string(),
+        ),
+        ..Default::default()
+    }
+}
+
 impl ReaCommitmentService {
+    /// Ensure the FIRST active self-custody commitment for a verified runtime
+    /// placement.
+    ///
+    /// This is conductor-required: automatic self-stewardship must never
+    /// degrade to an unanchored SQLite promise. The caller invokes it only
+    /// after `record_self_held_shard` has verified local bytes and passes the
+    /// generated manifest's exact blob address.
+    pub async fn ensure_active_self_custody(
+        conn: &mut SqliteConnection,
+        ctx: &AppContext,
+        blob_marker: &str,
+        blob_size_bytes: u64,
+        provider: &str,
+        content_id: Option<&str>,
+        hc_lamad: &Arc<HcClient>,
+    ) -> Result<EnsureCustodyOutcome, StorageError> {
+        let _guard = CUSTODY_AUTHOR_LOCK.lock().await;
+        let input = build_custody_blob_input(
+            blob_marker,
+            blob_size_bytes,
+            provider,
+            provider,
+            content_id,
+            "runtime-self-stewardship",
+        );
+        let id = input
+            .id
+            .as_deref()
+            .expect("custody input always has a deterministic id")
+            .to_string();
+
+        let existing = rea_commitments::get_commitment(conn, ctx, &id)?;
+        let created = existing.is_none();
+        let outcome = if existing.as_ref().is_some_and(|row| row.state == "active") {
+            EnsureCustodyOutcome::AlreadyActive
+        } else {
+            if created {
+                Self::create(conn, ctx, input, None, Some(hc_lamad)).await?;
+            }
+
+            let update = UpdateReaCommitmentState {
+                state: "active".to_string(),
+                finished: None,
+                metadata_json: None,
+            };
+            Self::update_state(conn, ctx, &id, &update, None, Some(hc_lamad)).await?;
+
+            if created {
+                EnsureCustodyOutcome::CreatedAndActivated
+            } else {
+                EnsureCustodyOutcome::ActivatedExisting
+            }
+        };
+
+        // A re-upload produces a new immutable artifact address and therefore a
+        // new commitment id. Once that successor is active, retire any older
+        // live custody promise for this same provider/content identity through
+        // the existing notarized state-transition path. Retrying is safe: the
+        // current row is recognized above, then stale cleanup runs again.
+        if let Some(content_id) = content_id {
+            let query = ReaCommitmentQuery {
+                action: Some("custody-blob".to_string()),
+                provider: Some(provider.to_string()),
+                receiver: Some(provider.to_string()),
+                limit: 1_000,
+                ..Default::default()
+            };
+            let stale = rea_commitments::list_commitments(conn, ctx, &query)?;
+            for row in stale {
+                if row.id == id || matches!(row.state.as_str(), "cancelled" | "superseded") {
+                    continue;
+                }
+                let same_content = row
+                    .metadata_json
+                    .as_deref()
+                    .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+                    .and_then(|metadata| {
+                        metadata
+                            .get("contentId")
+                            .and_then(|value| value.as_str())
+                            .map(|candidate| candidate == content_id)
+                    })
+                    .unwrap_or(false);
+                if !same_content {
+                    continue;
+                }
+                let cancel = UpdateReaCommitmentState {
+                    state: "cancelled".to_string(),
+                    finished: None,
+                    metadata_json: None,
+                };
+                Self::update_state(conn, ctx, &row.id, &cancel, None, Some(hc_lamad)).await?;
+            }
+        }
+
+        Ok(outcome)
+    }
+
     pub async fn create(
         conn: &mut SqliteConnection,
         ctx: &AppContext,
@@ -942,6 +1100,44 @@ mod tests {
             false,
             &upd("active", Some(false))
         ));
+    }
+
+    #[test]
+    fn runtime_custody_input_uses_exact_manifest_address_and_shared_id() {
+        let input = build_custody_blob_input(
+            "sha256-server-artifact",
+            4096,
+            "uhCAk-self",
+            "uhCAk-self",
+            Some("elohim-host-landing"),
+            "runtime-self-stewardship",
+        );
+        assert_eq!(
+            input.id.as_deref(),
+            Some(deterministic_custody_id(
+                "uhCAk-self",
+                "uhCAk-self",
+                "sha256-server-artifact"
+            ))
+            .as_deref()
+        );
+        assert_eq!(
+            input.resource_classified_as.as_deref(),
+            Some("sha256-server-artifact")
+        );
+        assert_eq!(input.resource_quantity_value, Some(4096.0));
+        assert_eq!(input.resource_quantity_unit.as_deref(), Some("B"));
+        let metadata: serde_json::Value =
+            serde_json::from_str(input.metadata_json.as_deref().unwrap()).unwrap();
+        assert_eq!(metadata["contentId"], "elohim-host-landing");
+        assert_eq!(metadata["consentBasis"], "node-self-stewardship-placement");
+    }
+
+    #[test]
+    fn runtime_custody_id_changes_with_the_exact_artifact_address() {
+        let browser = deterministic_custody_id("uhCAk-self", "uhCAk-self", "sha256-browser");
+        let server = deterministic_custody_id("uhCAk-self", "uhCAk-self", "sha256-server");
+        assert_ne!(browser, server);
     }
 }
 

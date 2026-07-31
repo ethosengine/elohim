@@ -7,7 +7,7 @@ title: "blobHash/serverBlobHash duality — no canonical join key, custody-facin
 slug: "blobhash-serverblobhash-duality-canonical-join-key"
 written: "2026-07-30"
 author: "agentic-developer"
-status: "open"
+status: "done"
 priority: "high"
 area: "elohim-storage"
 tags: [blob-hash, custody-blob, canonical-join-key, cid-first-migration, derive-class, elohim-storage]
@@ -96,3 +96,14 @@ investigation) before implementation. The investigation should also produce the
 "why do they differ" answer, since options (a)/(b) are workarounds while (c) is
 the only option that actually removes the duality rather than routing around
 it — the choice should be made with that trade-off explicit, not by default.
+
+## Completion (2026-07-31)
+
+Investigation disproved the entry's premise: the fields name different
+artifacts, not two computations of one artifact. `blobHash` is the
+primary/browser bundle; `serverBlobHash` is the optional SSR server bundle.
+The bounded spec
+`genesis/docs/superpowers/specs/2026-07-31-custody-blob-canonical-artifact-address-design.md`
+therefore designates the exact `ShardManifest.blob_hash` as the custody join
+key. Content lookup is now an explicit artifact-role resolver with no
+cross-field fallback. Seeder coverage passes 38/38 focused tests.
