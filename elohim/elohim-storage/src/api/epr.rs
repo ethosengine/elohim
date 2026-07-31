@@ -545,6 +545,12 @@ async fn put_epr(
         "Attestation" => EprKind::Attestation,
         "Delegation" => EprKind::Delegation,
         "FeedbackSignal" => EprKind::FeedbackSignal,
+        // AttentionTending / WitnessedInteraction wire names per elohim-epr's
+        // canonical kind_canonical() (elohim/epr/src/envelope.rs) — no
+        // pub as_str()/FromStr is exposed on EprKind, so these arms are kept
+        // local and must be matched against that source, not re-derived.
+        "AttentionTending" => EprKind::AttentionTending,
+        "WitnessedInteraction" => EprKind::WitnessedInteraction,
         other => return Ok(response::bad_request(&format!("unknown kind: {other}"))),
     };
 

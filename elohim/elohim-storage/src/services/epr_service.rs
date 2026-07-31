@@ -500,6 +500,13 @@ fn kind_from_str(s: &str) -> Result<elohim_epr::EprKind, StorageError> {
         "Commitment" => Ok(Commitment),
         "Attestation" => Ok(Attestation),
         "Delegation" => Ok(Delegation),
+        "FeedbackSignal" => Ok(FeedbackSignal),
+        // AttentionTending / WitnessedInteraction wire names per elohim-epr's
+        // canonical kind_canonical() (elohim/epr/src/envelope.rs) — no
+        // pub as_str()/FromStr is exposed on EprKind, so these arms are kept
+        // local and must be matched against that source, not re-derived.
+        "AttentionTending" => Ok(AttentionTending),
+        "WitnessedInteraction" => Ok(WitnessedInteraction),
         other => Err(StorageError::InvalidInput(format!(
             "unknown EprKind: {other}"
         ))),
@@ -720,6 +727,124 @@ mod wire_bytes_tests {
         let mut conn = setup_conn();
         let err = ingest_from_wire_bytes(&mut conn, &[0xFF, 0xFE]).unwrap_err();
         assert!(matches!(err, StorageError::InvalidInput(_)));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Round-trip proof for the previously-unparseable kinds
+// ---------------------------------------------------------------------------
+
+/// Round-trip proof for the three `EprKind`s that `kind_from_str` rejected
+/// before this fix — `FeedbackSignal` (governance coupling leg required per
+/// `elohim/epr/src/kind.rs:70`), `AttentionTending` and `WitnessedInteraction`
+/// (no coupling legs required per `elohim/epr/src/kind.rs:78,90`). Each test
+/// ingests a signed `Epr` of the kind, reconstructs it via
+/// `fetch_wire_bytes_by_cid` (exercising `kind_from_str` inside
+/// `reconstruct_epr`), and runs `verify()` (exercising `kind_from_str` inside
+/// the coupling stage) — the two call sites that were silently failing.
+#[cfg(test)]
+mod missing_kind_round_trip_tests {
+    use super::*;
+    use diesel::connection::SimpleConnection;
+    use elohim_epr::{cid::compute_cid, proof::AgentKeypair, Coupling, Epr, EprKind, Reach};
+
+    fn setup_conn() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("open memory db");
+        let migrations_sql =
+            std::fs::read_to_string("migrations/2026-04-22-050000_add_epr_tables/up.sql")
+                .expect("load epr up.sql");
+        conn.batch_execute(&migrations_sql)
+            .expect("apply epr migrations");
+        // A.7 migration: verified_at + verified_signer_fingerprint columns
+        let a7_sql =
+            std::fs::read_to_string("migrations/2026-04-25-000000_verified_at_on_epr_atoms/up.sql")
+                .expect("load a7 verified_at migration");
+        conn.batch_execute(&a7_sql)
+            .expect("apply a7 verified_at migration");
+        conn
+    }
+
+    /// Build + sign an `Epr` of `kind` with the given coupling, using a
+    /// deterministic per-test keypair (`seed`).
+    fn sample_epr(kind: EprKind, coupling: Coupling, seed: u8) -> (Epr, AgentKeypair) {
+        let kp = AgentKeypair::from_secret(&[seed; 32]).unwrap();
+        let signer_cid = compute_cid(&kp.public_key_bytes());
+        let schema_ref = compute_cid(b"schema-ref-missing-kind");
+        let epr = Epr::builder()
+            .kind(kind)
+            .schema_ref(schema_ref)
+            .schema_key("test/schema")
+            .reach(Reach::Commons)
+            .coupling(coupling)
+            .issued_at(chrono::Utc::now())
+            .payload(b"payload".to_vec())
+            .sign(&kp, signer_cid)
+            .expect("sign");
+        (epr, kp)
+    }
+
+    /// Ingest, fetch-by-CID reconstruction, and verify — the three
+    /// storage-layer stages `kind_from_str` gates.
+    fn assert_round_trips(kind: EprKind, coupling: Coupling, seed: u8) {
+        let mut conn = setup_conn();
+        let (epr, kp) = sample_epr(kind, coupling, seed);
+        let cid_str = epr.envelope.cid.to_string();
+
+        let ingested = ingest(&mut conn, epr.clone()).expect("ingest must succeed");
+        assert_eq!(ingested.cid, cid_str);
+
+        // fetch_by_cid + reconstruct_epr (via fetch_wire_bytes_by_cid) —
+        // exercises kind_from_str inside reconstruct_epr.
+        let fetched = fetch_wire_bytes_by_cid(&mut conn, &cid_str)
+            .expect("fetch_wire_bytes_by_cid must succeed")
+            .expect("row must exist");
+        let decoded: Epr = ciborium::de::from_reader(&fetched.wire_bytes[..]).expect("decode");
+        assert_eq!(
+            decoded.envelope.cid, epr.envelope.cid,
+            "CID must match after reconstruction"
+        );
+        assert_eq!(decoded.envelope.kind, kind, "kind must round-trip exactly");
+        assert_eq!(decoded.payload, epr.payload);
+
+        // verify() — exercises kind_from_str inside the coupling stage.
+        let report =
+            verify(&mut conn, &cid_str, &kp.public_key_bytes()).expect("verify must not error");
+        assert!(
+            report.verified,
+            "kind {kind:?} must verify: {:?}",
+            report.error
+        );
+    }
+
+    #[test]
+    fn feedback_signal_round_trips() {
+        let gov = compute_cid(b"feedback-signal-governance-target");
+        let coupling = Coupling {
+            knowledge: None,
+            value: None,
+            governance: Some(gov),
+        };
+        assert_round_trips(EprKind::FeedbackSignal, coupling, 0x10);
+    }
+
+    #[test]
+    fn attention_tending_round_trips() {
+        let coupling = Coupling {
+            knowledge: None,
+            value: None,
+            governance: None,
+        };
+        assert_round_trips(EprKind::AttentionTending, coupling, 0x11);
+    }
+
+    #[test]
+    fn witnessed_interaction_round_trips() {
+        let coupling = Coupling {
+            knowledge: None,
+            value: None,
+            governance: None,
+        };
+        assert_round_trips(EprKind::WitnessedInteraction, coupling, 0x12);
     }
 }
 
