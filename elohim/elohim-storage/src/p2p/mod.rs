@@ -7901,7 +7901,12 @@ impl P2PNode {
                     );
                 }
                 Ok(_) => {}
-                Err(e) => debug!(error = %e, pin_id, "acquisition: pin retirement failed"),
+                // A rejected status write (e.g. a CHECK-constraint violation)
+                // means the pin never actually left `active` — the exact
+                // failure mode that made retirement inert until the
+                // 2026-07-31-200000_acquisition_pins_admit_retired migration.
+                // That must never be invisible again.
+                Err(e) => warn!(error = %e, pin_id, "acquisition: pin retirement failed"),
             }
         }
         crate::metrics::inc_acquisition_pin_retirements("exhausted", retired);
@@ -7935,8 +7940,8 @@ impl P2PNode {
             if !acquisition::pin_cooled_down(&pin.updated_at, now) {
                 continue;
             }
-            if let Ok(n) = crate::db::acquisition_pins::set_pin_status(conn, pin.id, "active") {
-                if n > 0 {
+            match crate::db::acquisition_pins::set_pin_status(conn, pin.id, "active") {
+                Ok(n) if n > 0 => {
                     readmitted += 1;
                     info!(
                         target: "elohim_storage::acquisition",
@@ -7946,6 +7951,14 @@ impl P2PNode {
                          never a delete"
                     );
                 }
+                Ok(_) => {}
+                // A rejected status write here would silently strand the pin
+                // in `retired` forever — never invisible again.
+                Err(e) => warn!(
+                    error = %e,
+                    pin_id = pin.id,
+                    "acquisition: cooldown re-admission write failed"
+                ),
             }
         }
         if readmitted > 0 {
@@ -7992,9 +8005,8 @@ impl P2PNode {
             if !advertised.contains(pin.head_ref.as_str()) {
                 continue;
             }
-            if let Ok(n) = crate::db::acquisition_pins::set_pin_status(&mut conn, pin.id, "active")
-            {
-                if n > 0 {
+            match crate::db::acquisition_pins::set_pin_status(&mut conn, pin.id, "active") {
+                Ok(n) if n > 0 => {
                     readmitted += 1;
                     info!(
                         target: "elohim_storage::acquisition",
@@ -8003,6 +8015,14 @@ impl P2PNode {
                         "acquisition pin RE-ADMITTED — a peer advertised its content again"
                     );
                 }
+                Ok(_) => {}
+                // A rejected status write here would silently strand the pin
+                // in `retired` forever — never invisible again.
+                Err(e) => warn!(
+                    error = %e,
+                    pin_id = pin.id,
+                    "acquisition: inventory-driven re-admission write failed"
+                ),
             }
         }
         if readmitted > 0 {

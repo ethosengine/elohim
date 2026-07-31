@@ -39,10 +39,14 @@ pub const MAX_ACQUISITION_INFLIGHT: usize = 25;
 /// Pin status for a pin whose every wanted item exhausted its retry budget
 /// against every connected provider.
 ///
-/// NOT a new column and NOT a migration: `acquisition_pins.status` is free-form
-/// TEXT and [`crate::views::PinView`]`::status` is a `String`, so this is
-/// additive on the wire. `updated_at` (already stamped by `set_pin_status`) is
-/// the retirement clock.
+/// NOT a new column: `acquisition_pins.status` is TEXT and
+/// [`crate::views::PinView`]`::status` is a `String`, so this value is
+/// additive on the wire. It DOES need a migration, though: `status` carries a
+/// CHECK constraint enumerating the admitted values, and the original
+/// migration (`2026-06-07-000000_acquisition_pins/up.sql`) did not include
+/// `'retired'` — writing it failed with a CheckViolation at the SQLite engine
+/// until `2026-07-31-200000_acquisition_pins_admit_retired` widened the CHECK.
+/// `updated_at` (already stamped by `set_pin_status`) is the retirement clock.
 ///
 /// Distinct from `removed`, which is a PERSON's revocation. `retired` is the
 /// SUBSTRATE saying "no peer can supply these bytes right now" — a pin the

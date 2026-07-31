@@ -278,4 +278,51 @@ mod tests {
             "re-pin must preserve the notarized commitment_cid back-reference"
         );
     }
+
+    /// Regression for the inert pin-retirement path (commit 192f77cd0):
+    /// the original `status` CHECK only admitted `('active', 'paused',
+    /// 'removed')`, so `set_pin_status(..., "retired")` failed at the SQLite
+    /// engine with a CheckViolation that `retire_exhausted_pins` swallowed at
+    /// `debug!` level — the pin never actually left `active`. The
+    /// 2026-07-31-200000_acquisition_pins_admit_retired migration widens the
+    /// CHECK to admit `'retired'`. This test runs against the crate's real
+    /// embedded migrations (`test_conn()` above), so deleting that migration
+    /// directory reintroduces the old CHECK and this test fails with a
+    /// CheckViolation on the `set_pin_status(..., "retired")` call below.
+    #[test]
+    fn retired_status_is_admitted_by_the_check_constraint_and_round_trips() {
+        let mut conn = test_conn();
+
+        let pin = upsert_pin(&mut conn, sample_pin(1)).expect("upsert");
+
+        // The write that was inert before the migration: must now Ok, not
+        // CheckViolation.
+        let affected = set_pin_status(&mut conn, pin.id, "retired")
+            .expect("set_pin_status(\"retired\") must succeed once the CHECK admits it");
+        assert_eq!(affected, 1, "exactly one row flips to retired");
+
+        // Must be findable via the general status query (the readmission
+        // paths' read side).
+        let retired = list_pins_by_status(&mut conn, "retired").expect("list_pins_by_status");
+        assert_eq!(retired.len(), 1, "retired pin must be listed by status");
+        assert_eq!(retired[0].id, pin.id);
+
+        // Must not still appear as active.
+        let active = list_active_pins(&mut conn).expect("list_active_pins");
+        assert!(
+            active.is_empty(),
+            "retired pin must not appear in the active list"
+        );
+
+        // Flip back to active (the readmission path) must also Ok.
+        let readmitted = set_pin_status(&mut conn, pin.id, "active")
+            .expect("set_pin_status(\"active\") readmission must succeed");
+        assert_eq!(readmitted, 1);
+        let active_again = list_active_pins(&mut conn).expect("list_active_pins after readmit");
+        assert_eq!(
+            active_again.len(),
+            1,
+            "pin must be active again after readmission"
+        );
+    }
 }
