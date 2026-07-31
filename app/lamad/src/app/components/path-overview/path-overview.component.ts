@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  OnDestroy,
+  inject,
+  signal,
+} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 // @coverage: 45.1% (2026-03-03)
@@ -137,6 +144,8 @@ interface ChapterDisplay {
   imports: [CommonModule, RecommendationListComponent],
   templateUrl: './path-overview.component.html',
   styleUrls: ['./path-overview.component.css'],
+  // OnPush-unsafe: ngOnInit subscribe mutation — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class PathOverviewComponent implements OnInit, OnDestroy {
   pathId = '';

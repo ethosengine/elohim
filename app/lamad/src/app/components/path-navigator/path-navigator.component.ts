@@ -1,5 +1,6 @@
 import { CommonModule, DOCUMENT } from '@angular/common';
 import {
+  ChangeDetectionStrategy,
   Component,
   OnInit,
   OnDestroy,
@@ -104,6 +105,8 @@ const NAV_FAILED_MSG = 'Navigation failed:';
   imports: [CommonModule, RouterModule, LessonViewComponent, FocusedViewToggleComponent],
   templateUrl: './path-navigator.component.html',
   styleUrls: ['./path-navigator.component.css'],
+  // OnPush-unsafe: ngOnInit subscribe mutation + setTimeout — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class PathNavigatorComponent implements OnInit, OnDestroy {
   // Route params

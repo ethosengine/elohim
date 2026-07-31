@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -160,6 +160,8 @@ import { SearchService } from '../../services/search.service';
       }
     `,
   ],
+  // OnPush-unsafe: queryParams + search subscribe mutation — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class SearchComponent implements OnInit {
   query = '';

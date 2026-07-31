@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
 
 import { eprToUniversalHref } from '@elohim/service';
 import type { EconomicEventView } from '@elohim/storage-client/generated';
@@ -19,6 +19,8 @@ import { EventService } from '@elohim/rea-runtime';
   imports: [CommonModule],
   templateUrl: './attention-flow.component.html',
   styleUrls: ['./attention-flow.component.css'],
+  // OnPush-unsafe: ngOnInit subscribe mutation — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class AttentionFlowComponent implements OnInit {
   events: EconomicEventView[] = [];

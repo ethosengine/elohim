@@ -1,5 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, OnDestroy } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  OnInit,
+  OnDestroy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 
@@ -25,6 +31,8 @@ import { SyncProgressComponent } from '../sync-progress/sync-progress.component'
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './lamad-layout.component.html',
   styleUrls: ['./lamad-layout.component.css'],
+  // OnPush-unsafe: ngOnInit subscribe mutation (readiness gate) — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class LamadLayoutComponent implements OnInit, OnDestroy {
   isReady = false;

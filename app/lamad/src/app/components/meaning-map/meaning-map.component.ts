@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, Inject, OnInit, OnDestroy } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  Inject,
+  OnInit,
+  OnDestroy,
+} from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)
@@ -41,6 +48,8 @@ interface ContentNodeWithAffinity extends ContentNode {
   imports: [CommonModule, RouterModule],
   templateUrl: './meaning-map.component.html',
   styleUrls: ['./meaning-map.component.css'],
+  // OnPush-unsafe: ngOnInit subscribe mutation — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class MeaningMapComponent implements OnInit, OnDestroy {
   categories: CategorySection[] = [];

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 /**
@@ -15,6 +15,10 @@ import { RouterOutlet } from '@angular/router';
   selector: 'lamad-root',
   standalone: true,
   imports: [RouterOutlet],
+  // OnPush-unsafe: ROOT view — an OnPush root is never marked dirty, so a global
+  // ApplicationRef tick skips it and freezes change detection for the whole
+  // non-signal tree. See backlog-onpush-eager-debt-inventory.
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <router-outlet />
   `,

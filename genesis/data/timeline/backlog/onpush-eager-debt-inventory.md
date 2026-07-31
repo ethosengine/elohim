@@ -8,9 +8,17 @@ slug: "onpush-eager-debt-inventory"
 written: "2026-07-30"
 author: "angular22-campaign"
 status: "backlog"
-priority: "low"
-tags: [angular, change-detection, onpush, cleanup, v22-migration]
+priority: "high"
+tags: [angular, change-detection, onpush, cleanup, v22-migration, regression]
 cites:
+  - app/lamad/src/app/app.component.ts
+  - app/lamad/src/app/app.component.spec.ts
+  - app/lamad/src/app/components/lamad-layout/lamad-layout.component.ts
+  - app/lamad/src/app/components/lamad-layout/lamad-layout.component.spec.ts
+  - app/lamad/src/app/components/lamad-home/lamad-home.component.ts
+  - app/elohim-app/src/app/app.component.ts
+  - doorway/doorway-app/src/app/app.component.ts
+  - app/imagodei-portal/src/app/app.component.ts
   - app/elohim-app/src/app/components/home/home.component.ts
   - app/lamad/src/app/components/search/search.component.ts
   - app/lamad/src/app/renderers/markdown-renderer/markdown-renderer.component.ts
@@ -150,6 +158,80 @@ Eager again; `search.component.ts` was not flagged by review and remains OnPush.
 `content-viewer.component.ts` was never Eager-stamped to begin with (already implicit-OnPush
 pre-wave, consistent with the affinity-circle precedent) — its comment is inherited context
 from a shared test pattern, not evidence of a stamp this wave touched.
+
+## Alpha regression (2026-07-31): the class the post-review missed — the ROOT view
+
+The post-review restoration list above was built from one shape: *a component that mutates
+template-bound state from a subscribe/timer/listener callback*. That heuristic is correct but
+incomplete, and the miss shipped: on both deployed alpha doorways the entire lamad surface hung
+on "Loading content..." forever. The doorway returned `/db/content?limit=1` in 13ms, the
+subscriber ran, `isReady` flipped to `true` — and nothing ever re-rendered.
+
+**The missed rule: the ROOT component's strategy governs the whole tree.** The bundle root is
+the only view attached to `ApplicationRef`. A zone-driven global tick (`dirtyFlags |=
+ViewTreeGlobal`) refreshes an `Eager`/CheckAlways root and traverses into its children, but
+SKIPS an OnPush root that nothing has marked dirty — and skipping the root skips every
+descendant. `app/lamad/src/app/app.component.ts` is a stateless 8-line shell holding a single
+`<router-outlet />`; it has no subscribe, no timer, no listener, so the wave's heuristic read it
+as trivially OnPush-safe and the review had no reason to look at it. Removing its stamp froze
+change detection for the entire non-signal tree.
+
+Everything observed on alpha follows from that one line:
+
+| Observation | Why |
+|---|---|
+| "Loading content..." forever, no errors, data present | global tick never reaches any view |
+| The sync strip (`app-sync-progress`) kept updating live | it is signal-backed — a signal write marks its own view dirty and rides the *targeted* refresh path, which does not depend on the root |
+| A bare mouse click changed nothing | no template-bound listener, so no view was marked dirty |
+| Dispatching the navigator's `(navigate)` event instantly rendered the whole page | Angular's listener wrapper marks that view dirty, and a targeted refresh reaches it |
+
+**Diagnosis rule of thumb:** signal-backed components updating while plain-property components
+stay frozen is the fingerprint of a non-Eager root, not of a data-layer stall. Verify by
+dispatching any template-bound event and watching the page unstick.
+
+### lamad restorations (2026-07-31)
+
+`app/lamad/src/app/app.component.ts` (the root, and the necessary fix), plus nine route-visible
+components that were left implicitly OnPush while carrying the documented subscribe-mutation
+shape — they are the next rungs down the same chain, so an Eager root alone still strands the
+learner:
+
+| Component | Failure mode |
+|---|---|
+| `app/lamad/src/app/app.component.ts` | **ROOT view** — an OnPush root freezes global change detection for the whole tree |
+| `app/lamad/src/app/components/lamad-layout/lamad-layout.component.ts` | `ngOnInit` subscribe mutation (the readiness gate that hung) |
+| `app/lamad/src/app/components/lamad-home/lamad-home.component.ts` | `ngOnInit` subscribe mutation (path index load) |
+| `app/lamad/src/app/components/path-navigator/path-navigator.component.ts` | `ngOnInit` subscribe mutation + `setTimeout` |
+| `app/lamad/src/app/components/path-overview/path-overview.component.ts` | `ngOnInit` subscribe mutation |
+| `app/lamad/src/app/components/graph-explorer/graph-explorer.component.ts` | `ngOnInit` subscribe mutation |
+| `app/lamad/src/app/components/search/search.component.ts` | queryParams + search subscribe mutation |
+| `app/lamad/src/app/components/meaning-map/meaning-map.component.ts` | `ngOnInit` subscribe mutation |
+| `app/lamad/src/app/components/attention-flow/attention-flow.component.ts` | `ngOnInit` subscribe mutation |
+| `app/lamad/src/app/content-io/components/default-code-editor/default-code-editor.component.ts` | debounced subscribe mutation + `setTimeout` |
+
+Two regression specs now guard the class, both built so they FAIL without the stamp (verified by
+removing it): `app/lamad/src/app/app.component.spec.ts` (root-view propagation) and the
+`readiness gate renders without an external change-detection trigger` case in
+`app/lamad/src/app/components/lamad-layout/lamad-layout.component.spec.ts`. Both mirror the
+browser instead of forcing a check — `provideZoneChangeDetection()` (TestBed defaults to
+zoneless, which masks this entire class), `fixture.autoDetectChanges(true)`, the mutation
+delivered inside `NgZone.run()`, and the assertion taken after `whenStable()`. Neither calls
+`fixture.detectChanges()` after the mutation.
+
+### OPEN — the other three bundle roots are still implicitly OnPush
+
+Not changed in this fix (the lamad hang was the reported regression and is the only surface
+verified end-to-end against live alpha data). All three carry the same latent root-view freeze
+and each needs its own eyes-on verification before stamping:
+
+- `app/elohim-app/src/app/app.component.ts`
+- `doorway/doorway-app/src/app/app.component.ts`
+- `app/imagodei-portal/src/app/app.component.ts`
+
+Their first paint is masked by router navigation (activating a routed component marks views
+dirty), so a static route renders fine and only *post-render async updates* freeze — the same
+mask the review noted for `elohim-navigator`. Route each app through `pnpm look` on a surface
+whose content arrives after first paint before deciding.
 
 ## Recheck trigger
 

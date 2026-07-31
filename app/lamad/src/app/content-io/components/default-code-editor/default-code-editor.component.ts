@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import {
+  ChangeDetectionStrategy,
   Component,
   Input,
   Output,
@@ -51,6 +52,8 @@ import { ContentIOExportInput } from '../../interfaces/content-io-plugin.interfa
   imports: [CommonModule, FormsModule],
   templateUrl: './default-code-editor.component.html',
   styleUrls: ['./default-code-editor.component.css'],
+  // OnPush-unsafe: debounced subscribe mutation + setTimeout — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class DefaultCodeEditorComponent implements ContentEditorComponent, OnInit, OnDestroy {
   // ═══════════════════════════════════════════════════════════════════════════

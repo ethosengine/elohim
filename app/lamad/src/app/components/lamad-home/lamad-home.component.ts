@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, Inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, OnDestroy, Inject } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
 // @coverage: 86.3% (2026-02-24)
@@ -42,6 +42,8 @@ import { PathService } from '../../services/path.service';
   imports: [CommonModule, RouterModule],
   templateUrl: './lamad-home.component.html',
   styleUrls: ['./lamad-home.component.css'],
+  // OnPush-unsafe: ngOnInit subscribe mutation (path index load) — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class LamadHomeComponent implements OnInit, OnDestroy {
   /** Featured paths shown initially (limited for performance) */

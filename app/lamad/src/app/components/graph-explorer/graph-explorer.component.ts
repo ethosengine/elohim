@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import {
+  ChangeDetectionStrategy,
   Component,
   inject,
   Inject,
@@ -67,6 +68,8 @@ const EDGE_TYPE_NEXT: ClusterEdge['type'] = 'NEXT';
   imports: [CommonModule, RouterModule],
   templateUrl: './graph-explorer.component.html',
   styleUrls: ['./graph-explorer.component.css'],
+  // OnPush-unsafe: ngOnInit subscribe mutation — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('graphContainer', { static: true })
