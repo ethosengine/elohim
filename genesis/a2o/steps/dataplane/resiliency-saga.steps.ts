@@ -102,6 +102,121 @@ function resolveMetricsBaseUrl(world: E2EWorld, peerName: string, metricName: st
 }
 
 /**
+ * Shared implementation for both the lenient ("{word} {float}") and strict
+ * ("strictly {word} {float}") wordings of the labelled-metric Then step
+ * below. Both share the same base pending-not-fail contract for a truly
+ * unreachable surface (missing storage URL, or /metrics never once
+ * answering 200 across the whole poll window) — that always stays
+ * 'pending', never a hard failure, in either mode.
+ *
+ * Where they diverge is what an ABSENT series/label combination means once
+ * the endpoint has proven itself reachable (answered 200 at least once):
+ *
+ * - lenient (strict=false, the default wording, unchanged behavior): still
+ *   returns 'pending' — "the sweep genuinely hasn't run yet" is treated the
+ *   same as "cannot observe yet at all". This is what chapter 2's
+ *   skipped_present>=0 and chapter 7's custody_class_count>=1 scenarios
+ *   still use; keeping their behavior exactly as before is deliberate — see
+ *   the "strictly" wording's docstring for why this can't be flipped
+ *   globally.
+ * - strict (strict=true, "strictly" wording): once /metrics has answered
+ *   200 at least once during the poll, an absent series/label combination
+ *   is a MEASURED zero, not an unobserved one — the endpoint had every
+ *   chance to report it and never did. The assertion runs against 0 and
+ *   fails if the comparison demands more. This closes the false-green
+ *   channel where a 'pending' step causes cucumber to SKIP every remaining
+ *   step in the scenario (including an always-materialised gauge assertion
+ *   later in the same scenario) — see ch06's "healing forward and locally
+ *   converged" scenario.
+ */
+interface LabeledMetricAssertion {
+  world: E2EWorld;
+  metricName: string;
+  labelKey: string;
+  labelValue: string;
+  peerName: string;
+  cmp: string;
+  expected: number;
+  strict: boolean;
+}
+
+async function assertLabeledMetric(args: LabeledMetricAssertion): Promise<'pending' | void> {
+  const { world, metricName, labelKey, labelValue, peerName, cmp, expected, strict } = args;
+  const base = resolveMetricsBaseUrl(world, peerName, metricName);
+  if (!base) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `  PENDING: labeled metric "${metricName}" on ${peerName} — ` +
+        `no direct storage URL configured (set E2E_STORAGE_${peerName.toUpperCase()})`
+    );
+    return 'pending';
+  }
+
+  // elohim_-prefixed series (identity-fill, custody-class, heal-outcomes)
+  // are populated by elohim-storage's periodic multi-minute sweep, not on
+  // every scrape — poll rather than declaring pending on the first miss. A
+  // non-200 response or network error is treated the same as "series absent
+  // yet" (keep polling — the endpoint may still be coming up post-restart);
+  // GAUGE_SWEEP_POLL_TIMEOUT_MS bounds the total wait either way.
+  //
+  // `reachable` tracks whether /metrics EVER answered 200 during the poll —
+  // this is the env-red (endpoint never reachable) vs code-red (endpoint
+  // reachable, series genuinely never fired) distinction the strict mode
+  // needs; it is only ever set true inside the probe, right after a 200.
+  let reachable = false;
+  const actual = await pollForGauge(async () => {
+    const { status, text: body } = await getRaw(`${base}/metrics`);
+    if (status !== 200) {
+      throw new Error(`GET ${base}/metrics returned ${status}`);
+    }
+    reachable = true;
+    return parseLabeledPrometheusMetric(body, metricName, labelKey, labelValue);
+  });
+
+  let measured: number;
+  if (actual === undefined) {
+    if (strict && reachable) {
+      measured = 0;
+    } else {
+      // eslint-disable-next-line no-console
+      console.log(
+        `  PENDING: labeled metric "${metricName}{${labelKey}="${labelValue}"}" on ${peerName} — ` +
+          `series/label combination not present after polling up to ` +
+          `${GAUGE_SWEEP_POLL_TIMEOUT_MS / 1000}s (/metrics unreachable, or the sweep genuinely hasn't run yet)`
+      );
+      return 'pending';
+    }
+  } else {
+    measured = actual;
+  }
+
+  const label = `labeled metric "${metricName}{${labelKey}="${labelValue}"}" on ${peerName}: ${measured} ${cmp} ${expected}`;
+  switch (cmp) {
+    case '>=':
+      assert.ok(measured >= expected, `${label} — FAILED`);
+      break;
+    case '<=':
+      assert.ok(measured <= expected, `${label} — FAILED`);
+      break;
+    case '>':
+      assert.ok(measured > expected, `${label} — FAILED`);
+      break;
+    case '<':
+      assert.ok(measured < expected, `${label} — FAILED`);
+      break;
+    case '==':
+    case '=':
+      assert.strictEqual(measured, expected, `${label} — FAILED`);
+      break;
+    case '!=':
+      assert.notStrictEqual(measured, expected, `${label} — FAILED`);
+      break;
+    default:
+      throw new Error(`Unknown comparison operator: "${cmp}". Use >=, <=, >, <, ==, !=`);
+  }
+}
+
+/**
  * Assert a labelled Prometheus metric value on the peer's /metrics endpoint,
  * pinning ONE label key/value pair (e.g. action="created", class="stocked").
  *
@@ -131,64 +246,68 @@ Then(
     cmp: string,
     expected: number
   ) {
-    const base = resolveMetricsBaseUrl(this, peerName, metricName);
-    if (!base) {
-      // eslint-disable-next-line no-console
-      console.log(
-        `  PENDING: labeled metric "${metricName}" on ${peerName} — ` +
-          `no direct storage URL configured (set E2E_STORAGE_${peerName.toUpperCase()})`
-      );
-      return 'pending';
-    }
-
-    // elohim_-prefixed series (identity-fill, custody-class) are populated by
-    // elohim-storage's periodic multi-minute sweep, not on every scrape —
-    // poll rather than declaring pending on the first miss. A non-200
-    // response or network error is treated the same as "series absent yet"
-    // (keep polling — the endpoint may still be coming up post-restart);
-    // GAUGE_SWEEP_POLL_TIMEOUT_MS bounds the total wait either way.
-    const actual = await pollForGauge(async () => {
-      const { status, text: body } = await getRaw(`${base}/metrics`);
-      if (status !== 200) {
-        throw new Error(`GET ${base}/metrics returned ${status}`);
-      }
-      return parseLabeledPrometheusMetric(body, metricName, labelKey, labelValue);
+    return assertLabeledMetric({
+      world: this,
+      metricName,
+      labelKey,
+      labelValue,
+      peerName,
+      cmp,
+      expected,
+      strict: false,
     });
+  }
+);
 
-    if (actual === undefined) {
-      // eslint-disable-next-line no-console
-      console.log(
-        `  PENDING: labeled metric "${metricName}{${labelKey}="${labelValue}"}" on ${peerName} — ` +
-          `series/label combination not present after polling up to ` +
-          `${GAUGE_SWEEP_POLL_TIMEOUT_MS / 1000}s (/metrics unreachable, or the sweep genuinely hasn't run yet)`
-      );
-      return 'pending';
-    }
-
-    const label = `labeled metric "${metricName}{${labelKey}="${labelValue}"}" on ${peerName}: ${actual} ${cmp} ${expected}`;
-    switch (cmp) {
-      case '>=':
-        assert.ok(actual >= expected, `${label} — FAILED`);
-        break;
-      case '<=':
-        assert.ok(actual <= expected, `${label} — FAILED`);
-        break;
-      case '>':
-        assert.ok(actual > expected, `${label} — FAILED`);
-        break;
-      case '<':
-        assert.ok(actual < expected, `${label} — FAILED`);
-        break;
-      case '==':
-      case '=':
-        assert.strictEqual(actual, expected, `${label} — FAILED`);
-        break;
-      case '!=':
-        assert.notStrictEqual(actual, expected, `${label} — FAILED`);
-        break;
-      default:
-        throw new Error(`Unknown comparison operator: "${cmp}". Use >=, <=, >, <, ==, !=`);
-    }
+/**
+ * Strict sibling of the labelled-metric step above: once /metrics has
+ * proven reachable (a 200 response was observed at least once during the
+ * poll), an absent series/label combination is asserted as a measured 0
+ * instead of returning 'pending'. 'pending' is still returned when the
+ * endpoint never once answered 200 (missing storage URL, or genuinely
+ * unreachable throughout the poll) — the env-red/code-red distinction is
+ * preserved, only the "reachable but the label never fired" case is
+ * hardened from a skippable pending into a real assertion.
+ *
+ * Opt-in by wording (not a global default): every OTHER `>= 1`-class caller
+ * of the lenient step must be re-checked before ever moving to strict
+ * semantics wholesale, since a currently-pending environment (series never
+ * observed yet) would become a hard failure. Chapter 7's
+ * `elohim_custody_class_count{class="stocked"} >= 1` scenario is the one
+ * other `>= 1` caller today; it is NOT actually at risk of flipping because
+ * its own `When I read "/api/v1/weave"` step forces the custody-class sweep
+ * to run (and publish ALL SIX class label values, including a genuine 0 for
+ * "stocked") before this Then ever executes — so by assertion time the
+ * series is always present (measured, possibly 0), never absent, under
+ * either wording. `elohim_projection_heal_outcomes_total` has no such
+ * forcing step for the "healed" label, which is exactly why it — and only
+ * it — needed the strict wording.
+ *
+ * Example:
+ *   Then labeled metric "elohim_projection_heal_outcomes_total" with label "outcome" "healed" on peer "alpha-A" strictly >= 1
+ */
+Then(
+  'labeled metric {string} with label {string} {string} on peer {string} strictly {word} {float}',
+  { timeout: GAUGE_SWEEP_POLL_TIMEOUT_MS + 15_000 },
+  async function (
+    this: E2EWorld,
+    metricName: string,
+    labelKey: string,
+    labelValue: string,
+    peerName: string,
+    cmp: string,
+    expected: number
+  ) {
+    return assertLabeledMetric({
+      world: this,
+      metricName,
+      labelKey,
+      labelValue,
+      peerName,
+      cmp,
+      expected,
+      strict: true,
+    });
   }
 );
 

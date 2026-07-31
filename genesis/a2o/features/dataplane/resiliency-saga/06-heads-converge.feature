@@ -5,10 +5,25 @@
 # notary-authority.feature's "resolves the same canonical head across peers" step
 # for the same distinction at the notary layer).
 #
-# Proof signal (local): alpha-A's own reconcile pass reports caughtUp=true, has
-#   healed at least once (elohim_projection_heal_outcomes_total{outcome="healed"}),
-#   and its own per-sweep convergence gauge (elohim_projection_reconcile_converged)
-#   reads 1 (2026-07-26 reframe — see below).
+# Proof signal (local): alpha-A's own reconcile pass reports caughtUp=true, its
+#   own per-sweep convergence gauge (elohim_projection_reconcile_converged)
+#   reads 1 (2026-07-26 reframe — see below), and has healed at least once
+#   (elohim_projection_heal_outcomes_total{outcome="healed"}).
+#
+# Ordering + strictness (2026-07-31): the converged-gauge assertion runs
+# BEFORE the healed-outcome assertion, and the healed-outcome assertion uses
+# the "strictly" labelled-metric wording. Both changes close the same false-
+# green channel: the lenient labelled-metric step returns 'pending' (not a
+# hard failure) when the healed{outcome} series has never been observed
+# (e.g. right after a restart, before the first successful heal) — and a
+# 'pending' step makes cucumber SKIP every remaining step in the scenario,
+# so the converged assertion below it never ran and the scenario could read
+# green/pending while convergence was actually 0. "strictly" makes an absent
+# series a measured zero (assert-and-fail) once /metrics has proven
+# reachable, rather than an unobserved 'pending'; reordering additionally
+# guarantees the always-materialised converged gauge (registered at process
+# start, never legitimately "not yet observable") is checked first and can
+# never be shadowed by any predecessor's pending, strict or not.
 # Proof signal (cross-node): the served head for elohim-host-landing matches the
 #   declared head on BOTH alpha-A and elohim.host (reused verbatim from
 #   served-projected-head.feature's Track-4 T4-2 step).
@@ -44,8 +59,8 @@ Feature: Chapter 6 — blobs sync to one head
 
   Scenario: alpha-A's reconcile pass is healing forward and locally converged
     Then peer "alpha-A" /health p2p.caughtUp is true
-    And labeled metric "elohim_projection_heal_outcomes_total" with label "outcome" "healed" on peer "alpha-A" >= 1
     And metric "elohim_projection_reconcile_converged" on peer "alpha-A" >= 1
+    And labeled metric "elohim_projection_heal_outcomes_total" with label "outcome" "healed" on peer "alpha-A" strictly >= 1
 
   # Station (minted 2026-07-26): the interstitial node the cure sprint could only
   # find by log archaeology. Both projections CLAIM a notarized anchor for the
