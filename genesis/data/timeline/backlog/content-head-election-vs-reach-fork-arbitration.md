@@ -87,3 +87,131 @@ Read the DNA (`content_store/src/lib.rs`): **the existing machinery cannot conve
 **Fork resolved 2026-07-11 (partition-risk aware): prefer reuse-an-existing-entry over a new link type.** Checked the integrity zome: **no existing Head/Canonical/Version/Supersede link type**, and `LinkTypes` is at **225/256** (tight per the DNA CLAUDE.md link-budget warning). A NEW link type is an integrity change → DNA-hash change → **P2P partition / re-key event** (a network event, not a deploy — the consequential path to avoid). So the selector should be modeled to stay **coordinator-only / hot-swappable**: reuse an existing entry type (an Attestation, or a Content record with a canonical-head discriminator — note "canonical attestation entries now live as elohim DNA Content entries", integrity lib.rs:1095) that a coordinator `declare` writes and the coordinator `resolve_content_head` reads, so it lands via `update_coordinators` (`ALLOW_COORDINATOR_UPDATE`) with no DNA-hash move. This is the next arc's focused DNA-design decision (rust-architect) — a fresh Objective, not tail-of-session integrity surgery.
 
 Note: this is the LANDING's case — a genesis-canonical artifact double-authored at deploy (a deploy artifact, one intended head). GENUINE independent authorship of the same real-world object (two agents, one EPR) is a DISTINCT future problem: true bespoke-duplicate MERGING (entity resolution), NOT head-election. Do not conflate — the landing wants ONE canonical head elected across its accidental twins; real duplicates want a merge. (Operator, 2026-07-11: "C is future design work for true merging bespoke duplicates.")
+
+## CORRECTED 2026-07-31 — the 2026-07-11 "B needs a cross-root selector" claim is stale; it shipped
+
+The 2026-07-11 addendum above ("DNA-GROUNDED... the existing declare/resolve
+is single-root-scoped") concluded that cross-root convergence "needs a
+bounded DNA change: a cross-root canonical-head selector," and the
+fork-resolution paragraph immediately after it recommended building that
+selector as a coordinator-only reuse of an existing entry type (no new link
+type, no DNA-hash move). Both the selector and the reuse-not-a-new-link-type
+shape have since **shipped**:
+
+- `select_canonical_winner` — `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs:2876`
+  — a pure, unit-tested arbitration function over `CanonicalCandidate`s (see
+  its own unit tests at `:2977` onward).
+- `declare_canonical_content_head` — same file, `:3557` — the CROSS-ROOT
+  declare entry point. Its input (`DeclareCanonicalHeadInput`, documented
+  from `:2609`) may name "ANY retrievable Content action for the id —
+  including a version authored under a DIFFERENT root by a DIFFERENT agent,"
+  exactly the `elohim-host-landing` adam-vs-matthew shape this addendum was
+  written against. It is gated by `authorize_canonical_head_declarer` (a
+  labeled DEV-TIME SCAFFOLD, god-mode open today — the earned-authority seam,
+  not first-writer-wins) rather than by root-chain membership, which is the
+  cross-root property the 07-11 addendum was asking for.
+
+Both are coordinator functions (no new integrity-zome link type), so they
+landed via `update_coordinators` hot-swap — no DNA-hash move, no partition —
+consistent with the 07-11 fork-resolution recommendation. The Rust-side
+consumer is `elohim/elohim-storage/src/services/head_adoption.rs`
+(adopt-before-author), whose module doc explicitly defers ordering decisions
+to this selector: "ordering is arbitrated in-zome by `select_canonical_winner`.
+Inventing a newest-wins election here would reintroduce the head-flapping
+this exists to stop" (`head_adoption.rs:40-42`).
+
+This correction does not reopen the deferred fork-arbitration item above —
+the earned-authority C5 criterion (reach-cohort + signature) is still
+unbuilt, and `authorize_canonical_head_declarer` is still the god-mode
+scaffold, not C5. It only retires the specific "the selector doesn't exist
+yet" claim. See the DECISION section below (2026-07-31) for the current
+answer to the declared-vs-declared question this selector's arbitration
+partially bears on.
+
+## DECISION 2026-07-31 — ch06 declared-vs-declared head-direction: R1 adopted
+
+The ch06 resiliency-saga station
+(`genesis/a2o/features/dataplane/resiliency-saga/06-heads-converge.feature`,
+"a declared-vs-declared conflict rule") asked: when two peers each hold a
+DECLARED, notarized head for the same content id, which declaration wins?
+Three options were on the table.
+
+- **R1 — no automatic arbitration between two competing declared heads.**
+  Divergence escalates to a FRESH authority declaration; it does not resolve
+  locally. Today's stand-in authority channel is the deploy declare-cycle
+  (`scripts/ci/stage-spa-blob.sh` `DECLARE_ONLY`, invoked from
+  `authorHeadOnce` in the root `Jenkinsfile`). **ADOPTED.**
+- **R2 — earned-tier arbitration via `progenitor_pubkey`.** The winner is
+  whichever declaration carries the earned-authority signature (reach-cohort
+  edit-membership + author/community signature — the Plan C5 criterion this
+  backlog item's "deferred work" section already scoped, and the eventual
+  replacement for `authorize_canonical_head_declarer`'s god-mode scaffold).
+  **Recorded as the successor arc, gated on C5.** C5 is DNA-hash-moving (the
+  earned-tier marker is anticipated to need new entry/link shape beyond the
+  reused `Content`-record discriminator the staging tier uses today), so
+  landing it requires the alpha genesis pair (adam + matthew — see
+  `[[project_alpha_topology_bootstrap_pair]]`) to reinstall together, per the
+  root `CLAUDE.md`'s DNA-reinstall-pairing invariant.
+- **R3 — newest `declared_at` wins.** **REJECTED.**
+
+### Why R1, not R3 (LAW-3: head stays declared, never recency)
+
+`declared_at` is not globally comparable across conductors —
+`elohim/elohim-storage/src/services/head_adoption.rs:36-42`: "the zome
+substitutes the RECEIVING conductor's `sys_time` on the carried-record
+branch, so 'whose declaration is newer' cannot be decided from two peers'
+projections." A newest-wins rule would silently prefer whichever conductor's
+receive-clock happened to be later, not whichever declaration is actually
+authoritative — reintroducing exactly the head-flapping that
+`select_canonical_winner`'s presence-based (not recency-based) in-zome
+arbitration was built to stop. Falsifier 1: any observed case where the
+"correct" (operator- or earned-authority-intended) head is the OLDER
+`declared_at` proves recency is wrong on its own terms. Falsifier 2 (the one
+already on record): `head_adoption.rs` itself states inventing a newest-wins
+rule at the storage layer "would reintroduce the head-flapping this exists to
+stop" — i.e., the module that would have to implement R3 already documents
+why it refuses to.
+
+### Why R1 is sufficient for what was actually observed
+
+The `elohim-host-landing` divergence that motivated this station was a
+**self-crown artifact** — a per-node restart sweep (`witness_ghost_anchors` /
+`reanchor_backfill`) authored a fresh local root and immediately crowned it as
+canonical (the pre-adopt-before-author defect), not two operators genuinely
+and legitimately declaring different, intended heads for the same id. Fix A
+(adopt-before-author, this file's `head_adoption.rs`) already closes the
+self-crown class. The corpus rule this backlog item already carries above
+("`Divergent` escalates to the earned-authority election, it does not resolve
+locally") stands unchanged; the deploy declare-cycle is today's interim stand-in
+for "a fresh authority declaration," and it is now made LOAD-BEARING — the
+`DECLARE_ONLY` leg of `stage-spa-blob.sh` exits non-zero on a fan-out that
+never reaches HTTP 2xx, and the Jenkinsfile's `authorHeadOnce` surfaces that
+as stage/build UNSTABLE — rather than staying silently advisory, because
+under R1 a silent failure of this channel is a silent failure of the ONLY
+arbitration path.
+
+### R1 falsification triggers — any of these reopens the question
+
+1. **A genuine two-operator fork.** Two peers each declare a genuinely
+   DIFFERENT, intended head for the same id — neither a self-crowned restart
+   artifact — and this recurs AFTER adopt-before-author is fleet-wide (i.e.,
+   it is not the self-crown class Fix A already closes). → R2 (earned-tier
+   arbitration) becomes NECESSARY, not merely a nice-to-have successor.
+2. **A newer staging self-declaration displaces a deploy declaration.** If
+   any peer's OWN restart/heal sweep is ever observed re-crowning itself OVER
+   a `DECLARE_ONLY`-propagated deploy declaration (the self-crown defect
+   recurring post-fix, or a new code path with the same shape) → R2
+   IMMEDIATELY: it would mean presence-based in-zome arbitration is not
+   holding and an automatic local rule is silently deciding after all.
+3. **`DECLARE_ONLY` fan-out failing silently.** If the deploy declare-cycle
+   can fail to reach a target doorway without that failure being visible
+   anywhere, the interim authority channel is unverifiable and R1's stand-in
+   is broken. **FIXED by this same 2026-07-31 change** — see
+   `scripts/ci/stage-spa-blob.sh` (the `DECLARE_ONLY` leg now exits non-zero
+   on any fan-out that never confirms HTTP 2xx) and the root `Jenkinsfile`'s
+   `authorHeadOnce` (the `declareRc != 0` branch now calls
+   `unstable(...)`).
+
+Pointer: the ch06 feature's declared-vs-declared station comment
+(`genesis/a2o/features/dataplane/resiliency-saga/06-heads-converge.feature`)
+records this decision inline and points back here for the full rationale.

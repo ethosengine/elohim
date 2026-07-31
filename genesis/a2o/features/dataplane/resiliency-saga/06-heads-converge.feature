@@ -137,10 +137,20 @@ Feature: Chapter 6 — blobs sync to one head
   #     says B's; the operator's deploy intent may say A's. Probe: both
   #     /head responses declared:true with unequal headActionHash — today
   #     that state is invisible (each side reads locally-green).
-  #   current state: OPEN — blocked behind the shem-conductor DHT silence
-  #     (backlog: shem-conductors-signal-hairpin-suspect-dht-silent) and an
-  #     operator head-direction decision; the canonical channel (declare
-  #     with carried record) is the lever once both are resolved.
+  #   DECIDED 2026-07-31 — R1 adopted: no automatic arbitration between two
+  #     competing declared heads. Divergence escalates to a FRESH authority
+  #     declaration rather than resolving locally; recency (declared_at) is
+  #     never the tiebreak — it is not globally comparable across conductors
+  #     (head_adoption.rs:36-42). Today's stand-in authority channel is the
+  #     deploy declare-cycle (stage-spa-blob.sh DECLARE_ONLY, now load-bearing
+  #     rather than advisory). Full record, rejected alternatives (R3), and the
+  #     gated successor arc (R2, earned-tier via progenitor_pubkey):
+  #     genesis/data/timeline/backlog/content-head-election-vs-reach-fork-arbitration.md.
+  #   current state: rule DECIDED; still blocked from live exercise behind the
+  #     shem-conductor DHT silence (backlog:
+  #     shem-conductors-signal-hairpin-suspect-dht-silent) — no fabric event has
+  #     yet driven a real declared-vs-declared conflict through the fresh-
+  #     declaration path end to end.
   Scenario: elohim.host adopts alpha-A's declared head after a restart
     Given peer "elohim.host" at "elohim.host"
     Then peer "elohim.host" resolves the declared head for content "elohim-host-landing" equal to peer "alpha-A"

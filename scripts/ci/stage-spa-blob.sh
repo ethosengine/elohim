@@ -26,21 +26,33 @@ ATTEMPTS="${STAGE_BLOB_ATTEMPTS:-3}"
 # target hash through every doorway is idempotent-by-content — staging
 # scaffold-over-scaffold with an identical target converges identically — and
 # stamps each peer's row eagerly. Resolves the hash from the AUTHORING doorway
-# (SOURCE_DOORWAY_URL), POSTs it to THIS doorway. ADVISORY: always exits 0;
-# a "not retrievable" refusal here is the live diagnostic that the peer's
-# conductor cannot fetch the authoring root's action (substrate gossip gap).
+# (SOURCE_DOORWAY_URL), POSTs it to THIS doorway.
+#
+# LOAD-BEARING under R1 (2026-07-31 decision:
+# genesis/data/timeline/backlog/content-head-election-vs-reach-fork-arbitration.md):
+# there is no automatic arbitration between two competing declared heads —
+# divergence escalates to a fresh authority declaration, and THIS channel is
+# today's stand-in for that authority. A silent fan-out failure here would
+# leave a doorway stale while the caller reports success, so this leg now
+# exits non-zero whenever the declare could NOT be delivered to
+# DOORWAY_EPR_URL (source/hash unresolvable, curl transport error, or the
+# retry ladder exhausted on 503/429/"not retrievable"). It exits 0 only on
+# confirmed propagation (HTTP 2xx). Callers that want the pre-R1 fire-and-forget
+# behaviour should invoke with `sh(returnStatus: true, ...)` and only surface
+# the failure as UNSTABLE, not a hard build failure (see Jenkinsfile
+# authorHeadOnce).
 if [ "${DECLARE_ONLY:-0}" = "1" ]; then
     SRC="${SOURCE_DOORWAY_URL:-}"
     if [ -z "${SRC}" ]; then
         echo "  ⚠ DECLARE_ONLY: SOURCE_DOORWAY_URL not set — skipping canonical-head propagation to ${DOORWAY_EPR_URL}" >&2
-        exit 0
+        exit 1
     fi
     head_hash=$(curl -fSs -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
         "${SRC}/db/content/${SLUG}/head" 2>/dev/null \
         | python3 -c "import sys, json; print(json.load(sys.stdin).get('headActionHash',''))" 2>/dev/null) || head_hash=""
     if [ -z "${head_hash}" ]; then
         echo "  ⚠ DECLARE_ONLY: could not resolve headActionHash from ${SRC}/db/content/${SLUG}/head — skipping propagation to ${DOORWAY_EPR_URL}" >&2
-        exit 0
+        exit 1
     fi
     # DECLARE-CARRIES-RECORD (sprint-3). Ask the AUTHORING doorway for the head
     # action's full serialized Record and carry it in the declare body. Without
@@ -114,6 +126,7 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
     # higher ceiling; 12 stays the default for other callers.
     attempt=0
     max_attempts="${DECLARE_MAX_ATTEMPTS:-12}"
+    declare_ok=0
     while :; do
         attempt=$((attempt + 1))
         declare_raw=$(curl -sS -o - -w '\n%{http_code}' -X POST \
@@ -122,13 +135,14 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
             --data-binary "@${declare_body_file}" \
             "${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head" 2>&1) || {
             echo "  ⚠ DECLARE_ONLY: curl error POSTing canonical-head to ${DOORWAY_EPR_URL}: ${declare_raw} — peer keeps its own head until gossip/heal converges" >&2
-            exit 0
+            exit 1
         }
         declare_status="${declare_raw##*$'\n'}"
         declare_body="${declare_raw%$'\n'*}"
         case "${declare_status}" in
             2??)
                 echo "  ✓ canonical head propagated to ${DOORWAY_EPR_URL}: ${head_hash} (staging tier, attempt ${attempt})"
+                declare_ok=1
                 break
                 ;;
             503|429)
@@ -152,7 +166,14 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
                 ;;
         esac
     done
-    exit 0
+    # R1 (2026-07-31): this leg IS the arbitration channel now — a fan-out
+    # that never reached HTTP 2xx must be visible to the caller, not silently
+    # advisory, so a stale doorway doesn't hide behind a green deploy.
+    if [ "${declare_ok}" = "1" ]; then
+        exit 0
+    fi
+    echo "  ⚠ DECLARE_ONLY: fan-out to ${DOORWAY_EPR_URL} did NOT converge (exhausted retry budget) — exiting non-zero so the caller can surface this" >&2
+    exit 1
 fi
 
 cd "${DIST_DIR}"

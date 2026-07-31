@@ -328,10 +328,17 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
                 outcomes["hash|${bundle.slug}|${kind}".toString()] = readFile(hashFile).trim()
             }
             // Propagate the canonical-head declaration to the OTHER doorways
-            // (DECLARE_ONLY leg in the script; advisory, idempotent-by-content —
-            // cross-peer link gossip can lag/degrade, so each peer's conductor
-            // writes the same canonical link locally). returnStatus: never
-            // fails the build.
+            // (DECLARE_ONLY leg in the script). Under R1 (2026-07-31 decision:
+            // genesis/data/timeline/backlog/content-head-election-vs-reach-fork-arbitration.md)
+            // this IS the declared-vs-declared arbitration channel — no
+            // automatic arbitration exists between two competing declared
+            // heads, so a fan-out failure here must be visible rather than
+            // buried. returnStatus: true still keeps this from hard-failing
+            // the build (a target doorway staying stale is not fatal to the
+            // deploy), but the script now exits non-zero on any fan-out that
+            // never reached HTTP 2xx (source/hash unresolvable, curl error, or
+            // retry ladder exhausted) — surface that as stage/build UNSTABLE
+            // so it isn't silently swallowed.
             for (int j = 0; j < doorwayEprUrls.size(); j++) {
                 if (j == i) { continue }
                 // DECLARE_MAX_ATTEMPTS=24 (~36min worst-case): cross-conductor
@@ -339,9 +346,13 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
                 // the default 12-attempt ladder (~18min) misses the tail. One
                 // successful declare records ordering on the peer, after which
                 // the monotonic heal converges it automatically each sweep.
+                def declareRc = 1
                 withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", 'DECLARE_ONLY=1', 'DECLARE_MAX_ATTEMPTS=24', "SOURCE_DOORWAY_URL=${doorwayEprUrl}"]) {
-                    sh(returnStatus: true,
+                    declareRc = sh(returnStatus: true,
                        script: "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '-' '${bundle.slug}' '${doorwayEprUrls[j]}' '${kind}'")
+                }
+                if (declareRc != 0) {
+                    unstable("canonical-head declare ${bundle.slug} (${kind}): ${doorwayEprUrls[j]} did not confirm propagation (exit ${declareRc}) — that doorway may stay stale until the next declare-cycle or heal converges it; see stage-spa-blob.sh DECLARE_ONLY log above")
                 }
             }
             return host
