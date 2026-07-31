@@ -62,6 +62,33 @@ Feature: Chapter 6 — blobs sync to one head
     And metric "elohim_projection_reconcile_converged" on peer "alpha-A" >= 1
     And labeled metric "elohim_projection_heal_outcomes_total" with label "outcome" "healed" on peer "alpha-A" strictly >= 1
 
+  # HONESTY GUARD (added 2026-07-31, with the divergence-classification cure).
+  #
+  # `elohim_projection_reconcile_converged` was gated on the divergence TOTAL,
+  # and the dominant class of divergence on a live peer is one heal is FORBIDDEN
+  # to move: the local row already carries a different declared head, so only a
+  # canonical channel may move it (fills-never-moves). matthew logged 6071
+  # `refused_declared` outcomes against 8 `healed` in 12h — the refusals are
+  # correct and permanent until a canonical channel fires, so the gauge could
+  # never reach 1 no matter how well the heal leg worked. It read 0 fleet-wide
+  # for 12h+. Convergence now excludes only ADJUDICATED divergence (refused, or
+  # retry-budget-spent) and still fails on unadjudicated divergence.
+  #
+  # This scenario is the fence against the cure becoming a whitewash. It asserts
+  # BOTH sides at once: divergence is still MEASURED and published (>= 1 proves
+  # the total was not quietly zeroed to make the gauge green), AND convergence is
+  # reachable in the same breath. A future change that "fixes" convergence by
+  # suppressing the divergence count fails here; so does one that re-gates
+  # convergence on the total.
+  #
+  # The adjudicated share is separately readable as
+  # `elohim_projection_reconcile_divergent_refused{stream}`, so an operator can
+  # always subtract to get exactly what convergence is gated on:
+  #   elohim_projection_reconcile_divergent - elohim_projection_reconcile_divergent_refused
+  Scenario: convergence excludes only adjudicated divergence, never unresolved divergence
+    Then labeled metric "elohim_projection_reconcile_divergent" with label "stream" "content" on peer "alpha-A" >= 1
+    And metric "elohim_projection_reconcile_converged" on peer "alpha-A" >= 1
+
   # Station (minted 2026-07-26): the interstitial node the cure sprint could only
   # find by log archaeology. Both projections CLAIM a notarized anchor for the
   # content id, but the claims diverge (alpha-A uhCkkh_Gb… vs elohim.host

@@ -1053,6 +1053,41 @@ pub fn declared_head_for(
     Ok(found.flatten().filter(|h| !h.trim().is_empty()))
 }
 
+/// Batch form of [`declared_head_for`]: the declared HEAD for every id in `ids`
+/// that carries one, as `id → head`.
+///
+/// Ids with no row, a NULL declaration, or an empty-string declaration are
+/// ABSENT from the map — the same "nothing local to preserve" collapse
+/// [`declared_head_for`] makes, so a caller can read presence-in-map as "a
+/// canonical channel owns this row's head".
+///
+/// Exists so the reconcile discovery leg can classify a whole sweep's divergence
+/// set with ONE query instead of a per-id round trip (the divergent set is
+/// thousands of rows on a seeded peer). Chunked under SQLite's bound-variable
+/// limit exactly as [`content_ids_present`] is.
+pub fn declared_heads_for(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    ids: &[String],
+) -> Result<std::collections::HashMap<String, String>, StorageError> {
+    const CHUNK: usize = 500;
+    let mut out = std::collections::HashMap::new();
+    for chunk in ids.chunks(CHUNK) {
+        let rows: Vec<(String, Option<String>)> = content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq_any(chunk))
+            .select((content::id, content::declared_head_action_hash))
+            .load(conn)
+            .map_err(|e| StorageError::Internal(format!("declared head batch lookup: {e}")))?;
+        for (id, declared) in rows {
+            if let Some(head) = declared.filter(|h| !h.trim().is_empty()) {
+                out.insert(id, head);
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// Stamp the notary-declared HEAD onto an EXISTING content row — the reconcile
 /// leg's conductor-VERIFIED stamp entrypoint (HEAD-election projection, Plan C3).
 ///
@@ -3411,6 +3446,50 @@ mod tests {
 
     /// HEAD-election (ii): `stamp_declared_head` stamps an EXISTING row (both hashes)
     /// and returns `Ok(false)` (no insert) for a missing row; re-stamp is idempotent.
+    #[test]
+    fn declared_heads_for_batches_the_skipped_declared_predicate() {
+        // The reconcile discovery leg classifies a whole sweep's divergence on
+        // this one query, so it must agree EXACTLY with the per-id
+        // `declared_head_for` that `stamp_declared_head_mode` consults before
+        // returning `SkippedDeclared` — a row in the map is a row heal is
+        // forbidden to move.
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        create_content(&mut conn, &ctx, mk_plain("declared")).unwrap();
+        create_content(&mut conn, &ctx, mk_plain("undeclared")).unwrap();
+        stamp_declared_head(&mut conn, &ctx, "declared", "uhCkk-head-1", None, None).unwrap();
+
+        let ids = vec![
+            "declared".to_string(),
+            "undeclared".to_string(),
+            "no-such-row".to_string(),
+        ];
+        let map = declared_heads_for(&mut conn, &ctx, &ids).unwrap();
+
+        assert_eq!(
+            map.get("declared").map(String::as_str),
+            Some("uhCkk-head-1")
+        );
+        assert!(
+            !map.contains_key("undeclared"),
+            "an undeclared row has nothing local to preserve — heal MAY fill it"
+        );
+        assert!(
+            !map.contains_key("no-such-row"),
+            "a missing row is absence, not a declaration"
+        );
+
+        // Agreement with the per-id predicate, both directions.
+        for id in ["declared", "undeclared", "no-such-row"] {
+            assert_eq!(
+                declared_head_for(&mut conn, &ctx, id).unwrap(),
+                map.get(id).cloned(),
+                "batch and per-id predicates disagree on {id}"
+            );
+        }
+    }
+
     #[test]
     fn stamp_declared_head_stamps_existing_and_false_for_missing() {
         let mut conn = setup_test_db();

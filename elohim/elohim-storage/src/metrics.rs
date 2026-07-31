@@ -465,6 +465,45 @@ lazy_static! {
     )
     .unwrap();
 
+    /// The ADJUDICATED share of `elohim_projection_reconcile_divergent` — the
+    /// divergence this sweep is not permitted (or no longer able) to resolve.
+    /// label: stream = "rea" | "content" | "collectives".
+    ///
+    /// Additive on purpose: the existing `..._divergent` series KEEPS meaning the
+    /// TOTAL (no class label was added to it, so every existing dashboard and
+    /// alert stays valid). Subtract to get the number convergence is actually
+    /// gated on:
+    ///
+    /// ```promql
+    /// elohim_projection_reconcile_divergent - elohim_projection_reconcile_divergent_refused
+    /// ```
+    ///
+    /// Two things land in this bucket, both of them the substrate working as
+    /// designed rather than a gap:
+    ///
+    /// - **refused-declared** — the local row already carries a DIFFERENT declared
+    ///   head, so heal is FORBIDDEN to move it (`StampOutcome::SkippedDeclared`;
+    ///   canonical channels own that move). Permanent until a canonical channel
+    ///   fires, and the DOMINANT class on a live peer.
+    /// - **retry-exhausted** — the cross-sweep miss ledger has spent the id's
+    ///   budget against unchanged peer evidence.
+    ///
+    /// Why it exists: `elohim_projection_reconcile_converged` was gated on the
+    /// TOTAL, so ONE correctly-refused row pinned it at 0 for the process
+    /// lifetime (matthew, 12h: 6071 `refused_declared` heal outcomes against 8
+    /// `healed`). A gauge that cannot move is not a conservative gauge; it is an
+    /// unreadable one. This series is what makes the split legible from
+    /// Prometheus alone.
+    pub static ref PROJECTION_RECONCILE_DIVERGENT_REFUSED: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_divergent_refused",
+            "Last-sweep ADJUDICATED anchor-divergent rows by reconcile stream \
+             (heal forbidden to move, or retry budget spent).",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
     /// Reconcile sweeps completed. The DENOMINATOR for every other reconcile
     /// series — "gaps per sweep" and "heals per sweep" are only readable against
     /// it, exactly as `elohim_sync_rounds_total` serves the sync plane. Without
@@ -641,6 +680,38 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Acquisition pins currently RETIRED — pins whose bytes no connected peer
+    /// could supply, held back so they stop pinning `pull.caughtUp` false forever.
+    ///
+    /// The gauge that makes retirement legible instead of magical. `pull.caughtUp`
+    /// reaching true is only trustworthy read TOGETHER with this: caught-up with
+    /// this at 0 means everything wanted arrived; caught-up with this non-zero
+    /// means the queue drained because unsatisfiable wants were set aside, and the
+    /// pins are still on the books awaiting re-admission.
+    pub static ref ACQUISITION_PINS_RETIRED: IntGauge = IntGauge::new(
+        "elohim_acquisition_pins_retired",
+        "Acquisition pins currently retired (no connected peer can supply their bytes).",
+    )
+    .unwrap();
+
+    /// Acquisition pin retirement TRANSITIONS. label: reason = "exhausted"
+    /// (retired: every want spent its retry budget against every connected peer)
+    /// | "readmitted" (revived: a peer advertised the content again, or the
+    /// cooldown elapsed).
+    ///
+    /// A counter beside the gauge on purpose: a steady gauge can mean "nothing is
+    /// happening" or "pins are retiring and reviving at the same rate", and only
+    /// the transition rate tells them apart — the same flapping question
+    /// `elohim_projection_reconcile_sweeps_total` answers for the reconcile plane.
+    pub static ref ACQUISITION_PIN_RETIREMENTS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_pin_retirements_total",
+            "Acquisition pin retirement transitions by reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
     /// Outbound sync request outcomes. Deliberately labelled by RESULT ONLY, never
     /// by peer: a peer-id label is an unbounded-cardinality bomb on a real mesh.
     /// Peer identity stays in the log line at the same site. label: result = "ok" |
@@ -721,6 +792,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_LOCAL_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_EXHAUSTED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_DIVERGENT.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_DIVERGENT_REFUSED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_SWEEPS.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_CONVERGED.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_REDISTRIBUTE_BYTES_MISSING.clone()));
@@ -735,6 +807,8 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(SYNC_DOCS_ENUMERATED.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUEST_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_OUTCOMES.clone()));
+        let _ = REGISTRY.register(Box::new(ACQUISITION_PINS_RETIRED.clone()));
+        let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_RETIREMENTS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_IN_SYNC_TOTAL.clone()));
     });
 }
@@ -962,13 +1036,19 @@ pub fn inc_projection_heal_outcome(stream: &str, outcome: &str) {
 }
 
 /// Publish a reconcile stream's last-sweep gauges: discovered `gaps` (pending after
-/// discovery) and `local_total` (local projection rows). `stream` is "rea" | "content".
+/// discovery) and `local_total` (local projection rows). `stream` is "rea" |
+/// "content" | "collectives".
+///
+/// `divergent` is the TOTAL; `divergent_refused` is its adjudicated share (see
+/// [`PROJECTION_RECONCILE_DIVERGENT_REFUSED`]) — `divergent_refused <= divergent`
+/// always, and the difference is what gates convergence.
 pub fn set_projection_reconcile_gauges(
     stream: &str,
     gaps: u64,
     local_total: u64,
     exhausted: u64,
     divergent: u64,
+    divergent_refused: u64,
 ) {
     PROJECTION_RECONCILE_GAPS
         .with_label_values(&[stream])
@@ -982,16 +1062,28 @@ pub fn set_projection_reconcile_gauges(
     PROJECTION_RECONCILE_DIVERGENT
         .with_label_values(&[stream])
         .set(divergent as i64);
+    PROJECTION_RECONCILE_DIVERGENT_REFUSED
+        .with_label_values(&[stream])
+        .set(divergent_refused as i64);
 }
 
 /// 1 when the peer holds what its peers advertised, 0 otherwise. Pure so the
 /// three-condition rule is testable without a registry — and so it cannot drift
 /// from `GapCounts::converged`, which computes the same rule minus divergence.
+///
+/// `divergent_actionable` is the UNADJUDICATED divergence — the total MINUS the
+/// share heal is forbidden to move (a canonical channel owns the row's declared
+/// head) or has exhausted its retry budget against. Passing the TOTAL here is the
+/// bug this parameter name now guards: on a live peer the refused class is the
+/// dominant one and permanent until a canonical channel fires, so a total-gated
+/// gauge reads 0 forever no matter how well the heal leg works. Divergence
+/// nobody has adjudicated still defeats convergence — that half is the honest
+/// half and is kept.
 pub fn converged_gauge_value(
     counts: &crate::p2p::reconcile_rails::GapCounts,
-    divergent: usize,
+    divergent_actionable: usize,
 ) -> i64 {
-    i64::from(counts.converged && divergent == 0)
+    i64::from(counts.converged && divergent_actionable == 0)
 }
 
 /// Publish one completed reconcile sweep: advance the sweep denominator and
@@ -1002,10 +1094,10 @@ pub fn converged_gauge_value(
 /// the failure mode that let `/health` and `/p2p/status` drift 12x apart.
 pub fn record_reconcile_sweep(
     counts: &crate::p2p::reconcile_rails::GapCounts,
-    divergent_anchor: usize,
+    divergent_actionable: usize,
 ) {
     PROJECTION_RECONCILE_SWEEPS.inc();
-    PROJECTION_RECONCILE_CONVERGED.set(converged_gauge_value(counts, divergent_anchor));
+    PROJECTION_RECONCILE_CONVERGED.set(converged_gauge_value(counts, divergent_actionable));
 }
 
 /// Record one Part-B redistribution attempt skipped because the candidate's blob
@@ -1013,6 +1105,24 @@ pub fn record_reconcile_sweep(
 /// the precise signal lives here — see [`SHARD_REDISTRIBUTE_BYTES_MISSING`]).
 pub fn inc_shard_redistribute_bytes_missing() {
     SHARD_REDISTRIBUTE_BYTES_MISSING.inc();
+}
+
+/// Publish the count of currently-retired acquisition pins.
+pub fn set_acquisition_pins_retired(count: u64) {
+    ACQUISITION_PINS_RETIRED.set(count as i64);
+}
+
+/// Record `n` acquisition-pin retirement transitions of `reason` ("exhausted" |
+/// "readmitted").
+///
+/// Both label series are materialised on the first call of each (an `inc_by(0)`
+/// registers the series without moving it), so "no pin has ever retired" stays
+/// distinguishable from "the emitter never ran" — the same diagnosis-ambiguity
+/// lesson as [`inc_identity_fill`].
+pub fn inc_acquisition_pin_retirements(reason: &str, n: u64) {
+    ACQUISITION_PIN_RETIREMENTS
+        .with_label_values(&[reason])
+        .inc_by(n);
 }
 
 /// Publish the last peer_status fan-in sweep's `missed` count.
@@ -1115,6 +1225,43 @@ mod tests {
     }
 
     #[test]
+    fn divergence_heal_is_forbidden_to_move_does_not_defeat_convergence_but_unadjudicated_does() {
+        // The live shape this split cures (matthew, 12h): 6071 divergent rows,
+        // EVERY one of them a row whose local declared head differs — heal is
+        // forbidden to move those (canonical channels own them), so it healed 8.
+        // Gating the gauge on the TOTAL made `converged` structurally
+        // unreachable: the refusals are correct and permanent until a canonical
+        // channel fires, so no amount of healing could ever flip it.
+        let healed = GapCounts {
+            pending: 0,
+            completed: 5,
+            failed: 0,
+            caught_up: true,
+            exhausted: 0,
+            converged: true,
+        };
+
+        // 6071 divergent, all 6071 adjudicated → actionable 0 → CONVERGED.
+        // The total is still published on `..._divergent`; the adjudicated share
+        // on `..._divergent_refused`. Nothing is hidden, only re-classified.
+        let actionable = 6071usize.saturating_sub(6071);
+        assert_eq!(
+            converged_gauge_value(&healed, actionable),
+            1,
+            "divergence heal is FORBIDDEN to move must not defeat convergence"
+        );
+
+        // The honest half is kept: ONE row nobody has adjudicated still defeats
+        // it. This is the guard against the split becoming a whitewash.
+        let actionable = 6071usize.saturating_sub(6070);
+        assert_eq!(
+            converged_gauge_value(&healed, actionable),
+            0,
+            "unadjudicated divergence must still defeat convergence"
+        );
+    }
+
+    #[test]
     fn register_all_idempotent_and_gathers_all_metrics() {
         register_all();
         register_all(); // Once-guarded — must not panic or double-register.
@@ -1158,8 +1305,10 @@ mod tests {
         // The live 2026-07-25 shape, per arm: rea holds ZERO local rows while
         // 62 gaps sit discovered, and content carries 1860 rows under an anchor
         // no peer advertises. `caughtUp` reported true over both.
-        set_projection_reconcile_gauges("rea", 62, 0, 61, 0);
-        set_projection_reconcile_gauges("content", 1956, 4158, 0, 1860);
+        set_projection_reconcile_gauges("rea", 62, 0, 61, 0, 0);
+        // 1860 divergent of which 1855 are adjudicated (heal forbidden to move)
+        // — the split the `..._divergent_refused` series exists to publish.
+        set_projection_reconcile_gauges("content", 1956, 4158, 0, 1860, 1855);
         record_reconcile_sweep(
             &GapCounts {
                 pending: 0,
@@ -1252,6 +1401,11 @@ mod tests {
         assert!(
             text.contains("elohim_projection_reconcile_divergent"),
             "per-stream divergent gauge missing:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_projection_reconcile_divergent_refused"),
+            "adjudicated-divergence gauge missing — without it the total cannot \
+             be read against what convergence is actually gated on:\n{text}"
         );
         assert!(
             text.contains("elohim_projection_reconcile_sweeps_total"),

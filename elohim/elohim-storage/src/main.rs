@@ -4026,6 +4026,7 @@ async fn async_main(
                 tokio::spawn(async move {
                     use elohim_storage::p2p::projection_reconcile::{
                         heal_decision, run_discovery, run_heal, HealAction, InventoryWindow,
+                        MissLedger,
                     };
                     use std::sync::atomic::Ordering;
                     use tokio::time::{interval, Duration, MissedTickBehavior};
@@ -4047,13 +4048,27 @@ async fn async_main(
                     // so a corpus larger than the responder's page cap is windowed
                     // over successive sweeps instead of re-diffing only the hot set.
                     let mut inventory_window = InventoryWindow::new();
+                    // Cross-sweep miss counts, owned by this SAME single loop —
+                    // one owner, no lock. The per-sweep GapTracker cannot carry
+                    // a retry budget across sweeps (it is rebuilt every tick), so
+                    // without this the arms re-ask the conductor about the same
+                    // unresolvable rows forever and the exhausted gauge reads 0
+                    // while the whole backlog is, in fact, being abandoned and
+                    // retried. Re-admission (new peer evidence, or a cooldown)
+                    // keeps exhaustion from becoming a black hole.
+                    let mut miss_ledger = MissLedger::new();
                     loop {
                         tokio::select! {
                             _ = ticker.tick() => {
                                 // Discovery is conductor-free and bounded (peer
                                 // asks capped by PEER_TIMEOUT) — runs EVERY tick.
-                                let plan =
-                                    run_discovery(&handle, &pool, &mut inventory_window).await;
+                                let plan = run_discovery(
+                                    &handle,
+                                    &pool,
+                                    &mut inventory_window,
+                                    &mut miss_ledger,
+                                )
+                                .await;
 
                                 let bridge_up = hc_cell.get().is_some();
                                 let in_flight = heal_inflight.load(Ordering::Acquire);

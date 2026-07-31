@@ -140,6 +140,143 @@ const WITNESS_SWEEP_BUDGET: Duration = Duration::from_secs(120);
 /// the tracker is rebuilt each sweep, so a transient miss self-heals.
 const MAX_RETRIES: u32 = 3;
 
+/// Sweeps an exhausted [`MissLedger`] entry stays dormant before it is re-admitted
+/// for one more round of attempts.
+///
+/// Exhaustion must not be PERMANENT: an id the conductor cannot see today may be
+/// gossiped to it tomorrow, and a ledger with no cooldown would silently stop
+/// healing it for the process lifetime. At the default 300s tick this is ~1h of
+/// dormancy — a ~12× cut in conductor asks for a stuck id, while still retrying
+/// it roughly hourly.
+const MISS_READMIT_SWEEPS: u32 = 12;
+
+/// Per-stream ceiling on ledger entries. Bounds the memory a hostile or merely
+/// huge peer inventory can pin: past the cap new ids are admitted WITHOUT being
+/// recorded (fail-open — the pre-ledger behaviour), never dropped.
+const MISS_LEDGER_CAP: usize = 100_000;
+
+/// Whether a gap id may be enqueued for heal this sweep.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Admission {
+    /// Enqueue it — the retry budget has room (or fresh evidence re-admitted it).
+    Retry,
+    /// Retry budget spent against UNCHANGED evidence — do not enqueue this sweep.
+    /// ADJUDICATED, not unresolved: the conductor has been asked `MAX_RETRIES`
+    /// times and nothing new has been advertised since.
+    Exhausted,
+}
+
+#[derive(Debug, Clone)]
+struct MissEntry {
+    /// Sweeps this id has been a gap under `evidence`.
+    misses: u32,
+    /// The peer-advertised claim that made it a gap (content/REA: the advertised
+    /// anchor; collectives: the cid). A DIFFERENT claim is new evidence and
+    /// re-admits the id immediately.
+    evidence: String,
+    /// Sweeps spent exhausted, counted toward [`MISS_READMIT_SWEEPS`].
+    dormant: u32,
+}
+
+/// Cross-sweep miss counts for the reconcile arms — the thing that makes
+/// `MAX_RETRIES` REAL.
+///
+/// ## Why this exists (the treadmill it kills)
+///
+/// Every arm rebuilds its [`GapTracker`] per sweep (the tracker is Category C
+/// per-sweep state), so `GapTracker::exhausted_count` is structurally always 0
+/// and `enqueue_missing`'s `>= max_retries` refusal can never fire across
+/// sweeps. The visible consequence: ~1000 rows re-discovered and re-asked of the
+/// conductor EVERY sweep forever (matthew logged ~151k `missing` heal outcomes in
+/// 12h), and `elohim_projection_reconcile_exhausted` published 0 while the whole
+/// backlog was, in fact, abandoned-and-retried.
+///
+/// This ledger is owned by the single discovery loop in `main.rs` alongside
+/// [`InventoryWindow`] — one owner, no lock — and threaded `&mut` into each
+/// discovery arm. It is deliberately NOT inside `GapTracker`: the tracker's
+/// per-sweep rebuild is correct (it is the sweep's work list); what was missing
+/// is memory ACROSS sweeps.
+///
+/// ## Re-admission (why exhaustion is never a black hole)
+///
+/// - **New evidence** — a peer advertising a DIFFERENT anchor/cid for the id
+///   resets its counter immediately. The thing we gave up on is not the thing
+///   being advertised now.
+/// - **Cooldown** — after [`MISS_READMIT_SWEEPS`] dormant sweeps the id is
+///   re-admitted for another round.
+///
+/// An id the ledger holds back is ADJUDICATED: it does not defeat convergence
+/// (we have done what the substrate permits), but it never vanishes silently —
+/// it stays in the divergence TOTAL and is published on
+/// `elohim_projection_reconcile_exhausted`.
+#[derive(Debug, Default)]
+pub struct MissLedger {
+    streams: std::collections::HashMap<&'static str, std::collections::HashMap<String, MissEntry>>,
+}
+
+impl MissLedger {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record that `id` is STILL a gap this sweep, under `evidence`, and decide
+    /// whether it may be enqueued.
+    pub fn admit(&mut self, stream: &'static str, id: &str, evidence: &str) -> Admission {
+        let entries = self.streams.entry(stream).or_default();
+        match entries.get_mut(id) {
+            None => {
+                if entries.len() >= MISS_LEDGER_CAP {
+                    // Fail-open: an un-recorded id behaves exactly as it did
+                    // before this ledger existed (retried every sweep).
+                    return Admission::Retry;
+                }
+                entries.insert(
+                    id.to_string(),
+                    MissEntry {
+                        misses: 1,
+                        evidence: evidence.to_string(),
+                        dormant: 0,
+                    },
+                );
+                Admission::Retry
+            }
+            Some(e) => {
+                if e.evidence != evidence {
+                    // New evidence — this is not the claim we gave up on.
+                    e.evidence = evidence.to_string();
+                    e.misses = 1;
+                    e.dormant = 0;
+                    return Admission::Retry;
+                }
+                if e.misses >= MAX_RETRIES {
+                    e.dormant = e.dormant.saturating_add(1);
+                    if e.dormant >= MISS_READMIT_SWEEPS {
+                        e.misses = 1;
+                        e.dormant = 0;
+                        return Admission::Retry;
+                    }
+                    return Admission::Exhausted;
+                }
+                e.misses = e.misses.saturating_add(1);
+                Admission::Retry
+            }
+        }
+    }
+
+    /// `id` is no longer a gap (in-sync, or absent-local and thus another
+    /// plane's job) — forget it, so a later relapse starts from a clean budget.
+    pub fn resolved(&mut self, stream: &'static str, id: &str) {
+        if let Some(entries) = self.streams.get_mut(stream) {
+            entries.remove(id);
+        }
+    }
+
+    /// Ids currently tracked for `stream` (observability / test assertion).
+    pub fn tracked(&self, stream: &'static str) -> usize {
+        self.streams.get(stream).map(|e| e.len()).unwrap_or(0)
+    }
+}
+
 /// Per-peer deadline for a single `ProjectionInventory` federation request.
 const PEER_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -641,6 +778,14 @@ pub struct ProjectionReconcileStatus {
     pub peers_asked: usize,
     /// Gaps in the last sweep that were present locally but with a DIFFERENT
     /// anchor than a peer advertised (anchor-divergence, not just absence).
+    ///
+    /// This stays the TOTAL, deliberately: the wire shape is consumed by
+    /// `/p2p/status` clients and a2o gates, and adjudicated divergence must never
+    /// silently vanish from it. The ADJUDICATED share (heal is forbidden to move
+    /// it, or its retry budget is spent) is published separately on
+    /// `elohim_projection_reconcile_divergent_refused`; only the remainder —
+    /// unadjudicated divergence — defeats
+    /// [`ProjectionReconcileStatus::converged`].
     #[ts(type = "number")]
     pub divergent_anchor: usize,
     /// Cumulative gaps healed across all sweeps this process lifetime.
@@ -679,12 +824,18 @@ impl ProjectionReconcileState {
     }
 
     /// Publish the result of a completed sweep, advancing cumulative counters.
+    ///
+    /// `divergent_anchor` is the TOTAL divergence across the folded arms;
+    /// `divergent_refused` is the ADJUDICATED share of it. The difference —
+    /// UNADJUDICATED divergence — is what convergence is gated on.
     async fn publish_sweep(
         &self,
         counts: crate::p2p::reconcile_rails::GapCounts,
         peers_asked: usize,
         divergent_anchor: usize,
+        divergent_refused: usize,
     ) {
+        let divergent_actionable = divergent_anchor.saturating_sub(divergent_refused);
         let mut s = self.inner.write().await;
         s.pending = counts.pending;
         s.completed = counts.completed;
@@ -697,12 +848,26 @@ impl ProjectionReconcileState {
         s.exhausted = counts.exhausted;
         // The gap ledger converging is necessary but not sufficient: rows held
         // locally under an anchor no peer advertises are divergence this sweep
-        // did not resolve, so they defeat convergence on their own.
-        s.converged = counts.converged && divergent_anchor == 0;
+        // did not resolve, so they defeat convergence on their own — UNLESS the
+        // sweep adjudicated them.
+        //
+        // Adjudicated means one of two things, both of which are the substrate
+        // working as designed rather than a gap:
+        //   1. the local row already carries a DIFFERENT declared head, so heal
+        //      is FORBIDDEN to move it (only canonical channels may — see
+        //      `StampOutcome::SkippedDeclared`); or
+        //   2. the id has spent its cross-sweep retry budget against unchanged
+        //      evidence (`MissLedger`).
+        // Gating on the TOTAL made `converged` unreachable fleet-wide for as long
+        // as ONE correctly-refused row existed (matthew: 6071 refused_declared vs
+        // 8 healed in 12h), which is not an honest zero — it is a metric that
+        // cannot move. Gating on the remainder keeps the honest half: a row nobody
+        // has adjudicated still defeats convergence.
+        s.converged = counts.converged && divergent_actionable == 0;
         // Same call site as the wire field on purpose: metric and /p2p/status
         // are written together, so they cannot drift apart the way /health and
         // /p2p/status did (1860 vs 148 in the same minute, 2026-07-25).
-        crate::metrics::record_reconcile_sweep(&counts, divergent_anchor);
+        crate::metrics::record_reconcile_sweep(&counts, divergent_actionable);
     }
 }
 
@@ -716,6 +881,19 @@ pub struct ReaDiscovery {
     peers_asked: usize,
     ids_discovered: usize,
     divergent_anchor: usize,
+    /// The ADJUDICATED share of `divergent_anchor` — divergence heal is not
+    /// permitted (or no longer able) to resolve this sweep.
+    ///
+    /// Structurally 0 on this arm today: REA rows carry no declaration-ordering
+    /// column, so there is no "already declared" refusal here, and the ledger's
+    /// exhaustion is counted against absence gaps rather than divergence. Carried
+    /// anyway so both folded arms present the same pair to `publish_sweep` and a
+    /// future REA declaration can only ever ADD to it.
+    divergent_refused: usize,
+    /// Gap ids the cross-sweep [`MissLedger`] held back this sweep (retry budget
+    /// spent against unchanged evidence). Published on
+    /// `elohim_projection_reconcile_exhausted{stream="rea"}`.
+    exhausted_persistent: usize,
     local_total: usize,
 }
 
@@ -728,6 +906,8 @@ impl ReaDiscovery {
             peers_asked: 0,
             ids_discovered: 0,
             divergent_anchor: 0,
+            divergent_refused: 0,
+            exhausted_persistent: 0,
             local_total: 0,
         }
     }
@@ -954,10 +1134,11 @@ pub async fn run_discovery(
     p2p: &P2PHandle,
     pool: &DbPool,
     window: &mut InventoryWindow,
+    misses: &mut MissLedger,
 ) -> SweepPlan {
-    let rea = discover_rea(p2p, pool, window).await;
-    let content = discover_content(p2p, pool, window).await;
-    let collectives = discover_collectives(p2p, pool, window).await;
+    let rea = discover_rea(p2p, pool, window, misses).await;
+    let content = discover_content(p2p, pool, window, misses).await;
+    let collectives = discover_collectives(p2p, pool, window, misses).await;
 
     tracing::info!(
         target: "elohim_storage::projection_reconcile",
@@ -965,11 +1146,14 @@ pub async fn run_discovery(
         rea_ids_discovered = rea.ids_discovered,
         rea_gaps = rea.tracker.counts().pending,
         rea_divergent_anchor = rea.divergent_anchor,
+        rea_exhausted = rea.exhausted_persistent,
         rea_local_total = rea.local_total,
         content_peers_asked = content.peers_asked,
         content_ids_discovered = content.ids_discovered,
         content_gaps = content.tracker.counts().pending,
         content_divergent_anchor = content.divergent_anchor,
+        content_divergent_refused = content.divergent_refused,
+        content_exhausted = content.exhausted_persistent,
         content_local_anchored = content.local_anchored,
         collectives_peers_asked = collectives.peers_asked,
         collectives_ids_discovered = collectives.ids_discovered,
@@ -1020,16 +1204,21 @@ pub async fn run_heal(
         peers_asked,
         ids_discovered,
         divergent_anchor: rea_divergent,
+        divergent_refused: rea_divergent_refused,
+        exhausted_persistent: rea_exhausted,
         local_total,
     } = rea;
     // Publish the last-sweep gauges BEFORE heal (discovered gaps + local rows), so
-    // convergence is watchable on `/metrics` without tailing Loki.
+    // convergence is watchable on `/metrics` without tailing Loki. `exhausted` is
+    // the CROSS-SWEEP ledger count, not the per-sweep tracker's (which is
+    // structurally 0 — the tracker is rebuilt every sweep).
     crate::metrics::set_projection_reconcile_gauges(
         "rea",
         tracker.counts().pending as u64,
         local_total as u64,
-        tracker.counts().exhausted as u64,
+        rea_exhausted as u64,
         rea_divergent as u64,
+        rea_divergent_refused as u64,
     );
     let counts = heal_rea(&mut tracker, &discovered_by, hc, pool, &pacing).await;
 
@@ -1037,6 +1226,8 @@ pub async fn run_heal(
         tracker: mut content_tracker,
         discovered_by: content_discovered_by,
         divergent_anchor: content_divergent,
+        divergent_refused: content_divergent_refused,
+        exhausted_persistent: content_exhausted,
         peers_asked: content_peers_asked,
         ids_discovered: content_ids_discovered,
         local_anchored,
@@ -1046,8 +1237,9 @@ pub async fn run_heal(
         "content",
         content_tracker.counts().pending as u64,
         local_anchored as u64,
-        content_tracker.counts().exhausted as u64,
+        content_exhausted as u64,
         content_divergent as u64,
+        content_divergent_refused as u64,
     );
     let ContentHealOutcome {
         healed: content_healed,
@@ -1071,15 +1263,21 @@ pub async fn run_heal(
         alias_by_cid,
         discovered_by: collectives_discovered_by,
         divergent_cid: collectives_divergent,
+        exhausted_persistent: collectives_exhausted,
         peers_asked: collectives_peers_asked,
         ids_discovered: collectives_ids_discovered,
         local_anchored: collectives_local_anchored,
     } = collectives;
+    // The collectives arm's divergence is refused BY CONSTRUCTION — a divergent
+    // cid is counted and WARN-logged but never enqueued (no declaration-ordering
+    // column exists to prove a forward move), so all of it is adjudicated. It
+    // does not fold into `publish_sweep` at all; this gauge is its only surface.
     crate::metrics::set_projection_reconcile_gauges(
         "collectives",
         collectives_tracker.counts().pending as u64,
         collectives_local_anchored as u64,
-        collectives_tracker.counts().exhausted as u64,
+        collectives_exhausted as u64,
+        collectives_divergent as u64,
         collectives_divergent as u64,
     );
     let CollectivesHealOutcome {
@@ -1123,7 +1321,12 @@ pub async fn run_heal(
     // Publish mirrors the pre-decoupling contract: REA counts + peers_asked, with
     // the divergent-anchor counter folding in BOTH arms (the one cross-arm signal).
     state
-        .publish_sweep(counts, peers_asked, rea_divergent + content_divergent)
+        .publish_sweep(
+            counts,
+            peers_asked,
+            rea_divergent + content_divergent,
+            rea_divergent_refused + content_divergent_refused,
+        )
         .await;
 
     tracing::info!(
@@ -1527,6 +1730,7 @@ async fn discover_rea(
     p2p: &P2PHandle,
     pool: &DbPool,
     window: &mut InventoryWindow,
+    misses: &mut MissLedger,
 ) -> ReaDiscovery {
     let app_ctx = crate::db::AppContext::default_lamad();
     // Rotating window offset for this sweep (advanced after the peer loop).
@@ -1573,6 +1777,11 @@ async fn discover_rea(
     // Ids present locally but with a peer-advertised non-empty anchor that
     // disagrees with ours — excluded from the tracker's local set so they heal.
     let mut divergent_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    // id → first NON-EMPTY advertised anchor. The cross-sweep [`MissLedger`]
+    // keys its retry budget on this: a peer advertising a DIFFERENT anchor is
+    // new evidence and re-admits an exhausted id.
+    let mut advertised_anchor: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
 
     for peer in &peers {
         let peer_id = match peer.peer_id.parse::<libp2p::PeerId>() {
@@ -1646,6 +1855,11 @@ async fn discover_rea(
             discovered_by
                 .entry(entry.id.clone())
                 .or_insert_with(|| peer.peer_id.clone());
+            if !entry.dht_anchor_hash.is_empty() {
+                advertised_anchor
+                    .entry(entry.id.clone())
+                    .or_insert_with(|| entry.dht_anchor_hash.clone());
+            }
             // Anchor-divergence: both present, peer carries a non-empty anchor
             // that disagrees with ours. An empty remote anchor is not evidence
             // of divergence (the peer is itself un-anchored).
@@ -1676,9 +1890,25 @@ async fn discover_rea(
         .cloned()
         .collect();
     let mut tracker = GapTracker::new(MAX_RETRIES);
-    tracker.set_local_ids(tracker_local);
-    let all_discovered: Vec<String> = discovered_by.keys().cloned().collect();
-    tracker.discover(all_discovered);
+    tracker.set_local_ids(tracker_local.clone());
+    // Cross-sweep retry budget: an id the conductor has failed to resolve for
+    // MAX_RETRIES sweeps under UNCHANGED peer evidence stops being re-asked
+    // (the ~151k-missing-outcomes treadmill). Ids already held locally are
+    // forgotten, so a later relapse starts from a clean budget.
+    let mut exhausted_persistent = 0usize;
+    let mut admitted: Vec<String> = Vec::new();
+    for id in discovered_by.keys() {
+        if tracker_local.contains(id) {
+            misses.resolved(PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS, id);
+            continue;
+        }
+        let evidence = advertised_anchor.get(id).map(String::as_str).unwrap_or("");
+        match misses.admit(PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS, id, evidence) {
+            Admission::Retry => admitted.push(id.clone()),
+            Admission::Exhausted => exhausted_persistent += 1,
+        }
+    }
+    tracker.discover(admitted);
 
     ReaDiscovery {
         tracker,
@@ -1686,6 +1916,8 @@ async fn discover_rea(
         peers_asked,
         ids_discovered,
         divergent_anchor,
+        divergent_refused: 0,
+        exhausted_persistent,
         local_total,
     }
 }
@@ -1846,6 +2078,28 @@ pub struct ContentDiscovery {
     tracker: GapTracker,
     discovered_by: std::collections::HashMap<String, String>,
     divergent_anchor: usize,
+    /// The ADJUDICATED share of `divergent_anchor` — divergence this sweep is
+    /// not permitted (or no longer able) to resolve, and which therefore must not
+    /// defeat convergence:
+    ///
+    /// - **refused-declared** — the local row already carries a DIFFERENT
+    ///   declared head, so heal is FORBIDDEN to move it (`StampMode::GapFill` →
+    ///   [`crate::db::content_diesel::StampOutcome::SkippedDeclared`]); only a
+    ///   canonical channel may. This is the DOMINANT class on a live peer
+    ///   (matthew: 6071 refusals against 8 heals in 12h), and gating convergence
+    ///   on it made the gauge structurally unreachable.
+    /// - **retry-exhausted** — the cross-sweep [`MissLedger`] has spent this id's
+    ///   budget against unchanged peer evidence.
+    ///
+    /// Classified at DISCOVERY from the local projection alone (no conductor
+    /// call): the same `declared_head_for` predicate `stamp_declared_head_mode`
+    /// uses to decide `SkippedDeclared`, so the two cannot drift apart.
+    divergent_refused: usize,
+    /// Gap ids the cross-sweep [`MissLedger`] held back this sweep. Published on
+    /// `elohim_projection_reconcile_exhausted{stream="content"}`, which was
+    /// structurally pinned to 0 before the ledger existed (the tracker is rebuilt
+    /// per sweep, so its own `exhausted_count` can never fire across sweeps).
+    exhausted_persistent: usize,
     peers_asked: usize,
     ids_discovered: usize,
     local_anchored: usize,
@@ -1868,6 +2122,8 @@ impl ContentDiscovery {
             tracker: GapTracker::new(MAX_RETRIES),
             discovered_by: std::collections::HashMap::new(),
             divergent_anchor: 0,
+            divergent_refused: 0,
+            exhausted_persistent: 0,
             peers_asked,
             ids_discovered: 0,
             local_anchored: 0,
@@ -1942,6 +2198,7 @@ async fn discover_content(
     p2p: &P2PHandle,
     pool: &DbPool,
     window: &mut InventoryWindow,
+    misses: &mut MissLedger,
 ) -> ContentDiscovery {
     let app_ctx = crate::db::AppContext::default_lamad();
     // Rotating window offset for this sweep (advanced after the peer loop).
@@ -2121,7 +2378,9 @@ async fn discover_content(
 
     // (4) Classify → gap set (anchor-gap ∪ divergent). Absent + in-sync are dropped.
     let mut gap_ids: Vec<String> = Vec::new();
+    let mut divergent_ids: Vec<String> = Vec::new();
     let mut divergent_anchor = 0usize;
+    let mut resolved_ids: Vec<&String> = Vec::new();
     for id in &advertised_ids {
         match classify_content_gap(
             id,
@@ -2129,24 +2388,93 @@ async fn discover_content(
             &local_anchors,
             advertised_anchor.get(id).map(String::as_str),
         ) {
-            ContentGap::AbsentLocal | ContentGap::InSync => {}
+            ContentGap::AbsentLocal | ContentGap::InSync => resolved_ids.push(id),
             ContentGap::AnchorGap => gap_ids.push(id.clone()),
             ContentGap::Divergent => {
                 divergent_anchor += 1;
+                divergent_ids.push(id.clone());
                 gap_ids.push(id.clone());
             }
         }
     }
 
+    // (4b) Split the divergence into ACTIONABLE and REFUSED, locally and with no
+    // conductor call — one batch read of the same `declared_head_action_hash`
+    // column `stamp_declared_head_mode` consults to return `SkippedDeclared`.
+    //
+    // A row that already carries a declared head is one heal is FORBIDDEN to move
+    // (canonical channels own it). Counting it as unresolved divergence is what
+    // pinned `elohim_projection_reconcile_converged` at 0 fleet-wide: the refusal
+    // is permanent until a canonical channel fires, so the gauge could never move
+    // no matter how well the heal leg worked.
+    //
+    // A read failure is conservative in the HONEST direction: no declarations
+    // known ⇒ nothing adjudicated ⇒ the divergence still defeats convergence.
+    let mut declared_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    if !divergent_ids.is_empty() {
+        match pool.get() {
+            Ok(mut conn) => {
+                match crate::db::content_diesel::declared_heads_for(
+                    &mut conn,
+                    &app_ctx,
+                    &divergent_ids,
+                ) {
+                    Ok(declared) => declared_ids = declared.into_keys().collect(),
+                    Err(e) => tracing::warn!(
+                        error = %e,
+                        "projection-reconcile[content]: declared-head classification failed; \
+                         counting all divergence as unadjudicated this sweep"
+                    ),
+                }
+            }
+            Err(e) => tracing::warn!(
+                error = %e,
+                "projection-reconcile[content]: db conn failed for declared-head classification; \
+                 counting all divergence as unadjudicated this sweep"
+            ),
+        }
+    }
+
+    // (4c) Cross-sweep retry budget (see [`MissLedger`]): drop gap ids whose
+    // budget is spent against unchanged peer evidence, so the sweep stops
+    // re-asking the conductor about the same ~1000 rows forever. An id held back
+    // here is ADJUDICATED — it joins `divergent_refused` when it is a divergence,
+    // and is published on the exhausted gauge either way.
+    let mut exhausted_persistent = 0usize;
+    let mut exhausted_divergent = 0usize;
+    let divergent_set: std::collections::HashSet<&String> = divergent_ids.iter().collect();
+    let mut admitted: Vec<String> = Vec::with_capacity(gap_ids.len());
+    for id in gap_ids {
+        let evidence = advertised_anchor.get(&id).map(String::as_str).unwrap_or("");
+        match misses.admit(PROJECTION_INVENTORY_TABLE_CONTENT, &id, evidence) {
+            Admission::Retry => admitted.push(id),
+            Admission::Exhausted => {
+                exhausted_persistent += 1;
+                // Count ONLY ids the declaration predicate did not already
+                // adjudicate — the two buckets partition the divergence set, so
+                // an id in both must not be counted twice.
+                if divergent_set.contains(&id) && !declared_ids.contains(&id) {
+                    exhausted_divergent += 1;
+                }
+            }
+        }
+    }
+    let divergent_refused = declared_ids.len().saturating_add(exhausted_divergent);
+    for id in resolved_ids {
+        misses.resolved(PROJECTION_INVENTORY_TABLE_CONTENT, id);
+    }
+
     // Feed the gap set through a fresh per-sweep tracker on the shared rails
     // (empty local set → every gap id becomes pending, under MAX_RETRIES).
     let mut tracker = GapTracker::new(MAX_RETRIES);
-    tracker.discover(gap_ids);
+    tracker.discover(admitted);
 
     ContentDiscovery {
         tracker,
         discovered_by,
         divergent_anchor,
+        divergent_refused,
+        exhausted_persistent,
         peers_asked,
         ids_discovered,
         local_anchored,
@@ -2590,6 +2918,9 @@ pub struct CollectivesDiscovery {
     /// Advertised cids whose local alias row already carries a DIFFERENT cid.
     /// Counted + WARN-logged, never enqueued (see the module doc).
     divergent_cid: usize,
+    /// Gap cids the cross-sweep [`MissLedger`] held back this sweep. Published on
+    /// `elohim_projection_reconcile_exhausted{stream="collectives"}`.
+    exhausted_persistent: usize,
     peers_asked: usize,
     ids_discovered: usize,
     local_anchored: usize,
@@ -2605,6 +2936,7 @@ impl CollectivesDiscovery {
             alias_by_cid: std::collections::HashMap::new(),
             discovered_by: std::collections::HashMap::new(),
             divergent_cid: 0,
+            exhausted_persistent: 0,
             peers_asked,
             ids_discovered: 0,
             local_anchored: 0,
@@ -2687,6 +3019,7 @@ async fn discover_collectives(
     p2p: &P2PHandle,
     pool: &DbPool,
     window: &mut InventoryWindow,
+    misses: &mut MissLedger,
 ) -> CollectivesDiscovery {
     let app_ctx = crate::db::AppContext::default_lamad();
     let sweep_offset = window.offset_for(PROJECTION_INVENTORY_TABLE_COLLECTIVES);
@@ -2884,14 +3217,27 @@ async fn discover_collectives(
         );
     }
 
+    // Cross-sweep retry budget (see [`MissLedger`]). The gap key IS the cid here,
+    // so "new evidence" can only ever arrive as a NEW key — the ledger's
+    // evidence field is the cid itself and the cooldown is what re-admits.
+    let mut exhausted_persistent = 0usize;
+    let mut admitted: Vec<String> = Vec::with_capacity(gap_cids.len());
+    for cid in gap_cids {
+        match misses.admit(PROJECTION_INVENTORY_TABLE_COLLECTIVES, &cid, &cid) {
+            Admission::Retry => admitted.push(cid),
+            Admission::Exhausted => exhausted_persistent += 1,
+        }
+    }
+
     let mut tracker = GapTracker::new(MAX_RETRIES);
-    tracker.discover(gap_cids);
+    tracker.discover(admitted);
 
     CollectivesDiscovery {
         tracker,
         alias_by_cid,
         discovered_by,
         divergent_cid,
+        exhausted_persistent,
         peers_asked,
         ids_discovered,
         local_anchored,
@@ -3346,6 +3692,7 @@ mod tests {
                 },
                 3,
                 1,
+                0,
             )
             .await;
         let s1 = state.status().await;
@@ -3369,6 +3716,7 @@ mod tests {
                     converged: true,
                 },
                 2,
+                0,
                 0,
             )
             .await;
@@ -3398,6 +3746,7 @@ mod tests {
                 },
                 3,
                 1860, // ...but 1860 rows diverge, so the PEER did not.
+                0,    // ...and NONE of them is adjudicated.
             )
             .await;
 
@@ -3408,6 +3757,181 @@ mod tests {
         assert!(
             !s.converged,
             "divergent anchors mean this peer does NOT hold what its peers hold"
+        );
+    }
+
+    #[tokio::test]
+    async fn divergence_heal_is_forbidden_to_move_does_not_defeat_convergence() {
+        // The live 12h shape on matthew: 6071 `refused_declared` heal outcomes
+        // against 8 `healed`. Every one of those refusals is CORRECT — the local
+        // row already carries a different declared head, and heal fills-never-
+        // moves, so only a canonical channel may move it. Gating `converged` on
+        // the divergence TOTAL therefore pinned the gauge at 0 fleet-wide for
+        // 12h+: not a conservative reading, an unreadable one.
+        //
+        // Sibling of `retry_exhausted_gaps_are_caught_up_but_not_converged` in
+        // reconcile_rails.rs — same lesson from the divergence side: a number
+        // that cannot move is not a safety property.
+        let state = ProjectionReconcileState::new();
+        state
+            .publish_sweep(
+                GapCounts {
+                    pending: 0,
+                    completed: 8,
+                    failed: 0,
+                    caught_up: true,
+                    exhausted: 0,
+                    converged: true,
+                },
+                3,
+                6071, // total divergence...
+                6071, // ...ALL of it adjudicated (heal forbidden to move it).
+            )
+            .await;
+
+        let s = state.status().await;
+        assert_eq!(
+            s.divergent_anchor, 6071,
+            "the TOTAL stays on the wire — adjudicated divergence must not vanish"
+        );
+        assert!(
+            s.converged,
+            "divergence heal is forbidden to move must not defeat convergence"
+        );
+    }
+
+    #[tokio::test]
+    async fn one_unadjudicated_divergent_row_still_defeats_convergence() {
+        // The guard against the split becoming a whitewash: the honest half of
+        // the old rule is kept. A single row NOBODY has adjudicated — no local
+        // declaration, retry budget unspent — is divergence this sweep did not
+        // resolve, and it defeats convergence exactly as before.
+        let state = ProjectionReconcileState::new();
+        state
+            .publish_sweep(
+                GapCounts {
+                    pending: 0,
+                    completed: 8,
+                    failed: 0,
+                    caught_up: true,
+                    exhausted: 0,
+                    converged: true,
+                },
+                3,
+                6071,
+                6070, // one row short of fully adjudicated
+            )
+            .await;
+
+        let s = state.status().await;
+        assert_eq!(s.divergent_anchor, 6071);
+        assert!(
+            !s.converged,
+            "unadjudicated divergence must still defeat convergence"
+        );
+    }
+
+    #[test]
+    fn miss_ledger_makes_max_retries_real_across_sweeps() {
+        // The treadmill: the per-sweep GapTracker is rebuilt every tick, so its
+        // own retry budget can never fire across sweeps — matthew re-asked its
+        // conductor about the same ~1000 rows forever (~151k missing outcomes
+        // in 12h) while `elohim_projection_reconcile_exhausted` published 0.
+        let mut ledger = MissLedger::new();
+        for sweep in 1..=MAX_RETRIES {
+            assert_eq!(
+                ledger.admit("content", "row-1", "anchor-A"),
+                Admission::Retry,
+                "sweep {sweep} is still within budget"
+            );
+        }
+        assert_eq!(
+            ledger.admit("content", "row-1", "anchor-A"),
+            Admission::Exhausted,
+            "budget spent against UNCHANGED evidence — stop asking"
+        );
+    }
+
+    #[test]
+    fn new_peer_evidence_re_admits_an_exhausted_id_immediately() {
+        // Exhaustion is about a CLAIM, not an id: a peer advertising a different
+        // anchor is not the thing we gave up on.
+        let mut ledger = MissLedger::new();
+        for _ in 0..=MAX_RETRIES {
+            ledger.admit("content", "row-1", "anchor-A");
+        }
+        assert_eq!(
+            ledger.admit("content", "row-1", "anchor-A"),
+            Admission::Exhausted
+        );
+        assert_eq!(
+            ledger.admit("content", "row-1", "anchor-B"),
+            Admission::Retry,
+            "a DIFFERENT advertised anchor is fresh evidence"
+        );
+    }
+
+    #[test]
+    fn exhaustion_is_never_permanent() {
+        // A row the conductor cannot see today may be gossiped to it tomorrow.
+        // Without the cooldown the ledger would silently stop healing it for the
+        // process lifetime — trading one dishonest gauge for a real gap.
+        let mut ledger = MissLedger::new();
+        for _ in 0..MAX_RETRIES {
+            ledger.admit("content", "row-1", "anchor-A");
+        }
+        let mut exhausted_sweeps = 0;
+        for _ in 0..MISS_READMIT_SWEEPS {
+            match ledger.admit("content", "row-1", "anchor-A") {
+                Admission::Exhausted => exhausted_sweeps += 1,
+                Admission::Retry => break,
+            }
+        }
+        assert_eq!(
+            exhausted_sweeps,
+            MISS_READMIT_SWEEPS - 1,
+            "dormant for the cooldown, then re-admitted for another round"
+        );
+        assert_eq!(
+            ledger.admit("content", "row-1", "anchor-A"),
+            Admission::Retry,
+            "the fresh budget is spendable again"
+        );
+    }
+
+    #[test]
+    fn a_resolved_id_leaves_the_ledger_with_a_clean_budget() {
+        // A row that heals and later relapses must not inherit the old budget —
+        // the relapse is new work, not a continuation.
+        let mut ledger = MissLedger::new();
+        for _ in 0..MAX_RETRIES {
+            ledger.admit("rea", "row-1", "anchor-A");
+        }
+        ledger.resolved("rea", "row-1");
+        assert_eq!(ledger.tracked("rea"), 0);
+        assert_eq!(
+            ledger.admit("rea", "row-1", "anchor-A"),
+            Admission::Retry,
+            "a relapsed row starts from a clean budget"
+        );
+    }
+
+    #[test]
+    fn ledger_streams_do_not_share_budgets() {
+        // The three arms carry disjoint id spaces; a content id and a REA id
+        // that happen to collide must not spend each other's retries.
+        let mut ledger = MissLedger::new();
+        for _ in 0..=MAX_RETRIES {
+            ledger.admit("content", "shared-id", "anchor-A");
+        }
+        assert_eq!(
+            ledger.admit("content", "shared-id", "anchor-A"),
+            Admission::Exhausted
+        );
+        assert_eq!(
+            ledger.admit("rea", "shared-id", "anchor-A"),
+            Admission::Retry,
+            "another stream's exhaustion must not bleed across"
         );
     }
 
@@ -3428,6 +3952,7 @@ mod tests {
                     converged: false,
                 },
                 3,
+                0,
                 0,
             )
             .await;

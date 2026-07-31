@@ -38,6 +38,14 @@ peersAsked: number,
 /**
  * Gaps in the last sweep that were present locally but with a DIFFERENT
  * anchor than a peer advertised (anchor-divergence, not just absence).
+ *
+ * This stays the TOTAL, deliberately: the wire shape is consumed by
+ * `/p2p/status` clients and a2o gates, and adjudicated divergence must never
+ * silently vanish from it. The ADJUDICATED share (heal is forbidden to move
+ * it, or its retry budget is spent) is published separately on
+ * `elohim_projection_reconcile_divergent_refused`; only the remainder —
+ * unadjudicated divergence — defeats
+ * [`ProjectionReconcileStatus::converged`].
  */
 divergentAnchor: number, 
 /**
