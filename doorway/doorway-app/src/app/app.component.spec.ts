@@ -19,6 +19,7 @@ import { AuthStateService } from './services/auth-state.service';
     <span data-testid="probe">{{ value }}</span>
   `,
   // Keep the child Eager so this regression isolates the bundle ROOT strategy.
+  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
   changeDetection: ChangeDetectionStrategy.Eager,
 })
 class RootCdProbeComponent {

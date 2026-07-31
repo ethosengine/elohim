@@ -13,6 +13,7 @@ import { AuthStateService } from './services/auth-state.service';
   // OnPush-unsafe: ROOT view — an OnPush root is never marked dirty, so a global
   // ApplicationRef tick skips it and freezes change detection for the whole
   // non-signal tree. See backlog-onpush-eager-debt-inventory.
+  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
   changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class AppComponent implements OnInit {
