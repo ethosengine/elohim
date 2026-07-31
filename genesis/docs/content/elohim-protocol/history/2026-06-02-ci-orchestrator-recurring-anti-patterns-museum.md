@@ -29,7 +29,8 @@ memory_anchors:
 # CI / orchestrator recurring anti-patterns — the museum face
 
 > **Hot-context pointer (the one sentence to remember):**
-> These ten failure modes recurred across **≥3 distinct agentic shifts each** — recurrence is the signal
+> These thirteen failure modes recurred across **≥3 distinct agentic shifts each** (the starred rows are
+> sub-threshold but earned their place — see the footnote) — recurrence is the signal
 > that an anti-pattern earned canonical placement, not just narration. The mechanism of each lives in a
 > linked memory entry; this record is the **single frequency-ranked index** a future CI planner meets
 > before touching the pipeline. Read it before you read a red build as a regression.
@@ -60,10 +61,20 @@ bodies themselves retire to git; the durable mechanism of each pattern lives in 
 
 | 12 | **Prefix-matched "first-reachable-wins" is not a routing strategy** — when EVERY member of a pool satisfies the match predicate, first-that-matches silently degenerates to **index 0 always wins**. The genesis seeders walk `CONDUCTOR_URLS` looking for an installed app whose id starts with `elohim` — but every alpha conductor installs one, so the walk always stopped at adam. It reads as a fleet-wide outage whenever index 0 is the unhealthy member, and as *correct behavior* whenever index 0 happens to be healthy — while writing every human's data onto index 0's source chain with index 0's provenance. Fix: name-affinity (`elohim-<name>-<env>`) **plus** an explicit `skipped` state for "no pod for this member" — never a broader walk. **Diagnostic tell: every failing row names the same target.** | 2* | `backlog/ci-genesis-household-founder-binding.md` (#1119, identities); `backlog/ci-genesis-agent-bindings-conductor-fanin.md` (#1380–#1386, bindings — the sibling that never got the backport) |
 
+| 13 | **A `DEFERRED:` fallback arm in the pre-push hook is DEAD CODE — the local gate is whatever the justfile says, and nothing else** — `run_gate` branches `elif command -v just && [ -f justfile ]` → `just gate`, *else* the big `case` block. `just` IS installed in the dev image, so for any project with a justfile the `case` arm never executes. Its `DEFERRED:` comments ("fallback includes X that the justfile gate omits") therefore describe **coverage nobody gets** — and read as reassurance while the gap is total. Compounding tell: `vitest run` does not type-check (vite strips types), so a `test`-only gate is blind to every strict-TS error in a spec file while CI's `tsc --noEmit` sees the whole tree. Diagnostic question when a red "should have been caught locally": *is the step in the justfile `gate` recipe, or only in the fallback arm?* Fix: put the step in the justfile; never park it in the fallback. | 2* | `backlog/ci-genesis-seeder-spec-typecheck-gate-gap.md` (#1400–#1401, TS2352/TS2493); `backlog/ci-genesis-projectionspec-ts2739.md` (#1101, TS2739 — same stage, same blind spot, two months earlier) |
+
 \* #6 recurred in 2 shifts but is a full-cycle-cost no-op silencer worth the museum row.
 #12 is likewise 2 occurrences, but of an *identical mechanism against the identical config list*, where
 the second instance ran three weeks intermittently and its GREEN builds were the mis-provenanced ones —
 a silent-corruption failure mode worth the row before a third recurrence. #11 is a first-occurrence (fp `97d7fb9c085c`, #1185–#1197) earning its row as a *new structural class* — JSONNull-survives-truthiness after a writeJSON/readJSON round-trip — not yet a ≥3-shift recurrence; recorded so the next planner does not re-derive it. (Same `net.sf.json` library as the JSONArray note at `Jenkinsfile:1654`.)
+#13 is 2 occurrences (#1101 and #1400–#1401) two months and two authors apart against the *same* CI
+stage through the *same* dead-gate mechanism, and it is a **meta-trap**: it is the reason other traps in
+this table keep reaching CI at all, so it earns the row before a third recurrence. Its blast radius is
+wider than the one gate that was fixed — at the time of writing, `elohim-app` (fallback claims full-tree
+`eslint`; justfile `gate` runs only `lint-routes lint-a11y`) and `orchestrator` (fallback claims
+`graph-walker` + `orchestrator-integration` node tests; `test-jenkinsfile-lints` is scoped to
+`jenkinsfile-cps-scope.test.mjs` alone) carry the identical dead claim. Audit every `DEFERRED:` note in
+`.husky/pre-push.bash` against the project's justfile `gate` recipe before trusting it.
 
 ## The load-bearing reading (so you feel the pull and resist it)
 

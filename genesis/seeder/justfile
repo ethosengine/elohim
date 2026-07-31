@@ -24,8 +24,17 @@ test:
 check:
     pnpm exec tsc --noEmit
 
-# Quality gate: install + validate + test
-gate: install validate test
+# Quality gate: install + validate + type-check + test
+#
+# `check` is load-bearing, not decorative: CI's genesis `Validate Constants`
+# stage runs `tsc --noEmit` over the WHOLE seeder tree (src/ AND src/__tests__/)
+# via genesis/scripts/ci/typecheck-seeder.sh and exits 1 before any seeding.
+# `vitest run` does NOT type-check — vite strips types — so a strict-TS error
+# that lives only in a spec file passes `test` locally and fails the pipeline.
+# That gap has now broken genesis twice: #1101 (TS2739, ProjectionSpec literal)
+# and #1400/#1401 (TS2352/TS2493, zero-arg vi.fn tuple index). Keep `check`
+# ahead of `test` so the local gate is a superset of the CI gate.
+gate: install validate check test
 
 # =============================================================================
 # Seeding Recipes

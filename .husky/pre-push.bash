@@ -893,9 +893,16 @@ run_gate() {
         fi
         ;;
       genesis)
-        # DEFERRED: fallback includes python3 validate-human-ids.py and pnpm run
-        # typecheck that the genesis/seeder justfile gate omits.
-        # Delete only after genesis/seeder/justfile gate: adds both steps.
+        # REACHABILITY WARNING: this whole `case` block is the `just not found`
+        # branch. `just` IS installed in the dev image, so a DEFERRED note here
+        # describes coverage NOBODY GETS — the justfile gate is the only local
+        # gate that actually runs. Never let a step live only in this arm.
+        # (Cost: `pnpm run typecheck` sat here while genesis/seeder/justfile's
+        # gate omitted it — genesis CI red twice, #1101 and #1400/#1401. Fixed
+        # 2026-07-31 by adding `check` to that justfile's `gate`.)
+        # DEFERRED: fallback still includes python3 validate-human-ids.py that
+        # the genesis/seeder justfile gate omits.
+        # Delete only after genesis/seeder/justfile gate: adds that step.
         python3 genesis/scripts/validate-human-ids.py 2>&1 && \
         pnpm install --frozen-lockfile --ignore-scripts 2>&1 && \
         pnpm run validate 2>&1 && \
