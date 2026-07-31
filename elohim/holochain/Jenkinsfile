@@ -243,9 +243,12 @@ def runSimulationTest() {
 def deployEdgeWithManifest(String env, String namespace, String manifestTemplate, String envFile, String resourceName = 'elohim-edgenode') {
     def versions = readProperties(file: envFile)
     def deployVersion = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
+    // Digest-pinned doorway ref (tag@sha256:…) when the push captured one —
+    // Harbor retention strips this repo's SHA tags, digests can't be untagged.
+    def doorwayRef = ((versions.DOORWAY_DIGEST ?: '') ==~ /sha256:[a-f0-9]{64}/) ? "${versions.DOORWAY_TAG}@${versions.DOORWAY_DIGEST}" : versions.DOORWAY_TAG
     def sedArgs = [
         "s/EDGENODE_TAG_PLACEHOLDER/${versions.EDGENODE_TAG}/g",
-        "s/DOORWAY_TAG_PLACEHOLDER/${versions.DOORWAY_TAG}/g",
+        "s/DOORWAY_TAG_PLACEHOLDER/${doorwayRef}/g",
         "s/STORAGE_TAG_PLACEHOLDER/${versions.STORAGE_TAG}/g",
         "s/HAPP_INSTALLER_TAG_PLACEHOLDER/${versions.HAPP_INSTALLER_TAG}/g",
         "s/DOORWAY_APP_TAG_PLACEHOLDER/${versions.DOORWAY_APP_TAG}/g",
@@ -747,10 +750,12 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         ? '[{ip: "10.99.0.2", hostnames: ["elohim.host", "signal.elohim.host"]}]'
         : '[]'
 
+    // Digest-pinned doorway ref — see deployEdgeWithManifest note.
+    def doorwayRef = ((versions.DOORWAY_DIGEST ?: '') ==~ /sha256:[a-f0-9]{64}/) ? "${versions.DOORWAY_TAG}@${versions.DOORWAY_DIGEST}" : versions.DOORWAY_TAG
     def sedArgs = [
         // Image tag placeholders
         "s|EDGENODE_TAG_PLACEHOLDER|${versions.EDGENODE_TAG}|g",
-        "s|DOORWAY_TAG_PLACEHOLDER|${versions.DOORWAY_TAG}|g",
+        "s|DOORWAY_TAG_PLACEHOLDER|${doorwayRef}|g",
         "s|STORAGE_TAG_PLACEHOLDER|${versions.STORAGE_TAG}|g",
         "s|HAPP_INSTALLER_TAG_PLACEHOLDER|${versions.HAPP_INSTALLER_TAG}|g",
         "s|DOORWAY_APP_TAG_PLACEHOLDER|${versions.DOORWAY_APP_TAG}|g",
@@ -923,9 +928,11 @@ def deployDoorwayManifest(String targetEnv, String envFile, List allHumans, Stri
     def versions = readProperties(file: envFile)
     def deployVersion = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
 
+    // Digest-pinned doorway ref — see deployEdgeWithManifest note.
+    def doorwayRef = ((versions.DOORWAY_DIGEST ?: '') ==~ /sha256:[a-f0-9]{64}/) ? "${versions.DOORWAY_TAG}@${versions.DOORWAY_DIGEST}" : versions.DOORWAY_TAG
     def sedArgs = [
         "s|EDGENODE_TAG_PLACEHOLDER|${versions.EDGENODE_TAG}|g",
-        "s|DOORWAY_TAG_PLACEHOLDER|${versions.DOORWAY_TAG}|g",
+        "s|DOORWAY_TAG_PLACEHOLDER|${doorwayRef}|g",
         "s|STORAGE_TAG_PLACEHOLDER|${versions.STORAGE_TAG}|g",
         "s|HAPP_INSTALLER_TAG_PLACEHOLDER|${versions.HAPP_INSTALLER_TAG}|g",
         "s|DOORWAY_APP_TAG_PLACEHOLDER|${versions.DOORWAY_APP_TAG}|g",
@@ -1017,9 +1024,13 @@ def deployOnlyEnvFilePreflight(String envFile) {
     echo "  HAPP_INSTALLER_TAG=${existing.HAPP_INSTALLER_TAG}"
     echo "  DOORWAY_APP_TAG=${existing.DOORWAY_APP_TAG}"
     echo "  HAPP_TAG=${existing.HAPP_TAG}"
+    // Doorway: verify by digest when the env file carries one — its SHA tags
+    // are retention-stripped, so the tag 404ing is expected while the digest
+    // (what the deploy actually renders) is the real availability check.
+    def doorwayCheckRef = ((existing.DOORWAY_DIGEST ?: '') ==~ /sha256:[a-f0-9]{64}/) ? existing.DOORWAY_DIGEST : existing.DOORWAY_TAG
     def checks = [
         ['elohim-edgenode', existing.EDGENODE_TAG],
-        ['elohim-doorway', existing.DOORWAY_TAG],
+        ['elohim-doorway', doorwayCheckRef],
         ['elohim-storage', existing.STORAGE_TAG],
         ['elohim-happ-installer', existing.HAPP_INSTALLER_TAG],
         ['elohim-doorway-app', existing.DOORWAY_APP_TAG],
@@ -1759,6 +1770,15 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 if (doorwayPushed) {
                                     env.IMAGES_PUSHED = 'true'
+                                    // Harbor retention strips this repo's SHA tags after push
+                                    // (backlog: harbor-retention-strips-doorway-sha-tags) — carry
+                                    // the push-time digest so deploys pin tag@digest and a
+                                    // stripped tag can't strand rollouts in ImagePullBackOff.
+                                    def dwDigest = sh(script: "cat '${env.WORKSPACE}/elohim-doorway.digest' 2>/dev/null || true", returnStdout: true).trim()
+                                    if (dwDigest ==~ /sha256:[a-f0-9]{64}/) {
+                                        env.DOORWAY_DIGEST = dwDigest
+                                        echo "Doorway deploy pin: ${DOORWAY_TAG}@${dwDigest}"
+                                    }
                                 }
 
                                 sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-untracked.sh' elohim-storage elohim-storage '${STORAGE_TAG}' 'elohim-storage'"
@@ -1928,6 +1948,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 SITE_TAG=${currentSiteTag}
 EDGENODE_TAG=${EDGENODE_TAG}
 DOORWAY_TAG=${DOORWAY_TAG}
+DOORWAY_DIGEST=${env.DOORWAY_DIGEST ?: ''}
 STORAGE_TAG=${STORAGE_TAG}
 HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
@@ -2058,6 +2079,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
 SITE_TAG=${currentSiteTag}
 EDGENODE_TAG=${EDGENODE_TAG}
 DOORWAY_TAG=${DOORWAY_TAG}
+DOORWAY_DIGEST=${env.DOORWAY_DIGEST ?: ''}
 STORAGE_TAG=${STORAGE_TAG}
 HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
@@ -2167,6 +2189,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
 SITE_TAG=${currentSiteTag}
 EDGENODE_TAG=${EDGENODE_TAG}
 DOORWAY_TAG=${DOORWAY_TAG}
+DOORWAY_DIGEST=${env.DOORWAY_DIGEST ?: ''}
 STORAGE_TAG=${STORAGE_TAG}
 HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}

@@ -38,6 +38,23 @@ if nerdctl -n k8s.io images | grep -q "${LOCAL_IMAGE}.*${IMAGE_TAG}"; then
 
     nerdctl -n k8s.io push "harbor.ethosengine.com/ethosengine/${REMOTE_IMAGE}:${TAG}"
     nerdctl -n k8s.io push "harbor.ethosengine.com/ethosengine/${REMOTE_IMAGE}:${GIT_COMMIT_HASH}"
+
+    # Resolve the pushed manifest digest so deploys can pin by digest — Harbor's
+    # tag-retention policy strips this repo's SHA tags after push (backlog:
+    # harbor-retention-strips-doorway-sha-tags), and a digest reference cannot be
+    # untagged. Local containerd inspect first (race-free), Harbor's
+    # Docker-Content-Digest header as fallback. Fail-open: no digest file just
+    # means the deploy renders the plain tag (pre-digest behavior).
+    DIGEST="$(nerdctl -n k8s.io image inspect "harbor.ethosengine.com/ethosengine/${REMOTE_IMAGE}:${TAG}" --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null | grep "ethosengine/${REMOTE_IMAGE}@" | grep -oE 'sha256:[a-f0-9]{64}' | head -n1)"
+    if [ -z "${DIGEST}" ]; then
+        DIGEST="$(curl -sfI -H 'Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json' "https://harbor.ethosengine.com/v2/ethosengine/${REMOTE_IMAGE}/manifests/${TAG}" 2>/dev/null | tr -d '\r' | awk 'tolower($1)=="docker-content-digest:" {print $2}' | grep -oE 'sha256:[a-f0-9]{64}' | head -n1)"
+    fi
+    if [ -n "${DIGEST}" ]; then
+        printf '%s\n' "${DIGEST}" > "${WORKSPACE:-.}/${REMOTE_IMAGE}.digest"
+        echo "${LABEL} pushed digest: ${DIGEST}"
+    else
+        echo "${LABEL} digest unresolved — deploy will render the plain tag"
+    fi
     exit 0
 else
     echo "${LABEL} image not found, skipping push"
