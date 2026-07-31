@@ -54,6 +54,8 @@ The lanes' distribution mechanism. A commons EPR (a Gottman module, a curriculum
 
 **Two guards on the ToS analogy:** policies are schema-rooted taxonomy instances — machine-comparable lane declarations, never prose EULAs (a policy that cannot be rendered as a per-variety table is invalid); and commons policy atoms are themselves council-ratified, TTL'd documents on the re-ratification clock (§8) — adhesion terms stay accountable.
 
+**The epistemic timestamp (steering decision 2026-07-31).** Adoption is also evidence. The adoption commitment pins the policy CID *and a content-addressed digest of the claim-state actually visible at the adopting node at adoption time* — not merely what globally existed, but what had reached here. When material adopted in good faith later draws ratified harm claims, the record proves the couple adopted under clean standing ("we didn't know, and couldn't have") — hindsight without retroactive guilt, mishpat's ex-post-facto prohibition made structural, protecting adopter and author alike. **Bare adoption is a legible posture:** an EPR with no adoption policy and no governance state is presented as such ("ungoverned — no council review, no steward warranty") and defaults to the most-protective lanes (nothing aggregates). The absence of governance is itself recorded evidence — at adoption (you knowingly adopted unreviewed material) and in hindsight (the commons had not yet looked; there was no warning to heed).
+
 ## 5. Aggregation pipeline and rollup federation
 
 1. **Care kind** — declare the observation kind (kind is a free string; pillar-manifest mechanism) and the first care EconomicEvents (`appreciate` is the live bridge).
@@ -112,7 +114,7 @@ This floor is designed to be acted upon by resident household elohim — assumed
 4. Effective-reach overlay: mint ∧ ratified transition claims.
 5. Co-signature proofs + the co-authored/single-authored consent line.
 6. Signal-variety taxonomy schema + lane vocabulary (§3).
-7. Adoption-policy atoms + adoption/revocation/re-adoption/modification ceremony (§4).
+7. Adoption-policy atoms + adoption/revocation/re-adoption/modification ceremony + the adoption-time epistemic digest (visible-claim-state pinning; bare-adoption legible posture) (§4).
 8. Aggregator wiring + care kind + rollup chaining + aggregates-as-atoms federation + participation-rate metadata (§5).
 9. Graduation ceremony (voluntary) and compelled-graduation front door (§6).
 10. Identity-coherence repairs (household_id NULL class; provider namespace guard; in_scope_of multi-value).
