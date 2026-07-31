@@ -87,6 +87,8 @@ wording and step reorder.
 | `b19f12014` | storage Leg A: convergence actionable/refused split + MissLedger |
 | `192f77cd0` | storage Leg B: pin retirement/re-admission + fabric-sized retry budget |
 | `cd7b73472` | apps: Eager stamps on elohim-app/doorway-app/imagodei-portal roots + specs |
+| `0f9b4145b` | CI: zero-scenario Dataplane Validation exits 3 → UNSTABLE, never SUCCESS |
+| `0d0b830af` | storage: migration admitting 'retired' pin status (review-critical fix) |
 
 New a2o coverage: ch06 honesty-guard scenario (divergence measured AND
 converged); `11-pull-queue-retires.feature` (@concern:saga-11) registered
@@ -122,5 +124,24 @@ contract 221 green, export_bindings doc-only drift; lamad vitest
   third layer under two resolved prior docs) — needs its own RCA.
 - **ch10 rendered-card scenario** remains @wip @browser-only — CI proves
   the API claim, not the pixels; candidate for a browser-lane follow-up.
-- Independent code review of `b19f12014`/`192f77cd0` in flight at
-  handoff; findings, if any, amend before push.
+
+## Review outcome (independent, adversarial)
+
+The code review of the two reconcile commits found one CRITICAL, fixed
+before handoff: `acquisition_pins.status` carries a CHECK constraint
+(`active|paused|removed`) from its 2026-06-07 migration, so Leg B's
+`'retired'` write was engine-rejected and debug-swallowed — the fix was
+inert as committed. Cured by `0d0b830af` (table-rebuild migration
+admitting `retired`, DB-level round-trip regression test, swallowed-error
+sites bumped to `warn!`). Lesson, dated 2026-07-31: "free-form TEXT" is a
+claim about the *column type*, not the *constraint set* — verify CHECK
+constraints in the original migration before asserting no-migration.
+
+Non-blocking follow-ups from the same review (both observable via the
+new metrics): (1) REA arm's `divergent_refused` is hardcoded 0, so a
+genuine cross-peer REA anchor divergence could hold `converged` false
+from that stream alone — partition REA's exhausted set like content's;
+(2) inventory-driven pin re-admission has no failed-provider/dwell gate,
+so a peer that advertises but never delivers can flap retire↔readmit at
+content-list cadence; (3) verify `drain_acquisition_queue`'s rotation
+actually visits distinct peers so "budget = providers probed" holds.
